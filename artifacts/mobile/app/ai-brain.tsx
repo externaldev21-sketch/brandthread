@@ -42,7 +42,6 @@ import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import AuroraGlow from '@/components/ai/AuroraGlow';
 import AiComposer from '@/components/ai/AiComposer';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
@@ -56,6 +55,7 @@ import {
 import {
   sendMessage,
   sendMessageStream,
+  sendPreviewMessageStream,
   cancelGeneration,
   loadSession,
   startNewSession,
@@ -64,7 +64,7 @@ import {
   undoAction,
 } from '@/services/aiService';
 import { getStoreContext } from '@/lib/api';
-import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
   FONT,
   FS,
@@ -324,11 +324,10 @@ function MessageBubble({
 interface EmptyStateProps {
   context: AIScreenContext;
   onPillPress: (text: string) => void;
-  accentColor: string;
   isTablet: boolean;
 }
 
-function EmptyState({ context, onPillPress, accentColor, isTablet }: EmptyStateProps) {
+function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const prompts =
@@ -339,7 +338,10 @@ function EmptyState({ context, onPillPress, accentColor, isTablet }: EmptyStateP
 
   return (
     <View style={[styles.emptyState, isTablet && styles.emptyStateTablet]}>
-      <BrandthreadLogo size={isTablet ? 64 : 52} showGlow glowColor={accentColor} animated />
+      {/* No showGlow halo — Dev's rule: no translucent overlays, no grey
+          fills; a translucent-white glow circle read as a grey chip behind
+          the mark. Plain white/silver logo only. */}
+      <BrandthreadLogo size={isTablet ? 64 : 52} animated />
       <Text style={styles.emptyTitle}>What are we building today?</Text>
       <Text style={styles.emptySubtitle}>
         Ask about your brand, products, content, store, or performance.
@@ -395,6 +397,12 @@ const GREETING: AIMessage = {
   content: 'Hi — how can I help?',
   ts: 0,
 };
+
+// Stable reference for "no session yet" — `session?.messages ?? []` would
+// otherwise hand a brand-new array to a useMemo dependency on every render,
+// defeating its memoization (same bug class as app/boost.tsx's infinite
+// render loop, though here it doesn't set state so it isn't infinite).
+const EMPTY_MESSAGES: AIMessage[] = [];
 
 export default function AiBrainScreen() {
   const colors = useColors();
@@ -462,6 +470,34 @@ export default function AiBrainScreen() {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
 
+      // Dev/web preview (checked first, before anything Clerk-related):
+      // real production Clerk is never reachable from a preview host (see
+      // lib/devPreview.ts's own __DEV__ + non-production-host gates), so
+      // waiting on `isAuthLoaded` here would hang forever the moment Clerk's
+      // script fails to load — exactly Dev's real preview environment. This
+      // path never touches Clerk state at all and never calls the real
+      // paid AI endpoint; it answers locally from seeded preview data (see
+      // lib/previewAiBrain.ts).
+      if (isSellerDevPreview() || isBuyerDevPreview()) {
+        setInputText('');
+        setErrorMsg(null);
+        setPendingRetryText(text);
+        setIsGenerating(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setStreamingText('');
+        try {
+          const result = await sendPreviewMessageStream(
+            { userText: text, session, userId, storeContext },
+            (textSoFar) => setStreamingText(textSoFar),
+          );
+          setSession(result.session);
+        } finally {
+          setIsGenerating(false);
+          setStreamingText('');
+        }
+        return;
+      }
+
       // Clerk hasn't finished hydrating the session yet — this is not the
       // same as "not signed in". Retrying getToken() here would sometimes
       // resolve to null for a genuinely signed-in user and wrongly show the
@@ -473,18 +509,31 @@ export default function AiBrainScreen() {
         return;
       }
 
-      if (!isSignedIn) {
-        setErrorMsg('Sign in to use Brandthread AI.');
-        setPendingRetryText(text);
-        setInputText(text);
-        return;
-      }
-
       setInputText('');
       setErrorMsg(null);
       setPendingRetryText(text);
       setIsGenerating(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setStreamingText('');
+
+      // No sign-in wall on this screen (Dev's explicit call). Real
+      // production users reaching this screen are always signed in already
+      // (AuthGate keeps a genuinely signed-out user off it entirely) — this
+      // is a last-resort fallback, not the expected path, so it still
+      // answers rather than showing a sign-in error.
+      if (!isSignedIn) {
+        try {
+          const result = await sendPreviewMessageStream(
+            { userText: text, session, userId, storeContext },
+            (textSoFar) => setStreamingText(textSoFar),
+          );
+          setSession(result.session);
+        } finally {
+          setIsGenerating(false);
+          setStreamingText('');
+        }
+        return;
+      }
 
       const token = await getToken().catch(() => null);
 
@@ -499,7 +548,6 @@ export default function AiBrainScreen() {
         return;
       }
 
-      setStreamingText('');
       try {
         const result = await sendMessageStream(
           { userText: text, session, authToken: token, userId, storeContext },
@@ -645,7 +693,7 @@ export default function AiBrainScreen() {
    * session. It is always shown so the screen never opens blank.
    * FlatList is inverted, so items are reversed for rendering.
    */
-  const sessionMessages = session?.messages ?? [];
+  const sessionMessages = session?.messages ?? EMPTY_MESSAGES;
   const allMessages: AIMessage[] = [GREETING, ...sessionMessages];
 
   // Build a map from assistant-message id → preceding user text for retry.
@@ -693,22 +741,42 @@ export default function AiBrainScreen() {
 
   return (
     <View style={styles.root}>
-      <AuroraGlow thinking={isGenerating} />
-
       <KeyboardAvoidingView
         style={styles.kav}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {/* ── Header ──────────────────────────────────────────────────────── */}
+        {/* ── Header ──────────────────────────────────────────────────────────
+            Plain icons via rightElement, not ScreenHeader's `actions` prop —
+            `actions` renders each icon in a bordered/filled chip
+            (components/ScreenHeader.tsx's `actionBtn`), which read as
+            inconsistent boxes sitting next to the header's own plain close
+            X. rightElement puts them in the same slot with no box, matching
+            the close button's own plain treatment. */}
         <ScreenHeader
           title={label}
           variant="modal"
           onBack={() => goBackOr(router)}
-          actions={[
-            { icon: 'rotate-ccw', onPress: handleClear, accessibilityLabel: 'Clear conversation' },
-            { icon: 'sliders', onPress: () => router.push('/ai-settings' as any), accessibilityLabel: 'AI settings' },
-          ]}
+          rightElement={
+            <View style={styles.headerIconRow}>
+              <TouchableOpacity
+                onPress={handleClear}
+                style={styles.headerIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Clear conversation"
+              >
+                <Feather name="rotate-ccw" size={20} color={colors.foreground} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/ai-settings' as any)}
+                style={styles.headerIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="AI settings"
+              >
+                <Feather name="sliders" size={20} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+          }
         />
 
         {/* ── Error banner ────────────────────────────────────────────────── */}
@@ -726,49 +794,9 @@ export default function AiBrainScreen() {
           </View>
         ) : null}
 
-        {/* ── Signed-out gate ─────────────────────────────────────────────────
-            Only shown once Clerk has actually finished loading AND
-            confirmed there's no session — never during the brief hydration
-            window, which is what previously caused this screen to show a
-            false "sign in" prompt for already-signed-in sellers. */}
-        {isAuthLoaded && !isSignedIn && !isPreviewCatalogEnabled() ? (
-          <View style={styles.signInGate}>
-            <Feather name="lock" size={28} color={colors.mutedForeground} />
-            <Text style={styles.signInGateTitle}>Sign in to use Brandthread AI</Text>
-            <Text style={styles.signInGateBody}>
-              Brandthread AI reads your store's live data to answer questions — sign in to start chatting.
-            </Text>
-            <TouchableOpacity
-              style={[styles.signInGateBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/sign-in' as any)}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.signInGateBtnText, { color: colors.primaryForeground }]}>Sign in</Text>
-            </TouchableOpacity>
-          </View>
-        ) : isAuthLoaded && !isSignedIn ? (
-          // Preview/dev mode: explorable demo instead of a hard sign-in wall.
-          // Real signed-out production behavior above is unchanged.
-          <View style={styles.signInGate}>
-            <Feather name="cpu" size={28} color={colors.mutedForeground} />
-            <Text style={styles.signInGateTitle}>Brandthread AI</Text>
-            <Text style={styles.signInGateBody}>
-              Brandthread AI reads your store's sales, orders and inventory to answer questions like
-              "What's my best seller this week?" or "Draft a restock reminder for low-stock items."
-              Sign in to chat with your own data.
-            </Text>
-            <TouchableOpacity
-              style={[styles.signInGateBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/sign-in' as any)}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.signInGateBtnText, { color: colors.primaryForeground }]}>Sign in</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* ── Message list ────────────────────────────────────────────── */}
-            <FlatList
+        <>
+          {/* ── Message list ────────────────────────────────────────────── */}
+          <FlatList
               ref={flatListRef}
               data={[...allMessages].reverse()}
               keyExtractor={m => m.id}
@@ -789,7 +817,6 @@ export default function AiBrainScreen() {
                     <EmptyState
                       context={parsedContext}
                       onPillPress={handlePillPress}
-                      accentColor={colors.primary}
                       isTablet={isTablet}
                     />
                   </View>
@@ -805,12 +832,15 @@ export default function AiBrainScreen() {
               onStop={handleStop}
               isGenerating={isGenerating}
               canSend={canSend}
-              placeholder={isAuthLoaded ? 'Ask anything about your brand…' : 'Preparing your session…'}
+              placeholder={
+                isAuthLoaded || isSellerDevPreview() || isBuyerDevPreview()
+                  ? 'Ask anything about your brand…'
+                  : 'Preparing your session…'
+              }
               accentColor={colors.primary}
               bottomInset={composerBottomInset}
             />
-          </>
-        )}
+        </>
       </KeyboardAvoidingView>
     </View>
   );
@@ -821,11 +851,25 @@ export default function AiBrainScreen() {
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Solid black, deliberately not colors.background/a decorative glow —
+    // Dev's rule: no translucent overlays, no grey fills, on this screen.
+    backgroundColor: '#000000',
   },
   kav: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+
+  // ── Header icons (plain, no box — see the ScreenHeader rightElement above)
+  headerIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Error banner
@@ -853,39 +897,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   retryBannerText: {
     color: colors.destructive,
     fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-  },
-
-  // ── Signed-out gate
-  signInGate: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SP.xl,
-    gap: SP.sm,
-  },
-  signInGateTitle: {
-    color: colors.text,
-    fontSize: FS.lg,
-    fontFamily: FONT.semibold,
-    marginTop: SP.sm,
-    textAlign: 'center',
-  },
-  signInGateBody: {
-    color: colors.mutedForeground,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: SP.sm,
-  },
-  signInGateBtn: {
-    paddingHorizontal: SP.xl,
-    paddingVertical: SP.sm,
-    borderRadius: RADIUS.lg,
-  },
-  signInGateBtnText: {
-    fontSize: FS.md,
     fontFamily: FONT.semibold,
   },
 

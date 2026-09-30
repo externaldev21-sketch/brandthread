@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, queryPersister } from '@/lib/queryClient';
+import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -54,6 +54,8 @@ import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
+import { initTabDataCache } from '@/lib/tabDataCache';
+import { initFeedPostsCache } from '@/lib/feedPostsCache';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
@@ -87,6 +89,7 @@ import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellConte
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
+import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -884,18 +887,20 @@ function ServiceConfigurer() {
       // must be dropped explicitly or the previous account's plan tier would
       // gate features for the next signed-in account.
       invalidatePlanCache();
-      // The shared TanStack queryClient (lib/queryClient.ts) is NOT scoped
-      // by userId — its query keys (queryKeys.tabData/orderList/productList/
-      // profile) carry no userId of their own, so without this, a query
-      // cached under account A's session (gcTime is 24h) would still be
-      // readable — and, worse, is persisted to AsyncStorage and rehydrated
-      // on a cold launch — after switching straight to account B, with
-      // nothing re-scoping it. Clearing it here matches the same
-      // "wipe the previous user's cache before init'ing the next" pattern
-      // clearSocialCache/clearCartCache already use.
-      queryClient.clear();
     }
     prevUserIdRef.current = newUserId;
+    // The shared TanStack queryClient (lib/queryClient.ts) and the two
+    // instant-first-paint caches (tabDataCache/feedPostsCache) are now
+    // namespaced by userId — same pattern as initSocialService/
+    // initCartService/initProductService below — instead of being wiped on
+    // every switch. Re-scoping (not clearing) is what makes switching BACK
+    // to an already-visited account on this device instant: its entries
+    // were never evicted, just filed under its own userId, so this multi-
+    // account device gets true instant switching with zero bleed, not a
+    // full clear()+refetch flicker every time.
+    setQueryKeyScope(newUserId);
+    initTabDataCache(newUserId);
+    initFeedPostsCache(newUserId);
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);
@@ -1189,13 +1194,13 @@ function RootLayoutNav() {
         <Stack.Screen name="settings"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="design-canvas"    options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="manufacturer"     options={{ headerShown: false }} />
-        <Stack.Screen name="finance"          options={{ headerShown: false }} />
+        <Stack.Screen name="finance" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="customers"        options={{ headerShown: false }} />
         <Stack.Screen name="shipping"         options={{ headerShown: false }} />
         <Stack.Screen name="team"             options={{ headerShown: false }} />
         <Stack.Screen name="team-invite"      options={{ headerShown: false }} />
         <Stack.Screen name="ai-assistant"     options={{ headerShown: false }} />
-        <Stack.Screen name="community"        options={{ headerShown: false }} />
+        <Stack.Screen name="community" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
         <Stack.Screen name="website"          options={{ headerShown: false }} />
@@ -1203,19 +1208,19 @@ function RootLayoutNav() {
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="add-product" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
-        <Stack.Screen name="content"          options={{ headerShown: false }} />
+        <Stack.Screen name="content" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
         {/* Manufacturer Hub screens */}
-        <Stack.Screen name="manufacturer-hub"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-hub" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1304,7 +1309,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Live Shopping */}
-        <Stack.Screen name="seller-go-live"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="seller-go-live" options={() => ({ headerShown: false, animation: consumeAnimationOverride('slide_from_bottom'), presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT })} />
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1342,19 +1347,19 @@ function RootLayoutNav() {
         <Stack.Screen name="ai-brand-memory"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="ai-settings"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Design Studio screens */}
-        <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-garment"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-templates"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-brand-assets"      options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="design-text-to-design"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-text-to-design" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="design-upload-sketch"     options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="design-mockup-to-model"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="design-ai-photoshoot"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-mockup-to-model" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="design-ai-photoshoot" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="design-prompt-edit"       options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-bg-removal" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-campaign" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="meta-ads-connect"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="meta-ads-setup"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="meta-ads-manage"          options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1371,7 +1376,7 @@ function RootLayoutNav() {
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payouts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="thread-cash-history" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
@@ -1389,10 +1394,10 @@ function RootLayoutNav() {
         <Stack.Screen name="ai-photography-chat" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="lifestyle-images"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Store settings sub-screens */}
-        <Stack.Screen name="customer-accounts"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="customer-accounts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="taxes-duties"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="taxes-duties" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />

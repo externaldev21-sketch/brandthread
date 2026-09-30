@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
@@ -35,6 +35,7 @@ import type { ProfileSearchResult } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryOverlay, StoryOverlayType, StoryPrivacySettings } from '@/services/socialTypes';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { useRole } from '@/contexts/RoleContext';
 import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -438,8 +439,16 @@ export default function StoryComposer() {
   const { user } = useUser();
   const { theme } = useAppTheme();
   const api = useApi();
-  const params = useLocalSearchParams<{ accountType?: string }>();
-  const isSeller = params.accountType === 'seller';
+  // The real signed-in role (seller preview counts as seller — RoleContext
+  // handles that), NOT an `accountType` route param: every seller entry
+  // point (camera-capture.tsx, create-post.tsx) pushes this route with no
+  // such param, so a seller landed here always saw POST/STORY only — LIVE
+  // never showed no matter the account, and a seller's story/post got
+  // attributed as `authorAccountType: 'buyer'`. Used for every seller-only
+  // decision in this screen: the LIVE mode item, the Product/Shop-link
+  // stickers, and what account type gets forwarded/recorded.
+  const { role } = useRole();
+  const isSeller = role === 'seller';
 
   const myName = user?.fullName || user?.firstName || user?.username || 'You';
   const myHandle = user?.username ? `@${user.username}` : '';
@@ -866,7 +875,7 @@ export default function StoryComposer() {
         authorHandle: myHandle,
         authorInitials: myInitials,
         authorColor: MY_COLOR,
-        authorAccountType: (params.accountType as any) ?? 'buyer',
+        authorAccountType: isSeller ? 'seller' : 'buyer',
         media,
         repliesDisabled: false,
         privacy: { visibility: 'public', replyPermission: 'everyone' },
@@ -892,7 +901,7 @@ export default function StoryComposer() {
       Alert.alert("Couldn't share your story", 'Try again.');
       setIsPosting(false);
     }
-  }, [api, myName, myHandle, myInitials, params.accountType, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
+  }, [api, myName, myHandle, myInitials, isSeller, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
 
   // Tapping send/Share opens Instagram's own Share sheet rather than posting
   // immediately (see docs/story-flows.md for what's shown there).
@@ -1108,7 +1117,11 @@ export default function StoryComposer() {
                   }}
                   onPress={() => {
                     hapticToggle();
-                    if (m === 'post') { router.push({ pathname: '/create-post', params: { accountType: params.accountType ?? 'buyer' } } as any); return; }
+                    // Forward the REAL role, not the route param this screen
+                    // was reached with (see isSeller's own doc above) — a
+                    // seller tapping POST must still land on create-post's
+                    // seller-gated fields, not fall back to its buyer view.
+                    if (m === 'post') { router.push({ pathname: '/create-post', params: { accountType: isSeller ? 'seller' : 'buyer' } } as any); return; }
                     if (m === 'live') { router.push('/seller-go-live' as never); return; }
                     setMode(m);
                   }}

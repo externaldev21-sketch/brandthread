@@ -208,7 +208,17 @@ export default function SellerVerificationScreen() {
       <ScreenHeader title="Identity Verification" onBack={leaveSetupDestination} />
 
       <ScrollView
-        style={{ flex: 1 }}
+        // The floating SellerGlobalTabBar overlays the bottom ~120px of
+        // every normal seller screen by default (see app/_layout.tsx's
+        // deny-list comment) — `contentContainerStyle`'s paddingBottom below
+        // only extends how far this can scroll, it doesn't move content that
+        // already fits without scrolling. On this screen that meant the last
+        // numbered step ("Stripe reviews the documents…") could render
+        // directly under the bar's own order-count badge (half-done audit:
+        // that text overlapping the bar's "2"). Reserving the same space on
+        // the ScrollView's own `style` shrinks its visible area instead, so
+        // the last step clears the bar regardless of scroll position.
+        style={{ flex: 1, paddingBottom: 120 }}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
