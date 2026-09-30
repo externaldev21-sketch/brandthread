@@ -82,11 +82,23 @@ const PRIORITY_IDS = [
   'products', 'discounts', 'analytics', 'payouts',
   'content', 'messages', 'boost', 'settings',
 ];
+// 'help' is unlinked from the grid itself (same "kept reachable, just not
+// from here" treatment this file already gives 'brand-memory' — see
+// lib/sellerControlCenter.ts) and moved to a "?" icon in the header instead,
+// next to "View store". Dev's own bug report: with it in the grid, Help &
+// Support was the sole item in the final row, leaving a large empty area
+// under it — 28 remaining items divides evenly into exactly 7 full rows of
+// 4, so removing it (rather than reordering around it) is what actually
+// closes that gap instead of just moving it elsewhere.
+const GRID_EXCLUDED_IDS = ['help'];
 const GRID_ITEMS: ControlCenterItem[] = [
   ...PRIORITY_IDS.map((id) => ALL_ITEMS.find((item) => item.id === id)).filter((i): i is ControlCenterItem => !!i),
-  ...ALL_ITEMS.filter((item) => !PRIORITY_IDS.includes(item.id)),
+  ...ALL_ITEMS.filter((item) => !PRIORITY_IDS.includes(item.id) && !GRID_EXCLUDED_IDS.includes(item.id)),
 ];
 const GRID_COLUMNS = 4;
+// Reserves a fixed 2-line-tall box for every grid label — see gridLabel's
+// own style comment for why.
+const GRID_LABEL_LINE_HEIGHT = 15;
 
 /** Rubber-band resistance for dragging the sheet up past its resting
  *  position — a diminishing-returns curve (never a hard clamp) that
@@ -335,7 +347,7 @@ export default function SellerStudioRadialMenu({
               </View>
             )}
           </View>
-          <Text style={styles.gridLabel} numberOfLines={2}>{item.label}</Text>
+          <Text style={styles.gridLabel} numberOfLines={2}>{item.shortLabel ?? item.label}</Text>
         </PressableScale>
       </View>
     );
@@ -414,6 +426,19 @@ export default function SellerStudioRadialMenu({
                   </Text>
                 </Pressable>
               </View>
+              {/* Help & Support: unlinked from the feature grid itself (see
+                  GRID_EXCLUDED_IDS's own comment — it was the lone item in
+                  an otherwise-full final row) and moved here instead, per
+                  Dev's own suggestion, as a plain "?" next to View store. */}
+              <PressableScale
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/help' as never)); }}
+                accessibilityRole="button"
+                accessibilityLabel="Help & Support"
+                testID="seller-control-center-item-help"
+                style={styles.helpBtn}
+              >
+                <Feather name="help-circle" size={20} color={theme.text} />
+              </PressableScale>
               <PressableScale
                 onPress={() => collapse(() => router.push('/store-preview' as never))}
                 accessibilityRole="button"
@@ -523,6 +548,14 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
   },
   statusLive: { color: theme.success },
   statusSetup: { color: theme.accentLight },
+  helpBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
   viewStoreBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -543,7 +576,31 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
   gridCell: { width: '25%', paddingVertical: SP.sm },
   gridItem: { alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingHorizontal: 4 },
   gridIconWrap: { alignItems: 'center', justifyContent: 'center' },
-  gridLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, textAlign: 'center', lineHeight: 15 },
+  // GRID_LABEL_LINE_HEIGHT * 2 reserves a fixed 2-line-tall box for every
+  // label regardless of whether its own text is 1 or 2 lines — Dev's own bug
+  // report: a 1-line label ("Boost") next to a 2-line one ("Add product")
+  // used to leave the icon above it sitting at a different height than its
+  // row neighbors, and the row itself a different height than the next row
+  // down, like the Binance Features sheet reference this grid is modeled on
+  // never has. `wordWrap`/`overflowWrap: 'normal'` (web only — React Native
+  // Web's own default Text style hard-codes `wordWrap: 'break-word'` on any
+  // multi-line Text, including this one, which is what let "Manufacturer
+  // Hub" break mid-word as "Manufacture/r Hub" instead of wrapping only at
+  // the space; native ignores this key entirely, so it's always safe to
+  // include unconditionally rather than gating it behind Platform.OS).
+  gridLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: theme.text,
+    textAlign: 'center',
+    lineHeight: GRID_LABEL_LINE_HEIGHT,
+    height: GRID_LABEL_LINE_HEIGHT * 2,
+    // `wordWrap` is the exact key react-native-web's own Text component
+    // reads to decide overflow-wrap behavior (see its textOneLine/
+    // textMultiLine internal styles) — already part of RN's TextStyle type,
+    // just normally left at its default. No effect on native.
+    wordWrap: 'normal',
+  },
   gridBadge: {
     position: 'absolute',
     top: -6,
