@@ -711,6 +711,20 @@ async function rollingWindowCents(
   return Math.max(0, Number(row?.total ?? 0));
 }
 
+async function liveGiftRollingWindowCents(executor: DbExecutor, userId: string, direction: "sent" | "received"): Promise<number> {
+  const source = direction === "sent" ? "live_gift_sent" : "live_gift";
+  const amountExpr = direction === "sent" ? sql`-${threadCashEntries.amountCents}` : threadCashEntries.amountCents;
+  const [row] = await executor
+    .select({ total: sql<string>`COALESCE(SUM(${amountExpr}), 0)` })
+    .from(threadCashEntries)
+    .where(and(
+      eq(threadCashEntries.buyerId, userId),
+      eq(threadCashEntries.source, source),
+      gt(threadCashEntries.createdAt, sql`now() - interval '24 hours'`),
+    ));
+  return Math.max(0, Number(row?.total ?? 0));
+}
+
 export async function sendThreadCash(
   senderId: string,
   recipientId: string,
@@ -818,6 +832,108 @@ export async function sendThreadCash(
     // transaction, the winner is looked up fresh, outside it.
     if (isUniqueViolation(error)) {
       const winner = await lookupTransferByKey(db);
+      if (winner) return winner;
+    }
+    throw error;
+  }
+}
+
+/**
+ * A LIVE gift: buyer → seller Thread Cash, instant and unconditional —
+ * unlike sendThreadCash's friend-to-friend transfer this is never gated on
+ * mutual follow (a viewer gifting a host they're watching doesn't follow
+ * them back) and never sits pending a claim; it posts both the debit and
+ * the credit in the same transaction. The seller's credit uses the
+ * `'live_gift'` source cashOut.ts already expects (see its module doc) so
+ * cashing out and the seller's Thread Cash history both see it correctly
+ * with no further plumbing.
+ */
+export async function sendLiveGift(
+  buyerId: string,
+  sellerId: string,
+  streamId: string,
+  amountCents: number,
+  idempotencyKey: string,
+): Promise<{ giftId: string }> {
+  if (!Number.isInteger(amountCents) || amountCents < 1) {
+    throw new ThreadCashError("Enter a valid Thread Cash amount.");
+  }
+  if (buyerId === sellerId) {
+    throw new ThreadCashError("You can't gift yourself.");
+  }
+  if (!idempotencyKey || idempotencyKey.length > 160) {
+    throw new ThreadCashError("A valid idempotency key is required.", 400, "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED");
+  }
+
+  async function lookupByKey(executor: DbExecutor): Promise<{ giftId: string } | null> {
+    const [row] = await executor.select({ id: threadCashEntries.id })
+      .from(threadCashEntries)
+      .where(and(eq(threadCashEntries.idempotencyKey, idempotencyKey), eq(threadCashEntries.source, "live_gift_sent")))
+      .limit(1);
+    return row ? { giftId: row.id } : null;
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-balance:${buyerId}`}))`);
+      await assertThreadCashNotFrozen(tx, buyerId);
+
+      const existingByKey = await lookupByKey(tx);
+      if (existingByKey) return existingByKey;
+
+      if (await isBlocked(tx, buyerId, sellerId)) {
+        throw new ThreadCashError("You can't send Thread Cash to this person.", 403, "THREAD_CASH_BLOCKED");
+      }
+
+      const config = await getThreadCashConfig(tx);
+      const sendable = await sendableBalanceCents(tx, buyerId);
+      if (amountCents > sendable) {
+        throw new ThreadCashError(
+          sendable < await getBalanceCents(tx, buyerId)
+            ? "Some of your Thread Cash was received from a friend and can't be sent again."
+            : `Insufficient Thread Cash. You have $${(sendable / 100).toFixed(2)}.`,
+          400,
+          "INSUFFICIENT_THREAD_CASH",
+        );
+      }
+
+      // Same daily send/receive ceilings sendThreadCash enforces (one
+      // combined "Thread Cash sent today" cap across friend-sends and live
+      // gifts, not two independent ones a buyer could stack; and a receive
+      // cap on the seller — cashable Thread Cash makes the anti-farming
+      // reasoning that already applies to friend transfers matter here too).
+      const sentTodayFriends = await rollingWindowCents(tx, buyerId, "send_sent");
+      const sentTodayGifts = await liveGiftRollingWindowCents(tx, buyerId, "sent");
+      if (sentTodayFriends + sentTodayGifts + amountCents > config.dailySendCapCents) {
+        throw new ThreadCashError("You've reached today's Thread Cash sending limit.", 400, "THREAD_CASH_DAILY_SEND_CAP");
+      }
+      const receivedTodayBySeller = await liveGiftRollingWindowCents(tx, sellerId, "received");
+      if (receivedTodayBySeller + amountCents > config.dailyReceiveCapCents) {
+        throw new ThreadCashError("This seller has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
+      }
+
+      const [debit] = await tx.insert(threadCashEntries).values({
+        buyerId,
+        amountCents: -amountCents,
+        source: "live_gift_sent",
+        referenceId: streamId,
+        idempotencyKey,
+        note: `Sent $${(amountCents / 100).toFixed(2)} Thread Cash in a live`,
+      }).returning({ id: threadCashEntries.id });
+
+      await tx.insert(threadCashEntries).values({
+        buyerId: sellerId,
+        amountCents,
+        source: "live_gift",
+        referenceId: streamId,
+        note: `Received $${(amountCents / 100).toFixed(2)} Thread Cash gift in a live`,
+      });
+
+      return { giftId: debit.id };
+    });
+  } catch (error: any) {
+    if (isUniqueViolation(error)) {
+      const winner = await lookupByKey(db);
       if (winner) return winner;
     }
     throw error;

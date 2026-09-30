@@ -3,6 +3,7 @@
  */
 import type { Feather } from '@expo/vector-icons';
 import { formatCents } from './money';
+import { ApiError } from './networkNotice';
 
 export const FREELANCER_SERVICE_TYPES: {
   value: string;
@@ -43,33 +44,25 @@ export function ratingLabel(tenths: number | null | undefined): string | null {
   return (tenths / 10).toFixed(1);
 }
 
+const GENERIC_ERROR_FALLBACK = 'Something went wrong. Try again.';
+
 /**
- * Extracts a human-readable message from api.ts errors, which look like
- * `Error: API 409: {"error":"...","code":"..."}`.
+ * Human-readable message from an api.ts error. Never surfaces the raw
+ * "API 4xx: ..." wire format, a 5xx/infra message, or this app's own
+ * audit/e2e fake-API 'NOT_SEEDED' placeholder text — those all fall back to
+ * a generic, friendly message instead.
  */
-export function apiErrorMessage(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
-  const jsonStart = msg.indexOf('{');
-  if (jsonStart >= 0) {
-    try {
-      const parsed = JSON.parse(msg.slice(jsonStart));
-      if (parsed?.error) return String(parsed.error);
-    } catch {
-      // fall through to raw message
-    }
+export function apiErrorMessage(e: unknown, fallback: string = GENERIC_ERROR_FALLBACK): string {
+  if (e instanceof ApiError) {
+    if (e.code === 'NOT_SEEDED') return fallback;
+    const message = e.message.replace(/^API \d{3}:\s*/, '').trim();
+    if (e.status >= 500 || !message) return fallback;
+    return message;
   }
-  return msg;
+  return fallback;
 }
 
 /** True when the error body carries a specific error `code`. */
 export function apiErrorCode(e: unknown): string | null {
-  const msg = e instanceof Error ? e.message : String(e);
-  const jsonStart = msg.indexOf('{');
-  if (jsonStart >= 0) {
-    try {
-      const parsed = JSON.parse(msg.slice(jsonStart));
-      if (parsed?.code) return String(parsed.code);
-    } catch {}
-  }
-  return null;
+  return e instanceof ApiError ? e.code ?? null : null;
 }

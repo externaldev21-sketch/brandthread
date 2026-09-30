@@ -147,10 +147,11 @@ export default function ThreadCashScreen() {
     // Dev web preview only: the preview session has no real signed-in Clerk
     // user, so skip the network round-trip entirely and show clearly-labeled
     // placeholder data for UI review. No fake business numbers ever reach a
-    // real signed-in buyer — this path is unreachable outside __DEV__ web
-    // preview. Also covers a seller-role preview session: Thread Cash is a
-    // buyer-only balance, so a seller preview has nothing real to fetch here
-    // either and would otherwise just 404 against the buyer-only endpoint.
+    // real signed-in account — this path is unreachable outside __DEV__ web
+    // preview. Covers both roles: Thread Cash balances are shared between
+    // buyers and sellers (sellers can send/receive it in seller-conversation
+    // messages, same as buyers), and this app's own audit/e2e sandbox has no
+    // real backend behind GET /api/thread-cash for either one.
     //
     // No artificial delay here (a `setTimeout` used to sit before resolving,
     // to "look" like a network round trip): a `setTimeout` started while a

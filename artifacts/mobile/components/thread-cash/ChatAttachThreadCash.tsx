@@ -201,6 +201,15 @@ export function ThreadCashAttachButton({
 
   async function handleConfirmAndSend() {
     if (cents < 1 || confirming || sending) return;
+    // Real balance check, client-side: the server independently re-validates
+    // this at send time too (the actual security boundary — balanceCents
+    // here can be stale), but a sender should never even reach the
+    // biometric-confirm step for an amount they plainly can't cover, on
+    // either the buyer or the seller side of this shared component.
+    if (balanceCents != null && cents > balanceCents) {
+      Alert.alert('Not enough Thread Cash', `Your balance is ${formatAmountDisplay(balanceCents)}.`);
+      return;
+    }
     setConfirming(true);
     try {
       const device = await getDeviceSecurity();
@@ -273,7 +282,8 @@ export function ThreadCashAttachButton({
   }, [step, sentResult]);
 
   const handle = recipientHandle ? `@${recipientHandle.replace(/^@/, '')}` : (recipientName || 'them');
-  const canProceedToConfirm = cents > 0;
+  const insufficientBalance = balanceCents != null && cents > balanceCents;
+  const canProceedToConfirm = cents > 0 && !insufficientBalance;
 
   return (
     <>
@@ -347,12 +357,17 @@ export function ThreadCashAttachButton({
           ) : step === 'keypad' ? (
             <>
               <Text
-                style={[styles.bigAmount, { color: cents > 0 ? theme.text : theme.subtle }]}
+                style={[styles.bigAmount, { color: insufficientBalance ? theme.error : cents > 0 ? theme.text : theme.subtle }]}
                 accessibilityLabel={`Amount ${formatAmountDisplay(cents)}`}
                 testID="thread-cash-amount"
               >
                 {formatAmountDisplay(cents)}
               </Text>
+              {insufficientBalance && (
+                <Text style={[styles.insufficientText, { color: theme.error }]} testID="thread-cash-insufficient">
+                  Not enough Thread Cash — balance {balanceCents == null ? '···' : formatAmountDisplay(balanceCents)}
+                </Text>
+              )}
               <View style={styles.numpad}>
                 {NUMPAD_KEYS.map((key) => (
                   <TouchableOpacity
@@ -451,7 +466,10 @@ export function ThreadCashAttachButton({
               fullWidth
               loading={sending || confirming}
               disabled={!canProceedToConfirm || sending || confirming}
-              onPress={() => { step === 'confirm' ? handleConfirmAndSend() : setStep('confirm'); }}
+              onPress={() => {
+                if (!canProceedToConfirm) return;
+                step === 'confirm' ? handleConfirmAndSend() : setStep('confirm');
+              }}
               accessibilityLabel={step === 'confirm' ? 'Confirm and send' : 'Continue'}
               testID={step === 'confirm' ? 'thread-cash-confirm-send' : 'thread-cash-continue'}
             />
@@ -613,6 +631,7 @@ const styles = StyleSheet.create({
   chip: { flex: 1, borderWidth: 1, borderRadius: RADIUS.pill, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: FS.base, fontFamily: FONT.bold },
   bigAmount: { fontSize: 56, fontFamily: FONT.bold, textAlign: 'center', marginVertical: SP.md },
+  insufficientText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center', marginTop: -SP.sm, marginBottom: SP.sm },
   numpad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: SP.sm },
   numpadKey: { width: '32%', height: 56, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   numpadKeyText: { fontSize: FS.xl, fontFamily: FONT.semibold },

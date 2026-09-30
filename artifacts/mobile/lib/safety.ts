@@ -96,6 +96,10 @@ export function reportHref(target: ReportTarget): string {
 /** Human message from an API error, without the "API 4xx:" prefix. */
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
+    // 'NOT_SEEDED' is emitted only by this app's own audit/e2e/screenshot
+    // fake-API harnesses for an endpoint they don't have a fixture for — it
+    // should never be treated as a real, user-facing error message.
+    if (error.code === 'NOT_SEEDED') return fallback;
     const message = error.message.replace(/^API \d{3}:\s*/, '').trim();
     if (error.status >= 500 || !message) return fallback;
     return message;

@@ -49,6 +49,11 @@ describe('API error presentation', () => {
     expect(apiErrorMessage(new ApiError(500, 'stack trace'), 'Try again.')).toBe('Try again.');
     expect(apiErrorMessage(new Error('boom'), 'Try again.')).toBe('Try again.');
   });
+
+  it('never leaks the audit/e2e fake-API "not seeded" placeholder text', () => {
+    const error = new ApiError(404, JSON.stringify({ error: { code: 'NOT_SEEDED', message: 'Not part of the demo data' } }));
+    expect(apiErrorMessage(error, 'We couldn’t load that.')).toBe('We couldn’t load that.');
+  });
 });
 
 describe('safety entry points', () => {

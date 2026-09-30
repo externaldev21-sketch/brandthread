@@ -18,7 +18,9 @@ export const threadCashEntries = pgTable('thread_cash_entries', {
   amountCents: integer('amount_cents').notNull(), // + earned/refunded, - spent/expired
   // 'daily_checkin' | 'streak_bonus' | 'redemption' | 'checkout_spend' |
   // 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' |
-  // 'send_received' | 'send_cancelled' | 'send_expired'
+  // 'send_received' | 'send_cancelled' | 'send_expired' | 'cash_out' |
+  // 'live_gift_sent' (buyer debit) | 'live_gift' (seller credit — cashable,
+  // unlike a buyer's reward credit; see api-server's threadCash/cashOut.ts)
   source:      text('source').notNull(),
   referenceId: text('reference_id'),
   note:        text('note'),
