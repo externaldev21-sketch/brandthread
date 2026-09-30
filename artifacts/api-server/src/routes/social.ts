@@ -20,7 +20,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
-import { visibleCommentCounts } from "../lib/postVisibility";
+import { publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -460,6 +460,7 @@ router.get("/profile/:userId", async (req, res) => {
       bio: null,
       followersCount: 0,
       followingCount: 0,
+      likesCount: 0,
       postsCount: 0,
       isFollowing: false,
       isFollowedBy: false,
@@ -490,11 +491,13 @@ router.get("/profile/:userId", async (req, res) => {
     .from(posts)
     .innerJoin(users, and(eq(users.clerkId, posts.userId), eq(users.accountType, "buyer")))
     .where(eq(posts.userId, other));
+  const likesCount = await publicProfileLikes(other);
 
   res.json({
     ...formatUser(user),
     followersCount: follsRow?.n ?? 0,
     followingCount: fingRow?.n  ?? 0,
+    likesCount,
     postsCount:     postsRow?.n ?? 0,
     isFollowing,
     isFollowedBy,

@@ -74,6 +74,7 @@ beforeAll(async () => {
   await insertPost("private", { userId: seller, visibility: { isPublic: false, allowComments: true, allowReposts: true, showLikeCount: true } });
   await insertPost("draft", { userId: seller, postStatus: "draft" });
   await insertPost("future", { userId: seller, postStatus: "scheduled", scheduledAt: new Date(Date.now() + 86_400_000) });
+  await insertPost("removed", { userId: seller, moderationStatus: "removed" });
   await insertPost("buyerPhoto", { userId: buyer, mediaType: "photo", mediaUrl: "https://cdn.example.com/b.jpg" });
 
   await db.insert(postTaggedProducts).values({ postId: postIds.public, productId, position: 0 });
@@ -81,6 +82,12 @@ beforeAll(async () => {
     { userId: stranger, postId: postIds.public, type: "view" },
     { userId: friend, postId: postIds.public, type: "view" },
     { userId: friend, postId: postIds.public, type: "like" },
+    { userId: stranger, postId: postIds.public, type: "like" },
+    { userId: friend, postId: postIds.private, type: "like" },
+    { userId: friend, postId: postIds.draft, type: "like" },
+    { userId: friend, postId: postIds.future, type: "like" },
+    { userId: friend, postId: postIds.removed, type: "like" },
+    { userId: friend, postId: postIds.buyerPhoto, type: "like" },
   ]);
 
   // buyer ↔ friend are mutual follows (friends); stranger follows buyer one-way.
@@ -93,6 +100,7 @@ beforeAll(async () => {
 
   const { default: publicRouter } = await import("../public");
   const { default: profileMediaRouter } = await import("../profile-media");
+  const { default: socialRouter } = await import("../social");
   const app = express();
   app.use(express.json());
   app.use((req: any, _res, next) => {
@@ -102,6 +110,7 @@ beforeAll(async () => {
   });
   app.use("/api/public", publicRouter);
   app.use("/api/public", profileMediaRouter);
+  app.use("/api/social", socialRouter);
   await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -130,7 +139,7 @@ describe("GET /api/public/users/:userId/videos", () => {
       mediaType: "video",
       authorAccountType: "seller",
       viewsCount: 2,
-      likesCount: 1,
+      likesCount: 2,
       seller: { brandName: "Thread Atelier" },
     });
     // Tagged product carries its live lowest variant price for the shop pill.
@@ -210,6 +219,35 @@ describe("seller shop source for profiles", () => {
     const body = await get(`/api/public/sellers/${seller}`).then((r) => r.json() as Promise<any>);
     expect(body.profile.productsCount).toBe(1);
     expect(body.profile.videosCount).toBe(1);
+    expect(body.profile.likesCount).toBe(2);
+    expect(body.profile.followersCount).toBe(0);
+    expect(body.profile.followingCount).toBe(0);
+  });
+  it("returns the same authoritative total for a seller's social profile and zero for an unliked profile", async () => {
+    const sellerSocial = await get(`/api/social/profile/${seller}`, stranger).then((r) => r.json() as Promise<any>);
+    const buyerSocial = await get(`/api/social/profile/${buyer}`, friend).then((r) => r.json() as Promise<any>);
+    const empty = await get(`/api/social/profile/${friend}`, buyer).then((r) => r.json() as Promise<any>);
+    expect(sellerSocial.likesCount).toBe(2);
+    expect(buyerSocial.likesCount).toBe(1);
+    expect(empty.likesCount).toBe(0);
+    const blocked = await get(`/api/social/profile/${seller}`, blocker).then((r) => r.json() as Promise<any>);
+    expect(blocked.likesCount).toBe(0);
+  });
+  it("counts likes beyond the public seller's 30-post page", async () => {
+    const extraIds = await db.insert(posts).values(Array.from({ length: 31 }, (_, index) => ({
+      userId: seller,
+      mediaUrl: `https://cdn.example.com/extra-${index}.jpg`,
+      createdAt: new Date(Date.now() - (index + 2) * 60_000),
+    }))).returning({ id: posts.id });
+    try {
+      await db.insert(interactions).values({ userId: stranger, postId: extraIds[30].id, type: "like" });
+      const body = await get(`/api/public/sellers/${seller}`).then((r) => r.json() as Promise<any>);
+      expect(body.posts).toHaveLength(30);
+      expect(body.posts.some((post: any) => post.id === extraIds[30].id)).toBe(false);
+      expect(body.profile.likesCount).toBe(3);
+    } finally {
+      await db.delete(posts).where(inArray(posts.id, extraIds.map((post) => post.id)));
+    }
   });
 });
 
