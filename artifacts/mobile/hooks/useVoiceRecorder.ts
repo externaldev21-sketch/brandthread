@@ -27,7 +27,12 @@ const LOCK_THRESHOLD = -70;
 
 const METERING_INTERVAL_MS = 100;
 const MIN_RECORDING_MS = 400;
+/** Voice notes stop and send automatically at this length (server cap: 300s). */
+const MAX_RECORDING_MS = 5 * 60 * 1000;
 const MAX_WAVEFORM_SAMPLES = 60;
+const WEB_AUDIO_MIME: Record<string, string> = {
+  'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/wav': 'wav',
+};
 
 function normalizeMetering(db: number | undefined): number {
   // expo-audio reports dBFS, roughly -160 (silence) to 0 (max). Clamp to a
@@ -71,6 +76,7 @@ export function useVoiceRecorder(
   const startedAtRef = useRef(0);
   const cancelledRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoFinishRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (phase !== 'idle' && recorderState.isRecording) {
@@ -96,7 +102,9 @@ export function useVoiceRecorder(
       setPhase('recording');
       hapticMedium();
       timerRef.current = setInterval(() => {
-        setElapsedMs(Date.now() - startedAtRef.current);
+        const elapsed = Date.now() - startedAtRef.current;
+        setElapsedMs(elapsed);
+        if (elapsed >= MAX_RECORDING_MS) autoFinishRef.current?.();
       }, 100);
       return true;
     } catch {
@@ -151,7 +159,12 @@ export function useVoiceRecorder(
       for (let i = 0; i < bytes.byteLength; i += CHUNK) {
         binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
       }
-      const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
+      // Native recordings are m4a; the browser's MediaRecorder produces
+      // webm/ogg/mp4 — declare what the blob really is so server-side
+      // content validation accepts it.
+      const blobType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+      const webMime = Platform.OS === 'web' ? WEB_AUDIO_MIME[blobType] : undefined;
+      const url = await uploadMedia(btoa(binary), webMime ? blobType : 'audio/m4a', webMime ?? 'm4a');
       const durationSec = Math.max(1, Math.round(status.durationMillis / 1000));
       const result = { uri: url, durationSec, waveform: waveformSnapshot.length ? waveformSnapshot : [0.2, 0.4, 0.3, 0.5, 0.2] };
       onRecorded(result);
@@ -162,6 +175,10 @@ export function useVoiceRecorder(
       void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
     }
   }, [recorder, uploadMedia, waveform, dragX, dragY, stopTimer, onRecorded]);
+
+  useEffect(() => {
+    autoFinishRef.current = () => { void finish(); };
+  }, [finish]);
 
   const startWeb = useCallback(async () => {
     if (phase === 'idle') {
