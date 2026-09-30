@@ -52,7 +52,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { MediaGrid, type MediaGridAsset } from '@/components/create-post/MediaGrid';
-import { RADII } from '@/constants/radii';
+import { RADII, radius, nestedRadius } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import { FADE_MS } from '@/constants/motion';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -2466,10 +2466,10 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   pkModePill: {
     flexDirection: 'row', backgroundColor: 'rgba(30,30,30,0.88)',
-    borderRadius: RADII.pill, padding: 3,
+    borderRadius: radius.md, padding: 3,
   },
   pkModePillBtn: {
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: RADII.pill,
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: nestedRadius(radius.md, 3),
   },
   pkModePillBtnActive: { backgroundColor: FG },
   pkModePillText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
@@ -2498,7 +2498,7 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   errorBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, flex: 1 },
   readyBanner:      { position: 'absolute', bottom: 90, left: 20, right: 20, zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: 12, padding: 12 },
   readyBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
-  coverFrameBtn:    { position: 'absolute', bottom: 145, alignSelf: 'center', zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  coverFrameBtn:    { position: 'absolute', bottom: 145, alignSelf: 'center', zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 9 },
   coverFrameBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 
   videoBottomBar: {
@@ -2598,7 +2598,7 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   toggleLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   scheduleRow:     { flexDirection: 'row', gap: 10 },
-  schedulePill:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
+  schedulePill:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
   schedulePillText:{ fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   scheduleDisplayRow: {
     flexDirection: 'row', alignItems: 'center', marginTop: 12,
@@ -2659,7 +2659,7 @@ const createMs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:    { flex: 1, backgroundColor: BG_SOFT },
   searchWrap:{ flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10, marginHorizontal: 16, marginTop: 12 },
   searchInput:{ flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
-  tabPill:  { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
+  tabPill:  { backgroundColor: CARD, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
   tabText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   soundRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER, gap: 10 },
   soundIcon:{ width: 36, height: 36, backgroundColor: CARD, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

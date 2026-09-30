@@ -77,6 +77,7 @@ import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
+import { radius } from '@/constants/radii';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -1059,7 +1060,7 @@ function makeStyles(theme: AppThemePreset) {
 
 const topBarStyles = StyleSheet.create({
   walletChip: {
-    height: 28, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    height: 28, borderRadius: radius.sm, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
     gap: 4, paddingHorizontal: 8, overflow: 'hidden',
   },
   walletText: { fontFamily: FONT.bold, fontSize: FS.xs, fontVariant: ['tabular-nums'] },

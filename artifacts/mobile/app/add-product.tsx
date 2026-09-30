@@ -24,7 +24,7 @@ import { File, Paths } from 'expo-file-system';
 
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
@@ -2196,7 +2196,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 4,
     paddingHorizontal: SP.sm,
     paddingVertical: 6,
-    borderRadius: RADII.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER,
   },
@@ -2385,7 +2385,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colorSwatch: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   valueChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.pill,
+    backgroundColor: CARD_ELEVATED, borderRadius: radius.sm,
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },

@@ -26,6 +26,7 @@ import {
   markSetupStarted, dismissWelcome, skipTask,
 } from '@/lib/setupStore';
 import SetupProgressRing from '@/components/SetupProgressRing';
+import { radius } from '@/constants/radii';
 
 export default function SetupWalkthroughSheet({
   visible,
@@ -240,7 +241,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   rowDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   skip: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
   primaryBtn: {
-    marginTop: SP.md, height: 50, borderRadius: RADIUS.pill, backgroundColor: theme.accent,
+    marginTop: SP.md, height: 50, borderRadius: radius.md, backgroundColor: theme.accent,
     alignItems: 'center', justifyContent: 'center',
   },
   primaryBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },

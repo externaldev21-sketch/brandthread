@@ -95,7 +95,7 @@ import { StudioCoverBackdrop, StudioCoverGrain } from '@/components/StudioCardCo
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -109,6 +109,7 @@ import {
   ALL_ITEMS,
   type ControlCenterItem,
 } from '@/lib/sellerControlCenter';
+import { radius } from '@/constants/radii';
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
 
@@ -1288,7 +1289,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: theme.border,
   },
@@ -1419,7 +1420,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // white/silver wash behind lighter text rather than a loud CTA.
   enterButton: {
     height: 42,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
     alignSelf: 'center',

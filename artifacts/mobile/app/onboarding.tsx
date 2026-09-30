@@ -102,6 +102,7 @@ import {
   StitchAccent,
 } from '@/components/onboarding/OnboardingUI';
 import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
+import { radius } from '@/constants/radii';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -264,7 +265,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
   );
 }
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emoji:    { fontSize: 16 },
   chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
@@ -285,7 +286,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   );
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: radius.md, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
@@ -1616,7 +1617,7 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divider:   { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginVertical: SPACE.md },
   divLine:   { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: BORDER },
   divText:   { ...TYPE.label, color: MUTED },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
   appleBtn:  { borderColor: BORDER },
   oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
   existingEmailChip: {

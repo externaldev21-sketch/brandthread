@@ -36,6 +36,7 @@ import { LoadingSkeleton, HapticSwitch} from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
+import { radius } from '@/constants/radii';
 
 interface SellerProductRow {
   id: string;
@@ -693,7 +694,7 @@ const styles = StyleSheet.create({
   tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   tzRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },
   chipRow: { flexDirection: 'row', gap: 8, paddingRight: SP.md },
-  chip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  chip: { borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   customToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
   customToggleText: { fontFamily: FONT.medium, fontSize: FS.xs },

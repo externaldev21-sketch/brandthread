@@ -49,6 +49,7 @@ import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import { radius } from '@/constants/radii';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -760,7 +761,7 @@ const styles = StyleSheet.create({
   // height (not padding-driven) so it reliably lands in the 28-30pt range
   // and centers against the avatar/name block via hostPill's alignItems.
   followBtn: {
-    height: 30, minWidth: 60, backgroundColor: '#fff', borderRadius: RADIUS.pill,
+    height: 30, minWidth: 60, backgroundColor: '#fff', borderRadius: radius.sm,
     paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center',
   },
   followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
@@ -816,7 +817,7 @@ const styles = StyleSheet.create({
   productInfo: { flex: 1 },
   productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
   productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
-  buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 
   chatWrap: { maxWidth: '70%' },

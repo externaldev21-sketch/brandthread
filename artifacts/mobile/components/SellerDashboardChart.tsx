@@ -17,6 +17,7 @@ import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
 import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 export type SellerDashboardRange = 'today' | 'week' | 'month' | 'year' | 'all';
 
@@ -433,7 +434,7 @@ export function SellerDashboardChart({
             style={[styles.rangeIndicatorWrap, rangeIndicatorStyle]}
             testID="seller-dashboard-range-indicator"
           >
-            <Glass variant="pressed" radius={999} style={StyleSheet.absoluteFill} />
+            <Glass variant="pressed" radius={radius.md} style={StyleSheet.absoluteFill} />
           </Animated.View>
         )}
         {DASHBOARD_RANGES.map((item) => {
@@ -540,7 +541,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    borderRadius: 999,
+    borderRadius: radius.md,
     overflow: 'hidden',
   },
   rangePill: {
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
+    borderRadius: radius.md,
   },
   rangeText: {
     fontFamily: FONT.semibold,

@@ -28,6 +28,7 @@ import {
   DesignProjectType, DesignCanvas, GarmentType,
   GARMENT_TEMPLATES, CANVAS_PRESETS, PROJECT_TYPE_LABELS,
 } from '@/services/designTypes';
+import { radius } from '@/constants/radii';
 
 // ─── Step type definitions ────────────────────────────────────────────────────
 
@@ -760,7 +761,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.sm,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
-    borderRadius: RADIUS.xl,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: CARD,

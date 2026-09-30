@@ -7,7 +7,7 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 import type { SearchCategory, SuggestedBrand } from '@/lib/searchData';
 
 export type SearchSort = 'relevance' | 'price_asc' | 'price_desc' | 'newest';
@@ -211,7 +211,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   applyBtn: {
     marginTop: SPACING.lg, marginHorizontal: SCREEN_GUTTER,
-    height: 50, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
   },
   applyText: { ...TYPE_SCALE.body, fontFamily: FONT.bold },
 });

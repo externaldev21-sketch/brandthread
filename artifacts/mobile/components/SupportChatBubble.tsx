@@ -22,9 +22,10 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import {
   BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS,
+  FONT, FS, SP,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { radius } from '@/constants/radii';
 
 const SUCCESS_GRN = '#34D399';
 
@@ -446,7 +447,7 @@ const s = StyleSheet.create({
   quickReplies: { paddingVertical: 10 },
   quickChip:    {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm,
     borderWidth: 1,
   },
   quickChipText: { fontSize: FS.xs, fontFamily: FONT.semibold },

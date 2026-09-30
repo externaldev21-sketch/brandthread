@@ -46,6 +46,7 @@ import { SkeletonBlock } from '@/components/layout';
 import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { radius } from '@/constants/radii';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
 
@@ -501,7 +502,7 @@ function makeStyles(theme: AppThemePreset) {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
     paddingVertical: 14,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,
@@ -514,7 +515,7 @@ function makeStyles(theme: AppThemePreset) {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
     paddingVertical: 14,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.text,
     minHeight: COMP.buttonHSm,
@@ -677,7 +678,7 @@ function makeStyles(theme: AppThemePreset) {
   primaryBtn: {
     width: '100%',
     height: COMP.buttonH,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     backgroundColor: theme.accent,
     alignItems: 'center',
     justifyContent: 'center',
@@ -690,7 +691,7 @@ function makeStyles(theme: AppThemePreset) {
   secondaryBtn: {
     width: '100%',
     height: COMP.buttonH,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,

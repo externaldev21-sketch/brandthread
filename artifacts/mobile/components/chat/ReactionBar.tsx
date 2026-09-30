@@ -4,6 +4,7 @@ import type { ReactionType } from '@/services/socialTypes';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { AppleEmoji } from '@/lib/appleEmoji';
 import { reactionAuthorId, reactionAuthorName, reactionKind } from '@/lib/reactionShapes';
+import { radius } from '@/constants/radii';
 
 // Re-exported so existing call sites (app/buyer-conversation.tsx,
 // app/seller-conversation.tsx) keep importing these from this file; the
@@ -82,7 +83,7 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1,
   },
   chipLabel: { fontSize: 12, fontWeight: '600' },
 });

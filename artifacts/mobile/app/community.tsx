@@ -18,6 +18,7 @@ import { useApi, type Freelancer } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, serviceLabel, formatHourlyRate, ratingLabel } from '@/lib/freelancer';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 export default function CommunityScreen() {
   const colors = useColors();
@@ -283,7 +284,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: SP.sm + 4, paddingVertical: 7,
-    borderRadius: RADIUS.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.sm, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
   },
   chipText: { color: colors.mutedForeground, fontSize: FS.xs, fontFamily: FONT.medium },
   centerBox: { alignItems: 'center', gap: SP.sm, paddingVertical: SP.xl + 8 },

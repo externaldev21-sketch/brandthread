@@ -35,6 +35,7 @@ import { formatCents } from '@/lib/money';
 import { isPreviewConversationId, isSellerPreviewConversationId } from '@/lib/previewInbox';
 import { authenticateForAppLock, getDeviceSecurity } from '@/lib/appLock';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
+import { radius } from '@/constants/radii';
 
 /**
  * How long the "sent" confirmation moment holds before the sheet dismisses
@@ -637,7 +638,7 @@ const styles = StyleSheet.create({
   learnMore: { fontFamily: FONT.semibold, textDecorationLine: 'underline', fontStyle: 'normal' },
   noteInput: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.base, fontFamily: FONT.regular, marginBottom: SP.md },
   chipRow: { flexDirection: 'row', gap: SP.xs, marginBottom: SP.lg },
-  chip: { flex: 1, borderWidth: 1, borderRadius: RADIUS.pill, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
+  chip: { flex: 1, borderWidth: 1, borderRadius: radius.sm, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: FS.base, fontFamily: FONT.bold },
   bigAmount: { fontSize: 56, fontFamily: FONT.bold, textAlign: 'center', marginVertical: SP.md },
   insufficientText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center', marginTop: -SP.sm, marginBottom: SP.sm },
@@ -659,7 +660,7 @@ const styles = StyleSheet.create({
   cardTextCol: { flex: 1, position: 'relative' },
   cardTitle: { fontSize: FS.sm, fontFamily: FONT.bold },
   cardSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 1 },
-  acceptBtn: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: 6 },
+  acceptBtn: { borderRadius: radius.sm, paddingHorizontal: SP.md, paddingVertical: 6 },
   acceptBtnText: { fontSize: FS.xs, fontFamily: FONT.bold },
   cancelLink: { fontSize: FS.xs, fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

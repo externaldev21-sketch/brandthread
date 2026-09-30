@@ -60,6 +60,7 @@ import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
+import { radius } from '@/constants/radii';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -140,7 +141,7 @@ const pillS = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },

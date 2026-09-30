@@ -32,6 +32,7 @@ import {
   updateFulfillmentChecklist, PackagePreset,
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
+import { radius } from '@/constants/radii';
 
 const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
 const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Other'] as const;
@@ -745,7 +746,7 @@ const createStyles = (theme: { background: string; card: string; border: string;
     presetChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, gap: 2 },
     presetChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
     presetChipSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-    carrierChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+    carrierChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
 
     fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
     input: { backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.sm, color: FG, fontSize: FS.base, fontFamily: FONT.regular },

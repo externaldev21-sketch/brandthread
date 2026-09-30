@@ -15,6 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { FONT, FS, SP, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED, SCREEN_BG } from '@/lib/theme';
 import type { ReviewItem } from '@/components/ProductReviewsSection';
+import { radius } from '@/constants/radii';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -159,7 +160,7 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   muted: { color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.sm },
   chipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: BORDER_SUBTLE },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER_SUBTLE },
   chipText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: MUTED },
   card: { paddingBottom: SP.md, marginBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },

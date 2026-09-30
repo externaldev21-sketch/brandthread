@@ -29,6 +29,7 @@ import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/Bra
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
+import { radius } from '@/constants/radii';
 
 type Step = 'overview' | 'confirm' | 'done';
 const CONFIRM_WORD = 'DELETE';
@@ -324,7 +325,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   blockerTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
   blockerDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, marginTop: 2 },
   blockerBtn: {
-    paddingHorizontal: 12, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
+    paddingHorizontal: 12, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
   },
   blockerBtnText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.xs },

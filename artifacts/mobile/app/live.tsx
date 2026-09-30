@@ -30,7 +30,7 @@ import * as ExpoLinking from 'expo-linking';
 import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
@@ -54,6 +54,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { LIVE_VIEWER_GESTURE } from '@/lib/firstRunTips/content';
+import { radius } from '@/constants/radii';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -508,7 +509,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.medium, fontSize: FS.sm },
   rtcWrap: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A0A0B' },
-  rtcBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 18, height: 42 },
+  rtcBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: radius.md, paddingHorizontal: 18, height: 42 },
   rtcBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },

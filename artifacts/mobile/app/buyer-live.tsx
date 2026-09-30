@@ -34,6 +34,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+import { radius } from '@/constants/radii';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -692,7 +693,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   streamTitle:      { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 13 },
   productStrip:     { position: 'absolute', bottom: 155, left: 0, right: 0, zIndex: 8 },
   productStripInner:{ paddingHorizontal: 12, gap: 8 },
-  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
+  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipName:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 90 },
   productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
   bottom:           { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
@@ -720,7 +721,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   purchasePrice: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
   fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: SP.xs },
   variantRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  variantChip: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
+  variantChip: { borderWidth: 1, borderColor: BORDER, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   variantDisabled: { opacity: 0.35 },
   variantText: { color: FG, fontFamily: FONT.medium, fontSize: FS.xs },
   purchaseInput: { minHeight: 44, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
@@ -736,7 +737,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   endedIcon:        { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   endedTitle:       { fontSize: FS.lg, fontFamily: FONT.bold },
   endedSub:         { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
-  backBtn:          { marginTop: 24, borderRadius: RADIUS.pill, paddingHorizontal: 28, paddingVertical: 12 },
+  backBtn:          { marginTop: 24, borderRadius: radius.md, paddingHorizontal: 28, paddingVertical: 12 },
   backBtnText:      { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
   });
 };

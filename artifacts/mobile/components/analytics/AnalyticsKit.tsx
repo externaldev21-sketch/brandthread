@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { radius } from '@/constants/radii';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -85,7 +86,7 @@ export function HeaderPillButton({ label, onPress }: { label: string; onPress: (
 // translucent look Dev has banned app-wide. This pill is a plain white/black
 // chip on every theme preset, not a themed accent surface.
 const pillBtnStyles = (_colors: Colors) => StyleSheet.create({
-  btn:  { paddingHorizontal: SP.sm + 4, paddingVertical: SP.sm - 1, minHeight: 36, borderRadius: RADIUS.pill, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#000000', alignItems: 'center', justifyContent: 'center' },
+  btn:  { paddingHorizontal: SP.sm + 4, paddingVertical: SP.sm - 1, minHeight: 36, borderRadius: radius.md, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#000000', alignItems: 'center', justifyContent: 'center' },
   text: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#000000' },
 });
 
@@ -159,7 +160,7 @@ export function PillTabs<T extends string>({
   );
 }
 const pillTabStyles = (colors: Colors) => StyleSheet.create({
-  pill:       { minHeight: 36, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs, borderRadius: RADIUS.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  pill:       { minHeight: 36, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.primary },
   pillText:     { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground },
   pillTextActive: { color: colors.accentForeground },

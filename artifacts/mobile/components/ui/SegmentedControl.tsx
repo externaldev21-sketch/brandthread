@@ -15,7 +15,7 @@ import { hapticToggle } from '@/lib/haptics';
 import { FONT, ON_DARK_MUTED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { RADII, radius, nestedRadius } from '@/constants/radii';
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
@@ -100,7 +100,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
       accessibilityRole="tablist"
       style={[
         styles.root,
-        { height, borderRadius: RADII.pill },
+        { height, borderRadius: radius.md },
         glass
           ? { overflow: 'hidden', borderWidth: 0 }
           : { backgroundColor: palette.card, borderColor: palette.border },
@@ -110,7 +110,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
       testID={testID}
     >
       {glass && (
-        <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
+        <Glass variant="regular" tint="dark" radius={radius.md} style={StyleSheet.absoluteFill} />
       )}
       {segmentWidth > 0 && (
         <Animated.View
@@ -119,7 +119,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
             {
               width: segmentWidth,
               backgroundColor: glass ? 'rgba(255,255,255,0.94)' : theme.accent,
-              borderRadius: RADII.pill,
+              borderRadius: nestedRadius(radius.md, 3),
               top: 3,
               bottom: 3,
             },

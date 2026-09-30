@@ -17,6 +17,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 interface Message {
   id: string;
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
   loadingText: { fontSize: 13, fontFamily: FONT.regular },
   suggestionList: { flexGrow: 0, maxHeight: 40 },
-  suggestion: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 220, alignSelf: 'center' },
+  suggestion: { borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 220, alignSelf: 'center' },
   suggestionText: { fontSize: 12, fontFamily: FONT.regular },
   inputBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, gap: 8 },

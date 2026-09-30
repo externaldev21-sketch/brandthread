@@ -22,6 +22,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useApi } from '@/lib/api';
 import { withAt } from '@/lib/storyMentionSticker';
 import type { MentionPerson } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
 
 /** Follow-first ordering, stable within each group. */
 export function sortFollowingFirst(people: MentionPerson[]): MentionPerson[] {
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
 
   bar: { minHeight: 48, justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
   barContent: { paddingHorizontal: SP.sm, gap: SP.sm, alignItems: 'center' },
-  barItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, minHeight: 44, borderRadius: RADIUS.pill, backgroundColor: 'rgba(255,255,255,0.1)' },
+  barItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 10, minHeight: 44, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.1)' },
   barItemText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm, maxWidth: 120 },
   barEmpty: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md },
 });

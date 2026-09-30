@@ -28,6 +28,7 @@ import type { PaymentPath } from '@/lib/checkoutPayment';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CheckoutSection, OptionRow, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import { CardEntry } from './StripePayment';
+import { radius } from '@/constants/radii';
 
 export interface SavedCard {
   id: string;
@@ -266,7 +267,7 @@ const SYSTEM_FONT = Platform.select({
 // (see the module comment) and does not follow the app theme, so its styles
 // stay a plain module-level StyleSheet.
 const walletStyles = StyleSheet.create({
-  wallet: { height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
+  wallet: { height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
   walletMark: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // The platform's own typeface, not Inter (see the module comment).
   walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG },

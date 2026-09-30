@@ -32,6 +32,7 @@ import { ProfileThread } from './ProfileThread';
 import {
   COVER_MAX_SECONDS, COVER_TRIM_LENGTHS, clampTrim, defaultTrim, formatClock, needsTrim, pickerDurationSeconds, shouldShowCoverCoachmark,
 } from './profileCoverRules';
+import { radius } from '@/constants/radii';
 
 export interface CoverMedia { videoUrl: string | null; posterUrl: string | null }
 type PickedVideo = { uri: string; mimeType: string | null; durationSeconds: number | null };
@@ -320,7 +321,7 @@ export function CoverTrimSheet({
             >
               {(state) => (
                 <>
-                  <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.pill} theme={theme} />
+                  <InteractionLayer state={state as { pressed: boolean }} radius={radius.md} theme={theme} />
                   <Text style={[s.trimChipText, { color: selected ? theme.background : theme.text }]}>{length}s</Text>
                 </>
               )}
@@ -363,7 +364,7 @@ export function CoverHeroAffordance({
     >
       {(state) => (
         <>
-          <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.pill} theme={theme} />
+          <InteractionLayer state={state as { pressed: boolean }} radius={radius.md} theme={theme} />
           <Feather name={busy ? 'loader' : hasCover ? 'film' : 'plus'} size={15} color={theme.text} />
           <Text style={s.affordanceText} numberOfLines={1}>{label}</Text>
         </>
@@ -395,10 +396,10 @@ function makeStyles(theme: AppThemePreset) {
     trimWindow: { position: 'absolute', top: -1, bottom: -1, borderWidth: 2, borderRadius: RADIUS.sm },
     trimTimes: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, textAlign: 'center', fontVariant: ['tabular-nums'] },
     trimChips: { flexDirection: 'row', justifyContent: 'center', gap: SP.sm, marginBottom: SP.sm },
-    trimChip: { minWidth: 56, height: 44, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, overflow: 'hidden' },
+    trimChip: { minWidth: 56, height: 44, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, overflow: 'hidden' },
     trimChipText: { fontFamily: FONT.bold, fontSize: FS.sm },
     affordance: {
-      height: 44, borderRadius: RADIUS.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+      height: 44, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
       gap: 8, paddingHorizontal: SP.md, overflow: 'hidden', alignSelf: 'center',
     },
     affordanceText: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text },

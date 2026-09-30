@@ -16,6 +16,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { hapticToggle } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
+import { radius } from '@/constants/radii';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -347,7 +348,7 @@ function makeStyles(colors: Colors) {
     urlSuffix: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     statusChip: {
-      paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.pill,
+      paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.md,
       borderWidth: 1, borderColor: colors.border,
       minHeight: 44, justifyContent: 'center',
     },

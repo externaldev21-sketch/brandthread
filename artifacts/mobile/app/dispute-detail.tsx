@@ -13,6 +13,7 @@ import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { radius } from '@/constants/radii';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -591,7 +592,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chip:               {
     flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     paddingHorizontal: SP.sm, paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   chipActive:         { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

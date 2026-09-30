@@ -37,7 +37,7 @@ import { MentionStickerView, ReshareCard } from '@/components/StoryMentionSticke
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useStoryMentions } from '@/hooks/useStoryMentions';
 import { FONT, FS, ON_DARK, RADIUS, SP, ICON } from '@/lib/theme';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { prefetchImage } from '@/lib/prefetch';
 import { useApi } from '@/lib/api';
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
   addRow: { paddingHorizontal: SP.md, paddingBottom: SP.sm, flexDirection: 'row' },
   addPill: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 44, paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: 'rgba(0,0,0,0.45)',
   },
   addLabel: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.base },
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.xs, flexDirection: 'row', alignItems: 'center', gap: SP.sm },

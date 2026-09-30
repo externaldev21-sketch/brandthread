@@ -46,6 +46,7 @@ import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileContr
 import { setSellerFollowing, removeFollower } from '@/services/socialService';
 import { RemoveFollowerSheet, type RemoveFollowerPerson } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { radius } from '@/constants/radii';
 
 export type ConnectionsTab = 'followers' | 'following';
 export type FollowSort = 'default' | 'latest' | 'earliest';
@@ -508,7 +509,7 @@ function RemovePill({ onPress, theme }: { onPress: () => void; theme: AppThemePr
 }
 
 const pillStyles = StyleSheet.create({
-  pill: { height: 32, paddingHorizontal: 14, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  pill: { height: 32, paddingHorizontal: 14, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   text: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });
 

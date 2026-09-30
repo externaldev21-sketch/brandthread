@@ -33,6 +33,7 @@ import {
 import { replaceBackground } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
+import { radius } from '@/constants/radii';
 
 type BgTab = 'color' | 'gradient' | 'upload' | 'ai';
 
@@ -498,7 +499,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   bgUploadedRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
   bgUploadedText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   sceneGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
-  scenePill:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  scenePill:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   scenePillActive:    { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   scenePillText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   scenePillTextActive:{ color: PURPLE_LIGHT },

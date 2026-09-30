@@ -20,6 +20,7 @@ import {
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ResponsiveContainer } from '@/components/layout';
 import { formatCents } from '@/lib/money';
+import { radius } from '@/constants/radii';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -176,6 +177,6 @@ const styles = StyleSheet.create({
   tilePrice: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
   messageTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.sm, textAlign: 'center' },
   messageDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
-  primaryBtn: { height: COMP.buttonHSm, borderRadius: RADIUS.pill, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, alignSelf: 'center' },
+  primaryBtn: { height: COMP.buttonHSm, borderRadius: radius.md, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, alignSelf: 'center' },
   primaryBtnText: { color: BG, fontFamily: FONT.semibold, fontSize: FS.sm },
 });

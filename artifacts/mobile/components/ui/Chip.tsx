@@ -16,7 +16,7 @@ import { hapticToggle, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export interface ChipProps {
@@ -74,7 +74,7 @@ export function Chip({
         style={[
           styles.chip,
           {
-            borderRadius: RADII.pill,
+            borderRadius: radius.sm,
             backgroundColor: selected ? theme.accent : palette.card,
             borderColor: selected ? theme.accent : palette.border,
             borderWidth: isQuickReply ? StyleSheet.hairlineWidth : 1,

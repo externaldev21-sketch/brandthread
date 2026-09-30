@@ -47,6 +47,7 @@ import {
   SHADOW_PURPLE,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1228,7 +1229,7 @@ const s = StyleSheet.create({
   chip: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: CARD,

@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, SearchBar, useUndoToast } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -36,6 +36,7 @@ import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
+import { radius } from '@/constants/radii';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -119,7 +120,7 @@ const pillS = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },

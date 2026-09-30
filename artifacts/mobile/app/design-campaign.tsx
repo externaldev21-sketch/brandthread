@@ -81,6 +81,7 @@ import type {
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -995,7 +996,7 @@ const styles = StyleSheet.create({
   textInputField:  { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.base, fontFamily: FONT.regular, marginTop: SP.xs },
   charCount:       { fontSize: FS.xs, fontFamily: FONT.regular, alignSelf: 'flex-end', marginTop: 2 },
   textArea:        { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, minHeight: 70, marginTop: SP.xs },
-  ctaChip:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
+  ctaChip:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
   ctaChipText:     { fontSize: FS.sm, fontFamily: FONT.semibold },
   ctaRadio:        { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   ctaRadioFill:    { width: 9, height: 9, borderRadius: 5 },

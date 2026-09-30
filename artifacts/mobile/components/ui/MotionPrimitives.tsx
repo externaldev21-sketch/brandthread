@@ -18,6 +18,7 @@ import { hapticSuccessAction, hapticToggle } from '@/lib/haptics';
 import { identityOrNone } from '@/lib/animationUtils';
 import { FONT, RED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE, TypeRoleName } from '@/constants/typography';
+import { radius } from '@/constants/radii';
 
 // ─── Heart pop ────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ export function CountUpNumber({ value, role = 'headline', color, durationMs = 40
 }
 
 const styles = StyleSheet.create({
-  followBtn: { height: 36, paddingHorizontal: 18, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  followBtn: { height: 36, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   followBtnSmall: { height: 30, paddingHorizontal: 14 },
   followBtnDisabled: { opacity: 0.5 },
 });

@@ -22,7 +22,7 @@ import {
   FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -1137,7 +1137,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: SP.xs,
     backgroundColor: CARD_ELEVATED,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
     borderWidth: 1,
@@ -1340,7 +1340,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 6,
     backgroundColor: `${PURPLE}E0`,
-    borderRadius: 22,
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 8,
     maxWidth: 230,
@@ -1383,7 +1383,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   closeBtnWrap: { position: 'absolute', right: SP.sm },
   taggedChip: {
-    position: 'absolute', left: SP.md, zIndex: 11, minWidth: 44, height: 44, borderRadius: 22,
+    position: 'absolute', left: SP.md, zIndex: 11, minWidth: 44, height: 44, borderRadius: radius.md,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: SP.sm,
     backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)',
   },

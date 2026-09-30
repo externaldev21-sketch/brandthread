@@ -54,6 +54,7 @@ import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { radius } from '@/constants/radii';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1312,7 +1313,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: SP.sm,
     backgroundColor: FG,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     paddingVertical: SP.md,
     paddingHorizontal: SP.xl,
     minHeight: 52,

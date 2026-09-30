@@ -76,6 +76,7 @@ import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } fro
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { Snackbar } from '@/components/ui/Snackbar';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
+import { radius } from '@/constants/radii';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2353,7 +2354,7 @@ const requestPanelStyles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     height: 44,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2429,7 +2430,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   requestProfileName: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   requestProfileHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
   requestProfilePill: {
-    height: 34, paddingHorizontal: SP.md, borderRadius: RADIUS.pill,
+    height: 34, paddingHorizontal: SP.md, borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
@@ -2507,7 +2508,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   reactionChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1,
   },
   reactionCount: { fontSize: 11, fontFamily: FONT.semibold },
   // Seen receipt (Instagram DM "Seen just now" reference) — small muted
@@ -2671,7 +2672,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   buyerContextOrderTotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginLeft: SP.xs },
   buyerContextRetry: {
     marginTop: SP.sm, paddingVertical: SP.xs, paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER,
   },
   buyerContextRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
   buyerContextCartNote: {

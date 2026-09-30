@@ -41,6 +41,7 @@ import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import type {
   MetaAdObjective, MetaAdPromoteKind, MetaCampaign, MetaTargetingResult,
 } from '@/lib/api';
+import { radius } from '@/constants/radii';
 
 let WebViewLazy: React.ComponentType<any> | null = null;
 try {
@@ -646,7 +647,7 @@ const s = StyleSheet.create({
   helper:       { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },
   sourceChip:   { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SP.sm, paddingHorizontal: SP.xs },
   sourceChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'center' },
-  chip:         { borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
+  chip:         { borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
   chipText:     { fontSize: FS.sm, fontFamily: FONT.semibold },
   rowLabel:     { fontSize: FS.base, fontFamily: FONT.semibold },
   creativeBox:  { width: '100%', aspectRatio: 4 / 5, borderRadius: RADIUS.md, borderWidth: 1, overflow: 'hidden' },

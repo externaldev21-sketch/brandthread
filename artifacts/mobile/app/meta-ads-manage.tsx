@@ -28,6 +28,7 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents } from '@/services/metaAdsService';
 import type { MetaCampaign, MetaCampaignInsights } from '@/lib/api';
+import { radius } from '@/constants/radii';
 
 type Row = MetaCampaign & { insights?: MetaCampaignInsights };
 
@@ -328,7 +329,7 @@ const s = StyleSheet.create({
   statValue:  { fontSize: FS.sm, fontFamily: FONT.bold },
   statLabel:  { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 1 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.md },
-  actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
   actionBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   modalCard:  { width: '100%', maxWidth: 360, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.lg },

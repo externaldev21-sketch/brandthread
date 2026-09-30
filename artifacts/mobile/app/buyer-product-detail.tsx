@@ -44,7 +44,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
@@ -276,7 +276,7 @@ const galleryStyles = StyleSheet.create({
   dot: { height: 6, borderRadius: 3, backgroundColor: ON_DARK },
   resetZoom: {
     position: 'absolute', right: SP.md, bottom: 56, flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.sm, backgroundColor: 'rgba(0,0,0,0.65)',
   },
   resetZoomText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xs },
   thumbRail: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },

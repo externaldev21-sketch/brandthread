@@ -43,7 +43,7 @@ import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
-import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ICON, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -113,6 +113,7 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
+import { radius } from '@/constants/radii';
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
 const LIVE_TOP_SLOP = 48;
@@ -1352,7 +1353,7 @@ export default function ActivityCenterScreen() {
             testID="activity-new-pill"
             noMinHeight
           >
-            <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
+            <Glass variant="regular" tint="dark" radius={radius.md} style={StyleSheet.absoluteFill} />
             <Feather name="arrow-up" size={ICON.sm} color={theme.text} />
             <Text style={styles.livePillText}>New activity</Text>
           </PressableScale>
@@ -1440,7 +1441,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.xs,
     paddingHorizontal: SP.md,
     height: 36,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     overflow: 'hidden',
   },
   livePillText: {
@@ -1620,7 +1621,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     minWidth: 88,
     height: 32,
     paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

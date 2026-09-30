@@ -19,6 +19,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import type { DesignLayer, BlendModeKind } from '@/services/designTypes';
+import { radius } from '@/constants/radii';
 
 const BLEND_MODES: BlendModeKind[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
 
@@ -276,7 +277,7 @@ const s = StyleSheet.create({
   opacityFill: { height: '100%', backgroundColor: FG },
   blendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   blendChip: {
-    paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: radius.sm,
     backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER_SUBTLE,
   },
   blendChipActive: { backgroundColor: FG, borderColor: FG },

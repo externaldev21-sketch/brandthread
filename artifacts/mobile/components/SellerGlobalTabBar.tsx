@@ -44,6 +44,7 @@ import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
+import { radius } from '@/constants/radii';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -341,11 +342,11 @@ export function SellerGlobalTabBar({ onOpenStudio, hidden = false }: SellerGloba
           {
             width: metrics.capsuleWidth,
             height: metrics.capsuleHeight,
-            borderRadius: metrics.capsuleHeight / 2,
+            borderRadius: radius.bar,
           },
         ]}
       >
-        <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} />
+        <TabBarGlass theme={theme} radius={radius.bar} />
         <TabBarIndicator x={indicatorX} target={indicatorTarget} opacity={indicatorOpacity} metrics={metrics} theme={theme} />
 
         <View
