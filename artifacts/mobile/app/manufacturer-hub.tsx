@@ -282,7 +282,7 @@ function HubHeader({ activeTab, router, onLeave }: {
           // Invite your own (off-platform) manufacturer with a private signup link
           icon: 'plus',
           onPress: () => router.push('/invite-manufacturer' as never),
-          accessibilityLabel: 'Invite your own manufacturer',
+          accessibilityLabel: 'Invite a manufacturer',
         },
       ]}
     />
@@ -632,6 +632,9 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           style={s.searchToggle}
           onPress={() => setSearchActive(v => !v)}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={searchActive ? 'Close manufacturer search' : 'Search manufacturers'}
+          accessibilityState={{ expanded: searchActive }}
         >
           <Feather name="search" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>

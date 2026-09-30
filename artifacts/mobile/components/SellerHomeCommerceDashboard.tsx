@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -187,13 +188,15 @@ export default function SellerHomeCommerceDashboard({
   onSetupStateChange: (next: SetupState) => void;
 }) {
   const router = useRouter();
+  const { isSignedIn } = useAuth();
   const api = useApi();
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
+  const sellerPreview = isSellerDevPreview();
+  const analyticsUserId = sellerPreview ? userId ?? 'demo-seller' : userId;
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
-
   const [range, setRange] = useState<SellerDashboardRange>('week');
   const [metric, setMetric] = useState<MetricKey>('sales');
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
@@ -214,7 +217,6 @@ export default function SellerHomeCommerceDashboard({
   const balanceGenerationRef = useRef(0);
   const threadCash = useSellerThreadCashBalance();
   const payoutAttemptKeyRef = useRef<string | null>(null);
-
   const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrderSummary[] | null>(null);
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
@@ -230,7 +232,7 @@ export default function SellerHomeCommerceDashboard({
     setStoreContextTick((t) => t + 1);
   }), []);
 
-  const data = selectSellerHomeAnalytics(snapshot, userId, range);
+  const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -270,31 +272,25 @@ export default function SellerHomeCommerceDashboard({
 
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
-    if (!userId) {
+    if (sellerPreview) {
+      // Signed-out web previews use the same range-aware chart contract as
+      // the live dashboard, without querying a seller account.
+      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
+      setAnalyticsError(false);
+      setSnapshot({
+        key: sellerHomeAnalyticsKey(analyticsUserId ?? 'demo-seller', range),
+        data: next,
+      });
+      setLoading(false);
+      return;
+    }
+    if (!analyticsUserId) {
       setLoading(false);
       return;
     }
     let active = true;
-    const requestKey = sellerHomeAnalyticsKey(userId, range);
+    const requestKey = sellerHomeAnalyticsKey(analyticsUserId, range);
     setLoading(true);
-
-    // The dev web seller preview (?bt_preview=seller) has no real backend to
-    // call — previously this fell through to api.analytics.home() against an
-    // unreachable/placeholder host, which is exactly what produced the
-    // reported bug (every range showing the same stale bucket data, "Year"
-    // relabeling the current month 8x instead of 12 distinct trailing
-    // months). Generate deterministic local chart data instead: a flat $0
-    // baseline in fresh mode (a brand-new seller, never fake activity), or a
-    // realistic, range-varying curve in demo mode (isPreviewDemoMode() —
-    // explicit ?demo=1 opt-in). See lib/previewSellerChartData.ts and
-    // lib/devPreview.ts.
-    if (isSellerDevPreview()) {
-      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
-      setAnalyticsError(false);
-      setSnapshot({ key: requestKey, data: next });
-      setLoading(false);
-      return () => { active = false; };
-    }
 
     api.analytics.home(range as SellerHomeTimeRange)
       .then((next) => {
@@ -312,11 +308,19 @@ export default function SellerHomeCommerceDashboard({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [api, range, userId, retryTick, storeContextTick]);
+  }, [analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]);
 
   // ── Range-independent data (orders, inventory, hub, products) — fetched
   // once per seller/refresh, not re-fetched on every chart range switch. ────
   const loadSecondaryData = useCallback(async () => {
+    if (sellerPreview) {
+      setTopProducts([]);
+      setRecentOrders([]);
+      setEverSoldCount(12);
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: 0 });
+      setSecondaryError(false);
+      return;
+    }
     if (!userId) {
       setTopProducts([]);
       setRecentOrders([]);
@@ -374,12 +378,24 @@ export default function SellerHomeCommerceDashboard({
       if (__DEV__) console.warn('[seller-dashboard] secondary data unavailable', error);
       setSecondaryError(true);
     }
-  }, [api, userId]);
+  }, [api, sellerPreview, userId]);
 
   useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick, storeContextTick]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
+    if (sellerPreview) {
+      setFinanceBalance({
+        available: { amount: 428122, currency: 'usd', formatted: '$4,281.22' },
+        pending: { amount: 184250, currency: 'usd', formatted: '$1,842.50' },
+        connected: true,
+        payoutsEnabled: true,
+        bankConnected: true,
+        processingCashout: null,
+      });
+      setFinanceLoading(false);
+      return;
+    }
     if (!userId || isLoadingRole || currentRole !== 'owner') {
       setFinanceBalance(null);
       setFinanceLoading(isLoadingRole);
@@ -395,7 +411,7 @@ export default function SellerHomeCommerceDashboard({
     } finally {
       if (balanceGenerationRef.current === generation) setFinanceLoading(false);
     }
-  }, [api, currentRole, isLoadingRole, userId]);
+  }, [api, currentRole, isLoadingRole, sellerPreview, userId]);
 
   useEffect(() => { void loadFinanceBalance(); }, [loadFinanceBalance]);
 
@@ -451,6 +467,7 @@ export default function SellerHomeCommerceDashboard({
   }, [loadSecondaryData]);
 
   const requestCashOut = useCallback(() => {
+    if (!isSignedIn) return;
     if (currentRole !== 'owner') {
       Alert.alert('Owner access required', 'Only the store owner can cash out earnings.');
       return;
@@ -565,7 +582,7 @@ export default function SellerHomeCommerceDashboard({
         },
       ],
     );
-  }, [api, currentRole, financeBalance, loadFinanceBalance, nav, userId]);
+  }, [api, currentRole, financeBalance, isSignedIn, loadFinanceBalance, nav, userId]);
 
   const openTask = useCallback((task: SetupTask) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -674,13 +691,13 @@ export default function SellerHomeCommerceDashboard({
             <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible>
               <Text style={[styles.screenTitle, { color: theme.text ?? FG }]}>Dashboard</Text>
             </View>
-            <ActivityBellButton
+            {(!sellerPreview || isSignedIn) && <ActivityBellButton
               testID="seller-dashboard-activity"
               color={theme.text ?? FG}
               size={22}
               style={styles.topBarAction}
               badgeBorderColor={theme.background ?? BG}
-            />
+            />}
           </View>
 
           {!data && analyticsError ? (

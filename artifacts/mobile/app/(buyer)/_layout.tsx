@@ -114,29 +114,13 @@ function BuyerTabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        // Directional slide between tabs (Instagram/TikTok-style): driven by
-        // transitionSpec + sceneStyleInterpolator rather than the 'shift'/
-        // 'fade' presets so the distance is a full screen width and the
-        // easing/duration match this round's spec exactly. `animation` is
-        // deliberately left unset — React Navigation's bottom-tabs enables
-        // per-frame animation whenever a transitionSpec is present, and
-        // leaving it out (rather than 'none') is what makes that so. Each
-        // tab keeps its own mounted state/scroll position throughout (see
-        // detachInactiveScreens/freezeOnBlur below), so this is purely a
-        // visual transition, not a remount.
         transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
         sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
-      {/* Registration order matters here, not just for the capsule's visual
-          layout: React Navigation's bottom-tabs derives each screen's slide
-          direction from this order relative to the active tab (see
-          forDirectionalSlide above), so this list is kept in the exact same
-          left-to-right order as the capsule + Profile circle (Home,
-          Discover, Inbox, Activity, Profile) rather than grouping Profile
-          with the other top-level screens the way BUYER_TAB_ITEMS itself
-          doesn't need to. */}
+      {/* Keep route registration in the same left-to-right order as the bar
+          for predictable tab and accessibility navigation. */}
       {/* Home — seller videos with product tagging, likes, comments, purchase */}
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab' }} />
       <Tabs.Screen name="discover" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Discover tab' }} />

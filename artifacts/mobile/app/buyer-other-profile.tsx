@@ -46,7 +46,7 @@ type RemoteProfile = {
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
-  followersCount: number; followingCount: number;
+  followersCount: number; followingCount: number; likesCount: number;
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
   postsCount: number;
@@ -259,11 +259,7 @@ export default function BuyerOtherProfileScreen() {
     else router.replace('/(buyer)/' as never);
   };
 
-  // Followers · Following — Posts was dropped (dev: a high count in any
-  // column was getting cut off). No honest "Likes" total exists for another
-  // buyer's public profile (their posts are paginated, so summing only the
-  // loaded page would undercount), so this stays a two-column row rather
-  // than showing a fabricated number.
+  // The server counts all eligible post likes; the paginated video grid is not a total.
   const stats: ProfileStat[] = [
     {
       key: 'followers', label: 'Followers', value: formatCompactCount(profile?.followersCount ?? 0),
@@ -273,6 +269,7 @@ export default function BuyerOtherProfileScreen() {
       key: 'following', label: 'Following', value: formatCompactCount(profile?.followingCount ?? 0),
       onPress: canonicalReady ? () => router.push(connectionsHref('following', canonicalUserId) as never) : undefined,
     },
+    { key: 'likes', label: 'Likes', value: typeof profile?.likesCount === 'number' ? formatCompactCount(profile.likesCount) : '–' },
   ];
 
   const meta = (

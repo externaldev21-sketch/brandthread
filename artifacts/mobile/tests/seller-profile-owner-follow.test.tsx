@@ -29,9 +29,9 @@ const {
   },
   followStateMock: vi.fn(),
   setFollowingMock: vi.fn(),
-  searchParamsMock: vi.fn(() => ({ id: "seller-9" })),
+  searchParamsMock: vi.fn((): Record<string, string | undefined> => ({ id: "seller-9" })),
   creatorVideosMock: vi.fn(),
-  authMock: vi.fn(() => ({ isLoaded: true, userId: "buyer-1" })),
+  authMock: vi.fn((): { isLoaded: boolean; userId: string | null } => ({ isLoaded: true, userId: "buyer-1" })),
 }));
 
 vi.mock("@/components/profile/ProfileCover", async () =>
@@ -168,6 +168,10 @@ vi.mock("react-native-safe-area-context", () => ({
 }));
 
 vi.mock("@/hooks/useApi", () => ({ useApi: () => apiMock }));
+vi.mock("@/lib/api", () => ({ useApi: () => apiMock }));
+vi.mock("@/contexts/FeatureFlagContext", () => ({ useFeatureFlag: () => false }));
+vi.mock("@/components/thread-cash/ChatAttachThreadCash", () => ({ ThreadCashAttachButton: () => null }));
+vi.mock("@/lib/contextualPushPermission", () => ({ requestContextualPushPermission: vi.fn() }));
 
 vi.mock("@/hooks/useColors", () => ({
   useColors: () => ({ primary: "#C7CDD5", foreground: "#FAFAFA", mutedForeground: "#D7D7DB" }),
@@ -208,6 +212,7 @@ vi.mock("@/lib/safety", () => ({
 }));
 
 import SellerProfileScreen from "@/app/seller-profile";
+import BuyerOtherProfileScreen from "@/app/buyer-other-profile";
 
 async function flush() {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();
@@ -232,7 +237,7 @@ function textContent(value: unknown): string {
 
 const sellerProfile = {
   clerkId: "seller-9", brandName: "Acme Co", username: "acme", bio: "We make things.",
-  productsCount: 12, videosCount: 2,
+  productsCount: 12, videosCount: 2, likesCount: 12_500, followersCount: 12, followingCount: 3,
 };
 
 const videoRow = (id: string) => ({
@@ -351,6 +356,25 @@ describe("seller-profile.tsx videos grid and shop", () => {
     await act(async () => { followers.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith("/connections?type=followers&userId=seller-9");
   });
+
+  it("shows server totals in Followers · Following · Likes order, not page likes or rating", async () => {
+    renderer = await renderScreen();
+    const stats = renderer.root.findByProps({ testID: "profile-stats" });
+    const rows = stats.findAll((node) => typeof node.props.testID === "string" && node.props.testID.startsWith("profile-stat-") && typeof node.type === "string");
+    expect(rows.map((row) => row.props.testID)).toEqual(["profile-stat-followers", "profile-stat-following", "profile-stat-likes"]);
+    expect(stats.findByProps({ testID: "profile-stat-likes" }).props.accessibilityLabel).toBe("12.5K Likes");
+    expect(textContent(stats)).not.toContain("Rating");
+  });
+
+  it("shows all three public totals to a signed-out visitor", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: null });
+    renderer = await renderScreen();
+    expect(apiMock.social.profile).not.toHaveBeenCalled();
+    const stats = renderer.root.findByProps({ testID: "profile-stats" });
+    expect(stats.findByProps({ testID: "profile-stat-followers" }).props.accessibilityLabel).toBe("12 Followers");
+    expect(stats.findByProps({ testID: "profile-stat-following" }).props.accessibilityLabel).toBe("3 Following");
+    expect(stats.findByProps({ testID: "profile-stat-likes" }).props.accessibilityLabel).toBe("12.5K Likes");
+  });
 });
 
 describe("seller-profile.tsx follow", () => {
@@ -364,5 +388,30 @@ describe("seller-profile.tsx follow", () => {
     await act(async () => { follow.props.onPress(); await flush(); });
     expect(setFollowingMock).toHaveBeenCalledWith("seller-9", true);
     expect(textContent(renderer.root.findByProps({ testID: "profile-stat-followers" }).props.children)).toContain("13");
+  });
+});
+
+describe("buyer-other-profile.tsx public stats", () => {
+  let renderer: ReactTestRenderer | undefined;
+  afterEach(async () => { if (renderer) await act(async () => { renderer?.unmount(); }); });
+
+  it("uses the API Likes total, not the page of loaded videos", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: "buyer-1" });
+    searchParamsMock.mockReturnValue({ userId: "buyer-2", name: "Alex", handle: "@alex" });
+    apiMock.social.profile.mockResolvedValue({
+      userId: "buyer-2", name: "Alex", username: "alex", displayName: "Alex",
+      followersCount: 5, followingCount: 10_000, likesCount: 12_500,
+      isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false,
+    });
+    (apiMock.social as any).storiesForUser = vi.fn().mockResolvedValue([]);
+    creatorVideosMock.mockResolvedValue({
+      posts: [videoRow("one")], total: 1, hasMore: false, nextOffset: 1, restricted: null, user: null,
+    });
+    await act(async () => { renderer = create(<BuyerOtherProfileScreen />); await flush(); });
+    const stats = renderer!.root.findByProps({ testID: "profile-stats" });
+    expect(stats.findAll((node) => typeof node.props.testID === "string" && node.props.testID.startsWith("profile-stat-") && typeof node.type === "string")
+      .map((row) => row.props.testID)).toEqual(["profile-stat-followers", "profile-stat-following", "profile-stat-likes"]);
+    expect(stats.findByProps({ testID: "profile-stat-likes" }).props.accessibilityLabel).toBe("12.5K Likes");
+    expect(stats.findByProps({ testID: "profile-stat-following" }).props.accessibilityLabel).toBe("10K Following");
   });
 });

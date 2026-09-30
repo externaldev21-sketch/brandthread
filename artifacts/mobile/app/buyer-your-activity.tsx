@@ -117,20 +117,30 @@ export default function BuyerYourActivity() {
               ))}
             </View>
 
-            {/* Recently deleted — navigates to the archive screen which shows archived posts */}
-            <Text style={s.groupLabel}>Manage</Text>
-            <Card style={s.card}>
-              <ListRow
-                icon="archive"
-                iconColor={theme.accent}
-                title="Archive"
-                subtitle="Posts you've archived from your profile"
-                chevron
-                onPress={() => router.push('/buyer-archive' as never)}
-              />
-            </Card>
           </>
         )}
+        <Text style={s.groupLabel}>Viewing history</Text>
+        <Card style={s.card}>
+          <ListRow
+            icon="play-circle"
+            iconColor={theme.text}
+            title="Recently watched"
+            subtitle="Videos from the last 36 hours"
+            chevron
+            onPress={() => router.push('/buyer-recently-watched' as never)}
+          />
+        </Card>
+        <Text style={s.groupLabel}>Manage</Text>
+        <Card style={s.card}>
+          <ListRow
+            icon="archive"
+            iconColor={theme.accent}
+            title="Archive"
+            subtitle="Posts you've archived from your profile"
+            chevron
+            onPress={() => router.push('/buyer-archive' as never)}
+          />
+        </Card>
       </ScrollView>
     </View>
   );

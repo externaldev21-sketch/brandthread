@@ -51,6 +51,9 @@ import {
 
 interface SellerView {
   sellerId: string;
+  likesCount: number | null;
+  followersCount: number | null;
+  followingCount: number | null;
   brandName: string;
   username: string;
   bio: string;
@@ -82,6 +85,9 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
   const brandName = profile?.brandName ?? profile?.displayName ?? 'Seller';
   return {
     sellerId: profile?.clerkId ?? profile?.id ?? fallbackId,
+    likesCount: typeof profile?.likesCount === 'number' ? profile.likesCount : null,
+    followersCount: typeof profile?.followersCount === 'number' ? profile.followersCount : null,
+    followingCount: typeof profile?.followingCount === 'number' ? profile.followingCount : null,
     brandName,
     username: profile?.username ?? brandName.toLowerCase().replace(/[^a-z0-9]/g, ''),
     bio: profile?.bio ?? '',
@@ -167,6 +173,8 @@ export default function SellerProfileScreen() {
         }
         if (!active) return;
         setSeller(view);
+        setFollowers(view.followersCount);
+        setFollowing(view.followingCount);
       } catch {
         if (active && reloadTick === 0) setProfileError(true);
       } finally {
@@ -179,11 +187,9 @@ export default function SellerProfileScreen() {
   // ── Social counts + follow state (public counts for everyone; follow
   // state only once signed in) ──────────────────────────────────────────────
   useEffect(() => {
-    // Counts must load for a signed-out guest too — the comment above always
-    // said so, but gating the whole effect on `userId` left it never firing
-    // for a guest (or before Clerk finishes loading), so Followers/Following
-    // stayed the "–" placeholder forever instead of the real number.
-    if (!canonicalSellerId) return;
+    // The public seller response supplies guest-safe totals; signed-in viewers
+    // also fetch their relationship state from the social endpoint.
+    if (!canonicalSellerId || !userId) return;
     let active = true;
     Promise.allSettled([
       (!isOwner && userId) ? getSellerFollowState(canonicalSellerId) : Promise.resolve(null),
@@ -416,10 +422,7 @@ export default function SellerProfileScreen() {
   const videosCount = Math.max(videos.total, seller?.videosCount ?? 0);
   const productsCount = seller?.productsCount ?? 0;
 
-  // Followers · Following · Rating — Videos/Posts was dropped (dev: a high
-  // count in any column was getting cut off; three columns gives each
-  // enough room). The grid's own "Videos" section header above still shows
-  // the count.
+  // Likes comes from the public profile total, not the paginated video grid.
   const stats: ProfileStat[] = [
     {
       key: 'followers', label: 'Followers', value: followers == null ? '–' : formatCompactCount(followers),
@@ -429,7 +432,7 @@ export default function SellerProfileScreen() {
       key: 'following', label: 'Following', value: following == null ? '–' : formatCompactCount(following),
       onPress: canonicalSellerId ? () => router.push(connectionsHref('following', isOwner ? null : canonicalSellerId) as never) : undefined,
     },
-    { key: 'rating', label: 'Rating', value: rating && rating.totalCount > 0 ? rating.avgRating.toFixed(1) : '–' },
+    { key: 'likes', label: 'Likes', value: seller?.likesCount == null ? '–' : formatCompactCount(seller.likesCount) },
   ];
 
   const actions = isOwner ? (
@@ -618,6 +621,8 @@ export default function SellerProfileScreen() {
           visible={shareSheetVisible}
           onClose={() => setShareSheetVisible(false)}
           avatarUrl={seller?.avatarUrl ?? null}
+          profileUsername={seller?.username}
+          profileBrandName={seller?.brandName}
           sellerExtra={{
             rating,
             products: videos.posts.slice(0, 3).map((post) => ({ id: post.id, uri: post.thumbnailUri ?? post.mediaUris[0] })),

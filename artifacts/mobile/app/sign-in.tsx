@@ -113,6 +113,7 @@ export default function SignInScreen() {
   const canSubmitPassword = identifierKind !== 'invalid' && password.length >= 1;
   const canVerifyTotp = totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+  const showPreviewUser = __DEV__ && Platform.OS === 'web' && !isAddAccount;
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -565,6 +566,8 @@ export default function SignInScreen() {
                 <TextInput
                   ref={passwordRef}
                   style={[s.input, s.pwInput]}
+                  testID="release-check-password"
+                  accessibilityLabel="Password"
                   placeholder="••••••••"
                   placeholderTextColor={theme.subtle}
                   value={password}
@@ -711,6 +714,8 @@ export default function SignInScreen() {
             <Text style={s.label}>{phoneSupported ? 'Email or phone number' : 'Email address'}</Text>
             <TextInput
               style={s.input}
+              testID="release-check-email"
+              accessibilityLabel={phoneSupported ? 'Email or phone number' : 'Email address'}
               placeholder={phoneSupported ? 'you@yourbrand.com or phone number' : 'you@yourbrand.com'}
               placeholderTextColor={theme.subtle}
               value={identifier}
@@ -722,7 +727,6 @@ export default function SignInScreen() {
               autoComplete="email"
               returnKeyType="go"
               onSubmitEditing={() => sendCode(false)}
-              testID="identifier-input"
             />
           </View>
 
@@ -754,6 +758,20 @@ export default function SignInScreen() {
             style={s.primaryWrap}
             testID="use-password-button"
           />
+
+          {showPreviewUser && (
+            <Button
+              label="Continue as preview user"
+              variant="secondary"
+              testID="continue-as-preview-user"
+              onPress={() => {
+                hapticToggle();
+                router.replace('/onboarding?previewUser=1' as never);
+              }}
+              fullWidth
+              style={s.primaryWrap}
+            />
+          )}
 
           {/* ── Create account ─────────────────────────────────────────────────── */}
           <Button

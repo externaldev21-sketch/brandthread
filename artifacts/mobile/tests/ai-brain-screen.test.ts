@@ -21,10 +21,10 @@ const rootLayout = read('app/_layout.tsx');
 const aurora = read('components/ai/AuroraGlow.tsx');
 const composer = read('components/ai/AiComposer.tsx');
 
-// ─── Bug fix: composer/content must clear the tab bar + home indicator ───────
+// ─── Full-screen composer clears the home indicator without a seller bar ─────
 
-describe('ai-brain input is never behind the seller tab bar', () => {
-  it('the ai-brain route is deny-listed so the global seller tab bar never mounts on top of it', () => {
+describe('ai-brain uses a full-screen composer', () => {
+  it('deny-lists the ai-brain route so the global seller tab bar stays hidden', () => {
     const setBlock = rootLayout.match(
       /const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
     );
@@ -32,9 +32,10 @@ describe('ai-brain input is never behind the seller tab bar', () => {
     expect(setBlock![1]).toContain("'ai-brain'");
   });
 
-  it('the composer pins its own bottom padding to the safe-area inset, not a hardcoded value', () => {
-    expect(screen).toContain('insets.bottom');
-    expect(screen).toContain('composerBottomInset');
+  it('uses only the safe-area bottom inset for the composer', () => {
+    expect(screen).toContain('const composerBottomInset = Math.max(insets.bottom, 8);');
+    expect(screen).toContain('bottomInset={composerBottomInset}');
+    expect(screen).not.toContain('sellerBar.occupiedHeight');
   });
 
   it('uses KeyboardAvoidingView so the composer rises with the keyboard', () => {
@@ -45,6 +46,23 @@ describe('ai-brain input is never behind the seller tab bar', () => {
   it('renders the composer through the shared AiComposer component, not an inline input row', () => {
     expect(screen).toContain('<AiComposer');
     expect(screen).toContain("from '@/components/ai/AiComposer'");
+  });
+
+  it('keeps the input focusable and submits text from the keyboard or send button', () => {
+    expect(composer).toContain('pointerEvents="none"');
+    expect(composer).toContain('submitBehavior="submit"');
+    expect(composer).toContain('onChangeText={onChangeText}');
+    expect(composer).toContain('onPress={isGenerating ? onStop : onSend}');
+    expect(composer).toContain('zIndex: 1');
+    expect(composer).toContain('height: 36');
+    expect(composer).toContain('minHeight: 36');
+  });
+
+  it('uses preview replies for signed-out previews and guards signed-in token failures', () => {
+    expect(screen).toContain('if (!isSignedIn)');
+    expect(screen).toContain('sendPreviewMessageStream(');
+    expect(screen).toContain('const token = await getToken().catch(() => null)');
+    expect(screen).toContain("Couldn't verify your session. Tap Retry.");
   });
 });
 

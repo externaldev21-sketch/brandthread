@@ -15,6 +15,8 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { getPreviewBuyerOrders, isPreviewCommerceId } from '@/lib/previewCommerce';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -108,9 +110,10 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
   const extraCount = order.lineItems.length - 1;
   const sellerInitial = order.sellerName.charAt(0).toUpperCase();
   const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
+  const isPreview = isPreviewCommerceId(order.id);
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
         <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
@@ -169,16 +172,17 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
+            {isPreviewCommerceId(order.id) && order.trackingNumber ? ` · ${order.trackingNumber}` : ''}
           </Text>
         </View>
       )}
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} disabled={isPreview}>
           <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
         </TouchableOpacity>
-        {order.trackingNumber && (
+        {order.trackingNumber && !isPreviewCommerceId(order.id) && (
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
@@ -238,9 +242,13 @@ export default function BuyerOrdersScreen() {
   const centeredPadding = useCenteredContentPadding();
   const router = useRouter();
   const openOrder = useCallback((orderId: string) => {
+    // Synthetic preview orders are list-only; never hand their IDs to a
+    // detail/mutation route backed by the live API.
+    if (isPreviewCommerceId(orderId)) return;
     router.push(('/buyer-order-detail?id=' + orderId) as never);
   }, [router]);
   const { userId } = useAuth();
+  const buyerPreview = isBuyerDevPreview() && !userId;
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
   const [ordersOwnerId, setOrdersOwnerId] = useState<string | null | undefined>(userId);
@@ -260,10 +268,11 @@ export default function BuyerOrdersScreen() {
 
   const load = useCallback(async (generation: number) => {
     if (!userId) {
-      setOrders([]);
-      setOrdersOwnerId(null);
+      setOrders(buyerPreview ? getPreviewBuyerOrders() : []);
+      setOrdersOwnerId(userId);
       setLoading(false);
       setRefreshing(false);
+      setLoadError(false);
       hasLoadedRef.current = true;
       return;
     }
@@ -298,7 +307,7 @@ export default function BuyerOrdersScreen() {
     setLoading(false);
     setRefreshing(false);
     hasLoadedRef.current = true;
-  }, [userId]);
+  }, [buyerPreview, userId]);
 
   const retry = useCallback(() => {
     if (refreshing) return;

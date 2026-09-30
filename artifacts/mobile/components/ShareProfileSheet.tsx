@@ -9,8 +9,8 @@
  * skinned in Brandthread's monochrome brand instead of Instagram's colorful
  * gradients:
  *   - X top-left closes back to the profile.
- *   - A style pill top-center cycles three background variants on tap:
- *     COLOR (monochrome gradient), EMOJI (tiled Brandthread glyph pattern),
+ *   - Three visible choices top-center select the background: COLOR
+ *     (monochrome gradient), EMOJI (tiled Brandthread glyph pattern),
  *     SELFIE (the signed-in user's own photo, blurred full-bleed).
  *   - A scan-QR icon top-right opens a full-screen QR scanner
  *     (components/ShareProfileQrScanner.tsx, matching the Mobbin QR-scanner
@@ -30,7 +30,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Image, Modal, Platform, StyleSheet, Text, View, useWindowDimensions,
+  Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -38,6 +38,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 
 import { FONT, FS, SP, RADIUS, ICON, SUCCESS, RED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -78,6 +79,10 @@ interface ShareProfileSheetProps {
   onClose: () => void;
   /** Avatar/logo image the caller already has loaded — api.auth.me() doesn't return one. Doubles as the SELFIE background source. */
   avatarUrl?: string | null;
+  /** Username already loaded from the signed-in user's own profile API. */
+  profileUsername?: string | null;
+  profileDisplayName?: string | null;
+  profileBrandName?: string | null;
   buyerExtra?: BuyerExtra;
   sellerExtra?: SellerExtra;
 }
@@ -91,8 +96,11 @@ interface OwnIdentity {
 
 type BusyAction = 'share' | 'copy' | 'download' | null;
 
-export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileSheetProps) {
+export function ShareProfileSheet({
+  visible, onClose, avatarUrl, profileUsername, profileDisplayName, profileBrandName,
+}: ShareProfileSheetProps) {
   const { theme } = useAppTheme();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
@@ -112,8 +120,24 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
+    if (!authLoaded) return;
     setError(false);
     setLoading(true);
+    if (!isSignedIn) {
+      setIdentity(null);
+      setLoading(false);
+      return;
+    }
+    if (normalizeUsername(profileUsername)) {
+      setIdentity({
+        username: profileUsername ?? null,
+        displayName: profileDisplayName ?? null,
+        brandName: profileBrandName ?? null,
+        accountType: null,
+      });
+      setLoading(false);
+      return;
+    }
     try {
       const data = await api.auth.me();
       setIdentity({
@@ -127,7 +151,7 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, authLoaded, isSignedIn, profileUsername, profileDisplayName, profileBrandName]);
 
   useEffect(() => {
     if (!visible) return;
@@ -162,10 +186,11 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
     }
   }, [showToast]);
 
-  const handleCyclePill = useCallback(() => {
+  const handleSelectVariant = useCallback((next: BackgroundVariant) => {
+    if (variant === next) return;
     hapticToggle();
-    setVariant(v => VARIANTS[(VARIANTS.indexOf(v) + 1) % VARIANTS.length]);
-  }, []);
+    setVariant(next);
+  }, [variant]);
 
   const handleOpenScanner = useCallback(() => {
     hapticLight();
@@ -198,7 +223,8 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
     void runAction('copy', async () => {
       hapticSuccess();
       if (Platform.OS === 'web') {
-        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(canonicalUrl);
+        if (!navigator?.clipboard?.writeText) throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(canonicalUrl);
       } else {
         const Clipboard = await import('expo-clipboard');
         await Clipboard.setStringAsync(canonicalUrl);
@@ -250,16 +276,24 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
               <Feather name="x" size={ICON.md} color={theme.text} />
             </PressableScale>
 
-            <PressableScale
-              onPress={handleCyclePill}
-              style={styles.pill}
-              accessibilityRole="button"
-              accessibilityLabel={`Background style: ${VARIANT_LABEL[variant]}. Tap to change.`}
-              testID="share-profile-style-pill"
-              noMinHeight
-            >
-              <Text style={[styles.pillText, { color: theme.text }]}>{VARIANT_LABEL[variant]}</Text>
-            </PressableScale>
+            <View style={styles.stylePicker} accessibilityRole="tablist" accessibilityLabel="Profile background style">
+              {VARIANTS.map(option => (
+                <Pressable
+                  key={option}
+                  onPress={() => handleSelectVariant(option)}
+                  style={[styles.styleOption, variant === option && styles.styleOptionSelected]}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`${VARIANT_LABEL[option]} background`}
+                  accessibilityState={{ selected: variant === option }}
+                  aria-selected={variant === option}
+                  testID={`share-profile-style-${option}`}
+                >
+                  <Text style={[styles.styleOptionText, variant === option && styles.styleOptionTextSelected]}>
+                    {VARIANT_LABEL[option]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
             <PressableScale
               onPress={handleOpenScanner}
@@ -278,6 +312,14 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
             {loading ? (
               <View style={[styles.card, { alignItems: 'center', justifyContent: 'center' }]}>
                 <Feather name="loader" size={24} color="#0A0A0B" />
+              </View>
+            ) : !isSignedIn ? (
+              <View style={[styles.card, styles.stateCard]}>
+                <Feather name="link-2" size={28} color="#0A0A0B" />
+                <Text style={styles.stateText}>Share your real profile</Text>
+                <Text style={styles.stateDetail}>
+                  This design preview has no public profile link. Sign in to share your profile anywhere.
+                </Text>
               </View>
             ) : error ? (
               <View style={[styles.card, styles.stateCard]}>
@@ -313,6 +355,9 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
                 <View style={styles.handlePill}>
                   <Text style={[styles.handleText, { color: theme.text }]} numberOfLines={1}>{handle}</Text>
                 </View>
+                <Text style={[styles.profileLink, { color: theme.muted }]} selectable numberOfLines={1}>
+                  {canonicalUrl}
+                </Text>
               </>
             )}
           </View>
@@ -341,6 +386,11 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
                 textColor={theme.text}
               />
             </View>
+          )}
+          {!loading && !error && isSignedIn && canonicalUrl && (
+            <Text style={[styles.shareHint, { color: theme.muted }]}>
+              Send through Messages or an app in your share sheet. Copy link to paste it anywhere.
+            </Text>
           )}
           </View>
 
@@ -489,18 +539,33 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  pill: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs,
+  stylePicker: {
+    flex: 1,
+    maxWidth: 250,
+    minWidth: 0,
+    marginHorizontal: SP.xs,
+    padding: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.48)',
   },
-  pillText: {
+  styleOption: {
+    flex: 1,
+    minWidth: 0,
+    height: 34,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  styleOptionSelected: { backgroundColor: '#FFFFFF' },
+  styleOptionText: {
     color: '#FFFFFF',
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    letterSpacing: 1.2,
+    letterSpacing: 0.3,
   },
+  styleOptionTextSelected: { color: '#0A0A0B' },
   contentWrap: {
     flex: 1,
     alignItems: 'center',
@@ -528,6 +593,7 @@ const styles = StyleSheet.create({
   },
   stateCard: { paddingHorizontal: SP.lg, gap: SP.sm },
   stateText: { fontFamily: FONT.medium, fontSize: FS.sm, color: '#0A0A0B', textAlign: 'center' },
+  stateDetail: { fontFamily: FONT.regular, fontSize: FS.xs, color: '#555555', textAlign: 'center' },
   retryText: { fontFamily: FONT.bold, fontSize: FS.sm, color: '#0A0A0B', textDecorationLine: 'underline' },
   handlePill: {
     paddingHorizontal: SP.md,
@@ -541,6 +607,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
+  profileLink: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', marginTop: SP.xs },
+  shareHint: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', paddingHorizontal: SP.lg, marginTop: SP.sm },
   tilesRow: {
     flexDirection: 'row',
     width: '100%',

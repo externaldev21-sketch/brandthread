@@ -13,6 +13,7 @@
  * PUT    /api/conversations/:id/messages/:messageId/reactions   — set my reaction (upsert)
  * DELETE /api/conversations/:id/messages/:messageId/reactions   — remove my reaction
  * PATCH  /api/conversations/:id/read      — mark read
+ * PATCH  /api/conversations/:id/mute      — mute or unmute this conversation
  * PATCH  /api/conversations/:id/typing    — set/clear my "typing…" signal (polled by the other side)
  * PATCH  /api/conversations/:id/accept    — accept a message request
  * DELETE /api/conversations/:id           — decline / delete conversation
@@ -118,6 +119,7 @@ function buildConversationView(
       ? new Date(conv.lastMessageAt).getTime()
       : undefined,
     unreadCount:        me?.unreadCount        ?? 0,
+    isMuted:            me?.isMuted            ?? false,
     isFriendshipActive: true,
     isArchived:         false,
     // The Brandthread Agent's welcome thread is always pinned regardless of
@@ -508,6 +510,29 @@ router.get("/:id", async (req, res) => {
       unavailable: relation === "blocked_me" || relation === "mutual",
     },
   });
+});
+
+// ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
+router.patch("/:id/mute", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const muted = (req.body as { muted?: unknown } | undefined)?.muted;
+
+  if (typeof muted !== "boolean") {
+    return res.status(400).json({ error: "muted must be a boolean" });
+  }
+
+  const [membership] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!membership) return res.status(403).json({ error: "Not a participant" });
+
+  await db.update(conversationParticipants)
+    .set({ isMuted: muted })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ muted });
 });
 
 // ─── GET /api/conversations/:id/messages ─────────────────────────────────────

@@ -18,6 +18,8 @@ export interface ScreenHeaderAction {
 
 interface ScreenHeaderProps {
   title: string;
+  /** Top-level tab screens have no back destination. */
+  showBack?: boolean;
   subtitle?: string;
   rightElement?: React.ReactNode;
   /** Extra icon-button actions rendered right of `rightElement` (back/action slots). */
@@ -32,12 +34,14 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
+  /** Override the spoken back label when the route changes between a list and an inline form. */
+  backAccessibilityLabel?: string;
   /** Optional testID forwarded to the back/close button, for screens whose tests target it directly. */
   backTestID?: string;
   /**
    * 'push' (default) shows the standard back arrow for a stack-pushed screen.
-   * 'modal' shows a close "X" instead, for screens presented as a modal/sheet
-   * — same position and hit area either way. Pass whichever matches the
+   * 'modal' shows a close "X" on the right for screens presented as a modal/sheet.
+   * Pass whichever matches the
    * route's actual `presentation` option; this never changes push vs modal
    * itself, only which icon a screen that already has one shows.
    */
@@ -59,7 +63,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', showBack = true,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -85,16 +89,18 @@ export function ScreenHeader({
     <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
       <View style={styles.container}>
         {variant === 'push' && (
-          <PressableScale
-            onPress={closeOrBack}
-            style={styles.closeBtnPlain}
-            accessibilityRole="button"
-            accessibilityLabel={`Go back from ${title}`}
-            accessibilityHint={`Returns from ${title}`}
-            testID={backTestID ?? 'screen-header-back'}
-          >
-            <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
-          </PressableScale>
+          showBack ? (
+            <PressableScale
+              onPress={closeOrBack}
+              style={styles.closeBtnPlain}
+              accessibilityRole="button"
+              accessibilityLabel={backAccessibilityLabel ?? `Go back from ${title}`}
+              accessibilityHint={`Returns from ${title}`}
+              testID={backTestID ?? 'screen-header-back'}
+            >
+              <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
+            </PressableScale>
+          ) : <View style={{ width: COMP.iconBtn }} />
         )}
 
         <View style={styles.titleBlock}>
@@ -129,16 +135,18 @@ export function ScreenHeader({
           {variant === 'modal' && (
             <>
               {rightElement}
-              <PressableScale
-                onPress={closeOrBack}
-                style={styles.closeBtnPlain}
-                accessibilityRole="button"
-                accessibilityLabel={`Close ${title}`}
-                accessibilityHint={`Dismisses ${title}`}
-                testID={backTestID ?? 'screen-header-back'}
-              >
-                <Feather name="x" size={ICON.md} color={colors.foreground} />
-              </PressableScale>
+              {showBack ? (
+                <PressableScale
+                  onPress={closeOrBack}
+                  style={styles.closeBtnPlain}
+                  accessibilityRole="button"
+                  accessibilityLabel={backAccessibilityLabel ?? `Close ${title}`}
+                  accessibilityHint={`Dismisses ${title}`}
+                  testID={backTestID ?? 'screen-header-back'}
+                >
+                  <Feather name="x" size={ICON.md} color={colors.foreground} />
+                </PressableScale>
+              ) : <View style={{ width: COMP.iconBtn }} />}
             </>
           )}
         </View>

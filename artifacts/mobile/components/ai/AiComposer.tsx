@@ -1,7 +1,7 @@
 /**
  * AiComposer — the floating glass input pill for the Brandthread AI screen.
  *
- * A premium frosted pill with a silver edge glow that intensifies on focus,
+ * A compact frosted input with a silver edge glow that intensifies on focus,
  * and a send control that morphs into a stop square while the AI is
  * generating. Purely presentational — sending/stopping/text state all stay
  * owned by app/ai-brain.tsx; this component never talks to the AI backend.
@@ -78,19 +78,23 @@ export default function AiComposer({
         <Animated.View pointerEvents="none" style={[styles.edgeGlow, glowStyle]} />
         <View style={styles.pill}>
           {Platform.OS !== 'android' && (
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView pointerEvents="none" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           )}
-          <View style={styles.pillTint} />
+          <View pointerEvents="none" style={styles.pillTint} />
 
           <TextInput
             style={styles.textInput}
+            // On web, an ancestor press handler dismisses the keyboard on
+            // bubbled clicks. Keep the tap inside the composer so focus sticks.
+            {...(Platform.OS === 'web' ? { onClick: (event: React.MouseEvent) => event.stopPropagation() } : {})}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
             placeholderTextColor={colors.subtle}
             multiline
             returnKeyType="send"
-            blurOnSubmit={false}
+            submitBehavior="submit"
+            accessibilityLabel="Message Brandthread AI"
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             onSubmitEditing={() => {
@@ -123,32 +127,32 @@ export default function AiComposer({
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wrap: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 4,
   },
   pillShadowWrap: {
-    borderRadius: 26,
+    borderRadius: 23,
   },
   edgeGlow: {
     position: 'absolute',
-    top: -1.5,
-    left: -1.5,
-    right: -1.5,
-    bottom: -1.5,
-    borderRadius: 27.5,
-    borderWidth: 1.5,
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: 24,
+    borderWidth: 1,
   },
   pill: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderRadius: 26,
+    alignItems: 'center',
+    borderRadius: 23,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.14)',
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 6,
-    minHeight: 52,
+    paddingLeft: 14,
+    paddingRight: 3,
+    paddingVertical: 2,
+    minHeight: 44,
   },
   pillTint: {
     ...StyleSheet.absoluteFill,
@@ -156,21 +160,29 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   textInput: {
     flex: 1,
+    // Keep the composer one line tall at rest; longer text scrolls inside it.
+    // The frosted layers are absolutely positioned, so explicitly paint the
+    // text above them (otherwise typing works but the characters are hidden).
+    zIndex: 1,
+    height: 36,
+    minHeight: 36,
     color: colors.text,
     fontSize: FS.base,
     fontFamily: FONT.regular,
-    paddingVertical: 10,
-    paddingRight: 8,
-    maxHeight: 120,
+    lineHeight: 20,
+    paddingVertical: 7,
+    paddingRight: 4,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   // 44x44 minimum comfortable touch target (COMP.minTouchTarget); was 40x40.
   sendBtn: {
+    zIndex: 1,
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
   },
   sendIconWrap: {
     alignItems: 'center',

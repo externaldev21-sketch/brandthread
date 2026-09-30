@@ -223,7 +223,8 @@ vi.mock('@/lib/productUtils', () => ({
 
 vi.mock('@/lib/money', () => ({
   formatCents: vi.fn(() => '$0.00'),
-  parseDecimalToCents: vi.fn(() => undefined),
+  parseDecimalToCents: vi.fn((value: string) =>
+    /^\d+(?:\.\d{1,2})?$/.test(value.trim()) ? Math.round(Number(value) * 100) : null),
 }));
 
 import AddProductScreen from '@/app/add-product';
@@ -271,11 +272,6 @@ describe('AddProduct draft exit protection', () => {
   it('warns after an immediate edit, then skips the warning once that edit is saved', async () => {
     renderer = await renderScreen();
 
-    // The flow now opens on the Photos step — jump to Details to reach the name field.
-    await act(async () => {
-      renderer.root.findByProps({ testID: 'add-product-step-details' }).props.onPress();
-    });
-
     const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
     await act(async () => {
       nameInput.props.onChangeText('Last-second product edit');
@@ -321,10 +317,6 @@ describe('AddProduct draft exit protection', () => {
   it('prevents native back navigation after an immediate edit until the seller chooses to leave', async () => {
     renderer = await renderScreen();
 
-    await act(async () => {
-      renderer.root.findByProps({ testID: 'add-product-step-details' }).props.onPress();
-    });
-
     const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
     await act(async () => {
       nameInput.props.onChangeText('Native back draft edit');
@@ -360,5 +352,37 @@ describe('AddProduct draft exit protection', () => {
     });
 
     expect(dispatchMock).toHaveBeenCalledWith(nativeBackAction);
+  });
+
+  it('shows the full product form and one publish action without a wizard footer', async () => {
+    renderer = await renderScreen();
+    const form = renderer.root.findByProps({ testID: 'add-product-form' });
+
+    expect(form.findByProps({ testID: 'product-input-Product name *' })).toBeTruthy();
+    expect(form.findByProps({ testID: 'product-input-Retail price *' })).toBeTruthy();
+    expect(form.findByProps({ testID: 'product-input-Weight (grams)' })).toBeTruthy();
+    expect(form.findAllByProps({ label: 'Publish product' }).filter(button => typeof button.type === 'string')).toHaveLength(1);
+    expect(form.findAllByProps({ label: 'Next' })).toHaveLength(0);
+    expect(form.findAllByProps({ label: 'Cancel' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'add-product-save-draft' })).toBeTruthy();
+
+    await act(async () => {
+      form.findAllByProps({ testID: 'add-product-variants-toggle' })
+        .find(node => typeof node.props.onPress === 'function')!.props.onPress();
+    });
+    const options = form.findAllByProps({ title: 'Options' })
+      .find(node => typeof node.props.action?.onPress === 'function')!;
+    await act(async () => {
+      options.props.action.onPress();
+    });
+    expect(form.findByProps({ testID: 'product-input-Option name' })).toBeTruthy();
+    expect(form.findByProps({ testID: 'product-input-Product name *' })).toBeTruthy();
+
+    await act(async () => {
+      await form.findAllByProps({ label: 'Publish product' })
+        .find(node => typeof node.props.onPress === 'function')!.props.onPress();
+    });
+    expect(alertMock).toHaveBeenCalledWith('Invalid price', expect.stringContaining('Enter a valid price'));
+    expect(form.findByProps({ testID: 'add-product-publish-error' })).toBeTruthy();
   });
 });

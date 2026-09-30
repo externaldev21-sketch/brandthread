@@ -1826,6 +1826,7 @@ export default function OnboardingScreen() {
     deviceFlow,
     deviceStep,
     deviceProbe,
+    previewUser,
   } = useLocalSearchParams<{
     postAuth?: string;
     addAccount?: string;
@@ -1833,10 +1834,12 @@ export default function OnboardingScreen() {
     deviceFlow?: string;
     deviceStep?: string;
     deviceProbe?: string;
+    previewUser?: string;
   }>();
   const insets  = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const isAddAccount = addAccount === '1';
+  const isDevWebPreviewUser = __DEV__ && Platform.OS === 'web' && previewUser === '1';
   const deviceProbeEnabled = __DEV__ && deviceProbe === '1';
   const deviceProbeFlow: Flow | null = __DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')
     ? deviceFlow
@@ -2140,7 +2143,7 @@ export default function OnboardingScreen() {
     // back into the Auth/sign-up screen — only a deliberate "add another
     // account" flow (isAddAccount) still needs it, to create a second,
     // separate Clerk identity while the first stays signed in.
-    const skipAuth = isSignedIn && !isAddAccount;
+    const skipAuth = (isSignedIn && !isAddAccount) || isDevWebPreviewUser;
     // After AccountType (step 0), go to path-specific Auth (step 1), unless
     // already signed in, in which case go straight to the next step (Name).
     const next = skipAuth
@@ -2188,6 +2191,10 @@ export default function OnboardingScreen() {
   async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
+    if (isDevWebPreviewUser && typeof window !== 'undefined') {
+      window.location.assign('/?bt_preview=buyer');
+      return;
+    }
     let profileId: string | null = null;
     let failureStage = 'required-profile';
     let pendingSyncQueued = false;
@@ -2286,6 +2293,11 @@ export default function OnboardingScreen() {
   async function finishSeller() {
     if (finishing) return;
     setFinishing(true);
+    if (isDevWebPreviewUser && typeof window !== 'undefined') {
+      await selectTheme(selectedThemeId);
+      window.location.assign('/?bt_preview=seller');
+      return;
+    }
     try {
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();

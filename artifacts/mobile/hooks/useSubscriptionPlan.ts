@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 
 export type PlanId = 'starter' | 'growth' | 'pro';
 
@@ -54,6 +55,7 @@ export function invalidatePlanCache() {
 
 export function useSubscriptionPlan() {
   const api = useApi();
+  const { isSignedIn, userId } = useAuth();
   const [plan, setPlan] = useState<PlanId | null>(_cache);
   const [loading, setLoading] = useState(_cache === null);
   const [error, setError] = useState(false);
@@ -68,6 +70,12 @@ export function useSubscriptionPlan() {
   // Rebuild fetchPlan whenever `api` changes (it wraps Clerk tokens).
   useEffect(() => {
     fetchRef.current = function fetchPlan() {
+      if (!isSignedIn || !userId) {
+        setPlan(null);
+        setLoading(false);
+        setError(false);
+        return;
+      }
       if (_cache !== null) {
         setPlan(_cache);
         setLoading(false);
@@ -106,7 +114,7 @@ export function useSubscriptionPlan() {
         setError(true);
       });
     };
-  }, [api]);
+  }, [api, isSignedIn, userId]);
 
   // On mount: run initial fetch and register a stable listener for future
   // invalidations. The listener is removed when the component unmounts.
@@ -121,7 +129,7 @@ export function useSubscriptionPlan() {
     return () => {
       _listeners.delete(listener);
     };
-  }, []); // intentionally empty — register/unregister once per lifecycle
+  }, [isSignedIn, userId]); // recheck when a real session becomes available
 
   /** True if the user's plan meets or exceeds `minPlan`. */
   function hasPlan(minPlan: PlanId): boolean {

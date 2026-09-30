@@ -109,6 +109,7 @@ import {
 } from '@/lib/sellerControlCenter';
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
+import { STUDIO_MENU_ORIGIN, subscribeStudioMenuReturn } from '@/lib/navigation/studioMenuReturn';
 
 // ─── Menu contents ────────────────────────────────────────────────────────────
 // Dev's consolidation pass: the menu should only hold destinations with NO
@@ -280,6 +281,7 @@ export default function SellerStudioRadialMenu({
   const dragStartY = useSharedValue(0);
 
   const [open, setOpen] = useState(false);
+  const resumeCardOnOpenRef = useRef(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   const [brandName, setBrandName] = useState<string | null>(null);
@@ -299,6 +301,8 @@ export default function SellerStudioRadialMenu({
       setSetupDone(completedRequiredTaskCount(state));
       setSetupTotal(requiredTaskCount(state));
     });
+    if (!userId) return () => { cancelled = true; };
+
     api.auth.me().then((profile: any) => {
       if (cancelled) return;
       setBrandName(profile?.brandName ?? profile?.displayName ?? profile?.name ?? null);
@@ -367,18 +371,21 @@ export default function SellerStudioRadialMenu({
   const lastStepAtRef = useRef(0);
 
   useEffect(() => {
-    // Reset to the first card every time the page opens fresh, so it never
-    // reopens wherever a previous session happened to leave off.
+    // Fresh opens start at the first card; returning from a Studio tool resumes
+    // the previous selection without rearming its auto-enter timer.
     if (open) {
-      cardIndex.value = 0;
-      gestureStartIndex.value = 0;
+      if (!resumeCardOnOpenRef.current) {
+        cardIndex.value = 0;
+        gestureStartIndex.value = 0;
+        setCardIndexJS(0);
+      }
+      resumeCardOnOpenRef.current = false;
       landedPulse.value = 0;
       cancelAnimation(fillProgress);
       fillProgress.value = 0;
       microTriggerIndex.value = -1;
       microTriggerSeq.value = 0;
       setEnterState('hidden');
-      setCardIndexJS(0);
       lastStepAtRef.current = 0;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -454,6 +461,11 @@ export default function SellerStudioRadialMenu({
     translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING, ...NO_REDUCE_MOTION });
   }, [translateY, pageHeight]);
 
+  useEffect(() => subscribeStudioMenuReturn(() => {
+    resumeCardOnOpenRef.current = true;
+    expand();
+  }), [expand]);
+
   useEffect(() => {
     if (openRequestKey > 0 && !open) expand();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -502,7 +514,13 @@ export default function SellerStudioRadialMenu({
       return;
     }
     setNextPushAnimationNone();
-    router.push(item.route as never);
+    if (item.id === 'payouts') {
+      router.push({ pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'analytics') {
+      router.push({ pathname: '/(tabs)/analytics', params: { from: STUDIO_MENU_ORIGIN } });
+    } else {
+      router.push(item.route as never);
+    }
   }, [translateY, fillProgress, planLoading, planError, hasPlan, retryPlan, router]);
 
   // ── Gestures ─────────────────────────────────────────────────────────────────

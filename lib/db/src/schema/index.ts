@@ -892,6 +892,7 @@ export const conversationParticipants = pgTable('conversation_participants', {
   accountType:    text('account_type').notNull().default('buyer'),
   unreadCount:    integer('unread_count').notNull().default(0),
   lastReadAt:     timestamp('last_read_at'),
+  isMuted:        boolean('is_muted').notNull().default(false),
   // Chat details (DM flows PR 2) mute: null = not muted; a timestamp = muted
   // until then (a far-future sentinel represents "Until I turn it back on").
   // Per-membership, like unreadCount/lastReadAt above, since mute is a

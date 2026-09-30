@@ -108,7 +108,9 @@ describe('Studio card carousel: horizontal release LOCKS (does not navigate); ta
   });
 
   it('the sheet opens fresh with no card landed (landedPulse reset alongside cardIndex)', () => {
-    const resetBlock = studio.slice(studio.indexOf('if (open) {', studio.indexOf('useEffect(() => {\n    // Reset to the first card')), studio.indexOf('setCardIndexJS(0);'));
+    const start = studio.indexOf('if (open) {', studio.indexOf('// Fresh opens'));
+    const resetBlock = studio.slice(start, studio.indexOf('}, [open]);', start));
+    expect(resetBlock).toContain('cardIndex.value = 0;');
     expect(resetBlock).toContain('landedPulse.value = 0;');
   });
 });

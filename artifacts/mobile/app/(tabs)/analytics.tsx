@@ -11,6 +11,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { useAuth } from '@clerk/expo';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GRID_MAX_WIDTH, SP } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -18,6 +19,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { formatCents } from '@/lib/money';
+import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import {
   getSalesAnalytics, getFilterState, saveFilterState,
 } from '@/services/analyticsService';
@@ -84,6 +86,13 @@ function formatChartDollars(cents: number): string {
 
 export default function AnalyticsScreen() {
   const colors = useColors();
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const onBack = params.from === STUDIO_MENU_ORIGIN ? () => {
+    // Tab routes stay mounted: do not retain the Studio origin for later visits.
+    router.setParams({ from: undefined });
+    returnToStudioMenu(router);
+  } : undefined;
   const api = useApi();
   const { userId } = useAuth();
   const s = React.useMemo(() => createStyles(colors), [colors]);
@@ -157,7 +166,7 @@ export default function AnalyticsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1 }}>
-        <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+        <ScreenHeader title="Analytics" subtitle="Last 7 days" onBack={onBack} />
         <AnalyticsSkeleton kpiCount={2} listRows={0} />
       </View>
     );
@@ -169,7 +178,7 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+      <ScreenHeader title="Analytics" subtitle="Last 7 days" onBack={onBack} />
       <ScrollView
         ref={scrollResetRef}
         style={s.scroll}

@@ -103,3 +103,17 @@ mtime_ms = 1790115720999
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/eb036a0a-5a5c-4fb9-8cb1-e81564f27b8a/7abcfaab-9045-4d14-a0a9-e34c45d1057a"
 storage_version_token = "1790115746129644"
 content_type = "image/png"
+
+[[outputs]]
+id = "kCfvHrHtr9ImoOmMv-BF7"
+uri = "file://exports/brandthread-full-app-source-2026-09-28.zip"
+type = "unspecified"
+title = "Download Brandthread full app source"
+description = "Current source snapshot (HEAD 2d062621): every mobile screen and onboarding flow, API, shared code, manufacturer portal, design system, and runtime assets. ZIP, 89.8 MiB; excludes secrets, dependencies, and non-runtime screenshot galleries."
+logical_id = "12cb8517-09b6-46b7-a5b6-cc8cd4d04e6a"
+content_hash = "sha256:3db0759d72da18f064d42ae9845d757b38f1d87a3f5bb74d1402a6a0e9e5cc2c"
+size = 94140501
+mtime_ms = 1790632787065
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/12cb8517-09b6-46b7-a5b6-cc8cd4d04e6a/7e5a0400-f48d-4c57-a75a-dd42950ed90c"
+storage_version_token = "1790632794643556"
+content_type = "application/octet-stream"

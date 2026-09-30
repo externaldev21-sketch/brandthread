@@ -75,6 +75,7 @@ import { createNotificationResponseHandler } from '@/lib/notificationNavigation'
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
+import { getDevWebPreviewRole } from '@/lib/devPreview';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { ActionSheetHost } from '@/components/ui/ActionSheet';
@@ -341,7 +342,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
 // Renders the global seller tab bar + Studio radial menu when:
 //   1. SellerShellContext reports an active seller session (set by AuthGate after
 //      it resolves onboarding completion and role from AsyncStorage/server), OR
-//   2. PREVIEW_ROLE === 'seller' in the dev web bypass (no Clerk required).
+//   2. The development seller preview is active on web (no Clerk required).
 //
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
@@ -355,9 +356,8 @@ function SellerBarGate() {
   const segments = useSegments();
   const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
 
-  // Honor the dev web preview bypass: PREVIEW_ROLE is evaluated at module load
-  // time (before Clerk resolves) so it must be checked independently of
-  // isActiveSeller. It is inert in production builds (__DEV__ guard in PREVIEW_ROLE).
+  // Preview navigation must not depend on Clerk or completed onboarding.
+  // PREVIEW_ROLE is web-only; native seller chrome requires an active session.
   const isPreviewSeller = PREVIEW_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
@@ -470,11 +470,11 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     .catch(() => {});
 }
 
-// ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// Explicitly opt in with ?bt_preview=buyer or ?bt_preview=seller in the URL to
-// skip the Clerk/onboarding gates and jump straight to that dashboard for
-// design review. Without the query param, web behaves like every other
-// platform: real splash -> sign-up -> onboarding. Inert in production builds.
+// ─── DEV design-preview bypass (web only) ─────────────────────────────────────
+// The default development web preview opens the seller side.
+// Explicit ?bt_preview=buyer and ?bt_preview=seller links switch preview roles.
+// The web guard keeps this inert on native builds. Expo Go follows real auth;
+// non-dev navigation-isolation tests require an explicit preview role.
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
@@ -483,10 +483,13 @@ const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   // NAVIGATION_ISOLATION_TEST somehow reached a production build — see
   // lib/devPreview.ts's isProductionPreviewHost doc comment.
   if (isProductionPreviewHost()) return null;
+  if (__DEV__) return getDevWebPreviewRole();
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   if (v !== 'buyer' && v !== 'seller') return null;
   return v;
 })();
+const DEV_WEB_ONBOARDING_PREVIEW =
+  __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
@@ -536,13 +539,6 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
     }
   }
 }
-if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
-  AsyncStorage.multiSet([
-    ['splash_seen', 'true'],
-    ['onboarding_complete', 'true'],
-    ['user_role', DEV_BYPASS_ROLE],
-  ]);
-}
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
@@ -578,6 +574,7 @@ function AuthGate() {
   const [threadExplainerSeen, setThreadExplainerSeen] = useState<boolean | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
+  const [devWebPreviewReady, setDevWebPreviewReady] = useState(!DEV_WEB_ONBOARDING_PREVIEW);
   const prevSignedInRef = useRef<boolean | null>(null);
 
   // Clear per-account caches on sign-out so a different account gets fresh data.
@@ -623,6 +620,30 @@ function AuthGate() {
       ]);
       router.replace('/splash');
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
+
+  // A full reload of the default dev-web preview always restarts the walkthrough.
+  useEffect(() => {
+    if (!DEV_WEB_ONBOARDING_PREVIEW || devForcedRef.current || !isLoaded) return;
+    devForcedRef.current = true;
+    void (async () => {
+      try { if (isSignedIn) await signOut(); } catch {}
+      await AsyncStorage.multiRemove([
+        ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', 'splash_seen',
+        'onboarding_draft', 'onboarding_pending_flow',
+        'onboarding_first_name', 'onboarding_brand_name',
+        'onboarding_brand_stage', 'onboarding_goals',
+        'onboarding_style_interests', 'onboarding_selected_plan',
+      ]);
+      setOnboardingDone(false);
+      setStoredRole(null);
+      setSplashSeen(false);
+      setActiveSeller(false);
+      setDevWebPreviewReady(true);
+      router.replace('/splash');
+    })();
+  // This reset is intentionally once per full dev-web page load.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
@@ -714,6 +735,7 @@ function AuthGate() {
     // its navigation key prevents the initial auth redirect from racing that
     // mount and producing a blank error screen in web previews.
     if (!rootNavigationState?.key) return;
+    if (!devWebPreviewReady) return;
 
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
@@ -735,23 +757,12 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
+      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products', 'muted-words'].includes(segments[0] as string);
 
-    // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    // PREVIEW_ROLE only reads the query string once, at module load — it
-    // deliberately does NOT fall back to the persisted role (see its own
-    // comment: an explicit ?bt_preview= on a real reload must reset state).
-    // But isSellerDevPreview/isBuyerDevPreview (same gates: __DEV__ ||
-    // NAVIGATION_ISOLATION_TEST, web only, never on a production host) DO
-    // fall back to the persisted role for exactly the case that matters
-    // here — a full-page reload of a deep link (e.g. "/design", query
-    // string dropped by earlier in-app navigation, or simply not repeated
-    // on every reload) while a preview session is already active. Without
-    // this fallback, AuthGate stopped recognizing preview mode on such a
-    // reload and fell through into the real Clerk/onboarding gate below,
-    // which requires a genuinely signed-in account this bypass never sets
-    // up — leaving the deep link stuck rather than rendering the route it
-    // was pointed at.
+    // Development previews skip onboarding without writing completion flags.
+    // PREVIEW_ROLE reads the query only once, while these dev-only web helpers
+    // also recognize the persisted role when reloading a deep link without it.
+    // Expo Go still uses DEV_BYPASS_ROLE; normal accounts remain auth-gated.
     const webPreviewRole = Platform.OS === 'web'
       ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null)
       : null;
@@ -858,7 +869,7 @@ function AuthGate() {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
+  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key, devWebPreviewReady]);
 
   return null;
 }
@@ -1215,7 +1226,6 @@ function RootLayoutNav() {
         <Stack.Screen name="community" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
-        <Stack.Screen name="website"          options={{ headerShown: false }} />
         <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
@@ -1343,6 +1353,7 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-recently-watched" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-menu"        options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1515,8 +1526,8 @@ export default function RootLayout() {
     <AppIntroSplash ready={appReady}>
       <ClerkLoadErrorBoundary>
         <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-          {PREVIEW_ROLE ? (
-            // DEV preview bypass: don't wait for clerk-js — render screens directly.
+          {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
+            // Development previews render without waiting for Clerk.
             appTree
           ) : (
             <>

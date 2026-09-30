@@ -50,26 +50,28 @@ export function LiveHostPill({
 }) {
   return (
     <View style={styles.hostPill} testID="live-host-pill">
-      <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
-      <Pressable
-        onPress={onOpenHost}
-        style={styles.hostTap}
-        accessibilityRole="button"
-        accessibilityLabel={`${host.name}${host.verified ? ', verified' : ''}. ${formatViewerCount(viewerCount)} watching. Open profile`}
-      >
-        <LiveHostAvatar host={host} size={32} />
-        <View style={styles.hostText}>
-          <View style={styles.hostNameRow}>
-            <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
-            {host.verified && <Feather name="check-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
+      <View style={styles.hostIdentity} testID="live-host-identity">
+        <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
+        <Pressable
+          onPress={onOpenHost}
+          style={styles.hostTap}
+          accessibilityRole="button"
+          accessibilityLabel={`${host.name}${host.verified ? ', verified' : ''}. ${formatViewerCount(viewerCount)} watching. Open profile`}
+        >
+          <LiveHostAvatar host={host} size={36} />
+          <View style={styles.hostText}>
+            <View style={styles.hostNameRow}>
+              <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
+              {host.verified && <Feather name="check-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
+            </View>
+            <View style={styles.hostMetaRow}>
+              <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
+              <Feather name="eye" size={10} color="rgba(255,255,255,0.8)" />
+              <Text style={[styles.hostMeta, TABULAR_NUMS]} testID="live-viewer-count">{formatViewerCount(viewerCount)}</Text>
+            </View>
           </View>
-          <View style={styles.hostMetaRow}>
-            <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
-            <Feather name="eye" size={10} color="rgba(255,255,255,0.8)" />
-            <Text style={[styles.hostMeta, TABULAR_NUMS]} testID="live-viewer-count">{formatViewerCount(viewerCount)}</Text>
-          </View>
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
       <Pressable
         onPress={() => { hapticSelection(); onFollow(); }}
         style={[styles.followBtn, following && styles.followBtnOn]}
@@ -407,31 +409,31 @@ export function LiveCommentBar({
 }
 
 const styles = StyleSheet.create({
-  hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', flexShrink: 0 },
   hostInitials: { color: '#fff', fontFamily: FONT.bold },
-  // flexShrink so this compresses (its own text truncates via numberOfLines)
-  // before the viewer stack/count/close button on the other side of the row
-  // ever overlap it — neither side shrinks by default in RN's flexbox, so
-  // without this the two sides overflowed into each other on narrower
-  // screens once the viewer stack + count + close button reached their
-  // combined natural width.
+  // Allow the identity to truncate before it crowds the close button on
+  // narrow screens. The follow button remains a separate target.
   hostPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 3, paddingRight: 4, paddingVertical: 3,
-    borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250, flexShrink: 1, minWidth: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 18, flexShrink: 1, minWidth: 0, maxWidth: 300,
   },
-  hostTap: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
-  hostText: { flexShrink: 1, minWidth: 0 },
-  hostNameRow: { flexDirection: 'row', alignItems: 'center' },
-  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 13, flexShrink: 1 },
-  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11 },
-  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
+  hostIdentity: {
+    height: 48, justifyContent: 'center', flexShrink: 1, minWidth: 0,
+    paddingLeft: 5, paddingRight: 14,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
+  },
+  hostTap: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0 },
+  hostText: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
+  hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 14, lineHeight: 18, flexShrink: 1 },
+  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
+  hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
+  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
+  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12, letterSpacing: 0.8 },
   followBtn: {
-    minWidth: 58, height: 32, paddingHorizontal: 12, borderRadius: RADIUS.pill,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    minWidth: 66, height: 32, paddingHorizontal: 14, borderRadius: RADIUS.pill,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 32 },
+  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 34, height: 34 },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
   // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each

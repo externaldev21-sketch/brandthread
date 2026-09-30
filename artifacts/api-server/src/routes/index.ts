@@ -99,6 +99,7 @@ import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
 import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
+import releaseTestControlRouter from "./release-test-control";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
@@ -121,6 +122,7 @@ router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
+router.use("/release-test-control", releaseTestControlRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
 

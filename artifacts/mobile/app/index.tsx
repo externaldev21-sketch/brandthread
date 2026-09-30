@@ -92,6 +92,10 @@ export default function Index() {
     // fires — reduces how often the checks inside actually need to catch a
     // still in-flight resolution.
     const redirect = setTimeout(() => {
+      // Expo web may mount the index briefly while hydrating a deep link.
+      // Do not replace /inbox, /activity, or another preview screen with Home.
+      if (Platform.OS === 'web' && typeof window !== 'undefined'
+        && window.location.pathname.replace(/\/+$/, '') !== '') return;
       // Re-check the LIVE ref at fire time, not the atRoot this effect
       // closed over — see atRootRef's own comment above for why.
       if (!atRootRef.current) return;
@@ -118,11 +122,16 @@ export default function Index() {
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router, atRoot]);
 
-  if (__DEV__ && Platform.OS === 'web' && params.bt_capture === '1') {
+  if (
+    __DEV__
+    && Platform.OS === 'web'
+    && params.bt_capture === '1'
+    && (previewRole === 'buyer' || previewRole === 'seller')
+  ) {
     return (
       <Redirect
         href={{
-          pathname: previewRole === 'seller' ? '/(tabs)' : '/(buyer)',
+          pathname: previewRole === 'buyer' ? '/(buyer)' : '/(tabs)',
           params,
         }}
       />

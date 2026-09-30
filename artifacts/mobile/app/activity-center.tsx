@@ -385,7 +385,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   ], [onDismiss, onOpenMenu, row, theme.cardElevated, theme.error, theme.text]);
 
   return (
-    <SwipeableActions actions={swipeActions}>
+    <SwipeableActions actions={swipeActions} backgroundColor={theme.background}>
     <View style={styles.row}>
       {/* Unread dot — LinkedIn-style leading dot in the row's own 16pt
           gutter (https://mobbin.com/screens/e455bcf1-7b85-4c0b-b4fd-76df1241fd5f),

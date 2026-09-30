@@ -29,7 +29,7 @@ import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect, useIsFocused } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import {
   SURFACE, CARD, BORDER,
@@ -45,7 +45,9 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useApi } from '@/lib/api';
+import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
+import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
@@ -547,6 +549,20 @@ export default function BuyerPostCommentsScreen() {
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
+  const [guestMutedPhrases, setGuestMutedPhrases] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (user?.id) {
+      setGuestMutedPhrases([]);
+      return;
+    }
+    let active = true;
+    void readGuestMutedWords().then(
+      (words) => { if (active) setGuestMutedPhrases(words.map((word) => word.phrase)); },
+      () => { if (active) setGuestMutedPhrases(null); },
+    );
+    return () => { active = false; };
+  }, [user?.id]);
+  const isFocused = useIsFocused();
 
   /**
    * Sheet grows with the keyboard instead of the keyboard eating into a
@@ -672,6 +688,11 @@ export default function BuyerPostCommentsScreen() {
     if (mediaUri && postType === 'video') mediaPlayer.play();
     return () => mediaPlayer.pause();
   }, [mediaPlayer, mediaUri, postType]));
+  useMeaningfulVideoWatch(
+    mediaPlayer,
+    isFocused && !!user?.id && UUID_RE.test(postId) && postType === 'video' && !!mediaUri,
+    () => { void api.posts.recordWatchedVideo(postId).catch(() => {}); },
+  );
 
   const myName = user?.fullName || user?.firstName || user?.username || 'You';
   const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
@@ -964,15 +985,18 @@ export default function BuyerPostCommentsScreen() {
    */
   const visibleRows = useMemo(() => {
     const out: (Row | ViewRepliesRow)[] = [];
+    const visibleComments = user?.id ? comments : guestMutedPhrases === null ? [] : comments.filter(
+      (comment) => !matchesGuestMutedWords(comment.body, guestMutedPhrases),
+    );
     let i = 0;
-    while (i < comments.length) {
-      const row = comments[i];
+    while (i < visibleComments.length) {
+      const row = visibleComments[i];
       if (row.isReply) { i += 1; continue; } // orphaned reply — shouldn't happen, skip defensively
       out.push(row);
       let j = i + 1;
       const replies: Row[] = [];
-      while (j < comments.length && comments[j].isReply && comments[j].parentId === row.id) {
-        replies.push(comments[j]);
+      while (j < visibleComments.length && visibleComments[j].isReply && visibleComments[j].parentId === row.id) {
+        replies.push(visibleComments[j]);
         j += 1;
       }
       if (replies.length > 0) {
@@ -983,7 +1007,7 @@ export default function BuyerPostCommentsScreen() {
       i = j;
     }
     return out;
-  }, [comments, expandedRoots]);
+  }, [comments, expandedRoots, user?.id, guestMutedPhrases]);
 
   const toggleReplies = useCallback((rootId: string) => {
     setExpandedRoots(prev => {

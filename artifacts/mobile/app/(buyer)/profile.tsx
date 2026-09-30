@@ -956,6 +956,8 @@ export default function ProfileScreen() {
         visible={shareSheetOpen}
         onClose={() => setShareSheetOpen(false)}
         avatarUrl={avatarUri}
+        profileUsername={profile?.username}
+        profileDisplayName={displayName}
         buyerExtra={{
           statLabel: 'followers',
           statValue: socialCounts?.followers ?? profile?.friendsCount ?? 0,

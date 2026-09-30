@@ -150,6 +150,7 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
     coachmarkVisible,
     dismissCoachmark,
     startAdd,
+    pickFromLibrary: () => { hapticLight(); void pickFrom('library'); },
     openManage: () => { hapticSelection(); setManageOpen(true); },
     manageOpen,
     closeManage: () => setManageOpen(false),

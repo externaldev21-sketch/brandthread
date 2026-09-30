@@ -3,6 +3,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSegments, type Tabs } from 'expo-router';
 import Animated, {
   Easing,
+  interpolate,
   useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
@@ -164,29 +165,39 @@ export function BuyerTabBar({
   // waiting for React to commit the real navigation state and competing with
   // that mount for the JS thread.
   const progress = useSharedValue(isCompact ? 1 : 0);
+  const modeTarget = useSharedValue(isCompact ? 1 : 0);
   useAnimatedReaction(
-    () => indicatorTarget.value === 0,
-    (nowCompact, wasCompact) => {
-      if (nowCompact === wasCompact) return;
-      progress.set(reducedMotion ? (nowCompact ? 1 : 0) : withTiming(nowCompact ? 1 : 0, BAR_MODE_TIMING));
+    () => activeIndex >= 0 && indicatorTarget.value === 0,
+    (nowCompact) => {
+      const target = nowCompact ? 1 : 0;
+      if (modeTarget.value === target) return;
+      modeTarget.value = target;
+      progress.set(reducedMotion ? target : withTiming(target, BAR_MODE_TIMING));
     },
-    [reducedMotion],
+    [activeIndex, reducedMotion],
   );
 
-  // TabBarGlassZone isn't a Reanimated-aware component (its native path
-  // renders several plain BlurView bands, its web path a CSS mask) — its
-  // `height` prop can only be updated from JS, which used to happen via a
-  // per-frame useAnimatedReaction + runOnJS (~16 React re-renders across the
-  // transition, on the same JS thread mounting the destination screen). Set
-  // once, straight to the target, instead — a same-tick snap rather than a
-  // gradual sync, trading a barely-visible seam on the glass strip's own top
-  // edge for zero per-frame JS work.
-  const [barTopInset, setBarTopInset] = React.useState(
-    isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset,
-  );
+  // A Profile press hides the pill without changing its tab index. Reconcile
+  // against the committed route as well, so Profile always gets the regular
+  // size and returning to Home restores compact even if the pill target stayed
+  // at zero. A press-in that already chose the right size isn't restarted.
   React.useEffect(() => {
-    setBarTopInset(isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset);
-  }, [isCompact, compactMetrics.barTopInset, regularMetrics.barTopInset]);
+    const target = isCompact ? 1 : 0;
+    if (modeTarget.get() === target) return;
+    modeTarget.set(target);
+    progress.set(reducedMotion ? target : withTiming(target, BAR_MODE_TIMING));
+  }, [isCompact, reducedMotion, modeTarget, progress]);
+
+  // Clip a stable glass surface to the animated bar height on the UI thread.
+  // With the incoming transform-based capsule resize, its top stays centered
+  // inside the regular-height row: only HALF the height delta moves its top.
+  // Match that actual visible top rather than the compact layout height.
+  const glassClipStyle = useAnimatedStyle(() => ({
+    height: interpolate(progress.value, [0, 1], [
+      regularMetrics.barTopInset,
+      regularMetrics.barTopInset - (regularMetrics.capsuleHeight - compactMetrics.capsuleHeight) / 2,
+    ]),
+  }));
 
   // Capsule/circle scale factors, in "regular -> compact" ratio form so the
   // capsule and circle can each be rendered at a FIXED (regular) layout size
@@ -326,29 +337,19 @@ export function BuyerTabBar({
         slideStyle,
       ]}
     >
-      {/* Frosted glass over whatever's actually rendered behind the bar —
-          the feed's full-bleed video, or an ordinary scrolling list on
-          Discover/Inbox/Activity/Profile. `BuyerTabBar` is the one shared
-          tab-bar container mounted for the whole buyer navigator (see
-          app/(buyer)/_layout.tsx's `tabBar` prop), so rendering it here
-          once — instead of each screen wiring its own copy — is what gets
-          every one of those screens the same live-sampled treatment
-          automatically, feed included.
-          `bar`'s own coordinate origin is already offset by
-          `metrics.bottomOffset` from the true screen bottom (see the
-          `bottom` set on `styles.bar` above), so this needs the negative
-          of that same offset to actually reach the screen's bottom edge —
-          a plain `bottom: 0` would stop short by exactly that offset and
-          leave a hard, unblurred edge below the glass. The height is
-          `barTopInset` (not the more generous `occupiedHeight`) so the
-          glass's own top edge lands exactly on the bar's top pixel, with
-          no gap of sharp content between them. */}
-      <TabBarGlassZone
-        height={barTopInset}
-        width={width}
-        tint="dark"
-        style={{ bottom: -metrics.bottomOffset }}
-      />
+      {/* Clip a fixed-size glass surface from its bottom; its feather remains
+          at the animated top edge as the capsule scales on the UI thread. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.glassClip, { bottom: -metrics.bottomOffset }, glassClipStyle]}
+      >
+        <TabBarGlassZone
+          height={regularMetrics.barTopInset}
+          width={width}
+          tint="dark"
+          style={{ top: 0, bottom: undefined }}
+        />
+      </Animated.View>
 
       {/* ── Capsule ─────────────────────────────────────────────────────── */}
       {/* Fixed at its regular layout size always — `capsuleAnimatedStyle`
@@ -454,6 +455,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  glassClip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,

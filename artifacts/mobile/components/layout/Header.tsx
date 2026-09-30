@@ -50,6 +50,7 @@ export function Header({
   subtitle,
   largeTitle,
   onBack,
+  backAccessibilityLabel = 'Go back',
   showBack = true,
   actions = [],
   scrollY,
@@ -62,6 +63,7 @@ export function Header({
   subtitle?: string;
   largeTitle?: boolean;
   onBack?: () => void;
+  backAccessibilityLabel?: string;
   showBack?: boolean;
   actions?: HeaderAction[];
   scrollY?: Animated.Value;
@@ -153,7 +155,7 @@ export function Header({
         {showBack ? (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={backAccessibilityLabel}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={handleBack}
             style={styles.iconBtn}
@@ -275,8 +277,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm,
   },
   iconBtn: {
-    width: ICON.xl + SP.sm,
-    height: ICON.xl + SP.sm,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

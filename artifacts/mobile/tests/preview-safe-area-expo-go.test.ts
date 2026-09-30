@@ -19,11 +19,14 @@ describe('browser preview safe areas and Expo Go startup', () => {
     expect(sellerBar).toContain('bottom: metrics.bottomOffset');
     expect(tabBarParts).toContain('minWidth: 44');
     expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
+    expect(cookieConsent).toContain('const BANNER_BOTTOM = 72 + SP.md;');
+    expect(cookieConsent).toContain('bottom:BANNER_BOTTOM');
     // The cookie banner's bottom offset is derived from the same tab bar
     // metrics both bars use (occupiedHeight), rather than a hardcoded value
     // tuned for phone proportions only — see WebAppShell / desktop web pass.
     expect(cookieConsent).toContain('tabBarInset + SP.sm');
     expect(cookieConsent).toContain('useTabBarMetrics().occupiedHeight');
+    expect(cookieConsent).toContain('{ bottom: tabBarInset + SP.sm }');
   });
 
   it('does not statically load the unavailable keyboard-controller native module', () => {

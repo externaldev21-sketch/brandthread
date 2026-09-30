@@ -43,7 +43,7 @@ import { liveShopSelection } from '@/lib/live/liveShop';
 import type { LiveStream } from '@/lib/live/types';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
-  LiveViewerCount, LiveViewerStack, type LiveHeartLayerHandle,
+  type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
@@ -182,7 +182,7 @@ function LivePage({
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={[styles.topScrim, { height: topInset + 110 }]} />
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.7)']} locations={[0, 0.4, 1]} style={[styles.bottomScrim, { height: bottomInset + 360 }]} />
 
-      {/* Top-left host pill · top-right viewer stack + count + close. Sits at
+      {/* One creator identity + follow action on the left, close on the right. Sits at
           topInset + 6, below the safe area (Dynamic Island on device, and
           TabPageHeader's 67pt web fallback when insets.top reads 0 in a
           plain browser preview) — never level with the notch. Mute lives in
@@ -195,15 +195,11 @@ function LivePage({
           onFollow={onFollow}
           onOpenHost={onOpenHost}
         />
-        <View style={styles.topRight}>
-          <LiveViewerStack viewers={stream.topViewers} />
-          <LiveViewerCount count={viewerCount} />
-          <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
-            <Feather name="x" size={22} color="#fff" />
-          </Pressable>
-        </View>
+        <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
+          <Feather name="x" size={22} color="#fff" />
+        </Pressable>
       </View>
-      <Text style={[styles.title, { top: topInset + 56 }]} numberOfLines={1}>{stream.title}</Text>
+      <Text style={[styles.title, { top: topInset + 68 }]} numberOfLines={1}>{stream.title}</Text>
 
       {/* Right rail */}
       <View style={[styles.railWrap, { bottom: bottomInset + 52 + (pinned ? 74 : 0) + 8 }]} pointerEvents="box-none">
@@ -504,8 +500,7 @@ const styles = StyleSheet.create({
   rtcBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  topRow: { position: 'absolute', left: 12, right: 12, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,

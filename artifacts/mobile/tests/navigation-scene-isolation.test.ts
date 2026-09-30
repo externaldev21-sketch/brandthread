@@ -8,12 +8,12 @@ const read = (relativePath: string) =>
 describe('navigation scene isolation', () => {
   it('gives every root-stack scene one opaque background plane', () => {
     const rootLayout = read('app/_layout.tsx');
-    const layoutStart = rootLayout.indexOf('screenLayout={({ children }) => (');
+    const layoutStart = rootLayout.indexOf('screenLayout={({ route, children }) => (');
     const stackOptions = rootLayout.indexOf('screenOptions={{', layoutStart);
 
     expect(layoutStart).toBeGreaterThan(-1);
     expect(rootLayout.slice(layoutStart, stackOptions)).toContain(
-      '<IsolatedStackScene>{children}</IsolatedStackScene>',
+      '<IsolatedStackScene routeName={route.name}>{children}</IsolatedStackScene>',
     );
     expect(rootLayout).toContain('backgroundColor: palette.background');
     expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');

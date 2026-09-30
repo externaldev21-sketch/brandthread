@@ -97,7 +97,8 @@ describe('Studio auto-enter: re-touching always re-arms a fresh countdown, cance
   });
 
   it('a fresh open resets enterState to hidden alongside the rest of the carousel state', () => {
-    const resetBlock = studio.slice(studio.indexOf('if (open) {', studio.indexOf('useEffect(() => {\n    // Reset to the first card')), studio.indexOf('setCardIndexJS(0);'));
+    const start = studio.indexOf('if (open) {', studio.indexOf('// Fresh opens'));
+    const resetBlock = studio.slice(start, studio.indexOf('}, [open]);', start));
     expect(resetBlock).toContain("setEnterState('hidden');");
   });
 });

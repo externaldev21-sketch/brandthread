@@ -28,6 +28,16 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   expiresAtIdx: index("rate_limit_buckets_expires_at_idx").on(table.expiresAt),
 }));
 
+/** Buyer-scoped, one-shot release-check failures shared across API replicas. */
+export const releaseTestFailureClaims = pgTable("release_test_failure_claims", {
+  buyerId: text("buyer_id").primaryKey(),
+  failureKind: text("failure_kind").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  expiresAtIdx: index("release_test_failure_claims_expires_at_idx").on(table.expiresAt),
+}));
+
 /** Durable one-success allowance for the seller onboarding AI sample. */
 export const onboardingAiSamples = pgTable("onboarding_ai_samples", {
   accountId: text("account_id").primaryKey(),

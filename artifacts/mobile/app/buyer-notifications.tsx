@@ -4,6 +4,7 @@ import {
   Alert, StyleSheet,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { FONT, ICON } from '@/lib/theme';
@@ -231,6 +232,17 @@ export default function BuyerNotifications() {
 
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory | undefined>(undefined);
+  const [filterEdges, setFilterEdges] = useState({ left: false, right: false });
+  const filterViewport = useRef(0);
+  const filterContent = useRef(0);
+  const filterOffset = useRef(0);
+  const updateFilterEdges = useCallback(() => {
+    const left = filterOffset.current > 2;
+    const right = filterContent.current - filterViewport.current - filterOffset.current > 2;
+    setFilterEdges(previous =>
+      previous.left === left && previous.right === right ? previous : { left, right },
+    );
+  }, []);
   const [notifLoading, setNotifLoading] = useState(true);
   const [optionsFor, setOptionsFor] = useState<Notification | null>(null);
 
@@ -446,24 +458,65 @@ export default function BuyerNotifications() {
       />
 
       {/* CATEGORY PILLS */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.pillsScroll}
-        contentContainerStyle={styles.pillsContent}
-      >
-        {PILLS.map(pill => {
-          const active = selectedCategory === pill.value;
-          return (
-            <Chip
-              key={pill.label}
-              label={pill.label}
-              selected={active}
-              onPress={() => setSelectedCategory(pill.value)}
+      <View style={styles.pillsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          overScrollMode="never"
+          directionalLockEnabled
+          scrollEventThrottle={16}
+          accessibilityLabel="Notification filters, swipe left or right for more categories"
+          style={styles.pillsScroll}
+          contentContainerStyle={styles.pillsContent}
+          onLayout={event => {
+            filterViewport.current = event.nativeEvent.layout.width;
+            updateFilterEdges();
+          }}
+          onContentSizeChange={width => {
+            filterContent.current = width;
+            updateFilterEdges();
+          }}
+          onScroll={event => {
+            filterOffset.current = event.nativeEvent.contentOffset.x;
+            updateFilterEdges();
+          }}
+        >
+          {PILLS.map(pill => {
+            const active = selectedCategory === pill.value;
+            return (
+              <Chip
+                key={pill.label}
+                label={pill.label}
+                selected={active}
+                onPress={() => setSelectedCategory(pill.value)}
+              />
+            );
+          })}
+        </ScrollView>
+        {filterEdges.left && (
+          <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeLeft]}>
+            <LinearGradient
+              colors={[theme.background, `${theme.background}00`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
             />
-          );
-        })}
-      </ScrollView>
+            <Feather name="chevron-left" size={14} color={theme.muted} />
+          </View>
+        )}
+        {filterEdges.right && (
+          <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeRight]}>
+            <LinearGradient
+              colors={[`${theme.background}00`, theme.background]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Feather name="chevron-right" size={14} color={theme.muted} />
+          </View>
+        )}
+      </View>
 
       {/* UNREAD COUNT */}
       {unreadCount > 0 && (
@@ -529,6 +582,9 @@ const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
+  pillsRow: {
+    position: 'relative',
+  },
   pillsScroll: {
     flexGrow: 0,
     // flexShrink defaults to 1, so a sibling flex:1 element (the loading
@@ -542,6 +598,24 @@ const makeStyles = () => StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     gap: SPACING.sm,
+    alignItems: 'center',
+  },
+  pillsEdge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    bottom: SPACING.sm,
+    width: 28,
+    justifyContent: 'center',
+  },
+  pillsEdgeLeft: {
+    left: 0,
+    alignItems: 'flex-start',
+    paddingLeft: 2,
+  },
+  pillsEdgeRight: {
+    right: 0,
+    alignItems: 'flex-end',
+    paddingRight: 2,
   },
   unreadBar: {
     paddingHorizontal: SPACING.md,
