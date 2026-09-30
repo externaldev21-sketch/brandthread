@@ -97,7 +97,7 @@ All 22 cases below run against the real `conversations`/`social` routers and a r
 | Post like | A's like on S's post → `notifyPostLike` reaches S (`notificationsFeed` row) AND the post's own `likeCount` (`GET /api/posts/:id`) reflects it | PASS | |
 | Post comment | A's comment on S's post → `notifyCommentActivity` reaches S AND the post's own comment list reflects it | PASS | |
 | Story view | `POST /stories/:id/view` reflected in the author's `GET /stories/:id/viewers` | PASS | |
-| Story reply | — | Covered elsewhere | routed through the same DM/request pipeline as section 3 (no separate story-reply conversation-creation code path exists); not duplicated |
+| Story reply | — | Covered elsewhere | `storyMentions.ts`'s `routeStoryReply` now delegates directly to `conversationRouting.ts`'s `shouldRouteToRequests` (previously a separate, parallel implementation of the same rule) — verified via `story-mentions.integration.test.ts`'s 3 routing cases (not follower → Requests, follower → inbox, seller with a paid order → inbox), all passing after the consolidation |
 
 ## 6. Account-switch isolation
 
