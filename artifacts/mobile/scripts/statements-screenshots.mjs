@@ -66,7 +66,28 @@ async function open(browser, images, origin, target, ready, months) {
   return { context, page };
 }
 
+/** Text-fit pass: flags clipped/ellipsised text (scrollWidth > clientWidth) and text escaping its parent. */
+async function textFit(page, name) {
+  const issues = await page.evaluate((vw) => {
+    const out = [];
+    for (const el of document.querySelectorAll('div, span')) {
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!own) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const label = el.textContent.trim().slice(0, 40);
+      if (el.scrollWidth > el.clientWidth + 1) out.push(`clipped: ${label}`);
+      if (r.left < 0 || r.right > vw + 0.5) out.push(`off-screen: ${label}`);
+      const p = el.parentElement?.getBoundingClientRect();
+      if (p && (r.left < p.left - 1 || r.right > p.right + 1)) out.push(`overflows parent: ${label}`);
+    }
+    return out;
+  }, VIEWPORT.width);
+  if (issues.length) { console.error(`TEXT-FIT FAIL ${name}:`, issues); process.exitCode = 1; } else console.log(`  text-fit clean ${name}`);
+}
+
 async function shot(page, name) {
+  if (!name.startsWith('05')) await textFit(page, name); // 05 is the pre-existing Finance screen
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(OUT, `${name}.png`), animations: 'disabled', caret: 'hide' });
   console.log(`  ok ${name}`);
@@ -82,9 +103,11 @@ async function run() {
     {
       const { context, page } = await open(browser, images, server.origin, '/statements', (p) => p.getByTestId('statement-month-2026-09'), MONTHS);
       await shot(page, '01-statements-list');
+      await page.getByTestId('statement-month-2026-09').locator('xpath=..').screenshot({ path: path.join(OUT, '07-zoom-month-list-card.png') });
       await page.getByTestId('statement-month-2026-08').click();
       await page.getByTestId('statement-download-pdf').waitFor({ timeout: 15_000 });
       await shot(page, '02-statement-month-detail');
+      await page.getByTestId('statement-download-pdf').locator('xpath=..').screenshot({ path: path.join(OUT, '06-zoom-download-buttons.png') });
       await context.close();
     }
     {
