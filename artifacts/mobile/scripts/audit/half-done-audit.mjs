@@ -22,6 +22,23 @@
  * Usage:
  *   node scripts/audit/half-done-audit.mjs [--skip-build] [--only route,route]
  *     [--limit N] [--time-budget-ms N] [--roles seller,buyer]
+ *     [--data-states fresh,demo] [--shard-out <path.json>]
+ *
+ * `--data-states` (default: `fresh`) controls whether each route/role is
+ * loaded with a brand-new/empty account (`fresh`, the historical default —
+ * no query param) and/or with the app's own `&demo=1` opt-in
+ * (`isPreviewDemoMode()`, see lib/devPreview.ts) which switches on the
+ * seeded/populated preview datasets (lib/previewInbox.ts, previewOrders.ts,
+ * previewSellerProducts.ts, previewActivity.ts, etc). Pass
+ * `--data-states fresh,demo` to audit both states — doubles the combination
+ * count.
+ *
+ * `--shard-out <path>` writes this run's raw per-combo results (not the
+ * merged report/baseline) to a JSON file instead of the usual
+ * docs/audit/half-done-findings.json + report + CI gate, so a long full run
+ * can be split into several bounded shard invocations (see `--only` to pick
+ * a route slice per shard) and combined afterward with
+ * `merge-shard-results.mjs` — see docs/audit/README.md.
  *
  * Output:
  *   docs/audit/half-done-findings.json   — structured findings (this run)
@@ -46,6 +63,7 @@ import {
 } from '../store-screenshots/harness.mjs';
 import { BUYER_USER, SELLER_USER } from '../store-screenshots/demo-data.mjs';
 import { ensureDemoImages } from '../store-screenshots/demo-images.mjs';
+import { ownerForRoute } from './route-ownership.mjs';
 
 const REPO_ROOT = path.resolve(MOBILE_ROOT, '..', '..');
 const APP_DIR = path.join(MOBILE_ROOT, 'app');
@@ -87,7 +105,18 @@ function extractFsScale(src) {
 const INTER_FAMILIES = extractFontFamilies(THEME_SRC); // e.g. Inter_400Regular, Inter_500Medium, ...
 const FS_SCALE = extractFsScale(THEME_SRC); // e.g. [11,12,13,15,17,19,22,26,30,36]
 
-const PLACEHOLDER_RE = /coming soon|isn't tracked yet|is not tracked yet|not available yet|TODO\b|lorem ipsum|placeholder|^Label$|^Title$|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
+// Deliberately NOT included as a bare exact-word match: "Label" and "Title"
+// on their own. The original `^Label$|^Title$` rule was meant to catch an
+// un-customized default component prop (a control that still literally says
+// "Label" because nobody filled it in) but a full fresh+demo run found it
+// false-positiving on genuine, deliberately-short domain vocabulary — the
+// "Title" field label on the real Add Product form (app/add-product.tsx,
+// shared by product-editor.tsx) and the "Label" step in the shipping-status
+// tracker's Order/Label/Pickup/Transit/Delivered row (app/shipping.tsx,
+// shared by shipping-delivery.tsx) — both real, permanent, correctly-used
+// one-word UI copy, not stubs. Same judgement-call treatment as bare
+// "sample"/"read-only" below for preview-demo-wording.
+const PLACEHOLDER_RE = /coming soon|isn't tracked yet|is not tracked yet|not available yet|TODO\b|lorem ipsum|placeholder|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
 
 // Dev's explicit rule: no visible preview/demo tell anywhere, ever — a fresh
 // (empty) real install must read exactly like this text, never like a demo
@@ -131,8 +160,19 @@ const PARAM_VALUES = {
   filter: 'all',
   step: '1',
 };
+// Generic fallback for a dynamic-route param with no dedicated
+// PARAM_VALUES entry (e.g. buyer-other-profile's userId/name/handle
+// /initials/color). Deliberately does NOT contain "preview"/"demo"/"mock":
+// several routes render this fallback directly as visible text (a
+// profile's name/handle), and an earlier 'preview-1' fallback was
+// tripping PREVIEW_DEMO_WORDING_RE — a false "preview/demo wording" hard
+// finding caused entirely by the audit harness's own synthesized param
+// value, not by real app text. This is separate from the *intentionally*
+// preview-prefixed fixture IDs in PARAM_VALUES above (e.g.
+// 'preview-conversation-01', matched in lib/previewInboxData.ts) — those
+// are real seed keys the app defines and must stay as-is.
 function paramValueFor(name) {
-  return PARAM_VALUES[name.toLowerCase()] ?? 'preview-1';
+  return PARAM_VALUES[name.toLowerCase()] ?? 'sample-1';
 }
 
 // ─── route discovery ───────────────────────────────────────────────────────────
@@ -324,7 +364,15 @@ const PAGE_SCAN_FN = () => {
 };
 
 // ─── run one route/role combination ───────────────────────────────────────────
-async function auditRoute({ browser, origin, role, route, images, budgetMs, maxTaps = 40 }) {
+// `dataState` is 'fresh' (brand-new/empty account, historical default) or
+// 'demo' (appends `&demo=1`, the app's own populated-preview-dataset opt-in
+// — see isPreviewDemoMode() in lib/devPreview.ts).
+function withDataState(url, dataState) {
+  if (dataState !== 'demo') return url;
+  return `${url}${url.includes('?') ? '&' : '?'}demo=1`;
+}
+
+async function auditRoute({ browser, origin, role, route, images, budgetMs, maxTaps = 40, dataState = 'fresh' }) {
   const findings = [];
   const consoleErrors = [];
   const startedAt = Date.now();
@@ -346,13 +394,13 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
   let unreachableReason = null;
   try {
     const target = route.query ? `${route.routePath}?${route.query}` : route.routePath;
-    await page.goto(`${origin}/?bt_preview=${role}`, { timeout: 20_000 });
+    await page.goto(withDataState(`${origin}/?bt_preview=${role}`, dataState), { timeout: 20_000 });
     await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 }).catch(() => {});
     await waitForQuietNetwork(activity, 500, 8_000);
     await page.evaluate((url) => {
       history.pushState(history.state, '', url);
       window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-    }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+    }, withDataState(`${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`, dataState));
     await page.waitForTimeout(900);
     await waitForImages(page, 6_000);
     await waitForQuietNetwork(activity, 500, 6_000);
@@ -366,7 +414,7 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
     // reflects the final route.
     if (bodyText.trim().length < 3) {
       try {
-        const fullUrl = `${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`;
+        const fullUrl = withDataState(`${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`, dataState);
         await page.goto(fullUrl, { timeout: 20_000 });
         await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 }).catch(() => {});
         await waitForQuietNetwork(activity, 500, 8_000);
@@ -574,14 +622,14 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
       }
       // reset for the next tap
       try {
-        await page.goto(`${origin}/?bt_preview=${role}`, { timeout: 10_000 });
+        await page.goto(withDataState(`${origin}/?bt_preview=${role}`, dataState), { timeout: 10_000 });
         await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 10_000 }).catch(() => {});
         await waitForQuietNetwork(activity, 300, 4_000);
         const target = route.query ? `${route.routePath}?${route.query}` : route.routePath;
         await page.evaluate((url) => {
           history.pushState(history.state, '', url);
           window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-        }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+        }, withDataState(`${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`, dataState));
         await page.waitForTimeout(400);
       } catch {
         break; // reload itself failing — stop tapping this route/role, keep findings so far
@@ -602,7 +650,10 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
 
 // ─── main ──────────────────────────────────────────────────────────────────────
 function parseArgs(argv) {
-  const opts = { skipBuild: false, only: null, limit: null, timeBudgetMs: null, roles: ['seller', 'buyer'], ci: false, perRouteBudgetMs: 45_000, maxTaps: 40 };
+  const opts = {
+    skipBuild: false, only: null, limit: null, timeBudgetMs: null, roles: ['seller', 'buyer'],
+    ci: false, perRouteBudgetMs: 45_000, maxTaps: 40, dataStates: ['fresh'], shardOut: null,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--skip-build') opts.skipBuild = true;
@@ -613,6 +664,8 @@ function parseArgs(argv) {
     else if (a === '--roles') opts.roles = argv[++i].split(',');
     else if (a === '--max-taps') opts.maxTaps = Number(argv[++i]);
     else if (a === '--ci') opts.ci = true;
+    else if (a === '--data-states') opts.dataStates = argv[++i].split(',');
+    else if (a === '--shard-out') opts.shardOut = argv[++i];
   }
   return opts;
 }
@@ -649,7 +702,7 @@ async function main() {
   if (opts.only) routes = routes.filter((r) => opts.only.some((o) => r.routePath.includes(o) || r.file.includes(o)));
   if (opts.limit) routes = routes.slice(0, opts.limit);
 
-  console.log(`Discovered ${routeFiles.length} route files; auditing ${routes.length} across roles [${opts.roles.join(', ')}].`);
+  console.log(`Discovered ${routeFiles.length} route files; auditing ${routes.length} across roles [${opts.roles.join(', ')}] and data-states [${opts.dataStates.join(', ')}].`);
 
   if (!opts.skipBuild) {
     console.log('Building preview web export…');
@@ -659,7 +712,7 @@ async function main() {
   }
 
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
-  const browser = await launchBrowser();
+  let browser = await launchBrowser();
 
   const images = await ensureDemoImages(browser, path.join(MOBILE_ROOT, '.audit', 'demo-images'));
 
@@ -668,21 +721,59 @@ async function main() {
   const globalBudget = opts.timeBudgetMs ?? Infinity;
   let interrupted = false;
 
+  // A crashed/killed Chromium process (OOM under resource contention from
+  // other concurrent Playwright processes on the same box is the observed
+  // cause) leaves `browser` disconnected; every subsequent
+  // openContext()/page call then throws "Target page, context or browser
+  // has been closed", which — before this fix — silently fell through to
+  // the generic catch below and got recorded as a per-route "unreachable"
+  // finding for every remaining route in the run, a false-negative cascade
+  // (the routes aren't actually broken, the browser process is dead). Detect
+  // that specific failure, relaunch the browser, and retry the current
+  // route once before giving up on it.
+  const BROWSER_DIED_RE = /Target page, context or browser has been closed|Browser has been closed|Browser closed|has been closed$/i;
+  async function runOneCombo(route, role, dataState) {
+    return Promise.race([
+      auditRoute({ browser, origin, role, route, images, budgetMs: opts.perRouteBudgetMs, maxTaps: opts.maxTaps, dataState }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('route timed out')), opts.perRouteBudgetMs + 15_000)),
+    ]);
+  }
+
   outer:
   for (const route of routes) {
     for (const role of opts.roles) {
-      if (Date.now() - overallStart > globalBudget) { interrupted = true; break outer; }
-      process.stdout.write(`  [${role}] ${route.routePath}${route.query ? '?' + route.query : ''} … `);
-      try {
-        const r = await Promise.race([
-          auditRoute({ browser, origin, role, route, images, budgetMs: opts.perRouteBudgetMs, maxTaps: opts.maxTaps }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('route timed out')), opts.perRouteBudgetMs + 15_000)),
-        ]);
-        results.push({ route: route.routePath, file: route.file, role, ...r });
-        console.log(r.reachable ? `${r.findings.length} finding(s)` : `unreachable (${r.unreachableReason})`);
-      } catch (err) {
-        results.push({ route: route.routePath, file: route.file, role, reachable: false, unreachableReason: String(err?.message || err), findings: [] });
-        console.log(`ERROR: ${err?.message || err}`);
+      for (const dataState of opts.dataStates) {
+        if (Date.now() - overallStart > globalBudget) { interrupted = true; break outer; }
+        if (!browser.isConnected()) {
+          console.log('  [browser was disconnected before this route — relaunching]');
+          await browser.close().catch(() => {});
+          browser = await launchBrowser();
+        }
+        process.stdout.write(`  [${role}/${dataState}] ${route.routePath}${route.query ? '?' + route.query : ''} … `);
+        try {
+          const r = await runOneCombo(route, role, dataState);
+          results.push({ route: route.routePath, file: route.file, role, dataState, ...r });
+          console.log(r.reachable ? `${r.findings.length} finding(s)` : `unreachable (${r.unreachableReason})`);
+        } catch (err) {
+          const msg = String(err?.message || err);
+          if (BROWSER_DIED_RE.test(msg)) {
+            console.log(`browser crashed (${msg.slice(0, 80)}) — relaunching and retrying once`);
+            await browser.close().catch(() => {});
+            browser = await launchBrowser();
+            try {
+              const r = await runOneCombo(route, role, dataState);
+              results.push({ route: route.routePath, file: route.file, role, dataState, ...r });
+              console.log(`  [retry] ${r.reachable ? `${r.findings.length} finding(s)` : `unreachable (${r.unreachableReason})`}`);
+              continue;
+            } catch (err2) {
+              results.push({ route: route.routePath, file: route.file, role, dataState, reachable: false, unreachableReason: `browser crashed, retry also failed: ${String(err2?.message || err2)}`.slice(0, 300), findings: [] });
+              console.log(`  [retry] ERROR: ${err2?.message || err2}`);
+              continue;
+            }
+          }
+          results.push({ route: route.routePath, file: route.file, role, dataState, reachable: false, unreachableReason: msg.slice(0, 300), findings: [] });
+          console.log(`ERROR: ${msg}`);
+        }
       }
     }
   }
@@ -693,8 +784,23 @@ async function main() {
   const flat = [];
   for (const r of results) {
     for (const f of r.findings) {
-      flat.push({ ...f, route: r.route, file: r.file, role: r.role, tier: classifyTier(f), screenshotDir: r.shotDir });
+      flat.push({ ...f, route: r.route, file: r.file, role: r.role, dataState: r.dataState, tier: classifyTier(f), screenshotDir: r.shotDir, owner: ownerForRoute(r.route) });
     }
+  }
+
+  if (opts.shardOut) {
+    // Shard mode: dump raw combo results for later merging (see
+    // merge-shard-results.mjs) instead of writing the top-level report/CI
+    // gate, which only make sense once every shard has been combined.
+    mkdirSync(path.dirname(opts.shardOut), { recursive: true });
+    writeFileSync(opts.shardOut, JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      interrupted,
+      routesDiscovered: routeFiles.length,
+      results: results.map((r) => ({ route: r.route, role: r.role, dataState: r.dataState, file: r.file, reachable: r.reachable, unreachableReason: r.unreachableReason, findings: r.findings, shotDir: r.shotDir })),
+    }, null, 2));
+    console.log(`\nShard wrote ${results.length} combo result(s) to ${opts.shardOut}`);
+    return;
   }
 
   const summary = {
@@ -702,7 +808,7 @@ async function main() {
     interrupted,
     routesDiscovered: routeFiles.length,
     routesAudited: results.length,
-    unreachable: results.filter((r) => !r.reachable).map((r) => ({ route: r.route, role: r.role, reason: r.unreachableReason })),
+    unreachable: results.filter((r) => !r.reachable).map((r) => ({ route: r.route, role: r.role, dataState: r.dataState, reason: r.unreachableReason })),
     findingsByType: {},
     findingsByTier: { hard: 0, warn: 0 },
   };
@@ -711,11 +817,11 @@ async function main() {
     summary.findingsByTier[f.tier] += 1;
   }
 
-  writeFileSync(OUT_JSON, JSON.stringify({ summary, findings: flat, results: results.map((r) => ({ route: r.route, role: r.role, reachable: r.reachable, unreachableReason: r.unreachableReason, file: r.file })) }, null, 2));
+  writeFileSync(OUT_JSON, JSON.stringify({ summary, findings: flat, results: results.map((r) => ({ route: r.route, role: r.role, dataState: r.dataState, reachable: r.reachable, unreachableReason: r.unreachableReason, file: r.file })) }, null, 2));
   console.log(`\nWrote ${OUT_JSON}`);
   console.log(`Findings: ${flat.length} (hard: ${summary.findingsByTier.hard}, warn: ${summary.findingsByTier.warn})`);
 
-  writeMarkdown(summary, flat);
+  writeMarkdown(summary, flat, results);
 
   if (opts.ci) {
     const exitCode = ciGate(flat);
@@ -737,13 +843,44 @@ function groupArea(route) {
   return 'Other';
 }
 
-function writeMarkdown(summary, flat) {
+function writeMarkdown(summary, flat, results = []) {
   const byArea = {};
   for (const f of flat) {
     const area = groupArea(f.route);
     (byArea[area] ??= []).push(f);
   }
   const areaOrder = Object.keys(byArea).sort((a, b) => byArea[b].length - byArea[a].length);
+
+  // ─── per-owner scoreboard ────────────────────────────────────────────────
+  // Per unique route (not per route×role×dataState combo): hard/warn finding
+  // counts, whether it's entirely finding-free, and whether it's "still
+  // failing" (unreachable in at least one combo, or has at least one
+  // hard-tier finding anywhere).
+  const routeOwner = new Map();
+  const routeHard = new Map();
+  const routeWarn = new Map();
+  const routeUnreachable = new Set();
+  for (const f of flat) {
+    routeOwner.set(f.route, f.owner ?? ownerForRoute(f.route));
+    if (f.tier === 'hard') routeHard.set(f.route, (routeHard.get(f.route) || 0) + 1);
+    else routeWarn.set(f.route, (routeWarn.get(f.route) || 0) + 1);
+  }
+  for (const r of results) {
+    if (!routeOwner.has(r.route)) routeOwner.set(r.route, ownerForRoute(r.route));
+    if (!r.reachable) routeUnreachable.add(r.route);
+  }
+  const ownerStats = {};
+  for (const [route, owner] of routeOwner) {
+    const s = (ownerStats[owner] ??= { hard: 0, warn: 0, routes: 0, zeroFindingRoutes: 0, failingRoutes: 0 });
+    s.routes += 1;
+    const hard = routeHard.get(route) || 0;
+    const warn = routeWarn.get(route) || 0;
+    s.hard += hard;
+    s.warn += warn;
+    if (hard === 0 && warn === 0 && !routeUnreachable.has(route)) s.zeroFindingRoutes += 1;
+    if (hard > 0 || routeUnreachable.has(route)) s.failingRoutes += 1;
+  }
+  const ownerOrder = Object.keys(ownerStats).sort((a, b) => ownerStats[b].hard - ownerStats[a].hard);
 
   const lines = [];
   lines.push('# Half-done audit report');
@@ -754,6 +891,17 @@ function writeMarkdown(summary, flat) {
   lines.push(`- Route × role combinations audited: ${summary.routesAudited}`);
   lines.push(`- Unreachable: ${summary.unreachable.length}`);
   lines.push(`- Total findings: ${flat.length} (hard: ${summary.findingsByTier.hard}, warn: ${summary.findingsByTier.warn})`);
+  lines.push('');
+  lines.push('## Scoreboard by area/owner');
+  lines.push('');
+  lines.push('Each owning session\'s row — see `route-ownership.mjs`/`route-ownership.json` for the mapping rules and `docs/audit/README.md` for the heuristic writeup. Counts are per unique route (not per route×role×data-state combo): a route counts once toward "zero-finding routes" only if it produced no hard AND no warn finding under any role/state it was audited in, and once toward "routes still failing" if it has any hard-tier finding or was unreachable under any role/state.');
+  lines.push('');
+  lines.push('| Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |');
+  lines.push('|---|---|---|---|---|---|');
+  for (const owner of ownerOrder) {
+    const s = ownerStats[owner];
+    lines.push(`| ${owner} | ${s.hard} | ${s.warn} | ${s.routes} | ${s.zeroFindingRoutes} | ${s.failingRoutes} |`);
+  }
   lines.push('');
   lines.push('## Notes on this run');
   lines.push('');
@@ -781,23 +929,23 @@ function writeMarkdown(summary, flat) {
   if (summary.unreachable.length === 0) {
     lines.push('None.');
   } else {
-    lines.push('| Route | Role | Reason |');
-    lines.push('|---|---|---|');
-    for (const u of summary.unreachable) lines.push(`| \`${u.route}\` | ${u.role} | ${u.reason ?? ''} |`);
+    lines.push('| Route | Role | Data state | Reason |');
+    lines.push('|---|---|---|---|');
+    for (const u of summary.unreachable) lines.push(`| \`${u.route}\` | ${u.role} | ${u.dataState ?? 'fresh'} | ${u.reason ?? ''} |`);
   }
   lines.push('');
-  lines.push('## Findings by area');
+  lines.push('## Findings by area (audit-script grouping, not the owner scoreboard above)');
   lines.push('');
   for (const area of areaOrder) {
     const items = byArea[area].sort((a, b) => (a.tier === b.tier ? 0 : a.tier === 'hard' ? -1 : 1));
     lines.push(`### ${area} (${items.length})`);
     lines.push('');
-    lines.push('| Route | Role | Type | Tier | Detail | Screenshot |');
-    lines.push('|---|---|---|---|---|---|');
+    lines.push('| Route | Role | Data state | Type | Tier | Detail | Screenshot |');
+    lines.push('|---|---|---|---|---|---|---|');
     for (const f of items.slice(0, 300)) {
       const shot = f.screenshotDir ? `[view](../../${f.screenshotDir}/00-initial.png)` : '';
       const detail = (f.detail || '').replace(/\|/g, '\\|').slice(0, 160);
-      lines.push(`| \`${f.route}\` | ${f.role} | ${f.type} | ${f.tier} | ${detail} | ${shot} |`);
+      lines.push(`| \`${f.route}\` | ${f.role} | ${f.dataState ?? 'fresh'} | ${f.type} | ${f.tier} | ${detail} | ${shot} |`);
     }
     lines.push('');
   }
@@ -824,10 +972,31 @@ function ciGate(flat) {
 }
 
 export function findingKey(f) {
-  return `${f.type}::${f.route}::${f.role}::${(f.control || f.text || f.detail || '').slice(0, 80)}`;
+  return `${f.type}::${f.route}::${f.role}::${f.dataState ?? 'fresh'}::${(f.control || f.text || f.detail || '').slice(0, 80)}`;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Re-exported for merge-shard-results.mjs, which builds the same top-level
+// report/baseline from several shard runs instead of one in-process run.
+export {
+  groupArea,
+  writeMarkdown as writeMarkdownExport,
+  classifyTier as classifyTierExport,
+  ownerForRoute as ownerForRouteExport,
+  walkRoutes,
+  fileToRoute,
+  requiredQueryParams,
+  paramValueFor,
+  APP_DIR,
+  MOBILE_ROOT as MOBILE_ROOT_EXPORT,
+  PLACEHOLDER_RE,
+};
+
+// Only run the CLI when this file is executed directly (`node
+// half-done-audit.mjs ...`), not when merge-shard-results.mjs imports its
+// exports.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

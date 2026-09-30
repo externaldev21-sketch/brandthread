@@ -47,7 +47,13 @@ export type ThreadCashEntry = {
   source:
     | 'daily_checkin' | 'streak_bonus' | 'redemption' | 'checkout_spend'
     | 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' | 'send_received'
-    | 'send_cancelled' | 'send_expired' | 'redemption_cancelled';
+    | 'send_cancelled' | 'send_expired' | 'redemption_cancelled'
+    // Seller-earned Thread Cash (not spendable at checkout, cashable to real
+    // payout money — see app/thread-cash-history.tsx): 'live_gift' is
+    // credited by the Live-gifting flow, 'send_received' doubles as a
+    // buyer-to-seller message payment, 'cash_out' is this seller debiting
+    // their balance into their Stripe payout balance.
+    | 'live_gift' | 'cash_out';
   referenceId: string | null;
   note: string | null;
   createdAt: string;

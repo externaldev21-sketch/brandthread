@@ -63,6 +63,8 @@ import {
 // (order status only, via `FULFILLMENT_MAP`), so the two disagreed.
 import { apiRowToOrder } from '@/app/(tabs)/orders';
 import { filterOrders } from '@/services/orderService';
+import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
 import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
 import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
@@ -181,6 +183,7 @@ export default function SellerHomeCommerceDashboard({
   const [financeLoading, setFinanceLoading] = useState(true);
   const [cashingOut, setCashingOut] = useState(false);
   const balanceGenerationRef = useRef(0);
+  const threadCash = useSellerThreadCashBalance();
   const payoutAttemptKeyRef = useRef<string | null>(null);
 
   const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
@@ -628,7 +631,7 @@ export default function SellerHomeCommerceDashboard({
             <View style={styles.errorBanner} testID="seller-dashboard-error">
               <Feather name="alert-circle" size={16} color={theme.error} />
               <Text style={[styles.errorText, { color: theme.error }]}>Couldn’t load your dashboard.</Text>
-              <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
+              <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
                 <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -719,6 +722,26 @@ export default function SellerHomeCommerceDashboard({
                 </View>
               )}
 
+              {/* ── Thread Cash — small row, links to the Payouts card/cash-out ── */}
+              {currentRole === 'owner' && (
+                <TouchableOpacity
+                  style={[styles.section, styles.threadCashRow, { borderColor: theme.borderSubtle }]}
+                  activeOpacity={0.8}
+                  onPress={() => nav('/payouts')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Thread Cash balance, open Payouts"
+                  testID="seller-dashboard-thread-cash-row"
+                >
+                  <ThreadCashBillIcon size={16} />
+                  <Text style={[styles.threadCashLabel, { color: theme.muted }]}>Thread Cash</Text>
+                  <View style={{ flex: 1 }} />
+                  <Text style={[styles.threadCashValue, { color: THREAD_CASH_GREEN_MID }]}>
+                    {threadCash.loading ? '···' : formatCents(threadCash.balanceCents ?? 0)}
+                  </Text>
+                  <Feather name="chevron-right" size={16} color={theme.subtle} />
+                </TouchableOpacity>
+              )}
+
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
                 {newSeller ? (
@@ -740,7 +763,7 @@ export default function SellerHomeCommerceDashboard({
                   <View style={[isTablet && styles.tabletRowItem, styles.errorBanner]}>
                     <Feather name="alert-circle" size={16} color={theme.error} />
                     <Text style={[styles.errorText, { color: theme.error }]}>Some dashboard data couldn’t load.</Text>
-                    <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
+                    <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
                       <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
                     </TouchableOpacity>
                   </View>
@@ -839,7 +862,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
-  screenTitle: { fontFamily: FONT.bold, fontSize: 20, letterSpacing: -0.4 },
+  screenTitle: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.4 },
 
   heroSkeleton: { paddingTop: SP.md },
 
@@ -852,7 +875,7 @@ const styles = StyleSheet.create({
   },
   heroValue: {
     fontFamily: FONT.bold,
-    fontSize: 52,
+    fontSize: FS.h1,
     letterSpacing: -1.2,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
@@ -886,7 +909,7 @@ const styles = StyleSheet.create({
   balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.6 },
   balanceValue: { fontFamily: FONT.bold, fontSize: FS.lg, marginTop: 2, fontVariant: ['tabular-nums'] },
   withdrawButton: {
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: SP.md,
     borderRadius: RADIUS.md,
     alignItems: 'center',
@@ -894,6 +917,17 @@ const styles = StyleSheet.create({
   },
   withdrawButtonDisabled: { opacity: 0.5 },
   withdrawButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
+
+  threadCashRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    minHeight: 44,
+    paddingTop: SP.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  threadCashLabel: { fontFamily: FONT.medium, fontSize: FS.sm },
+  threadCashValue: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
 
   tabletRow: { flexDirection: 'row', gap: SP.lg, alignItems: 'flex-start' },
   tabletRowItem: { flex: 1, minWidth: 0 },

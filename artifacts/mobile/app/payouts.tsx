@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -23,6 +23,10 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashCard';
+import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
+import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+import { formatCents } from '@/lib/money';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -60,7 +64,7 @@ function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
 export default function PayoutsScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
+  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const router = useRouter();
   const params = useLocalSearchParams();
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
@@ -82,6 +86,8 @@ export default function PayoutsScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
   const connectRequestRef = useRef(false);
   const onboardingOpenRef = useRef(false);
+  const threadCash = useSellerThreadCashBalance();
+  const [cashOutVisible, setCashOutVisible] = useState(false);
 
   function leaveSetupDestination() {
     if (launchedFromSellerSetup) {
@@ -148,6 +154,13 @@ export default function PayoutsScreen() {
   }, [api, refreshConnectStatus]);
 
   useEffect(() => { load(); }, [load]);
+
+  function handleCashedOut(result: { threadCashCents: number; payoutCents: number; feeCents: number }) {
+    setCashOutVisible(false);
+    void threadCash.reload();
+    void load(); // the cash-out is a real Stripe transfer — refresh the payout balance too
+    Alert.alert('Cashed out', `${formatCents(result.threadCashCents)} Thread Cash moved to your payout balance as ${formatCents(result.payoutCents)}.`);
+  }
 
   useFocusEffect(useCallback(() => {
     void refreshConnectStatus();
@@ -225,6 +238,20 @@ export default function PayoutsScreen() {
         }]}
       />
 
+      <SellerThreadCashCard
+        balanceCents={threadCash.balanceCents}
+        loading={threadCash.loading}
+        error={threadCash.error}
+        onReload={threadCash.reload}
+        onCashOutPress={() => setCashOutVisible(true)}
+      />
+      <CashOutSheet
+        visible={cashOutVisible}
+        balanceCents={threadCash.balanceCents ?? 0}
+        onClose={() => setCashOutVisible(false)}
+        onCashedOut={handleCashedOut}
+      />
+
       {/* Balance hero */}
       <View style={styles.balanceHero}>
         <Text style={styles.balanceHeroLabel}>Available balance</Text>
@@ -268,7 +295,14 @@ export default function PayoutsScreen() {
       </View>
 
       {activeTab === 'payouts' ? (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
+        <ScrollView
+          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: SP.md },
+            payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
+          ]}
+        >
           {loading ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
@@ -276,13 +310,19 @@ export default function PayoutsScreen() {
           ) : loadError ? (
             <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
           ) : payouts.length === 0 ? (
-            <EmptyState
-              icon="inbox"
-              title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-              message={balance?.connected === false
-                ? 'Add a bank account under Bank account to start receiving payouts.'
-                : 'Payouts show up here once your available balance clears.'}
-            />
+            <View style={{ alignItems: 'center' }}>
+              <EmptyState
+                icon="inbox"
+                title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
+                message=""
+                compact
+              />
+              <Text style={styles.payoutsEmptyMessage}>
+                {balance?.connected === false
+                  ? 'Add a bank account under Bank account to start receiving payouts.'
+                  : 'Payouts show up here once your available balance clears.'}
+              </Text>
+            </View>
           ) : (
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
@@ -304,7 +344,10 @@ export default function PayoutsScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
+        <ScrollView
+          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
+          contentContainerStyle={[styles.list, { paddingBottom: SP.md }]}
+        >
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
@@ -433,15 +476,13 @@ export default function PayoutsScreen() {
 }
 
 const createStyles = (theme: AppThemePreset) => {
-  const { accent, text, muted, subtle, card, border, warning } = theme;
+  const { accent, text, muted, subtle, card, border } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
-  devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${warning}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
-  devBannerText:{ color: warning, fontSize: FS.xs, fontFamily: FONT.medium },
   balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
   balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
   balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
@@ -459,6 +500,10 @@ const createStyles = (theme: AppThemePreset) => {
   tabText:      { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
    tabTextActive:{ color: accent },
   list:         { padding: SP.md },
+  payoutsEmptyMessage: {
+    color: muted, fontSize: FS.sm, fontFamily: FONT.medium, textAlign: 'center',
+    maxWidth: 280, marginTop: -4,
+  },
   payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: border },
   payoutLeft:   {},
   payoutRight:  { alignItems: 'flex-end', gap: 4 },

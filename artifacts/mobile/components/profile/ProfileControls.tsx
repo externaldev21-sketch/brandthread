@@ -117,6 +117,81 @@ export function ProfileButton({
   );
 }
 
+/**
+ * Own-profile action row (seller): a compact "Edit" button on the left
+ * (black + 1pt silver border, white text) and one long white "Messages"
+ * button filling the rest of the row (black text, unread badge) — Dev's
+ * call replacing the previous three-button Edit/Share/Contact row. Both
+ * controls are 38-40pt tall with a 10pt radius and a 44pt hit area (padded
+ * via hitSlop rather than growing the visible pill), Inter 600 labels.
+ */
+export function ProfileEditMessagesRow({
+  onEdit,
+  onEditLongPress,
+  onMessages,
+  unreadCount = 0,
+}: {
+  onEdit: () => void;
+  onEditLongPress?: () => void;
+  onMessages: () => void;
+  unreadCount?: number;
+}) {
+  const { theme } = useAppTheme();
+  const hitSlop = { top: 3, bottom: 3, left: 3, right: 3 };
+  return (
+    <View style={styles.editMessagesRow}>
+      <PressableScale
+        onPress={() => { hapticLight(); onEdit(); }}
+        onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
+        accessibilityRole="button"
+        accessibilityLabel="Edit profile"
+        accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
+        testID="profile-edit-details"
+        hitSlop={hitSlop}
+        style={[styles.editBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        {(state) => (
+          <>
+            <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+            <Text style={[styles.editMessagesLabel, { color: theme.text }]} numberOfLines={1}>Edit</Text>
+          </>
+        )}
+      </PressableScale>
+      {/* PressableScale forwards a plain-object `style` only to its INNER
+          Animated.View, never to the outer Pressable that actually
+          participates in this row's flex layout (see its own comment) — so
+          `flex: 1` on messagesBtn alone never reached the real layout
+          participant, and this button rendered barely wider than Edit
+          instead of filling the row. Wrapping it in a plain flex:1 View
+          (the same indirection ProfileButton's own buttonWrap already
+          relies on) gives the flex to an element that actually gets it. */}
+      <View style={styles.messagesBtnWrap}>
+        <PressableScale
+          onPress={() => { hapticLight(); onMessages(); }}
+          accessibilityRole="button"
+          accessibilityLabel={unreadCount > 0 ? `Messages, ${unreadCount} unread` : 'Messages'}
+          accessibilityHint="Opens your buyer messages"
+          testID="profile-messages-btn"
+          hitSlop={hitSlop}
+          style={[styles.messagesBtn, { backgroundColor: theme.accent }]}
+        >
+          {(state) => (
+            <>
+              <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+              <Text style={[styles.editMessagesLabel, { color: theme.onAccent }]} numberOfLines={1}>Messages</Text>
+              {unreadCount > 0 && (
+                <View style={[styles.messagesBadge, { backgroundColor: theme.card }]}>
+                  <Text style={[styles.messagesBadgeText, { color: theme.text }]}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </>
+          )}
+        </PressableScale>
+      </View>
+    </View>
+  );
+}
+
 /** Round glass control floating over the hero media (back, share, more…). */
 export function ProfileGlassButton({
   icon,
@@ -498,6 +573,33 @@ const styles = StyleSheet.create({
   },
   buttonText: { fontFamily: FONT.bold, fontSize: FS.base, flexShrink: 1 },
   disabled: { opacity: 0.5 },
+
+  // `width: '100%'` (not just `flex: 1`): this row is the sole child of the
+  // caller's own `actionRow` View, itself sized by content along its own
+  // row axis with nothing to stretch it — without an explicit full width
+  // here, this row shrinks to fit Edit + Messages' unexpanded content size,
+  // leaving Messages' own `flex: 1` (below) with no extra space to grow
+  // into and rendering it barely wider than Edit instead of filling the row.
+  editMessagesRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%' },
+  editBtn: {
+    height: 39, borderRadius: RADIUS.sm, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: SP.lg, overflow: 'hidden',
+  },
+  // The actual flex participant is messagesBtnWrap (a plain View) — see the
+  // render method's comment on why PressableScale itself can't carry flex.
+  messagesBtnWrap: { flex: 1 },
+  messagesBtn: {
+    width: '100%', height: 39, borderRadius: RADIUS.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, overflow: 'hidden',
+  },
+  editMessagesLabel: { fontFamily: FONT.semibold, fontSize: FS.base },
+  messagesBadge: {
+    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  messagesBadgeText: { fontFamily: FONT.bold, fontSize: 10 },
 
   glass: {
     width: 44, height: 44, borderRadius: 22, borderWidth: 1,

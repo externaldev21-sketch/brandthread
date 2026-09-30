@@ -48,6 +48,13 @@ export const LEDGER_ACCOUNTS = {
    * liability in this ledger — see docs/payments/thread-cash-checkout-todo.md).
    */
   thread_cash_seller_topup: "thread_cash_seller_topup",
+  /**
+   * Brandthread's cost of a seller cashing out their earned Thread Cash
+   * (from Live gifts / message payments) into their real payout balance
+   * (party = seller). Funded from the platform's own balance, same shape as
+   * `thread_cash_seller_topup` — see lib/threadCash/cashOut.ts.
+   */
+  thread_cash_seller_cash_out: "thread_cash_seller_cash_out",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

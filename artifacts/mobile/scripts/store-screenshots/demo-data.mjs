@@ -608,6 +608,15 @@ export function respond({ method, path, query, role, options = {} }) {
   let match;
 
   if (p === '/config/features') return { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null };
+  // app/boost.tsx (Promote a post) fetches all three of these on load;
+  // unseeded, they 404 on every single load of that screen. The demo seller
+  // has no video/slideshow posts (only photo posts in the feed fixture, and
+  // boost only accepts video/2+-image slideshows), so an honest empty state
+  // — no eligible posts yet, no active boosts — is the real answer here,
+  // not fabricated boost data.
+  if (p === '/boosts/targets') return [];
+  if (p === '/boosts/summary') return { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
+  if (p === '/boosts') return [];
   if (p === '/auth/me') return profileFor(role);
   // Buyer account/settings screens the half-done audit crawls on load —
   // previously unseeded, so every one of these 404'd as soon as the screen
@@ -742,7 +751,30 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/returns/buyer') return [];
   if (p === '/loyalty') return { balance: 0, valueCents: 0, history: [] };
   if (p === '/profile/cover-coachmark') return { seen: true };
-  if (p === '/thread-cash') return { balanceCents: 0, history: [] };
+  if (p === '/thread-cash') {
+    return {
+      balanceCents: options.fresh ? 0 : 4260,
+      config: { dailyAmountCents: 10, streakBonusCents: 100, streakBonusDays: 7, graceHours: 20, expiryDays: 180, maxRedemptionPerOrderCents: 2000 },
+      streak: { currentStreak: 0, longestStreak: 0, lastCheckInDate: null, timezone: 'UTC', alreadyCheckedInToday: false, dayInCycle: 0 },
+    };
+  }
+  if (p === '/thread-cash/history') {
+    if (options.fresh) return { history: [] };
+    return {
+      history: [
+        { id: 'stc-1', buyerId: role, amountCents: 500, source: 'live_gift', referenceId: null, note: 'Gift during your Live', createdAt: iso(0) },
+        { id: 'stc-2', buyerId: role, amountCents: 200, source: 'send_received', referenceId: null, note: 'From Jordan Reyes', createdAt: iso(1 * DAY) },
+        { id: 'stc-3', buyerId: role, amountCents: -2000, source: 'cash_out', referenceId: null, note: 'Cashed out to payout balance', createdAt: iso(2 * DAY) },
+        { id: 'stc-4', buyerId: role, amountCents: 1500, source: 'live_gift', referenceId: null, note: 'Gift during your Live', createdAt: iso(3 * DAY) },
+        { id: 'stc-5', buyerId: role, amountCents: 60, source: 'send_received', referenceId: null, note: 'From Amara Chen', createdAt: iso(4 * DAY) },
+        { id: 'stc-6', buyerId: role, amountCents: 4000, source: 'live_gift', referenceId: null, note: 'Gift during your Live', createdAt: iso(5 * DAY) },
+      ],
+    };
+  }
+  if (p === '/thread-cash/quote') {
+    const threadCashCents = Number(query.get('threadCashCents') ?? 0) || 0;
+    return { threadCashCents, payoutCents: threadCashCents, feeCents: 0 };
+  }
   if (p === '/seller/profile') {
     const p2 = profileFor('seller');
     return {
@@ -941,10 +973,30 @@ export function respond({ method, path, query, role, options = {} }) {
     };
   }
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
-  // lib/appStartPrefetch.ts's warmSellerTabs() calls this on every seller
-  // app boot too — unseeded, it 404s on every single seller page load.
+  // Seller dashboard's secondary (range-independent) fetch group, plus
+  // lib/appStartPrefetch.ts's warmSellerTabs() app-boot prefetch — without
+  // these seeded, api.products.list()/api.inventory.list()/api.analytics
+  // .products() all 404 ("NOT_SEEDED") on every seller page load, which
+  // spams a hard console-error finding on every audit run and (for a
+  // role/account this fixture wasn't written for) can leave
+  // SellerDashboardTrafficSources-adjacent state undefined. Real seller
+  // products/inventory/top-sellers, not fabricated for this response alone.
   if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
-  if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  if (p === '/inventory') return role === 'seller' ? SELLER_PRODUCTS.map((product) => product.inventory) : [];
+  if (p === '/analytics/products') return role === 'seller'
+    ? SELLER_PRODUCTS.filter((product) => product.totalRevenueCents > 0).map((product) => ({
+      productId: product.id, name: product.name, unitsSold: product.totalSales, revenueCents: product.totalRevenueCents,
+    }))
+    : [];
+  if (p === '/finance/balance') return options.fresh
+    ? { available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false, payoutsEnabled: false, bankConnected: false, processingCashout: null }
+    : { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  if (p === '/finance/payouts') return { payouts: options.fresh ? [] : [
+    { id: 'po_demo_1', arrivalDate: DEMO_NOW, formatted: '$412.30', status: 'paid', destination: { last4: '4242' } },
+  ] };
+  // Rendered on every seller screen (StripeConnectWarning); unseeded, it
+  // 404s on every single dashboard load, not just this route's own fetches.
+  if (p === '/seller/connect/status') return { connected: true, stripeAccountId: 'acct_demo', chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242', providerConfigured: true };
   if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
   if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.fresh ? 0 : options.orderCount ?? 9);
   if (p === '/conversations') return role === 'seller' ? sellerConversations(options.fresh ? 0 : options.conversationCount ?? 5) : [];
@@ -978,9 +1030,8 @@ export function respond({ method, path, query, role, options = {} }) {
   // surface the original screenshot script needed. Zero-state ("fresh
   // preview") shapes throughout, matching this file's existing convention
   // and every consumer's own defensive `?? []`/`Array.isArray` handling.
-  if (p === '/products') return [];
-  if (p === '/posts/mine') return [];
-  if (p === '/inventory') return [];
+  // (/products, /posts/mine and /inventory are seeded once, above, with
+  // real per-role data rather than a blanket [] here.)
   if (p === '/ad-campaigns') return [];
   if (p === '/discount-codes') return [];
   if (p === '/loyalty') return { enrolled: false, pointsBalance: 0, tiers: [] };
@@ -997,19 +1048,22 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/buyer/payment-methods') return [];
   if (p === '/buyer/recently-viewed') return [];
   if ((match = p.match(/^\/buyer\/collections\/[^/]+\/items$/))) return [];
-  if (p === '/boosts') return [];
-  if (p === '/boosts/summary') return { activeCount: 0, totalSpendCents: 0, totalImpressions: 0, totalClicks: 0 };
-  if (p === '/boosts/targets') return [];
+  // (/boosts, /boosts/summary and /boosts/targets are seeded once, above,
+  // with the real Summary field names the client actually reads.)
   if (p === '/auth/feed-gestures-tip') return { seenVersion: 0 };
   if (p === '/auth/account/deletion-check') return { canDelete: true, accountType: role, blockers: [], willDelete: [], willRetain: [] };
   if (p === '/auth/sessions') return { sessions: [] };
   if (p === '/freelancers') return { freelancers: [] };
   if (p === '/freelancers/me') return { freelancer: null };
-  if (p === '/seller/connect/status') return { connected: false, stripeAccountId: null, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, status: 'not_connected', verified: false, bankLast4: null, providerConfigured: false };
+  // (/seller/connect/status is seeded once, above, as connected: true — this
+  // demo seller's setup checklist already marks "connect_payments" done and
+  // /finance/balance already reports connected: true, so a second,
+  // contradicting "not_connected" answer here would disagree with the rest
+  // of this same demo persona.)
   if (p === '/seller/subscription/invoices') return [];
   if (p === '/integrations/klaviyo') return { connected: false };
   if (p === '/analytics/revenue') return { totalCents: 0, orderCount: 0, daily: [] };
-  if (p === '/analytics/products') return [];
+  // (/analytics/products is seeded once, above, with real per-role data.)
   if (p === '/analytics/customers') return { stats: {} };
   if (p === '/public/discover/feed') return { items: [], computedAt: iso(0), source: 'empty', nextOffset: null };
   // 'col_nl_ember' is the audit's fixed dynamic-route param value for

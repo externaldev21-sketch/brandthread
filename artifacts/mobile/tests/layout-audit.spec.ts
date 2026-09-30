@@ -104,7 +104,7 @@ const SCREENS = [
   { id: 'seller-products', title: 'Seller products', role: 'seller', path: '/(tabs)/products', ready: 'Products', hasTabBar: true },
   { id: 'seller-settings', title: 'Seller settings', role: 'seller', path: '/seller-settings', ready: 'Settings', hasTabBar: false },
   { id: 'manufacturer-hub', title: 'Manufacturer hub', role: 'seller', path: '/manufacturer-hub', ready: 'Porto Knit Collective', hasTabBar: false },
-  { id: 'theme-picker', title: 'Theme picker', role: 'seller', path: '/app-theme', ready: 'Choose your Brandthread finish', hasTabBar: false },
+  { id: 'theme-picker', title: 'Theme picker', role: 'seller', path: '/appearance', ready: 'Follow app theme', hasTabBar: false },
 ];
 
 // ─── In-page audit: overflow + tab-bar overlap ─────────────────────────────

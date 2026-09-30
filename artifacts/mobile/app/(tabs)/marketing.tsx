@@ -3,18 +3,19 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from '
 import { useColors } from '@/hooks/useColors';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
-import { EmptyState, IconButton } from '@/components/BrandthreadUI';
+import { EmptyState, IconButton, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { FS, FONT, SP, COMP } from '@/lib/theme';
+import { FS, FONT, SP, COMP, ICON } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -89,12 +90,16 @@ export default function MarketingScreen() {
         .catch(() => { if (!cancelled) setKlaviyo({ connected: false }); });
       api.adCampaigns.list()
         .then((res) => { if (!cancelled) { setCampaigns(Array.isArray(res?.campaigns) ? res.campaigns : []); setCampaignsError(false); } })
-        // A failed fetch must never collapse into "No campaigns yet" — that
-        // reads as a real, permanent empty state instead of a retryable outage.
-        .catch(() => { if (!cancelled) { setCampaigns([]); setCampaignsError(true); } });
+        // A failed fetch on a real, authenticated account must never
+        // collapse into "No campaigns yet" — that reads as a real,
+        // permanent empty state instead of a retryable outage. But a dev
+        // web preview has no real signed-in account behind it at all, so a
+        // 401/404 there is expected and benign, not a genuine failure —
+        // show the normal empty state instead of an error banner.
+        .catch(() => { if (!cancelled) { setCampaigns([]); setCampaignsError(!isSellerDevPreview()); } });
       api.discountCodes.list()
         .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
-        .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(true); } });
+        .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
       api.referrals.stats()
         .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0 }); })
         .catch(() => { if (!cancelled) setReferrals(null); });
@@ -111,13 +116,16 @@ export default function MarketingScreen() {
     <View style={{ flex: 1 }}>
     <ScreenHeader
       title="Marketing"
-      subtitle="Campaigns, discounts & automation"
       onBack={() => router.push('/(tabs)/more' as never)}
-      actions={[{
-        icon: 'bar-chart-2',
-        onPress: () => router.push('/(tabs)/analytics' as never),
-        accessibilityLabel: 'View analytics',
-      }]}
+      rightElement={(
+        <PressableScale
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/analytics' as never); }}
+          accessibilityRole="button"
+          accessibilityLabel="View analytics"
+        >
+          <Feather name="bar-chart-2" size={ICON.md} color={colors.foreground} />
+        </PressableScale>
+      )}
     />
     <ScrollView
       ref={scrollResetRef}
@@ -125,13 +133,15 @@ export default function MarketingScreen() {
       contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Stats Row */}
-      <View style={styles.statsRow}>
+      {/* Stats Row — flat, no card/border boxes; a single hairline divider
+          under the row and a hairline between the two chips is the only
+          separation (Dev's standing "no grey boxes" rule). */}
+      <View style={[styles.statsRow, { borderBottomColor: colors.border }]}>
         {[
           { label: 'Email Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
           { label: 'SMS Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
-        ].map((s) => (
-          <View key={s.label} style={[styles.statChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        ].map((s, i) => (
+          <View key={s.label} style={[styles.statChip, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
             <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
@@ -161,22 +171,21 @@ export default function MarketingScreen() {
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/design-campaign' as never); }}
       />
       {campaignsError ? (
-        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border, padding: SP.md }]}>
+        <View style={styles.emptyFlat}>
           <RetryRow label="Couldn't load campaigns" onRetry={retryAll} />
         </View>
       ) : campaigns.length === 0 ? (
-        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <EmptyState
-            compact
-            icon="tv"
-            title="No campaigns yet"
-            description="Create a Meta ad to put your products in front of new buyers."
-            action={{ label: 'Create a campaign', icon: 'plus', onPress: () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/design-campaign' as never);
-            } }}
-          />
-        </View>
+        <EmptyState
+          compact
+          icon="tv"
+          title="No campaigns yet"
+          description="Create a Meta ad to put your products in front of new buyers."
+          style={styles.emptyFlat}
+          action={{ label: 'Create a campaign', icon: 'plus', onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/design-campaign' as never);
+          } }}
+        />
       ) : (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {campaigns.map((c, i) => (
@@ -210,22 +219,21 @@ export default function MarketingScreen() {
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
       />
       {discountsError ? (
-        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border, padding: SP.md }]}>
+        <View style={styles.emptyFlat}>
           <RetryRow label="Couldn't load discount codes" onRetry={retryAll} />
         </View>
       ) : discounts.length === 0 ? (
-        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <EmptyState
-            compact
-            icon="percent"
-            title="No discount codes yet"
-            description="Codes give buyers a reason to check out now instead of later."
-            action={{ label: 'Create a discount', icon: 'plus', onPress: () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/discounts' as never);
-            } }}
-          />
-        </View>
+        <EmptyState
+          compact
+          icon="percent"
+          title="No discount codes yet"
+          description="Codes give buyers a reason to check out now instead of later."
+          style={styles.emptyFlat}
+          action={{ label: 'Create a discount', icon: 'plus', onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/discounts' as never);
+          } }}
+        />
       ) : (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {discounts.slice(0, 5).map((d, i) => (
@@ -282,14 +290,14 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs, minHeight: COMP.headerH },
   pageTitle: { fontSize: FS.xl, fontFamily: FONT.bold, letterSpacing: -0.3, marginBottom: 2 },
   pageSubtitle: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 20 },
-  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  statChip: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget },
+  statsRow: { flexDirection: 'row', paddingBottom: SP.md, marginBottom: 24, borderBottomWidth: StyleSheet.hairlineWidth },
+  statChip: { flex: 1, paddingVertical: 12, alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget },
   statVal: { fontSize: FS.base, fontFamily: FONT.bold },
   statLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24, minHeight: COMP.buttonH },
   klaviyoText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  emptyCard: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
+  emptyFlat: { marginBottom: 24 },
   emptyText: { fontSize: FS.sm, fontFamily: FONT.regular },
   campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, minHeight: COMP.minTouchTarget },
   campaignIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

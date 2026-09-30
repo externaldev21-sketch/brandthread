@@ -8,6 +8,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Ellipse, Rect, Line } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -17,7 +18,7 @@ import {
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, COMP,
 } from '@/lib/theme';
 import { getProject, updateProject } from '@/services/designService';
 import { GARMENT_TYPES, GARMENT_TEMPLATES, GARMENT_VIEWS } from '@/services/designTypes';
@@ -70,6 +71,102 @@ const ZONE_RECTS: Record<string, { x: number; y: number; w: number; h: number }>
   'Custom':       { x: 20, y: 20, w: 60, h: 60 },
 };
 
+// ─── Garment silhouette ───────────────────────────────────────────────────
+// A real vector garment outline, tinted by the selected color — not a flat
+// colored card with a text label. Front/back share the same body silhouette
+// (accurate to how a real garment looks from either side) with a small
+// front-only or back-only detail (collar tag vs. neck seam) so the two
+// views are still visually distinct; "detail" zooms into the chest/pocket
+// area via a tighter viewBox, mimicking a close-up product shot.
+// All paths sit on a shared 200×240 canvas.
+
+const GARMENT_STROKE = 'rgba(0,0,0,0.22)';
+
+function torsoBodyPath(sleeveLength: number): string {
+  // Crew-neck tee/sweatshirt/jacket body: shoulders → sleeve → underarm →
+  // hem → mirrored back up the other side, with a shallow front neckline.
+  const s = sleeveLength; // how far the sleeve extends past the shoulder
+  return `M 70 18
+    C 78 8, 122 8, 130 18
+    L ${130 + s} 40
+    L ${118 + s} 68
+    L 132 56
+    L 132 210
+    L 68 210
+    L 68 56
+    L ${82 - s} 68
+    L ${70 - s} 40
+    Z`;
+}
+
+function GarmentSilhouette({ type, view, colorHex }: { type: string; view: string; colorHex: string }) {
+  const isDetail = view === 'detail';
+  const isBack = view === 'back';
+  const viewBox = isDetail ? '55 30 90 90' : '0 0 200 240';
+  const fill = colorHex;
+  const isPants = type === 'sweatpants' || type === 'shorts';
+  const isHat = type === 'hat';
+  const isBag = type === 'bag';
+  const isBoxy = type === 'packaging';
+
+  return (
+    <Svg width="72%" height="72%" viewBox={viewBox} preserveAspectRatio="xMidYMid meet">
+      {isHat ? (
+        <>
+          <Path d="M 40 130 C 40 80, 75 45, 100 45 C 125 45, 160 80, 160 130 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Ellipse cx={100} cy={132} rx={72} ry={14} fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+        </>
+      ) : isBag ? (
+        <>
+          <Path d="M 55 90 L 145 90 L 155 205 L 45 205 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Path d="M 75 90 C 75 60, 125 60, 125 90" fill="none" stroke={GARMENT_STROKE} strokeWidth={4} />
+        </>
+      ) : isBoxy ? (
+        <>
+          <Rect x={45} y={70} width={110} height={110} fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Path d="M 45 70 L 100 40 L 155 70" fill="none" stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Path d="M 100 40 L 100 180" fill="none" stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.5} />
+        </>
+      ) : isPants ? (
+        <>
+          <Path
+            d="M 62 20 L 138 20 L 142 100 L 116 220 L 100 220 L 100 130 L 84 220 L 68 220 L 58 100 Z"
+            fill={fill}
+            stroke={GARMENT_STROKE}
+            strokeWidth={2}
+          />
+          <Line x1={72} y1={20} x2={72} y2={95} stroke={GARMENT_STROKE} strokeWidth={1} opacity={0.4} />
+          <Line x1={128} y1={20} x2={128} y2={95} stroke={GARMENT_STROKE} strokeWidth={1} opacity={0.4} />
+        </>
+      ) : (
+        <>
+          <Path
+            d={torsoBodyPath(type === 'tank' ? 2 : type === 'longsleeve' ? 30 : 16)}
+            fill={fill}
+            stroke={GARMENT_STROKE}
+            strokeWidth={2}
+          />
+          {type === 'hoodie' && (
+            <Path d="M 76 20 C 76 2, 124 2, 124 20 C 124 30, 112 30, 100 34 C 88 30, 76 30, 76 20 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          )}
+          {!isBack && (type === 'jacket' || type === 'denim') && (
+            <Line x1={100} y1={24} x2={100} y2={208} stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.6} />
+          )}
+          {!isBack && type !== 'jacket' && type !== 'denim' && (
+            <Path d="M 88 20 Q 100 34 112 20" fill="none" stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.55} />
+          )}
+          {isBack && (
+            <Line x1={100} y1={16} x2={100} y2={208} stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.35} />
+          )}
+          {type === 'hoodie' && (
+            <Path d="M 92 64 L 108 64 L 108 96 L 100 104 L 92 96 Z" fill="none" stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.5} />
+          )}
+        </>
+      )}
+    </Svg>
+  );
+}
+
 export default function DesignGarmentScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
@@ -118,22 +215,17 @@ export default function DesignGarmentScreen() {
 
   // Determine if garment is light or dark for text contrast
   const isDarkGarment = ['#000000', '#1E3A5F', '#6B7280', '#EF4444', '#3B82F6', '#0F766E', '#22C55E', '#F97316', '#EC4899'].includes(garmentColor);
-  const garmentTextColor = isDarkGarment ? '#FFFFFF' : '#111111';
 
   return (
     <View style={gs.root}>
       <ScreenHeader
         title="Garment Design"
         onBack={() => goBackOr(router)}
-        rightElement={(
-          <TouchableOpacity
-            style={gs.openEditorBtn}
-            onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
-          >
-            <Feather name="edit-2" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={gs.openEditorText}>Open Editor</Text>
-          </TouchableOpacity>
-        )}
+        actions={[{
+          icon: 'edit-2',
+          onPress: () => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any),
+          accessibilityLabel: 'Open in editor',
+        }]}
       />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -157,14 +249,15 @@ export default function DesignGarmentScreen() {
 
         {/* ── GARMENT PREVIEW ── */}
         <View style={gs.previewContainer}>
-          <View style={[gs.garmentPreview, { backgroundColor: garmentColor }]}>
-            {/* Garment silhouette label */}
-            <Text style={[gs.garmentLabel, { color: garmentTextColor }]}>
-              {garmentLabel(garmentType)}
-            </Text>
-            <Text style={[gs.garmentViewLabel, { color: garmentTextColor + 'AA' }]}>
-              {viewLabel(currentView)} View
-            </Text>
+          <View style={gs.garmentPreview}>
+            {/* Real vector garment mockup, tinted by the selected color —
+                not a flat color card with a text label standing in for it. */}
+            <GarmentSilhouette type={garmentType} view={currentView} colorHex={garmentColor} />
+            <View style={gs.garmentCaption}>
+              <Text style={gs.garmentCaptionText}>
+                {garmentLabel(garmentType)} · {viewLabel(currentView)}
+              </Text>
+            </View>
 
             {/* Selected placement overlay */}
             {selectedZone && ZONE_RECTS[selectedZone] && (() => {
@@ -263,7 +356,12 @@ export default function DesignGarmentScreen() {
         </View>
 
         {/* ── ACTIONS ── */}
-        <View style={[gs.section, { paddingBottom: insets.bottom + SP.xl }]}>
+        {/* This screen keeps the persistent seller tab bar — its own real
+            44px+ tall floating capsule, not just the safe-area inset. A
+            flat `insets.bottom + SP.xl` guess left the last section (and,
+            above it, Garment Color's swatch row) sitting under the bar
+            instead of clearing it. */}
+        <View style={[gs.section, { paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md }]}>
           <TouchableOpacity
             style={gs.savePlacementBtn}
             onPress={handleSavePlacement}
@@ -291,8 +389,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  openEditorBtn:{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  openEditorText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
 
   section:      { paddingHorizontal: SP.md, paddingTop: SP.md },
   sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
@@ -302,9 +398,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   typePillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   previewContainer: { paddingHorizontal: SP.md, paddingTop: SP.md },
-  garmentPreview: { width: '100%', aspectRatio: 0.85, borderRadius: RADIUS.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER, position: 'relative' },
-  garmentLabel: { fontSize: FS.xxl, fontFamily: FONT.bold, letterSpacing: -0.5 },
-  garmentViewLabel: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: 4 },
+  garmentPreview: { width: '100%', aspectRatio: 0.85, borderRadius: RADIUS.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER, position: 'relative', backgroundColor: CARD_ELEVATED },
+  garmentCaption: { position: 'absolute', bottom: SP.md, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: 6 },
+  garmentCaptionText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
 
   zoneOverlay:  { position: 'absolute', borderRadius: RADIUS.xs, borderWidth: 2, borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: SUCCESS, backgroundColor: 'rgba(16,185,129,0.12)', borderStyle: 'dashed' },

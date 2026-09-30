@@ -86,6 +86,37 @@ describe("fresh-install: personal preview modules gate their seeded cast on isPr
     expect(s).toContain("if (isBuyerDevPreview()) return previewMyPosts;");
     expect(s).toContain("if (!isBuyerDevPreview()) throw new Error('Buyer post publishing is not available yet.');");
   });
+
+  it("lib/live/liveProvider.ts: the seeded preview live streams (fake viewer counts, scripted chat) only render under demo=1, a fresh preview forces the real empty state", () => {
+    const s = src("../live/liveProvider.ts");
+    expect(s).toContain("import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
+    // forceEmpty must be the inverse of demo mode, not a separate opt-out
+    // query param — that inversion (default show, an explicit opt-out param
+    // to see the real empty state) was the actual fresh-install leak: a
+    // plain `?bt_preview=buyer` always showed the fake "Maison Vela, 1,204
+    // viewers" cast. The old opt-out param may still be mentioned in a
+    // comment explaining the history; it must not appear in any live code path.
+    const functionsOnly = s.replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(functionsOnly).not.toContain("bt_live");
+    expect(s).toMatch(/function previewForcesEmpty\(\)[\s\S]{0,80}return !\(BOOT_DEMO \|\| isPreviewDemoMode\(\)\);/);
+  });
+
+  it("lib/live/previewLiveProvider.ts: the seeded upcoming-lives schedule and suggested creators (fake follower counts) only return under demo=1 — app/live.tsx's LiveEmptyState must see real empty arrays on a fresh install, not just an empty stream list", () => {
+    const s = src("../live/previewLiveProvider.ts");
+    expect(s).toMatch(/async listUpcoming\(\): Promise<UpcomingLive\[\]> \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*if \(forceEmpty\) return \[\];/);
+    expect(s).toMatch(/async listSuggestedCreators\(\): Promise<SuggestedCreator\[\]> \{\s*if \(forceEmpty\) return \[\];/);
+  });
+
+  it("app/live-feed.tsx: the sample fashion-runway rooms (fake viewer counts, scripted chat) only render under demo=1, a fresh preview shows the real LiveEmptyState", () => {
+    const s = src("../../app/live-feed.tsx");
+    expect(s).toContain("import { isPreviewDemoMode } from '@/lib/devPreview';");
+    expect(s).toContain("import { LiveEmptyState } from '@/components/live/LiveEmptyState';");
+    expect(s).toMatch(/const showDemoRooms = isPreviewDemoMode\(\);/);
+    expect(s).toMatch(/const \[rooms, setRooms\] = useState<LiveRoom\[\]>\(\s*showDemoRooms/);
+    // The empty branch must actually use the shared LiveEmptyState, not a
+    // bespoke "no lives" screen that could itself drift from the pattern.
+    expect(s).toMatch(/rooms\.length === 0[\s\S]{0,40}<LiveEmptyState/);
+  });
 });
 
 describe("fresh-install: devPreview.ts's isPreviewDemoMode is the single shared gate", () => {
@@ -99,5 +130,7 @@ describe("fresh-install: devPreview.ts's isPreviewDemoMode is the single shared 
     for (const path of consumers) {
       expect(src(path), `${path} should import isPreviewDemoMode from ./devPreview`).toContain("from './devPreview'");
     }
+    // lib/live/ is a subdirectory, so its import is the @/lib alias instead.
+    expect(src("../live/liveProvider.ts")).toContain("from '@/lib/devPreview'");
   });
 });

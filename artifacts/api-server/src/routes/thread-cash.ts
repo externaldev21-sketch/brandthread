@@ -21,11 +21,22 @@
  * POST /api/thread-cash/claim       — claim a Thread Cash send
  * POST /api/thread-cash/cancel      — sender cancels a still-pending send
  *                                      (send/claim/cancel feature-flagged: 'threadCashSend')
+ * POST /api/thread-cash/live-gift   — gift a live stream's host: instant, no mutual-follow
+ *                                      gate, no pending claim (unlike /send). Lands on the
+ *                                      seller's balance with source 'live_gift'.
+ * POST /api/thread-cash/cash-out    — SELLER-ONLY. Converts a seller's earned Thread
+ *                                      Cash (from Live gifts / message payments — see
+ *                                      lib/threadCash/cashOut.ts) into a real Stripe
+ *                                      Transfer to their payout balance. Unlike buyer
+ *                                      Thread Cash, a seller's earned balance is real
+ *                                      value and can be cashed out. Requires the
+ *                                      "payouts" permission, same as POST /finance/payout.
  */
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, threadCashStreaks } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requirePermission } from "../middlewares/requireRole";
 import { computeCheckIn, localDateString, EMPTY_STREAK_STATE, type StreakState } from "../lib/threadCash/streaks";
 import { notifyThreadCashReceived } from "../lib/activityEvents";
 import {
@@ -41,10 +52,12 @@ import {
   isFeatureEnabled,
   redeemThreadCash,
   sendThreadCash,
+  sendLiveGift,
   cancelThreadCashRedemption,
   listOpenThreadCashRedemptions,
 } from "../lib/threadCash/wallet";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
+import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
 
 const router = Router();
@@ -408,6 +421,48 @@ router.post("/send", async (req, res) => {
   }
 });
 
+// ─── POST /api/thread-cash/live-gift ────────────────────────────────────────
+// A viewer gifting a live stream's host — instant, unconditional (never
+// gated on mutual follow, never sits pending a claim, unlike /send). The
+// seller's credit lands with source 'live_gift', which cashOut.ts already
+// treats as real, cashable value.
+router.post("/live-gift", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const { streamId, amountCents: rawAmount } = req.body ?? {};
+  const amountCents = Math.floor(Number(rawAmount));
+  if (typeof streamId !== "string" || !streamId.trim()) {
+    res.status(400).json({ error: "A live stream is required." });
+    return;
+  }
+  if (!amountCents || amountCents < 1) {
+    res.status(400).json({ error: "Provide a valid Thread Cash amount." });
+    return;
+  }
+  const idempotencyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey.trim() : "";
+  if (!idempotencyKey) {
+    res.status(400).json({ error: "A valid idempotency key is required.", code: "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED" });
+    return;
+  }
+  try {
+    // The authoritative host — never trust a client-supplied sellerId.
+    const rows = await db.execute(sql`SELECT seller_id FROM live_streams WHERE id = ${streamId}::uuid LIMIT 1`);
+    const sellerId = (rows.rows[0] as any)?.seller_id as string | undefined;
+    if (!sellerId) {
+      res.status(404).json({ error: "This live could not be found." });
+      return;
+    }
+    const gift = await sendLiveGift(buyerId, sellerId, streamId, amountCents, idempotencyKey);
+    void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents });
+    res.json({ ok: true, giftId: gift.giftId });
+  } catch (error) {
+    if (error instanceof ThreadCashError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+});
+
 router.post("/claim", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   if (!(await isFeatureEnabled("threadCashSend", true))) {
@@ -445,6 +500,47 @@ router.post("/cancel", async (req, res) => {
   try {
     await cancelThreadCash(transferId, buyerId);
     res.json({ ok: true });
+  } catch (error) {
+    if (error instanceof ThreadCashError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+});
+
+// ─── POST /api/thread-cash/cash-out ─────────────────────────────────────────
+// Seller-only: converts earned Thread Cash into a real Stripe Transfer to
+// the seller's own payout balance. Gated on the "payouts" permission (not
+// requireAuth alone) — same money-moving-write rule as POST /finance/payout:
+// a team member with only view access can see the balance but never cash it
+// out. `GET /api/thread-cash/quote` lets the client preview the payout/fee
+// for an amount before confirming (no auth requirement beyond the session).
+router.get("/quote", (req, res) => {
+  const threadCashCents = Math.floor(Number(req.query.threadCashCents));
+  if (!threadCashCents || threadCashCents < 1) {
+    res.status(400).json({ error: "Provide a valid Thread Cash amount." });
+    return;
+  }
+  const { payoutCents, feeCents } = computeCashOutPayoutCents(threadCashCents);
+  res.json({ threadCashCents, payoutCents, feeCents });
+});
+
+router.post("/cash-out", requirePermission("payouts"), async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const threadCashCents = Math.floor(Number(req.body?.threadCashCents));
+  if (!threadCashCents || threadCashCents < 1) {
+    res.status(400).json({ error: "Provide a valid Thread Cash amount." });
+    return;
+  }
+  const idempotencyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey.trim() : "";
+  if (!idempotencyKey) {
+    res.status(400).json({ error: "A valid idempotency key is required.", code: "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED" });
+    return;
+  }
+  try {
+    const result = await cashOutThreadCash(stripe, sellerId, threadCashCents, idempotencyKey);
+    res.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });

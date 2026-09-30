@@ -8,7 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { isProductionPreviewHost } from '@/lib/devPreview';
+import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -86,6 +86,7 @@ import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
+import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -299,6 +300,19 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // the bottom; the bar previously floated on top of the payment note (it
   // only pads for the safe-area inset, not the bar's own height), covering it.
   'boost',
+  // Same category as ai-brain/ai-mockup-chat above: a full-screen chat
+  // thread with its own composer (text input, attach menu — including the
+  // Thread Cash send button) pinned to the safe-area bottom inset only.
+  // The floating seller tab bar wasn't deny-listed against this route
+  // either, so it rendered on top of the composer and silently intercepted
+  // every tap there (confirmed live: a real click on the Thread Cash attach
+  // button hit the tab bar's own DOM node instead). The equivalent buyer
+  // screen (buyer-conversation) never has this problem — the buyer tab bar
+  // only mounts inside the (buyer) group's own layout, and buyer-conversation
+  // is a root-Stack sibling of it, not a member — but the seller tab bar is
+  // a global, default-on overlay gated by this deny-list instead, and this
+  // route was simply missing from it.
+  'seller-conversation',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -670,11 +684,48 @@ function AuthGate() {
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
+    // PREVIEW_ROLE only reads the query string once, at module load — it
+    // deliberately does NOT fall back to the persisted role (see its own
+    // comment: an explicit ?bt_preview= on a real reload must reset state).
+    // But isSellerDevPreview/isBuyerDevPreview (same gates: __DEV__ ||
+    // NAVIGATION_ISOLATION_TEST, web only, never on a production host) DO
+    // fall back to the persisted role for exactly the case that matters
+    // here — a full-page reload of a deep link (e.g. "/design", query
+    // string dropped by earlier in-app navigation, or simply not repeated
+    // on every reload) while a preview session is already active. Without
+    // this fallback, AuthGate stopped recognizing preview mode on such a
+    // reload and fell through into the real Clerk/onboarding gate below,
+    // which requires a genuinely signed-in account this bypass never sets
+    // up — leaving the deep link stuck rather than rendering the route it
+    // was pointed at.
+    const webPreviewRole = Platform.OS === 'web'
+      ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null)
+      : null;
+    const devRole = PREVIEW_ROLE ?? webPreviewRole ?? DEV_BYPASS_ROLE;
     if (devRole) {
-      // The index route handles the preview redirect after the root Stack has
-      // mounted. Redirecting from this root-level effect races Expo Router's
-      // initial navigator on web and produces a blank error screen.
+      // The index route handles the "/" preview redirect after the root
+      // Stack has mounted (redirecting from this root-level effect for
+      // `atRoot` races Expo Router's initial navigator on web and produces
+      // a blank error screen) — but a direct deep link to a route name
+      // that exists, identically, in BOTH (buyer) and (tabs) (e.g.
+      // "/profile") is a different problem: route groups add no path
+      // segment, so Expo Router resolves the bare URL to whichever
+      // same-named file it statically prefers, regardless of
+      // `bt_preview=`. A real signed-in account gets this corrected by the
+      // "Role mismatch corrections" block below (storedRole vs
+      // inBuyerGroup/inTabsGroup) — preview mode has no storedRole to
+      // check, but the exact same inBuyerGroup/inTabsGroup-vs-role
+      // mismatch can happen here too (confirmed live:
+      // "/profile?bt_preview=seller" loaded the buyer's own profile).
+      // Mirroring that same correction for devRole, still without racing
+      // the atRoot redirect above.
+      if (!atRoot) {
+        if (devRole === 'buyer' && inTabsGroup) {
+          router.replace('/(buyer)/' as never);
+        } else if (devRole === 'seller' && inBuyerGroup) {
+          router.replace('/(tabs)/' as never);
+        }
+      }
       return;
     }
 
@@ -1208,6 +1259,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="appearance"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1264,6 +1316,7 @@ function RootLayoutNav() {
         <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="thread-cash-history" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1318,6 +1371,15 @@ export default function RootLayout() {
     Inter_700Bold,
   });
   const [fontGateExpired, setFontGateExpired] = useState(false);
+
+  useEffect(() => {
+    // Fire-and-forget: warms the Appearance screen's icon/theme thumbnails
+    // in the background so it never has to show a loading/fade state for a
+    // bitmap that was already resolved before the screen ever mounts. Never
+    // gates app-ready — a slow preload just means the first Appearance visit
+    // pays the (already-fast, bundled-locally) resolve cost instead.
+    void preloadAppearanceAssets();
+  }, []);
 
   useEffect(() => {
     // Last-resort safety net only: expo-font can occasionally hang (a stale
