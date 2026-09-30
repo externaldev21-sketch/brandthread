@@ -23,6 +23,8 @@ import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
+import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+import { formatCents } from '@/lib/money';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -124,6 +126,7 @@ export default function MoreScreen() {
     Object.fromEntries(SECTIONS.map(s => [s.key, true])),
   );
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const threadCash = useSellerThreadCashBalance();
   const { plan } = useSubscriptionPlan();
   const planLabel = plan === 'pro' ? 'PRO' : plan === 'growth' ? 'GROWTH' : 'FREE';
 
@@ -270,12 +273,15 @@ export default function MoreScreen() {
                       item.label === 'Messages' && unreadMessages > 0
                         ? unreadMessages
                         : item.badge;
+                    const description = item.label === 'Payouts' && threadCash.balanceCents != null
+                      ? `${item.desc} · ${formatCents(threadCash.balanceCents)} Thread Cash`
+                      : item.desc;
                     return (
                       <NavigationCard
                         key={item.label}
                         icon={item.icon}
                         label={item.label}
-                        description={item.desc}
+                        description={description}
                         accent={item.accent === 'accent' ? theme.accent : item.accent === 'accentLight' ? theme.accentLight : item.accent === 'secondary' ? theme.secondary : item.accent === 'warning' ? theme.warning : item.accent === 'success' ? theme.success : theme.muted}
                         badge={badgeProp}
                         onPress={() => handleNavPress(item)}
