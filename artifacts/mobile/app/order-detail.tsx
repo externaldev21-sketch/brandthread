@@ -1079,7 +1079,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       )}
 
       {/* Cancellation reason card */}
-      {order.status === 'cancelled' && order.cancellation && (
+      {order.status === 'cancelled' && order.cancellation && !order.autoRefundedAt && (
         <View style={s.section}>
           <BrandthreadCard style={s.cancellationCard}>
             <View style={s.cancellationHeader}>

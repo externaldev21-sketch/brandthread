@@ -782,6 +782,8 @@ export default function OrdersScreen() {
         // ?demo=1 only: the seeded delivery-guarantee fixtures.
         const demo = isPreviewDemoMode() ? getPreviewSellerOrders().map(apiRowToOrder) : [];
         setOrders(demo);
+        // Owner = the (absent) account, so the owner guard below lets the rows through.
+        setOrdersOwnerId(userId as string | null);
         setStats(computeStats(demo));
         setLoadError(false);
         setLoading(false);

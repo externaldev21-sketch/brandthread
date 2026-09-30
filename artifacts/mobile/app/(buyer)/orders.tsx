@@ -35,18 +35,9 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function statusBadgeVariant(status: OrderStatus): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
-  switch (status) {
-    case 'new':          return 'info';
-    case 'processing':   return 'purple';
-    case 'ready_to_ship': return 'warning';
-    case 'shipped':      return 'warning';
-    case 'delivered':    return 'success';
-    case 'cancelled':    return 'neutral';
-    case 'refunded':     return 'error';
-    case 'disputed':     return 'error';
-    default:             return 'neutral';
-  }
+// Monochrome: every order status reads as the same neutral pill; the label carries the meaning.
+function statusBadgeVariant(_status: OrderStatus): 'neutral' {
+  return 'neutral';
 }
 
 function statusBadgeLabel(status: OrderStatus): string {
@@ -127,7 +118,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           <Text style={styles.orderMeta}>{order.orderNumber} · {fmtDate(order.createdAt)}</Text>
         </View>
         <StatusBadge
-          label={autoRefunded ? 'REFUNDED' : statusBadgeLabel(order.status)}
+          label={autoRefunded ? (order.delivery?.autoRefund?.partial ? 'PARTIAL REFUND' : 'REFUNDED') : statusBadgeLabel(order.status)}
           variant={autoRefunded ? 'neutral' : statusBadgeVariant(order.status)}
           small
         />
@@ -136,7 +127,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
       {/* Delivery headline — "Arriving Oct 15" / "Delivered" / "Refunded" */}
       {headline && (
         <Text
-          style={[styles.headline, headline.tone === 'success' && { color: theme.success }, headline.tone === 'muted' && { color: theme.muted }]}
+          style={[styles.headline, headline.tone === 'muted' && { color: theme.muted }]}
           numberOfLines={1}
         >
           {headline.text}
@@ -304,7 +295,7 @@ export default function BuyerOrdersScreen() {
     if (!userId) {
       // No account: empty, except the demo=1 preview cast (lib/previewOrders.ts).
       setOrders(isPreviewDemoMode() ? getPreviewBuyerOrders().map(mapApiBuyerOrder) : []);
-      setOrdersOwnerId(null);
+      setOrdersOwnerId(userId);
       setLoading(false);
       setRefreshing(false);
       hasLoadedRef.current = true;
@@ -404,6 +395,7 @@ export default function BuyerOrdersScreen() {
           for Activity, see app/activity-center.tsx's history). */}
       <FlatList
         horizontal
+        style={{ flexGrow: 0 }}
         data={FILTER_CHIPS}
         keyExtractor={i => i.key}
         showsHorizontalScrollIndicator={false}

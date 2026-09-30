@@ -882,7 +882,7 @@ export default function BuyerOrderDetailScreen() {
           <GradientCard colors={GRAD_CARD_GLOW} glow>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, flexWrap: 'wrap' }}>
               <StatusBadge
-                label={order.delivery?.autoRefund ? 'REFUNDED' : statusBadgeLabel(order.status)}
+                label={order.delivery?.autoRefund ? (order.delivery.autoRefund.partial ? 'PARTIALLY REFUNDED' : 'REFUNDED') : statusBadgeLabel(order.status)}
                 variant={order.delivery?.autoRefund ? 'neutral' : statusBadgeVariant(order.status)}
               />
               <Text style={styles.fulfillmentStatus}>

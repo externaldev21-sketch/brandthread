@@ -106,13 +106,13 @@ export function DeliveryTrackerCard({
       {delivery.trackingNumber ? (
         <View style={s.btnRow}>
           <SecondaryButton
-            label={trackingCopied ? 'Copied' : 'Copy number'}
+            label={trackingCopied ? 'Copied' : 'Copy'}
             icon={trackingCopied ? 'check' : 'copy'}
             onPress={onCopyTracking}
             small style={{ flex: 1 }}
           />
           {delivery.trackingUrl ? (
-            <SecondaryButton label="Track on carrier" icon="external-link" onPress={onOpenTracking} small style={{ flex: 1 }} />
+            <SecondaryButton label="Track package" icon="external-link" onPress={onOpenTracking} small style={{ flex: 1 }} />
           ) : null}
         </View>
       ) : null}

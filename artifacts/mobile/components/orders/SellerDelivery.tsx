@@ -97,7 +97,7 @@ function bannerStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     box: {
       borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md,
-      padding: SP.md, marginHorizontal: SP.md, marginBottom: SP.md, gap: 4,
+      padding: SP.md, gap: 4,
     },
     head: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     title: { flex: 1, fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
