@@ -253,8 +253,6 @@ export default function ProductBundleEditScreen() {
             <HapticSwitch
               value={isActive}
               onValueChange={setIsActive}
-              trackColor={{ false: BORDER, true: PURPLE_DIM }}
-              thumbColor={isActive ? PURPLE_LIGHT : MUTED}
             />
           </View>
         )}

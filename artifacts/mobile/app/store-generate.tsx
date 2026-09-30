@@ -760,8 +760,6 @@ export default function StoreGenerateScreen() {
                       : features.filter(f => f !== value),
                   });
                 }}
-                trackColor={{ false: BORDER, true: PURPLE }}
-                thumbColor={isOn ? PURPLE_LIGHT : MUTED}
               />
             </View>
           );

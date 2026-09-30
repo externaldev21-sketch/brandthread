@@ -15,6 +15,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, ON_DARK } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 export function FeedTopBar({
   topInset,
@@ -47,6 +48,11 @@ export function FeedTopBar({
    */
   onOpenFriends: () => void;
 }) {
+  // Pads each plain icon control's real tap area up to 44x44 without
+  // changing its visual footprint — see useHitAreaBoost's doc comment.
+  const closeSearchHit = useHitAreaBoost();
+  const friendsHit = useHitAreaBoost();
+  const searchHit = useHitAreaBoost();
   return (
     <View style={[styles.root, { paddingTop: Math.max(0, topInset - 4) }]} pointerEvents="box-none">
       {searchOpen ? (
@@ -66,7 +72,8 @@ export function FeedTopBar({
             onSubmitEditing={onCloseSearch}
           />
           <TouchableOpacity
-            style={styles.iconBtn}
+            style={[styles.iconBtn, closeSearchHit.boostStyle]}
+            onLayout={closeSearchHit.onLayout}
             activeOpacity={0.7}
             onPress={onCloseSearch}
             accessibilityRole="button"
@@ -101,7 +108,8 @@ export function FeedTopBar({
               <Text style={[styles.liveText, hasActiveLive && styles.liveTextActive]}>LIVE</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.iconBtn}
+              style={[styles.iconBtn, friendsHit.boostStyle]}
+              onLayout={friendsHit.onLayout}
               activeOpacity={0.7}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -130,7 +138,8 @@ export function FeedTopBar({
           </View>
 
           <TouchableOpacity
-            style={styles.iconBtn}
+            style={[styles.iconBtn, searchHit.boostStyle]}
+            onLayout={searchHit.onLayout}
             activeOpacity={0.7}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -154,7 +163,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: 8 },
   leftCluster: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   tabsWrap: { flex: 1, alignItems: 'center' },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  // `minWidth`/`minHeight` (not a fixed `width`/`height`): still renders as
+  // a 36x36 box exactly as before (the icon glyph is well under 36pt, so
+  // the min floors it at 36 either way), but leaves room for
+  // useHitAreaBoost's own `minWidth`/`minHeight` to widen it further — a
+  // *fixed* width/height on this same element would instead have taken
+  // priority over the boost's and suppressed it.
+  iconBtn: { minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   liveBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 30,
     paddingHorizontal: 8, borderRadius: 15, width: 52, justifyContent: 'center',

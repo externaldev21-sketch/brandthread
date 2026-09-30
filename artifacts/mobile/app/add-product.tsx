@@ -251,6 +251,10 @@ export default function AddProductScreen() {
   // build yet; every photo still gets its own crop either way).
   const [cropQueue, setCropQueue] = useState<string[]>([]);
   const [cropTargetId, setCropTargetId] = useState<string | null>(null);
+  // Photos row: 3 empty "Add photo" squares by default, growable one at a
+  // time (up to 10) via the quiet "+" tile at the end — see renderPhotos().
+  // Never allowed to drop below however many photos are already filled in.
+  const [photoSlotCount, setPhotoSlotCount] = useState(3);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -992,34 +996,40 @@ export default function AddProductScreen() {
     ]);
   }
 
-  // Depop/Vinted-style listing photo row: a horizontal row of 3:4 slots on
-  // black with hairline dashed borders (no filled grey boxes) — first slot
-  // is the "Add photos" tile, then one slot per photo. Tap a photo to crop
-  // it; long-press for cover/cutout/remove; the small chevrons reorder
-  // (this project has no drag-list library yet, so reorder is tap-based
-  // rather than a literal finger-drag — same end result).
+  // Photo row per Dev's spec: true 1:1 square tiles, 3 empty "Add photo"
+  // slots by default (solid hairline border, no dashed placeholder look),
+  // then a quiet "+" tile that stages one more empty slot per tap (up to
+  // 10 total, then the "+" disappears). Filled slots show the photo edge
+  // to edge with a small remove X; the small chevrons reorder (no
+  // drag-list library yet, so reorder is tap-based, not a literal drag).
   function renderPhotos() {
     const media = draftData.media ?? [];
+    const visibleSlotCount = Math.min(10, Math.max(photoSlotCount, media.length));
+    const canAddSlot = visibleSlotCount < 10;
     return (
       <View style={{ gap: SP.sm }}>
         <View style={s.photoRowHeader}>
           <Text style={s.photoRowTitle}>Photos</Text>
-          <Text style={s.photoRowCount}>{media.length}/10 · Up to 10</Text>
+          <Text style={s.photoRowCount}>{media.length}/10</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.photoRowContent}>
-          <TouchableOpacity
-            style={s.photoAddSlot}
-            onPress={pickPhotos}
-            disabled={media.length >= 10}
-            accessibilityLabel="Add photos"
-            accessibilityRole="button"
-            testID="add-product-add-photos"
-          >
-            <Feather name="camera" size={22} color={MUTED} />
-            <Text style={s.photoAddSlotLabel}>Add photos</Text>
-          </TouchableOpacity>
-
-          {media.map((m, idx) => {
+          {Array.from({ length: visibleSlotCount }, (_, idx) => {
+            const m = media[idx];
+            if (!m) {
+              return (
+                <TouchableOpacity
+                  key={`empty-${idx}`}
+                  style={s.photoAddSlot}
+                  onPress={pickPhotos}
+                  accessibilityLabel="Add photo"
+                  accessibilityRole="button"
+                  testID="add-product-add-photos"
+                >
+                  <Feather name="camera" size={20} color={MUTED} />
+                  <Text style={s.photoAddSlotLabel}>Add photo</Text>
+                </TouchableOpacity>
+              );
+            }
             const upload = mediaUpload[m.id];
             const bgStatus = bgRemovalState[m.id];
             const displayUri = m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri;
@@ -1094,6 +1104,18 @@ export default function AddProductScreen() {
               </TouchableOpacity>
             );
           })}
+
+          {canAddSlot && (
+            <TouchableOpacity
+              style={s.photoMoreSlot}
+              onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
+              accessibilityLabel="Add another photo slot"
+              accessibilityRole="button"
+              testID="add-product-add-slot"
+            >
+              <Feather name="plus" size={16} color={SUBTLE} />
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
     );
@@ -1294,8 +1316,6 @@ export default function AddProductScreen() {
               updateUnsavedState(setTrackInventory, v);
               patchDraft({ inventory: { ...(draftData.inventory!), trackQuantity: v } });
             }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
         {trackInventory && (
@@ -1336,8 +1356,6 @@ export default function AddProductScreen() {
               updateUnsavedState(setAllowOversell, v);
               patchDraft({ inventory: { ...(draftData.inventory!), allowOverselling: v, policy: v ? 'continue' : 'deny' } });
             }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
       </>
@@ -1798,8 +1816,6 @@ export default function AddProductScreen() {
           <HapticSwitch
             value={featuredHome}
             onValueChange={v => { setFeaturedHome(v); patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } }); }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
         <SectionHeader title="SEO & URL" style={s.sectionHdr} />
@@ -1826,8 +1842,6 @@ export default function AddProductScreen() {
               setIsPreOrder(v);
               patchDraft({ salesModel: v ? 'pre-order' : 'pre-made' });
             }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
         {isPreOrder && (
@@ -2236,27 +2250,36 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   plusRowText: { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   priceRow: { flexDirection: 'row', gap: SP.sm },
 
-  // Depop/Vinted-style photo row: black background, hairline dashed 3:4
-  // slots — no filled grey boxes.
+  // Photo row: true 1:1 square tiles. 84x84 x3 default tiles + the quiet
+  // "+" tile + 3 x 8px gaps = 360px, fitting a 393px screen's 361px content
+  // width (16px gutters) without needing to scroll until a 4th photo is added.
   photoRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   photoRowTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  photoRowCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  photoRowCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   photoRowContent: { flexDirection: 'row', gap: SP.sm, paddingVertical: 2 },
   photoAddSlot: {
-    width: 84, height: 112, borderRadius: RADIUS.md,
-    borderWidth: 1, borderStyle: 'dashed', borderColor: BORDER,
+    width: 84, height: 84, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: BORDER,
     backgroundColor: '#000',
     alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   photoAddSlotLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', paddingHorizontal: 4 },
   photoSlot: {
-    width: 84, height: 112, borderRadius: RADIUS.md,
-    borderWidth: 1, borderStyle: 'dashed', borderColor: BORDER,
+    width: 84, height: 84, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: BORDER,
     backgroundColor: '#000',
     overflow: 'hidden', position: 'relative',
   },
   photoSlotImg: { width: '100%', height: '100%' },
   photoSlotImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  // The trailing "add another slot" tile — deliberately quieter than the
+  // "Add photo" slots (no label, thin dim "+", faint border) so it reads
+  // as a minor affordance rather than competing with the real action rows.
+  photoMoreSlot: {
+    width: 40, height: 84, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   mediaDeleteBtn: {
     position: 'absolute', top: 4, right: 4,
     width: 20, height: 20, borderRadius: RADII.pill,

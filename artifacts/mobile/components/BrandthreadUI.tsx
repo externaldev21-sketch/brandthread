@@ -1272,11 +1272,26 @@ export function CheckoutSkeleton() {
   );
 }
 
-export function HapticSwitch({ onValueChange, thumbColor, ...props }: SwitchProps) {
+// Brand rule: the app is black/white/silver only — green (and any other
+// accent hue) is reserved for Thread Cash. A Switch has no "brand accent" of
+// its own the way a button or link does, so every toggle in the app defaults
+// to this fixed monochrome pair regardless of which of the 12 seller
+// storefront themes (AppThemeContext) is active — a toggle is a system-style
+// control, not storefront-brand-colored chrome. `trackColor`/`thumbColor`
+// stay overridable for the rare legitimate exception (e.g. Thread Cash).
+const SWITCH_TRACK_OFF = '#3A3A3C'; // dark grey
+const SWITCH_TRACK_ON  = '#E5E5E5'; // silver/white
+const SWITCH_THUMB_OFF = '#FFFFFF'; // white thumb reads clearly on the dark-grey track
+const SWITCH_THUMB_ON  = '#000000'; // black thumb reads clearly on the silver/white track
+
+export function HapticSwitch({ onValueChange, trackColor, thumbColor, value, ...props }: SwitchProps) {
+  const resolvedThumbColor = thumbColor ?? (value ? SWITCH_THUMB_ON : SWITCH_THUMB_OFF);
   return (
     <Switch
       {...props}
-      thumbColor={thumbColor}
+      value={value}
+      trackColor={trackColor ?? { false: SWITCH_TRACK_OFF, true: SWITCH_TRACK_ON }}
+      thumbColor={resolvedThumbColor}
       // react-native-web's Switch has a web-only `activeThumbColor` prop for
       // the thumb while the switch is on, separate from `thumbColor`. Native
       // iOS/Android ignore it entirely and just use `thumbColor` in both
@@ -1284,12 +1299,13 @@ export function HapticSwitch({ onValueChange, thumbColor, ...props }: SwitchProp
       // never passes `activeThumbColor`, react-native-web silently falls
       // back to its own default (#009688, teal) for the "on" thumb — so on
       // web only, every switch with a custom thumb color showed a
-      // hardcoded teal dot once flipped on. Mirror `thumbColor` into it so
-      // web matches native and the app stays on-brand in all themes.
-      {...({ activeThumbColor: thumbColor } as object)}
-      onValueChange={(value) => {
+      // hardcoded teal dot once flipped on. Mirror the resolved thumb color
+      // into it so web matches native and the app stays on-brand in all
+      // themes.
+      {...({ activeThumbColor: resolvedThumbColor } as object)}
+      onValueChange={(next) => {
         hapticSelection();
-        onValueChange?.(value);
+        onValueChange?.(next);
       }}
     />
   );
