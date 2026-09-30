@@ -10,7 +10,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 
@@ -87,7 +87,7 @@ export default function SellerDataExportScreen() {
 
   return (
       <View style={styles.root}>
-      <Header title="Export My Data" />
+      <ScreenHeader title="Export My Data" />
 
        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}

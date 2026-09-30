@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/Button';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { File, Paths } from 'expo-file-system';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BrandthreadScreen, BrandthreadHeader,
 } from '@/components/BrandthreadUI';
@@ -418,13 +419,8 @@ export default function MockupToModelScreen() {
           presentationStyle="formSheet"
           onRequestClose={() => setShowProductPicker(false)}
         >
-          <View style={s.pickerRoot}>
-            <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>Choose a product</Text>
-              <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
-                <Feather name="x" size={ICON.sm} color={FG} />
-              </TouchableOpacity>
-            </View>
+          <SafeAreaProvider style={s.pickerRoot}>
+            <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
             <Text style={s.pickerSub}>This photo will become the product's cover photo.</Text>
             {loadingPickerProducts ? (
               <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
@@ -451,7 +447,7 @@ export default function MockupToModelScreen() {
                 )}
               />
             )}
-          </View>
+          </SafeAreaProvider>
         </Modal>
       </BrandthreadScreen>
     );
@@ -1002,19 +998,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     pickerRoot: {
       flex: 1,
       backgroundColor: BG,
-    },
-    pickerHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: SP.md,
-      borderBottomWidth: 1,
-      borderBottomColor: BORDER,
-    },
-    pickerTitle: {
-      fontFamily: FONT.bold,
-      fontSize: FS.md,
-      color: FG,
     },
     pickerSub: {
       fontFamily: FONT.regular,

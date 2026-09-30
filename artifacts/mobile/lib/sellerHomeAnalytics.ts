@@ -1,3 +1,5 @@
+export type TrafficSource = 'feed' | 'search' | 'profile' | 'external';
+
 export type SellerHomeAnalytics = {
   range: string;
   totalCents: number;
@@ -7,8 +9,17 @@ export type SellerHomeAnalytics = {
   toCapture: number;
   /** The immediately preceding period of the same length (e.g. yesterday for "today"). */
   previous: { totalCents: number; orderCount: number; visitorCount: number };
+  /** Real per-source breakdown (Discover feed / Search / Your profile / External links), same range. */
+  trafficSources: Array<{ source: TrafficSource; count: number; sharePercent: number }>;
   buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
 };
+
+export const EMPTY_TRAFFIC_SOURCES: SellerHomeAnalytics['trafficSources'] = [
+  { source: 'feed', count: 0, sharePercent: 0 },
+  { source: 'search', count: 0, sharePercent: 0 },
+  { source: 'profile', count: 0, sharePercent: 0 },
+  { source: 'external', count: 0, sharePercent: 0 },
+];
 
 export type SellerHomeAnalyticsSnapshot = {
   key: string;
@@ -24,6 +35,7 @@ export function zeroSellerHomeAnalytics(range: string): SellerHomeAnalytics {
     toFulfill: 0,
     toCapture: 0,
     previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
+    trafficSources: EMPTY_TRAFFIC_SOURCES,
     buckets: [],
   };
 }

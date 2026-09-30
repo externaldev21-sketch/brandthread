@@ -49,7 +49,7 @@ import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics'
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import {
-  messageSellerAboutProductHref, profileHref, profileVideosHref,
+  messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
@@ -482,12 +482,13 @@ export default function BuyerProductDetailScreen() {
   const { theme, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, GRAD_PRIMARY, SHADOW_PURPLE } = useChrome();
   const s = makeStyles(theme);
   const wl = makeWaitlistStyles(theme);
-  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId } = useLocalSearchParams<{
+  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId, src } = useLocalSearchParams<{
     productId?: string;
     sourcePostId?: string;
     sourceTagId?: string;
     editVariantId?: string;
     editCartItemId?: string;
+    src?: string;
   }>();
   const router = useRouter();
   const pathname = usePathname();
@@ -626,6 +627,17 @@ export default function BuyerProductDetailScreen() {
 
     return () => { cancelled = true; };
   }, [productId]);
+
+  // Real per-source traffic tracking for the seller's own Dashboard — a
+  // signed-out shopper's visit still counts, so this never gates on
+  // isSignedIn. Fire-and-forget, never blocks this screen's own render.
+  useEffect(() => {
+    if (!product?.id || !product.sellerId) return;
+    api.publicSellers
+      .recordStoreVisit(product.sellerId, { source: resolveStoreVisitSource(src), productId: product.id })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, product?.sellerId]);
 
   // Meta Pixel + Conversions API — ViewContent, once per loaded product. This
   // is the real buyer-facing product page (product-detail.tsx is the seller's

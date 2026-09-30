@@ -171,6 +171,27 @@ export const storefrontVisits = pgTable('storefront_visits', {
   sellerVisitsIndex: index('storefront_visits_seller_id_idx').on(table.sellerId),
 }));
 
+// ─── Store Visits (per-source traffic tracking) ───────────────────────────────
+// One row per real visit to a seller's store (productId null) or a specific
+// product screen (productId set), tagged with where the buyer navigated from.
+// Distinct from `storefrontVisits` above: that table dedupes a signed-in
+// viewer once per seller per day (the input to conversion rate); this table
+// records every real visit, unauthenticated buyers included, purely to give
+// the seller Dashboard's Traffic sources panel a real per-source breakdown.
+export const storeVisits = pgTable('store_visits', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  sellerId:      text('seller_id').notNull(),
+  productId:     uuid('product_id'),
+  // 'feed' | 'search' | 'profile' | 'external' — see StoreVisitSource in the
+  // mobile app's lib/profileNavigation.ts for how each is attached.
+  source:        text('source').notNull(),
+  viewerUserId:  text('viewer_user_id'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  sellerIdIndex:        index('store_visits_seller_id_idx').on(table.sellerId),
+  sellerCreatedAtIndex: index('store_visits_seller_created_at_idx').on(table.sellerId, table.createdAt),
+}));
+
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 export const products = pgTable('products', {

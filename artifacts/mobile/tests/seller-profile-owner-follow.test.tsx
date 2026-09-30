@@ -23,7 +23,7 @@ const {
   routerMock: { push: vi.fn(), back: vi.fn(), canGoBack: vi.fn(() => true), replace: vi.fn() },
   apiMock: {
     seller: { getProfile: vi.fn() },
-    publicSellers: { get: vi.fn(), recordVisit: vi.fn() },
+    publicSellers: { get: vi.fn(), recordVisit: vi.fn(), recordStoreVisit: vi.fn() },
     reviews: { forSeller: vi.fn() },
     social: { block: vi.fn(), profile: vi.fn() },
   },
@@ -258,6 +258,7 @@ beforeEach(() => {
   apiMock.seller.getProfile.mockReset();
   apiMock.publicSellers.get.mockReset().mockResolvedValue({ profile: sellerProfile, products: [] });
   apiMock.publicSellers.recordVisit.mockReset().mockResolvedValue(undefined);
+  apiMock.publicSellers.recordStoreVisit.mockReset().mockResolvedValue(undefined);
   apiMock.reviews.forSeller.mockReset().mockResolvedValue({ avgRating: 4.8, totalCount: 10 });
   apiMock.social.profile.mockReset().mockResolvedValue({ followersCount: 12, followingCount: 3 });
   followStateMock.mockReset().mockResolvedValue({ isFollowing: false, followersCount: 12 });
