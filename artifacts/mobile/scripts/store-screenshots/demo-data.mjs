@@ -988,7 +988,12 @@ export function respond({ method, path, query, role, options = {} }) {
       productId: product.id, name: product.name, unitsSold: product.totalSales, revenueCents: product.totalRevenueCents,
     }))
     : [];
-  if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  if (p === '/finance/balance') return options.fresh
+    ? { available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false, payoutsEnabled: false, bankConnected: false, processingCashout: null }
+    : { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  if (p === '/finance/payouts') return { payouts: options.fresh ? [] : [
+    { id: 'po_demo_1', arrivalDate: DEMO_NOW, formatted: '$412.30', status: 'paid', destination: { last4: '4242' } },
+  ] };
   // Rendered on every seller screen (StripeConnectWarning); unseeded, it
   // 404s on every single dashboard load, not just this route's own fetches.
   if (p === '/seller/connect/status') return { connected: true, stripeAccountId: 'acct_demo', chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242', providerConfigured: true };

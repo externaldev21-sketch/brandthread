@@ -50,6 +50,18 @@ export function clerkStubScript(user) {
   const client = { id: 'client_demo', sessions: [session], activeSessions: [session], lastActiveSessionId: session.id, signIn: {}, signUp: {} };
   const listeners = new Set();
   const noop = () => undefined;
+  // Newer @clerk/expo hooks (useSignIn()/useSignUp()) read their state via
+  // useSyncExternalStore from Clerk.__internal_state's signInSignal/
+  // signUpSignal (alien-signals), not from client.signIn/signUp directly.
+  // Without these, mounting /sign-in, /onboarding or /account-type (which
+  // render even for this stub's already-signed-in demo session) throws
+  // "t.__internal_state.signUpSignal is not a function" and trips the app's
+  // error boundary. Static empty snapshots are enough: this stub never
+  // drives a real sign-in/sign-up flow, it only needs the hooks to mount.
+  const STATIC_EMPTY_ERRORS = Object.freeze({ fields: Object.freeze({}), raw: null, global: null });
+  const STATIC_SIGN_IN_SNAPSHOT = Object.freeze({ errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signIn: null });
+  const STATIC_SIGN_UP_SNAPSHOT = Object.freeze({ errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signUp: null });
+  const STATIC_WAITLIST_SNAPSHOT = Object.freeze({ errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', waitlist: null });
   const target = {
     loaded: false,
     version: '0.0.0-screenshots',
@@ -82,6 +94,17 @@ export function clerkStubScript(user) {
     handleRedirectCallback: async () => undefined,
     navigate: async () => undefined,
     buildUrlWithAuth: (url) => url,
+    __internal_state: {
+      signInSignal: () => STATIC_SIGN_IN_SNAPSHOT,
+      signUpSignal: () => STATIC_SIGN_UP_SNAPSHOT,
+      waitlistSignal: () => STATIC_WAITLIST_SNAPSHOT,
+      // Minimal stand-in for alien-signals' effect(): run fn once to
+      // establish "interest", never re-run it (this stub's snapshots never
+      // change, so there's nothing to notify).
+      __internal_effect(fn) { fn(); return noop; },
+      __internal_computed(getter) { const value = getter(); return () => value; },
+      __internal_waitlist: {},
+    },
   };
   // Any Clerk UI method the app might call (openSignIn, mountUserButton, …) is a no-op.
   window.Clerk = new Proxy(target, {
