@@ -645,6 +645,137 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/team/context') return { role: 'owner', storeOwnerId: SELLER_USER.id, teamMembershipId: null };
   if (p === '/team/my-memberships') return { memberships: [] };
 
+  // Storefront (seller) — half-done audit: /store-settings, /store-editor,
+  // /store-ai-improve, /store-nav, /store-pages, /store-theme-picker and
+  // /store-builder all fetch GET /store on load; unseeded, it 404'd on
+  // every one of them. Shape matches the real storefronts table row
+  // (lib/db/src/schema/index.ts) and api-server/src/routes/store.ts's
+  // GET / handler — a plausible, in-progress Northline Studio storefront.
+  if (p === '/store') {
+    return {
+      id: 'storefront_northline',
+      ownerId: SELLER_USER.id,
+      slug: 'northline-studio',
+      title: 'Northline Studio',
+      subtitle: 'Independent streetwear, small-batch heavyweight basics.',
+      description: 'Considered pieces for everyday movement, cut heavy and made to last.',
+      status: 'published',
+      theme: {
+        themeId: 'thread',
+        primaryColor: '#111111',
+        secondaryColor: '#6B6B6B',
+        accentColor: '#2B2B2B',
+        backgroundColor: '#F7F7F5',
+        textColor: '#111111',
+        fontFamily: 'Cormorant Garamond, Georgia, serif',
+        borderRadius: 0,
+      },
+      branding: { tagline: 'The new uniform.', logoUrl: SELLER_USER.imageUrl, targetAudience: 'Streetwear buyers who want fewer, better pieces' },
+      sections: [
+        { id: 'thread-hero', type: 'hero_image', title: 'Hero Image', enabled: true, settings: { heading: 'The new uniform.', description: 'Considered pieces for everyday movement.', buttonLabel: 'Shop the collection', fullWidth: true, sectionHeight: 'tall' } },
+        { id: 'thread-products', type: 'product_grid', title: 'Product Grid', enabled: true, settings: { heading: 'Current collection', description: 'The pieces in rotation.', columns: 2, quickAdd: false } },
+        { id: 'thread-story', type: 'brand_story', title: 'Brand Story', enabled: true, settings: { heading: 'Designed with intention.', description: 'Fewer pieces, better made, and meant to be worn often.' } },
+        { id: 'thread-newsletter', type: 'newsletter', title: 'Newsletter', enabled: true, settings: { heading: 'Stay close.', description: 'New releases, studio notes, and first access.', buttonLabel: 'Join the list' } },
+      ],
+      seo: { metaTitle: 'Northline Studio — Heavyweight streetwear', metaDescription: 'Small-batch heavyweight basics, made to last.' },
+      socialLinks: {},
+      analyticsCode: null,
+      publishedAt: iso(9 * DAY),
+      sharePreviewRevokedAt: null,
+    };
+  }
+  // /store-builder also checks for an in-progress Shopify import on load
+  // (getLatestShopifyImport()) — unseeded, this 404'd every time. `null` is
+  // the real API's own "no import yet" answer (api-server's GET /latest).
+  if (p === '/shopify-imports/latest') return null;
+  // /store-versions fetches the saved version history on load — unseeded,
+  // every load 404'd before any version ever showed. A couple of plausible
+  // past saves (storeService.ts's getVersions() maps trigger/label/snapshot).
+  if (p === '/store/versions') {
+    return [
+      { id: 'ver_nl_2', label: 'Before Drop 04 refresh', trigger: 'publish', snapshot: {}, createdAt: iso(2 * DAY), createdBy: SELLER_USER.id },
+      { id: 'ver_nl_1', label: 'Initial Thread Theme setup', trigger: 'manual', snapshot: {}, createdAt: iso(9 * DAY), createdBy: SELLER_USER.id },
+    ];
+  }
+  // /seller-verification fetches identity verification status on load —
+  // unseeded, it 404'd before the screen could render anything. 'unverified'
+  // is the same starting state a brand-new seller actually has.
+  if (p === '/seller/verification/status') return { verified: false, verificationStatus: 'unverified', sessionId: null };
+  // /vacation-mode fetches current vacation state on load — unseeded, every
+  // load 404'd before the toggle could show its real value.
+  if (p === '/seller/vacation') return { vacationMode: false, vacationMessage: null, vacationUntil: null };
+  // /team and /users both fetch the member roster; /team also loads the
+  // recent activity log. Unseeded, both 404'd on first render. The owner
+  // row plus one active admin and one pending invite give the screens
+  // something real to lay out (avatars, status pills, role chips).
+  if (p === '/team/members') {
+    return [
+      { id: 'owner', email: SELLER_USER.email, name: 'Maya Okafor', role: 'owner', status: 'active', invitedAt: null, joinedAt: iso(180 * DAY), lastActiveAt: iso(0), memberClerkId: SELLER_USER.id, online: true, isOwner: true },
+      { id: 'member_nl_1', email: 'devon@northlinestudio.co', name: 'Devon Cole', role: 'admin', status: 'active', invitedAt: iso(60 * DAY), expiresAt: null, expired: false, joinedAt: iso(58 * DAY), lastActiveAt: iso(3 * HOUR), memberClerkId: 'user_devon', online: false, isOwner: false },
+      { id: 'member_nl_2', email: 'priya@northlinestudio.co', name: 'Priya Shah', role: 'marketing', status: 'pending', invitedAt: iso(2 * DAY), expiresAt: isoAhead(5 * DAY), expired: false, joinedAt: null, lastActiveAt: null, memberClerkId: null, online: false, isOwner: false },
+    ];
+  }
+  if (p === '/team/activity') {
+    return {
+      logs: [
+        { id: 'act_nl_1', ownerId: SELLER_USER.id, actorClerkId: SELLER_USER.id, actorRole: 'owner', message: 'Invited priya@northlinestudio.co as marketing', resourceType: 'team', resourceId: 'member_nl_2', createdAt: iso(2 * DAY) },
+        { id: 'act_nl_2', ownerId: SELLER_USER.id, actorClerkId: 'user_devon', actorRole: 'admin', message: 'Updated the Drop 04 product grid', resourceType: 'store', resourceId: 'storefront_northline', createdAt: iso(3 * HOUR) },
+      ],
+      hasMore: false,
+      nextOffset: 2,
+    };
+  }
+  // /roles fetches the role tiers with live staff counts — unseeded, it
+  // 404'd on load and the screen fell back to its own static placeholder
+  // counts. Mirrors api-server/src/routes/team.ts's ROLE_DEFINITIONS, with
+  // counts matching the /team/members seed above (one active admin, one
+  // pending marketing invite).
+  if (p === '/team/roles') {
+    return [
+      { key: 'owner', name: 'Owner', group: 'Organization', description: 'Full access to all features including billing, payouts, and team management', permissions: ['*'], staffCount: 1, pendingCount: 0 },
+      { key: 'admin', name: 'Admin', group: 'Organization', description: 'Manage products, orders, inventory, analytics, customers, marketing, payouts and the team', permissions: ['products', 'orders', 'inventory', 'analytics', 'customers', 'marketing', 'payouts', 'team'], staffCount: 1, pendingCount: 0 },
+      { key: 'finance', name: 'Finance', group: 'Store', description: 'View balance, payouts, transactions and statements', permissions: ['payouts', 'analytics'], staffCount: 0, pendingCount: 0 },
+      { key: 'orders', name: 'Orders', group: 'Store', description: 'Manage orders, fulfillment and inventory', permissions: ['orders', 'inventory'], staffCount: 0, pendingCount: 0 },
+      { key: 'marketing', name: 'Marketing', group: 'Store', description: 'Manage ads, boosts and discount codes', permissions: ['marketing', 'analytics'], staffCount: 0, pendingCount: 1 },
+      { key: 'viewer', name: 'Viewer', group: 'Store', description: 'Read-only access to analytics and store data', permissions: ['analytics'], staffCount: 0, pendingCount: 0 },
+    ];
+  }
+  // /locations fetches the seller's fulfillment locations — unseeded, it
+  // 404'd on load. Raw snake_case fields, matching the real handler's raw
+  // SQL row shape (app/locations.tsx reads loc.is_active/is_primary directly).
+  if (p === '/seller/locations') {
+    return {
+      locations: [
+        { id: 'loc_nl_1', owner_id: SELLER_USER.id, name: 'Northline Studio — Warehouse', address: '4100 SE Division St', city: 'Portland', state: 'OR', country: 'US', zip: '97202', phone: '+1 503-555-0143', is_active: true, is_primary: true, fulfills_online_orders: true, created_at: iso(180 * DAY) },
+      ],
+    };
+  }
+  // /languages reads store localization settings via the shared seller
+  // settings row — unseeded, it 404'd before the current language could
+  // show. Matches api-server's seller-settings-route.ts ({ settings }).
+  if (p === '/seller/settings') return { settings: { storeLanguage: 'en' } };
+  // /notifications-settings fetches the buyer/seller-agnostic preference
+  // endpoint (api.notificationPrefs, mounted at /api/notification-prefs,
+  // distinct from /api/seller/notification-prefs) — unseeded, it 404'd on
+  // load. Matches notification-prefs.ts's GET / response shape.
+  if (p === '/notification-prefs') {
+    return {
+      digest: 'realtime',
+      role: 'seller',
+      pushEnabled: true,
+      quietHours: { start: null, end: null, timezone: DEMO_TIME_ZONE },
+      categories: {
+        new_orders: true, production_milestones: true, payout_confirmations: true,
+        customer_messages: true, disputes: true, subscription_trial: true, inventory_alerts: true,
+      },
+    };
+  }
+  // /shopify-import checks connection status on load — unseeded, it 404'd
+  // before the screen could tell whether Shopify was connected. 'Not
+  // connected yet' is the real starting state for a seller who hasn't set
+  // up the bridge, matching serializeConnection()'s disconnected shape.
+  if (p === '/shopify/status') return { connected: false, fulfillmentEnabled: false, linkedProductsCount: 0 };
+
   // Public / buyer
   if (p === '/public/products/high-demand') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 6));
   if (p === '/public/products') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? PUBLIC_PRODUCTS.length));
