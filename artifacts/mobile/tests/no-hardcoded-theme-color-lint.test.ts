@@ -332,7 +332,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/design-studio/LayersPanel.tsx',
   'components/design-studio/SkiaDrawingCanvas.tsx',
   'components/design-studio/SvgDrawingCanvas.tsx',
-  'components/design/BgRefineCanvas.tsx',
   'components/discover/DiscoverEntityCard.tsx',
   'components/discover/DiscoverFilterRow.tsx',
   'components/discover/DiscoverPager.tsx',
