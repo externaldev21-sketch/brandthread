@@ -677,7 +677,7 @@ const s = StyleSheet.create({
   webFallback: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   webFallbackIcon: { width: 76, height: 76, borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   webFallbackTitle: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center', marginBottom: SP.xs },
-  webFallbackText: { maxWidth: 520, fontSize: FS.base, lineHeight: 22, textAlign: 'center', marginBottom: SP.lg },
+  webFallbackText: { maxWidth: 520, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', marginBottom: SP.lg },
   webFallbackButton: { borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 14 },
   webFallbackButtonText: { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
 

@@ -11,14 +11,16 @@ describe('development app preview routing', () => {
       "if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;",
     );
     expect(layoutSource).toContain("if (v !== 'buyer' && v !== 'seller') return null;");
+    // Index's own redirect-away-from-"/" effect must resolve the preview
+    // role the same way (isSellerDevPreview/isBuyerDevPreview — the
+    // `__DEV__ || NAVIGATION_ISOLATION_TEST` OR, not bare `__DEV__`) so an
+    // exported preview build (the screenshot/audit harness) redirects too,
+    // not just a local dev server.
+    expect(indexSource).toContain("from '@/lib/devPreview'");
+    expect(indexSource).toContain('if (isSellerDevPreview()) effectivePreviewRole = ');
+    expect(indexSource).toContain('else if (isBuyerDevPreview()) effectivePreviewRole = ');
     expect(indexSource).toContain(
-      "const effectivePreviewRole = Platform.OS === 'web'",
-    );
-    expect(indexSource).toContain(
-      "previewRole === 'seller' || previewRole === 'buyer' ? previewRole : null",
-    );
-    expect(indexSource).toContain(
-      "previewRole === 'seller' ? '/(tabs)' : '/(buyer)'",
+      "effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'",
     );
   });
 

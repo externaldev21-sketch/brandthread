@@ -160,7 +160,6 @@ const MODAL_INSETS_ALLOWLIST = new Set([
   'app/design-ai-photoshoot.tsx',
   'app/design-bg-replace.tsx',
   'app/help.tsx',
-  'app/meta-ads-manage.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
   'components/SellerTutorialOverlay.tsx',
