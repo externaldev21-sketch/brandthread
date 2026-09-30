@@ -11,10 +11,9 @@
  */
 import { Asset } from 'expo-asset';
 import type { ThreadComment, ProfileSummary } from '@/lib/safetyTypes';
+import type { MentionPerson } from '@/services/socialTypes';
 
 export interface PreviewComment extends ThreadComment {
-  /** Shown as a small "creator liked" badge — not part of the real API shape. */
-  creatorLiked?: boolean;
   replies: PreviewComment[];
 }
 
@@ -137,8 +136,37 @@ export function buildPreviewComments(postId: string, creatorName: string): Previ
     });
   }
 
+  // The creator's own pinned answer leads the thread (additive demo data for
+  // the pin + @mention UI; real posts get both from the server).
+  const creatorHandle = creatorName.toLowerCase().replace(/\s+/g, '');
+  roots.unshift({
+    id: `preview-comment-${postId}-pinned`,
+    postId,
+    parentId: null,
+    body: 'Runs true to size, restock lands Friday. Thanks @mayac for asking!',
+    createdAt: iso(180),
+    author: profile(creatorName, creatorHandle),
+    likesCount: 41,
+    likedByMe: false,
+    isMine: false,
+    canDelete: false,
+    pendingReview: false,
+    pinned: true,
+    mentions: [{ userId: 'preview-user-mayac', handle: 'mayac' }],
+    replies: [],
+  });
+
   return roots;
 }
+
+/** People suggested by the composer's @ strip in preview mode (no API call). */
+export const PREVIEW_MENTION_PEOPLE: MentionPerson[] = POOL.slice(0, 8).map((entry) => {
+  const base = profile(entry.name, entry.handle);
+  return {
+    userId: base.userId, name: entry.name, username: entry.handle, handle: `@${entry.handle}`,
+    avatarUrl: base.avatarUrl, initials: base.initials, color: '#1C1C1E', isFollowing: false,
+  };
+});
 
 /** The Activity notification a preview comment deep link came from. */
 export interface PreviewNotificationComment {

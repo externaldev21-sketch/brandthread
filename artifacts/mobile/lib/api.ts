@@ -2218,6 +2218,15 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`,
           { liked },
         ),
+      /** Post owner only: pin a top-level comment (replaces any other pin). */
+      pin: (postId: string, commentId: string) =>
+        post<{ pinned: boolean; commentId: string }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/pin`, {},
+        ),
+      unpin: (postId: string, commentId: string) =>
+        del<{ pinned: boolean; commentId: string }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/pin`,
+        ),
     },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {
