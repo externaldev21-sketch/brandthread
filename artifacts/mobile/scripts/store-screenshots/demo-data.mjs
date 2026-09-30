@@ -608,6 +608,15 @@ export function respond({ method, path, query, role, options = {} }) {
   let match;
 
   if (p === '/config/features') return { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null };
+  // app/boost.tsx (Promote a post) fetches all three of these on load;
+  // unseeded, they 404 on every single load of that screen. The demo seller
+  // has no video/slideshow posts (only photo posts in the feed fixture, and
+  // boost only accepts video/2+-image slideshows), so an honest empty state
+  // — no eligible posts yet, no active boosts — is the real answer here,
+  // not fabricated boost data.
+  if (p === '/boosts/targets') return [];
+  if (p === '/boosts/summary') return { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
+  if (p === '/boosts') return [];
   if (p === '/auth/me') return profileFor(role);
   // Buyer account/settings screens the half-done audit crawls on load —
   // previously unseeded, so every one of these 404'd as soon as the screen
@@ -742,7 +751,30 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/returns/buyer') return [];
   if (p === '/loyalty') return { balance: 0, valueCents: 0, history: [] };
   if (p === '/profile/cover-coachmark') return { seen: true };
-  if (p === '/thread-cash') return { balanceCents: 0, history: [] };
+  if (p === '/thread-cash') {
+    return {
+      balanceCents: options.fresh ? 0 : 4260,
+      config: { dailyAmountCents: 10, streakBonusCents: 100, streakBonusDays: 7, graceHours: 20, expiryDays: 180, maxRedemptionPerOrderCents: 2000 },
+      streak: { currentStreak: 0, longestStreak: 0, lastCheckInDate: null, timezone: 'UTC', alreadyCheckedInToday: false, dayInCycle: 0 },
+    };
+  }
+  if (p === '/thread-cash/history') {
+    if (options.fresh) return { history: [] };
+    return {
+      history: [
+        { id: 'stc-1', buyerId: role, amountCents: 500, source: 'live_gift', referenceId: null, note: 'Gift during your Live', createdAt: iso(0) },
+        { id: 'stc-2', buyerId: role, amountCents: 200, source: 'send_received', referenceId: null, note: 'From Jordan Reyes', createdAt: iso(1 * DAY) },
+        { id: 'stc-3', buyerId: role, amountCents: -2000, source: 'cash_out', referenceId: null, note: 'Cashed out to payout balance', createdAt: iso(2 * DAY) },
+        { id: 'stc-4', buyerId: role, amountCents: 1500, source: 'live_gift', referenceId: null, note: 'Gift during your Live', createdAt: iso(3 * DAY) },
+        { id: 'stc-5', buyerId: role, amountCents: 60, source: 'send_received', referenceId: null, note: 'From Amara Chen', createdAt: iso(4 * DAY) },
+        { id: 'stc-6', buyerId: role, amountCents: 4000, source: 'live_gift', referenceId: null, note: 'Gift during your Live', createdAt: iso(5 * DAY) },
+      ],
+    };
+  }
+  if (p === '/thread-cash/quote') {
+    const threadCashCents = Number(query.get('threadCashCents') ?? 0) || 0;
+    return { threadCashCents, payoutCents: threadCashCents, feeCents: 0 };
+  }
   if (p === '/seller/profile') {
     const p2 = profileFor('seller');
     return {
@@ -1011,9 +1043,8 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/buyer/payment-methods') return [];
   if (p === '/buyer/recently-viewed') return [];
   if ((match = p.match(/^\/buyer\/collections\/[^/]+\/items$/))) return [];
-  if (p === '/boosts') return [];
-  if (p === '/boosts/summary') return { activeCount: 0, totalSpendCents: 0, totalImpressions: 0, totalClicks: 0 };
-  if (p === '/boosts/targets') return [];
+  // (/boosts, /boosts/summary and /boosts/targets are seeded once, above,
+  // with the real Summary field names the client actually reads.)
   if (p === '/auth/feed-gestures-tip') return { seenVersion: 0 };
   if (p === '/auth/account/deletion-check') return { canDelete: true, accountType: role, blockers: [], willDelete: [], willRetain: [] };
   if (p === '/auth/sessions') return { sessions: [] };

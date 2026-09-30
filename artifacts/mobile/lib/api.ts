@@ -2814,6 +2814,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
       cancel: (body: { transferId: string }) =>
         post<{ ok: boolean }>('/api/thread-cash/cancel', body),
+      /** Preview the payout (after any fee) for cashing out a Thread Cash amount, at the live rate. */
+      cashOutQuote: (threadCashCents: number) =>
+        get<{ threadCashCents: number; payoutCents: number; feeCents: number }>(`/api/thread-cash/quote?threadCashCents=${threadCashCents}`),
+      /** Seller-only: converts earned Thread Cash into a real Stripe transfer to the payout balance. */
+      cashOut: (body: { threadCashCents: number; idempotencyKey: string }) =>
+        post<{ ok: boolean; threadCashCents: number; payoutCents: number; feeCents: number; transferId: string }>('/api/thread-cash/cash-out', body),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {
