@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ApiError } from '@/lib/networkNotice';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -173,6 +174,7 @@ export default function SellerHomeCommerceDashboard({
   const { isTablet } = useBreakpoint();
   const sellerPreview = isSellerDevPreview();
   const analyticsUserId = sellerPreview ? userId ?? 'demo-seller' : userId;
+  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
   const [range, setRange] = useState<SellerDashboardRange>('week');
   const [metric, setMetric] = useState<MetricKey>('sales');
@@ -635,7 +637,7 @@ export default function SellerHomeCommerceDashboard({
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarMetrics.occupiedHeight + SP.md }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
@@ -818,8 +820,13 @@ export default function SellerHomeCommerceDashboard({
                 <View style={styles.section}>
                   <SellerDashboardTrafficSources
                     totalVisits={data.visitorCount}
+                    previousVisits={data.previous?.visitorCount ?? 0}
+                    periodLabel={range !== 'all' ? PERIOD_LABEL[range] : null}
                     trafficSources={data.trafficSources}
                     theme={theme}
+                    onSeeAll={() => nav('/analytics-store')}
+                    onOpenSource={() => nav('/analytics-store')}
+                    onShareStore={() => nav('/share-store')}
                   />
                 </View>
               )}
@@ -876,7 +883,7 @@ const styles = StyleSheet.create({
   // flex: 1 on the ScrollView itself is required on iOS so the layout engine
   // gives it a bounded height and allows inner content to scroll correctly.
   scrollView: { flex: 1 },
-  scroll: { flexGrow: 1, paddingBottom: 160 },
+  scroll: { flexGrow: 1 },
   scrollEndMarker: { height: 1 },
 
   // Matches the shared root-page Header's exact title/row treatment (Discover

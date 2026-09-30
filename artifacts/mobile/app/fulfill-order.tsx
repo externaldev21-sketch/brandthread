@@ -106,6 +106,12 @@ export default function FulfillOrderScreen() {
   const hasValidLabel = !!label && label.status !== 'voided';
 
   const load = useCallback(async () => {
+    // No order id at all (e.g. a bad/incomplete deep link) — nothing to
+    // fetch; the "order not found" branch below handles the rest.
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [raw, presetList] = await Promise.all([

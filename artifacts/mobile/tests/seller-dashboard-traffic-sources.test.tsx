@@ -1,9 +1,11 @@
 /**
- * SellerDashboardTrafficSources — real per-source breakdown (item 126,
- * finished). Backed by the `store_visits` table (migration 108) and the
- * `trafficSources` field GET /api/analytics/home now returns for the same
- * range as the rest of the dashboard. No lock row, no dashes — a fresh
- * store with no visits yet shows a real 0 for every source.
+ * SellerDashboardTrafficSources — redesign per Dev's direction (Mobbin refs:
+ * YouTube Studio per-source bars, eBay headline+delta, Stripe/Linear-style
+ * single segmented breakdown bar), reskinned black/white/silver.
+ *
+ * Reported bug this redesign fixes: the old zero state showed BOTH "No
+ * store visits yet" AND a table of four "0  0%" rows — doubled up. A fresh
+ * store must show exactly one clean empty state, never a zero table.
  */
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -19,6 +21,7 @@ vi.mock('react-native', () => {
     StyleSheet: { create: (s: unknown) => s, hairlineWidth: 1 },
     View: el('View'),
     Text: el('Text'),
+    TouchableOpacity: el('TouchableOpacity'),
   };
 });
 
@@ -27,13 +30,34 @@ vi.mock('@expo/vector-icons', () => {
   return { Feather: (props: Record<string, unknown>) => React.createElement('Feather', props) };
 });
 
+vi.mock('react-native-reanimated', () => {
+  const React = require('react') as typeof import('react');
+  const el = (name: string) => (props: Record<string, unknown>) =>
+    React.createElement(name, props, props.children as React.ReactNode);
+  return {
+    default: { View: el('AnimatedView') },
+    useSharedValue: (initial: unknown) => React.useRef({ value: initial }).current,
+    useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
+    withTiming: (toValue: unknown) => toValue,
+    Easing: { out: (fn: unknown) => fn, cubic: (t: number) => t },
+  };
+});
+
+vi.mock('@/components/BrandthreadUI', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    PressableScale: ({ children, onPress, ...rest }: any) =>
+      React.createElement('PressableScale', { ...rest, onPress }, children),
+  };
+});
+
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { EMPTY_TRAFFIC_SOURCES } from '@/lib/sellerHomeAnalytics';
 
 const theme = {
   text: '#F7F7FA',
-  muted: 'rgba(247,247,250,0.58)',
-  subtle: 'rgba(247,247,250,0.50)',
+  muted: '#C0C0C0',
+  subtle: '#B0B0B0',
   borderSubtle: 'rgba(255,255,255,0.04)',
   cardElevated: '#1E1E22',
 } as any;
@@ -45,6 +69,8 @@ const REAL_SOURCES = [
   { source: 'external' as const, count: 188, sharePercent: 15 },
 ];
 
+const noop = () => {};
+
 describe('SellerDashboardTrafficSources', () => {
   let renderer: ReactTestRenderer | null = null;
 
@@ -53,71 +79,94 @@ describe('SellerDashboardTrafficSources', () => {
     renderer = null;
   });
 
-  it('shows the real total visit count, compactly formatted', async () => {
+  function texts() {
+    return renderer!.root.findAllByType('Text' as React.ElementType).map((t) => String(t.props.children));
+  }
+
+  it('shows the real total visit count, compactly formatted, with a delta line', async () => {
     await act(async () => {
       renderer = create(
-        <SellerDashboardTrafficSources totalVisits={12480} trafficSources={REAL_SOURCES} theme={theme} />,
+        <SellerDashboardTrafficSources
+          totalVisits={12480} previousVisits={10000} periodLabel="last week"
+          trafficSources={REAL_SOURCES} theme={theme}
+          onSeeAll={noop} onOpenSource={noop} onShareStore={noop}
+        />,
       );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
-    expect(texts).toContain('12.5K');
-    expect(texts).toContain('store visits this period');
+    const t = texts();
+    expect(t).toContain('12.5K');
+    expect(t.join(' ')).toContain('store visits this period');
+    expect(t.join(' ')).toContain('vs last week');
   });
 
-  it('shows a plain "No store visits yet" line for the zero/fresh state — never a bold "0"', async () => {
+  it('a fresh store shows exactly ONE clean empty state — never both the message AND a table of zero rows', async () => {
     await act(async () => {
       renderer = create(
-        <SellerDashboardTrafficSources totalVisits={0} trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme} />,
+        <SellerDashboardTrafficSources
+          totalVisits={0} previousVisits={0} periodLabel="last week"
+          trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme}
+          onSeeAll={noop} onOpenSource={noop} onShareStore={noop}
+        />,
       );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
-    expect(texts).toContain('No store visits yet');
-    expect(texts).not.toContain('store visits this period');
+    const t = texts();
+    expect(t.join(' ')).toContain('No visits yet');
+    expect(t.join(' ')).toContain('Share store');
+    // The doubled-up bug: a zero table (four "0" + four "0%" rows) must
+    // never render alongside the empty-state message.
+    expect(t.filter((x) => x === '0').length).toBe(0);
+    expect(t.filter((x) => x === '0%').length).toBe(0);
+    expect(t).not.toContain('store visits this period');
+    // No source names/legend rows in the empty state either.
+    expect(t).not.toContain('Discover feed');
   });
 
-  it('shows a real count and share for every source — no lock row, no dashes', async () => {
+  it('shows a real count and share for every source once there are visits — no lock row, no dashes', async () => {
     await act(async () => {
       renderer = create(
-        <SellerDashboardTrafficSources totalVisits={1250} trafficSources={REAL_SOURCES} theme={theme} />,
+        <SellerDashboardTrafficSources
+          totalVisits={1250} previousVisits={1000} periodLabel="last week"
+          trafficSources={REAL_SOURCES} theme={theme}
+          onSeeAll={noop} onOpenSource={noop} onShareStore={noop}
+        />,
       );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => String(t.props.children));
-    expect(texts).not.toContain('—');
-    expect(texts.join(' ')).not.toContain("isn't tracked yet");
-    expect(texts).toContain('500');
-    expect(texts).toContain('40%');
-    expect(texts).toContain('312');
-    expect(texts).toContain('25%');
-    expect(texts).toContain('250');
-    expect(texts).toContain('20%');
-    expect(texts).toContain('188');
-    expect(texts).toContain('15%');
+    const t = texts();
+    expect(t).not.toContain('—');
+    expect(t.join(' ')).not.toContain("isn't tracked yet");
+    expect(t).toContain('500');
+    expect(t).toContain('40%');
+    expect(t).toContain('312');
+    expect(t).toContain('25%');
+    expect(t).toContain('250');
+    expect(t).toContain('20%');
+    expect(t).toContain('188');
+    expect(t).toContain('15%');
+    expect(t).toContain('Discover feed');
+    expect(t).toContain('Search');
+    expect(t).toContain('Your profile');
+    expect(t).toContain('External links');
   });
 
-  it('a fresh store with no visits yet shows a real 0 (not a dash) for every source', async () => {
+  it('highlights the top source with a "Most visits from" caption', async () => {
     await act(async () => {
       renderer = create(
-        <SellerDashboardTrafficSources totalVisits={0} trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme} />,
+        <SellerDashboardTrafficSources
+          totalVisits={1250} previousVisits={1000} periodLabel="last week"
+          trafficSources={REAL_SOURCES} theme={theme}
+          onSeeAll={noop} onOpenSource={noop} onShareStore={noop}
+        />,
       );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => String(t.props.children));
-    expect(texts).not.toContain('—');
-    const zeroCount = texts.filter((t) => t === '0').length;
-    expect(zeroCount).toBe(4);
-    const zeroPercentCount = texts.filter((t) => t === '0%').length;
-    expect(zeroPercentCount).toBe(4);
+    const joined = texts().join(' ');
+    expect(joined).toContain('Most visits from');
+    expect(joined).toContain('Discover feed');
   });
 
-  it('lists all four real source categories by name', async () => {
-    await act(async () => {
-      renderer = create(
-        <SellerDashboardTrafficSources totalVisits={0} trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme} />,
-      );
-    });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
-    expect(texts).toContain('Discover feed');
-    expect(texts).toContain('Search');
-    expect(texts).toContain('Your profile');
-    expect(texts).toContain('External links');
+  it('no preview/demo/placeholder wording anywhere in the source', () => {
+    const { readFileSync } = require('node:fs');
+    const { resolve } = require('node:path');
+    const source = readFileSync(resolve(__dirname, '../components/SellerDashboardTrafficSources.tsx'), 'utf8');
+    expect(source).not.toMatch(/\bpreview\b|\bdemo\b|coming soon|not available yet/i);
   });
 });
