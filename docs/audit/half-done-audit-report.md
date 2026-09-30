@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T10:52:24.010Z (partial run — time budget hit).
+Generated 2026-09-30T11:18:11.157Z (partial run — time budget hit).
 
 - Route files discovered: 268
-- Route × role combinations audited: 318
+- Route × role combinations audited: 373
 - Unreachable: 0
-- Total findings: 2868 (hard: 9, warn: 2859)
+- Total findings: 3339 (hard: 9, warn: 3330)
 
 ## Scoreboard by area/owner
 
@@ -17,7 +17,7 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 | store+account (session 01Cdzzzi) | 4 | 303 | 8 | 0 | 1 |
 | profiles+social (session 01MjTkyh) | 0 | 995 | 27 | 1 | 0 |
 | buyer (session 01AaWLh1) | 0 | 874 | 24 | 0 | 0 |
-| design (session 01DgPbif) | 0 | 172 | 6 | 0 | 0 |
+| design (session 01DgPbif) | 0 | 643 | 20 | 0 | 0 |
 | growth (session 019SGXKf) | 0 | 381 | 11 | 1 | 0 |
 | live (session 01Kp8Jgx) | 0 | 20 | 1 | 0 | 0 |
 
@@ -37,11 +37,11 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| hit-target-too-small | warn | 2093 |
-| type-scale-drift | warn | 476 |
-| clipped-text | warn | 134 |
-| min-size-violation | warn | 131 |
-| overlapping-text | warn | 18 |
+| hit-target-too-small | warn | 2443 |
+| type-scale-drift | warn | 549 |
+| clipped-text | warn | 157 |
+| min-size-violation | warn | 154 |
+| overlapping-text | warn | 20 |
 | console-error | hard | 7 |
 | color-rule-violation | warn | 6 |
 | placeholder-copy | hard | 2 |
@@ -53,7 +53,7 @@ None.
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (1574)
+### Other (2045)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
