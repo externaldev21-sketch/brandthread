@@ -14,10 +14,14 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 
-export const LIVE_RED = '#FF3B30';
+// #D32F2F, not the brighter #FF3B30 this used to be: white text on that
+// brighter red only hit 3.55:1 contrast (need 4.5:1) at the tiny badge sizes
+// this ring/tag render at. This still reads as the same "LIVE red" — red
+// stays reserved for the LIVE badge/end-call only, per the color rule.
+export const LIVE_RED = '#D32F2F';
 
 export function LiveAvatarRing({
   live,
@@ -168,9 +172,9 @@ const styles = StyleSheet.create({
     backgroundColor: LIVE_RED,
     borderRadius: 4,
     paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingVertical: 2,
     borderWidth: 1.5,
     borderColor: '#000',
   },
-  tagText: { color: '#fff', fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
+  tagText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
 });
