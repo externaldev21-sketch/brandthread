@@ -22,7 +22,7 @@
  * All service contracts, recovery semantics, and account/store scoping preserved.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity,
@@ -35,7 +35,10 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
@@ -50,6 +53,7 @@ import {
   restoreDeletedProject, deleteProject, purgeDeletedProjects,
   getSyncedDesignAssets,
   getRecoverableLegacyProjectCount, recoverLegacyDesignProjects,
+  stackProjects, removeFromStack,
 } from '@/services/designService';
 import {
   DesignProject,
@@ -58,7 +62,7 @@ import {
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
-import { validateJsonByteLength } from '@/lib/fileValidator';
+import { validateJsonByteLength, validateMimeExtPair, validateMagicBytes, ALLOWED_IMAGE_MIMES } from '@/lib/fileValidator';
 import { GridSkeleton } from '@/components/layout';
 import { EmptyState } from '@/components/BrandthreadUI';
 import ReanimatedAnimated from 'react-native-reanimated';
@@ -1123,6 +1127,13 @@ const dl = StyleSheet.create({
   purgeLbl:   { fontFamily: FONT.medium, fontSize: FS.sm, color: RED },
 });
 
+// A gallery grid row is either one project, or a fanned stack of several
+// sharing a stackId (see designService.ts's stackProjects/addToStack/
+// removeFromStack).
+type GalleryEntry =
+  | { kind: 'single'; project: DesignProject }
+  | { kind: 'stack'; stackId: string; projects: DesignProject[] };
+
 // ─── Grid Item ────────────────────────────────────────────────────────────────
 // Thumbnail fills cell edge-to-edge (no card padding). Name + dims text below,
 // left-aligned, matching screenshot 0 exactly.
@@ -1154,7 +1165,7 @@ function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNa
         accessibilityState={{ selected }}
         testID={`grid-item-${project.id}`}
       >
-        {/* Selection checkbox — top-right over the thumbnail */}
+        {/* Selection check badge — bottom-left over the thumbnail */}
         {selectionMode && (
           <View style={[g.checkbox, selected && g.checkboxOn]}>
             {selected && <Feather name="check" size={10} color={BG} />}
@@ -1187,6 +1198,62 @@ function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNa
   );
 }
 
+// ─── Stack Grid Item ──────────────────────────────────────────────────────────
+// A group of projects sharing a stackId renders as one fanned tile — two
+// faint offset cards behind the top project's real thumbnail, a "N designs"
+// count badge, and a caption instead of per-item dims. Tapping opens
+// StackContentsSheet; the whole stack selects/deselects as one unit in
+// selection mode (its member ids all flip together).
+
+interface StackGridItemProps {
+  projects: DesignProject[];
+  selected: boolean;
+  selectionMode: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}
+
+function StackGridItem({ projects, selected, selectionMode, onPress, onLongPress }: StackGridItemProps) {
+  const top = projects[0];
+  return (
+    <View style={[g.cell, selected && g.cellSelected]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        activeOpacity={0.80}
+        accessibilityLabel={`Stack, ${projects.length} designs`}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        testID={`grid-stack-${top.id}`}
+      >
+        {selectionMode && (
+          <View style={[g.checkbox, selected && g.checkboxOn]}>
+            {selected && <Feather name="check" size={10} color={BG} />}
+          </View>
+        )}
+        <View style={g.stackCountBadge}>
+          <Feather name="layers" size={10} color={FG} />
+          <Text style={g.stackCountText}>{projects.length}</Text>
+        </View>
+        <View style={g.thumb}>
+          <View style={g.stackBack2} />
+          <View style={g.stackBack1} />
+          <DesignLayerCompositor
+            project={top}
+            displaySize={CELL_SIZE}
+            borderRadius={RADIUS.sm}
+          />
+        </View>
+      </TouchableOpacity>
+      <View style={g.meta}>
+        <Text style={g.name} numberOfLines={1}>{top.name}</Text>
+        <Text style={g.dims}>{projects.length} designs</Text>
+      </View>
+    </View>
+  );
+}
+
 const g = StyleSheet.create({
   cell:        { width: CELL_SIZE, position: 'relative' },
   cellSelected: { opacity: 0.70 },
@@ -1198,71 +1265,178 @@ const g = StyleSheet.create({
     backgroundColor: CARD,   // visible while compositor renders
   },
   meta:        { paddingTop: 5, paddingBottom: SP.xs, paddingHorizontal: 2 },
-  name:        { fontFamily: FONT.medium, fontSize: FS.xs, color: FG, lineHeight: 16 },
+  name:        { fontFamily: FONT.bold, fontSize: FS.meta, color: FG, lineHeight: 16 },
   dims:        { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 15, marginTop: 1 },
+  // Check badge — bottom-left over the thumbnail (Procreate puts its own
+  // selection mark in the same corner; ours is white/monochrome, not blue).
   checkbox:    {
-    position: 'absolute', top: SP.xs, right: SP.xs, zIndex: 10,
-    width: 20, height: 20, borderRadius: 10,
+    position: 'absolute', bottom: SP.xs, left: SP.xs, zIndex: 10,
+    width: 22, height: 22, borderRadius: 11,
     borderWidth: 1.5, borderColor: FG,
-    backgroundColor: 'transparent',
+    backgroundColor: BG,
     alignItems: 'center', justifyContent: 'center',
   },
   checkboxOn:  { backgroundColor: FG },
+  // Fanned-stack chrome — two faint offset "cards" behind the main
+  // thumbnail, and the "N designs" caption replacing per-item dims.
+  stackBack2:  { position: 'absolute', top: 8, left: 8, right: -8, bottom: -8, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER_SUBTLE },
+  stackBack1:  { position: 'absolute', top: 4, left: 4, right: -4, bottom: -4, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER_SUBTLE },
+  stackCountBadge: {
+    position: 'absolute', top: SP.xs, right: SP.xs, zIndex: 10,
+    paddingHorizontal: 7, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)', borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3,
+  },
+  stackCountText: { fontFamily: FONT.semibold, fontSize: 10, color: FG },
 });
 
-// ─── Selection Toolbar ────────────────────────────────────────────────────────
+// ─── Selection count pill ─────────────────────────────────────────────────────
+// A quiet, non-interactive reminder of how many are selected — every actual
+// action (Delete, More → Stack/Preview/Share/Duplicate/Rename) lives in the
+// header and the More Options sheet, not a second duplicate toolbar.
 
-interface SelectionToolbarProps {
+const tb = StyleSheet.create({
+  countPill: {
+    position: 'absolute', bottom: SP.lg, alignSelf: 'center',
+    backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs,
+  },
+  countPillText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+});
+
+// ─── More Options sheet ────────────────────────────────────────────────────────
+// Opened from the header's "More" in selection mode. Every row is a real,
+// end-to-end action against designService — nothing here is a placeholder.
+
+interface MoreOptionsSheetProps {
+  visible: boolean;
   count: number;
-  canRename: boolean;
-  onRename: () => void;
+  onClose: () => void;
+  onStack: () => void;
+  onPreview: () => void;
+  onShare: () => void;
   onDuplicate: () => void;
-  onSoftDelete: () => void;
-  onCancel: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  sharing: boolean;
 }
 
-function SelectionToolbar({ count, canRename, onRename, onDuplicate, onSoftDelete, onCancel }: SelectionToolbarProps) {
+function MoreOptionsSheet({ visible, count, onClose, onStack, onPreview, onShare, onDuplicate, onRename, onDelete, sharing }: MoreOptionsSheetProps) {
   const insets = useSafeAreaInsets();
-  const botPad = insets.bottom;
+  const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
+  if (!modalVisible) return null;
+
+  const ROWS: { key: string; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }[] = [
+    { key: 'stack', icon: 'layers', label: 'Stack', onPress: onStack, disabled: count < 2 },
+    { key: 'preview', icon: 'eye', label: 'Preview', onPress: onPreview, disabled: count !== 1 },
+    { key: 'share', icon: 'share', label: sharing ? 'Sharing…' : 'Share', onPress: onShare, disabled: count !== 1 || sharing },
+    { key: 'duplicate', icon: 'copy', label: 'Duplicate', onPress: onDuplicate, disabled: count === 0 },
+    { key: 'rename', icon: 'edit-2', label: 'Rename', onPress: onRename, disabled: count !== 1 },
+    { key: 'delete', icon: 'trash-2', label: 'Delete', onPress: onDelete, disabled: count === 0, destructive: true },
+  ];
+
   return (
-    <View style={[tb.bar, { paddingBottom: botPad + SP.sm }]} testID="selection-toolbar">
-      <Text style={tb.count}>{count} selected</Text>
-      <View style={tb.actions}>
-        {canRename && (
-          <TouchableOpacity style={tb.btn} onPress={onRename} hitSlop={HIT}
-            accessibilityLabel="Rename selected" accessibilityRole="button" testID="sel-rename">
-            <Feather name="edit-2" size={ICON.sm} color={FG} />
-            <Text style={tb.btnLbl}>Rename</Text>
+    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID="more-options-sheet">
+      <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+        <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close more options" accessibilityRole="button" />
+      </ReanimatedAnimated.View>
+      <GestureDetector gesture={panGesture}>
+      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
+        <View style={sh.handle} />
+        <Text style={mo.title}>More Options</Text>
+        {ROWS.map(row => (
+          <TouchableOpacity
+            key={row.key}
+            style={[mo.row, row.disabled && mo.rowDisabled]}
+            onPress={row.onPress}
+            disabled={row.disabled}
+            activeOpacity={0.75}
+            accessibilityLabel={row.label}
+            accessibilityRole="button"
+            testID={`more-options-${row.key}`}
+          >
+            <Feather name={row.icon} size={ICON.md} color={row.destructive ? RED : FG} />
+            <Text style={[mo.rowLbl, row.destructive && { color: RED }]}>{row.label}</Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity style={tb.btn} onPress={onDuplicate} hitSlop={HIT}
-          accessibilityLabel="Duplicate selected" accessibilityRole="button" testID="sel-duplicate">
-          <Feather name="copy" size={ICON.sm} color={FG} />
-          <Text style={tb.btnLbl}>Duplicate</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[tb.btn, { opacity: count > 0 ? 1 : 0.4 }]}
-          onPress={onSoftDelete} hitSlop={HIT}
-          accessibilityLabel="Delete selected" accessibilityRole="button" testID="sel-delete">
-          <Feather name="trash-2" size={ICON.sm} color={RED} />
-          <Text style={[tb.btnLbl, { color: RED }]}>Delete</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={tb.btn} onPress={onCancel} hitSlop={HIT}
-          accessibilityLabel="Cancel selection" accessibilityRole="button" testID="sel-cancel">
-          <Text style={tb.btnLbl}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+        ))}
+      </ReanimatedAnimated.View>
+      </GestureDetector>
+    </Modal>
   );
 }
 
-const tb = StyleSheet.create({
-  bar:     { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: CARD_ELEVATED, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm, paddingHorizontal: SP.lg },
-  count:   { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, textAlign: 'center', marginBottom: SP.xs },
-  actions: { flexDirection: 'row', justifyContent: 'space-around' },
-  btn:     { alignItems: 'center', gap: SP.xs, minHeight: COMP.iconBtn, justifyContent: 'center', paddingHorizontal: SP.sm },
-  btnLbl:  { fontFamily: FONT.regular, fontSize: FS.xs, color: FG },
+const mo = StyleSheet.create({
+  title:   { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.sm },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, minHeight: COMP.buttonHSm },
+  rowDisabled: { opacity: 0.35 },
+  rowLbl:  { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
 });
+
+// ─── Stack contents sheet ───────────────────────────────────────────────────────
+// Opened by tapping a fanned stack tile outside selection mode. A plain list
+// of its real members — tap one to open its preview, or pull it back out of
+// the stack.
+
+interface StackContentsSheetProps {
+  visible: boolean;
+  projects: DesignProject[];
+  onClose: () => void;
+  onOpen: (project: DesignProject) => void;
+  onRemove: (projectId: string) => void | Promise<void>;
+}
+
+function StackContentsSheet({ visible, projects, onClose, onOpen, onRemove }: StackContentsSheetProps) {
+  const insets = useSafeAreaInsets();
+  const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
+  if (!modalVisible) return null;
+
+  return (
+    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID="stack-contents-sheet">
+      <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+        <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close stack" accessibilityRole="button" />
+      </ReanimatedAnimated.View>
+      <GestureDetector gesture={panGesture}>
+      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { maxHeight: '75%', paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
+        <View style={sh.handle} />
+        <Text style={mo.title}>{projects.length} design{projects.length === 1 ? '' : 's'} in this stack</Text>
+        <FlatList
+          data={projects}
+          keyExtractor={p => p.id}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <View style={sh.presetRow}>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.md }}
+                onPress={() => onOpen(item)}
+                accessibilityLabel={`Open ${item.name}`}
+                accessibilityRole="button"
+                testID={`stack-item-${item.id}`}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: RADIUS.sm, overflow: 'hidden' }}>
+                  <DesignLayerCompositor project={item} displaySize={40} borderRadius={RADIUS.sm} />
+                </View>
+                <View style={sh.presetInfo}>
+                  <Text style={sh.presetLbl} numberOfLines={1}>{item.name}</Text>
+                  <Text style={sh.presetDim}>{dimsLabel(item)}</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onRemove(item.id)}
+                hitSlop={HIT}
+                accessibilityLabel={`Remove ${item.name} from stack`}
+                accessibilityRole="button"
+                testID={`stack-remove-${item.id}`}
+              >
+                <Feather name="x-circle" size={ICON.md} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      </ReanimatedAnimated.View>
+      </GestureDetector>
+    </Modal>
+  );
+}
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -1282,6 +1456,9 @@ export default function DesignGalleryScreen() {
   const [renameProject, setRenameProject]       = useState<DesignProject | null>(null);
   const [previewProject, setPreviewProject]     = useState<DesignProject | null>(null);
   const [recoveryVisible, setRecoveryVisible]   = useState(false);
+  const [stackSheetId, setStackSheetId]         = useState<string | null>(null);
+  const [moreOptionsVisible, setMoreOptionsVisible] = useState(false);
+  const [sharing, setSharing]                   = useState(false);
 
   // Safe area — web gets hardcoded insets per SKILL.md
   const topInset = useHeaderTopInset();
@@ -1310,6 +1487,37 @@ export default function DesignGalleryScreen() {
       return () => {};
     }, [loadData, deletedExpanded]),
   );
+
+  // ── Stacks ─────────────────────────────────────────────────────────────────
+  // Groups projects sharing a stackId into one gallery entry each; everything
+  // else renders individually, in its original order.
+  const galleryEntries = useMemo<GalleryEntry[]>(() => {
+    const byStack = new Map<string, DesignProject[]>();
+    for (const p of projects) {
+      if (!p.stackId) continue;
+      const list = byStack.get(p.stackId) ?? [];
+      list.push(p);
+      byStack.set(p.stackId, list);
+    }
+    const seen = new Set<string>();
+    const entries: GalleryEntry[] = [];
+    for (const p of projects) {
+      if (p.stackId) {
+        if (seen.has(p.stackId)) continue;
+        seen.add(p.stackId);
+        const members = byStack.get(p.stackId)!;
+        // A "stack" of one (every other member got deleted/unstacked) is
+        // just a normal single tile — no fan, no count badge.
+        if (members.length < 2) { entries.push({ kind: 'single', project: members[0] }); continue; }
+        entries.push({ kind: 'stack', stackId: p.stackId, projects: members });
+      } else {
+        entries.push({ kind: 'single', project: p });
+      }
+    }
+    return entries;
+  }, [projects]);
+
+  const stackSheetProjects = stackSheetId ? projects.filter(p => p.stackId === stackSheetId) : [];
 
   // ── Selection ──────────────────────────────────────────────────────────────
 
@@ -1343,6 +1551,32 @@ export default function DesignGalleryScreen() {
     else toggleSelect(project.id);
   }
 
+  /** A stack tile selects/deselects every member together, and opens the
+   *  stack-contents sheet (rather than a single preview) outside selection. */
+  function handleStackPress(members: DesignProject[]) {
+    if (selectionMode) {
+      const ids = members.map(m => m.id);
+      const allSelected = ids.every(id => selectedIds.has(id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        ids.forEach(id => (allSelected ? next.delete(id) : next.add(id)));
+        return next;
+      });
+    } else {
+      setStackSheetId(members[0].stackId ?? null);
+    }
+  }
+
+  function handleStackLongPress(members: DesignProject[]) {
+    if (!selectionMode) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setSelectionMode(true);
+      setSelectedIds(new Set(members.map(m => m.id)));
+    } else {
+      handleStackPress(members);
+    }
+  }
+
   // ── Bulk actions ───────────────────────────────────────────────────────────
 
   async function bulkDuplicate() {
@@ -1365,6 +1599,75 @@ export default function DesignGalleryScreen() {
     const [id] = [...selectedIds];
     const project = projects.find(p => p.id === id);
     if (project) { setRenameProject(project); cancelSelection(); }
+  }
+
+  /** Header "Delete" and More Options' "Delete" both land here — a real
+   *  confirm step (Alert) before the irreversible-feeling bulk soft-delete. */
+  function confirmBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setMoreOptionsVisible(false);
+    Alert.alert(
+      selectedIds.size === 1 ? 'Delete this design?' : `Delete ${selectedIds.size} designs?`,
+      'Moved to Recently Deleted — you can restore it for a limited time.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: bulkSoftDelete },
+      ],
+    );
+  }
+
+  /** "Stack" from More Options — groups every selected design into one
+   *  fanned stack (or merges into an existing one if any selection member
+   *  already belongs to one). Real end-to-end: persists via designService,
+   *  not local-only UI state. */
+  async function handleStackSelected() {
+    if (selectedIds.size < 2) return;
+    try {
+      await stackProjects([...selectedIds]);
+      setMoreOptionsVisible(false);
+      cancelSelection();
+      loadData();
+    } catch (e: unknown) {
+      Alert.alert('Could not stack', e instanceof Error ? e.message : 'Try again.');
+    }
+  }
+
+  /** "Preview" from More Options — only meaningful for exactly one
+   *  selection, same modal the grid's own tap-to-preview uses. */
+  function handlePreviewSelected() {
+    if (selectedIds.size !== 1) return;
+    const [id] = [...selectedIds];
+    const project = projects.find(p => p.id === id);
+    setMoreOptionsVisible(false);
+    if (project) setPreviewProject(project);
+  }
+
+  /** "Share" from More Options — shares the design's real rendered
+   *  thumbnail (the same DesignLayerCompositor output the grid shows,
+   *  captured via its snapshot export) through the native share sheet, not
+   *  a placeholder/text-only share. */
+  async function handleShareSelected() {
+    if (selectedIds.size !== 1 || sharing) return;
+    const [id] = [...selectedIds];
+    const project = projects.find(p => p.id === id);
+    setMoreOptionsVisible(false);
+    if (!project) return;
+    setSharing(true);
+    try {
+      const available = await Sharing.isAvailableAsync();
+      if (!available) { Alert.alert('Sharing unavailable', 'Sharing is not available on this device.'); return; }
+      const assets = await getSyncedDesignAssets(project.id);
+      const thumb = assets.find(a => a.kind === 'thumbnail') ?? assets[0];
+      if (!thumb) {
+        Alert.alert('Nothing to share yet', 'Open this design and export it once before sharing.');
+        return;
+      }
+      await Sharing.shareAsync(thumb.downloadUrl, { dialogTitle: `Share ${project.name}` });
+    } catch {
+      Alert.alert('Could not share', 'Try again.');
+    } finally {
+      setSharing(false);
+    }
   }
 
   // ── Photo import ───────────────────────────────────────────────────────────
@@ -1396,43 +1699,93 @@ export default function DesignGalleryScreen() {
     } catch { Alert.alert('Error', 'Could not import photo.'); }
   }
 
-  // ── Import (image or clipboard JSON) ──────────────────────────────────────
+  // ── Import (real Files picker — image or a Brandthread project JSON) ──────
+  // Procreate parity: "Import" opens the device's Files app, not a photo-
+  // library picker (that's "Photo", above) or a hidden Alert menu. Reuses
+  // the same MIME+ext pair check design-canvas.tsx's own file-insert flow
+  // uses (lib/fileValidator) — this is a real end-to-end import, not a
+  // dead/placeholder action: it always ends by opening the new project's
+  // editor.
 
-  function handleImport() {
-    Alert.alert(
-      'Import',
-      'Import an image to start a new canvas, or paste a Brandthread project JSON from clipboard.',
-      [
-        {
-          text: 'Import Image',
-          onPress: async () => {
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 1,
-            });
-            if (result.canceled || !result.assets?.[0]) return;
-            const asset = result.assets[0];
-            let durable: string;
-            try { durable = await makeDurableUri(asset.uri); }
-            catch (e: unknown) { Alert.alert('Import failed', e instanceof Error ? e.message : String(e)); return; }
-            const w = asset.width || 1080, h = asset.height || 1080;
-            const proj = await createProject('canvas', 'Imported Image', { width: w, height: h, backgroundHex: '#000000' });
-            const now = new Date().toISOString();
-            await updateProject(proj.id, {
-              layers: [{
-                id: uid(), name: 'Image', type: 'image',
-                visible: true, locked: false, order: 0, opacity: 1,
-                transform: { x: 0, y: 0, width: w, height: h, rotation: 0, scaleX: 1, scaleY: 1 },
-                data: { kind: 'image' as const, uri: durable, opacity: 1, fit: 'contain', blendMode: 'normal' },
-                createdAt: now, updatedAt: now,
-              }],
-            });
-            router.push(`/design-canvas?id=${proj.id}`);
-          },
-        },
-        { text: 'Import from Clipboard', onPress: () => setNewCanvasVisible(true) },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+  async function handleImport() {
+    let result: DocumentPicker.DocumentPickerResult;
+    try {
+      result = await DocumentPicker.getDocumentAsync({
+        type: [...ALLOWED_IMAGE_MIMES, 'application/json'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+    } catch {
+      Alert.alert('Picker error', 'Could not open the file picker. Try again.');
+      return;
+    }
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    const mime = asset.mimeType ?? '';
+    const uri = asset.uri;
+
+    const pairResult = validateMimeExtPair(mime || null, asset.name);
+    if (!pairResult.ok) {
+      Alert.alert('Unsupported file', pairResult.reason);
+      return;
+    }
+
+    // ── Brandthread project JSON → a new, fully restored project ──────────
+    if (mime === 'application/json' || asset.name.toLowerCase().endsWith('.json')) {
+      try {
+        const fileObj = new File(uri);
+        const raw = await fileObj.text();
+        const sizeResult = validateJsonByteLength(raw);
+        if (!sizeResult.ok) { Alert.alert('File too large', sizeResult.reason); return; }
+        const jsonResult = validateBtJson(raw);
+        if (!jsonResult.ok) { Alert.alert('Cannot import', jsonResult.reason); return; }
+        const parsed = JSON.parse(raw);
+        const width = Number(parsed?.canvas?.width), height = Number(parsed?.canvas?.height);
+        if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 16384 || height > 16384) {
+          Alert.alert('Cannot import', 'Invalid canvas dimensions.');
+          return;
+        }
+        const now = new Date().toISOString();
+        const proj = await createProject('canvas', `${parsed.name || asset.name.replace(/\.json$/i, '')} (imported)`, {
+          width, height,
+          backgroundHex: typeof parsed.canvas.backgroundHex === 'string' ? parsed.canvas.backgroundHex : '#000000',
+        });
+        await updateProject(proj.id, { layers: jsonResult.layers, createdAt: now, updatedAt: now });
+        router.push(`/design-canvas?id=${proj.id}`);
+      } catch {
+        Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread .json file.");
+      }
+      return;
+    }
+
+    // ── Image file → a new canvas with it as the first layer ───────────────
+    try {
+      const fileObj = new File(uri);
+      const buf = await fileObj.arrayBuffer();
+      const bytes = new Uint8Array(buf, 0, Math.min(buf.byteLength, 16));
+      const magicResult = validateMagicBytes(bytes, mime);
+      if (!magicResult.ok) { Alert.alert('Rejected', magicResult.reason); return; }
+
+      const durable = await makeDurableUri(uri, asset.name.split('.').pop() ?? 'png');
+      // DocumentPicker doesn't report pixel dimensions the way ImagePicker
+      // does; the image layer's `fit: 'contain'` scales it to whatever
+      // square canvas it lands on, same as the Photo import path's fallback.
+      const size = 1080;
+      const proj = await createProject('canvas', asset.name.replace(/\.[^.]+$/, '') || 'Imported Image', { width: size, height: size, backgroundHex: '#000000' });
+      const now = new Date().toISOString();
+      await updateProject(proj.id, {
+        layers: [{
+          id: uid(), name: asset.name || 'Imported image', type: 'image',
+          visible: true, locked: false, order: 0, opacity: 1,
+          transform: { x: 0, y: 0, width: size, height: size, rotation: 0, scaleX: 1, scaleY: 1 },
+          data: { kind: 'image' as const, uri: durable, opacity: 1, fit: 'contain', blendMode: 'normal' },
+          createdAt: now, updatedAt: now,
+        }],
+      });
+      router.push(`/design-canvas?id=${proj.id}`);
+    } catch (e: unknown) {
+      Alert.alert('Import failed', e instanceof Error ? e.message : 'Could not import that file.');
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1480,13 +1833,27 @@ export default function DesignGalleryScreen() {
 
         <View style={s.actionRow}>
           {selectionMode ? (
-            /* In selection mode the only header action is Cancel */
-            <TouchableOpacity
-              onPress={cancelSelection} hitSlop={HIT}
-              accessibilityLabel="Cancel selection" accessibilityRole="button" testID="header-cancel-select"
-            >
-              <Text style={s.actionBtn}>Cancel</Text>
-            </TouchableOpacity>
+            /* Selection mode: Delete + More on the left, X (Cancel) on the
+               right — Procreate's own selection-mode action row, reskinned
+               monochrome (white underline below, not Procreate's blue). */
+            <>
+              <TouchableOpacity
+                onPress={confirmBulkDelete}
+                disabled={selectedIds.size === 0}
+                hitSlop={HIT}
+                accessibilityLabel="Delete selected" accessibilityRole="button" testID="header-delete-select"
+              >
+                <Text style={[s.actionBtn, selectedIds.size === 0 && s.actionBtnDisabled]}>Delete</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setMoreOptionsVisible(true)}
+                hitSlop={HIT}
+                accessibilityLabel="More options" accessibilityRole="button" testID="header-more-select"
+              >
+                <Text style={s.actionBtn}>More</Text>
+              </TouchableOpacity>
+            </>
           ) : (
             <>
               <TouchableOpacity
@@ -1515,8 +1882,18 @@ export default function DesignGalleryScreen() {
           {/* Spacer */}
           <View style={{ flex: 1 }} />
 
-          {/* Plus — bare icon, top-right, same baseline as action text */}
-          {!selectionMode && (
+          {/* Plus (idle) / X (selection mode) — bare icon, top-right, same
+              baseline as action text. */}
+          {selectionMode ? (
+            <TouchableOpacity
+              onPress={cancelSelection}
+              hitSlop={HIT}
+              style={s.plusBtn}
+              accessibilityLabel="Exit selection mode" accessibilityRole="button" testID="header-cancel-select"
+            >
+              <Feather name="x" size={ICON.xl} color={FG} />
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1530,6 +1907,11 @@ export default function DesignGalleryScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Selection-mode underline bar — Procreate uses blue here; ours is
+            white/monochrome, the one deliberate accent-color deviation the
+            rest of the header never uses. */}
+        {selectionMode && <View style={s.selectionUnderline} />}
       </View>
 
       {/* Recovery entry point — only shown when recoverable projects exist */}
@@ -1557,8 +1939,8 @@ export default function DesignGalleryScreen() {
         </View>
       ) : (
         <FlatList
-          data={projects}
-          keyExtractor={p => p.id}
+          data={galleryEntries}
+          keyExtractor={entry => entry.kind === 'stack' ? entry.stackId : entry.project.id}
           numColumns={GRID_COLUMNS}
           columnWrapperStyle={s.gridRow}
           contentContainerStyle={[s.gridContent, { paddingBottom: botInset + 120 }]}
@@ -1586,28 +1968,35 @@ export default function DesignGalleryScreen() {
             />
           }
           renderItem={({ item }) => (
-            <GridItem
-              project={item}
-              selected={selectedIds.has(item.id)}
-              selectionMode={selectionMode}
-              onPress={() => handleGridPress(item)}
-              onLongPress={() => handleGridLongPress(item)}
-              onNamePress={() => setRenameProject(item)}
-            />
+            item.kind === 'stack' ? (
+              <StackGridItem
+                projects={item.projects}
+                selected={item.projects.every(p => selectedIds.has(p.id))}
+                selectionMode={selectionMode}
+                onPress={() => handleStackPress(item.projects)}
+                onLongPress={() => handleStackLongPress(item.projects)}
+              />
+            ) : (
+              <GridItem
+                project={item.project}
+                selected={selectedIds.has(item.project.id)}
+                selectionMode={selectionMode}
+                onPress={() => handleGridPress(item.project)}
+                onLongPress={() => handleGridLongPress(item.project)}
+                onNamePress={() => setRenameProject(item.project)}
+              />
+            )
           )}
         />
       )}
 
-      {/* Selection toolbar — floats above bottom */}
-      {selectionMode && (
-        <SelectionToolbar
-          count={selectedIds.size}
-          canRename={selectedIds.size === 1}
-          onRename={handleRenameSelected}
-          onDuplicate={bulkDuplicate}
-          onSoftDelete={bulkSoftDelete}
-          onCancel={cancelSelection}
-        />
+      {/* Selection count — small floating pill above the bottom edge; all
+          actual actions live in the header (Delete/More) and the More
+          Options sheet now, not a second toolbar duplicating them. */}
+      {selectionMode && selectedIds.size > 0 && (
+        <View style={tb.countPill} pointerEvents="none">
+          <Text style={tb.countPillText}>{selectedIds.size} selected</Text>
+        </View>
       )}
 
       {/* ── Modals / sheets ── */}
@@ -1640,6 +2029,27 @@ export default function DesignGalleryScreen() {
         count={recoverableCount}
         onClose={() => setRecoveryVisible(false)}
         onRecovered={loadData}
+      />
+
+      <MoreOptionsSheet
+        visible={moreOptionsVisible}
+        count={selectedIds.size}
+        onClose={() => setMoreOptionsVisible(false)}
+        onStack={handleStackSelected}
+        onPreview={handlePreviewSelected}
+        onShare={handleShareSelected}
+        onDuplicate={async () => { setMoreOptionsVisible(false); await bulkDuplicate(); }}
+        onRename={handleRenameSelected}
+        onDelete={confirmBulkDelete}
+        sharing={sharing}
+      />
+
+      <StackContentsSheet
+        visible={stackSheetId !== null}
+        projects={stackSheetProjects}
+        onClose={() => setStackSheetId(null)}
+        onOpen={(project) => { setStackSheetId(null); setPreviewProject(project); }}
+        onRemove={async (projectId) => { await removeFromStack(projectId); loadData(); }}
       />
     </View>
   );
@@ -1695,6 +2105,12 @@ const s = StyleSheet.create({
     color: FG,               // full white, not MUTED — matching reference
     paddingVertical: SP.xs,  // 4px tap height padding
   },
+  actionBtnDisabled: { color: SUBTLE },
+  // Thin white bar under the whole header while in selection mode — the
+  // header's one deliberate departure from the monochrome-everywhere-else
+  // rule's "no accent unless it's LIVE/Thread-Cash" clause: Procreate's own
+  // selection mode does the exact same thing in its accent blue.
+  selectionUnderline: { height: 2, backgroundColor: FG, marginTop: SP.xs },
   plusBtn: {
     // Same height as action text row; bare icon aligned to right edge
     alignItems: 'center',

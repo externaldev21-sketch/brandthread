@@ -1065,6 +1065,44 @@ export async function purgeDeletedProjects(): Promise<void> {
   await deleteProjectsSerialized(deletedIds, context);
 }
 
+// ─── Stacks ───────────────────────────────────────────────────────────────────
+// A "stack" is nothing more than a shared `stackId` across several projects —
+// no separate collection entity, matching Procreate's own model (a stack is
+// just how the gallery groups artworks that share a tag). Grouping/
+// ungrouping is a plain field update through the existing updateProject()
+// sync path, so it gets the same offline-safe merge/cloud-push behavior as
+// every other edit.
+
+let _uidStack = 0;
+function stackId(): string { return `stack_${Date.now()}_${++_uidStack}`; }
+
+/**
+ * Groups the given projects into one new stack (or, if any of them already
+ * belongs to a stack, reuses that stack's id so "select an existing stack
+ * tile + more items, then Stack" merges into it rather than creating a
+ * second one). Returns the resulting stack id.
+ */
+export async function stackProjects(projectIds: string[]): Promise<string> {
+  if (projectIds.length < 2) throw new Error('Select at least 2 designs to stack.');
+  const all = await getProjects();
+  const existing = projectIds
+    .map(id => all.find(p => p.id === id)?.stackId)
+    .find((id): id is string => !!id);
+  const id = existing ?? stackId();
+  for (const projectId of projectIds) await updateProject(projectId, { stackId: id });
+  return id;
+}
+
+/** Adds one project to an existing stack. */
+export async function addToStack(existingStackId: string, projectId: string): Promise<void> {
+  await updateProject(projectId, { stackId: existingStackId });
+}
+
+/** Removes a single project from whatever stack it's in (a no-op if it isn't in one). */
+export async function removeFromStack(projectId: string): Promise<void> {
+  await updateProject(projectId, { stackId: undefined });
+}
+
 export async function duplicateProject(id: string): Promise<DesignProject> {
   const context = captureSyncContext();
   const project = await getProject(id);
