@@ -1,0 +1,42 @@
+/* Admin dashboard theme — strict black / white / silver. Scoped to .admin-theme
+   so it never leaks into (or depends on) the manufacturer portal's palette. */
+.admin-theme,
+body.admin-theme {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 96%;
+  --border: 0 0% 14%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 96%;
+  --card-border: 0 0% 14%;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 96%;
+  --popover-border: 0 0% 18%;
+  --primary: 0 0% 96%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 62%;
+  --accent: 0 0% 12%;
+  --accent-foreground: 0 0% 96%;
+  --destructive: 0 72% 52%;
+  --destructive-foreground: 0 0% 98%;
+  --input: 0 0% 18%;
+  --ring: 0 0% 70%;
+  --radius: 0.5rem;
+  /* Derived border tokens are resolved at :root in the portal theme (green); restate them here. */
+  --primary-border: hsl(0 0% 96%);
+  --secondary-border: hsl(0 0% 20%);
+  --muted-border: hsl(0 0% 16%);
+  --accent-border: hsl(0 0% 20%);
+  --destructive-border: hsl(0 72% 52%);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+}
+.admin-theme ::selection { background: hsl(0 0% 80%); color: #000; }
+
+/* Overlays behind dialogs and sheets are solid, never see-through. */
+body.admin-theme .fixed.inset-0[class*="bg-black"] { background: hsl(0 0% 2%); }
+body.admin-theme :focus-visible { outline-color: hsl(0 0% 70%); }

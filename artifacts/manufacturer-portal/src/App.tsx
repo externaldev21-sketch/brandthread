@@ -23,6 +23,7 @@ import OrderTracker from '@/pages/order-tracker';
 import QuoteRequests from '@/pages/quote-requests';
 import Products from '@/pages/products';
 import NotFound from '@/pages/not-found';
+import AdminApp from '@/admin/AdminApp';
 import { Layout } from '@/components/layout';
 import { useIsModerator } from '@/hooks/use-ip-cases';
 
@@ -275,6 +276,9 @@ function AppRouter() {
             <Route path="/moderation/ip-cases">
               <Protected><ModeratorProtected><Layout><IpCases /></Layout></ModeratorProtected></Protected>
             </Route>
+
+            {/* Platform admin dashboard (users.role = admin; everyone else sees NotFound) */}
+            <Route path="/admin/*?" component={AdminApp} />
 
             <Route component={NotFound} />
           </Switch>
