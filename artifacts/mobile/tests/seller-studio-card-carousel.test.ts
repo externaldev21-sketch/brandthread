@@ -80,8 +80,8 @@ describe('Studio card carousel: horizontal release LOCKS (does not navigate); ta
     expect(studio).toContain('fillProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }');
   });
 
-  it('the auto-enter duration is a single named constant at 1000ms (lowered from 1500 per live-testing feedback)', () => {
-    expect(studio).toContain('const AUTO_ENTER_MS = 1000;');
+  it('the auto-enter duration is a single named constant at 1500ms (restored after Dev found the briefly-shipped 1000ms too short in real use)', () => {
+    expect(studio).toContain('const AUTO_ENTER_MS = 1500;');
   });
 
   it('fireLandedHaptic uses a firmer/distinct impact style from the per-card scrub tick (fireHapticTick)', () => {
