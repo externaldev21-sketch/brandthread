@@ -48,10 +48,12 @@ function StepBar({ steps }: { steps: DeliveryStep[] }) {
 }
 
 export function DeliveryTrackerCard({
-  delivery, status, onCopyTracking, trackingCopied, onOpenTracking, onConfirmReceipt,
+  delivery, status, storeName, onCopyTracking, trackingCopied, onOpenTracking, onConfirmReceipt,
 }: {
   delivery: BuyerDelivery;
   status: string;
+  /** Shown above the headline now that the screen header carries the title only. */
+  storeName?: string;
   onCopyTracking: () => void;
   trackingCopied: boolean;
   onOpenTracking: () => void;
@@ -78,6 +80,7 @@ export function DeliveryTrackerCard({
 
   return (
     <View style={s.card}>
+      {storeName ? <Text style={s.store} numberOfLines={1}>{storeName}</Text> : null}
       <Text style={s.headline}>{headline}</Text>
       {delivered && delivery.deliveryConfirmedBy ? (
         <Text style={s.sub}>{delivery.deliveryConfirmedBy === 'buyer' ? 'Confirmed by you' : 'Confirmed by the carrier'}</Text>
@@ -174,6 +177,7 @@ function styles(theme: AppThemePreset) {
       padding: SP.md, marginHorizontal: SP.md, marginBottom: SP.md,
     },
     headline: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text, letterSpacing: -0.3 },
+    store: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, marginBottom: 4 },
     sub: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 20 },
     stepRow: { flexDirection: 'row', marginTop: SP.md },
     stepCol: { flex: 1, alignItems: 'center' },
