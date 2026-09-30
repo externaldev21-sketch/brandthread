@@ -15,7 +15,7 @@
  * screen's own root background shows straight through.
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -49,6 +49,7 @@ export interface SellerListHeaderProps {
   onSortPress: () => void;
   sortAccessibilityLabel: string;
   chips: SellerListHeaderChip[];
+  showChipSlider?: boolean;
 }
 
 /** The count-line row every screen renders itself (inside its own list's
@@ -75,10 +76,39 @@ export function SellerListHeader({
   searchValue, onSearchChange, searchPlaceholder,
   onFilterPress, hasActiveFilter, filterAccessibilityLabel,
   onSortPress, sortAccessibilityLabel,
-  chips,
+  chips, showChipSlider = false,
 }: SellerListHeaderProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
+  const chipsRef = React.useRef<ScrollView>(null);
+  const [viewportWidth, setViewportWidth] = React.useState(0);
+  const [contentWidth, setContentWidth] = React.useState(0);
+  const [scrollX, setScrollX] = React.useState(0);
+  const [trackWidth, setTrackWidth] = React.useState(0);
+  const maxScroll = Math.max(0, contentWidth - viewportWidth);
+  const thumbWidth = trackWidth > 0 && contentWidth > 0
+    ? Math.min(trackWidth, Math.max(44, trackWidth * viewportWidth / contentWidth))
+    : 0;
+  const thumbTravel = Math.max(0, trackWidth - thumbWidth);
+  const thumbLeft = maxScroll > 0 ? Math.min(thumbTravel, scrollX / maxScroll * thumbTravel) : 0;
+  const sliderMetrics = React.useRef({ maxScroll, thumbTravel, thumbWidth, scrollX });
+  sliderMetrics.current = { maxScroll, thumbTravel, thumbWidth, scrollX };
+  const dragStartX = React.useRef(0);
+
+  const slideTo = (x: number) => {
+    const offset = Math.max(0, Math.min(sliderMetrics.current.maxScroll, x));
+    chipsRef.current?.scrollTo({ x: offset, animated: false });
+    setScrollX(offset);
+  };
+  const thumbPan = React.useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => { dragStartX.current = sliderMetrics.current.scrollX; },
+    onPanResponderMove: (_, gesture) => {
+      const { maxScroll: max, thumbTravel: travel } = sliderMetrics.current;
+      if (travel > 0) slideTo(dragStartX.current + gesture.dx * max / travel);
+    },
+  })).current;
 
   return (
     <View>
@@ -132,13 +162,18 @@ export function SellerListHeader({
         </PressableScale>
       </View>
 
-      {/* Status chips — horizontal scroll, edge-to-edge. `pillsRow`'s own
-          horizontal padding is what lets the last chip clip naturally at
-          the screen edge as a scroll affordance — no gradient overlay on
-          top of the chips (a previous `GRAD_DARK_FADE` scrim here went
-          fully opaque at its own edge, painting a solid black block over
-          the last chip instead of fading it). */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pillsRow}>
+      {/* Chips stay swipeable; Products also has a persistent draggable
+          scrollbar so off-screen filters are discoverable and reachable. */}
+      <ScrollView
+        ref={chipsRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.pillsRow}
+        onLayout={event => setViewportWidth(event.nativeEvent.layout.width)}
+        onContentSizeChange={width => setContentWidth(width)}
+        onScroll={event => setScrollX(event.nativeEvent.contentOffset.x)}
+        scrollEventThrottle={16}
+      >
         {chips.map((chip) => (
           <FilterChip
             key={chip.key}
@@ -149,6 +184,29 @@ export function SellerListHeader({
           />
         ))}
       </ScrollView>
+      {showChipSlider && maxScroll > 1 && (
+        <View style={s.sliderPadding}>
+          <Pressable
+            style={s.sliderTouch}
+            onPress={event => {
+              const { maxScroll: max, thumbTravel: travel, thumbWidth: thumb } = sliderMetrics.current;
+              if (travel > 0) slideTo((event.nativeEvent.locationX - thumb / 2) * max / travel);
+            }}
+            accessibilityRole="adjustable"
+            accessibilityLabel="Scroll product filters"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(scrollX / maxScroll * 100) }}
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={event => slideTo(scrollX + (event.nativeEvent.actionName === 'increment' ? viewportWidth * 0.75 : -viewportWidth * 0.75))}
+          >
+            <View style={s.sliderTrack} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+              <View style={s.sliderLine} />
+              <View {...thumbPan.panHandlers} style={[s.sliderThumbTouch, { left: thumbLeft, width: thumbWidth }]}>
+                <View style={s.sliderThumb} />
+              </View>
+            </View>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -215,4 +273,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     paddingTop: 2,
     gap: SP.xs,
   },
+  sliderPadding: { paddingHorizontal: SP.md, paddingBottom: SP.xs },
+  sliderTouch: { height: 24, justifyContent: 'center' },
+  sliderTrack: { height: 24, justifyContent: 'center' },
+  sliderLine: { height: 3, borderRadius: RADIUS.sm, backgroundColor: theme.border },
+  sliderThumbTouch: { position: 'absolute', top: 0, height: 24, justifyContent: 'center' },
+  sliderThumb: { height: 4, borderRadius: RADIUS.sm, backgroundColor: theme.muted },
 });

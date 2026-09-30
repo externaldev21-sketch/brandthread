@@ -759,6 +759,7 @@ export default function ProductsScreen() {
         filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
         onSortPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
         sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
+        showChipSlider
         chips={filterPills.map(pill => ({
           key: pill.value,
           label: pill.label,
