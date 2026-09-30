@@ -284,7 +284,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Same full-screen chat takeover as ai-brain above — its own composer is
   // pinned to the safe-area bottom inset only, so the floating tab bar
   // (which these two screens weren't deny-listed against) rendered on top
-  // of the input bar and suggestion chips.
+  // of the input bar, suggestion chips, and photo tray.
   'ai-mockup-chat',
   'ai-photography-chat',
   // Boost flow — sticky "Boost post · $X" CTA + payment-note footer pinned to
