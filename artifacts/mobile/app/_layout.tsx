@@ -86,6 +86,7 @@ import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
+import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -1205,6 +1206,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="appearance"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1315,6 +1317,15 @@ export default function RootLayout() {
     Inter_700Bold,
   });
   const [fontGateExpired, setFontGateExpired] = useState(false);
+
+  useEffect(() => {
+    // Fire-and-forget: warms the Appearance screen's icon/theme thumbnails
+    // in the background so it never has to show a loading/fade state for a
+    // bitmap that was already resolved before the screen ever mounts. Never
+    // gates app-ready — a slow preload just means the first Appearance visit
+    // pays the (already-fast, bundled-locally) resolve cost instead.
+    void preloadAppearanceAssets();
+  }, []);
 
   useEffect(() => {
     // Last-resort safety net only: expo-font can occasionally hang (a stale

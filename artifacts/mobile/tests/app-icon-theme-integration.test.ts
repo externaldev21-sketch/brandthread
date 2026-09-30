@@ -61,10 +61,10 @@ describe('theme-matched app icons', () => {
   });
 
   it('replaces fake seasonal choices with theme-matched icon options', () => {
-    const screen = readFileSync(resolve(root, 'app/app-icon.tsx'), 'utf8');
+    const screen = readFileSync(resolve(root, 'app/appearance.tsx'), 'utf8');
     expect(screen).toContain('Follow app theme');
     expect(screen).toContain('APP_THEME_PRESETS.map');
-    expect(screen).toContain('APP_ICON_IMAGES');
+    expect(screen).toContain('APPEARANCE_ICON_IMAGES');
     expect(screen).not.toMatch(/spring26|winter26|summer25|winter24/);
   });
 });
