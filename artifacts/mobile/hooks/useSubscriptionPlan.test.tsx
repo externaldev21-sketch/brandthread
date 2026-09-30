@@ -20,6 +20,10 @@ vi.mock("@/lib/api", () => ({
   useApi: () => api,
 }));
 
+vi.mock("@clerk/expo", () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: "user_test" }),
+}));
+
 import {
   invalidatePlanCache,
   useSubscriptionPlan,
