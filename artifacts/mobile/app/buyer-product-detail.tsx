@@ -48,6 +48,8 @@ import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
+import { CompleteTheFit } from '@/components/products/CompleteTheFit';
+import { ProductVideo } from '@/components/products/ProductVideo';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -1233,6 +1235,8 @@ export default function BuyerProductDetailScreen() {
             </>
           ) : null}
 
+          <ProductVideo productId={product.id} />
+
           {/* Returns & cancellation */}
           <View style={s.divider} />
           <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
@@ -1248,6 +1252,8 @@ export default function BuyerProductDetailScreen() {
 
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
+
+          <CompleteTheFit productId={product.id} />
 
           {/* You might also like — owns its header; renders nothing when empty. */}
           <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
