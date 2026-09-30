@@ -9,7 +9,7 @@ import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'rea
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
-import { COMP } from '@/lib/theme';
+import { COMP, FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
@@ -104,5 +104,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
   },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  // fontFamily, not fontWeight: without an explicit `fontFamily` this
+  // badge digit rendered in the browser's default sans font on web (no
+  // Inter face at all), and a bare numeric `fontWeight` on this app's
+  // per-weight static Inter faces has no matching real weight file, so the
+  // browser synthesizes ("faux-bolds") it instead of using a real bold
+  // glyph — see components/ui/AppText.tsx's doc comment.
+  badgeText: { fontSize: 10, fontFamily: FONT.bold },
 });

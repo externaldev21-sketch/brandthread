@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
-import { FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS, ON_DARK_MUTED } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
@@ -467,11 +467,15 @@ const styles = StyleSheet.create({
   },
   pinnedTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
   pinnedThumb: { width: 48, height: 48, borderRadius: 8, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  pinnedEyebrow: { color: 'rgba(255,255,255,0.65)', fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 },
+  // Solid opaque greys (ON_DARK_MUTED), not translucent white — a sub-1-alpha
+  // text color subpixel-antialiases against the live video underneath, which
+  // reads as a soft/smudgy mid-grey rather than a crisp silver (see
+  // lib/theme.ts's ON_DARK_MUTED doc comment).
+  pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 },
   pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 14, marginTop: 1 },
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
   pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
-  pinnedCompare: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
+  pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
   buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: RADIUS.pill, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
 

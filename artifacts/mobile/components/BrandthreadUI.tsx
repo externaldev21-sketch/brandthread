@@ -33,6 +33,7 @@ import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
+import { useSettled } from '@/lib/animationUtils';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -141,6 +142,20 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const { theme } = useAppTheme();
+  // Text-crispness fix: this wrapper used to carry `transform: [{ scale }]`
+  // (plus `opacity`) unconditionally, even fully at rest (scale===1,
+  // opacity===1) — an identity transform still forces react-native-web to
+  // promote the node to its own compositing layer (see lib/animationUtils.ts),
+  // and with ~100 call sites wrapping button/row labels app-wide, this was
+  // the single biggest source of "blurry text" reports: virtually every
+  // pressable label in the app sat on a permanently-promoted layer. Fixed
+  // the same way this app's other classic-Animated press effects do (see
+  // OrderSuccessSheet.tsx, motion/SheetRise.tsx): `useSettled` drops the
+  // `transform`/`opacity` keys entirely once the release animation has
+  // actually reached scale=1/opacity=1, instead of leaving them set forever.
+  // Starts settled (`true`) since scale/opacity both start at their identity
+  // values on mount.
+  const settled = useSettled(true);
 
   return (
     <Pressable
@@ -151,6 +166,9 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       hitSlop={hitSlop}
       android_ripple={rippleEnabled ? { color: `${theme.accent}2E`, borderless: false } : undefined}
       onPressIn={(e) => {
+        // Not settled for the whole pressed duration — the visible
+        // squish/dim genuinely needs the transform/opacity to render.
+        settled.unsettle();
         Animated.parallel([
           bounce
             ? Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING })
@@ -160,18 +178,23 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
         rest.onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        Animated.parallel([
-          bounce
-            ? Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING })
-            : Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
-          Animated.timing(opacity, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
-        ]).start();
+        // `settled.run` marks this settled again only once the release
+        // animation actually finishes at scale=1/opacity=1 — the true rest
+        // state — not before.
+        settled.run(
+          Animated.parallel([
+            bounce
+              ? Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING })
+              : Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
+            Animated.timing(opacity, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
+          ]),
+        );
         rest.onPressOut?.(e);
       }}
       style={typeof style === 'function' ? style : undefined}
     >
       {(state) => (
-        <Animated.View style={[typeof style === 'function' ? undefined : style, !noMinHeight && { minHeight: COMP.minTouchTarget }, { transform: [{ scale }], opacity }]}>
+        <Animated.View style={[typeof style === 'function' ? undefined : style, !noMinHeight && { minHeight: COMP.minTouchTarget }, !settled.value && { transform: [{ scale }], opacity }]}>
           {typeof children === 'function' ? children(state) : children}
         </Animated.View>
       )}
