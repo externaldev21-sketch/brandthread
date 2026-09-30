@@ -23,6 +23,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { emitProfileEvent } from '@/lib/profileEvents';
@@ -62,7 +63,12 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
   useEffect(() => { setCurrent(cover); }, [cover.videoUrl, cover.posterUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!own) return;
+    // isSellerDevPreview()/isBuyerDevPreview() (not just `own`): a stubbed/
+    // fake-signed-in Clerk session (this app's own audit/e2e harnesses fake
+    // a signed-in user so protected screens render at all) would otherwise
+    // let this reach the real backend-less coachmark endpoint and log a
+    // console 404 — see the identical fix in app/seller-inbox.tsx.
+    if (!own || isSellerDevPreview() || isBuyerDevPreview()) return;
     let alive = true;
     api.profileCover.coachmark()
       .then((status) => { if (alive) setCoachStatus(status); })

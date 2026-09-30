@@ -13,14 +13,18 @@ describe('development app preview routing', () => {
     );
     expect(layoutSource).toContain('if (__DEV__) return getDevWebPreviewRole();');
     expect(layoutSource).toContain("if (v !== 'buyer' && v !== 'seller') return null;");
-    expect(indexSource).toContain("const effectivePreviewRole = Platform.OS === 'web'");
-    expect(indexSource).toContain('? getDevWebPreviewRole()');
-    expect(indexSource).toContain(': DEV_BYPASS_ROLE;');
+    // Index's own redirect-away-from-"/" effect must resolve the preview
+    // role the same way (isSellerDevPreview/isBuyerDevPreview — the
+    // `__DEV__ || NAVIGATION_ISOLATION_TEST` OR, not bare `__DEV__`) so an
+    // exported preview build (the screenshot/audit harness) redirects too,
+    // not just a local dev server.
+    expect(indexSource).toContain("from '@/lib/devPreview'");
+    expect(indexSource).toContain('if (isSellerDevPreview()) effectivePreviewRole = ');
+    expect(indexSource).toContain('else if (isBuyerDevPreview()) effectivePreviewRole = ');
+    expect(indexSource).toContain('effectivePreviewRole = DEV_BYPASS_ROLE;');
     expect(indexSource).toContain("window.location.pathname.replace(/\\/+$/, '') !== ''");
     expect(indexSource).toContain("effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'");
-    expect(indexSource).toContain(
-      "previewRole === 'buyer' ? '/(buyer)' : '/(tabs)'",
-    );
+    expect(indexSource).toContain("previewRole === 'buyer' ? '/(buyer)' : '/(tabs)'");
   });
 
   it('uses populated seller analytics and balances instead of protected APIs in preview', () => {
