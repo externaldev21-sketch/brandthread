@@ -26,6 +26,8 @@ export interface ListRowProps {
   avatar?: { uri?: string | null; name?: string };
   title: string;
   subtitle?: string;
+  /** How many lines `subtitle` may wrap to before truncating. Defaults to 1. */
+  subtitleNumberOfLines?: number;
   value?: string;
   chevron?: boolean;
   toggle?: { value: boolean; onChange: (next: boolean) => void };
@@ -39,7 +41,7 @@ export interface ListRowProps {
 }
 
 export function ListRow({
-  icon, iconColor, avatar, title, subtitle, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
+  icon, iconColor, avatar, title, subtitle, subtitleNumberOfLines = 1, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
 }: ListRowProps) {
   const palette = useColors();
   // Rows get a subtle background highlight instead of a scale — a whole row
@@ -61,7 +63,7 @@ export function ListRow({
       )}
       <View style={styles.body}>
         <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={1}>{title}</Text>
-        {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={1}>{subtitle}</Text>}
+        {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines}>{subtitle}</Text>}
       </View>
       {right}
       {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1}>{value}</Text>}

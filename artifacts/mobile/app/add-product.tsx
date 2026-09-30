@@ -1316,8 +1316,6 @@ export default function AddProductScreen() {
               updateUnsavedState(setTrackInventory, v);
               patchDraft({ inventory: { ...(draftData.inventory!), trackQuantity: v } });
             }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
         {trackInventory && (
@@ -1358,8 +1356,6 @@ export default function AddProductScreen() {
               updateUnsavedState(setAllowOversell, v);
               patchDraft({ inventory: { ...(draftData.inventory!), allowOverselling: v, policy: v ? 'continue' : 'deny' } });
             }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
       </>
@@ -1820,8 +1816,6 @@ export default function AddProductScreen() {
           <HapticSwitch
             value={featuredHome}
             onValueChange={v => { setFeaturedHome(v); patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } }); }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
         <SectionHeader title="SEO & URL" style={s.sectionHdr} />
@@ -1848,8 +1842,6 @@ export default function AddProductScreen() {
               setIsPreOrder(v);
               patchDraft({ salesModel: v ? 'pre-order' : 'pre-made' });
             }}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={ON_DARK}
           />
         </View>
         {isPreOrder && (

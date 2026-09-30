@@ -884,8 +884,6 @@ function FilterModal({ visible, filters, onApply, onClose }: {
             <HapticSwitch
               value={local.hasPhotos}
               onValueChange={v => set('hasPhotos', v)}
-              trackColor={{ true: theme.accent, false: theme.border }}
-              thumbColor={theme.onAccent}
             />
           </View>
           <View style={fm.switchRow}>
@@ -893,8 +891,6 @@ function FilterModal({ visible, filters, onApply, onClose }: {
             <HapticSwitch
               value={local.verifiedOnly}
               onValueChange={v => set('verifiedOnly', v)}
-              trackColor={{ true: theme.accent, false: theme.border }}
-              thumbColor={theme.onAccent}
             />
           </View>
 

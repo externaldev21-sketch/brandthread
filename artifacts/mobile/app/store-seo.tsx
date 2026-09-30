@@ -165,8 +165,6 @@ export default function StoreSEOScreen() {
             <HapticSwitch
               value={seo.sitemapEnabled}
               onValueChange={v => patch({ sitemapEnabled: v })}
-              trackColor={{ false: colors.border, true: PURPLE }}
-              thumbColor={FG}
             />
           </View>
           <View style={se.divider} />
@@ -178,8 +176,6 @@ export default function StoreSEOScreen() {
             <HapticSwitch
               value={seo.searchVisible}
               onValueChange={v => patch({ searchVisible: v })}
-              trackColor={{ false: colors.border, true: PURPLE }}
-              thumbColor={FG}
             />
           </View>
           {!seo.searchVisible && (
