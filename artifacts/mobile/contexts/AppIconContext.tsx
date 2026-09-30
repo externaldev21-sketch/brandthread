@@ -84,6 +84,14 @@ export function AppIconProvider({ children }: { children: React.ReactNode }) {
     setPreference(null);
     setIsHydrated(false);
 
+    if (!userId) {
+      void AsyncStorage.getItem(storageKey).then((saved) => {
+        const local = decodeStoredPreference(saved);
+        if (active && local !== undefined) setPreference(local);
+      }).catch(() => {}).finally(() => { if (active) setIsHydrated(true); });
+      return () => { active = false; };
+    }
+
     api.auth.me()
       .then(async (profile) => {
         if (!active) return;
@@ -105,7 +113,7 @@ export function AppIconProvider({ children }: { children: React.ReactNode }) {
       });
 
     return () => { active = false; };
-  }, [api, storageKey]);
+  }, [api, storageKey, userId]);
 
   useEffect(() => {
     if (!isHydrated || !isThemeHydrated) return;
@@ -119,7 +127,7 @@ export function AppIconProvider({ children }: { children: React.ReactNode }) {
     void applyDeviceAppIcon(nextResolvedIconId);
     try {
       await AsyncStorage.setItem(storageKey, encodeStoredPreference(nextPreference));
-      await api.auth.updateProfile({
+      if (userId) await api.auth.updateProfile({
         appIconId: nextPreference,
         ...(userId ? { expectedClerkId: userId } : {}),
       });
