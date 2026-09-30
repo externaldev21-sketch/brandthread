@@ -160,8 +160,12 @@ export default function BuyerOtherProfileScreen() {
       setLoadFailed(false);
       const stories = await api.social.storiesForUser(resolvedId).catch(() => []);
       setStoryIds((Array.isArray(stories) ? stories : []).map((s: any) => s.id));
-      const hl = await api.social.userHighlights(resolvedId).catch(() => []);
-      setHighlights((Array.isArray(hl) ? hl : []).map(highlightFromServer));
+      try {
+        const hl = await api.social.userHighlights(resolvedId);
+        setHighlights((Array.isArray(hl) ? hl : []).map(highlightFromServer));
+      } catch {
+        setHighlights([]); // highlights are optional: never fail the profile over them
+      }
     } catch {
       setLoadFailed(true);
     } finally {
