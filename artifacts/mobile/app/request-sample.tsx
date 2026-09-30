@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -87,7 +88,24 @@ export default function RequestSampleScreen() {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   }
 
-  if (!manufacturer) return <View style={styles.root} />;
+  if (!manufacturer) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader
+          title="Request Sample"
+          onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        />
+        <EmptyState
+          icon="alert-circle"
+          title={manufacturerId ? 'Manufacturer unavailable' : 'No manufacturer selected'}
+          description={manufacturerId
+            ? "This manufacturer is no longer listed, or it's a private manufacturer you aren't connected to."
+            : 'Open this screen from a manufacturer’s profile to request a sample.'}
+          action={{ label: 'Back to directory', onPress: () => goBackOr(router) }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
