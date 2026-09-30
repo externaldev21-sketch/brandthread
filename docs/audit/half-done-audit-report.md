@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T06:44:28.755Z (partial run — time budget hit).
+Generated 2026-09-30T07:00:18.586Z (partial run — time budget hit).
 
 - Route files discovered: 266
-- Route × role combinations audited: 938
+- Route × role combinations audited: 1018
 - Unreachable: 12
-- Total findings: 4542 (hard: 872, warn: 3670)
+- Total findings: 4887 (hard: 962, warn: 3925)
 
 ## Scoreboard by area/owner
 
@@ -13,12 +13,12 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 
 | Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |
 |---|---|---|---|---|---|
-| store+account (session 01Cdzzzi) | 168 | 623 | 41 | 0 | 41 |
-| seller commerce (session 011WGHYC) | 162 | 460 | 36 | 0 | 36 |
+| store+account (session 01Cdzzzi) | 250 | 831 | 58 | 0 | 58 |
+| seller commerce (session 011WGHYC) | 166 | 478 | 37 | 0 | 37 |
 | profiles+social (session 01MjTkyh) | 146 | 995 | 45 | 0 | 45 |
-| buyer (session 01AaWLh1) | 120 | 582 | 35 | 0 | 35 |
+| buyer (session 01AaWLh1) | 122 | 599 | 36 | 0 | 36 |
 | growth (session 019SGXKf) | 102 | 310 | 24 | 0 | 24 |
-| design (session 01DgPbif) | 86 | 282 | 27 | 0 | 27 |
+| design (session 01DgPbif) | 88 | 294 | 28 | 0 | 28 |
 | supply (session 01Lbcp8K) | 66 | 294 | 20 | 0 | 20 |
 | live (session 01Kp8Jgx) | 20 | 124 | 6 | 0 | 6 |
 | headers/tab bar/crawl (session 0193ZtXu) | 2 | 0 | 1 | 0 | 1 |
@@ -39,17 +39,17 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| type-scale-drift | warn | 1593 |
-| hit-target-too-small | warn | 1052 |
-| console-error | hard | 704 |
-| contrast-violation | warn | 385 |
-| overlapping-text | warn | 238 |
-| clipped-text | warn | 172 |
+| type-scale-drift | warn | 1750 |
+| hit-target-too-small | warn | 1076 |
+| console-error | hard | 766 |
+| contrast-violation | warn | 433 |
+| overlapping-text | warn | 248 |
+| clipped-text | warn | 176 |
+| preview-demo-wording | hard | 104 |
 | min-size-violation | warn | 97 |
-| font-family | warn | 88 |
-| preview-demo-wording | hard | 76 |
+| font-family | warn | 92 |
 | placeholder-copy | hard | 72 |
-| color-rule-violation | warn | 45 |
+| color-rule-violation | warn | 53 |
 | error-boundary | hard | 16 |
 | repeated-labels | hard | 4 |
 
@@ -72,7 +72,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (2439)
+### Other (2751)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -686,7 +686,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
 | `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
 
-### Profile / settings (470)
+### Profile / settings (484)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -800,6 +800,10 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/settings/seller/00-initial.png) |
 | `/share-profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/share-profile/seller/00-initial.png) |
 | `/share-profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/share-profile/seller/00-initial.png) |
+| `/store-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/store-settings/seller/00-initial.png) |
+| `/store-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/store-settings/seller/00-initial.png) |
+| `/store-settings` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/store-settings/buyer/00-initial.png) |
+| `/store-settings` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/store-settings/buyer/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Change profile photo or video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add profile video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
@@ -990,10 +994,6 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/conversation-privacy-safety` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Privacy & safety" | [view](../../docs/audit/screenshots/conversation-privacy-safety/buyer/00-initial.png) |
 | `/customer-accounts` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer accounts" | [view](../../docs/audit/screenshots/customer-accounts/seller/00-initial.png) |
 | `/customer-accounts` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer accounts" | [view](../../docs/audit/screenshots/customer-accounts/seller/00-initial.png) |
-| `/customer-accounts` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer accounts" | [view](../../docs/audit/screenshots/customer-accounts/buyer/00-initial.png) |
-| `/customer-accounts` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer accounts" | [view](../../docs/audit/screenshots/customer-accounts/buyer/00-initial.png) |
-| `/customer-privacy` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer privacy" | [view](../../docs/audit/screenshots/customer-privacy/seller/00-initial.png) |
-| `/customer-privacy` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer privacy" | [view](../../docs/audit/screenshots/customer-privacy/seller/00-initial.png) |
 
 ### Buyer discover / feed (240)
 
@@ -1950,7 +1950,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/shipping-delivery` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "0" | [view](../../docs/audit/screenshots/shipping-delivery/buyer/00-initial.png) |
 | `/shipping-delivery` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "0" | [view](../../docs/audit/screenshots/shipping-delivery/buyer/00-initial.png) |
 
-### Messaging (112)
+### Messaging (131)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -1968,6 +1968,8 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/manufacturer-messages` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
 | `/manufacturer-messages` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
 | `/manufacturer-messages` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/thread-cash` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
 | `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
 | `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
 | `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
@@ -2066,6 +2068,23 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/manufacturer-messages` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
 | `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
 | `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | hit-target-too-small | warn | 268x36px control "Couldn't load balance — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | hit-target-too-small | warn | 361x36px control "Couldn't load history — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | hit-target-too-small | warn | 268x36px control "Couldn't load balance — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | hit-target-too-small | warn | 361x36px control "Couldn't load history — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "$0.00" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "$18.45" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
 
 ### AI / Studio tools (99)
 
