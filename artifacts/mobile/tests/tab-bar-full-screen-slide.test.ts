@@ -69,9 +69,9 @@ describe('tab bar slide motion: fast, plain ease-out, no spring', () => {
     expect(bar).not.toContain('Animated.spring');
   });
 
-  it('TAB_BAR_SLIDE_MS is fast (~150ms) and defines no spring constant alongside it', () => {
+  it('TAB_BAR_SLIDE_MS is fast (~200ms) and defines no spring constant alongside it', () => {
     const motion = src('../constants/motion.ts');
-    expect(motion).toMatch(/export const TAB_BAR_SLIDE_MS = 150;/);
+    expect(motion).toMatch(/export const TAB_BAR_SLIDE_MS = 200;/);
     expect(motion).toMatch(/export const TAB_BAR_SLIDE_EASING = Easing\.bezier\(/);
     expect(motion).not.toMatch(/TAB_BAR_SLIDE_SPRING/);
   });
