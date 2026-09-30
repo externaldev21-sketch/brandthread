@@ -10,6 +10,8 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -17,10 +19,45 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
  * by GET /api/store/preview (and, once published, GET /api/store/site/:slug)
  * that already contains the real catalog, cart, and checkout. No editor
  * chrome here — just the site, a close button, and a mobile/desktop toggle.
+ *
+ * Fresh preview (`?bt_preview=seller`, no `&demo=1`) never calls the real
+ * backend — there's nothing real to preview yet for a brand-new account,
+ * and hitting a real endpoint from an unauthenticated preview session just
+ * produces a network/auth error the person can't do anything about. It
+ * goes straight to the real "no products yet" empty state instead, the
+ * same thing a genuinely fresh seller with zero products would see.
  */
 
 type DeviceMode = 'mobile' | 'desktop';
 const DESKTOP_WIDTH = 1280;
+
+// react-native-webview has no real web implementation (its own source is a
+// "does not support this platform" dummy component on web — see
+// node_modules/react-native-webview/src/WebView.tsx). Using <WebView> on
+// web silently rendered that dummy view with no width/height set inside a
+// scaled, clipped container, which is how this screen went fully blank
+// with no error: the loading/error states were working fine, it was only
+// ever the "html loaded, show it" branch that had nothing real to show.
+// On web, render the HTML in a genuine DOM <iframe> instead.
+function HtmlSurface({ html, width, height, injectedJS }: {
+  html: string; width: number; height: number; injectedJS?: string;
+}) {
+  if (Platform.OS === 'web') {
+    return React.createElement('iframe', {
+      srcDoc: html,
+      style: { width, height, border: 'none', display: 'block', backgroundColor: '#FFFFFF' },
+      title: 'Store preview',
+    });
+  }
+  return (
+    <WebView
+      source={{ html }}
+      style={{ width, height }}
+      scalesPageToFit={false}
+      injectedJavaScriptBeforeContentLoaded={injectedJS}
+    />
+  );
+}
 
 export default function StorePreview() {
   const router = useRouter();
@@ -33,7 +70,13 @@ export default function StorePreview() {
   const [error, setError] = useState(false);
   const [device, setDevice] = useState<DeviceMode>('mobile');
 
+  // Fresh preview never has a real store to fetch — see the file doc
+  // comment. Demo preview (&demo=1) and real signed-in accounts both load
+  // the real endpoint, same as production.
+  const freshPreview = isSellerDevPreview() && !isPreviewDemoMode();
+
   const load = useCallback(async () => {
+    if (freshPreview) { setLoading(false); setError(false); setHtml(null); return; }
     setLoading(true);
     setError(false);
     try {
@@ -44,7 +87,8 @@ export default function StorePreview() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, freshPreview]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -52,6 +96,7 @@ export default function StorePreview() {
   const screenHeight = Dimensions.get('window').height - insets.top - insets.bottom - 52;
   const containerWidth = device === 'desktop' ? DESKTOP_WIDTH : screenWidth;
   const scale = device === 'desktop' ? screenWidth / DESKTOP_WIDTH : 1;
+  const desktopInjectedJS = "var m=document.querySelector('meta[name=viewport]'); if(m){m.setAttribute('content','width=" + DESKTOP_WIDTH + "');} true;";
 
   return (
     <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
@@ -71,8 +116,11 @@ export default function StorePreview() {
               key={mode}
               onPress={() => { Haptics.selectionAsync(); setDevice(mode); }}
               style={[styles.deviceBtn, device === mode && styles.deviceBtnActive]}
+              accessibilityLabel={mode === 'mobile' ? 'Mobile preview' : 'Desktop preview'}
+              accessibilityRole="button"
+              accessibilityState={{ selected: device === mode }}
             >
-              <Feather name={mode === 'mobile' ? 'smartphone' : 'monitor'} size={ICON.sm} color={device === mode ? theme.background : theme.muted} />
+              <Feather name={mode === 'mobile' ? 'smartphone' : 'monitor'} size={ICON.sm} color={device === mode ? '#000000' : theme.text} />
             </TouchableOpacity>
           ))}
         </View>
@@ -80,7 +128,16 @@ export default function StorePreview() {
         <View style={{ width: 36 }} />
       </View>
 
-      {loading ? (
+      {freshPreview ? (
+        <View style={styles.center}>
+          <EmptyState
+            icon="shopping-bag"
+            title="Your store is empty"
+            description="Add a product to see your store come to life here."
+            action={{ label: 'Add product', onPress: () => router.push('/add-product' as never), icon: 'plus' }}
+          />
+        </View>
+      ) : loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text} size="large" />
         </View>
@@ -99,17 +156,18 @@ export default function StorePreview() {
               width: containerWidth,
               height: screenHeight / scale,
               transform: [{ scale }],
-            }}
+              // Scale from the top-left, not the default center — a
+              // center-origin scale shifts a 1280px-wide desktop frame
+              // sideways/upward by half the shrink amount, pushing most of
+              // it off-screen instead of shrinking it in place to fit.
+              transformOrigin: 'top left',
+            } as any}
           >
-            <WebView
-              source={{ html }}
-              style={{ width: containerWidth, height: screenHeight / scale }}
-              scalesPageToFit={false}
-              injectedJavaScriptBeforeContentLoaded={
-                device === 'desktop'
-                  ? "var m=document.querySelector('meta[name=viewport]'); if(m){m.setAttribute('content','width=" + DESKTOP_WIDTH + "');} true;"
-                  : undefined
-              }
+            <HtmlSurface
+              html={html}
+              width={containerWidth}
+              height={screenHeight / scale}
+              injectedJS={device === 'desktop' ? desktopInjectedJS : undefined}
             />
           </View>
         </View>
@@ -128,9 +186,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     width: 36, height: 36, borderRadius: RADIUS.pill,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Monochrome rule: black/white/silver only — was theme.borderSubtle (a
+  // grey fill) with a theme.muted (grey) inactive icon.
   deviceToggle: {
     flexDirection: 'row', borderRadius: RADIUS.pill,
-    backgroundColor: theme.borderSubtle, padding: 3, gap: 3,
+    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    padding: 3, gap: 3,
   },
   deviceBtn: {
     width: 34, height: 30, borderRadius: RADIUS.pill,
