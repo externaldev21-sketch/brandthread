@@ -21,6 +21,7 @@ import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
 import { startCommunityPushJob } from "./lib/communityPush";
+import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
 
 validateEnv();
@@ -76,6 +77,7 @@ const server = app.listen(port, (err) => {
   startLiveRecordingFinalizeJob();
   startLiveViewersPresenceJob();
   startCommunityPushJob();
+  startScheduledPostPublisherJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────

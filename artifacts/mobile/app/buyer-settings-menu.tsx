@@ -81,6 +81,7 @@ export default function BuyerSettingsMenuScreen() {
       title: 'How you use Brandthread',
       rows: [
         { key: 'saved', icon: 'bookmark', label: 'Saved', onPress: () => router.push('/buyer-saved' as any) },
+        { key: 'drafts', icon: 'file-text', label: 'Drafts', onPress: () => router.push('/buyer-drafts' as any) },
         { key: 'archive', icon: 'archive', label: 'Archive', onPress: () => router.push('/buyer-archive' as any) },
         { key: 'your-activity', icon: 'activity', label: 'Your activity', onPress: () => router.push('/buyer-your-activity' as any) },
         { key: 'close-friends', icon: 'star', label: 'Close friends', onPress: () => router.push('/buyer-close-friends' as any) },

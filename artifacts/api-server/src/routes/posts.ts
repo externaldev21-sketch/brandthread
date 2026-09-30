@@ -23,6 +23,7 @@ import postVideoRouter, {
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { MAX_DRAFTS_PER_USER, onPostPublished, scheduleWindowError } from "../lib/postPublish";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -699,8 +700,19 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
   const now = new Date();
-  if (parsedScheduledAt && parsedScheduledAt.getTime() <= now.getTime()) {
-    return res.status(400).json({ error: "scheduledAt must be in the future" });
+  if (parsedScheduledAt) {
+    const windowError = scheduleWindowError(parsedScheduledAt, now);
+    if (windowError) return res.status(400).json({ error: windowError, code: "INVALID_SCHEDULE_TIME" });
+  }
+  if (isDraft) {
+    const [{ value: draftCount }] = await db.select({ value: count() }).from(posts)
+      .where(and(eq(posts.userId, clerkId), eq(posts.postStatus, "draft")));
+    if (Number(draftCount) >= MAX_DRAFTS_PER_USER) {
+      return res.status(409).json({
+        error: `You can keep up to ${MAX_DRAFTS_PER_USER} drafts. Delete one to save another.`,
+        code: "DRAFT_LIMIT_REACHED",
+      });
+    }
   }
   const postStatus: PostStatus = isDraft
     ? "draft"
@@ -812,6 +824,7 @@ router.post("/", requireAuth, async (req, res) => {
 // buyers need this too, to resume their own drafts (item 117).
 // Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
 // long-lived seller's full post history was previously loaded unbounded.
+const MINE_STATUS_FILTERS = ["draft", "scheduled", "published", "archived"] as const;
 router.get("/mine", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!await posterAccountType(clerkId)) {
@@ -821,10 +834,16 @@ router.get("/mine", requireAuth, async (req, res) => {
   if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
   const { limit, offset } = page.data;
   try {
+    const statusFilter = typeof req.query.status === "string" ? req.query.status : undefined;
+    if (statusFilter !== undefined && !MINE_STATUS_FILTERS.includes(statusFilter as never)) {
+      return res.status(400).json({ error: `status must be one of ${MINE_STATUS_FILTERS.join(", ")}`, code: "VALIDATION_ERROR" });
+    }
     const rows = await db.select().from(posts)
       .where(and(
         eq(posts.userId, clerkId),
-        inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
+        statusFilter
+          ? eq(posts.postStatus, statusFilter)
+          : inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
       ))
       .orderBy(desc(posts.createdAt))
       .limit(limit)
@@ -1002,8 +1021,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
   if (body.scheduledAt !== undefined && parsedScheduledAt === undefined) {
     return res.status(400).json({ error: "scheduledAt must be a valid ISO date or null" });
   }
-  if (parsedScheduledAt && parsedScheduledAt.getTime() <= Date.now()) {
-    return res.status(400).json({ error: "scheduledAt must be in the future" });
+  if (parsedScheduledAt) {
+    const windowError = scheduleWindowError(parsedScheduledAt);
+    if (windowError) return res.status(400).json({ error: windowError, code: "INVALID_SCHEDULE_TIME" });
   }
   if (body.isDraft !== undefined && typeof body.isDraft !== "boolean") {
     return res.status(400).json({ error: "isDraft must be a boolean" });
@@ -1076,6 +1096,96 @@ router.patch("/:id", requireAuth, async (req, res) => {
     req.log.error({ err, clerkId, postId: id }, "Failed to update seller post");
     return res.status(500).json({ error: "Failed to update post" });
   }
+});
+
+// ─── Drafts & scheduling (see docs/social/drafts-and-scheduling.md) ──────────
+
+async function loadOwnedPost(req: any, res: any) {
+  const clerkId = req.clerkUserId as string;
+  const id = req.params.id;
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    res.status(404).json({ error: "Post not found" });
+    return null;
+  }
+  const posterType = await posterAccountType(clerkId);
+  if (!posterType) {
+    res.status(403).json({ error: "Only buyer and seller accounts can manage posts.", code: "ACCOUNT_TYPE_REQUIRED" });
+    return null;
+  }
+  const [existing] = await db.select().from(posts)
+    .where(and(eq(posts.id, id), eq(posts.userId, clerkId))).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Post not found" });
+    return null;
+  }
+  return { clerkId, posterType, existing };
+}
+
+// POST /api/posts/:id/schedule { scheduledAt } — draft or scheduled -> scheduled (also reschedules)
+router.post("/:id/schedule", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { clerkId, posterType, existing } = ctx;
+  if (posterType === "buyer") {
+    return res.status(403).json({ error: "Buyer posts cannot be scheduled.", code: "BUYER_NO_SCHEDULING" });
+  }
+  if (existing.postStatus !== "draft" && existing.postStatus !== "scheduled") {
+    return res.status(409).json({ error: "Only drafts and scheduled posts can be scheduled.", code: "POST_NOT_SCHEDULABLE" });
+  }
+  const restriction = await publishingRestriction(clerkId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+  const at = parseScheduledAt((req.body as Record<string, unknown>)?.scheduledAt);
+  if (!at) return res.status(400).json({ error: "scheduledAt must be a valid ISO date", code: "INVALID_SCHEDULE_TIME" });
+  const windowError = scheduleWindowError(at);
+  if (windowError) return res.status(400).json({ error: windowError, code: "INVALID_SCHEDULE_TIME" });
+  const [updated] = await db.update(posts)
+    .set({ postStatus: "scheduled", scheduledAt: at, updatedAt: new Date() })
+    .where(and(eq(posts.id, existing.id), inArray(posts.postStatus, ["draft", "scheduled"])))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "Post is no longer schedulable.", code: "POST_NOT_SCHEDULABLE" });
+  return res.json((await postDetails([updated]))[0]);
+});
+
+// POST /api/posts/:id/unschedule — scheduled -> draft
+router.post("/:id/unschedule", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { existing } = ctx;
+  if (existing.postStatus === "draft") return res.json((await postDetails([existing]))[0]);
+  if (existing.postStatus !== "scheduled") {
+    return res.status(409).json({ error: "Only scheduled posts can be moved back to drafts.", code: "POST_NOT_SCHEDULED" });
+  }
+  const now = new Date();
+  const [updated] = await db.update(posts)
+    .set({ postStatus: "draft", scheduledAt: null, updatedAt: now })
+    .where(and(eq(posts.id, existing.id), eq(posts.postStatus, "scheduled"), gte(posts.scheduledAt, now)))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "This post is already going live.", code: "POST_ALREADY_LIVE" });
+  return res.json((await postDetails([updated]))[0]);
+});
+
+// POST /api/posts/:id/publish-now — draft or scheduled -> published (idempotent for published)
+router.post("/:id/publish-now", requireAuth, async (req, res) => {
+  const ctx = await loadOwnedPost(req, res);
+  if (!ctx) return;
+  const { clerkId, existing } = ctx;
+  if (existing.postStatus === "published") return res.json((await postDetails([existing]))[0]);
+  if (existing.postStatus !== "draft" && existing.postStatus !== "scheduled") {
+    return res.status(409).json({ error: "Only drafts and scheduled posts can be published.", code: "POST_NOT_PUBLISHABLE" });
+  }
+  const restriction = await publishingRestriction(clerkId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+  const now = new Date();
+  const [updated] = await db.update(posts)
+    .set({ postStatus: "published", scheduledAt: null, publishedAt: now, createdAt: now, updatedAt: now })
+    .where(and(eq(posts.id, existing.id), inArray(posts.postStatus, ["draft", "scheduled"])))
+    .returning();
+  if (!updated) {
+    const [current] = await db.select().from(posts).where(eq(posts.id, existing.id)).limit(1);
+    return res.json((await postDetails([current]))[0]);
+  }
+  await onPostPublished(updated);
+  return res.json((await postDetails([updated]))[0]);
 });
 
 // ─── DELETE /api/posts/:id ───────────────────────────────────────────────────
