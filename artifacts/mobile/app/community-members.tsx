@@ -267,7 +267,7 @@ export default function CommunityMembersScreen() {
   );
 
   const renderMember = ({ item: m }: { item: CommunityMember }) => {
-    const hint = [m.handle ? `@${m.handle}` : null, m.accountType === 'seller' ? 'Seller' : m.accountType === 'buyer' ? 'Buyer' : null]
+    const hint = [m.handle ? m.handle : null, m.accountType === 'seller' ? 'Seller' : m.accountType === 'buyer' ? 'Buyer' : null]
       .filter(Boolean).join(' · ');
     return (
       <View style={styles.row}>

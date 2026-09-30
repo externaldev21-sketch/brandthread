@@ -107,7 +107,10 @@ function makeDemoClient(): CommunityClient {
     remove: async () => {},
     join: async (id) => demoStore.join(id)!,
     joinByCode: async () => ({ status: 'joined', community: demoStore.join('demo-c-embroidery') }),
-    invitePreview: async () => ({ ...(demoStore.get('demo-c-embroidery') as Community) } as unknown as CommunityInvitePreview),
+    invitePreview: async () => ({
+      id: 'demo-c-private', name: 'Studio Circle', description: 'A small private group for brand founders sharing work in progress.',
+      iconKey: 'lock', kind: 'user', verified: false, visibility: 'private', requireApproval: false, memberCount: 38,
+    }),
     leave: async (id) => demoStore.leave(id),
     setMuted: async (id, muted) => demoStore.setMuted(id, muted),
     markRead: async (id) => demoStore.markRead(id),

@@ -294,7 +294,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   pillRole: { backgroundColor: theme.accentDim },
   pillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted },
-  quote: { borderLeftWidth: 2, paddingLeft: 8, marginBottom: 6 },
+  quote: { borderLeftWidth: 2, paddingLeft: 8, marginBottom: 6, maxWidth: BUBBLE_MAX - 24, overflow: 'hidden' },
   quoteName: { fontSize: FS.xs, fontFamily: FONT.semibold },
   quoteText: { fontSize: FS.xs, fontFamily: FONT.regular },
   text: {

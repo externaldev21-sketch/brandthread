@@ -84,7 +84,7 @@ export default function BuyerSettingsMenuScreen() {
         { key: 'archive', icon: 'archive', label: 'Archive', onPress: () => router.push('/buyer-archive' as any) },
         { key: 'your-activity', icon: 'activity', label: 'Your activity', onPress: () => router.push('/buyer-your-activity' as any) },
         { key: 'close-friends', icon: 'star', label: 'Close friends', onPress: () => router.push('/buyer-close-friends' as any) },
-        { key: 'groups', icon: 'users', label: 'Groups', value: groupsValue, onPress: () => router.push('/community' as any) },
+        { key: 'groups', icon: 'message-square', label: 'Groups', value: groupsValue, onPress: () => router.push('/community' as any) },
         { key: 'friends', icon: 'users', label: 'Friends', onPress: () => router.push('/(buyer)/friends' as any) },
         { key: 'highlights', icon: 'image', label: 'Highlights', onPress: () => router.push('/buyer-highlights-manager' as any) },
       ],
