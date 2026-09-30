@@ -20,7 +20,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
@@ -261,7 +261,7 @@ export default function SubscriptionScreen() {
   if (isLoadingRole && !isSellerPreview) {
     return (
       <View style={styles.root}>
-        <Header title="Subscription" />
+        <ScreenHeader title="Subscription" />
         <View style={styles.accessLoading}>
           <ActivityIndicator color={theme.accent} />
         </View>
@@ -272,7 +272,7 @@ export default function SubscriptionScreen() {
   if (!isSellerPreview && currentRole !== 'owner' && !isReadOnly) {
     return (
       <View style={styles.root}>
-        <Header title="Subscription" />
+        <ScreenHeader title="Subscription" />
         <RoleLockedView screenTitle="subscription & billing" currentRole={currentRole ?? undefined} />
       </View>
     );
@@ -280,7 +280,7 @@ export default function SubscriptionScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title="Subscription" />
+      <ScreenHeader title="Subscription" />
 
       {/* Tabs */}
       <View style={styles.tabRow}>

@@ -43,6 +43,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useApi } from '@/lib/api';
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
@@ -476,6 +477,7 @@ function CommentActionsSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <ModalSafeArea>
       <Pressable style={s.sheetScrim} onPress={onClose} accessibilityLabel="Dismiss" />
       <View style={[s.sheetCard, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
         <View style={s.sheetHandle} />
@@ -530,6 +532,7 @@ function CommentActionsSheet({
           </View>
         )}
       </View>
+      </ModalSafeArea>
     </Modal>
   );
 }

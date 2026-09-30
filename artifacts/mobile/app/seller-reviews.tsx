@@ -9,7 +9,7 @@ import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 
@@ -213,7 +213,7 @@ export default function SellerReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="My Reviews" />
+      <ScreenHeader title="My Reviews" />
 
       {/* Stats strip */}
       {reviews.length > 0 && (

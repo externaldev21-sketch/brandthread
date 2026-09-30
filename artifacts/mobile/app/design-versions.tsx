@@ -22,7 +22,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getVersions, restoreVersion, duplicateProject } from '@/services/designService';
 import { DesignVersion } from '@/services/designTypes';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 function formatDate(iso: string): string {
   try {
@@ -139,7 +139,7 @@ export default function DesignVersionsScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title="Version History" />
+      <ScreenHeader title="Version History" />
 
       {loading ? (
         <View style={styles.centered}>

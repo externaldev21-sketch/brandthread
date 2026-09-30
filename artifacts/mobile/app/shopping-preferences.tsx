@@ -19,7 +19,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -119,7 +119,7 @@ export default function ShoppingPreferences() {
 
   return (
     <View style={s.page}>
-      <Header title="Shopping Preferences" />
+      <ScreenHeader title="Shopping Preferences" />
 
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}

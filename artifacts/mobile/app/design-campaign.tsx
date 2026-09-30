@@ -79,7 +79,7 @@ import type {
   AdMediaKind,
 } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -595,10 +595,9 @@ export default function CreateAdScreen() {
 
   function renderHeader() {
     return (
-      <Header
+      <ScreenHeader
         title="Create Ad"
         onBack={() => goBackOr(router)}
-        actions={[{ icon: 'x', onPress: () => goBackOr(router), accessibilityLabel: 'Close' }]}
       />
     );
   }

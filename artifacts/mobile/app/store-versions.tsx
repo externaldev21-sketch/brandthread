@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT,
@@ -87,7 +87,7 @@ export default function StoreVersionsScreen() {
 
   return (
     <View style={vs.root}>
-      <Header
+      <ScreenHeader
         title="Version History"
         actions={[{ icon: 'plus', onPress: () => setCreating(true), accessibilityLabel: 'Save version' }]}
       />

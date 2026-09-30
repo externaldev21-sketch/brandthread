@@ -14,7 +14,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -203,7 +203,7 @@ export default function StorePoliciesScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
-      <Header title="Store policies" />
+      <ScreenHeader title="Store policies" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={PURPLE} /></View>

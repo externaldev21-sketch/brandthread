@@ -22,10 +22,11 @@ import { formatCents } from '@/lib/money';
 import { File as FSFile } from 'expo-file-system';
 
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard,
+  BrandthreadScreen, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, FormInput,
   LoadingSkeleton, EmptyState,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 import {
   getSample, submitSampleReview, addSampleRevision,
@@ -637,8 +638,8 @@ export default function SampleDetailScreen() {
 
   if (loading) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Sample Details" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Sample Details" onBack={() => goBackOr(router)} />
         <View style={s.loadingContainer}>
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
@@ -650,8 +651,8 @@ export default function SampleDetailScreen() {
 
   if (!sample) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Sample Details" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Sample Details" onBack={() => goBackOr(router)} />
         <View style={s.centered}>
           <EmptyState
             icon="package"
@@ -685,8 +686,8 @@ export default function SampleDetailScreen() {
   const primaryDisabled = isPendingPayment && sample.manufacturerPayoutReady !== true;
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader
         title="Sample Details"
         subtitle={manufacturerName}
         onBack={() => goBackOr(router)}

@@ -11,7 +11,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -211,7 +211,7 @@ export default function StorePagesScreen() {
   if (mode === 'list') {
     return (
       <View style={styles.root}>
-        <Header
+        <ScreenHeader
           title="Pages"
           actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'Create page' }]}
         />
@@ -266,7 +266,7 @@ export default function StorePagesScreen() {
 
   return (
     <View style={styles.root}>
-      <Header
+      <ScreenHeader
         title={mode === 'new' ? 'New Page' : 'Edit Page'}
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
       />

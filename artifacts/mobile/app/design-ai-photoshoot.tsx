@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BrandthreadScreen, BrandthreadHeader, GradientCard,
@@ -417,13 +419,8 @@ export default function AIPhotoshootScreen() {
           presentationStyle="formSheet"
           onRequestClose={() => setShowProductPicker(false)}
         >
-          <View style={s.pickerRoot}>
-            <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>Choose a product</Text>
-              <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
-                <Feather name="x" size={ICON.sm} color={FG} />
-              </TouchableOpacity>
-            </View>
+          <SafeAreaProvider style={s.pickerRoot}>
+            <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
             <Text style={s.pickerSub}>Selected photos will be added to the product's media gallery.</Text>
             {loadingPickerProducts ? (
               <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
@@ -454,7 +451,7 @@ export default function AIPhotoshootScreen() {
                 )}
               />
             )}
-          </View>
+          </SafeAreaProvider>
         </Modal>
       </BrandthreadScreen>
     );
@@ -1253,18 +1250,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pickerRoot: {
     flex: 1,
     backgroundColor: BG,
-    paddingTop: SP.md,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.lg,
-  },
-  pickerTitle: {
-    fontFamily: FONT.bold,
-    fontSize: FS.lg,
-    color: FG,
   },
   pickerSub: {
     fontFamily: FONT.regular,

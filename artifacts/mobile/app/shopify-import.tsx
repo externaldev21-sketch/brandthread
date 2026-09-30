@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
 import { COMP } from '@/lib/theme';
@@ -124,7 +124,7 @@ export default function ShopifyImportScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Header title="Import from Shopify" />
+      <ScreenHeader title="Import from Shopify" />
       {loadingStatus ? (
         <View style={{ padding: 20, gap: 12 }}>
           <LoadingSkeleton height={140} />

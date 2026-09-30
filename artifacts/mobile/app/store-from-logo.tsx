@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -261,7 +261,7 @@ export default function StoreFromLogoScreen() {
 
   return (
     <View style={fl.root}>
-      <Header title="Generate from Logo" />
+      <ScreenHeader title="Generate from Logo" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fl.scroll}>
         <Text style={fl.subtitle}>

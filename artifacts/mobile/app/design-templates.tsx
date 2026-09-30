@@ -21,7 +21,7 @@ import {
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
@@ -117,7 +117,7 @@ export default function DesignTemplatesScreen() {
 
   return (
     <View style={ts.root}>
-      <Header title="Templates" />
+      <ScreenHeader title="Templates" />
 
       {/* ── SEARCH ── */}
       <View style={ts.searchWrap}>

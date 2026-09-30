@@ -11,7 +11,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, T
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
 import { COMP } from '@/lib/theme';
@@ -77,7 +77,7 @@ export default function ShopifyFulfillmentScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1 }}>
-        <Header title="Fulfillment connections" />
+        <ScreenHeader title="Fulfillment connections" />
         <View style={{ padding: 20, gap: 16 }}>
           <LoadingSkeleton height={92} />
           <LoadingSkeleton height={160} />
@@ -88,7 +88,7 @@ export default function ShopifyFulfillmentScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Header title="Fulfillment connections" />
+      <ScreenHeader title="Fulfillment connections" />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
         <BrandthreadCard>
           <View style={styles.rowHeader}>

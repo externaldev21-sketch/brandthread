@@ -10,14 +10,14 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonBlock } from '@/components/ui';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
@@ -125,11 +125,6 @@ export default function ThreadCashScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
   const insets = useSafeAreaInsets();
-  // Same gate as the rest of this polish pass: outside a real device (or a
-  // preview frame that emulates one), react-native-safe-area-context's web
-  // implementation reads 0 for `insets.top`, which otherwise put the header
-  // right under the notch/Dynamic Island.
-  const topPad = useHeaderTopInset();
   const celebrateThreadCash = useCelebrateThreadCash();
   const [status, setStatus] = useState<ThreadCashStatus | null>(null);
   const [history, setHistory] = useState<ThreadCashEntry[]>([]);
@@ -201,9 +196,7 @@ export default function ThreadCashScreen() {
 
   return (
     <BrandthreadScreen scrollable noSafeTop>
-      <View style={{ paddingTop: topPad }}>
-        <BrandthreadHeader title="Thread Cash" onBack={() => goBackOr(router)} />
-      </View>
+      <ScreenHeader title="Thread Cash" onBack={() => goBackOr(router)} />
       {loading ? (
         <BalanceSkeleton styles={styles} />
       ) : (

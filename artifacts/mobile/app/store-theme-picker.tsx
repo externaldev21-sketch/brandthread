@@ -11,7 +11,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -165,7 +165,7 @@ export default function StoreThemePicker() {
 
   return (
     <View style={styles.root}>
-      <Header
+      <ScreenHeader
         title="Storefront Theme"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />

@@ -7,7 +7,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   GRAD_CARD_GLOW,
   FONT, FS, SP, ICON,
@@ -127,7 +127,7 @@ export default function StoreAiImproveScreen() {
 
   return (
     <View style={ai.root}>
-      <Header title="Improve Store" />
+      <ScreenHeader title="Improve Store" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ai.scroll}>
         <Text style={ai.subtitle}>AI-powered suggestions to improve your storefront.</Text>

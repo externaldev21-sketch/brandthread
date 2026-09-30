@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -292,7 +292,7 @@ export default function StoreFromMoodboardScreen() {
 
   return (
     <View style={mb.root}>
-      <Header title="Generate from Mood Board" />
+      <ScreenHeader title="Generate from Mood Board" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={mb.scroll}>
         <Text style={mb.subtitle}>

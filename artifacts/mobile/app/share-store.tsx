@@ -17,7 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 const BASE_URL = 'https://brandthread.app/store';
 
@@ -68,7 +68,7 @@ export default function ShareStoreScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
-      <Header title="Share Store" />
+      <ScreenHeader title="Share Store" />
 
       {/* Content */}
       <View style={s.body}>
