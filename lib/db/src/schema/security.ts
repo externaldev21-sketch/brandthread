@@ -1,4 +1,4 @@
-import { index, integer, pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp, uuid, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -79,4 +79,26 @@ export const sellerTrialReminderEvents = pgTable("seller_trial_reminder_events",
   sellerTrialUnique: unique("seller_trial_reminder_events_seller_trial_unique")
     .on(table.sellerId, table.trialEndAt),
   trialEndIdx: index("seller_trial_reminder_events_trial_end_idx").on(table.trialEndAt),
+}));
+
+/**
+ * Public web account-deletion requests (Google Play account-deletion URL).
+ * Only the SHA-256 hash of the emailed token is stored. A request becomes
+ * `completed` only after the owner confirms the emailed link and the existing
+ * account deletion succeeds.
+ */
+export const accountDeletionRequests = pgTable("account_deletion_requests", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  clerkId: text("clerk_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  status: text("status").notNull().default("pending"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tokenHashIdx: uniqueIndex("account_deletion_requests_token_hash_idx").on(table.tokenHash),
+  emailIdx: index("account_deletion_requests_email_idx").on(table.email, table.createdAt),
 }));

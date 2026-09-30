@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { clerkClient } from "@clerk/express";
 import {
   db, users, orders, orderItems, conversationParticipants, conversations, messages,
@@ -360,7 +360,9 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
 // Permanently erase an authenticated account. Financial/tax records are kept,
 // but are stripped of direct personal data. The user row is deliberately kept
 // as a tombstone so an old app cannot re-create it with /auth/sync.
-router.delete("/account", requireAuth, async (req, res) => {
+// Exported so the public web deletion request (routes/account-deletion-public.ts)
+// runs this exact logic after email verification instead of duplicating it.
+export async function accountDeletionHandler(req: Request, res: Response) {
   const clerkUserId = (req as any).clerkUserId as string;
   if (!hasDeletionConfirmation(req.body)) {
     res.status(400).json({ error: 'Type DELETE exactly to permanently delete your account.' });
@@ -482,7 +484,8 @@ router.delete("/account", requireAuth, async (req, res) => {
       error: "We could not complete account deletion. Database cleanup may have completed, but Clerk sign-in removal failed. Retry the request or contact support.",
     });
   }
-});
+}
+router.delete("/account", requireAuth, accountDeletionHandler);
 
 // ─── POST /api/auth/legal-acceptance ─────────────────────────────────────────
 // Records that the person agreed to the Terms of Service, Community Guidelines

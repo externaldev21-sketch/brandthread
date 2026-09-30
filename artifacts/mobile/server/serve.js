@@ -141,6 +141,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
+
+  // Public account-deletion page (Google Play requires a URL that works
+  // without the app). Plain HTML, not part of the SPA, so it never depends on
+  // a signed-in session; it calls /api/public/account-deletion/*.
+  if (/^\/account-deletion\/?$/.test(requestedPath)) {
+    const page = fs.readFileSync(path.join(__dirname, 'templates', 'account-deletion.html'), 'utf8');
+    sendHtml(res, 200, page, acceptEncoding);
+    return;
+  }
+
   if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
 
   // This server only ever serves the exported browser app — real /api/*

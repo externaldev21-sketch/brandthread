@@ -47,12 +47,114 @@ const FORBIDDEN_COLLECTED_TYPES = [
   'NSPrivacyCollectedDataTypeCoarseLocation',
 ];
 
+// Native modules that force an Info.plist usage string (or an ATT prompt) if
+// they are ever added. Keys are npm package names from package.json; values
+// list the plugin option or Info.plist key that must then be configured. A
+// package that is NOT installed needs nothing, and its key must stay absent
+// so the App Store does not see a permission the app never uses.
+const PURPOSE_STRING_REQUIREMENTS = {
+  'expo-camera': [['expo-camera', 'cameraPermission'], ['expo-camera', 'microphonePermission']],
+  'expo-image-picker': [['expo-image-picker', 'photosPermission'], ['expo-image-picker', 'cameraPermission'], ['expo-image-picker', 'microphonePermission']],
+  'expo-media-library': [['expo-media-library', 'photosPermission'], ['expo-media-library', 'savePhotosPermission']],
+  'expo-audio': [['expo-audio', 'microphonePermission']],
+  'expo-local-authentication': [['expo-local-authentication', 'faceIDPermission']],
+  // Agora (live video + calls) uses the camera and microphone directly.
+  'react-native-agora': [['expo-camera', 'cameraPermission'], ['expo-camera', 'microphonePermission']],
+  'expo-contacts': [['expo-contacts', 'contactsPermission']],
+  'expo-location': [['expo-location', 'locationWhenInUsePermission']],
+  'expo-tracking-transparency': [['expo-tracking-transparency', 'userTrackingPermission']],
+};
+
+// Info.plist keys that must NOT be present: there is no in-app SDK that
+// tracks across apps (the Meta/TikTok pixels run on the website only), and no
+// feature reads contacts, location, Bluetooth devices or speech.
+const FORBIDDEN_INFO_PLIST_KEYS = [
+  'NSUserTrackingUsageDescription',
+  'NSContactsUsageDescription',
+  'NSLocationWhenInUseUsageDescription',
+  'NSLocationAlwaysAndWhenInUseUsageDescription',
+  'NSLocationAlwaysUsageDescription',
+  'NSBluetoothAlwaysUsageDescription',
+  'NSSpeechRecognitionUsageDescription',
+];
+
+const FORBIDDEN_ANDROID_PERMISSIONS = [
+  'android.permission.READ_EXTERNAL_STORAGE',
+  'android.permission.WRITE_EXTERNAL_STORAGE',
+  'android.permission.ACCESS_FINE_LOCATION',
+  'android.permission.ACCESS_COARSE_LOCATION',
+  'android.permission.READ_CONTACTS',
+];
+
+// Must be blocked so a transitive SDK manifest can never add them and
+// contradict the Play Data safety form (docs/review-readiness/play-data-safety.md).
+const REQUIRED_BLOCKED_ANDROID_PERMISSIONS = [
+  'android.permission.SYSTEM_ALERT_WINDOW',
+  'android.permission.ACCESS_FINE_LOCATION',
+  'android.permission.ACCESS_COARSE_LOCATION',
+  'android.permission.READ_CONTACTS',
+  'android.permission.READ_PHONE_STATE',
+];
+
+function pluginEntries(expoConfig, name) {
+  return (expoConfig.plugins ?? []).filter((plugin) => (Array.isArray(plugin) ? plugin[0] : plugin) === name);
+}
+
+/** Returns a list of problems with the native permission / encryption / Android config. */
+function getNativeConfigErrors(expoConfig, packageJson) {
+  const errors = [];
+  const deps = { ...(packageJson.dependencies ?? {}), ...(packageJson.devDependencies ?? {}) };
+  const infoPlist = expoConfig.ios?.infoPlist ?? {};
+
+  for (const [pkg, options] of Object.entries(PURPOSE_STRING_REQUIREMENTS)) {
+    if (!deps[pkg]) {
+      if (pluginEntries(expoConfig, pkg).length > 0) errors.push(`${pkg} is configured as a plugin but is not a dependency`);
+      continue;
+    }
+    for (const [plugin, option] of options) {
+      const entries = pluginEntries(expoConfig, plugin);
+      const values = entries.map((entry) => (Array.isArray(entry) ? entry[1]?.[option] : undefined));
+      if (entries.length === 0 || values.some((value) => typeof value !== 'string' || value.trim().length < 30)) {
+        errors.push(`${pkg} needs an explicit, specific "${option}" purpose string on the ${plugin} plugin`);
+      }
+    }
+  }
+
+  // A plugin listed twice runs twice; the later purpose string silently wins.
+  for (const plugin of ['expo-local-authentication', 'expo-camera', 'expo-audio', 'expo-media-library', 'expo-image-picker']) {
+    if (pluginEntries(expoConfig, plugin).length > 1) errors.push(`${plugin} is listed more than once in plugins`);
+  }
+
+  for (const key of FORBIDDEN_INFO_PLIST_KEYS) {
+    if (key in infoPlist) errors.push(`ios.infoPlist.${key} is set but no feature needs it`);
+  }
+
+  if (expoConfig.ios?.config?.usesNonExemptEncryption !== false) {
+    errors.push('ios.config.usesNonExemptEncryption must be false (writes ITSAppUsesNonExemptEncryption=false)');
+  }
+
+  const permissions = expoConfig.android?.permissions ?? [];
+  for (const permission of FORBIDDEN_ANDROID_PERMISSIONS) {
+    if (permissions.includes(permission)) errors.push(`android.permissions must not list ${permission}`);
+  }
+  const blocked = expoConfig.android?.blockedPermissions ?? [];
+  for (const permission of REQUIRED_BLOCKED_ANDROID_PERMISSIONS) {
+    if (!blocked.includes(permission)) errors.push(`android.blockedPermissions must include ${permission}`);
+  }
+  return errors;
+}
+
 function fail(message) {
   console.error(`Privacy manifest verification failed: ${message}`);
   process.exit(1);
 }
 
 function assertConfiguredManifest() {
+  const nativeErrors = getNativeConfigErrors(
+    appConfig.expo,
+    JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8')),
+  );
+  if (nativeErrors.length > 0) fail(nativeErrors.join('; '));
   if (!configuredManifest) fail('expo.ios.privacyManifests is missing from app.json');
   if (configuredManifest.NSPrivacyTracking !== false) {
     fail('NSPrivacyTracking must remain false unless Brandthread adds cross-app tracking');
@@ -151,7 +253,11 @@ function assertGeneratedManifest() {
   console.log(`Verified generated app privacy manifest: ${path.relative(projectRoot, appManifestPath)}`);
 }
 
-module.exports = { REQUIRED_COLLECTED_TYPES, FORBIDDEN_COLLECTED_TYPES };
+module.exports = {
+  REQUIRED_COLLECTED_TYPES,
+  FORBIDDEN_COLLECTED_TYPES,
+  getNativeConfigErrors,
+};
 
 if (require.main === module) {
   assertConfiguredManifest();
