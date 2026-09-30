@@ -245,7 +245,7 @@ export async function ensureStoryReplyConversation(senderId: string, recipientId
       name,
       handle: p.username ? `@${p.username}` : "",
       initials: (parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : name.slice(0, 2)).toUpperCase(),
-      color: "#8B5CF6",
+      color: "#1C1C1E", // monochrome monogram avatar
       accountType: p.accountType ?? "buyer",
     };
   };

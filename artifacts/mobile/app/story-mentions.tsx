@@ -40,7 +40,7 @@ const MentionRow = React.memo(function MentionRow({ item, now, styles, onOpen }:
       noMinHeight
     >
       <View style={styles.dotSlot}>{!item.seen ? <View style={styles.dot} /> : null}</View>
-      <View style={[styles.avatar, { backgroundColor: tagger.color }]}>
+      <View style={[styles.avatar, { backgroundColor: '#1C1C1E' }]}>
         {tagger.avatarUrl ? (
           <CachedImage source={{ uri: tagger.avatarUrl }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />
         ) : (
@@ -134,7 +134,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   dotSlot: { width: 12, alignItems: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.text },
-  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   initials: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
   text: { flex: 1, gap: SP.xs },
   sentence: { fontSize: FS.base, lineHeight: 20 },

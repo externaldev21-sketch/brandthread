@@ -53,7 +53,7 @@ function PersonAvatar({ person, size }: { person: MentionPerson; size: number })
   return person.avatarUrl ? (
     <Image source={{ uri: person.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: person.color || '#444', alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
       <Text style={styles.initials}>{person.initials}</Text>
     </View>
   );

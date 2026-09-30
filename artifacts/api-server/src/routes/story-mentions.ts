@@ -21,7 +21,9 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
-import { avatarColor } from "../lib/activityEvents";
+
+/** Brand palette is black/white/silver: every avatar without a photo is a white monogram on this. */
+const MONOGRAM_COLOR = "#1C1C1E";
 
 const router = Router();
 router.use(requireAuth);
@@ -40,7 +42,7 @@ function storyView(row: typeof stories.$inferSelect, likedByMe: boolean) {
     authorName: row.authorName,
     authorHandle: row.authorHandle ?? "",
     authorInitials: row.authorInitials ?? "",
-    authorColor: row.authorColor ?? "#8B5CF6",
+    authorColor: row.authorColor ?? MONOGRAM_COLOR,
     authorAccountType: row.authorAccountType,
     media: (row.media as any[]) ?? [],
     repliesDisabled: row.repliesDisabled,
@@ -114,7 +116,7 @@ router.get("/mention-search", async (req, res) => {
       handle: u.username ? `@${u.username}` : "",
       avatarUrl: (typeof u.profileImageUrl === "string" && u.profileImageUrl.startsWith("http") ? u.profileImageUrl : u.avatarUrl) ?? null,
       initials: name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?",
-      color: avatarColor(u.clerkId),
+      color: MONOGRAM_COLOR,
       isFollowing: followingSet.has(u.clerkId),
     };
   });
@@ -168,7 +170,7 @@ router.get("/stories/mentions", async (req, res) => {
         name: p.name,
         handle: p.handle,
         initials: p.initials,
-        color: avatarColor(p.userId),
+        color: MONOGRAM_COLOR,
         avatarUrl: p.avatarUrl,
         accountType: p.accountType,
       },

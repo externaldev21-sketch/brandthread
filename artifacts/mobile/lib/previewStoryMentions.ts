@@ -22,11 +22,11 @@ type Seed = {
 };
 
 const SEEDS: Seed[] = [
-  { storyId: 'preview-mention-rae-1', userId: 'preview-story-rae', name: 'Rae Kim', handle: '@raekim', initials: 'RK', color: '#333338', poster: 6, slides: [6, 2], hoursAgo: 1 },
-  { storyId: 'preview-mention-theo-1', userId: 'preview-story-theo', name: 'Theo Park', handle: '@theo.fits', initials: 'TP', color: '#3D3D42', poster: 7, slides: [7], hoursAgo: 3 },
-  { storyId: 'preview-mention-rae-0', userId: 'preview-story-rae', name: 'Rae Kim', handle: '@raekim', initials: 'RK', color: '#333338', poster: 6, slides: [5], hoursAgo: 6, seen: true },
-  { storyId: 'preview-mention-nova-1', userId: 'preview-story-nova', name: 'Nova Dane', handle: '@nova.dane', initials: 'ND', color: '#2A2A2E', poster: 8, slides: [8], hoursAgo: 9, seen: true, handledAction: 'reshared' },
-  { storyId: 'preview-mention-sasha-1', userId: 'preview-story-sasha', name: 'Sasha Cole', handle: '@sasha.cole', initials: 'SC', color: '#3A3A3E', poster: 4, slides: [4, 3], hoursAgo: 14, seen: true, handledAction: 'dismissed' },
+  { storyId: 'preview-mention-rae-1', userId: 'preview-story-rae', name: 'Rae Kim', handle: '@raekim', initials: 'RK', color: '#1C1C1E', poster: 6, slides: [6, 2], hoursAgo: 1 },
+  { storyId: 'preview-mention-theo-1', userId: 'preview-story-theo', name: 'Theo Park', handle: '@theo.fits', initials: 'TP', color: '#1C1C1E', poster: 7, slides: [7], hoursAgo: 3 },
+  { storyId: 'preview-mention-rae-0', userId: 'preview-story-rae', name: 'Rae Kim', handle: '@raekim', initials: 'RK', color: '#1C1C1E', poster: 6, slides: [5], hoursAgo: 6, seen: true },
+  { storyId: 'preview-mention-nova-1', userId: 'preview-story-nova', name: 'Nova Dane', handle: '@nova.dane', initials: 'ND', color: '#1C1C1E', poster: 8, slides: [8], hoursAgo: 9, seen: true, handledAction: 'reshared' },
+  { storyId: 'preview-mention-sasha-1', userId: 'preview-story-sasha', name: 'Sasha Cole', handle: '@sasha.cole', initials: 'SC', color: '#1C1C1E', poster: 4, slides: [4, 3], hoursAgo: 14, seen: true, handledAction: 'dismissed' },
 ];
 
 function buildStory(seed: Seed, createdAt: number): Story {

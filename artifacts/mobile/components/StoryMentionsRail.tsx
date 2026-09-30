@@ -21,7 +21,7 @@ function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles:
         { borderColor: ring.seen ? theme.border : theme.text },
       ]}
     >
-      <View style={[styles.avatar, { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: tagger.color }]}>
+      <View style={[styles.avatar, { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
         {tagger.avatarUrl ? (
           <CachedImage source={{ uri: tagger.avatarUrl }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />
         ) : (
