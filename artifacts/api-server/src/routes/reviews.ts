@@ -11,6 +11,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
 import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
 import { resolveToClerkId } from "./public";
+import { toPublicReview } from "../lib/publicProfile";
 
 // ─── Startup migration — add seller reply columns ─────────────────────────────
 (async () => {
@@ -53,7 +54,7 @@ router.get("/product/:productId", async (req, res) => {
     .where(eq(reviews.productId, productId));
 
   return res.json({
-    reviews:    rows,
+    reviews:    rows.map(toPublicReview),
     avgRating:  Number(agg?.avgRating  ?? 0),
     totalCount: Number(agg?.totalCount ?? 0),
   });
@@ -89,7 +90,7 @@ router.get("/seller/:sellerId", async (req, res) => {
     .where(eq(reviews.sellerId, canonicalClerkId));
 
   return res.json({
-    reviews:    rows,
+    reviews:    rows.map(toPublicReview),
     avgRating:  Number(agg?.avgRating  ?? 0),
     totalCount: Number(agg?.totalCount ?? 0),
   });

@@ -19,7 +19,7 @@
  */
 import { Router } from "express";
 import {
-  db, conversations, conversationParticipants, messages, messageReactions, blocks, follows, users,
+  db, conversations, conversationParticipants, messages, messageReactions, blocks, users,
   products, orders, posts,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
@@ -29,6 +29,7 @@ import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { isFollowedBy, shouldRouteToRequests } from "../lib/conversationRouting";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
 import { enrichProductAttachments } from "../lib/productAttachmentInfo";
@@ -47,15 +48,6 @@ const MESSAGE_ATTACHMENT_TYPES = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function isFollowedBy(followerId: string, targetId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ followerId: follows.followerId })
-    .from(follows)
-    .where(and(eq(follows.followerId, followerId), eq(follows.followingId, targetId)))
-    .limit(1);
-  return !!row;
-}
 
 function getAttachmentPreview(attachment: unknown): string | undefined {
   if (!attachment || typeof attachment !== "object") return undefined;
@@ -434,13 +426,13 @@ router.post("/", rateLimit("messaging"), async (req, res) => {
     }
   }
 
-  // ── Determine if this is a follow-based message request (buyer↔buyer) ─────
-  // A DM from A→B is a request if B does NOT follow A.
-  let isRequest = false;
-  if (type === "buyer_to_buyer") {
-    const recipientFollowsSender = await isFollowedBy(participant.userId, myUserId);
-    isRequest = !recipientFollowsSender;
-  }
+  // ── Determine if this is a message request ─────────────────────────────────
+  // Same rule for every role pair (buyer<->buyer, buyer<->seller,
+  // seller<->buyer, seller<->seller): lands in the recipient's main inbox if
+  // the recipient already follows the sender, or the recipient is a seller
+  // the sender has a real paid order with — otherwise it's a request. See
+  // lib/conversationRouting.ts for the full rule and its reasoning.
+  const isRequest = await shouldRouteToRequests(participant.userId, myUserId, recipient?.accountType);
 
   // ── Create new conversation ───────────────────────────────────────────────
   const [conv] = await db.insert(conversations).values({
@@ -612,6 +604,19 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     .limit(1);
 
   if (!sender) return res.status(403).json({ error: "Not a participant" });
+
+  // ── Request gate: the recipient of a pending request can't reply until
+  // they accept it (server-side — a hidden composer alone isn't enough).
+  // The original requester can still send follow-up messages while it's
+  // pending; only the other side is gated.
+  const [conv] = await db
+    .select({ isRequest: conversations.isRequest, requestedBy: conversations.requestedBy })
+    .from(conversations)
+    .where(eq(conversations.id, id))
+    .limit(1);
+  if (conv?.isRequest && conv.requestedBy !== userId) {
+    return res.status(403).json({ error: "Accept this request before replying.", code: "REQUEST_NOT_ACCEPTED" });
+  }
 
   // ── Block check: any other participant has blocked this sender ────────────
   const otherParts = await db
