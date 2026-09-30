@@ -20,6 +20,7 @@ import { hapticDestructiveConfirm, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function MutedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -30,9 +31,8 @@ export default function MutedAccountsScreen() {
   const [query, setQuery] = useState('');
   const [unmuting, setUnmuting] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    getMutedUsers().then(setMuted);
-  }, []);
+  const load = useCallback(() => getMutedUsers().then(setMuted), []);
+  const pull = usePullToRefresh(load);
 
   useEffect(() => { load(); }, [load]);
 
@@ -83,6 +83,7 @@ export default function MutedAccountsScreen() {
 
       <FlatList
         data={filtered}
+        refreshControl={pull.refreshControl}
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={

@@ -28,6 +28,7 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
 
@@ -161,6 +162,8 @@ export default function BuyerHighlightsManager() {
   const params = useLocalSearchParams<{ create?: string; edit?: string }>();
   // Deep-link intents from the profile's highlights row run once per mount.
   const intentHandled = useRef(false);
+
+  const pull = usePullToRefresh(() => loadHighlights().then(setHighlights));
 
   useFocusEffect(useCallback(() => {
     loadHighlights().then((items) => {
@@ -305,6 +308,7 @@ export default function BuyerHighlightsManager() {
       <FlatList
         data={highlights}
         keyExtractor={h => h.id}
+        refreshControl={pull.refreshControl}
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
           <EmptyState

@@ -4,8 +4,8 @@
  * rating, size) narrow the list client-side, per Nike/Amazon-style review
  * screens on Mobbin.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, FlatList,TouchableOpacity, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -15,6 +15,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { FONT, FS, SP, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED, SCREEN_BG } from '@/lib/theme';
 import type { ReviewItem } from '@/components/ProductReviewsSection';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -30,19 +33,28 @@ export default function ProductReviewsScreen() {
   const [starFilter, setStarFilter] = useState<StarFilter>(null);
   const [sizeFilter, setSizeFilter] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [loadFailed, setLoadFailed] = useState(false);
+  const activeRef = useRef(true);
+  useEffect(() => () => { activeRef.current = false; }, []);
+
+  const load = useCallback(async () => {
     if (!productId) return;
-    let active = true;
-    api.reviews.forProduct(productId)
-      .then(data => {
-        if (!active) return;
-        setReviews(data.reviews ?? []);
-        setAvgRating(data.avgRating ?? 0);
-        setTotalCount(data.totalCount ?? 0);
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    try {
+      const data = await api.reviews.forProduct(productId);
+      if (!activeRef.current) return;
+      setReviews(data.reviews ?? []);
+      setAvgRating(data.avgRating ?? 0);
+      setTotalCount(data.totalCount ?? 0);
+      setLoadFailed(false);
+    } catch {
+      if (activeRef.current) setLoadFailed(true);
+    } finally {
+      if (activeRef.current) setLoading(false);
+    }
   }, [productId, api]);
+
+  useEffect(() => { void load(); }, [load]);
+  const pull = usePullToRefresh(load);
 
   const sizes = useMemo(
     () => [...new Set(reviews.map(r => r.sizeBought).filter((v): v is string => !!v))],
@@ -59,7 +71,20 @@ export default function ProductReviewsScreen() {
     <View style={s.root}>
       <ScreenHeader title={productName || 'Reviews'} subtitle={totalCount > 0 ? `${avgRating.toFixed(1)} · ${totalCount} reviews` : undefined} />
       {loading ? (
-        <View style={s.center}><ActivityIndicator /></View>
+        <View style={{ padding: SP.md }}>
+          {[0, 1, 2].map(i => (
+            <View key={i} style={s.card}>
+              <View style={s.headerRow}>
+                <SkeletonBlock width={32} height={32} radius={16} />
+                <SkeletonBlock width="40%" height={13} style={{ marginTop: 4 }} />
+              </View>
+              <SkeletonBlock width="90%" height={13} style={{ marginBottom: 6 }} />
+              <SkeletonBlock width="65%" height={13} />
+            </View>
+          ))}
+        </View>
+      ) : loadFailed && reviews.length === 0 ? (
+        <ErrorState message="Couldn't load reviews." onRetry={() => { void load(); }} style={{ flex: 1 }} />
       ) : (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
@@ -87,6 +112,7 @@ export default function ProductReviewsScreen() {
           <FlatList
             data={filtered}
             keyExtractor={item => item.id}
+            refreshControl={pull.refreshControl}
             contentContainerStyle={{ padding: SP.md }}
             ListEmptyComponent={<View style={s.center}><Text style={s.muted}>No matching reviews</Text></View>}
             renderItem={({ item }) => (

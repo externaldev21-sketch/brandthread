@@ -46,6 +46,7 @@ import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileContr
 import { setSellerFollowing, removeFollower } from '@/services/socialService';
 import { RemoveFollowerSheet, type RemoveFollowerPerson } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export type ConnectionsTab = 'followers' | 'following';
 export type FollowSort = 'default' | 'latest' | 'earliest';
@@ -152,7 +153,7 @@ export default function ConnectionsScreen() {
     const generation = ++generationRef.current;
     setError(false);
     setLoading(true);
-    Promise.all([
+    return Promise.all([
       api.social.followers(listOwner),
       api.social.following(listOwner, activeSort),
     ])
@@ -170,6 +171,7 @@ export default function ConnectionsScreen() {
   // Refetch whenever the list regains focus — following someone from their
   // profile and coming back shows the change immediately.
   useFocusEffect(useCallback(() => { load(sort); }, [load, sort]));
+  const pull = usePullToRefresh(() => load(sort));
 
   // Re-sort the Following list server-side when the sheet's selection changes
   // (without re-showing the loading skeleton over an already-loaded screen).
@@ -401,6 +403,7 @@ export default function ConnectionsScreen() {
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={renderItem}
+          refreshControl={pull.refreshControl}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
           keyboardShouldPersistTaps="handled"

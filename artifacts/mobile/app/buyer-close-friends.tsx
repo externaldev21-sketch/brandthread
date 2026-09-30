@@ -22,6 +22,7 @@ import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/ser
 import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -34,12 +35,15 @@ export default function BuyerCloseFriends() {
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const loadFriends = useCallback(() => Promise.all([getAcceptedFriends(), getCloseFriendIds()]).then(([list, ids]) => {
+    setFriends(list);
+    setCloseFriends(new Set(ids));
+  }), []);
+  const pull = usePullToRefresh(loadFriends);
+
   useFocusEffect(useCallback(() => {
-    Promise.all([getAcceptedFriends(), getCloseFriendIds()]).then(([list, ids]) => {
-      setFriends(list);
-      setCloseFriends(new Set(ids));
-    });
-  }, []));
+    void loadFriends();
+  }, [loadFriends]));
 
   const filtered = friends.filter(f =>
     f.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -127,6 +131,7 @@ export default function BuyerCloseFriends() {
         data={filtered}
         keyExtractor={f => f.id}
         renderItem={renderFriend}
+        refreshControl={pull.refreshControl}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 120 }}
         ListEmptyComponent={
           <EmptyState
