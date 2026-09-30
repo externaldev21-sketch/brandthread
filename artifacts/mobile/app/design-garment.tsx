@@ -374,7 +374,7 @@ export default function DesignGarmentScreen() {
             disabled={saving}
             activeOpacity={0.85}
           >
-            <Feather name="save" size={ICON.sm} color="#FFFFFF" />
+            <Feather name="save" size={ICON.sm} color="#000000" />
             <Text style={gs.savePlacementText}>{saving ? 'Saving…' : 'Save Placement'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -382,7 +382,7 @@ export default function DesignGarmentScreen() {
             onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
             activeOpacity={0.85}
           >
-            <Feather name="edit-2" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Feather name="edit-2" size={ICON.sm} color={FG} />
             <Text style={gs.openEditorLargeText}>Open in Editor</Text>
           </TouchableOpacity>
         </View>
@@ -437,9 +437,15 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   optionToggleActive: { borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
   optionToggleText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 
+  // PURPLE resolves to white (#FFFFFF) in the monochrome theme — that's
+  // the intended white primary-button fill, but the label/icon must be
+  // black on it, not white-on-white.
   savePlacementBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: SP.md, marginBottom: SP.sm },
-  savePlacementText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
-  openEditorLargeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingVertical: SP.md, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  openEditorLargeText: { fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  savePlacementText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#000000' },
+  // Black fill + a 1px white border, not a translucent white wash — same
+  // "translucency reads as grey once real content is behind it" issue as
+  // the canvas sliders, and the monochrome rule bans grey fills outright.
+  openEditorLargeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: '#000000', borderRadius: RADIUS.md, paddingVertical: SP.md, borderWidth: 1, borderColor: FG },
+  openEditorLargeText: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   });
 };
