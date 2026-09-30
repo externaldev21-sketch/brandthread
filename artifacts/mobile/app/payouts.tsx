@@ -310,13 +310,19 @@ export default function PayoutsScreen() {
           ) : loadError ? (
             <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
           ) : payouts.length === 0 ? (
-            <EmptyState
-              icon="inbox"
-              title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-              message={balance?.connected === false
-                ? 'Add a bank account under Bank account to start receiving payouts.'
-                : 'Payouts show up here once your available balance clears.'}
-            />
+            <View style={{ alignItems: 'center' }}>
+              <EmptyState
+                icon="inbox"
+                title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
+                message=""
+                compact
+              />
+              <Text style={styles.payoutsEmptyMessage}>
+                {balance?.connected === false
+                  ? 'Add a bank account under Bank account to start receiving payouts.'
+                  : 'Payouts show up here once your available balance clears.'}
+              </Text>
+            </View>
           ) : (
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
@@ -494,6 +500,10 @@ const createStyles = (theme: AppThemePreset) => {
   tabText:      { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
    tabTextActive:{ color: accent },
   list:         { padding: SP.md },
+  payoutsEmptyMessage: {
+    color: muted, fontSize: FS.sm, fontFamily: FONT.medium, textAlign: 'center',
+    maxWidth: 280, marginTop: -4,
+  },
   payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: border },
   payoutLeft:   {},
   payoutRight:  { alignItems: 'flex-end', gap: 4 },
