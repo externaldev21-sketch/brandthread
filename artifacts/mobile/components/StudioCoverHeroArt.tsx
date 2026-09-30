@@ -147,10 +147,11 @@ function GoLiveChromeCover() {
         {/* the one restrained tally light — small, on the housing, off by default look but rendered lit since this is the Go Live card */}
         <Circle cx={cx - 46} cy={cy - 20} r={5} fill="#ff3b30" />
         <Circle cx={cx - 46} cy={cy - 20} r={9} fill="#ff3b30" opacity={0.25} />
-        {/* pedestal */}
-        <Ellipse cx={cx} cy={332} rx={70} ry={10} fill="url(#chromeH)" opacity={0.9} />
+        {/* soft contact shadow, right under the body — a floating product-shot
+            look rather than a disconnected pedestal disc */}
+        <Ellipse cx={cx} cy={cy + 58} rx={68} ry={9} fill="#000000" opacity={0.6} />
       </G>
-      <G transform={`translate(0, ${2 * 336}) scale(1, -1)`} mask="url(#reflMask)" opacity={0.5}>
+      <G transform={`translate(0, ${2 * (cy + 58)}) scale(1, -1)`} mask="url(#reflMask)" opacity={0.5}>
         <Rect x={cx - 62} y={cy - 34} width={124} height={68} rx={14} fill="url(#chromeH)" />
         <Circle cx={cx + 20} cy={cy} r={46} fill="url(#chromeV)" />
       </G>

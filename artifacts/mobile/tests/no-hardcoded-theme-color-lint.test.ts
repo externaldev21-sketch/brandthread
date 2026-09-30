@@ -133,6 +133,11 @@ function hasHardcodedThemeColor(source: string, file: string): boolean {
 // `useAppTheme()`/`useColors()` tokens, then delete its line here in the
 // same change.
 const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
+  // Deliberately theme-INDEPENDENT: Dev's own spec for the Studio carousel's
+  // "album cover" art is a fixed black/white/silver/chrome palette regardless
+  // of the seller's chosen Appearance theme (same reasoning as the existing
+  // StudioCardCover.tsx, added in the same change that adds this file).
+  'components/StudioCoverHeroArt.tsx',
   'app/(buyer)/cart.tsx',
   'app/(buyer)/edit-profile.tsx',
   'app/(buyer)/friends.tsx',
