@@ -561,7 +561,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: theme.muted }]}>PRODUCTS IN THIS DROP</Text>
             {allProducts.length === 0 ? (
-              <Text style={{ color: theme.muted, fontSize: FS.sm }}>Add a product first, then come back to include it.</Text>
+              <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>Add a product first, then come back to include it.</Text>
             ) : (
               <View style={{ gap: 8 }}>
                 {allProducts.map(product => {
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   field: { gap: 8 },
   label: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1 },
-  hint: { fontSize: FS.xs, marginTop: 2 },
+  hint: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   input: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
   segmented: { flexDirection: 'row', gap: 8 },
   segmentItem: { flex: 1, borderWidth: 1, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' },
