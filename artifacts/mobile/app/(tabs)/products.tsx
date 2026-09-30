@@ -376,7 +376,7 @@ function SortModal({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
-  const scrollResetRef = useScrollReset<any>();
+  const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const sellerPreview = isSellerDevPreview();

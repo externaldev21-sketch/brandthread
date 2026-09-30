@@ -211,7 +211,7 @@ export default function ContentScreen() {
       <ScreenHeader
         title="Content"
         actions={[
-          { icon: 'bar-chart-2', onPress: () => router.push('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
+          { icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
           {
             icon: 'plus',
             onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); },

@@ -177,7 +177,7 @@ export default function ProductStoreScreen() {
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    goBackOr(router);
+    goBackOr(router, '/(buyer)/discover');
   }, [router]);
 
   const handleShare = useCallback(async () => {
@@ -249,7 +249,7 @@ export default function ProductStoreScreen() {
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.
         </Text>
-        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router)} activeOpacity={0.7}>
+        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router, '/(buyer)/discover')} activeOpacity={0.7}>
           <Text style={{ color: ACCENT_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
         </TouchableOpacity>
       </View>

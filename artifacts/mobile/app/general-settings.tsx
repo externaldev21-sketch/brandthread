@@ -3,6 +3,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Activity
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
@@ -32,7 +33,7 @@ export default function GeneralSettingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Store details" />
+      <ScreenHeader title="Store details" onBack={() => goBackOr(router, '/seller-settings')} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 60 }}

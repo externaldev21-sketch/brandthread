@@ -4,8 +4,10 @@
  */
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticToggle } from '@/lib/haptics';
@@ -58,6 +60,7 @@ const DIGEST_OPTIONS = [
 ];
 
 export default function NotificationsSettingsScreen() {
+  const router = useRouter();
   const api    = useApi();
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -145,7 +148,7 @@ export default function NotificationsSettingsScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Notifications" />
+      <ScreenHeader title="Notifications" onBack={() => goBackOr(router, '/(tabs)/more')} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Master switch ── */}

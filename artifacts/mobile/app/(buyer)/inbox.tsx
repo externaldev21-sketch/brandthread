@@ -261,7 +261,7 @@ function sortStoryTray(rows: StoryTrayRow[], isLive: (authorId: string) => boole
 export default function InboxScreen() {
   // Only one of the three page-level containers below (two empty-state
   // ScrollViews, one FlashList) mounts at a time, so sharing this ref is safe.
-  const scrollResetRef = useScrollReset<any>();
+  const scrollResetRef = useScrollReset<any>(true, false);
   const insets = useSafeAreaInsets();
   // Matches TabPageHeader's own topPad exactly (shared useHeaderTopInset),
   // so the search-mode header row sits at the identical vertical position

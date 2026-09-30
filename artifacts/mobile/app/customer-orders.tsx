@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { FS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
@@ -18,6 +18,7 @@ import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
 import { useUser } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type Customer = {
   id: string;
@@ -55,6 +56,7 @@ function cents(c: number) {
 }
 
 export default function CustomerOrdersScreen() {
+  const router = useRouter();
   const colors = useColors();
   const api = useApi();
   const { user, isLoaded: clerkLoaded } = useUser();
@@ -107,7 +109,7 @@ export default function CustomerOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={customer?.name ?? 'Customer Orders'} />
+      <ScreenHeader title={customer?.name ?? 'Customer Orders'} onBack={() => goBackOr(router, '/customers')} />
 
       {loading ? (
         <View style={s.center}>

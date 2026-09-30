@@ -94,7 +94,7 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
-  const listRef = useScrollReset<FlatList<any>>();
+  const listRef = useScrollReset<FlatList<any>>(true, false);
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();

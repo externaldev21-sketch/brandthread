@@ -570,7 +570,7 @@ export default function ActivityCenterScreen() {
   // zone, like iOS, and are visible (softly, through blur) right up to the
   // bar instead of stopping in an empty reserved gap above it.
   const screenPadding = useScreenPadding({ withTabBarInset: false });
-  const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>();
+  const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>(true, false);
   const router = useRouter();
   const { role } = useRole();
   const api = useApi();

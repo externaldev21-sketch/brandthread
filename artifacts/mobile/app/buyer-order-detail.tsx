@@ -733,7 +733,7 @@ export default function BuyerOrderDetailScreen() {
         const msg = result.refunded
           ? 'Your order has been cancelled and a full refund has been issued. It may take 5–10 business days to appear on your statement.'
           : 'Your order has been cancelled.';
-        Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router) }]);
+        Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router, '/(buyer)/orders') }]);
       }
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -753,7 +753,7 @@ export default function BuyerOrderDetailScreen() {
       `Looking for ${firstItem.productName}? Browse Discover to find it.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Discover', onPress: () => router.push('/(buyer)/discover' as never) },
+        { text: 'Discover', onPress: () => router.navigate('/(buyer)/discover' as never) },
       ]
     );
   }
@@ -763,7 +763,7 @@ export default function BuyerOrderDetailScreen() {
   if (visibleLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Order Details" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.accent} size="large" />
         </View>
@@ -774,7 +774,7 @@ export default function BuyerOrderDetailScreen() {
   if (fetchError && !order) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Order Details" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
           <Feather name="wifi-off" size={40} color={theme.muted} />
           <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
@@ -789,7 +789,7 @@ export default function BuyerOrderDetailScreen() {
   if (!order) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Order Details" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1 }} />
       </BrandthreadScreen>
     );
@@ -815,7 +815,7 @@ export default function BuyerOrderDetailScreen() {
       <ScreenHeader
         title={`Order ${order.orderNumber}`}
         subtitle={order.sellerName}
-        onBack={() => goBackOr(router)}
+        onBack={() => goBackOr(router, '/(buyer)/orders')}
       />
 
       {/* Live-updating status indicator */}

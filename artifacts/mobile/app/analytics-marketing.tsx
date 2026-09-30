@@ -49,7 +49,7 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
   const typeIcon: keyof typeof Feather.glyphMap = c.type === 'email' ? 'mail' : c.type === 'sms' ? 'message-square' : c.type === 'push' ? 'bell' : 'zap';
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/marketing' as never); }}
+      onPress={() => { Haptics.selectionAsync(); router.navigate('/(tabs)/marketing' as never); }}
       style={s.rowItem}
       activeOpacity={0.8}
     >
@@ -133,7 +133,7 @@ export default function AnalyticsMarketingScreen() {
       <ScreenHeader
         title="Marketing Analytics"
         subtitle={filter?.dateRange.label ?? '30 days'}
-        rightElement={<HeaderPillButton label="Marketing" onPress={() => router.push('/(tabs)/marketing' as never)} />}
+        rightElement={<HeaderPillButton label="Marketing" onPress={() => router.navigate('/(tabs)/marketing' as never)} />}
       />
       {loading ? (
         <AnalyticsSkeleton kpiCount={0} listRows={3} />

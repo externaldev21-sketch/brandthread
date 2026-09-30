@@ -84,13 +84,13 @@ export default function BuyerPrivacySettings() {
 
   async function handleBack() {
     if (hasChanges) await saveSettings(false);
-    goBackOr(router);
+    goBackOr(router, '/buyer-settings-menu');
   }
 
   if (!settings) {
     return (
       <View style={styles.root}>
-        <ScreenHeader title="Privacy" variant="push" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Privacy" variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
         <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md }}>
           <ListSkeleton rows={7} />
         </ScrollView>

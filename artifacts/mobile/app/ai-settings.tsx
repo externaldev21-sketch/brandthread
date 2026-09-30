@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP } from '../lib/theme';
 import { AISettings } from '../services/aiTypes';
 import { getAISettings, saveAISettings, clearSession } from '../services/aiService';
@@ -251,7 +252,7 @@ export default function AiSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="AI Settings" />
+      <ScreenHeader title="AI Settings" onBack={() => goBackOr(router, '/ai-brain')} />
 
       <ScrollView
         style={styles.scroll}

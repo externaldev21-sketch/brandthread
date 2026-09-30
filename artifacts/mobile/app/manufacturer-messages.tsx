@@ -179,7 +179,7 @@ export default function ManufacturerMessagesScreen() {
       rejection.message,
       [
         { text: 'Not now', style: 'cancel', onPress: () => goBackOr(router) },
-        { text: 'View plans', onPress: () => router.replace('/subscription' as never) },
+        { text: 'View plans', onPress: () => router.push('/subscription' as never) },
       ],
     );
     return true;

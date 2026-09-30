@@ -123,7 +123,7 @@ export default function CustomersScreen() {
         subtitle="Your customer list"
         rightElement={
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/analytics' as never)}
+            onPress={() => router.navigate('/(tabs)/analytics' as never)}
             hitSlop={10}
             activeOpacity={0.7}
             style={[styles.analyticsBtnHdr, { borderColor: colors.border, backgroundColor: colors.card }]}

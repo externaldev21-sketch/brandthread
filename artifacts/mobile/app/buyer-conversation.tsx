@@ -1844,7 +1844,7 @@ export default function BuyerConversationScreen() {
               } else if (orderId) {
                 router.push(('/buyer-order-detail?id=' + orderId) as never);
               } else {
-                router.push('/(buyer)/orders' as never);
+                router.navigate('/(buyer)/orders' as never);
               }
             }}
           />
@@ -2234,7 +2234,7 @@ export default function BuyerConversationScreen() {
       {conv?.type === 'buyer_to_seller_order' && (
         <PressableScale rippleEnabled={false}
           style={s.orderCard}
-          onPress={() => router.push('/(buyer)/orders' as never)}
+          onPress={() => router.navigate('/(buyer)/orders' as never)}
           activeOpacity={0.8}
         >
           <Feather name="package" size={ICON.md} color={theme.accent} />
