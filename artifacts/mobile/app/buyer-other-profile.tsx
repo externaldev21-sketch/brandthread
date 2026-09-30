@@ -46,6 +46,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
+import { taggedItemHref } from '@/services/profileService';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -65,7 +66,7 @@ type RemoteProfile = {
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
-  followersCount: number; followingCount: number;
+  followersCount: number; followingCount: number; likesCount?: number;
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
   postsCount: number;
@@ -312,7 +313,7 @@ export default function BuyerOtherProfileScreen() {
     const entry = tagged.items.find((candidate) => candidate.id === item.id);
     if (!entry) return;
     hapticSelection();
-    router.push(profileVideosHref({ source: 'creator', id: entry.authorId, startPostId: entry.id, title: entry.authorName ?? undefined }) as never);
+    router.push(taggedItemHref(entry) as never);
   }, [router, tagged.items]);
   const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
     <ProfileVideoTile item={item} index={index} width={layout.tileWidth} height={layout.tileHeight} onPress={activeTab === 'Tagged' ? openTagged : openVideo} />
@@ -337,6 +338,9 @@ export default function BuyerOtherProfileScreen() {
       key: 'following', label: 'Following', value: formatCompactCount(profile?.followingCount ?? 0),
       onPress: canonicalReady ? () => router.push(connectionsHref('following', canonicalUserId) as never) : undefined,
     },
+    ...(typeof profile?.likesCount === 'number'
+      ? [{ key: 'likes', label: 'Likes', value: formatCompactCount(profile.likesCount) } as ProfileStat]
+      : []),
   ];
 
   const meta = (

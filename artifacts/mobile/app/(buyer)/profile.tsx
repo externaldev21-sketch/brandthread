@@ -76,6 +76,7 @@ import { isBuyerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { taggedItemHref } from '@/services/profileService';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -291,7 +292,7 @@ const DraftsFolderTile = React.memo(function DraftsFolderTile({
 
 type ListRow =
   | { kind: 'post'; item: ProfileGridItem; post: BuyerPost }
-  | { kind: 'tagged'; item: ProfileGridItem; authorId: string; authorName: string | null }
+  | { kind: 'tagged'; item: ProfileGridItem; authorId: string; authorName: string | null; source: 'post' | 'story' }
   | { kind: 'saved'; saved: SavedItem }
   | { kind: 'order'; order: BuyerOrderView }
   // Instagram-style folder tile — first cell of the Posts grid, only when
@@ -671,6 +672,7 @@ export default function ProfileScreen() {
     if (activeTab === 'Tagged') {
       return tagged.items.map((entry) => ({
         kind: 'tagged' as const,
+        source: entry.source,
         authorId: entry.authorId,
         authorName: entry.authorName,
         item: {
@@ -739,7 +741,7 @@ export default function ProfileScreen() {
           height={layout.tileHeight}
           onPress={() => {
             hapticSelection();
-            router.push(profileVideosHref({ source: 'creator', id: item.authorId, startPostId: item.item.id, title: item.authorName ?? undefined }) as never);
+            router.push(taggedItemHref({ id: item.item.id, source: item.source, authorId: item.authorId, authorName: item.authorName }) as never);
           }}
         />
       );

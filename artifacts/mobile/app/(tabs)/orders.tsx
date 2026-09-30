@@ -35,6 +35,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1148,20 +1150,23 @@ export default function OrdersScreen() {
           <RetryRow label="Couldn't refresh orders" onRetry={onRefresh} />
         </View>
       )}
-      {/* Results count */}
-      <View style={[sellerListCountRowStyles.row, { paddingTop: 0 }]}>
-        <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>
-          {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
-          {activeFilter !== 'all'
-            ? ` · ${FILTERS.find(f => f.key === activeFilter)?.label ?? ALL_FILTERS.find(f => f.key === activeFilter)?.label}`
-            : ''}
-        </Text>
-        {sort !== 'newest' && (
-          <TouchableOpacity onPress={() => setSortModalVisible(true)} accessibilityRole="button" accessibilityLabel={`Current sort: ${currentSortLabel}. Change sort`}>
-            <Text style={s.sortIndicator}>{currentSortLabel} ↕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Results count — omitted on an empty list; the empty state below
+          already says there's nothing, so "0 orders" next to it is clutter. */}
+      {filtered.length > 0 && (
+        <View style={[sellerListCountRowStyles.row, { paddingTop: 0 }]}>
+          <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>
+            {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
+            {activeFilter !== 'all'
+              ? ` · ${FILTERS.find(f => f.key === activeFilter)?.label ?? ALL_FILTERS.find(f => f.key === activeFilter)?.label}`
+              : ''}
+          </Text>
+          {sort !== 'newest' && (
+            <TouchableOpacity onPress={() => setSortModalVisible(true)} accessibilityRole="button" accessibilityLabel={`Current sort: ${currentSortLabel}. Change sort`}>
+              <Text style={s.sortIndicator}>{currentSortLabel} ↕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   ), [filtered.length, activeFilter, sort, currentSortLabel, loadError, updatesPaused, theme.error]);
 
@@ -1190,13 +1195,11 @@ export default function OrdersScreen() {
       {/* ── Fixed header ── */}
       <SellerListHeader
         title="Orders"
-        onTitlePress={() => Alert.alert('Order view', 'Choose a view', [
-          { text: 'All orders', onPress: () => setActiveFilter('all') },
-          { text: 'Open orders', onPress: () => setActiveFilter('open') },
-          { text: 'Archived orders', onPress: () => setActiveFilter('archived') },
-          { text: 'Cancel', style: 'cancel' },
-        ])}
-        titleAccessibilityLabel="Choose order view"
+        titleMenu={[
+          { key: 'all', label: 'All orders', selected: activeFilter === 'all', onSelect: () => setActiveFilter('all') },
+          { key: 'returned', label: 'Returns', selected: activeFilter === 'returned', onSelect: () => setActiveFilter('returned') },
+        ]}
+        titleAccessibilityLabel="Orders, choose a view"
         actions={[{ icon: 'more-horizontal', onPress: handleMoreMenu, accessibilityLabel: 'More order actions' }]}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -1295,6 +1298,12 @@ export default function OrdersScreen() {
         onClose={() => setFilterSheetVisible(false)}
       />
 
+      <FirstRunTip
+        id="seller-orders"
+        variant="gesture"
+        contentReady={!loading}
+        gesture={SELLER_ORDERS_GESTURE}
+      />
     </View>
   );
 }

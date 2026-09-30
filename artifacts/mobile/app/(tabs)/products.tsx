@@ -32,6 +32,8 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -613,10 +615,14 @@ export default function ProductsScreen() {
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
+  // No count row on an empty list — the empty state below already says so;
+  // showing "0 products" next to it is just clutter with no information.
   const ListHeader = useMemo(() => (
-    <View style={sellerListCountRowStyles.row}>
-      <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
-    </View>
+    sortedProducts.length === 0 ? null : (
+      <View style={sellerListCountRowStyles.row}>
+        <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
+      </View>
+    )
   ), [sortedProducts.length, SUBTLE]);
 
   // Rich, per-filter empty states instead of one generic message.
@@ -660,14 +666,10 @@ export default function ProductsScreen() {
       {/* ── Fixed header ── */}
       <SellerListHeader
         title="Products"
-        onTitlePress={() => {
-          hapticPrimaryAction();
-          Alert.alert('Product view', 'Choose a view', [
-            { text: 'All products', onPress: () => setFilter('all') },
-            { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
-            { text: 'Cancel', style: 'cancel' },
-          ]);
-        }}
+        titleMenu={[
+          { key: 'all', label: 'All products', selected: filter === 'all', onSelect: () => setFilter('all') },
+          { key: 'collections', label: 'Collections', selected: false, onSelect: () => router.push('/store-collections' as never) },
+        ]}
         titleAccessibilityLabel="Products, choose a view"
         actions={[
           { icon: 'plus', onPress: () => router.push('/add-product' as never), accessibilityLabel: 'Add product' },
@@ -780,6 +782,12 @@ export default function ProductsScreen() {
         visible={stockEditVisible}
         onClose={() => setStockEditVisible(false)}
         onChanged={handleStockChanged}
+      />
+      <FirstRunTip
+        id="seller-products"
+        variant="gesture"
+        contentReady={!loading}
+        gesture={SELLER_PRODUCTS_GESTURE}
       />
     </View>
   );

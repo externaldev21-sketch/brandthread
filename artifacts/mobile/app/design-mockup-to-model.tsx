@@ -44,6 +44,8 @@ import {
 } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
 
 const { width: SW } = Dimensions.get('window');
 const THUMB_SIZE = 72;
@@ -601,6 +603,12 @@ export default function MockupToModelScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      <FirstRunTip
+        id="mockup-to-model"
+        variant="anchored"
+        contentReady
+        anchored={{ steps: MOCKUP_TO_MODEL_STEPS }}
+      />
     </BrandthreadScreen>
   );
 }

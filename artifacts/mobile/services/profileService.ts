@@ -11,7 +11,7 @@
  */
 import { serviceRequest } from '@/lib/serviceConfig';
 import { mapApiPostToSellerThreadPost, type SellerThreadPost } from '@/services/socialService';
-import type { VideoFeedSource } from '@/lib/profileNavigation';
+import { profileVideosHref, type VideoFeedSource } from '@/lib/profileNavigation';
 
 export const PROFILE_VIDEOS_PAGE_SIZE = 30;
 export const PROFILE_PRODUCTS_PAGE_SIZE = 40;
@@ -93,6 +93,14 @@ export function toTaggedItem(row: any): TaggedItem {
     caption: row?.caption ?? null,
     source: row?.source === 'story' ? 'story' : 'post',
   };
+}
+
+/** Where a Tagged-tab tile goes: a story mention opens the story viewer, a post opens the author's feed at that post. */
+export function taggedItemHref(item: Pick<TaggedItem, 'id' | 'source' | 'authorId' | 'authorName'>): string {
+  if (item.source === 'story') {
+    return `/buyer-story-viewer?storyId=${encodeURIComponent(item.id)}&allStoryIds=${encodeURIComponent(item.id)}`;
+  }
+  return profileVideosHref({ source: 'creator', id: item.authorId, startPostId: item.id, title: item.authorName ?? undefined });
 }
 
 /** Public videos that tag a product — what the product-scoped feed player swipes through. */

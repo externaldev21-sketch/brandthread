@@ -425,6 +425,31 @@ describe("seller-profile.tsx videos grid and shop", () => {
     );
   });
 
+  it("shows the server's authoritative Followers / Following / Likes totals", async () => {
+    apiMock.publicSellers.get.mockResolvedValue({ profile: { ...sellerProfile, likesCount: 4321, followersCount: 12, followingCount: 3 }, products: [] });
+    apiMock.social.profile.mockResolvedValue({ followersCount: 12, followingCount: 3, likesCount: 4321 });
+    renderer = await renderScreen();
+    const stat = (key: string) => textContent(renderer.root.findByProps({ testID: `profile-stat-${key}` }).props.children);
+    expect(stat("followers")).toContain("12");
+    expect(stat("following")).toContain("3");
+    expect(stat("likes")).toContain("4,321");
+  });
+
+  it("Tagged includes story mentions, which open the story viewer", async () => {
+    apiMock.social.tagged.mockResolvedValue([
+      { id: "p1", authorId: "buyer-5", authorName: "Pat", mediaUrl: "https://cdn.example.com/p1.jpg", mediaType: "photo", source: "post" },
+      { id: "s1", authorId: "buyer-5", authorName: "Pat", mediaUrl: "https://cdn.example.com/s1.jpg", mediaType: "story", source: "story" },
+    ]);
+    renderer = await renderScreen();
+    await switchTab(renderer, "tagged");
+    const tile = renderer.root.findAll((n) => n.props.testID === "profile-video-tile-s1" && typeof n.props.onPress === "function")[0];
+    await act(async () => { tile.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/buyer-story-viewer?storyId=s1&allStoryIds=s1");
+    const post = renderer.root.findAll((n) => n.props.testID === "profile-video-tile-p1" && typeof n.props.onPress === "function")[0];
+    await act(async () => { post.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/profile-videos?source=creator&id=buyer-5&startPostId=p1&title=Pat");
+  });
+
   it("has Posts | Products | Tagged tabs, and the Products tab lists the live listings", async () => {
     renderer = await renderScreen();
     const labels = renderer.root.findAll((n) => typeof n.props.accessibilityLabel === "string").map((n) => n.props.accessibilityLabel);

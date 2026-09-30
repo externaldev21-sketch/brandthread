@@ -34,7 +34,7 @@ import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
@@ -502,7 +502,7 @@ export default function ProfileScreen() {
   const handleTaggedPress = useCallback((item: ProfileGridItem) => {
     const entry = tagged.items.find((candidate) => candidate.id === item.id);
     if (!entry) return;
-    router.push(profileVideosHref({ source: 'creator', id: entry.authorId, startPostId: entry.id, title: entry.authorName ?? undefined }) as never);
+    router.push(taggedItemHref(entry) as never);
   }, [router, tagged.items]);
 
   const showingProductsGrid = activeTab === 'Shop';

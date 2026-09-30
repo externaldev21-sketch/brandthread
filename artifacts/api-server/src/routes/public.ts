@@ -19,7 +19,7 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
-import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import {
   paginationMetadata,
@@ -1198,7 +1198,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
     eq(products.status, "active"),
     isNull(products.deletedAt),
   );
-  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }]] = await Promise.all([
+  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }], likesCount, [followersRow], [followingRow]] = await Promise.all([
     db
       .select()
       .from(products)
@@ -1223,6 +1223,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
     db.select({ activeProductsCount: count() }).from(products).where(activeProductsWhere),
     db.select({ publicPostsCount: count() }).from(posts)
       .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
+    publicProfileLikes(canonicalClerkId),
+    db.select({ total: count() }).from(follows).where(eq(follows.followingId, canonicalClerkId)),
+    db.select({ total: count() }).from(follows).where(eq(follows.followerId, canonicalClerkId)),
   ]);
 
   // Attach variants to each product — mirrors the /products list enrichment so
@@ -1286,6 +1289,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
       profileImageUrl,
       productsCount: Number(activeProductsCount),
       videosCount: Number(publicPostsCount),
+      likesCount,
+      followersCount: Number(followersRow?.total ?? 0),
+      followingCount: Number(followingRow?.total ?? 0),
       // Cover video (null while unset or moderated away); never the raw status.
       ...publicCoverFields(seller),
       coverVideoModerationStatus: undefined,

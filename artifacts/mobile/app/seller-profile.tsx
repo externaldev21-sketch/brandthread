@@ -41,7 +41,7 @@ import {
   hasPaidPlan, isVisitorPreviewParam, planChipLabel, profileCapabilities, resolveProfileMode, viewAsVisitorHref,
 } from '@/lib/profileAccess';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
-import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
@@ -96,6 +96,10 @@ interface SellerView {
   videosCount: number;
   coverVideoUrl: string | null;
   coverPosterUrl: string | null;
+  /** Authoritative public totals from the API (likes on public posts, follower / following counts). */
+  likesCount: number | null;
+  followersCount: number | null;
+  followingCount: number | null;
 }
 
 function initialsOf(name: string): string {
@@ -127,6 +131,9 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     videosCount: Number(profile?.videosCount ?? 0),
     coverVideoUrl: httpOrNull(profile?.coverVideoUrl),
     coverPosterUrl: httpOrNull(profile?.coverPosterUrl),
+    likesCount: typeof profile?.likesCount === 'number' ? profile.likesCount : null,
+    followersCount: typeof profile?.followersCount === 'number' ? profile.followersCount : null,
+    followingCount: typeof profile?.followingCount === 'number' ? profile.followingCount : null,
   };
 }
 
@@ -153,6 +160,7 @@ export default function SellerProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followers, setFollowers] = useState<number | null>(null);
   const [following, setFollowing] = useState<number | null>(null);
+  const [likes, setLikes] = useState<number | null>(null);
   const [followPending, setFollowPending] = useState(false);
   const [rating, setRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
@@ -211,6 +219,10 @@ export default function SellerProfileScreen() {
         }
         if (!active) return;
         setSeller(view);
+        // The public profile's totals are authoritative (computed server-side, not from a loaded page).
+        if (view.likesCount != null) setLikes(view.likesCount);
+        if (view.followersCount != null) setFollowers((count) => count ?? view.followersCount);
+        if (view.followingCount != null) setFollowing((count) => count ?? view.followingCount);
       } catch {
         if (active && reloadTick === 0) setProfileError(true);
       } finally {
@@ -241,6 +253,7 @@ export default function SellerProfileScreen() {
       if (social.status === 'fulfilled' && social.value) {
         setFollowers(Number(social.value.followersCount ?? 0));
         setFollowing(Number(social.value.followingCount ?? 0));
+        if (typeof social.value.likesCount === 'number') setLikes(social.value.likesCount);
       }
     });
     return () => { active = false; };
@@ -456,7 +469,7 @@ export default function SellerProfileScreen() {
   const openTagged = useCallback((item: ProfileGridItem) => {
     const entry = tagged.items.find((candidate) => candidate.id === item.id);
     if (!entry) return;
-    router.push(profileVideosHref({ source: 'creator', id: entry.authorId, startPostId: entry.id, title: entry.authorName ?? undefined }) as never);
+    router.push(taggedItemHref(entry) as never);
   }, [router, tagged.items]);
 
   const postItems = useMemo(() => videos.posts.map(gridItemFromThreadPost), [videos.posts]);
@@ -540,7 +553,7 @@ export default function SellerProfileScreen() {
       key: 'following', label: 'Following', value: following == null ? '–' : formatCompactCount(following),
       onPress: canonicalSellerId ? () => router.push(connectionsHref('following', isOwner ? null : canonicalSellerId) as never) : undefined,
     },
-    { key: 'rating', label: 'Rating', value: rating && rating.totalCount > 0 ? rating.avgRating.toFixed(1) : '–' },
+    { key: 'likes', label: 'Likes', value: likes == null ? '–' : formatCompactCount(likes) },
   ];
 
   const actions = isOwner ? (
@@ -598,6 +611,7 @@ export default function SellerProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
+      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${rating.totalCount} reviews`} icon="star" /> : null}
       {caps.showPlanChip && plan ? (
         <ProfileChip
           label={planChipLabel(plan)}

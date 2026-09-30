@@ -10,7 +10,7 @@ import crypto from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { inArray, or } from "drizzle-orm";
-import { db, follows, postUserTags, posts, productVariants, products, reviews, users } from "@workspace/db";
+import { db, follows, postUserTags, posts, stories, storyMentions, productVariants, products, reviews, users } from "@workspace/db";
 import { PRIVATE_PROFILE_KEYS } from "../../lib/publicProfile";
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -78,6 +78,13 @@ beforeAll(async () => {
   const [byBuyer] = await db.insert(posts).values({ userId: buyer, mediaUrl: "https://example.test/t.jpg", caption: "tagging the brand" }).returning({ id: posts.id });
   await db.insert(postUserTags).values({ postId: byBuyer.id, taggedUserId: seller });
   void taggingPost;
+  const soon = new Date(Date.now() + 3_600_000);
+  const storyRows = await db.insert(stories).values([
+    { authorId: buyer, authorName: "PP Buyer", media: [{ imageUri: "https://example.test/s1.jpg" }], expiresAt: soon },
+    { authorId: buyer, authorName: "PP Buyer", media: [{ imageUri: "https://example.test/s2.jpg" }], expiresAt: soon, privacyVisibility: "friends" },
+    { authorId: buyer, authorName: "PP Buyer", media: [{ imageUri: "https://example.test/s3.jpg" }], expiresAt: new Date(Date.now() - 1000) },
+  ]).returning({ id: stories.id });
+  await db.insert(storyMentions).values(storyRows.map((r) => ({ storyId: r.id, mentionedUserId: seller, taggerId: buyer })));
   await db.insert(posts).values({
     userId: seller, mediaUrl: "https://example.test/private.jpg", caption: "private",
     visibility: { isPublic: false, allowComments: true, allowReposts: true, showLikeCount: true },
@@ -104,6 +111,7 @@ afterAll(async () => {
   await db.delete(reviews).where(inArray(reviews.sellerId, ids));
   await db.delete(products).where(inArray(products.ownerId, ids));
   await db.delete(posts).where(inArray(posts.userId, ids)); // cascades post_user_tags
+  await db.delete(stories).where(inArray(stories.authorId, ids)); // cascades story_mentions
   await db.delete(follows).where(or(inArray(follows.followerId, ids), inArray(follows.followingId, ids)));
   await db.delete(users).where(inArray(users.clerkId, ids));
   await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -195,13 +203,23 @@ describe("View as visitor", () => {
 describe("Tagged tab", () => {
   it("lists public posts that tagged the profile, as a minimal card", async () => {
     const rows = await get(`/api/social/profile/${seller}/tagged`, visitor).then((r) => r.json()) as any[];
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ authorId: buyer, caption: "tagging the brand", source: "post" });
+    expect(rows.map((r) => r.source).sort()).toEqual(["post", "story"]);
+    expect(rows.find((r) => r.source === "post")).toMatchObject({ authorId: buyer, caption: "tagging the brand" });
     expectPublicOnly(rows);
   });
 
+  it("includes live public story mentions only — not friends-only, expired, or from authors the viewer does not follow", async () => {
+    const rows = await get(`/api/social/profile/${seller}/tagged`, visitor).then((r) => r.json()) as any[];
+    const storiesOnly = rows.filter((r) => r.source === "story");
+    expect(storiesOnly).toHaveLength(1);
+    expect(storiesOnly[0]).toMatchObject({ authorId: buyer, thumbnailUrl: "https://example.test/s1.jpg", mediaType: "story" });
+    // seller follows nobody, so a story by `buyer` is not one the seller could open as a stranger
+    const asStranger = await get(`/api/social/profile/${seller}/tagged`, seller).then((r) => r.json()) as any[];
+    expect(asStranger.filter((r) => r.source === "story")).toHaveLength(1); // the tagged account itself may see it
+  });
+
   it("resolves the users.id alias and is empty for an untagged account", async () => {
-    expect(await get(`/api/social/profile/${sellerUuid}/tagged`, visitor).then((r) => r.json())).toHaveLength(1);
+    expect(await get(`/api/social/profile/${sellerUuid}/tagged`, visitor).then((r) => r.json())).toHaveLength(2);
     expect(await get(`/api/social/profile/${buyer}/tagged`, visitor).then((r) => r.json())).toEqual([]);
   });
 });
@@ -215,7 +233,7 @@ describe("buyer profile — what a visitor can read", () => {
     expectPublicOnly(body);
     const allowed = new Set([
       "userId", "name", "username", "displayName", "bio", "avatarUrl", "accountType", "initials", "color", "handle",
-      "coverVideoUrl", "coverPosterUrl", "followersCount", "followingCount", "postsCount", "isFollowing",
+      "coverVideoUrl", "coverPosterUrl", "followersCount", "followingCount", "likesCount", "postsCount", "isFollowing",
       "isFollowedBy", "isMutual", "iBlockedThem",
     ]);
     expect(Object.keys(body).filter((k) => !allowed.has(k))).toEqual([]);

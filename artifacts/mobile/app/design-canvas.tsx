@@ -25,7 +25,13 @@ import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable,
   Alert, ScrollView, TextInput, Modal, Dimensions, Share,
   Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent,
+  LayoutAnimation, UIManager,
 } from 'react-native';
+
+// Android needs this opt-in for LayoutAnimation (iOS/web animate by default).
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import Svg, {
   Path, Rect, Circle, G, Line, Text as SvgText,
   Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
@@ -346,6 +352,9 @@ export default function DesignCanvasScreen() {
 
   // ── Tool state ─────────────────────────────────────────────────────────────
   const [activeTopTool, setActiveTopTool]         = useState<ActiveTopTool>('brush');
+  // Procreate's own "Modify" toggle: row 2 (Actions/Adjustments/Selection/
+  // Transform) is hidden until this is tapped, exactly like the real app.
+  const [modifyExpanded, setModifyExpanded]       = useState(false);
   const [activeSheet, setActiveSheet]             = useState<ActiveSheet>(null);
   const [selectedLayerId, setSelectedLayerId]     = useState<string | null>(null);
   const [layerOptionsTarget, setLayerOptionsTarget] = useState<string | null>(null);
@@ -482,7 +491,6 @@ export default function DesignCanvasScreen() {
   const [sizeSliderDragging, setSizeSliderDragging] = useState(false);
   const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
   const sizeSliderHeightRef = useRef(200);
-  const sizeSliderYRef      = useRef(0);
 
   const brushIdxRef     = useRef(brushIdx);
   const brushSizeRef    = useRef(brushSize);
@@ -1482,45 +1490,61 @@ export default function DesignCanvasScreen() {
   }
 
   // ─── Left size slider PanResponder ─────────────────────────────────────────
+  // Was recomputing `pct` from scratch on every single move event, anchored
+  // to a fixed 0.5 baseline plus only the incremental delta since the LAST
+  // event (not the cumulative delta since the drag started) — so the value
+  // never tracked a smooth, continuous position; it jumped around the
+  // midpoint on every pixel of movement, exactly the "keeps messing up"
+  // symptom. Fixed to the standard pattern: capture the value's starting
+  // percentage once at grant, then use PanResponder's own `gestureState.dy`
+  // (cumulative since grant, not per-move) to offset from that fixed start.
+  const sizeSliderStartPctRef = useRef(0);
   const sizePanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: (e) => {
+      onPanResponderGrant: () => {
         setSizeSliderDragging(true);
-        sizeSliderYRef.current = e.nativeEvent.pageY;
+        const tool = activeTopToolRef.current;
+        const current = tool === 'eraser' ? eraserSizeRef.current
+          : tool === 'smudge' ? smudgeSizeRef.current
+          : brushSizeRef.current;
+        sizeSliderStartPctRef.current = Math.max(0, Math.min(1, current / 80));
       },
-      onPanResponderMove: (e) => {
-        const dy = sizeSliderYRef.current - e.nativeEvent.pageY;
-        const pct = Math.max(0, Math.min(1, dy / sizeSliderHeightRef.current + 0.5));
+      onPanResponderMove: (_e, gestureState) => {
+        const deltaPct = -gestureState.dy / sizeSliderHeightRef.current;
+        const pct = Math.max(0, Math.min(1, sizeSliderStartPctRef.current + deltaPct));
         const tool = activeTopToolRef.current;
         if (tool === 'eraser')       setEraserSize(Math.max(2, Math.round(pct * 80)));
         else if (tool === 'smudge')  setSmudgeSize(Math.max(2, Math.round(pct * 80)));
         else                         setBrushSize(Math.max(1, Math.round(pct * 80)));
-        sizeSliderYRef.current = e.nativeEvent.pageY;
       },
       onPanResponderRelease: () => setSizeSliderDragging(false),
+      onPanResponderTerminate: () => setSizeSliderDragging(false),
     })
   ).current;
 
-  // ─── Left opacity slider PanResponder — mirrors sizePanResponder ──────────
-  const opacitySliderYRef = useRef(0);
+  // ─── Left opacity slider PanResponder — same fix as sizePanResponder above:
+  // a fixed start percentage captured at grant, offset by gestureState.dy
+  // (cumulative since grant), instead of recomputing from a 0.5 baseline on
+  // every move event. ──────────────────────────────────────────────────────
   const opacitySliderHeightRef = useRef(200);
+  const opacitySliderStartPctRef = useRef(0);
   const opacityPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: (e) => {
+      onPanResponderGrant: () => {
         setOpacitySliderDragging(true);
-        opacitySliderYRef.current = e.nativeEvent.pageY;
+        opacitySliderStartPctRef.current = Math.max(0.02, Math.min(1, brushOpacityRef.current));
       },
-      onPanResponderMove: (e) => {
-        const dy = opacitySliderYRef.current - e.nativeEvent.pageY;
-        const pct = Math.max(0.02, Math.min(1, dy / opacitySliderHeightRef.current + 0.5));
+      onPanResponderMove: (_e, gestureState) => {
+        const deltaPct = -gestureState.dy / opacitySliderHeightRef.current;
+        const pct = Math.max(0.02, Math.min(1, opacitySliderStartPctRef.current + deltaPct));
         setBrushOpacity(pct);
-        opacitySliderYRef.current = e.nativeEvent.pageY;
       },
       onPanResponderRelease: () => setOpacitySliderDragging(false),
+      onPanResponderTerminate: () => setOpacitySliderDragging(false),
     })
   ).current;
 
@@ -1709,6 +1733,14 @@ export default function DesignCanvasScreen() {
     };
     mutateLayer(prev => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
+    // Without this, selectedLayerId was set but activeTopTool stayed
+    // whatever it was before (usually 'brush') — the transform handles
+    // only render when activeTopTool === 'transform' (see the handle
+    // Pressables below), so a freshly-inserted layer had no visible way
+    // to move/resize it at all. Selecting it should put it straight into
+    // "ready to move or resize" state, matching what placing an object
+    // is supposed to feel like.
+    setActiveTopTool('transform');
     closeSheet();
   }
 
@@ -1744,6 +1776,7 @@ export default function DesignCanvasScreen() {
       };
       mutateLayer(prev => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
+      setActiveTopTool('transform'); // see handleAddText's comment — same gap, same fix
       closeSheet();
     } catch {
       Alert.alert('Error', 'Could not access photo library.');
@@ -2097,6 +2130,7 @@ export default function DesignCanvasScreen() {
       };
       mutateLayer(prev => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
+      setActiveTopTool('transform');
       markDirty();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
@@ -3026,206 +3060,212 @@ export default function DesignCanvasScreen() {
   return (
     <View style={styles.root}>
 
-      {/* ── TOP BAR ── */}
+      {/* ── TOP BAR — Procreate Pocket's own structure: one slim row (back +
+          "Modify", tool icons + colour swatch), and tapping "Modify" reveals
+          a second row of 4 mode icons (Actions/Adjustments/Selection/
+          Transform) below it. Reskinned monochrome: white/silver highlight
+          instead of Procreate's blue, otherwise 1:1. No project name, no
+          undo/redo/save/share here — Procreate doesn't show them in this
+          bar either (name lives in the gallery's own rename flow; undo/
+          redo moved to the left sidebar below; export lives in the Actions
+          sheet's Share tab, reached via the wrench icon in row 2). ── */}
       <View style={[styles.topBar, { paddingTop: headerTopInset + 2 }]}>
         <View style={styles.topGroup}>
           <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back">
             <Feather name="chevron-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.topBtn, activeSheet === 'wrench' && styles.topBtnActive]}
-            onPress={() => openSheet('wrench')}
+            onPress={() => {
+              // Animate the row-2 reveal/hide (opacity+layout), matching
+              // Procreate's own quick slide-down instead of an instant pop.
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setModifyExpanded(v => !v);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+            testID="btn-modify-toggle"
+            accessibilityRole="button"
+            accessibilityLabel="Modify"
+            accessibilityState={{ expanded: modifyExpanded }}
           >
-            <Feather name="settings" size={ICON.sm} color={activeSheet === 'wrench' ? PURPLE_LIGHT : FG} />
+            <Text style={[styles.modifyLabel, modifyExpanded && styles.modifyLabelActive]}>Modify</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => setEditingName(true)} style={styles.topCenter}>
-          {editingName ? (
-            <TextInput
-              style={styles.nameInput}
-              value={projectName}
-              onChangeText={setProjectName}
-              onBlur={() => {
-                setEditingName(false);
-                // Name change: update ref, mark dirty; coordinator will persist.
-                projectNameRef.current = projectName;
-                if (projectRef.current) markDirty();
-              }}
-              autoFocus selectTextOnFocus
-            />
-          ) : (
-            <Text style={styles.topTitle} numberOfLines={1}>{projectName || 'Untitled'}</Text>
-          )}
-        </TouchableOpacity>
-
         <View style={styles.topGroup}>
           <TouchableOpacity
-            style={[styles.topBtn, !undoModelRef.current.canUndo && styles.topBtnDisabled]}
-            onPress={handleUndo} testID="btn-undo"
+            style={[styles.topBtn, activeTopTool === 'brush' && styles.topBtnActive]}
+            onPress={() => { selectTool('brush'); openSheet('brushLib'); }}
+            onLongPress={() => openSheet('brushLib')}
+            testID="btn-brush"
           >
-            <Feather name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
+            <Feather name="edit-2" size={ICON.sm} color={activeTopTool === 'brush' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.topBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
-            onPress={handleRedo} testID="btn-redo"
+            style={[styles.topBtn, activeTopTool === 'smudge' && styles.topBtnActive]}
+            onPress={() => selectTool(activeTopTool === 'smudge' ? 'brush' : 'smudge')}
+            testID="btn-smudge"
           >
-            <Feather name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
+            <Feather name="droplet" size={ICON.sm} color={activeTopTool === 'smudge' ? FG : MUTED} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.topBtn} onPress={handleManualSave} testID="btn-save">
-            <Feather name="save" size={ICON.sm}
-              color={saveStatus === 'unsaved' ? PURPLE_LIGHT : MUTED} />
+          <TouchableOpacity
+            style={[styles.topBtn, activeTopTool === 'eraser' && styles.topBtnActive]}
+            onPress={() => selectTool(activeTopTool === 'eraser' ? 'brush' : 'eraser')}
+            testID="btn-eraser"
+          >
+            <Feather name="circle" size={ICON.sm} color={activeTopTool === 'eraser' ? FG : MUTED} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.topBtn} onPress={() => openSheet('export')}>
-            <Feather name="share" size={ICON.sm} color={FG} />
+          <TouchableOpacity
+            style={[styles.topBtn, activeSheet === 'layers' && styles.topBtnActive]}
+            onPress={() => activeSheet === 'layers' ? closeSheet() : openSheet('layers')}
+            testID="btn-layers"
+          >
+            <Feather name="layers" size={ICON.sm} color={activeSheet === 'layers' ? FG : MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.colorSwatch}
+            onPress={() => activeSheet === 'color' ? closeSheet() : openSheet('color')}
+            testID="btn-color"
+          >
+            <View style={[styles.colorSwatchInner, { backgroundColor: drawColor }]} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── TOOL ROW ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.toolRow}
-        contentContainerStyle={styles.toolRowContent}
-      >
-        <TouchableOpacity
-          style={[styles.toolChip, activeTopTool === 'brush' && styles.toolChipActive]}
-          onPress={() => { selectTool('brush'); openSheet('brushLib'); }}
-          onLongPress={() => openSheet('brushLib')}
-          testID="btn-brush"
-        >
-          <Feather name="edit-2" size={ICON.sm} color={activeTopTool === 'brush' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeTopTool === 'brush' && { color: PURPLE_LIGHT }]}>Brush</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toolChip, activeTopTool === 'smudge' && styles.toolChipActive]}
-          onPress={() => selectTool(activeTopTool === 'smudge' ? 'brush' : 'smudge')}
-          testID="btn-smudge"
-        >
-          <Feather name="droplet" size={ICON.sm} color={activeTopTool === 'smudge' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeTopTool === 'smudge' && { color: PURPLE_LIGHT }]}>Smudge</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toolChip, activeTopTool === 'eraser' && styles.toolChipActive]}
-          onPress={() => selectTool(activeTopTool === 'eraser' ? 'brush' : 'eraser')}
-          testID="btn-eraser"
-        >
-          <Feather name="circle" size={ICON.sm} color={activeTopTool === 'eraser' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeTopTool === 'eraser' && { color: PURPLE_LIGHT }]}>Eraser</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toolChip, activeTopTool === 'select' && styles.toolChipActive]}
-          onPress={() => selectTool(activeTopTool === 'select' ? 'brush' : 'select')}
-          testID="btn-select"
-        >
-          <Feather name="move" size={ICON.sm} color={activeTopTool === 'select' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeTopTool === 'select' && { color: PURPLE_LIGHT }]}>Select</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toolChip, activeTopTool === 'transform' && styles.toolChipActive]}
-          onPress={() => {
-            const next = activeTopTool === 'transform' ? 'brush' : 'transform';
-            selectTool(next as ActiveTopTool);
-            if (next === 'transform' && selectedLayer) {
-              setDistortQuad(null);
-              setWarpMesh(null);
-              setTransformMode('freeform');
-            }
-          }}
-          testID="btn-transform"
-        >
-          <Feather name="maximize-2" size={ICON.sm} color={activeTopTool === 'transform' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeTopTool === 'transform' && { color: PURPLE_LIGHT }]}>Transform</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toolChip, activeTopTool === 'adjustments' && styles.toolChipActive]}
-          onPress={() => {
-            const next = activeTopTool === 'adjustments' ? 'brush' : 'adjustments';
-            selectTool(next as ActiveTopTool);
-            if (next === 'adjustments') openSheet('adjustments');
-          }}
-          testID="btn-adjustments"
-        >
-          <Feather name="sliders" size={ICON.sm} color={activeTopTool === 'adjustments' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeTopTool === 'adjustments' && { color: PURPLE_LIGHT }]}>Adjust</Text>
-        </TouchableOpacity>
-
-        <View style={styles.toolDivider} />
-
-        <TouchableOpacity
-          style={[styles.toolChip, activeSheet === 'layers' && styles.toolChipActive]}
-          onPress={() => activeSheet === 'layers' ? closeSheet() : openSheet('layers')}
-          testID="btn-layers"
-        >
-          <Feather name="layers" size={ICON.sm} color={activeSheet === 'layers' ? PURPLE_LIGHT : MUTED} />
-          <Text style={[styles.toolChipLabel, activeSheet === 'layers' && { color: PURPLE_LIGHT }]}>Layers</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.colorSwatch}
-          onPress={() => activeSheet === 'color' ? closeSheet() : openSheet('color')}
-          testID="btn-color"
-        >
-          <View style={[styles.colorSwatchInner, { backgroundColor: drawColor }]} />
-        </TouchableOpacity>
-      </ScrollView>
+      {/* ── MODIFY ROW 2 — Actions / Adjustments / Selection / Transform,
+          only visible once "Modify" is tapped. Matches Procreate's own
+          second row exactly: wrench, magic-wand, "S", arrow. ── */}
+      {modifyExpanded && (
+        <View style={styles.modifyRow2} testID="modify-row-2">
+          <TouchableOpacity
+            style={[styles.topBtn, activeSheet === 'wrench' && styles.topBtnActive]}
+            onPress={() => openSheet('wrench')}
+            testID="btn-actions"
+            accessibilityLabel="Actions"
+          >
+            <Feather name="tool" size={ICON.sm} color={activeSheet === 'wrench' ? FG : MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topBtn}
+            onPress={() => {
+              const next = activeTopTool === 'adjustments' ? 'brush' : 'adjustments';
+              selectTool(next as ActiveTopTool);
+              if (next === 'adjustments') openSheet('adjustments');
+            }}
+            testID="btn-adjustments"
+            accessibilityLabel="Adjustments"
+          >
+            <Feather name="zap" size={ICON.sm} color={activeTopTool === 'adjustments' ? FG : MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topBtn}
+            onPress={() => selectTool(activeTopTool === 'select' ? 'brush' : 'select')}
+            testID="btn-select"
+            accessibilityLabel="Selection"
+          >
+            <Text style={[styles.modeLetter, activeTopTool === 'select' && styles.modeLetterActive]}>S</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topBtn}
+            onPress={() => {
+              const next = activeTopTool === 'transform' ? 'brush' : 'transform';
+              selectTool(next as ActiveTopTool);
+              if (next === 'transform' && selectedLayer) {
+                setDistortQuad(null);
+                setWarpMesh(null);
+                setTransformMode('freeform');
+              }
+            }}
+            testID="btn-transform"
+            accessibilityLabel="Transform"
+          >
+            <Feather name="arrow-up-right" size={ICON.sm} color={activeTopTool === 'transform' ? FG : MUTED} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ── CANVAS AREA ── */}
       <View style={styles.canvasOuter}>
 
-        {/* Left edge: Procreate-style size + opacity vertical sliders, shown
-            only while a drawing tool (brush/smudge/eraser) is active — thin
-            translucent dark tracks over the canvas's left edge. */}
-        {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
-          <View style={styles.leftSliderRail} pointerEvents="box-none">
-            <View
-              style={styles.sizeSlider}
-              onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
-              {...sizePanResponder.panHandlers}
-              testID="brush-size-slider"
-            >
-              <View style={[
-                styles.sizeDisc,
-                {
-                  width:  Math.max(8, Math.min(28, activeSize * 1.4)),
-                  height: Math.max(8, Math.min(28, activeSize * 1.4)),
-                  borderRadius: 999,
-                  backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
-                  borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
-                  borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
-                },
-              ]} />
-              <View style={styles.sizeTrack}>
-                <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
-              </View>
-              {sizeSliderDragging && (
-                <View style={styles.sizeBubble}>
-                  <Text style={styles.sizeBubbleText}>{activeSize}</Text>
+        {/* Left sidebar: Procreate's own vertically-centred handles — size on
+            top, opacity below, undo/redo beneath both — inset from the edge
+            (not glued to it, so the size handle's own preview card never
+            gets clipped by the screen's rounded corner). Handles are barely
+            visible at rest (a short line + a small dot), matching
+            Procreate; dragging either one shows the large "Size 99%"-style
+            preview card top-left, exactly like the reference. */}
+        <View style={styles.leftSliderRail} pointerEvents="box-none">
+          {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
+            <>
+              <View
+                style={styles.sizeSlider}
+                onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
+                {...sizePanResponder.panHandlers}
+                testID="brush-size-slider"
+              >
+                <View style={styles.sizeTrack}>
+                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
                 </View>
-              )}
-            </View>
+              </View>
 
-            <View
-              style={styles.opacitySlider}
-              onLayout={e => { opacitySliderHeightRef.current = e.nativeEvent.layout.height; }}
-              {...opacityPanResponder.panHandlers}
-              testID="brush-opacity-slider"
-            >
-              <Feather name="droplet" size={ICON.xs} color={MUTED} style={styles.opacityIcon} />
-              <View style={styles.sizeTrack}>
-                <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
-              </View>
-              {opacitySliderDragging && (
-                <View style={styles.sizeBubble}>
-                  <Text style={styles.sizeBubbleText}>{Math.round(brushOpacity * 100)}%</Text>
+              <View
+                style={styles.opacitySlider}
+                onLayout={e => { opacitySliderHeightRef.current = e.nativeEvent.layout.height; }}
+                {...opacityPanResponder.panHandlers}
+                testID="brush-opacity-slider"
+              >
+                <View style={styles.sizeTrack}>
+                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
                 </View>
-              )}
+              </View>
+            </>
+          )}
+
+          <View style={styles.sidebarUndoGroup}>
+            <TouchableOpacity
+              style={[styles.sidebarIconBtn, !undoModelRef.current.canUndo && styles.topBtnDisabled]}
+              onPress={handleUndo} testID="btn-undo"
+              accessibilityLabel="Undo"
+            >
+              <Feather name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sidebarIconBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
+              onPress={handleRedo} testID="btn-redo"
+              accessibilityLabel="Redo"
+            >
+              <Feather name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Large drag preview card — Procreate's own "Size 99%" card, shown
+            top-left of the canvas while actively dragging either handle,
+            with a live dot at the actual brush size/opacity. Replaces the
+            old small inline bubble that sat next to the slider itself. */}
+        {(sizeSliderDragging || opacitySliderDragging) && (
+          <View style={styles.dragPreviewCard} pointerEvents="none">
+            <Text style={styles.dragPreviewLabel}>
+              {sizeSliderDragging ? `Size ${Math.round((activeSize / 80) * 100)}%` : `Opacity ${Math.round(brushOpacity * 100)}%`}
+            </Text>
+            <View style={styles.dragPreviewDotWrap}>
+              <View
+                style={[
+                  styles.dragPreviewDot,
+                  sizeSliderDragging
+                    ? {
+                        width: Math.max(4, Math.min(72, activeSize * 1.8)),
+                        height: Math.max(4, Math.min(72, activeSize * 1.8)),
+                        backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
+                        borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
+                        borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
+                      }
+                    : {
+                        width: 40, height: 40,
+                        backgroundColor: drawColor,
+                        opacity: brushOpacity,
+                      },
+                ]}
+              />
             </View>
           </View>
         )}
@@ -3649,24 +3689,16 @@ export default function DesignCanvasScreen() {
             </View>
           )}
 
-          {/* Canvas overlay controls */}
-          <View style={styles.canvasOverlay}>
-            <TouchableOpacity
-              style={[styles.overlayBtn, showGrid && styles.overlayBtnActive]}
-              onPress={() => setShowGrid(v => !v)}
-            >
-              <Feather name="grid" size={12} color={showGrid ? FG : MUTED} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.overlayBtn, showGuides && styles.overlayBtnActive]}
-              onPress={() => setShowGuides(v => !v)}
-            >
-              <Feather name="maximize" size={12} color={showGuides ? FG : MUTED} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.overlayBtn} onPress={() => openSheet('canvasInfo')}>
-              <Feather name="info" size={12} color={MUTED} />
-            </TouchableOpacity>
-          </View>
+          {/* The three unlabeled floating squares (grid toggle, legacy
+              "drawing guide" toggle, canvas-info) are gone — Procreate
+              doesn't float loose icon buttons over the canvas at all.
+              Grid + the fuller guide system (symmetry, opacity, size) and
+              canvas info are already reachable via the Actions sheet
+              (wrench, row 2) → Guides / Canvas tabs, which this phase
+              keeps working. The legacy standalone `showGuides` boolean
+              (a second, separate "drawing guide" toggle, distinct from
+              guideSettings) has no UI entry point in this phase — a
+              disclosed, low-visibility gap; see the PR description. */}
 
           {/* Animation frame controls — shown when animEnabled */}
           {animEnabled && (
@@ -3792,23 +3824,11 @@ export default function DesignCanvasScreen() {
             </View>
           )}
 
-          {/* Add text/photo buttons */}
-          <View style={styles.canvasAddBar}>
-            <TouchableOpacity
-              style={styles.canvasAddBtn}
-              onPress={() => openSheet('text')} testID="btn-add-text"
-            >
-              <Feather name="type" size={ICON.xs} color={FG} />
-              <Text style={styles.canvasAddLabel}>Text</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.canvasAddBtn}
-              onPress={handleAddImage} testID="btn-add-image"
-            >
-              <Feather name="image" size={ICON.xs} color={FG} />
-              <Text style={styles.canvasAddLabel}>Photo</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Floating Text/Photo chips removed per Dev's feedback — Procreate
+              has no floating add buttons over the canvas. Equivalent, fuller
+              functionality (text, photo, camera, file, cut/copy/paste) lives
+              in the wrench icon's Add tab (WrenchActionsSheet), reached from
+              the top bar's row 2 wrench button. */}
         </View>
       </View>
 
@@ -3892,6 +3912,7 @@ export default function DesignCanvasScreen() {
             };
             mutateLayer(prev => [...prev, newLayer]);
             setSelectedLayerId(newLayer.id);
+            setActiveTopTool('transform');
           } catch { Alert.alert('Error', 'Could not take photo.'); }
         }}
         onInsertFile={() => { closeSheet(); setTimeout(() => handleInsertFile(), 100); }}
@@ -5367,95 +5388,108 @@ const styles = StyleSheet.create({
   },
   eyedropperHintText: { fontFamily: FONT.medium, fontSize: FS.xs, color: '#FFFFFF', includeFontPadding: false }, // theme-exempt: text on a fixed black scrim over the canvas
 
+  // Procreate's own top bar: one slim row, back + "Modify" on the left,
+  // tool icons + colour swatch on the right — see the render block above
+  // for exactly why there's no name/undo/redo/save/share in here anymore.
   topBar: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: SURFACE,
     borderBottomWidth: 1, borderBottomColor: BORDER,
-    paddingHorizontal: SP.xs, paddingBottom: SP.xs, gap: SP.xs,
+    paddingHorizontal: SP.sm, paddingBottom: SP.xs, gap: SP.xs,
   },
   topGroup:    { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  topCenter:   { flex: 1, alignItems: 'center', paddingHorizontal: SP.xs },
   topBtn:      { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   topBtnActive:   { backgroundColor: CARD_ELEVATED },
   topBtnDisabled: { opacity: 0.35 },
-  topTitle:    { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
-  nameInput:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, borderBottomWidth: 1, borderBottomColor: BORDER_ACTIVE, textAlign: 'center', minWidth: 80 },
-
-  toolRow: {
-    flexGrow: 0,
+  // "Modify" reads as plain text, like Procreate's own back-adjacent label —
+  // never a filled chip (monochrome rule: no grey fill for an idle toggle).
+  modifyLabel:       { fontSize: FS.base, fontFamily: FONT.regular, color: FG, paddingVertical: SP.xs, paddingHorizontal: 2 },
+  modifyLabelActive: { fontFamily: FONT.semibold },
+  // Row 2 (Actions/Adjustments/Selection/Transform) — only mounted while
+  // "Modify" is expanded.
+  modifyRow2: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
     backgroundColor: SURFACE,
     borderBottomWidth: 1, borderBottomColor: BORDER,
+    paddingHorizontal: SP.sm, paddingVertical: 4,
   },
-  toolRowContent: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.sm, paddingVertical: 6, gap: 4,
-  },
-  toolChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 7, borderRadius: RADIUS.sm },
-  toolChipActive:{ backgroundColor: CARD_ELEVATED },
-  toolChipLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  toolDivider:   { width: 1, height: 20, backgroundColor: BORDER, marginHorizontal: 4 },
+  // Procreate's own "S" lettermark for Selection — there's no single
+  // Feather glyph for it, so it's rendered as text inside the same topBtn
+  // treatment as every icon beside it.
+  modeLetter:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  modeLetterActive: { color: FG },
 
-  colorSwatch:      { width: 30, height: 30, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: BORDER, padding: 3, marginLeft: 4 },
-  colorSwatchInner: { flex: 1, borderRadius: RADIUS.xs },
+  // Procreate's own colour control is a circle showing the current colour,
+  // not a rounded square.
+  colorSwatch:      { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER, padding: 3, marginLeft: 6 },
+  colorSwatchInner: { flex: 1, borderRadius: 999 },
 
-  canvasOuter: { flex: 1, flexDirection: 'row' },
+  // Dark workspace the artboard sits on — Procreate never shows a canvas
+  // edge-to-edge; it's always a page framed by margin on a dark surface.
+  canvasOuter: { flex: 1, flexDirection: 'row', backgroundColor: '#0A0A0A' },
 
-  // Procreate's own size/opacity rail is a short, fixed-height pair of
-  // pills floating OVER the canvas's left edge — not a sidebar stretched to
-  // the full canvas height. `alignSelf: 'stretch'` with no definite height
-  // anywhere in its own ancestor chain (canvasOuter is `flex: 1` inside a
-  // column whose own height comes from further flex/stretch, not a fixed
-  // pixel value) is exactly the kind of chain that only reliably resolves
-  // on native Yoga layout — on web's CSS flexbox it can leave `sizeTrack`
-  // (itself `flex: 1`) with an effectively unbounded height, so its `height:
-  // '{pct}%'` fill resolves against that instead of a real ~200px rail
-  // (the "full-height white bars" bug), and pushed `canvas` over by its
-  // width when mounted instead of overlaying it. Fixed pixel dimensions +
-  // `position: 'absolute'` sidesteps both: no percentage-height ambiguity,
-  // and the canvas never shifts when a drawing tool toggles the rail.
+  // Procreate's own sidebar: a slim column of handles, vertically centred,
+  // hugging the left edge with a small inset so the size handle never gets
+  // clipped by the screen's own rounded corner. Fixed pixel dimensions +
+  // position: 'absolute': no percentage-height ambiguity on web, and the
+  // canvas never shifts when a drawing tool toggles the handles.
   leftSliderRail: {
-    position: 'absolute', left: 0, top: 0, bottom: 0,
-    flexDirection: 'row', alignItems: 'center', zIndex: 5,
+    position: 'absolute', left: 6, top: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', gap: SP.lg, zIndex: 5,
   },
-  // Opaque black + a white outline, not a translucent black wash — a
-  // translucent pill was designed assuming a black canvas behind it, but
-  // once a blank canvas is a real white artboard (see the backgroundHex
-  // fix), that same translucency read as a solid grey blob instead.
-  // Monochrome rule: black/white only, no grey fill, regardless of what's
-  // behind the rail.
-  sizeSlider: {
-    width: 36, height: 220, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: SP.md, gap: SP.sm, borderRadius: RADIUS.pill,
-    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
-    marginLeft: SP.xs,
-  },
-  opacitySlider: {
-    width: 24, height: 180, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: SP.md, paddingTop: SP.lg, gap: SP.sm, borderRadius: RADIUS.pill,
-    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
-    marginLeft: SP.xs,
-  },
-  opacityIcon: { marginBottom: 4 },
-  // Fixed, clamped disc size — not derived from a track height that can
-  // itself be wrong; this is what was reading as "a huge white circle"
-  // once the rail's height stopped resolving correctly.
-  sizeDisc:  { marginBottom: 8, maxWidth: 28, maxHeight: 28 },
-  // Procreate-style track: a thin white outline line the full rail height
-  // (not a grey/white filled bar growing from the bottom) with a single
-  // solid-white thumb dot marking the current value.
-  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', position: 'relative' },
-  sizeThumb: { position: 'absolute', left: '50%', width: 12, height: 12, marginLeft: -6, borderRadius: 6, backgroundColor: FG },
-  sizeBubble:{ position: 'absolute', right: 50, top: '50%', backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER },
-  sizeBubbleText: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
+  // Slim, translucent-dark rails with a round handle — Procreate's own
+  // weight and style. Translucent black still gives real contrast against
+  // any canvas colour (a dark wash either way, so never literally
+  // invisible on a white artboard), without reading as a heavy, separate
+  // black UI chrome element sitting on top of the canvas.
+  sizeSlider:    { width: 14, height: 130, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingVertical: 6 },
+  opacitySlider: { width: 14, height: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingVertical: 6 },
+  sizeTrack: { width: 2, flex: 1, backgroundColor: 'rgba(255,255,255,0.35)', borderRadius: RADIUS.pill, position: 'relative' },
+  sizeThumb: { position: 'absolute', left: '50%', width: 14, height: 14, marginLeft: -7, borderRadius: 7, backgroundColor: FG },
+  // Undo/redo sit beneath both handles in the same sidebar column, matching
+  // Procreate's own placement (never in the top bar — see the top-bar
+  // comment for why) — and Procreate's own plain arrow icons, not boxed.
+  sidebarUndoGroup: { alignItems: 'center', gap: SP.md },
+  sidebarIconBtn:   { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
-  canvas:         { flex: 1, backgroundColor: BG, position: 'relative' },
+  // The large drag-time preview card — Procreate's own "Size 99%" card,
+  // top-left of the canvas, only while a handle is actively being dragged.
+  // Opaque black + a white outline (never translucent — a translucent pill
+  // read as solid grey once the canvas became a real white artboard).
+  dragPreviewCard: {
+    position: 'absolute', top: SP.md, left: SP.md, zIndex: 6,
+    width: 128, minHeight: 128,
+    backgroundColor: '#000000', borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    padding: SP.sm, alignItems: 'flex-start', justifyContent: 'flex-start',
+  },
+  dragPreviewLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
+  dragPreviewDotWrap: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  dragPreviewDot: { borderRadius: 999 },
+
+  // Inset "page on a dark desk" look, Procreate-style: the artboard never
+  // touches the screen edge — it floats with margin, soft rounded corners,
+  // and a shadow onto the dark canvasOuter surface behind it. NOTE: this is
+  // a fixed-margin inset, not true aspect-ratio-preserving letterboxing —
+  // for very tall/wide canvases the artboard will not exactly preserve its
+  // aspect ratio within this box. True letterbox-fit + pinch-to-zoom/pan is
+  // deliberately deferred to a follow-up (see PR notes) rather than rushed
+  // here, since canvasSize (read via onLayout below) drives the transform-
+  // handle coordinate math and a hasty aspect-fit change risks breaking it.
+  canvas: {
+    flex: 1,
+    backgroundColor: BG,
+    position: 'relative',
+    margin: 14,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
+  },
   inlineTextInput:{ position: 'absolute', backgroundColor: 'transparent', fontFamily: FONT.regular, padding: 4, minHeight: 40 },
-  canvasOverlay:  { position: 'absolute', top: SP.sm, right: SP.sm, flexDirection: 'column', gap: SP.xs },
-  overlayBtn:     { width: 28, height: 28, borderRadius: RADIUS.xs, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  overlayBtnActive: { borderColor: BORDER_ACTIVE },
-  canvasAddBar:   { position: 'absolute', bottom: SP.md, right: SP.md, flexDirection: 'column', gap: SP.xs },
-  canvasAddBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 7 },
-  canvasAddLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 
   // Transform handle Pressable overlays — positioned absolutely on canvas View
   // pointerEvents is NOT none; they must receive touch for startHandle() to fire.

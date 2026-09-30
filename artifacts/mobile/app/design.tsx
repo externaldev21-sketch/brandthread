@@ -1824,7 +1824,7 @@ export default function DesignGalleryScreen() {
           accessibilityRole="header"
           testID="gallery-title"
         >
-          Design Studio
+          Brandthread Studio
         </Text>
 
         <View style={s.actionRow}>
