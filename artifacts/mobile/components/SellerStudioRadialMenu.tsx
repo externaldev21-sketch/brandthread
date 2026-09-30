@@ -91,6 +91,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import { SHEET_EASING, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
 import { StudioCoverBackdrop, StudioCoverGrain } from '@/components/StudioCardCover';
+import { getCoverHeroArt } from '@/components/StudioCoverHeroArt';
 
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
@@ -717,7 +718,8 @@ export default function SellerStudioRadialMenu({
   function CarouselCard({ item, itemIndex }: { item: ControlCenterItem; itemIndex: number }) {
     const locked = isLocked(item);
     const microKind = MICRO_KIND[item.id] ?? 'pop-in';
-    const isGoLive = item.id === 'go-live';
+    const heroArt = getCoverHeroArt(item.id);
+    const HeroArt = heroArt;
 
     const cardStyle = useAnimatedStyle(() => {
       const distance = itemIndex - cardIndex.value;
@@ -772,14 +774,18 @@ export default function SellerStudioRadialMenu({
     const microTranslateX = useSharedValue(0);
     const microTranslateY = useSharedValue(0);
     const microOpacity = useSharedValue(1);
-    // go-live only:
-    const liveDotScale = useSharedValue(0);
-    const liveSweepProgress = useSharedValue(0);
 
     useAnimatedReaction(
       () => (microTriggerIndex.value === itemIndex ? microTriggerSeq.value : -1),
       (seq, prevSeq) => {
         if (seq === -1 || seq === prevSeq) return;
+        if (heroArt) {
+          // This card now has real hero-art cover art instead of an
+          // animated line icon — no icon left here to animate, and motion
+          // on top of the new art is deliberately deferred (see
+          // StudioCoverHeroArt.tsx) until Dev signs off on the art itself.
+          return;
+        }
         if (reduceMotion) {
           // Reduce Motion: fade only, never a transform.
           microOpacity.value = 0.5;
@@ -804,12 +810,13 @@ export default function SellerStudioRadialMenu({
             );
             break;
           case 'pulse-dot':
-            liveDotScale.value = withSequence(
-              withTiming(1.3, { duration: 150, easing: Easing.out(Easing.quad) }),
+            // go-live now has real hero-art cover art (see heroArt guard
+            // above) so this case is unreachable in practice; kept only so
+            // MICRO_KIND stays exhaustive for the type.
+            microScale.value = withSequence(
+              withTiming(1.1, { duration: 150, easing: Easing.out(Easing.quad) }),
               withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) }),
             );
-            liveSweepProgress.value = 0;
-            liveSweepProgress.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
             break;
           case 'rise':
             microScaleY.value = 0;
@@ -903,15 +910,6 @@ export default function SellerStudioRadialMenu({
         { scaleY: microScaleY.value },
       ],
     }));
-    const liveDotStyle = useAnimatedStyle(() => ({ transform: [{ scale: liveDotScale.value }] }));
-    const liveSweepStyle = useAnimatedStyle(() => ({
-      opacity: interpolate(liveSweepProgress.value, [0, 0.15, 0.85, 1], [0, 0.5, 0.5, 0], Extrapolation.CLAMP),
-      transform: [
-        { translateX: interpolate(liveSweepProgress.value, [0, 1], [-70, 70]) },
-        { rotate: '20deg' },
-      ],
-    }));
-
     // pointerEvents="none": the whole card area's gesture (scrub/dismiss/
     // tap, composed in cardAreaGesture) handles all real touch input — an
     // individual card never receives its own touches, since which card is
@@ -929,27 +927,25 @@ export default function SellerStudioRadialMenu({
         accessibilityLabel={item.label}
         testID={`seller-control-center-item-${item.id}`}
       >
-        <StudioCoverBackdrop />
+        {HeroArt ? <HeroArt /> : <StudioCoverBackdrop />}
         <Animated.View style={[styles.cardContent, contentStyle]}>
           <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
-            <View style={styles.cardMedallionRing} pointerEvents="none" />
+            {!heroArt && <View style={styles.cardMedallionRing} pointerEvents="none" />}
             <Animated.View
               style={[styles.cardLandedRing, ringStyle]}
               pointerEvents="none"
               testID={`seller-studio-card-landed-ring-${item.id}`}
             />
-            <Feather name={item.icon as any} size={84} color="rgba(0,0,0,0.5)" style={styles.cardIconShadow} />
-            <Feather name={item.icon as any} size={84} color={theme.text} />
+            {!heroArt && (
+              <>
+                <Feather name={item.icon as any} size={84} color="rgba(0,0,0,0.5)" style={styles.cardIconShadow} />
+                <Feather name={item.icon as any} size={84} color={theme.text} />
+              </>
+            )}
             {locked && (
               <View style={styles.cardLock}>
                 <Feather name="lock" size={14} color={theme.text} />
               </View>
-            )}
-            {isGoLive && (
-              <>
-                <Animated.View style={[styles.liveDot, liveDotStyle]} pointerEvents="none" />
-                <Animated.View style={[styles.liveSweep, liveSweepStyle]} pointerEvents="none" />
-              </>
             )}
           </Animated.View>
           <LinearGradient
@@ -1321,25 +1317,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // main white glyph — a cheap "emboss"/chrome pop that doesn't require a
   // gradient-filled icon mask.
   cardIconShadow: { position: 'absolute', transform: [{ translateX: 2 }, { translateY: 3 }] },
-  // go-live's own extras — a small red "LIVE" dot and a soft diagonal
-  // highlight sweep, both purely decorative (pointerEvents "none").
-  liveDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#ff3b30',
-    borderWidth: 1.5,
-    borderColor: '#000',
-  },
-  liveSweep: {
-    position: 'absolute',
-    width: 24,
-    height: 140,
-    backgroundColor: '#ffffff',
-  },
   cardLabel: {
     // Dropped from 24/bold — Dev: with the fill pill now the only visible
     // action, the big bottom title was reading like a second button.

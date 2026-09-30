@@ -128,12 +128,18 @@ describe('Studio card covers: per-card one-shot signature micro-animations', () 
     expect(reduceBlock).not.toMatch(/micro(Scale|Rotate|TranslateX|TranslateY)\.value\s*=\s*withSequence/);
   });
 
-  it('go-live gets its own extra dot-pulse + sweep, rendered only for that one item', () => {
-    expect(studio).toContain("item.id === 'go-live'");
-    expect(studio).toContain('liveDotScale');
-    expect(studio).toContain('liveSweepProgress');
-    expect(studio).toContain('styles.liveDot');
-    expect(studio).toContain('styles.liveSweep');
+  it('go-live no longer has a separate floating red dot/sweep overlay — Dev called it out as "half-ass"; LIVE red now only ever belongs to that card\'s own hero-art cover (StudioCoverHeroArt.tsx)', () => {
+    expect(studio).not.toContain('liveDotScale');
+    expect(studio).not.toContain('liveSweepProgress');
+    expect(studio).not.toContain('styles.liveDot');
+    expect(studio).not.toContain('styles.liveSweep');
+  });
+
+  it('cards with real hero-art cover art (getCoverHeroArt) hide the generic line icon entirely, never layering both', () => {
+    expect(studio).toContain("import { getCoverHeroArt } from '@/components/StudioCoverHeroArt';");
+    expect(studio).toContain('const heroArt = getCoverHeroArt(item.id);');
+    expect(studio).toContain('{HeroArt ? <HeroArt /> : <StudioCoverBackdrop />}');
+    expect(studio).toContain('{!heroArt && (');
   });
 });
 
