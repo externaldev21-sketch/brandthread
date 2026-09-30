@@ -295,9 +295,20 @@ export function EngagementButton({
     transform: [{ scale: likeSpringScale.value }],
   }));
 
-  // Pulse opacity while pending
+  // Pulse opacity while pending. `pulseSettled` tracks whether the pulse is
+  // truly at rest (opacity===1, not pending) — text-crispness fix: the
+  // rail's count/icon used to sit inside an `Animated.View` carrying
+  // `opacity: pulseAnim` at ALL times, including the vast majority of the
+  // button's life when it isn't pending at all (opacity pinned at the
+  // identity value 1). An identity `opacity`/`transform` style still forces
+  // react-native-web to promote that node to its own compositing layer (see
+  // lib/animationUtils.ts), which can soften the count/icon text painted
+  // inside it. `innerContent` below only renders the Animated wrapper while
+  // `pulseSettled` is false.
+  const [pulseSettled, setPulseSettled] = useState(true);
   useEffect(() => {
     if (pending) {
+      setPulseSettled(false);
       pulseRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 0.45, duration: 450, useNativeDriver: true }),
@@ -308,7 +319,9 @@ export function EngagementButton({
     } else {
       pulseRef.current?.stop();
       pulseRef.current = null;
-      Animated.timing(pulseAnim, { toValue: 1, duration: ANIM.fast, useNativeDriver: true }).start();
+      Animated.timing(pulseAnim, { toValue: 1, duration: ANIM.fast, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) setPulseSettled(true);
+      });
     }
   }, [pending]);
 
@@ -384,8 +397,8 @@ export function EngagementButton({
     });
   }
 
-  const innerContent = (
-    <Animated.View style={[{ opacity: pulseAnim }, style]}>
+  const railChildren = (
+    <>
       {iconTransform.length > 0 ? (
         <Animated.View style={{ transform: iconTransform }}>
           {iconNode}
@@ -398,8 +411,14 @@ export function EngagementButton({
       ) : count !== undefined && (
         <Text style={[ebStyles.count, { color: '#FFFFFF' }]}>{count}</Text>
       )}
-    </Animated.View>
+    </>
   );
+  // Plain `View` (no `opacity` key at all) once the pulse is at rest, instead
+  // of an `Animated.View` permanently pinned at `opacity: 1` — see
+  // `pulseSettled`'s doc comment above.
+  const innerContent = pulseSettled
+    ? <View style={style}>{railChildren}</View>
+    : <Animated.View style={[{ opacity: pulseAnim }, style]}>{railChildren}</Animated.View>;
 
   return (
     <TouchableOpacity

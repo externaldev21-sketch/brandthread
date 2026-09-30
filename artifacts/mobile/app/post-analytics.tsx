@@ -17,7 +17,7 @@ import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 
@@ -574,7 +574,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     flex: 1,
     color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONT.semibold,
     textAlign: 'center',
   },
   rangePill: {
@@ -589,7 +589,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   rangePillText: {
     color: colors.mutedForeground,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FONT.medium,
   },
 
   // ── Scroll ──
@@ -651,7 +651,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   statusBadgeText: {
     color: colors.primaryForeground,
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FONT.semibold,
     textTransform: 'capitalize',
   },
   openBtn: {
@@ -664,7 +664,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   openBtnText: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FONT.medium,
   },
 
   // ── Hero Metrics ──
@@ -686,7 +686,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   heroValue: {
     color: colors.text,
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     marginTop: 6,
   },
   heroLabel: {
@@ -703,7 +703,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   sectionTitle: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONT.semibold,
     marginTop: 24,
     marginBottom: 12,
   },
@@ -720,7 +720,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   unavailableTitle: {
     color: colors.text,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
   },
   unavailableText: {
     color: colors.mutedForeground,
@@ -752,7 +752,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   analyticsLabel: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONT.semibold,
   },
   analyticsDetail: {
     color: colors.mutedForeground,
@@ -762,7 +762,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   analyticsValue: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     textAlign: 'right',
   },
 
@@ -840,13 +840,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   revenueLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FONT.semibold,
     marginBottom: 4,
   },
   revenueValue: {
     color: colors.text,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     textAlign: 'center',
   },
 
@@ -868,7 +868,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   countryInitialsText: {
     color: colors.mutedForeground,
     fontSize: FS.xs,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
   },
   countryName: {
     color: colors.text,
@@ -895,7 +895,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   peakHourTime: {
     color: colors.success,
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
   },
   peakHourSub: {
     color: colors.mutedForeground,
@@ -935,6 +935,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   quickActionText: {
     color: colors.text,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: FONT.semibold,
   },
 });

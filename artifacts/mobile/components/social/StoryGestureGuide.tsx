@@ -10,7 +10,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 import { markStoryGestureGuideShown } from '@/lib/storyGestureGuideStorage';
 
 export { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.75)',
+    color: ON_DARK_MUTED,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     textAlign: 'center',
@@ -162,13 +162,13 @@ const styles = StyleSheet.create({
     fontSize: FS.md,
   },
   rowBody: {
-    color: 'rgba(255,255,255,0.7)',
+    color: ON_DARK_MUTED,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     marginTop: 2,
   },
   tapToKeepWatching: {
-    color: 'rgba(255,255,255,0.55)',
+    color: ON_DARK_MUTED,
     fontFamily: FONT.medium,
     fontSize: FS.xs,
     marginTop: SP.xxl,

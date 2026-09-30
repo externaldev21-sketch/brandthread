@@ -12,7 +12,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
-import { FONT } from '@/lib/theme';
+import { FONT, ON_DARK_MUTED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -281,7 +281,12 @@ function UnderlineTabs({
                 styles.underlineLabel,
                 {
                   fontFamily: selected ? FONT.bold : FONT.medium,
-                  color: selected ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                  // Solid opaque grey, not a translucent white — a
+                  // sub-1-alpha text color subpixel-antialiases against
+                  // whatever's behind it (varies as the feed's video plays),
+                  // which reads as a soft/smudgy mid-grey instead of a crisp
+                  // silver. See lib/theme.ts's ON_DARK_MUTED doc comment.
+                  color: selected ? '#FFFFFF' : ON_DARK_MUTED,
                 },
               ]}
               numberOfLines={1}
