@@ -11,7 +11,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { isAuthError } from '@/lib/networkNotice';
 import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
 
@@ -101,9 +101,15 @@ export default function StorePreview() {
   // from the same seeded catalog every other demo-gated seller screen
   // uses (lib/previewSellerProducts.ts) — see lib/previewStorefrontHtml.ts.
   //
-  // Only a real signed-in account outside preview mode calls the network.
-  const freshPreview = useMemo(() => isSellerDevPreview() && !isPreviewDemoMode(), []);
-  const demoPreview  = useMemo(() => isSellerDevPreview() && isPreviewDemoMode(), []);
+  // This screen is seller-only, but the dev/web preview bypass can still
+  // land here under `?bt_preview=buyer` (e.g. a route crawl testing every
+  // screen under both roles) with no real session either — checking only
+  // isSellerDevPreview() missed that case and let the real endpoint 404
+  // every time. Only a real signed-in account outside preview mode calls
+  // the network.
+  const inDevPreview = useMemo(() => isSellerDevPreview() || isBuyerDevPreview(), []);
+  const freshPreview = useMemo(() => inDevPreview && !isPreviewDemoMode(), [inDevPreview]);
+  const demoPreview  = useMemo(() => inDevPreview && isPreviewDemoMode(), [inDevPreview]);
 
   const load = useCallback(async () => {
     if (freshPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return; }
