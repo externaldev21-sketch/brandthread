@@ -1,4 +1,4 @@
--- 110: People tags on posts — drives the profile "Tagged" tab.
+-- 111: People tags on posts — drives the profile "Tagged" tab.
 CREATE TABLE IF NOT EXISTS post_user_tags (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id        UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,

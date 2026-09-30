@@ -990,7 +990,7 @@ export function respond({ method, path, query, role, options = {} }) {
         clerkId: SELLER_USER.id, brandName: 'Northline Studio', displayName: 'Maya Okafor', username: 'northlinestudio',
         bio: 'Heavyweight basics, cut and sewn in Portland. New drop every season.', website: null,
         profileImageUrl: SELLER_USER.imageUrl, avatarUrl: SELLER_USER.imageUrl, verified: true, accountType: 'seller',
-        brandType: 'clothing', vacationMode: false, productsCount: products.length, videosCount: 2,
+        brandType: 'clothing', vacationMode: false, productsCount: products.length, videosCount: 2, likesCount: 30200, followersCount: 24800, followingCount: 312,
       },
       products,
       posts: [],
@@ -1002,6 +1002,7 @@ export function respond({ method, path, query, role, options = {} }) {
       return [
         { id: 'tag_demo_1', authorId: BUYER_USER.id, authorName: 'Jordan Reyes', authorUsername: BUYER_USER.username, mediaUrl: img('look-mono'), thumbnailUrl: img('look-mono'), mediaType: 'photo', caption: 'Ember hoodie, finally', source: 'post' },
         { id: 'tag_demo_2', authorId: BUYER_USER.id, authorName: 'Jordan Reyes', authorUsername: BUYER_USER.username, mediaUrl: img('texture-ember'), thumbnailUrl: img('texture-ember'), mediaType: 'photo', caption: 'Rust jacket weather', source: 'post' },
+        { id: 'tag_demo_story_1', authorId: BUYER_USER.id, authorName: 'Jordan Reyes', authorUsername: BUYER_USER.username, mediaUrl: img('look-mono'), thumbnailUrl: img('look-mono'), mediaType: 'story', caption: null, source: 'story' },
       ];
     }
     return [];
@@ -1009,10 +1010,10 @@ export function respond({ method, path, query, role, options = {} }) {
   if ((match = p.match(/^\/social\/profile\/([^/]+)$/))) {
     const id = decodeURIComponent(match[1]);
     if (id === SELLER_USER.id) {
-      return { userId: SELLER_USER.id, name: 'Northline Studio', username: 'northlinestudio', displayName: 'Maya Okafor', bio: null, avatarUrl: SELLER_USER.imageUrl, accountType: 'seller', initials: 'NS', color: '#2B2B30', handle: '@northlinestudio', followersCount: 24800, followingCount: 312, postsCount: 2, isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false };
+      return { userId: SELLER_USER.id, name: 'Northline Studio', username: 'northlinestudio', displayName: 'Maya Okafor', bio: null, avatarUrl: SELLER_USER.imageUrl, accountType: 'seller', initials: 'NS', color: '#2B2B30', handle: '@northlinestudio', followersCount: 24800, followingCount: 312, likesCount: 30200, postsCount: 2, isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false };
     }
     if (id === BUYER_USER.id) {
-      return { userId: BUYER_USER.id, name: 'Jordan Reyes', username: BUYER_USER.username, displayName: 'Jordan Reyes', bio: 'Thrift finds, tailoring, and the occasional grail.', avatarUrl: BUYER_USER.imageUrl, accountType: 'buyer', initials: 'JR', color: '#7A7A7A', handle: '@' + BUYER_USER.username, followersCount: 186, followingCount: 94, postsCount: 2, isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false };
+      return { userId: BUYER_USER.id, name: 'Jordan Reyes', username: BUYER_USER.username, displayName: 'Jordan Reyes', bio: 'Thrift finds, tailoring, and the occasional grail.', avatarUrl: BUYER_USER.imageUrl, accountType: 'buyer', initials: 'JR', color: '#7A7A7A', handle: '@' + BUYER_USER.username, followersCount: 186, followingCount: 94, likesCount: 512, postsCount: 2, isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false };
     }
     return undefined;
   }
