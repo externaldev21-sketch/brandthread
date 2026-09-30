@@ -77,6 +77,11 @@ export const users = pgTable('users', {
   // with a completed identity verification before exposing a verified badge.
   activeStanding:               boolean('active_standing').notNull().default(true),
   policyRestricted:             boolean('policy_restricted').notNull().default(false),
+  // Repeat-infringer policy (see routes/ip-cases.ts): one strike per upheld
+  // takedown, auto-flag at IP_REPEAT_INFRINGER_STRIKES for moderator review.
+  ipStrikeCount:                integer('ip_strike_count').notNull().default(0),
+  ipRepeatInfringer:            boolean('ip_repeat_infringer').notNull().default(false),
+  ipRepeatInfringerFlaggedAt:   timestamp('ip_repeat_infringer_flagged_at', { withTimezone: true }),
   returnPolicy:       text('return_policy'),
   cancellationPolicy: text('cancellation_policy'),
   // ISO-3166 alpha-2 country the seller ships from. Used to resolve which
@@ -258,9 +263,22 @@ export const ipCases = pgTable('ip_cases', {
   moderatorNotes: text('moderator_notes'),
   assignedModeratorId: text('assigned_moderator_id'),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  // Takedown workflow (migration 231)
+  sellerId: text('seller_id'),
+  channel: text('channel').notNull().default('app'),
+  goodFaithStatement: boolean('good_faith_statement').notNull().default(false),
+  accuracyStatement: boolean('accuracy_statement').notNull().default(false),
+  signature: text('signature'),
+  takedownAt: timestamp('takedown_at', { withTimezone: true }),
+  sellerNotifiedAt: timestamp('seller_notified_at', { withTimezone: true }),
+  strikeAppliedAt: timestamp('strike_applied_at', { withTimezone: true }),
+  counterNoticeStatus: text('counter_notice_status').notNull().default('none'),
+  counterNoticeStatement: text('counter_notice_statement'),
+  counterNoticeReceivedAt: timestamp('counter_notice_received_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  sellerIdx: index('ip_cases_seller_idx').on(table.sellerId),
   statusLookupIdx: index('ip_cases_reference_token_idx').on(table.publicReference, table.statusTokenHash),
   moderationIdx: index('ip_cases_moderation_idx').on(table.status, table.createdAt),
   listingIdx: index('ip_cases_listing_idx').on(table.listingProductId),

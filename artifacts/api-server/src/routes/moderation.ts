@@ -32,6 +32,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const MODERATION_ACTIONS = ["dismiss", "remove_content", "suspend_user"] as const;
 export type ModerationAction = typeof MODERATION_ACTIONS[number];
 
+/** Review promise shown in the Community Guidelines: act on every report within 24 hours. */
+export const REPORT_SLA_HOURS = 24;
+export function reportDueBy(createdAt: Date): Date {
+  return new Date(createdAt.getTime() + REPORT_SLA_HOURS * 3_600_000);
+}
+
 router.get("/me", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const [account] = await db.select({ role: users.role }).from(users).where(eq(users.clerkId, userId)).limit(1);
@@ -87,6 +93,7 @@ router.get("/reports", async (req, res) => {
         open: sql<number>`count(*) FILTER (WHERE ${reports.status} = 'pending')`,
         held: sql<number>`count(*) FILTER (WHERE ${reports.status} = 'pending' AND ${reports.source} = 'auto_filter')`,
         resolvedToday: sql<number>`count(*) FILTER (WHERE ${reports.status} <> 'pending' AND ${reports.resolvedAt} >= ${startOfDay})`,
+        overdue: sql<number>`count(*) FILTER (WHERE ${reports.status} = 'pending' AND ${reports.createdAt} < ${new Date(Date.now() - REPORT_SLA_HOURS * 3_600_000)})`,
       }).from(reports),
     ]);
     const openByTarget = new Map(openCounts.map((row) => [`${row.targetType}:${row.targetId}`, Number(row.n)]));
@@ -103,6 +110,7 @@ router.get("/reports", async (req, res) => {
       reason: report.reason,
       note: report.description,
       createdAt: report.createdAt.toISOString(),
+      dueBy: reportDueBy(report.createdAt).toISOString(),
       resolution: report.status === "pending" ? null : {
         action: report.resolutionAction,
         note: report.resolutionNote,
@@ -121,6 +129,7 @@ router.get("/reports", async (req, res) => {
         open: Number(summaryRows[0]?.open ?? 0),
         heldByFilter: Number(summaryRows[0]?.held ?? 0),
         resolvedToday: Number(summaryRows[0]?.resolvedToday ?? 0),
+        overdue: Number(summaryRows[0]?.overdue ?? 0),
       },
     });
   } catch (err) {

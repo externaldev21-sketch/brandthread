@@ -20,13 +20,13 @@ import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
-import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import {
   paginationMetadata,
   parsePagination,
   setPaginationHeaders,
 } from "../lib/pagination";
-import { setPublicCacheHeaders } from "../lib/httpCache";
+import { setPublicCacheHeaders, setViewerScopedCacheHeaders } from "../lib/httpCache";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -119,7 +119,10 @@ export function rankRelatedProducts<T extends {
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
-    setPublicCacheHeaders(res);
+    // Block-aware: a signed-in viewer's list omits blocked sellers, so it
+    // must not be shared-cached.
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const category = singleQueryValue(req.query.category);
     const tag = singleQueryValue(req.query.tag);
     const ownerId = singleQueryValue(req.query.ownerId);
@@ -151,6 +154,7 @@ router.get("/products", async (req, res) => {
       eq(products.status, "active"),
       isNull(products.deletedAt),
       resolvedOwnerId ? eq(products.ownerId, resolvedOwnerId) : undefined,
+      notBlockedWith(viewerId, products.ownerId),
       category ? eq(products.category, category) : undefined,
       tag
         ? or(
@@ -251,9 +255,10 @@ router.get("/products/high-demand", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const activeProducts = await db.select().from(products)
-      .where(and(eq(products.status, "active"), isNull(products.deletedAt)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)));
     if (activeProducts.length === 0) return res.json([]);
 
     const productIds = activeProducts.map((product) => product.id);
@@ -337,7 +342,8 @@ router.get("/products/:id/videos", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const rows = await db.select({
       postId: posts.id,
       mediaUrl: posts.mediaUrl,
@@ -354,6 +360,7 @@ router.get("/products/:id/videos", async (req, res) => {
         eq(postTaggedProducts.productId, req.params.id),
         eq(posts.mediaType, "video"),
         publicPostCondition(),
+        notBlockedWith(viewerId, posts.userId),
       ))
       .orderBy(desc(posts.createdAt))
       .limit(lim);
@@ -384,15 +391,16 @@ router.get("/products/:id/related", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const [current] = await db.select().from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt))).limit(1);
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId))).limit(1);
     if (!current) return res.status(404).json({ error: "Product not found" });
 
     // Fetch the candidate set in one query and batch its dependent records below.
     // Ranking is application-side because tags/styleTags are JSON arrays.
     const candidates = await db.select().from(products)
-      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id), notBlockedWith(viewerId, products.ownerId)));
     const ranked = rankRelatedProducts(current, candidates).slice(0, lim);
     if (ranked.length === 0) return res.json([]);
 
@@ -421,11 +429,12 @@ router.get("/products/:id/related", async (req, res) => {
 // GET /api/public/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
-    setPublicCacheHeaders(res);
+    const viewerId = optionalViewerId(req);
+    setViewerScopedCacheHeaders(res, viewerId);
     const [product] = await db
       .select()
       .from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt)))
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)))
       .limit(1);
 
     if (!product) {
@@ -643,6 +652,7 @@ router.get("/search", async (req, res): Promise<void> => {
         .where(and(
           eq(posts.mediaType, "video"),
           publicPostCondition(),
+          notBlockedWith(viewerId, posts.userId),
           or(
             fuzzyMatch(posts.caption, term, pattern),
             sql`EXISTS (
@@ -1740,7 +1750,10 @@ router.get("/trending", async (req, res) => {
   try {
     // Trending is recomputed at most once a day server-side; a longer client
     // cache window is safe and cuts repeat load meaningfully.
-    setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
+    const viewerId = optionalViewerId(req);
+    if (viewerId) setViewerScopedCacheHeaders(res, viewerId);
+    else setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
+    const blocked = await blockedUserIds(viewerId);
     const page = parsePagination(req.query, { limit: 20 });
     if (!page.success || page.data.limit > 50 || page.data.offset !== 0) {
       return res.status(400).json({ error: "Invalid trending query", code: "VALIDATION_ERROR" });
@@ -1756,7 +1769,7 @@ router.get("/trending", async (req, res) => {
       .limit(1);
 
     if (cached && isCacheFresh(cached.computedAt) && Array.isArray(cached.results) && cached.results.length > 0) {
-      const items = (cached.results as any[]).slice(0, lim).map((item: any, i: number) => ({
+      const items = (cached.results as any[]).filter((item: any) => !blocked.has(item.brandId)).slice(0, lim).map((item: any, i: number) => ({
         ...item,
         rank: i + 1,
       }));
@@ -1780,7 +1793,7 @@ router.get("/trending", async (req, res) => {
       .limit(1);
 
     if (fresh && Array.isArray(fresh.results)) {
-      const items = (fresh.results as any[]).slice(0, lim).map((item: any, i: number) => ({
+      const items = (fresh.results as any[]).filter((item: any) => !blocked.has(item.brandId)).slice(0, lim).map((item: any, i: number) => ({
         ...item,
         rank: i + 1,
       }));
@@ -1918,8 +1931,14 @@ router.get("/discover/feed", async (req, res) => {
     }
     const { limit, offset } = page.data;
     const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
+    // Sellers with a block relationship to the viewer are dropped from the
+    // shared daily ranking per request; signed-in responses are not shared-cached.
+    const viewerId = optionalViewerId(req);
+    if (viewerId) setViewerScopedCacheHeaders(res, viewerId);
+    const blocked = await blockedUserIds(viewerId);
 
-    const paginate = (allItems: any[], source: "cache" | "computed") => {
+    const paginate = (rawItems: any[], source: "cache" | "computed") => {
+      const allItems = blocked.size ? rawItems.filter((item) => !blocked.has(item.brandId)) : rawItems;
       const items = allItems.slice(offset, offset + limit).map((item, i) => ({
         ...item,
         rank: offset + i + 1,

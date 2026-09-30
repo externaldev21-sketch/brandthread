@@ -202,3 +202,5 @@ export function shortRelativeTime(iso: string, now = Date.now()): string {
   if (days < 7) return `${days}d`;
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+export { REPORT_SLA_HOURS, reportSla, type ReportSla } from './reportSla';
