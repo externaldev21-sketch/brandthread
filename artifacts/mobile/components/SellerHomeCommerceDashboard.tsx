@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -125,6 +125,27 @@ const PERIOD_LABEL: Record<SellerDashboardRange, string> = {
   year: 'last year',
   all: '',
 };
+
+// Range-aware empty-chart copy — "No sales yet" alone reads the same for
+// every range; naming the range itself (Shopify's own zero-state pattern)
+// makes it clear which window is empty rather than implying the WHOLE store
+// has never sold anything.
+const EMPTY_CHART_MESSAGE: Record<SellerDashboardRange, string> = {
+  today: 'No sales yet today',
+  week: 'No sales yet this week',
+  month: 'No sales yet this month',
+  year: 'No sales yet this year',
+  all: 'No sales yet',
+};
+
+// Live updates while the Dashboard is visible: there's no push/socket
+// channel for new orders or Thread Cash events (see lib/live/* — that's Live
+// -stream viewer presence, a different concern), so this polls at a short
+// interval instead, matching the app's own established focus-poll pattern
+// (see app/seller-inbox.tsx's 30s conversation poll). useFocusEffect's
+// cleanup stops the interval the moment the screen loses focus — including
+// when the user switches tabs or backgrounds the app onto another tab.
+const LIVE_POLL_INTERVAL_MS = 30_000;
 
 function metricSeries(
   metric: MetricKey,
@@ -396,6 +417,27 @@ export default function SellerHomeCommerceDashboard({
 
   useEffect(() => { payoutAttemptKeyRef.current = null; }, [userId]);
 
+  // ── Live updates: refresh on regaining focus, then poll while visible ────
+  // `retryTick` already drives both the range-scoped analytics fetch and
+  // loadSecondaryData (orders/inventory/hub/products) below — bumping it is
+  // the same real refetch pull-to-refresh already triggers, just on a timer
+  // instead of a gesture.
+  const hasFocusedOnceRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFocusedOnceRef.current) {
+        // Not the very first mount — the seller is RETURNING to this screen
+        // (tab switch back, popped from another screen), so refresh
+        // immediately rather than waiting for the next poll tick.
+        setRetryTick((n) => n + 1);
+      }
+      hasFocusedOnceRef.current = true;
+
+      const interval = setInterval(() => setRetryTick((n) => n + 1), LIVE_POLL_INTERVAL_MS);
+      return () => clearInterval(interval);
+    }, []),
+  );
+
   const nav = useCallback((route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push(route as never);
@@ -551,7 +593,7 @@ export default function SellerHomeCommerceDashboard({
     if (!data) return { current: 0, previous: 0 };
     // A response with no `previous` bucket (a brand-new store, or a partial
     // payload) must not crash the dashboard — treat it as a zeroed prior period.
-    const previous = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
+    const previous = data.previous ?? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 };
     switch (metric) {
       case 'sales': return { current: data.totalCents, previous: previous.totalCents };
       case 'orders': return { current: data.orderCount, previous: previous.orderCount };
@@ -592,7 +634,7 @@ export default function SellerHomeCommerceDashboard({
   };
 
   const tiles: SellerDashboardStatTileData[] = data ? (['orders', 'visitors', 'conversion', 'aov'] as MetricKey[]).map((key) => {
-    const tilesPrevious = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
+    const tilesPrevious = data.previous ?? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 };
     const agg = key === 'orders' ? { current: data.orderCount, previous: tilesPrevious.orderCount }
       : key === 'visitors' ? { current: data.visitorCount, previous: tilesPrevious.visitorCount }
       : key === 'conversion' ? {
@@ -675,7 +717,7 @@ export default function SellerHomeCommerceDashboard({
                   // Never a fabricated "+31.1%"-style comparison for a
                   // brand-new/zero-sales account — matches Shopify's own
                   // zero-state chart ("$0.00 —", no percent).
-                  <Text style={[styles.heroDelta, { color: theme.muted }]}>No sales yet</Text>
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{EMPTY_CHART_MESSAGE[range]}</Text>
                 ) : deltaLine && scrubIndex === null && heroSettled ? (
                   <Text
                     style={[
@@ -702,6 +744,8 @@ export default function SellerHomeCommerceDashboard({
                 onScrub={setScrubIndex}
                 isEmpty={isEmptyChart}
                 formatValue={(v) => formatMetricValue(metric, v)}
+                emptyMessage={EMPTY_CHART_MESSAGE[range]}
+                showNowMarker={range === 'today'}
               />
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
