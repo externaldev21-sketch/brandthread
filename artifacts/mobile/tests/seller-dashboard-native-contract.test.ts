@@ -19,7 +19,7 @@ describe('seller dashboard native interaction contract', () => {
     expect(deviceFlow).toContain('markerAfter.y >= markerBefore.y - 20');
   });
 
-  it('keeps all six centered Studio actions, backdrop, swipe/backdrop dismiss, navigation, and gating in the device contract', () => {
+  it('keeps the Studio card carousel, backdrop, swipe/backdrop dismiss, navigation, and gating in the device contract', () => {
     expect(studio).toContain('justifyContent: \'center\'');
     expect(studio).toContain('testID="seller-studio-menu-backdrop"');
     // No close (X) button anywhere — swipe-down and backdrop tap are the
@@ -30,8 +30,8 @@ describe('seller dashboard native interaction contract', () => {
     expect(studio).toContain('GestureDetector');
     expect(studio).toContain('GROWTH_PLAN_ENFORCEMENT_ENABLED');
     expect(studio).toContain("!hasPlan('growth')");
-    expect(studio).toContain('setUpsellFeature(action.label)');
-    expect(studio).toContain('router.push(action.route as never)');
+    expect(studio).toContain('setUpsellFeature(item.label)');
+    expect(studio).toContain('router.push(item.route as never)');
     for (const label of [
       'Design Studio',
       'Mockup to Model',

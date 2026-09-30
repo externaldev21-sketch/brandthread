@@ -140,6 +140,38 @@ async function swipeDownToCloseStudio() {
   });
 }
 
+// The Studio sheet is a scrub carousel now (one card at a time, dragged
+// through), not a grid where every destination was simultaneously visible —
+// so reaching a given label means dragging the card area left in short
+// steps (each step advances a few cards; see lib/studioCardCarousel.ts's
+// CARD_SCRUB_STEP_PX) until it appears, bounded so a missing/renamed label
+// fails fast instead of hanging.
+async function scrubStudioCardsTo(label, maxSteps = 20) {
+  const { width, height } = await request(`/session/${sessionId}/window/rect`, undefined, 'GET');
+  const y = Math.round(height * 0.6);
+  for (let i = 0; i < maxSteps; i++) {
+    try {
+      return await find(label);
+    } catch {
+      await request(`/session/${sessionId}/actions`, {
+        actions: [{
+          type: 'pointer',
+          id: 'seller-studio-card-scrub',
+          parameters: { pointerType: 'touch' },
+          actions: [
+            { type: 'pointerMove', duration: 0, x: Math.round(width * 0.8), y },
+            { type: 'pointerDown', button: 0 },
+            { type: 'pointerMove', duration: 120, x: Math.round(width * 0.2), y },
+            { type: 'pointerUp', button: 0 },
+          ],
+        }],
+      });
+      await sleep(150);
+    }
+  }
+  throw new Error(`Could not scrub the Studio card carousel to "${label}"`);
+}
+
 async function verifyCreateRoutes() {
   const labels = ['New post', 'New product', 'Start a boost'];
   for (const label of labels) {
@@ -180,6 +212,9 @@ try {
 
   await tap('Open Studio tools');
   await waitFor('Studio tools dark backdrop');
+  // The carousel shows one card at a time — scrub to each of the six Growth
+  // Studio tools (they're grouped at the end of the list) rather than
+  // expecting them all on screen together like the old grid.
   for (const label of [
     'Design Studio',
     'Mockup to Model',
@@ -188,7 +223,7 @@ try {
     'Create Ad',
     'AI Photoshoot',
   ]) {
-    await waitFor(label);
+    await scrubStudioCardsTo(label);
   }
   await tap('Dismiss Studio tools backdrop');
   await absent('Design Studio');
@@ -201,7 +236,10 @@ try {
   }
   await absent('Design Studio');
 
+  // Release-on-card = instant go: scrub to a card and tap it, same as
+  // lifting the finger there would do.
   await tap('Open Studio tools');
+  await scrubStudioCardsTo('Design Studio');
   await tap('Design Studio');
   await absent('Design Studio');
 
