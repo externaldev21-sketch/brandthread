@@ -4,14 +4,13 @@
  * in the app's own monochrome + Thread Cash green tokens. Built on the same
  * Modal + SheetRise + useAppTheme() pattern as LiveProductsSheet.tsx.
  *
- * When `recipientId` is a real host userId (the app/live.tsx pager), sending
- * is a real `api.threadCash.send()` transfer, same call
- * components/thread-cash/ChatAttachThreadCash.tsx uses to send in a DM — the
- * server independently re-checks mutual follow at send/claim either way, so
- * this affordance is never the actual security boundary. Without a
- * `recipientId` (app/live-feed.tsx's sample rooms, which have no real host
- * account to transfer to), sending stays local-only: it decrements the
- * shown balance and the caller posts a chat line, same as before.
+ * When `recipientId` and `streamId` are both real (the app/live.tsx pager),
+ * sending is a real `api.threadCash.liveGift()` call — instant, never
+ * gated on mutual follow (a viewer gifting a host they're watching rarely
+ * follows them back), unlike `api.threadCash.send()`'s friend-to-friend
+ * transfer. Without a `streamId` (app/live-feed.tsx's sample rooms, which
+ * have no real host account to transfer to), sending stays local-only: it
+ * decrements the shown balance and the caller posts a chat line.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -31,13 +30,16 @@ import { hapticLight } from '@/lib/haptics';
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
 export function LiveThreadCashSheet({
-  visible, brandName, recipientId, onClose, onSent, onSendFailed,
+  visible, brandName, recipientId, streamId, onClose, onSent, onSendFailed,
 }: {
   visible: boolean;
   brandName: string;
-  /** Real host userId to transfer to. Omit for a sample room with no real
+  /** Real host userId to gift. Omit for a sample room with no real
    *  account behind it — sending then stays local-only (see module doc). */
   recipientId?: string | null;
+  /** Real live stream id, required alongside `recipientId` for a real gift
+   *  (the server looks up the authoritative host from it). */
+  streamId?: string | null;
   onClose: () => void;
   /** Fires once the gift is actually sent (transferred, or locally mocked
    *  when there's no `recipientId`) — the caller posts the chat line. */
@@ -90,10 +92,10 @@ export function LiveThreadCashSheet({
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
     hapticLight();
-    if (recipientId && !isPreviewThreadCashEnabled()) {
+    if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
       try {
-        await api.threadCash.send({
-          recipientId,
+        await api.threadCash.liveGift({
+          streamId,
           amountCents: selected,
           idempotencyKey: randomUUID(),
         });

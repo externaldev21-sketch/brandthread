@@ -2814,6 +2814,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
       cancel: (body: { transferId: string }) =>
         post<{ ok: boolean }>('/api/thread-cash/cancel', body),
+      /**
+       * Gift a live stream's host. Unlike `send`, this is never gated on
+       * mutual follow and lands on the seller's balance instantly — no
+       * pending/claim step, matching how a viewer actually relates to a
+       * host they're watching.
+       */
+      liveGift: (body: { streamId: string; amountCents: number; idempotencyKey: string }) =>
+        post<{ ok: boolean; giftId: string }>('/api/thread-cash/live-gift', body),
       /** Preview the payout (after any fee) for cashing out a Thread Cash amount, at the live rate. */
       cashOutQuote: (threadCashCents: number) =>
         get<{ threadCashCents: number; payoutCents: number; feeCents: number }>(`/api/thread-cash/quote?threadCashCents=${threadCashCents}`),
