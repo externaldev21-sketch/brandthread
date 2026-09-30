@@ -10,7 +10,8 @@ import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
-import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/layout';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -278,7 +279,7 @@ export default function PayoutsScreen() {
             <EmptyState
               icon="inbox"
               title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-              description={balance?.connected === false
+              message={balance?.connected === false
                 ? 'Add a bank account under Bank account to start receiving payouts.'
                 : 'Payouts show up here once your available balance clears.'}
             />

@@ -11,9 +11,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ListSkeleton } from '@/components/layout';
+import { EmptyState, ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
@@ -300,7 +300,7 @@ export default function SellerInboxScreen() {
           <EmptyState
             icon="message-circle"
             title="No messages yet"
-            description="When buyers message you about products or orders, their conversations will appear here."
+            message="When buyers message you about products or orders, their conversations will appear here."
           />
         </View>
       ) : (
