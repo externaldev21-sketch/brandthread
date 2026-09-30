@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { FS } from '@/lib/theme';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -152,7 +153,12 @@ export default function KlaviyoIntegrationScreen() {
               <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.disconnectBtn} onPress={handleDisconnect} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.disconnectBtn}
+              onPress={handleDisconnect}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Klaviyo</Text>
             </TouchableOpacity>
           </View>
@@ -183,6 +189,7 @@ export default function KlaviyoIntegrationScreen() {
               style={styles.helpRow}
               onPress={() => Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267')}
               activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Feather name="external-link" size={13} color={colors.primary} />
               <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my Private API Key?</Text>
@@ -212,7 +219,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 14 },
   connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
-  connectBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  connectBtnText: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
   helpText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
 
@@ -226,7 +233,7 @@ const styles = StyleSheet.create({
   syncedText: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 16 },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingVertical: 12, marginBottom: 10 },
   secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  disconnectBtn: { alignItems: 'center', paddingVertical: 8 },
+  disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 8 },
   disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 
   infoBlock: { flexDirection: 'row', gap: 8, marginTop: 20, paddingHorizontal: 4 },
