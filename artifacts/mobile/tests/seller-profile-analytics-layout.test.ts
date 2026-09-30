@@ -20,15 +20,23 @@ const analyticsKitSource = fs.readFileSync(
 describe('seller profile action layout', () => {
   // Instagram own-business-profile shape (mobbin.com/screens/
   // 7b7b7c39-39a7-4ba6-bf3a-45c009a4769d): a "Professional dashboard" row
-  // above one row of three buttons — Edit profile / Share profile / Contact
-  // — replacing the old six-button wall (Edit Profile, Settings, Go Live,
-  // Create Post, My Profile, Messages). Settings stays in the top-right
-  // gear; Go Live and Create Post move into the Studio control center.
-  it('shows the Professional dashboard row and only Edit profile / Share profile / Contact below it', () => {
+  // above the action row — replacing the old six-button wall (Edit Profile,
+  // Settings, Go Live, Create Post, My Profile, Messages), then later
+  // trimmed by Dev to just Edit (compact, left) + one long Messages button
+  // (ProfileEditMessagesRow) — Share moved off the action row (it's still
+  // reachable from the top-bar share icon) and Contact was folded into the
+  // new Messages button. Settings stays in the top-right gear; Go Live and
+  // Create Post live in the Studio control center.
+  it('shows the Professional dashboard row and the Edit + Messages action row below it', () => {
     expect(profileSource).toContain('Professional dashboard');
-    expect(profileSource).toContain('accessibilityLabel="Edit profile"');
-    expect(profileSource).toContain('accessibilityLabel="Share profile"');
-    expect(profileSource).toContain('accessibilityLabel="Contact"');
+    expect(profileSource).toContain('<ProfileEditMessagesRow');
+    expect(profileSource).toContain("onEdit={() => nav('/edit-profile')}");
+    expect(profileSource).toContain("onMessages={() => nav('/seller-inbox')}");
+    // The top-bar share icon (testID="seller-share-profile-btn") keeps its
+    // own "Share profile" accessibility label — only the action row's
+    // separate Share text button is gone.
+    expect(profileSource).not.toContain('testID="profile-share-btn"');
+    expect(profileSource).not.toContain('testID="profile-contact-btn"');
     expect(profileSource).not.toContain("label='Go Live'");
     expect(profileSource).not.toContain('accessibilityLabel="Go Live"');
     expect(profileSource).not.toContain("label='Create Post'");
