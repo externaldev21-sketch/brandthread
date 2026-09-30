@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { centsAtPercent, formatCents } from '@/lib/money';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { mapDelivery } from '@/lib/deliveryGuarantee';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
   HeldFundsRecord, PayoutMilestone, Fulfillment, FulfillmentGroup,
@@ -621,8 +622,9 @@ function mapBuyerFulfillmentStatus(dbStatus: string): FulfillmentStatus {
   }
 }
 
-function mapApiBuyerOrder(o: any): BuyerOrderView {
+export function mapApiBuyerOrder(o: any): BuyerOrderView {
   const address = o.shippingAddress;
+  const delivery = mapDelivery(o.delivery);
   return {
     id:                o.id,
     orderNumber:       o.orderNumber,
@@ -662,9 +664,12 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
     trackingStatus:    o.trackingStatus    ?? undefined,
     estimatedDelivery: o.estimatedDelivery ?? undefined,
     shippedAt:         o.shippedAt         ?? undefined,
-    isPreOrder:        false,
+    paidAt:            o.paidAt            ?? undefined,
+    isPreOrder:        delivery?.isPreorder ?? false,
+    preOrderEstShipDate: delivery?.promisedShipDate ?? undefined,
     hasReturnRequest: false,
     cancellationReason: o.cancellationReason ?? null,
+    delivery,
     createdAt:          o.createdAt ?? now(),
   };
 }
