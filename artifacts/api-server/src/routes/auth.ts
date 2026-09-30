@@ -22,6 +22,7 @@ import {
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
+import { AGE_RESTRICTED_MESSAGE, bandMaySellOrEarn, denyIfAgeRestricted } from "../lib/ageGate";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -704,6 +705,12 @@ router.post(
           },
         } as const;
       }
+      if (accountType === "seller" && !bandMaySellOrEarn(existing.ageBand)) {
+        return {
+          status: 403,
+          body: { error: AGE_RESTRICTED_MESSAGE, code: "AGE_RESTRICTED" },
+        } as const;
+      }
       const hasIdentity =
         existing.name.trim().length >= 2 &&
         (existing.displayName?.trim().length ?? 0) >= 2 &&
@@ -860,6 +867,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       res.status(400).json({ error: "accountType must be buyer or seller" });
       return;
     }
+    if (accountType === "seller" && await denyIfAgeRestricted(clerkId, res)) return;
     updates.accountType = accountType;
   }
   if (appThemeId !== undefined) updates.appThemeId = appThemeId;

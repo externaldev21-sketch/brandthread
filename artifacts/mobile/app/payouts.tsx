@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAgeStatus } from '@/lib/ageGate';
+import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -62,6 +64,12 @@ function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
 }
 
 export default function PayoutsScreen() {
+  const age = useAgeStatus();
+  if (age.status !== 'ok') return <AgeRestrictedScreen title="Payouts" status={age.status} onResolved={age.setBand} />;
+  return <PayoutsScreenContent />;
+}
+
+function PayoutsScreenContent() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles

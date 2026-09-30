@@ -12,6 +12,8 @@
  */
 import { LegalConsent } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
+import { AgeDobField } from '@/components/age/AgeNotices';
+import { checkDobInput, formatDobInput, setPendingDob, submitPendingAge } from '@/lib/ageGate';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -659,6 +661,16 @@ function BuyerAuthStep({
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [dobText, setDobText] = useState('');
+  const [dobError, setDobError] = useState<string | null>(null);
+  // Date of birth is validated here and held in memory only; the server keeps just the age band.
+  function requireAge(): boolean {
+    const check = checkDobInput(dobText, { seller: false });
+    if (!check.ok) { setDobError(check.error); setPendingDob(null); return false; }
+    setDobError(null);
+    setPendingDob(check.dob);
+    return true;
+  }
   const [consentError, setConsentError] = useState(false);
   function requireConsent(): boolean {
     if (!agreedToTerms) {
@@ -697,6 +709,7 @@ function BuyerAuthStep({
   async function handleSignUp() {
     if (!canSubmit || loading) return;
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     if (isSignedIn) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
       setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
@@ -766,6 +779,7 @@ function BuyerAuthStep({
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     setOAuth(provider);
     setError('');
     try {
@@ -969,6 +983,16 @@ function BuyerAuthStep({
 
           {error ? <Text style={sba.error}>{error}</Text> : null}
 
+          <AgeDobField
+            value={dobText}
+            onChange={(t) => { setDobText(t); setDobError(null); }}
+            error={dobError}
+            wrapStyle={sba.inputWrap}
+            labelStyle={sba.label}
+            inputStyle={sba.input}
+            hintStyle={sba.hint}
+          />
+
           <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 16 }} />
 
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
@@ -984,6 +1008,16 @@ function BuyerAuthStep({
       <ScrollView contentContainerStyle={sba.chooseScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={sba.chooseHeadline}>Sign up</Text>
         <Text style={sba.chooseSub}>Discover brands, buy products, and follow the drops that move you.</Text>
+
+        <AgeDobField
+          value={dobText}
+          onChange={(t) => { setDobText(t); setDobError(null); }}
+          error={dobError}
+          wrapStyle={sba.inputWrap}
+          labelStyle={sba.label}
+          inputStyle={sba.input}
+          hintStyle={sba.hint}
+        />
 
         <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 20 }} />
 
@@ -1114,6 +1148,16 @@ function SharedAuthStep({
   // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
   // is required before any account is created (email, Google or Apple).
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [dobText, setDobText] = useState('');
+  const [dobError, setDobError] = useState<string | null>(null);
+  // Date of birth is validated here and held in memory only; the server keeps just the age band.
+  function requireAge(): boolean {
+    const check = checkDobInput(dobText, { seller: true });
+    if (!check.ok) { setDobError(check.error); setPendingDob(null); return false; }
+    setDobError(null);
+    setPendingDob(check.dob);
+    return true;
+  }
   const [consentError, setConsentError] = useState(false);
   function requireConsent(): boolean {
     if (!agreedToTerms) {
@@ -1166,6 +1210,7 @@ function SharedAuthStep({
   async function handleSignUp() {
     if (!canSubmit || loading) return;
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     if (!passwordsMatch) { setError('Passwords do not match.'); return; }
     if (isSignedIn && !allowSignedInAccountCreation) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
@@ -1247,6 +1292,7 @@ function SharedAuthStep({
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     if (!requireConsent()) return;
+    if (!requireAge()) return;
     setOAuth(provider);
     setError('');
     try {
@@ -1476,6 +1522,19 @@ function SharedAuthStep({
             autoCorrect={false}
             maxLength={12}
             hint="Enter the code from the friend who invited you."
+          />
+        </Reveal>
+
+        <Reveal index={9}>
+          <FloatingInput
+            testID="onboarding-dob-input"
+            value={dobText}
+            onChangeText={(t) => { setDobText(formatDobInput(t)); setDobError(null); }}
+            label="Date of birth"
+            placeholder="MM/DD/YYYY"
+            keyboardType="number-pad"
+            maxLength={10}
+            error={dobError}
           />
         </Reveal>
 
@@ -2196,6 +2255,7 @@ export default function OnboardingScreen() {
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
+      await submitPendingAge(api);
       profileId = profile.clerkId;
       const updated = await api.auth.updateProfile({
         name,
@@ -2290,6 +2350,7 @@ export default function OnboardingScreen() {
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
+      await submitPendingAge(api);
       await api.auth.onboarding({
         brandName: brandName.trim(),
         brandStage,

@@ -26,6 +26,7 @@
  * `live_viewers` table (a WebSocket heartbeat, or the /heartbeat route as
  * an HTTP fallback) by jobs/liveViewersPresence.ts.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -83,6 +84,7 @@ function randomChannelName(): string {
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
 router.post("/start", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
+  if (await denyIfAgeRestricted(sellerId, res)) return;
   const { title, description, thumbnailUrl, productTags = [] } = req.body;
 
   if (!title?.trim()) return res.status(400).json({ error: "title is required" });

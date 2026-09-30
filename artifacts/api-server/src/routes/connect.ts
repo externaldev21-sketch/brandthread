@@ -2,6 +2,7 @@
  * Stripe Connect endpoints for seller onboarding and payout management.
  * Mounted at /api/seller/connect — all routes require Clerk auth.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import type Stripe from "stripe";
 import { db, users } from "@workspace/db";
@@ -50,6 +51,7 @@ router.post("/onboard", async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
+    if (await denyIfAgeRestricted(clerkUserId, res)) return;
 
     const baseUrl = `${getWebOrigin("https://localhost:3000")}/api-server`;
     const {

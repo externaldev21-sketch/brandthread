@@ -22,11 +22,15 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+import { useAgeStatus } from '@/lib/ageGate';
+import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
 
 export default function SellerGoLiveScreen() {
+  const age = useAgeStatus();
+  if (age.status !== 'ok') return <AgeRestrictedScreen title="Go live" status={age.status} onResolved={age.setBand} />;
   if (Platform.OS === 'web') {
     return (
       <NativeOnlyFeature
