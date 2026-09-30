@@ -432,7 +432,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   pillWrap: { position: 'absolute', left: 0, right: 0, bottom: SP.sm, alignItems: 'center' },
   newPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, height: 34,
-    paddingHorizontal: SP.md, borderRadius: radius.md, backgroundColor: theme.accent,
+    paddingHorizontal: SP.md, borderRadius: radius.sm, backgroundColor: theme.accent,
   },
   newPillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.onAccent },
   overlayText: { fontSize: 15, fontFamily: FONT.regular, lineHeight: 21 },
