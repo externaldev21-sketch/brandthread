@@ -50,9 +50,10 @@ import {
   estimateBoostReach,
   buildBoostReturnUrl,
 } from '@/services/boostService';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -288,12 +289,10 @@ function StepDots({ total, current }: { total: number; current: number }) {
 function PostThumbnail({ target }: { target: BoostTarget }) {
   const thumbnailUrl = target.mediaUrls?.[0] ?? target.mediaUrl;
 
+  // Honest UI: a post with no real thumbnail shows a plain card, never a
+  // generic film-strip icon standing in for a real image.
   if (!thumbnailUrl) {
-    return (
-      <View style={tc.fallback}>
-        <Feather name="film" size={22} color={MUTED} />
-      </View>
-    );
+    return <View style={tc.fallback} />;
   }
 
   return (
@@ -347,7 +346,12 @@ const tc = StyleSheet.create({
 });
 
 // ─── Dev preview fallback targets ────────────────────────────────────────────
-// Shown only when isSellerDevPreview() is true AND the real API returns 401/error.
+// Shown only when isSellerDevPreview() AND isPreviewDemoMode() are both true
+// (i.e. `?bt_preview=seller&demo=1`) and the real API returns 401/error. A
+// FRESH preview (no `&demo=1`) must show the real "no eligible posts yet"
+// empty state instead — a brand-new seller has nothing to promote, and this
+// screen must never look pre-populated by default (see lib/devPreview.ts's
+// isPreviewFreshMode/isPreviewDemoMode doc comment, and PR #373/#374).
 // No fake business metrics — just clearly-labeled placeholders for UI review.
 
 const PREVIEW_BOOST_TARGETS: BoostTarget[] = [
@@ -403,13 +407,18 @@ export default function BoostScreen() {
   const inSellerPreview = isSellerDevPreview(
     params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
   );
+  // Orthogonal to role — read bare (no synthetic override) so it sees the
+  // real `&demo=1` query param / its persisted mirror, same as every other
+  // already-fixed screen (e.g. SellerHomeCommerceDashboard.tsx).
+  const inSellerPreviewDemo = inSellerPreview && isPreviewDemoMode();
+  const previewTargets = inSellerPreviewDemo ? PREVIEW_BOOST_TARGETS : [];
 
   // ── State ─────────────────────────────────────────────────────────────────
 
   const [step,             setStep]             = useState<0 | 1 | 2>(0);
   const [selectedTarget,   setSelectedTarget]   = useState<BoostTarget | null>(null);
   const [targets,          setTargets]          = useState<BoostTarget[]>(
-    inSellerPreview ? PREVIEW_BOOST_TARGETS : [],
+    inSellerPreview ? previewTargets : [],
   );
   const [loadingTargets,   setLoadingTargets]   = useState(!inSellerPreview);
   const [targetsError,     setTargetsError]     = useState(false);
@@ -462,13 +471,15 @@ export default function BoostScreen() {
 
   const inSellerPreviewRef = useRef(inSellerPreview);
   inSellerPreviewRef.current = inSellerPreview;
+  const previewTargetsRef = useRef(previewTargets);
+  previewTargetsRef.current = previewTargets;
 
   // Direct Expo web navigation can render before a focus event is delivered.
   // Seed preview state explicitly so the screen never remains on its initial
   // loading flags while waiting for authenticated API calls it cannot make.
   useEffect(() => {
     if (!inSellerPreview) return;
-    setTargets(PREVIEW_BOOST_TARGETS);
+    setTargets(previewTargets);
     setTargetsError(false);
     setLoadingTargets(false);
     setExisting([]);
@@ -478,7 +489,7 @@ export default function BoostScreen() {
       spentCentsThisMonth: 0,
       activeCount: 0,
     });
-  }, [inSellerPreview]);
+  }, [inSellerPreview, previewTargets]);
 
   const loadTargets = useCallback(async () => {
     setLoadingTargets(true);
@@ -490,10 +501,10 @@ export default function BoostScreen() {
       const status = e?.status ?? e?.response?.status;
       const is401  = status === 401 || String(e?.message ?? '').includes('401');
       if (inSellerPreviewRef.current) {
-        // Dev web preview: 401 is expected (no token). Show labeled placeholders
-        // so the post picker and budget/duration steps can be reviewed.
-        // Any other error in preview also falls back to placeholders.
-        setTargets(PREVIEW_BOOST_TARGETS);
+        // Dev web preview: 401 is expected (no token). In demo mode, show
+        // labeled placeholders so the post picker and budget/duration steps
+        // can be reviewed; in fresh mode, an honest empty state instead.
+        setTargets(previewTargetsRef.current);
         setTargetsError(false);
       } else {
         // Production / native / buyer preview: preserve real error state.
@@ -532,7 +543,7 @@ export default function BoostScreen() {
   // regardless of how many times useApi() returns a newly-allocated facade.
   useFocusEffect(useCallback(() => {
     if (inSellerPreviewRef.current) {
-      setTargets(PREVIEW_BOOST_TARGETS);
+      setTargets(previewTargetsRef.current);
       setTargetsError(false);
       setLoadingTargets(false);
       setExisting([]);
@@ -911,23 +922,21 @@ export default function BoostScreen() {
               <ActivityIndicator color={FG} size="large" />
             </View>
           ) : targetsError ? (
-            <View style={s.emptyState}>
-              <Feather name="lock" size={ICON.xl} color={MUTED} />
-              <Text style={s.emptyTitle}>Sign in to continue</Text>
-              <Text style={s.emptyBody}>
-                Your session may have expired. Sign in again to load your eligible posts.
-              </Text>
-              <Button label="Retry" variant="secondary" size="small" onPress={loadTargets} style={s.retryBtn} />
-            </View>
+            <EmptyState
+              icon="lock"
+              title="Sign in to continue"
+              description="Your session may have expired. Sign in again to load your eligible posts."
+              action={{ label: 'Retry', onPress: loadTargets }}
+              compact
+            />
           ) : targets.length === 0 ? (
-            <View style={s.emptyState}>
-              <Feather name="film" size={ICON.xl} color={MUTED} />
-              <Text style={s.emptyTitle}>No eligible posts yet</Text>
-              <Text style={s.emptyBody}>
-                Publish a video or a slideshow with 2+ images, then come back to Promote.
-              </Text>
-              <Button label="Create a Post" variant="secondary" size="small" onPress={() => router.push('/create-post')} style={s.retryBtn} />
-            </View>
+            <EmptyState
+              icon="film"
+              title="No eligible posts yet"
+              description="Publish a video or a slideshow with 2+ images, then come back to Promote."
+              action={{ label: 'Create a Post', onPress: () => router.push('/create-post') }}
+              compact
+            />
           ) : (
             <View style={s.grid}>
               {targets.map((t) => (
@@ -1133,15 +1142,15 @@ export default function BoostScreen() {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
 
-  // Summary card
+  // Summary row — flat, no boxed container (per the app's monochrome "no
+  // grey boxes" rule): a plain row separated from the content below it by
+  // a hairline, matching how the dashboard's own balance row reads.
   summaryCard: {
     flexDirection: 'row',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.md,
+    paddingBottom: SP.md,
     marginBottom: SP.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
   },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryValue: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, marginBottom: 2 },
@@ -1195,12 +1204,8 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Empty / error states
+  // Loading state (the real empty/error states now use the shared EmptyState)
   centeredState: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xl },
-  emptyState:    { alignItems: 'center', paddingVertical: SP.xl * 1.5, gap: SP.sm },
-  emptyTitle:    { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  emptyBody:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
-  retryBtn:      { marginTop: SP.sm },
 
   // Selected target banner
   targetBanner: {
