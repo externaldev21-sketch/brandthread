@@ -255,7 +255,7 @@ export default function StoreBuilderScreen() {
             onPress={leaveSetupDestination}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.75}
-            style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
+            style={{ width: 44, height: 44, alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
           >
             <Feather name="arrow-left" size={ICON.sm} color={theme.onAccent} />
           </TouchableOpacity>

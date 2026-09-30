@@ -42,7 +42,7 @@ export default function ProductSizeChartScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const t = useMemo(() => makeTableStyles(theme), [theme]);
-  const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
+  const { productId } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
@@ -189,7 +189,6 @@ export default function ProductSizeChartScreen() {
     <View style={[s.root, { paddingTop: headerTopInset }]}>
       <BrandthreadHeader
         title="Size Chart"
-        subtitle={productName ?? undefined}
         onBack={() => goBackOr(router)}
       />
 

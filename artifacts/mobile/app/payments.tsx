@@ -418,7 +418,7 @@ export default function PaymentsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <Toast message={toast.message} visible={toast.visible} />
-      <ScreenHeader title="Payments" subtitle="Drop payouts & methods" />
+      <ScreenHeader title="Payments" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 120, paddingHorizontal: 20 }}

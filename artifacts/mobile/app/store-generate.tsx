@@ -886,7 +886,6 @@ export default function StoreGenerateScreen() {
     <View style={[st.root, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Generate My Store"
-        subtitle={`Step ${step} of ${TOTAL_STEPS}`}
         onBack={handleBack}
         rightElement={
           <TouchableOpacity onPress={handleSaveAndExit} style={st.saveExitBtn} activeOpacity={0.7}>

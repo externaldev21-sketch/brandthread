@@ -24,7 +24,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 
 import {
   getQuote, getCounteroffersForQuote, acceptQuote, declineQuote,
-  submitCounteroffer, getOrCreateConversation, createSample, getManufacturer,
+  submitCounteroffer, getOrCreateConversation, createSample,
 } from '@/services/manufacturerService';
 import { Quote, Counteroffer } from '@/services/manufacturerTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -182,7 +182,6 @@ export default function QuoteDetailScreen() {
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [counteroffers, setCounteroffers] = useState<Counteroffer[]>([]);
-  const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCounterForm, setShowCounterForm] = useState(mode === 'counter');
@@ -200,8 +199,6 @@ export default function QuoteDetailScreen() {
       if (q && generation === loadGeneration.current) {
         setQuote(q);
         setCounteroffers(cos);
-        const mfg = await getManufacturer(q.manufacturerId);
-        if (generation === loadGeneration.current) setManufacturerName(mfg?.name ?? 'Manufacturer');
       } else if (generation === loadGeneration.current) setQuote(null);
     } catch {
       if (generation === loadGeneration.current) setQuote(null);
@@ -342,7 +339,6 @@ export default function QuoteDetailScreen() {
     <BrandthreadScreen noSafeTop>
       <ScreenHeader
         title="Quote Details"
-        subtitle={manufacturerName}
         onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView

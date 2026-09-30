@@ -153,7 +153,7 @@ export default function StoreGeneratingScreen() {
         onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
-        style={{ position: 'absolute', top: headerTopInset + 12, left: SP.md, width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+        style={{ position: 'absolute', top: headerTopInset + 12, left: SP.md, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
       >
         <Feather name="arrow-left" size={ICON.sm} color={FG} />
       </TouchableOpacity>

@@ -120,7 +120,6 @@ export default function CustomersScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        subtitle="Your customer list"
         rightElement={
           <TouchableOpacity
             onPress={() => router.navigate('/(tabs)/analytics' as never)}

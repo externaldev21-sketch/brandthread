@@ -541,15 +541,13 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    width: 44, height: 44,
     alignItems: 'center', justifyContent: 'center',
     margin: SP.md,
   },
   backBtnHero: {
     position: 'absolute', top: 0, left: SP.md,
-    width: 36, height: 36, borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    width: 44, height: 44,
     alignItems: 'center', justifyContent: 'center',
     zIndex: 10,
   },

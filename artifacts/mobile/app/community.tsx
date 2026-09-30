@@ -78,7 +78,6 @@ export default function CommunityScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Community"
-        subtitle="Hire vetted creatives for your brand"
         rightElement={
           <PressableScale
             onPress={() => router.push('/freelancer-jobs' as any)}

@@ -256,7 +256,7 @@ export default function TechPackGeneratorScreen() {
       style={[styles.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScreenHeader title="Tech Pack Generator" subtitle="Professional tech packs for manufacturers" />
+      <ScreenHeader title="Tech Pack Generator" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.stepRow}>

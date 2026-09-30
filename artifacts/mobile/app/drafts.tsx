@@ -172,9 +172,6 @@ export default function DraftsScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="In-progress drafts"
-        subtitle={filterQuery.trim()
-          ? `${visibleDrafts.length} of ${drafts.length} drafts`
-          : `${drafts.length} draft${drafts.length === 1 ? '' : 's'}`}
         onBack={() => goBackOr(router)}
       />
 

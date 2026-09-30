@@ -689,7 +689,6 @@ export default function SampleDetailScreen() {
     <BrandthreadScreen noSafeTop>
       <ScreenHeader
         title="Sample Details"
-        subtitle={manufacturerName}
         onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>

@@ -130,7 +130,7 @@ export default function AnalyticsContentScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Content Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
+      <ScreenHeader title="Content Analytics" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={3} listRows={3} />
       ) : loadError && !data ? (

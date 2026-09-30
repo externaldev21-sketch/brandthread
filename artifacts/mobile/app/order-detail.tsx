@@ -786,7 +786,6 @@ export default function OrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={order.orderNumber}
-        subtitle={order.customer.name}
         variant="push"
         onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}

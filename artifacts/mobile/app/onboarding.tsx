@@ -2859,7 +2859,7 @@ const createSm = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SPACE.lg,
     paddingBottom: 8,
   },
-  backBtn:   { width: 36, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  backBtn:   { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   weave:     { position: 'absolute', left: 0, right: 0, zIndex: 0, opacity: 0.9 },
   stepWrap:  { flex: 1, paddingHorizontal: SPACE.lg },
   interactiveStepWrap: { position: 'relative', zIndex: 2 },

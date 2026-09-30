@@ -111,7 +111,6 @@ export default function ReturnDetailScreen() {
   const header = (
     <ScreenHeader
       title={view ? `Return · #${view.orderNumber}` : 'Return'}
-      subtitle={view ? (viewer === 'seller' ? view.buyerName : view.sellerName) : undefined}
       onBack={() => goBackOr(router)}
     />
   );

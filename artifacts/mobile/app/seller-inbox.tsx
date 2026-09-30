@@ -402,8 +402,6 @@ export default function SellerInboxScreen() {
     );
   }
 
-  const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-
   const queryLower = query.trim().toLowerCase();
   const visibleConvs = useMemo(() => convs
     .filter((c) => {
@@ -421,7 +419,6 @@ export default function SellerInboxScreen() {
     <View style={s.root}>
       <ScreenHeader
         title="Messages"
-        subtitle={totalUnread > 0 ? `${totalUnread} unread` : undefined}
         actions={[{
           icon: 'search',
           onPress: () => setSearchOpen((open) => !open),

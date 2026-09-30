@@ -280,15 +280,16 @@ describe('seller inbox unread state', () => {
     renderer = undefined;
   });
 
-  it('clears the opened row badge and total unread subtitle immediately', async () => {
+  it('clears the opened row badge immediately', async () => {
     apiMock.conversations.list.mockResolvedValue([
       conversation('unread-thread', 2),
       conversation('another-thread', 1),
     ]);
     renderer = await renderScreen();
 
-    expect(textContent(renderer)).toContain('3 unread');
     expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
+      .toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-another-thread' }, { deep: false }))
       .toHaveLength(1);
 
     const row = renderer.root.findByProps({ testID: 'seller-conversation-unread-thread' });
@@ -297,9 +298,10 @@ describe('seller inbox unread state', () => {
       await flushPromises();
     });
 
-    expect(textContent(renderer)).not.toContain('3 unread');
     expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
       .toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-another-thread' }, { deep: false }))
+      .toHaveLength(1);
     expect(routerMock.push).toHaveBeenCalledWith('/seller-conversation?id=unread-thread');
   });
 
@@ -336,11 +338,15 @@ describe('seller inbox unread state', () => {
     ]);
     renderer = await renderScreen();
 
+    const noStaleBadge = () =>
+      expect(renderer!.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
+        .toHaveLength(0);
+
     await act(async () => {
       renderer!.root.findByProps({ testID: 'seller-conversation-unread-thread' }).props.onPress();
       await flushPromises();
     });
-    expect(textContent(renderer)).not.toContain('3 unread');
+    noStaleBadge();
 
     let resolveDelayed!: (value: Conversation[]) => void;
     const delayed = new Promise<Conversation[]>((resolve) => {
@@ -348,7 +354,7 @@ describe('seller inbox unread state', () => {
     });
     apiMock.conversations.list.mockReturnValueOnce(delayed);
     await refocusScreen();
-    expect(textContent(renderer)).not.toContain('3 unread');
+    noStaleBadge();
 
     resolveDelayed([
       conversation('unread-thread', 2),
@@ -357,11 +363,11 @@ describe('seller inbox unread state', () => {
     await act(async () => {
       await flushPromises();
     });
-    expect(textContent(renderer)).not.toContain('3 unread');
+    noStaleBadge();
 
     apiMock.conversations.list.mockRejectedValueOnce(new Error('offline'));
     await refocusScreen();
-    expect(textContent(renderer)).not.toContain('3 unread');
+    noStaleBadge();
   });
 
   it('restores the server unread count after a failed read receipt and refocus', async () => {
@@ -375,7 +381,8 @@ describe('seller inbox unread state', () => {
       renderer!.root.findByProps({ testID: 'seller-conversation-unread-thread' }).props.onPress();
       await flushPromises();
     });
-    expect(textContent(renderer)).not.toContain('3 unread');
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
+      .toHaveLength(0);
 
     apiMock.conversations.list.mockResolvedValue([
       conversation('unread-thread', 2),
@@ -387,7 +394,6 @@ describe('seller inbox unread state', () => {
     });
     await refocusScreen();
 
-    expect(textContent(renderer)).toContain('3 unread');
     expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }).length)
       .toBeGreaterThan(0);
   });

@@ -25,12 +25,10 @@ type Colors = ReturnType<typeof useColors>;
 
 export function AnalyticsHeader({
   title,
-  subtitle,
   onBack,
   right,
 }: {
   title: string;
-  subtitle?: string;
   onBack?: () => void;
   right?: React.ReactNode;
 }) {
@@ -50,7 +48,6 @@ export function AnalyticsHeader({
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
         <Text style={s.title} numberOfLines={1}>{title}</Text>
-        {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
       {right}
     </View>
@@ -59,9 +56,8 @@ export function AnalyticsHeader({
 
 const headerStyles = (colors: Colors) => StyleSheet.create({
   root:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.lg },
-  backBtn:  { width: COMP.iconBtn, height: COMP.iconBtn, borderRadius: RADIUS.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  backBtn:  { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title:    { fontSize: FS.xl, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.3 },
-  subtitle: { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, marginTop: 1 },
 });
 
 /** Small pill button for a header's trailing slot (e.g. "Edit Store", "Mfr. Hub"). */

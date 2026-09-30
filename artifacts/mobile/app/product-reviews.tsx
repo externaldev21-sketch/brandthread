@@ -23,8 +23,6 @@ export default function ProductReviewsScreen() {
   const api = useApi();
   const { theme } = useAppTheme();
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
-  const [avgRating, setAvgRating] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [photosOnly, setPhotosOnly] = useState(false);
   const [starFilter, setStarFilter] = useState<StarFilter>(null);
@@ -37,8 +35,6 @@ export default function ProductReviewsScreen() {
       .then(data => {
         if (!active) return;
         setReviews(data.reviews ?? []);
-        setAvgRating(data.avgRating ?? 0);
-        setTotalCount(data.totalCount ?? 0);
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -57,7 +53,7 @@ export default function ProductReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={productName || 'Reviews'} subtitle={totalCount > 0 ? `${avgRating.toFixed(1)} · ${totalCount} reviews` : undefined} />
+      <ScreenHeader title={productName || 'Reviews'} />
       {loading ? (
         <View style={s.center}><ActivityIndicator /></View>
       ) : (

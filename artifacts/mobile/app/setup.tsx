@@ -27,8 +27,7 @@ import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import {
   getSetupState, completeTask, skipTask,
   SetupState, SetupTask, SetupTaskId,
-  completionPercent, nextTask, completedRequiredTaskCount,
-  requiredTaskCount, isSetupComplete,
+  completionPercent, nextTask, isSetupComplete,
 } from '@/lib/setupStore';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -183,15 +182,12 @@ export default function SetupScreen() {
 
   const pct = state ? completionPercent(state) : 0;
   const next = state ? nextTask(state) : null;
-  const done = state ? completedRequiredTaskCount(state) : 0;
-  const total = state ? requiredTaskCount(state) : 0;
   const allDone = state ? isSetupComplete(state) : false;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
         title="Store setup"
-        subtitle={`${done} of ${total} required completed`}
         variant="modal"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
         rightElement={

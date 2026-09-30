@@ -541,7 +541,6 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Remove Background"
-        subtitle="Clean product cutouts in seconds"
         onBack={() => goBackOr(router)}
       />
 

@@ -88,7 +88,7 @@ export default function AnalyticsCustomersScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Customer Analytics" subtitle="All time" />
+      <ScreenHeader title="Customer Analytics" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={0} listRows={4} />
       ) : loadError && !data ? (

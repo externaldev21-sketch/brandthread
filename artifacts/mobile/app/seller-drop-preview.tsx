@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   hero: { height: HERO_H, justifyContent: 'flex-end' },
   header: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  roundBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: '#8C8C8C', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6 },
   previewBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1 },
   copy: { padding: 20 },

@@ -157,7 +157,7 @@ export default function AnalyticsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1 }}>
-        <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+        <ScreenHeader title="Analytics" />
         <AnalyticsSkeleton kpiCount={2} listRows={0} />
       </View>
     );
@@ -169,7 +169,7 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+      <ScreenHeader title="Analytics" />
       <ScrollView
         ref={scrollResetRef}
         style={s.scroll}

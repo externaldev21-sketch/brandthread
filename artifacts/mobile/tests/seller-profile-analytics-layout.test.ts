@@ -98,7 +98,6 @@ describe('seller analytics overview layout', () => {
     expect(analyticsSource).not.toContain("label: '14 Days'");
     expect(analyticsSource).not.toContain("label: 'Custom'");
     expect(analyticsSource).not.toContain('label="Leads"');
-    expect(analyticsSource).toContain('Last 7 days');
     expect(analyticsSource).toContain('label="Visits"');
     expect(analyticsSource).toContain('label="Revenue"');
     expect(analyticsSource).toContain('Daily Revenue');

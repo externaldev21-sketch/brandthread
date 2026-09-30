@@ -306,7 +306,7 @@ export default function TeamScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Team Management" subtitle="Staff, permissions & tasks" />
+      <ScreenHeader title="Team Management" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}

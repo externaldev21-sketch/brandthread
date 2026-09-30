@@ -237,7 +237,7 @@ export default function FreelancerJobsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Freelance Jobs" subtitle="Escrow-protected gigs" />
+      <ScreenHeader title="Freelance Jobs" />
 
       {showTabs && (
         <View style={styles.tabsRow}>

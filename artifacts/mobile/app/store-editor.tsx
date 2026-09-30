@@ -339,13 +339,6 @@ export default function StoreEditor() {
     setStore(s);
   }
 
-  function saveStatusText() {
-    if (savingStatus === 'saving') return 'Saving...';
-    if (savingStatus === 'saved') return 'Saved';
-    if (savingStatus === 'failed') return 'Failed';
-    return '';
-  }
-
   const committedOrder = store
     ? [...store.sections].sort((a, b) => a.order - b.order).map(s => s.id)
     : [];
@@ -1146,7 +1139,6 @@ export default function StoreEditor() {
     <View style={styles.root}>
       <ScreenHeader
         title="Edit Store"
-        subtitle={savingStatus !== 'idle' ? saveStatusText() : undefined}
         onBack={() => goBackOr(router)}
         rightElement={
           <View style={styles.headerRight}>
