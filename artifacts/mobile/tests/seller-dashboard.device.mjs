@@ -120,6 +120,26 @@ async function pressAndroidBack() {
   await request(`/session/${sessionId}/back`, {});
 }
 
+// Swipe down anywhere on the Studio sheet — the only iOS dismiss gesture
+// now that the close (X) button is gone (swipe or tap the backdrop).
+async function swipeDownToCloseStudio() {
+  await find('Studio tools dark backdrop');
+  const { width, height } = await request(`/session/${sessionId}/window/rect`, undefined, 'GET');
+  await request(`/session/${sessionId}/actions`, {
+    actions: [{
+      type: 'pointer',
+      id: 'seller-studio-menu-swipe',
+      parameters: { pointerType: 'touch' },
+      actions: [
+        { type: 'pointerMove', duration: 0, x: Math.round(width / 2), y: Math.round(height * 0.35) },
+        { type: 'pointerDown', button: 0 },
+        { type: 'pointerMove', duration: 180, x: Math.round(width / 2), y: Math.round(height * 0.95) },
+        { type: 'pointerUp', button: 0 },
+      ],
+    }],
+  });
+}
+
 async function verifyCreateRoutes() {
   const labels = ['New post', 'New product', 'Start a boost'];
   for (const label of labels) {
@@ -177,7 +197,7 @@ try {
   if (isAndroid) {
     await pressAndroidBack();
   } else {
-    await tap('Close Studio tools');
+    await swipeDownToCloseStudio();
   }
   await absent('Design Studio');
 
