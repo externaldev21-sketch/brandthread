@@ -166,7 +166,7 @@ export const ProductCard = React.memo(function ProductCard({
 
           {/* Content below image */}
           <View style={s.content}>
-            <Text style={[s.name, { color: theme.text }]} numberOfLines={1}>{product.name}</Text>
+            <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
             <Text style={[s.meta, { color: theme.muted }]} numberOfLines={1}>
               {product.category}
               {product.variants.length > 0 ? ` · ${product.variants.length} variant${product.variants.length !== 1 ? 's' : ''}` : ''}
@@ -251,9 +251,14 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     padding: SP.sm,
     gap: 2,
   },
+  // lineHeight/minHeight reserve 2 full lines so the grid's rows stay aligned
+  // whether a name wraps or not (was numberOfLines={1}, which clipped long
+  // names like "Heavyweight Hoodie — Ember" instead of showing them in full).
   name: {
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
+    lineHeight: 17,
+    minHeight: 34,
     letterSpacing: -0.1,
   },
   meta: {
