@@ -1187,7 +1187,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         <View style={s.section}>
           <SectionHeader title="Pre-Order Details" />
           <BrandthreadCard>
-            <InfoRow label="Manufacturer" value={order.preOrder.manufacturerName ?? 'TBD'} />
+            <InfoRow label="Manufacturer" value={order.preOrder.manufacturerName ?? 'Not assigned yet'} />
             <InfoRow label="Production Status" value={order.preOrder.productionStatus.replace(/_/g, ' ')} />
             {order.preOrder.estimatedShipDate && (
               <InfoRow label="Est. Ship Date" value={fmtShort(order.preOrder.estimatedShipDate)} />

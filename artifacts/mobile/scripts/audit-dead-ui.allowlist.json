@@ -1,0 +1,15 @@
+[
+  { "kind": "noop", "file": "app/buyer-story-create.tsx", "match": "createCenter", "reason": "event-swallowing wrapper around a TextInput (accessibilityRole none); not a button" },
+  { "kind": "noop", "file": "app/design-bg-removal.tsx", "match": "Removing background", "reason": "disabled+loading progress button; tap intentionally does nothing" },
+  { "kind": "noop", "file": "app/product-detail.tsx", "reason": "disabled Add to Cart / Buy Now in the seller's buyer-page preview" },
+  { "kind": "noop", "file": "components/buyer-feed/LongPressMenu.tsx", "reason": "stops tap-through to the backdrop dismiss handler" },
+  { "kind": "noop", "file": "components/discover/DiscoverSafetyMenu.tsx", "reason": "stops tap-through to the backdrop dismiss handler" },
+  { "kind": "noop", "file": "components/social/RemoveFollowerSheet.tsx", "reason": "stops tap-through to the backdrop dismiss handler" },
+  { "kind": "noop", "file": "components/ui/ActionSheet.tsx", "reason": "stops tap-through to the backdrop dismiss handler" },
+  { "kind": "todo", "file": "app/(buyer)/cart.tsx", "match": "thread-cash-checkout-todo", "reason": "comment referencing a doc filename" },
+  { "kind": "todo", "file": "app/buyer-story-create.tsx", "match": "disabled \"coming soon\" item", "reason": "code comment explaining why an item was removed" },
+  { "kind": "todo", "file": "app/buyer-drop-detail.tsx", "match": "COMING SOON", "reason": "teaser label on a locked upcoming drop (real drop state, not a placeholder)" },
+  { "kind": "todo", "file": "components/chat/VoiceMessageBubble.tsx", "reason": "TRANSCRIPTION_STUB is reachable only when hasTranscription is passed; chat screens pass ALLOW_DEV_TOOLS so production never shows it" },
+  { "kind": "todo", "file": "app/buyer-story-create.tsx", "match": "Additional tools are coming soon", "reason": "OWNER: create-flow session owns this file; reported in docs/review-readiness/prod-hygiene.md" },
+  { "kind": "todo", "file": "app/create-post.tsx", "match": "Sound library coming soon", "reason": "OWNER: create-flow session owns this file; reported in docs/review-readiness/prod-hygiene.md" }
+]

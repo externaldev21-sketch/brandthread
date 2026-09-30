@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/expo';
 import { Platform, type TextStyle } from 'react-native';
 import { useApi } from '@/lib/api';
 import { isProductionPreviewHost } from '@/lib/devPreview';
+import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 
 export type AppThemeId =
   | 'monochrome' | 'purple' | 'olive' | 'navy' | 'champagne' | 'black' | 'silver'
@@ -119,9 +120,8 @@ export async function peekPersistedTheme(storage: ThemePeekStorage): Promise<App
 // check silently falls back to the default theme regardless of what's
 // requested. Still never active in a real production build (neither flag
 // set there).
-const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 const getPreviewThemeId = (): AppThemeId | null => {
-  if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return null;
+  if (!ALLOW_DEV_TOOLS) return null;
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
   if (isProductionPreviewHost()) return null;
   const requested = new URLSearchParams(window.location.search).get('bt_theme');
@@ -194,7 +194,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     // to compare computed element styles against, in the same preview-only build the crawl runs
     // against — never present in a real production build.
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    if (!__DEV__ && process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST !== '1') return;
+    if (!ALLOW_DEV_TOOLS) return;
     (window as unknown as { __btActiveTheme?: AppThemePreset }).__btActiveTheme = value.theme;
   }, [value.theme]);
   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
+import { REVENUECAT_TEST_API_KEY } from './buildFlags';
 import Purchases, { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 import { useAuth, useUser } from '@clerk/expo';
 import { useApi } from '@/lib/api';
@@ -28,7 +29,7 @@ let configured = false;
 export const queueRevenueCatIdentityTransition = createRevenueCatIdentityQueue();
 
 function apiKey(): string | undefined {
-  if (__DEV__) return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
+  if (__DEV__) return REVENUECAT_TEST_API_KEY;
   return Platform.OS === 'ios'
     ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
     : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;

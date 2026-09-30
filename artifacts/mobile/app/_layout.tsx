@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
+import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -477,8 +478,6 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // skip the Clerk/onboarding gates and jump straight to that dashboard for
 // design review. Without the query param, web behaves like every other
 // platform: real splash -> sign-up -> onboarding. Inert in production builds.
-const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
-
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   // Hard gate: never activate on the real production host, even if

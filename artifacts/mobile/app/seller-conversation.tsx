@@ -37,6 +37,7 @@ import {
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
+import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -930,6 +931,7 @@ export default function SellerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          hasTranscription={ALLOW_DEV_TOOLS}
           onViewTranscription={() => {
             setTranscriptionToast(true);
             setTimeout(() => setTranscriptionToast(false), 2600);
