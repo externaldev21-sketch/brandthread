@@ -13,14 +13,14 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyLikes, storyViews, notes, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, stories, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
-import { visibleCommentCounts } from "../lib/postVisibility";
+import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -573,6 +573,56 @@ router.get("/profile/:userId/posts", async (req, res) => {
     }
   }
   res.json(await buildBuyerPosts(myId, [other], limit, offset));
+});
+
+// ─── GET /api/social/profile/:userId/tagged ──────────────────────────────────
+// The profile "Tagged" tab: public posts where someone tagged this account.
+// Public for any signed-in viewer (like Instagram) and returns only the
+// tagged post's own public card — never anything about the tagged account's
+// private data. Block-aware in both directions (the profile and each author).
+router.get("/profile/:userId/tagged", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 30 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const other = await resolveToClerkId(req.params.userId);
+  if (!other) { res.status(404).json({ error: "User not found" }); return; }
+  if (other !== myId && (await blockRelation(myId, other)) !== "none") {
+    res.status(404).json({ error: "User not found" }); return;
+  }
+  const { limit, offset } = page.data;
+  const rows = await db.select({
+    id: posts.id,
+    userId: posts.userId,
+    mediaUrl: posts.mediaUrl,
+    thumbnailUrl: posts.thumbnailUrl,
+    mediaType: posts.mediaType,
+    caption: posts.caption,
+    createdAt: posts.createdAt,
+    authorName: users.displayName,
+    authorUsername: users.username,
+  }).from(postUserTags)
+    .innerJoin(posts, eq(posts.id, postUserTags.postId))
+    .innerJoin(users, eq(users.clerkId, posts.userId))
+    .where(and(
+      eq(postUserTags.taggedUserId, other),
+      publicPostCondition(),
+      notBlockedWith(myId, posts.userId),
+    ))
+    .orderBy(desc(postUserTags.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
+  res.json(rows.map((r) => ({
+    id: r.id,
+    authorId: r.userId,
+    authorName: r.authorName ?? null,
+    authorUsername: r.authorUsername ?? null,
+    mediaUrl: r.mediaUrl,
+    thumbnailUrl: r.thumbnailUrl ?? null,
+    mediaType: r.mediaType,
+    caption: r.caption ?? null,
+    createdAt: r.createdAt,
+    source: "post" as const,
+  })));
 });
 
 router.get("/friends/activity", async (req, res) => {

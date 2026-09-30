@@ -17,6 +17,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { toPublicPost, toPublicProduct, toPublicSellerProfile } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
@@ -1236,10 +1237,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
     if (!sellerVariantsByProduct[v.productId]) sellerVariantsByProduct[v.productId] = [];
     sellerVariantsByProduct[v.productId].push(v);
   }
-  const sellerProductsWithVariants = sellerProducts.map((p) => ({
-    ...p,
-    variants: sellerVariantsByProduct[p.id] ?? [],
-  }));
+  const sellerProductsWithVariants = sellerProducts.map((p) =>
+    toPublicProduct(p, sellerVariantsByProduct[p.id] ?? []));
 
   // Attach tagged products per post
   const postIds = sellerPosts.map((p) => p.id);
@@ -1275,7 +1274,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
 
   return res.json({
     profile: {
-      ...seller,
+      ...toPublicSellerProfile(seller),
       // Expose the canonical Clerk ID so callers can use it for follow/message/review actions.
       // This is safe: it's the functional identity needed by downstream authenticated endpoints,
       // not a secret (Clerk IDs are sent on every authenticated request header).
@@ -1292,10 +1291,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       coverVideoModerationStatus: undefined,
     },
     products: sellerProductsWithVariants,
-    posts: sellerPosts.map((p) => ({
-      ...p,
-      taggedProducts: tagsByPost.get(p.id) ?? [],
-    })),
+    posts: sellerPosts.map((p) => toPublicPost(p, tagsByPost.get(p.id) ?? [])),
   });
 });
 
@@ -1427,7 +1423,9 @@ router.get("/drops/:id", async (req, res) => {
 
   return res.json({
     ...drop,
-    seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null,
+    seller: seller
+      ? { displayName: seller.displayName, brandName: seller.brandName, verified: deriveSellerVerified(seller) }
+      : null,
     products: dropProducts.map((p) => ({ ...p, soldOut: p.stockRemaining <= 0 })),
     viewerHasEarlyAccess,
     effectiveReleaseAt,
