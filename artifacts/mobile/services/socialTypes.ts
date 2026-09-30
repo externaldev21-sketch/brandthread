@@ -471,7 +471,7 @@ export type NotificationCategory =
 
 export type NotificationType =
   | 'friend_request' | 'friend_accepted' | 'post_like' | 'post_comment'
-  | 'repost' | 'mention' | 'story_reaction' | 'story_reply' | 'new_follower'
+  | 'repost' | 'mention' | 'story_mention' | 'story_reshare' | 'story_reaction' | 'story_reply' | 'new_follower'
   | 'order_confirmed' | 'order_processing' | 'order_production'
   | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
   | 'order_out_for_delivery' | 'order_exception' | 'order_returned_to_sender'

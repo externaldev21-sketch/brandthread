@@ -85,6 +85,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/buyer-search.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
+  'app/story-mention-viewer.tsx',
   'app/c/[collectionId].tsx',
   'app/call-screen.tsx',
   'app/camera-capture.tsx',
