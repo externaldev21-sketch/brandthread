@@ -754,7 +754,6 @@ export default function BoostScreen() {
       <ScreenHeader
         title={title}
         onBack={goBack}
-        actions={[{ icon: 'x', onPress: () => goBackOr(router), accessibilityLabel: 'Close' }]}
       />
     );
   }

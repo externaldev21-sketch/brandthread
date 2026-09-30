@@ -10,12 +10,34 @@
  * from the main canvas screen) never risks crashing Expo Go/web.
  */
 
-import React, { useImperativeHandle, useMemo, useRef } from 'react';
+import React, { Component, useImperativeHandle, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { isSkiaAvailable } from '@/lib/skiaAvailability';
 import SvgDrawingCanvas, { SvgDrawingCanvasProps } from './SvgDrawingCanvas';
 import type { SkiaDrawingCanvasHandle } from './SkiaDrawingCanvas';
 import { FONT, FS, MUTED, SP } from '@/lib/theme';
+import { reportError } from '@/lib/monitoring';
+
+/**
+ * Backstop for the Skia render path specifically: `isSkiaAvailable()` is the
+ * primary guard (see lib/skiaAvailability.ts — it's what actually stops the
+ * web "Cannot read properties of undefined (reading 'PathBuilder')" crash
+ * from happening at all), but any *other* unexpected Skia failure — a device
+ * quirk, a future react-native-skia regression — should degrade to the SVG
+ * renderer too, never take down the whole screen via the app-level error
+ * boundary. A drawing surface that silently becomes non-GPU is a fine
+ * degrade; a canvas screen that crashes to "Something went wrong" is not.
+ */
+interface SkiaFallbackBoundaryState { failed: boolean }
+class SkiaFallbackBoundary extends Component<{ fallback: React.ReactNode; children: React.ReactNode }, SkiaFallbackBoundaryState> {
+  state: SkiaFallbackBoundaryState = { failed: false };
+  static getDerivedStateFromError(): SkiaFallbackBoundaryState { return { failed: true }; }
+  componentDidCatch(error: Error, info: { componentStack: string }): void {
+    if (__DEV__) console.error('[CanvasHost] Skia render path failed, falling back to SVG:', error.message, info.componentStack);
+    reportError(error, { componentStack: info.componentStack, tags: { source: 'skia-canvas-fallback' } });
+  }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
 
 export type CanvasHostProps = SvgDrawingCanvasProps; // same prop contract for both renderers
 
@@ -57,7 +79,11 @@ function CanvasHostInner(props: CanvasHostProps, ref: React.ForwardedRef<CanvasH
   }, [mode]);
 
   if (mode === 'skia' && SkiaDrawingCanvas) {
-    return <SkiaDrawingCanvas ref={skiaRef} {...props} />;
+    return (
+      <SkiaFallbackBoundary fallback={<SvgDrawingCanvas {...props} />}>
+        <SkiaDrawingCanvas ref={skiaRef} {...props} />
+      </SkiaFallbackBoundary>
+    );
   }
 
   return <SvgDrawingCanvas {...props} />;

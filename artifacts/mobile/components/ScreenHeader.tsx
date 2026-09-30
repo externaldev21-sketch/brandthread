@@ -40,8 +40,8 @@ interface ScreenHeaderProps {
   backTestID?: string;
   /**
    * 'push' (default) shows the standard back arrow for a stack-pushed screen.
-   * 'modal' shows a close "X" instead, for screens presented as a modal/sheet
-   * — same position and hit area either way. Pass whichever matches the
+   * 'modal' shows a close "X" on the right for screens presented as a modal/sheet.
+   * Pass whichever matches the
    * route's actual `presentation` option; this never changes push vs modal
    * itself, only which icon a screen that already has one shows.
    */
@@ -83,34 +83,38 @@ export function ScreenHeader({
     ? scrollY.interpolate({ inputRange: [collapseDistance * 0.5, collapseDistance], outputRange: [0, 1], extrapolate: 'clamp' })
     : 1;
 
+  const closeOrBack = () => (onBack ? onBack() : goBackOr(router));
+
   return (
     <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
       <View style={styles.container}>
-        {showBack ? <PressableScale
-          onPress={() => (onBack ? onBack() : goBackOr(router))}
-          style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-          accessibilityRole="button"
-          accessibilityLabel={backAccessibilityLabel ?? (variant === 'modal' ? `Close ${title}` : `Go back from ${title}`)}
-          accessibilityHint={variant === 'modal' ? `Dismisses ${title}` : `Returns from ${title}`}
-          testID={backTestID ?? 'screen-header-back'}
-        >
-          <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.md} color={colors.foreground} />
-        </PressableScale> : <View style={{ width: COMP.iconBtn }} />}
+        {variant === 'push' && (
+          showBack ? (
+            <PressableScale
+              onPress={closeOrBack}
+              style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={backAccessibilityLabel ?? `Go back from ${title}`}
+              accessibilityHint={`Returns from ${title}`}
+              testID={backTestID ?? 'screen-header-back'}
+            >
+              <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
+            </PressableScale>
+          ) : <View style={{ width: COMP.iconBtn }} />
+        )}
 
         <View style={styles.titleBlock}>
           {scrollY ? (
             <Animated.Text
               testID="screen-header-title"
+              {...({ dataSet: { variant } } as object)}
               style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}
               numberOfLines={1}
             >
               {title}
             </Animated.Text>
           ) : (
-            <Text testID="screen-header-title" style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
-          )}
-          {subtitle && !scrollY && (
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={1}>{subtitle}</Text>
+            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
           )}
         </View>
 
@@ -127,9 +131,46 @@ export function ScreenHeader({
               {action.badge && <View style={[styles.actionDot, { backgroundColor: colors.primary, borderColor: colors.background }]} />}
             </PressableScale>
           ))}
-          {rightElement ?? (!cappedActions?.length && <View style={{ width: COMP.iconBtn }} />)}
+          {variant === 'push' && (rightElement ?? (!cappedActions?.length && <View style={{ width: COMP.iconBtn }} />))}
+          {variant === 'modal' && (
+            <>
+              {rightElement}
+              {showBack ? (
+                <PressableScale
+                  onPress={closeOrBack}
+                  style={styles.closeBtnPlain}
+                  accessibilityRole="button"
+                  accessibilityLabel={backAccessibilityLabel ?? `Close ${title}`}
+                  accessibilityHint={`Dismisses ${title}`}
+                  testID={backTestID ?? 'screen-header-back'}
+                >
+                  <Feather name="x" size={ICON.md} color={colors.foreground} />
+                </PressableScale>
+              ) : <View style={{ width: COMP.iconBtn }} />}
+            </>
+          )}
         </View>
       </View>
+
+      {subtitle && !scrollY && (
+        <Text
+          style={[
+            styles.subtitle,
+            {
+              color: colors.mutedForeground,
+              // Sibling row below `container`, so it needs its own horizontal
+              // offset to line up under the title: the container's own gutter
+              // (SP.md) plus, for push, the back button's width + gap (44 +
+              // SP.sm) that the title itself is indented by in that variant.
+              paddingHorizontal: SP.md,
+              marginLeft: variant === 'push' ? 44 + SP.sm : 0,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+      )}
 
       {scrollY && (
         <Animated.View style={{ opacity: largeTitleOpacity!, transform: [{ scale: largeTitleScale! }], height: largeTitleHeight!, overflow: 'hidden' }}>
@@ -149,14 +190,12 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    // 'flex-start', deliberately not 'flex-end': the title's own vertical
-    // position must never depend on whether a screen also passes a
-    // `subtitle` — with `flex-end`, a taller (title+subtitle) titleBlock
-    // pushed the title's own top several pixels higher than a title-only
-    // screen's, which is exactly the "titles don't line up" bug this fixes.
-    // Top-aligning means every screen's title starts at the same fixed Y
-    // (topPad) regardless of what renders below it.
-    alignItems: 'flex-start',
+    // Center the title with the back/close button on the same row. The
+    // subtitle no longer lives inside this row (it's a sibling Text below
+    // `container`), so it can never affect this row's height or nudge the
+    // title's vertical position — that's what keeps title Y identical with
+    // or without a subtitle (the #389 invariant), even under center-align.
+    alignItems: 'center',
     minHeight: COMP.headerH,
     paddingHorizontal: SP.md,
     paddingBottom: SP.md,
@@ -169,6 +208,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  closeBtnPlain: {
+    // Modal-variant close button: plain icon, no box/background/border —
+    // Dev wants it visually lighter than the push-variant back button.
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionBtn: {
     width: 44,

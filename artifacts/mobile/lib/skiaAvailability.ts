@@ -57,6 +57,33 @@ export function loadSkia(): SkiaModuleShape | null {
       cached = null;
       return null;
     }
+    // On web, `require('@shopify/react-native-skia')` always resolves (the
+    // JS package exists there), and `mod.Skia` is a real, truthy object —
+    // but it's only a thin wrapper around CanvasKit, the actual WASM
+    // binary, which nothing here has asked the package to load. Until
+    // `LoadSkiaWeb()`/`WithSkiaWeb()` (from the package's own web entry)
+    // has completed, that WASM binding — exposed as `globalThis.CanvasKit`
+    // once ready — doesn't exist, and any real Skia call (e.g.
+    // `Skia.Path.Make()`) throws deep inside the package with "Cannot read
+    // properties of undefined (reading 'PathBuilder')" or similar, because
+    // it reaches for a CanvasKit method that was never attached. Since this
+    // app never calls `LoadSkiaWeb()`, Skia must be treated as unavailable
+    // on web so every call site falls back to the SVG drawing surface
+    // instead of crashing.
+    //
+    // Detected via `typeof window`/`document` rather than `Platform.OS` —
+    // deliberately NOT a static `import { Platform } from 'react-native'`
+    // here: that import forces this file into an SSR-style source
+    // transform (react-native's own entry point uses Flow syntax Vitest's
+    // transform can't parse) the moment it sits alongside this file's
+    // `require()` of another native module, breaking this module's own
+    // tests. `window`/`document` are exactly as web-specific and need no
+    // react-native import at all.
+    const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
+    if (isWeb && !(globalThis as { CanvasKit?: unknown }).CanvasKit) {
+      cached = null;
+      return null;
+    }
     cached = mod as SkiaModuleShape;
     return cached;
   } catch (err) {

@@ -127,7 +127,9 @@ const ROUTE_ALLOWLIST = process.env.NOTCH_CRAWL_ROUTES
 // Fast mode only spends its deeper-tap budget on the PR's changed routes,
 // and never on the fresh-account pass (nightly's job) — depth 0 across
 // every route on the default demo account is still checked every time.
-const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = FAST ? ['demo'] : DATA_STATES;
+const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = process.env.NOTCH_CRAWL_STATES
+  ? (process.env.NOTCH_CRAWL_STATES.split(',') as (typeof DATA_STATES)[number][])
+  : FAST ? ['demo'] : DATA_STATES;
 const MAX_DEPTH = FAST ? 1 : CLICK_BREADTH.length;
 
 interface Failure {
@@ -139,6 +141,18 @@ interface Failure {
   via?: string[]; // the chain of elements tapped to reach this depth
   element: string;
   edge: 'top' | 'bottom';
+  box: { x: number; y: number; width: number; height: number };
+  screenshot: string;
+}
+
+interface TabBarOverlapFailure {
+  kind: 'tab-bar-overlap';
+  route: string;
+  role: string;
+  dataState: string;
+  depth: number;
+  via?: string[];
+  element: string;
   box: { x: number; y: number; width: number; height: number };
   screenshot: string;
 }
@@ -216,6 +230,56 @@ const VIOLATION_SCRIPT = `(() => {
   return results;
 })()`;
 
+/** Flags visible text PERMANENTLY sitting underneath the floating tab bar's
+ * own footprint — the bar is `position: absolute` (see the deny-list comment
+ * in app/_layout.tsx) so it physically covers whatever is laid out beneath
+ * it; a screen with a sticky footer that only pads for the safe-area inset
+ * (not the bar's own height) gets its last line of text hidden behind the
+ * bar forever, exactly like Boost's payment note (a flex sibling of the
+ * screen's ScrollView, never scrollable itself). A screen this crawl reaches
+ * should either have the bar hidden (deny-listed) or pad its footer clear of
+ * it.
+ *
+ * Ordinary list/scroll content that merely scrolls PAST the bar as the user
+ * scrolls (e.g. the last row of a long Settings list, momentarily behind the
+ * bar's translucent glass mid-scroll) is exempt — same reasoning as
+ * VIOLATION_SCRIPT's `isBottomPinned` bottom-edge check: the user reaches it
+ * by scrolling, nothing hides it forever. Only text with no scrollable
+ * ancestor (so it can never scroll clear of the bar) counts as a real,
+ * permanent overlap. */
+const TAB_BAR_OVERLAP_SCRIPT = `(() => {
+  const bar = document.querySelector('[data-testid="seller-global-tab-bar"], [data-testid="buyer-bottom-tab-bar"]');
+  if (!bar) return [];
+  const barStyle = window.getComputedStyle(bar);
+  if (barStyle.display === 'none' || barStyle.visibility === 'hidden' || Number(barStyle.opacity) === 0) return [];
+  const barRect = bar.getBoundingClientRect();
+  if (barRect.width === 0 || barRect.height === 0) return [];
+  const hasScrollableAncestor = (node) => {
+    for (let a = node.parentElement; a; a = a.parentElement) {
+      const s = window.getComputedStyle(a);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && a.scrollHeight > a.clientHeight + 1) return true;
+    }
+    return false;
+  };
+  const results = [];
+  const all = document.querySelectorAll('body *');
+  for (const el of all) {
+    if (el.closest('[data-notch-exempt]')) continue;
+    if (bar.contains(el)) continue;
+    const isText = el.childNodes.length > 0 && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent && n.textContent.trim());
+    if (!isText) continue;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    const overlaps = rect.left < barRect.right && rect.right > barRect.left && rect.top < barRect.bottom && rect.bottom > barRect.top;
+    if (!overlaps) continue;
+    if (hasScrollableAncestor(el)) continue;
+    results.push({ box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (el.tagName + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || '').slice(0, 40) + '"') });
+  }
+  return results;
+})()`;
+
 /** Reads the ScreenHeader-rendered title's geometry + font, if this screen
  * has one, for the cross-screen consistency assertion below. Returns null
  * when there's no `screen-header-title` node currently on screen (e.g. a
@@ -243,6 +307,12 @@ const HEADER_GEOMETRY_SCRIPT = `(() => {
   return {
     top: Math.round(rect.top), left: Math.round(rect.left),
     fontSize: parseFloat(style.fontSize), fontWeight: style.fontWeight,
+    // ScreenHeader renders variant via dataSet={{ variant }}, which
+    // react-native-web serializes as data-variant on the title node —
+    // 'push' and 'modal' legitimately have different left positions (and
+    // which side the back/close button is on), so consistency is compared
+    // within a variant, not across both.
+    variant: el.dataset.variant || 'push',
   };
 })()`;
 
@@ -296,19 +366,22 @@ test('every screen clears the notch, the home indicator, and matches every other
   }
   const failures: Failure[] = [];
   const consistencyFailures: ConsistencyFailure[] = [];
+  const tabBarOverlapFailures: TabBarOverlapFailure[] = [];
   let checked = 0;
   const device = { viewport: VIEWPORT, scale: 3, isMobile: true, userAgent: IPHONE_USER_AGENT };
-  // The first screen-header-title geometry seen becomes the baseline every
-  // other screen's title is compared against — recorded once, globally
-  // (not per role/data-state), since the whole point is that it must never
-  // differ anywhere in the app.
-  let headerBaseline: { top: number; left: number; fontSize: number; fontWeight: string } | null = null;
+  // The first screen-header-title geometry seen for each variant becomes
+  // that variant's baseline every other screen of the same variant is
+  // compared against — recorded once per variant, globally (not per
+  // role/data-state). 'push' and 'modal' have deliberately different left
+  // positions (and button side), so they get separate baselines; within a
+  // variant, every screen must still match exactly.
+  const headerBaselines: Record<string, { top: number; left: number; fontSize: number; fontWeight: string; variant: string }> = {};
 
   async function checkScreen(page: any, route: string, role: string, dataState: string, depth: number, via: string[]) {
     checked += 1;
     const violations: any[] = await page.evaluate(VIOLATION_SCRIPT).catch(() => []);
     for (const v of violations) {
-      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length}.png`);
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length}.png`);
       await page.screenshot({ path: shot }).catch(() => {});
       failures.push({
         kind: 'clearance', route, role, dataState, depth, via: via.length ? via : undefined,
@@ -316,22 +389,33 @@ test('every screen clears the notch, the home indicator, and matches every other
       });
     }
 
+    const tabBarOverlaps: any[] = await page.evaluate(TAB_BAR_OVERLAP_SCRIPT).catch(() => []);
+    for (const o of tabBarOverlaps) {
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length}.png`);
+      await page.screenshot({ path: shot }).catch(() => {});
+      tabBarOverlapFailures.push({
+        kind: 'tab-bar-overlap', route, role, dataState, depth, via: via.length ? via : undefined,
+        element: o.element, box: o.box, screenshot: shot,
+      });
+    }
+
     const geo = await page.evaluate(HEADER_GEOMETRY_SCRIPT).catch(() => null);
     if (geo) {
-      if (!headerBaseline) {
-        headerBaseline = geo;
+      const baseline = headerBaselines[geo.variant];
+      if (!baseline) {
+        headerBaselines[geo.variant] = geo;
       } else {
         const mismatches: string[] = [];
-        if (Math.abs(geo.top - headerBaseline.top) > 1) mismatches.push(`top ${geo.top} vs baseline ${headerBaseline.top}`);
-        if (Math.abs(geo.left - headerBaseline.left) > 1) mismatches.push(`left ${geo.left} vs baseline ${headerBaseline.left}`);
-        if (Math.abs(geo.fontSize - headerBaseline.fontSize) > 1) mismatches.push(`fontSize ${geo.fontSize} vs baseline ${headerBaseline.fontSize}`);
-        if (geo.fontWeight !== headerBaseline.fontWeight) mismatches.push(`fontWeight ${geo.fontWeight} vs baseline ${headerBaseline.fontWeight}`);
+        if (Math.abs(geo.top - baseline.top) > 1) mismatches.push(`top ${geo.top} vs baseline ${baseline.top}`);
+        if (Math.abs(geo.left - baseline.left) > 1) mismatches.push(`left ${geo.left} vs baseline ${baseline.left}`);
+        if (Math.abs(geo.fontSize - baseline.fontSize) > 1) mismatches.push(`fontSize ${geo.fontSize} vs baseline ${baseline.fontSize}`);
+        if (geo.fontWeight !== baseline.fontWeight) mismatches.push(`fontWeight ${geo.fontWeight} vs baseline ${baseline.fontWeight}`);
         if (mismatches.length) {
-          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length}.png`);
+          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length}.png`);
           await page.screenshot({ path: shot }).catch(() => {});
           consistencyFailures.push({
             kind: 'consistency', route, role, dataState, mismatch: mismatches.join('; '),
-            expected: headerBaseline, actual: geo, screenshot: shot,
+            expected: baseline, actual: geo, screenshot: shot,
           });
         }
       }
@@ -397,11 +481,12 @@ test('every screen clears the notch, the home indicator, and matches every other
       checked, routeCount: routes.length,
       failureCount: failures.length, failures,
       consistencyFailureCount: consistencyFailures.length, consistencyFailures,
-      headerBaseline,
+      tabBarOverlapFailureCount: tabBarOverlapFailures.length, tabBarOverlapFailures,
+      headerBaselines,
     }, null, 2),
   );
 
-  const total = failures.length + consistencyFailures.length;
+  const total = failures.length + consistencyFailures.length + tabBarOverlapFailures.length;
   if (total > 0) {
     const clearanceSummary = failures
       .slice(0, 20)
@@ -411,6 +496,10 @@ test('every screen clears the notch, the home indicator, and matches every other
       .slice(0, 20)
       .map((f) => `  [${f.role}/${f.dataState}] ${f.route}: header ${f.mismatch}`)
       .join('\n');
-    expect(total, `${failures.length} clearance + ${consistencyFailures.length} header-consistency failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}`).toBe(0);
+    const tabBarOverlapSummary = tabBarOverlapFailures
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} hidden behind tab bar`)
+      .join('\n');
+    expect(total, `${failures.length} clearance + ${consistencyFailures.length} header-consistency + ${tabBarOverlapFailures.length} tab-bar-overlap failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}\n${tabBarOverlapSummary}`).toBe(0);
   }
 });
