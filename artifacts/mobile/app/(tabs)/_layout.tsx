@@ -20,15 +20,18 @@
  * detachInactiveScreens and freezeOnBlur: true are preserved for performance.
  */
 
-import { Tabs } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Tabs, usePathname } from 'expo-router';
 import { useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
+import { useSettled } from '@/lib/animationUtils';
 // Same Instagram/TikTok-style directional slide as the buyer tab layout —
 // see lib/tabSlideTransition.ts for the shared duration/easing/interpolators.
 import {
-  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, forDirectionalSlide, forReducedMotionCrossfade,
+  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, SLIDE_DURATION, REDUCED_MOTION_SLIDE_DURATION,
+  forDirectionalSlide, forReducedMotionCrossfade,
 } from '@/lib/tabSlideTransition';
 
 // ─── Tab label constants (referenced by navigation contract tests) ─────────────
@@ -49,6 +52,33 @@ export default function TabLayout() {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+
+  // Blurry-text fix: drop the slide's `transform` once a tab switch has
+  // settled, so the resting (focused) screen's full-screen wrapper carries
+  // no transform at all instead of a permanent identity matrix — see
+  // forDirectionalSlide's `settled` param in lib/tabSlideTransition.ts and
+  // lib/animationUtils.ts's useSettled/identityOrNone doc. Starts settled
+  // (true) since nothing has switched yet on mount.
+  const pathname = usePathname();
+  const settled = useSettled(true);
+  const prevPathnameRef = useRef(pathname);
+  if (prevPathnameRef.current !== pathname) {
+    // Unsettle synchronously, in the same render the route changes — not in
+    // an effect — so this render's sceneStyleInterpolator already wires up
+    // the live animated interpolation before the (tabs) navigator's own
+    // effect starts the transitionSpec animation. An effect-based unsettle
+    // would race that and can start the tab-bar's Animated.timing update
+    // against the previous, static "settled" style.
+    prevPathnameRef.current = pathname;
+    settled.unsettle();
+  }
+  useEffect(() => {
+    if (settled.value) return;
+    const duration = reduceMotion ? REDUCED_MOTION_SLIDE_DURATION : SLIDE_DURATION;
+    const timer = setTimeout(() => settled.settleImmediately(), duration);
+    return () => clearTimeout(timer);
+  }, [settled.value, settled.settleImmediately, reduceMotion]);
+
   return (
     <Tabs
       // See the buyer tab layout for why this is false: keeps every tab's
@@ -68,7 +98,7 @@ export default function TabLayout() {
         // animation whenever a transitionSpec is present, and leaving it
         // out (rather than 'none') is what makes that so.
         transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
-        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width),
+        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
         sceneStyle: { backgroundColor: theme.background },
       }}
     >
