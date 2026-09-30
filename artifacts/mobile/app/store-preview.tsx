@@ -11,7 +11,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { isAuthError } from '@/lib/networkNotice';
 import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
 
@@ -101,29 +101,37 @@ export default function StorePreview() {
   // from the same seeded catalog every other demo-gated seller screen
   // uses (lib/previewSellerProducts.ts) — see lib/previewStorefrontHtml.ts.
   //
-  // Only a real signed-in account outside preview mode calls the network.
+  // This screen is seller-only, but the dev/web preview bypass can still
+  // land here under `?bt_preview=buyer` (e.g. a route crawl testing every
+  // screen under both roles, or a persisted 'buyer' role from earlier
+  // testing in the same browser) with no real session either — checking
+  // only isSellerDevPreview() missed that case and let the real endpoint
+  // fire every time. Only a real signed-in account outside preview mode
+  // calls the network.
   //
   // Computed fresh on every render (not memoized with a frozen `[]` dep
   // array) and, critically, re-checked again with its own direct calls
   // inside load() itself below rather than trusted from a closure — a
   // real, live-observed failure mode was the real network branch firing
-  // despite the URL genuinely carrying `?bt_preview=seller`, which a
-  // captured/stale read of these gates could explain but a fresh,
-  // synchronous check right before the fetch cannot: it always reflects
-  // the actual current window.location/localStorage state at the exact
-  // moment the decision to call the network (or not) is made, so there is
-  // no window in which a cached/real response can reach the render before
-  // this check has run.
-  const freshPreview = isSellerDevPreview() && !isPreviewDemoMode();
-  const demoPreview  = isSellerDevPreview() && isPreviewDemoMode();
+  // despite the URL genuinely carrying `?bt_preview=seller`. A captured
+  // closure value computed once at mount can go stale; a fresh,
+  // synchronous check made right before the fetch decision cannot — it
+  // always reflects the actual current window.location/localStorage state
+  // at the exact moment that decision is made, so there is no window in
+  // which a cached/real response can reach the render before this check
+  // has run.
+  const inDevPreview  = isSellerDevPreview() || isBuyerDevPreview();
+  const freshPreview  = inDevPreview && !isPreviewDemoMode();
+  const demoPreview   = inDevPreview && isPreviewDemoMode();
 
   const load = useCallback(async () => {
     // Re-derive at call time — see the comment above these consts for why
     // this isn't just "freshPreview"/"demoPreview" from the render closure.
-    if (isSellerDevPreview() && !isPreviewDemoMode()) {
+    const devPreviewNow = isSellerDevPreview() || isBuyerDevPreview();
+    if (devPreviewNow && !isPreviewDemoMode()) {
       setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return;
     }
-    if (isSellerDevPreview() && isPreviewDemoMode()) {
+    if (devPreviewNow && isPreviewDemoMode()) {
       setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return;
     }
     if (inFlight.current) return;
