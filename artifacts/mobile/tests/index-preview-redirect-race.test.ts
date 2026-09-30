@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const indexSource = readFileSync(resolve(__dirname, '..', 'app/index.tsx'), 'utf8');
+const rootLayoutSource = readFileSync(resolve(__dirname, '..', 'app/_layout.tsx'), 'utf8');
 
 /**
  * Live verification caught this: directly loading "/seller-inbox?bt_preview=
@@ -98,5 +99,57 @@ describe('a direct cold load of /seller-inbox with both bt_preview and demo para
     const sellerInboxSource = readFileSync(resolve(__dirname, '..', 'app/seller-inbox.tsx'), 'utf8');
     expect(sellerInboxSource).not.toMatch(/router\.replace\(['"`]\/['"`]/);
     expect(sellerInboxSource).not.toContain("router.replace('/(tabs)/'");
+  });
+});
+
+/**
+ * Live re-verification after #498 shipped: the SAME cold load still landed
+ * on the dashboard. The Replit reporter's own working copy carries local,
+ * uncommitted onboarding-skip lines beyond what's in this repo — something
+ * outside app/index.tsx's control can still bounce a preview session through
+ * "/" before this file's own checks ever get a say. Rather than chase code
+ * this repo doesn't have, app/_layout.tsx now stashes the ORIGINAL requested
+ * path (once per real page load, in its existing PREVIEW_ROLE module-load
+ * block) and app/index.tsx restores it whenever it finds itself back at "/"
+ * during a preview session — regardless of what caused the bounce.
+ */
+describe('preview entry path is preserved across ANY bounce back to "/", not just this file\'s own races', () => {
+  it('app/_layout.tsx stashes the real page-load path (not "/") into sessionStorage, once per load', () => {
+    const block = rootLayoutSource.slice(
+      rootLayoutSource.indexOf('const demoParam = new URLSearchParams'),
+      rootLayoutSource.indexOf('if (DEV_BYPASS_ROLE && Platform.OS'),
+    );
+    expect(block).toContain("sessionStorage.setItem('bt_preview_entry_path'");
+    expect(block).toContain('window.location.pathname !== \'/\'');
+    expect(block).toContain('path: window.location.pathname + window.location.search');
+    expect(block).toContain('ts: Date.now()');
+  });
+
+  it('app/_layout.tsx clears any stale entry on a genuine bare "/" load', () => {
+    const block = rootLayoutSource.slice(
+      rootLayoutSource.indexOf('const demoParam = new URLSearchParams'),
+      rootLayoutSource.indexOf('if (DEV_BYPASS_ROLE && Platform.OS'),
+    );
+    expect(block).toContain("sessionStorage.removeItem('bt_preview_entry_path')");
+  });
+
+  it('app/index.tsx reads the stashed path and always consumes it (one-shot), rejecting stale ( >10s) entries', () => {
+    expect(indexSource).toContain('function consumePreviewEntryPath()');
+    const fnBody = indexSource.slice(
+      indexSource.indexOf('function consumePreviewEntryPath()'),
+      indexSource.indexOf('export default function Index()'),
+    );
+    expect(fnBody).toContain("sessionStorage.getItem('bt_preview_entry_path')");
+    expect(fnBody).toContain("sessionStorage.removeItem('bt_preview_entry_path')");
+    expect(fnBody).toContain('Date.now() - ts > 10_000');
+    // The removeItem call must come before the staleness/validity checks —
+    // it's a read-once consume regardless of whether the value is used.
+    expect(fnBody.indexOf('removeItem')).toBeLessThan(fnBody.indexOf('Date.now() - ts'));
+  });
+
+  it('the redirect timer prefers the restored entry path over the plain dashboard root', () => {
+    const timerBody = indexSource.slice(indexSource.indexOf('const redirect = setTimeout'));
+    expect(timerBody).toContain('const entryPath = consumePreviewEntryPath();');
+    expect(timerBody).toContain("router.replace((entryPath ?? (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/')) as never);");
   });
 });

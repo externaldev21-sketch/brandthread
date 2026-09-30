@@ -481,6 +481,33 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   const demoParam = new URLSearchParams(window.location.search).get('demo');
   if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');
   else localStorage.removeItem('bt_preview_demo');
+  // Preserve the ORIGINAL requested path for this load, so a preview
+  // session can restore its real destination even after some other code
+  // bounces it through "/" first — e.g. an onboarding-skip redirect that
+  // fires ahead of this file's own devRole check below. Live-verified: a
+  // cold load of "/seller-inbox?bt_preview=seller&demo=1" was still landing
+  // on the dashboard even after app/index.tsx's own race fixes (#497, #498)
+  // closed every gap THIS file introduces — meaning something else, outside
+  // this file's control, is the one doing the actual bounce-to-"/" here.
+  // app/index.tsx reads this back (see its own comment) and navigates to
+  // the real destination instead of defaulting to the dashboard once it
+  // regains control. Session-scoped (not just an in-memory variable) in
+  // case that other redirect is a hard reload rather than an SPA
+  // navigation, which would otherwise wipe this module's own memory of it.
+  // Timestamped and read-once (see app/index.tsx) so a stale leftover from
+  // an earlier load in this same tab is never mistaken for the current one.
+  if (typeof sessionStorage !== 'undefined') {
+    if (window.location.pathname !== '/') {
+      sessionStorage.setItem('bt_preview_entry_path', JSON.stringify({
+        path: window.location.pathname + window.location.search,
+        ts: Date.now(),
+      }));
+    } else {
+      // A genuine load of the bare root must never restore an old deep
+      // link left over from a previous navigation in this same tab.
+      sessionStorage.removeItem('bt_preview_entry_path');
+    }
+  }
 }
 if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
   AsyncStorage.multiSet([
