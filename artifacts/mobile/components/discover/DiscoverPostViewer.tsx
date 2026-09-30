@@ -148,7 +148,7 @@ export function DiscoverPostViewer({
 
   function openProfile(post: DiscoverPost) {
     if (post.authorAccountType === 'seller') {
-      router.push(`/seller-profile?id=${encodeURIComponent(post.authorId)}` as never);
+      router.push(`/seller-profile?id=${encodeURIComponent(post.authorId)}&src=feed` as never);
     } else {
       router.push(`/buyer-other-profile?userId=${encodeURIComponent(post.authorId)}&name=${encodeURIComponent(post.authorName)}&handle=${encodeURIComponent(post.authorHandle)}&initials=${encodeURIComponent(post.authorInitials)}` as never);
     }

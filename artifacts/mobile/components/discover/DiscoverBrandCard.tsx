@@ -13,7 +13,7 @@ export function DiscoverBrandCard({ brand }: { brand: BrandCardData }) {
       verified={brand.verified}
       subline={brand.followersLabel}
       fallbackIcon="shopping-bag"
-      onPress={() => router.push(`/seller-profile?id=${encodeURIComponent(brand.id)}` as never)}
+      onPress={() => router.push(`/seller-profile?id=${encodeURIComponent(brand.id)}&src=feed` as never)}
     />
   );
 }

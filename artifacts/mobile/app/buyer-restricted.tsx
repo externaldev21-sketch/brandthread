@@ -16,6 +16,7 @@ import { useColors } from '@/hooks/useColors';
 import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
 import type { RestrictRecord } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { Button, ListRow } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
@@ -109,26 +110,47 @@ export default function RestrictedAccountsScreen() {
         animationType="fade"
         onRequestClose={() => setConfirmUser(null)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setConfirmUser(null)}>
-          <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.md }]}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Unrestrict {confirmUser?.restrictedUserName}?</Text>
-            <Text style={styles.sheetDesc}>
-              Their future comments on your posts will be visible to everyone. They won't be notified.
-            </Text>
-            <View style={styles.sheetActions}>
-              <Button label="Cancel" onPress={() => setConfirmUser(null)} variant="secondary" style={{ flex: 1 }} />
-              <Button
-                label="Unrestrict"
-                onPress={() => confirmUser && handleUnrestrict(confirmUser)}
-                variant="destructive"
-                style={{ flex: 1 }}
-              />
-            </View>
-          </Pressable>
-        </Pressable>
+        <ModalSafeArea>
+          <UnrestrictConfirmSheet
+            confirmUser={confirmUser}
+            styles={styles}
+            onCancel={() => setConfirmUser(null)}
+            onConfirm={() => confirmUser && handleUnrestrict(confirmUser)}
+          />
+        </ModalSafeArea>
       </Modal>
     </View>
+  );
+}
+
+/** Rendered inside the Modal's own `ModalSafeArea` so `useSafeAreaInsets()`
+ * reads that native root's own insets, not the page's (stale/zeroed) ones. */
+function UnrestrictConfirmSheet({ confirmUser, styles, onCancel, onConfirm }: {
+  confirmUser: RestrictRecord | null;
+  styles: ReturnType<typeof makeStyles>;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Pressable style={styles.backdrop} onPress={onCancel}>
+      <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.md }]}>
+        <View style={styles.sheetHandle} />
+        <Text style={styles.sheetTitle}>Unrestrict {confirmUser?.restrictedUserName}?</Text>
+        <Text style={styles.sheetDesc}>
+          Their future comments on your posts will be visible to everyone. They won't be notified.
+        </Text>
+        <View style={styles.sheetActions}>
+          <Button label="Cancel" onPress={onCancel} variant="secondary" style={{ flex: 1 }} />
+          <Button
+            label="Unrestrict"
+            onPress={onConfirm}
+            variant="destructive"
+            style={{ flex: 1 }}
+          />
+        </View>
+      </Pressable>
+    </Pressable>
   );
 }
 

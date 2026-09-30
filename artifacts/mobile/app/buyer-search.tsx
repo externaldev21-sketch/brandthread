@@ -275,11 +275,11 @@ export default function BuyerSearchScreen() {
 
   function goToBrand(sellerId?: string) {
     hapticPrimaryAction();
-    if (sellerId) router.push({ pathname: '/seller-profile' as any, params: { sellerId } });
+    if (sellerId) router.push({ pathname: '/seller-profile' as any, params: { sellerId, src: 'search' } });
   }
 
   function goToProduct(productId: string) {
-    push({ pathname: '/thread-product-detail' as any, params: { productId } } as never);
+    push({ pathname: '/thread-product-detail' as any, params: { productId, src: 'search' } } as never);
   }
 
   function goToVideo(video: VideoResult) {
@@ -299,7 +299,7 @@ export default function BuyerSearchScreen() {
   function handlePersonPress(p: SearchPerson) {
     hapticPrimaryAction();
     if (p.accountType === 'seller') {
-      router.push({ pathname: '/seller-profile' as any, params: { sellerId: p.userId } });
+      router.push({ pathname: '/seller-profile' as any, params: { sellerId: p.userId, src: 'search' } });
     } else {
       router.push({
         pathname: '/buyer-other-profile' as any,

@@ -30,6 +30,9 @@ const {
     reviews: {
       forProduct: vi.fn(),
     },
+    publicSellers: {
+      recordStoreVisit: vi.fn(),
+    },
   },
   createBuyNowSessionMock: vi.fn(),
   getCartMock: vi.fn(),
@@ -379,6 +382,8 @@ describe('buyer product detail when seller payments are unavailable', () => {
     previewCatalogEnabledMock.mockReturnValue(false);
     previewCatalogProductMock.mockReset();
     previewCatalogProductMock.mockReturnValue(null);
+    apiMock.publicSellers.recordStoreVisit.mockReset();
+    apiMock.publicSellers.recordStoreVisit.mockResolvedValue(undefined);
     invalidatePaymentCacheMock.mockReset();
     routerMock.back.mockReset();
     routerMock.push.mockReset();

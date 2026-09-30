@@ -9,7 +9,6 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -24,9 +23,10 @@ import {
   FG, MUTED, SUBTLE,
   SUCCESS, ON_DARK,
   RED, RED_DIM,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
 import { PrimaryButton } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 const REFUND_REASONS = [
   'Order not received',
@@ -47,7 +47,6 @@ export default function BuyerRefundRequestScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,32 +104,35 @@ export default function BuyerRefundRequestScreen() {
   }
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Request Refund" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>
+      </View>
+    );
   }
 
   if (submitted) {
     return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-        <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
-        <Text style={s.successTitle}>Refund Request Submitted</Text>
-        <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
-        <Text style={s.successNote}>Refund updates will appear here.</Text>
-        <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Request Refund" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+          <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
+          <Text style={s.successTitle}>Refund Request Submitted</Text>
+          <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
+          <Text style={s.successNote}>Refund updates will appear here.</Text>
+          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+        </View>
       </View>
     );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View>
-          <Text style={s.headerTitle}>Request Refund</Text>
-          {order && <Text style={s.headerSub}>{order.orderNumber} · {order.sellerName}</Text>}
-        </View>
-      </View>
+      <ScreenHeader
+        title="Request Refund"
+        subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
         {/* Max refund */}
@@ -229,10 +231,6 @@ export default function BuyerRefundRequestScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  headerSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
   sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   maxCard: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md },

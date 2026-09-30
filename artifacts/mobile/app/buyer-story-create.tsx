@@ -46,6 +46,7 @@ import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { MediaCropper } from '@/components/media/MediaCropper';
 import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -1182,104 +1183,108 @@ export default function StoryComposer() {
   const renderShareSheets = () => (
     <>
       <Modal visible={shareSheetOpen} transparent animationType="slide" onRequestClose={() => setShareSheetOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setShareSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.shareSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Share</Text>
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setShareSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.shareSheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Share</Text>
 
-          <TouchableOpacity
-            style={styles.shareRow}
-            onPress={() => { hapticToggle(); setCloseFriendsOnly(false); }}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: !closeFriendsOnly }}
-          >
-            <View style={styles.shareRowAvatar}><Text style={styles.myAvatarText}>{myInitials}</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shareRowTitle}>Your story</Text>
-              <Text style={styles.shareRowSubtitle}>Sharing options</Text>
-            </View>
-            <View style={[styles.radioOuter, !closeFriendsOnly && styles.radioOuterActive]}>
-              {!closeFriendsOnly && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.shareRow}
+              onPress={() => { hapticToggle(); setCloseFriendsOnly(false); }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: !closeFriendsOnly }}
+            >
+              <View style={styles.shareRowAvatar}><Text style={styles.myAvatarText}>{myInitials}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shareRowTitle}>Your story</Text>
+                <Text style={styles.shareRowSubtitle}>Sharing options</Text>
+              </View>
+              <View style={[styles.radioOuter, !closeFriendsOnly && styles.radioOuterActive]}>
+                {!closeFriendsOnly && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.shareRow}
-            onPress={() => { hapticToggle(); setCloseFriendsOnly(true); }}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: closeFriendsOnly }}
-          >
-            <View style={[styles.shareRowAvatar, { backgroundColor: 'transparent' }]}>
-              <Feather name="star" size={20} color={ON_DARK} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shareRowTitle}>Close Friends</Text>
-              <Text style={styles.shareRowSubtitle}>Add people</Text>
-            </View>
-            <View style={[styles.radioOuter, closeFriendsOnly && styles.radioOuterActive]}>
-              {closeFriendsOnly && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.shareRow}
+              onPress={() => { hapticToggle(); setCloseFriendsOnly(true); }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: closeFriendsOnly }}
+            >
+              <View style={[styles.shareRowAvatar, { backgroundColor: 'transparent' }]}>
+                <Feather name="star" size={20} color={ON_DARK} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shareRowTitle}>Close Friends</Text>
+                <Text style={styles.shareRowSubtitle}>Add people</Text>
+              </View>
+              <View style={[styles.radioOuter, closeFriendsOnly && styles.radioOuterActive]}>
+                {closeFriendsOnly && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
 
-          <Button label={isPosting ? 'Sharing…' : 'Share'} onPress={confirmShareSheet} loading={isPosting} fullWidth style={{ marginTop: SP.md }} />
-        </View>
+            <Button label={isPosting ? 'Sharing…' : 'Share'} onPress={confirmShareSheet} loading={isPosting} fullWidth style={{ marginTop: SP.md }} />
+          </View>
+        </ModalSafeArea>
       </Modal>
 
       <Modal visible={alsoShareOpen} transparent animationType="slide" onRequestClose={finishAlsoShare}>
-        <View style={[styles.alsoShareSheet, { paddingTop: topInset + SP.md, paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.textToolTop}>
-            <Text style={styles.sheetTitle}>Also share to</Text>
-            <TouchableOpacity onPress={finishAlsoShare} accessibilityRole="button" accessibilityLabel="Done">
-              <Text style={styles.textToolDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.alsoShareSearchWrap}>
-            <Feather name="search" size={16} color={MUTED} />
-            <TextInput
-              style={[styles.alsoShareSearchInput, WEB_INPUT_RESET]}
-              placeholder="Search"
-              placeholderTextColor={MUTED}
-              value={alsoShareQuery}
-              onChangeText={setAlsoShareQuery}
-            />
-          </View>
-          {/* Highlights aren't in this app yet (shipping in a follow-up PR),
-              so this sheet doesn't show a fake "Add to Highlights" row. */}
-          {alsoShareSearching ? (
-            <ActivityIndicator style={{ marginTop: SP.lg }} color={ON_DARK} />
-          ) : (
-            <ScrollView style={{ marginTop: SP.sm }}>
-              {alsoShareResults.map((p) => {
-                const sent = alsoShareSentIds.has(p.userId);
-                return (
-                  <View key={p.userId} style={styles.alsoShareRow}>
-                    <View style={[styles.shareRowAvatar, { backgroundColor: p.color }]}><Text style={styles.myAvatarText}>{p.initials}</Text></View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.shareRowTitle}>{p.name}</Text>
-                      <Text style={styles.shareRowSubtitle}>@{p.handle}</Text>
+        <ModalSafeArea>
+          <View style={[styles.alsoShareSheet, { paddingTop: topInset + SP.md, paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.textToolTop}>
+              <Text style={styles.sheetTitle}>Also share to</Text>
+              <TouchableOpacity onPress={finishAlsoShare} accessibilityRole="button" accessibilityLabel="Done">
+                <Text style={styles.textToolDone}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.alsoShareSearchWrap}>
+              <Feather name="search" size={16} color={MUTED} />
+              <TextInput
+                style={[styles.alsoShareSearchInput, WEB_INPUT_RESET]}
+                placeholder="Search"
+                placeholderTextColor={MUTED}
+                value={alsoShareQuery}
+                onChangeText={setAlsoShareQuery}
+              />
+            </View>
+            {/* Highlights aren't in this app yet (shipping in a follow-up PR),
+                so this sheet doesn't show a fake "Add to Highlights" row. */}
+            {alsoShareSearching ? (
+              <ActivityIndicator style={{ marginTop: SP.lg }} color={ON_DARK} />
+            ) : (
+              <ScrollView style={{ marginTop: SP.sm }}>
+                {alsoShareResults.map((p) => {
+                  const sent = alsoShareSentIds.has(p.userId);
+                  return (
+                    <View key={p.userId} style={styles.alsoShareRow}>
+                      <View style={[styles.shareRowAvatar, { backgroundColor: p.color }]}><Text style={styles.myAvatarText}>{p.initials}</Text></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.shareRowTitle}>{p.name}</Text>
+                        <Text style={styles.shareRowSubtitle}>@{p.handle}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.alsoShareSendBtn, sent && styles.alsoShareSendBtnSent]}
+                        onPress={() => void sendAlsoShareTo(p)}
+                        disabled={sent || alsoShareSendingId === p.userId}
+                        accessibilityRole="button"
+                        accessibilityLabel={sent ? `Sent to ${p.name}` : `Send to ${p.name}`}
+                      >
+                        {alsoShareSendingId === p.userId ? (
+                          <ActivityIndicator size="small" color={ON_DARK} />
+                        ) : (
+                          <Text style={[styles.alsoShareSendText, sent && { color: ON_DARK }]}>{sent ? 'Sent' : 'Send'}</Text>
+                        )}
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.alsoShareSendBtn, sent && styles.alsoShareSendBtnSent]}
-                      onPress={() => void sendAlsoShareTo(p)}
-                      disabled={sent || alsoShareSendingId === p.userId}
-                      accessibilityRole="button"
-                      accessibilityLabel={sent ? `Sent to ${p.name}` : `Send to ${p.name}`}
-                    >
-                      {alsoShareSendingId === p.userId ? (
-                        <ActivityIndicator size="small" color={ON_DARK} />
-                      ) : (
-                        <Text style={[styles.alsoShareSendText, sent && { color: ON_DARK }]}>{sent ? 'Sent' : 'Send'}</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-              {!alsoShareQuery.trim() && (
-                <Text style={styles.alsoShareHint}>Search for people to send this story to.</Text>
-              )}
-            </ScrollView>
-          )}
-        </View>
+                  );
+                })}
+                {!alsoShareQuery.trim() && (
+                  <Text style={styles.alsoShareHint}>Search for people to send this story to.</Text>
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </ModalSafeArea>
       </Modal>
     </>
   );
@@ -1516,6 +1521,7 @@ export default function StoryComposer() {
 
       {/* ── Text tool overlay ── */}
       <Modal visible={textToolOpen} transparent animationType="fade" onRequestClose={() => setTextToolOpen(false)}>
+        <ModalSafeArea>
         <KeyboardAvoidingView
           style={styles.textToolBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1636,177 +1642,190 @@ export default function StoryComposer() {
             </View>
           </View>
         </KeyboardAvoidingView>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Text color sheet — swatch page + hue/saturation/brightness ── */}
       <Modal visible={textColorSheetOpen} transparent animationType="fade" onRequestClose={() => setTextColorSheetOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setTextColorSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Text color</Text>
-          <View style={styles.textToolColorRow}>
-            {['#FFFFFF', '#000000', '#C084FC', '#60A5FA', '#34D399', '#FBBF24', '#F97316', '#F87171'].map((c) => (
-              <PressableScale
-                key={c}
-                style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
-                onPress={() => { hapticToggle(); setTextDraftColor(c); }}
-                accessibilityRole="button"
-                accessibilityLabel={`Text color ${c}`}
-                accessibilityState={{ selected: textDraftColor === c }}
-              />
-            ))}
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setTextColorSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Text color</Text>
+            <View style={styles.textToolColorRow}>
+              {['#FFFFFF', '#000000', '#C084FC', '#60A5FA', '#34D399', '#FBBF24', '#F97316', '#F87171'].map((c) => (
+                <PressableScale
+                  key={c}
+                  style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
+                  onPress={() => { hapticToggle(); setTextDraftColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Text color ${c}`}
+                  accessibilityState={{ selected: textDraftColor === c }}
+                />
+              ))}
+            </View>
+            <HsbPicker color={textDraftColor} onChange={setTextDraftColor} />
           </View>
-          <HsbPicker color={textDraftColor} onChange={setTextDraftColor} />
-        </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Text animation sheet ── */}
       <Modal visible={textAnimationSheetOpen} transparent animationType="fade" onRequestClose={() => setTextAnimationSheetOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setTextAnimationSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Text animation</Text>
-          <Text style={styles.sheetSubtitle}>Plays back when story-viewer animation support ships — selection is saved now.</Text>
-          <View style={styles.animationGrid}>
-            {['Emphasize', 'Drift Up', 'Loud', 'Speedy', 'Fall', 'Headline', 'Slide Up'].map((a) => {
-              const active = textDraftAnimation === a;
-              return (
-                <TouchableOpacity
-                  key={a}
-                  style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
-                  onPress={() => { hapticToggle(); setTextDraftAnimation(active ? undefined : a); setTextAnimationSheetOpen(false); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Animation ${a}`}
-                  accessibilityState={{ selected: active }}
-                >
-                  <Text style={[styles.animationChipText, active && { color: '#000' }]}>{a}</Text>
-                </TouchableOpacity>
-              );
-            })}
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setTextAnimationSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Text animation</Text>
+            <Text style={styles.sheetSubtitle}>Plays back when story-viewer animation support ships — selection is saved now.</Text>
+            <View style={styles.animationGrid}>
+              {['Emphasize', 'Drift Up', 'Loud', 'Speedy', 'Fall', 'Headline', 'Slide Up'].map((a) => {
+                const active = textDraftAnimation === a;
+                return (
+                  <TouchableOpacity
+                    key={a}
+                    style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
+                    onPress={() => { hapticToggle(); setTextDraftAnimation(active ? undefined : a); setTextAnimationSheetOpen(false); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Animation ${a}`}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text style={[styles.animationChipText, active && { color: '#000' }]}>{a}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Text effect sheet ── */}
       <Modal visible={textEffectSheetOpen} transparent animationType="fade" onRequestClose={() => setTextEffectSheetOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setTextEffectSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Text effect</Text>
-          <View style={styles.animationGrid}>
-            {([['plain', 'Plain'], ['outline', 'Outline'], ['glow', 'Neon']] as const).map(([key, label]) => {
-              const active = textDraftEffect === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
-                  onPress={() => { hapticToggle(); setTextDraftEffect(key); setTextEffectSheetOpen(false); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Effect ${label}`}
-                  accessibilityState={{ selected: active }}
-                >
-                  <Text style={[styles.animationChipText, active && { color: '#000' }]}>{label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setTextEffectSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Text effect</Text>
+            <View style={styles.animationGrid}>
+              {([['plain', 'Plain'], ['outline', 'Outline'], ['glow', 'Neon']] as const).map(([key, label]) => {
+                const active = textDraftEffect === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
+                    onPress={() => { hapticToggle(); setTextDraftEffect(key); setTextEffectSheetOpen(false); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Effect ${label}`}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text style={[styles.animationChipText, active && { color: '#000' }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Sticker sheet ── */}
       <Modal visible={stickerSheetOpen} transparent animationType="slide" onRequestClose={() => setStickerSheetOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setStickerSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.stickerSheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Stickers</Text>
-          <View style={styles.stickerGrid}>
-            <StickerTile icon="at-sign" label="Mention" onPress={() => { addOverlay({ type: 'mention', mentionHandle: '@friend' }); setStickerSheetOpen(false); }} />
-            <StickerTile icon="map-pin" label="Location" onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setStickerSheetOpen(false); }} />
-            <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
-            <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { addOverlay({ type: 'poll', pollQuestion: 'This or that?', pollOptions: [{ label: 'This', votes: 0 }, { label: 'That', votes: 0 }] }); setStickerSheetOpen(false); }} />
-            <StickerTile icon="help-circle" label="Question" onPress={() => { addOverlay({ type: 'question', questionPrompt: 'Ask me anything' }); setStickerSheetOpen(false); }} />
-            <StickerTile icon="link" label="Link" onPress={() => { addOverlay({ type: 'link', linkUrl: 'https://', linkText: 'Link' }); setStickerSheetOpen(false); }} />
-            {isSeller ? (
-              <StickerTile icon="shopping-bag" label="Product" onPress={() => { setStickerSheetOpen(false); openProductPicker(); }} />
-            ) : null}
-            {isSeller ? (
-              <StickerTile icon="external-link" label="Shop link" onPress={() => { setStickerSheetOpen(false); setShopUrlDraft(''); setShopModalOpen(true); }} />
-            ) : null}
-            <StickerTile
-              icon="dollar-sign"
-              label="Thread Cash"
-              custom={<ThreadCashBillIcon size={26} />}              onPress={() => { addOverlay({ type: 'threadcash', text: 'Thread Cash' }); setStickerSheetOpen(false); }}
-            />
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setStickerSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.stickerSheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Stickers</Text>
+            <View style={styles.stickerGrid}>
+              <StickerTile icon="at-sign" label="Mention" onPress={() => { addOverlay({ type: 'mention', mentionHandle: '@friend' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="map-pin" label="Location" onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { addOverlay({ type: 'poll', pollQuestion: 'This or that?', pollOptions: [{ label: 'This', votes: 0 }, { label: 'That', votes: 0 }] }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="help-circle" label="Question" onPress={() => { addOverlay({ type: 'question', questionPrompt: 'Ask me anything' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="link" label="Link" onPress={() => { addOverlay({ type: 'link', linkUrl: 'https://', linkText: 'Link' }); setStickerSheetOpen(false); }} />
+              {isSeller ? (
+                <StickerTile icon="shopping-bag" label="Product" onPress={() => { setStickerSheetOpen(false); openProductPicker(); }} />
+              ) : null}
+              {isSeller ? (
+                <StickerTile icon="external-link" label="Shop link" onPress={() => { setStickerSheetOpen(false); setShopUrlDraft(''); setShopModalOpen(true); }} />
+              ) : null}
+              <StickerTile
+                icon="dollar-sign"
+                label="Thread Cash"
+                custom={<ThreadCashBillIcon size={26} />}              onPress={() => { addOverlay({ type: 'threadcash', text: 'Thread Cash' }); setStickerSheetOpen(false); }}
+              />
+            </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Product tag picker (sellers) ── */}
       <Modal visible={productPickerOpen} transparent animationType="slide" onRequestClose={() => setProductPickerOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setProductPickerOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[styles.stickerSheet, { paddingBottom: insets.bottom + SP.md, maxHeight: '65%' }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Tag a product</Text>
-          <ScrollView>
-            {taggableProducts.length === 0 ? (
-              <Text style={styles.emptyText}>No products to tag yet.</Text>
-            ) : taggableProducts.map((p) => (
-              <PressableScale
-                key={p.id}
-                style={styles.productRow}
-                onPress={() => {
-                  hapticLight();
-                  addOverlay({
-                    type: 'product',
-                    productId: p.id,
-                    productName: p.name,
-                    productImageUri: p.media?.[0]?.uri,
-                    productPriceCents: p.pricing?.priceCents,
-                  });
-                  setProductPickerOpen(false);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Tag ${p.name}`}
-              >
-                <Text style={styles.productRowText}>{p.name}</Text>
-                <Feather name="chevron-right" size={16} color={MUTED} />
-              </PressableScale>
-            ))}
-          </ScrollView>
-        </View>
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setProductPickerOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.stickerSheet, { paddingBottom: insets.bottom + SP.md, maxHeight: '65%' }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Tag a product</Text>
+            <ScrollView>
+              {taggableProducts.length === 0 ? (
+                <Text style={styles.emptyText}>No products to tag yet.</Text>
+              ) : taggableProducts.map((p) => (
+                <PressableScale
+                  key={p.id}
+                  style={styles.productRow}
+                  onPress={() => {
+                    hapticLight();
+                    addOverlay({
+                      type: 'product',
+                      productId: p.id,
+                      productName: p.name,
+                      productImageUri: p.media?.[0]?.uri,
+                      productPriceCents: p.pricing?.priceCents,
+                    });
+                    setProductPickerOpen(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tag ${p.name}`}
+                >
+                  <Text style={styles.productRowText}>{p.name}</Text>
+                  <Feather name="chevron-right" size={16} color={MUTED} />
+                </PressableScale>
+              ))}
+            </ScrollView>
+          </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Shop-link modal (sellers) ── */}
       <Modal visible={shopModalOpen} transparent animationType="fade" onRequestClose={() => setShopModalOpen(false)}>
-        <View style={styles.overlayModalBackdrop}>
-          <View style={styles.overlayModalCard}>
-            <Text style={styles.sheetTitle}>Add a shop link</Text>
-            <TextInput
-              style={styles.shopInput}
-              value={shopUrlDraft}
-              onChangeText={setShopUrlDraft}
-              placeholder="https://your-shop.com/…"
-              placeholderTextColor="rgba(255,255,255,0.35)"
-              autoFocus
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-            <View style={styles.overlayModalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShopModalOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalAddBtn, { backgroundColor: theme.accent }]}
-                onPress={() => {
-                  if (shopUrlDraft.trim()) addOverlay({ type: 'shop', shopUrl: shopUrlDraft.trim(), shopLabel: 'Visit shop' });
-                  setShopModalOpen(false);
-                }}
-              >
-                <Text style={[styles.modalAddText, getOnAccentTextStyle(theme)]}>Add</Text>
-              </TouchableOpacity>
+        <ModalSafeArea>
+          <View style={styles.overlayModalBackdrop}>
+            <View style={styles.overlayModalCard}>
+              <Text style={styles.sheetTitle}>Add a shop link</Text>
+              <TextInput
+                style={styles.shopInput}
+                value={shopUrlDraft}
+                onChangeText={setShopUrlDraft}
+                placeholder="https://your-shop.com/…"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                autoFocus
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+              <View style={styles.overlayModalActions}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShopModalOpen(false)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalAddBtn, { backgroundColor: theme.accent }]}
+                  onPress={() => {
+                    if (shopUrlDraft.trim()) addOverlay({ type: 'shop', shopUrl: shopUrlDraft.trim(), shopLabel: 'Visit shop' });
+                    setShopModalOpen(false);
+                  }}
+                >
+                  <Text style={[styles.modalAddText, getOnAccentTextStyle(theme)]}>Add</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
       {renderShareSheets()}
 

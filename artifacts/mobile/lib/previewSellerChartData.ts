@@ -29,7 +29,7 @@
  * getDay/getDate/getMonth/getHours — labels every bucket correctly, exactly
  * as it does for the real API's buckets.
  */
-import type { SellerHomeAnalytics } from './sellerHomeAnalytics';
+import { EMPTY_TRAFFIC_SOURCES, type SellerHomeAnalytics } from './sellerHomeAnalytics';
 
 export type PreviewSellerChartRange = 'today' | 'week' | 'month' | 'year' | 'all';
 export type PreviewSellerChartMode = 'fresh' | 'demo';
@@ -153,6 +153,13 @@ export function buildPreviewSellerAnalytics(
       visitorCount: Math.max(0, Math.round(visitorCount * 0.88)),
     };
 
+  // A deterministic (seeded, not Math.random) split of the same visitorCount
+  // above into the four real source categories — a plausible-looking demo
+  // shape, never a separate fabricated total. 'fresh' mode is a real
+  // brand-new store on day one: every source is a real 0, exactly like
+  // every other figure on this preview.
+  const trafficSources = mode === 'fresh' ? EMPTY_TRAFFIC_SOURCES : buildDemoTrafficSources(visitorCount, range);
+
   return {
     range,
     totalCents,
@@ -161,6 +168,25 @@ export function buildPreviewSellerAnalytics(
     toFulfill: mode === 'fresh' ? 0 : Math.max(0, Math.round(orderCount * 0.08)),
     toCapture: 0,
     previous,
+    trafficSources,
     buckets,
   };
+}
+
+const DEMO_TRAFFIC_WEIGHTS: Array<{ source: SellerHomeAnalytics['trafficSources'][number]['source']; weight: number }> = [
+  { source: 'feed', weight: 0.42 },
+  { source: 'search', weight: 0.24 },
+  { source: 'profile', weight: 0.19 },
+  { source: 'external', weight: 0.15 },
+];
+
+function buildDemoTrafficSources(visitorCount: number, range: PreviewSellerChartRange): SellerHomeAnalytics['trafficSources'] {
+  const rand = mulberry32(SEED_BY_RANGE[range] + 2);
+  const counts = DEMO_TRAFFIC_WEIGHTS.map(({ weight }) => Math.round(visitorCount * weight * (0.9 + rand() * 0.2)));
+  const total = counts.reduce((sum, c) => sum + c, 0);
+  return DEMO_TRAFFIC_WEIGHTS.map(({ source }, i) => ({
+    source,
+    count: counts[i],
+    sharePercent: total > 0 ? Math.round((counts[i] / total) * 1000) / 10 : 0,
+  }));
 }

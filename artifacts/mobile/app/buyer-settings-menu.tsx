@@ -21,7 +21,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { hapticLight, hapticDestructiveConfirm } from '@/lib/haptics';
@@ -119,7 +119,7 @@ export default function BuyerSettingsMenuScreen() {
 
   return (
     <View style={[s.page, { backgroundColor: theme.background }]}>
-      <Header title="Menu" dividerVariant="none" />
+      <ScreenHeader title="Menu" />
 
       <View style={s.searchWrap}>
         <View style={[s.searchField, { backgroundColor: theme.cardElevated }]}>

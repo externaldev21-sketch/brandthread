@@ -44,7 +44,8 @@ import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import { activeReturnFor, isReturnEligible, returnSubmitError } from '@/lib/returns';
@@ -209,7 +210,7 @@ export default function BuyerReturnRequestScreen() {
   }
 
   const header = (
-    <BrandthreadHeader
+    <ScreenHeader
       title="Request a return"
       subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
       onBack={() => goBackOr(router)}
@@ -218,7 +219,7 @@ export default function BuyerReturnRequestScreen() {
 
   if (phase === 'loading') {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {header}
         <View style={s.centered}><ActivityIndicator color={theme.text} size="large" /></View>
       </BrandthreadScreen>
@@ -227,7 +228,7 @@ export default function BuyerReturnRequestScreen() {
 
   if (phase === 'error') {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {header}
         <EmptyState
           icon="wifi-off"
@@ -241,7 +242,7 @@ export default function BuyerReturnRequestScreen() {
 
   if (phase === 'ineligible') {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {header}
         <EmptyState
           icon="package"
@@ -255,7 +256,7 @@ export default function BuyerReturnRequestScreen() {
 
   if (phase === 'existing' && existingReturnId) {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {header}
         <EmptyState
           icon="rotate-ccw"
@@ -270,7 +271,8 @@ export default function BuyerReturnRequestScreen() {
 
   if (phase === 'submitted') {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
+        {header}
         <View style={s.successWrap} testID="return-request-submitted">
           <View style={s.successIcon}>
             <Feather name="check" size={32} color="#FFFFFF" />
@@ -300,7 +302,7 @@ export default function BuyerReturnRequestScreen() {
   const returnDeadline = order?.createdAt ? new Date(new Date(order.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : '';
 
   return (
-    <BrandthreadScreen noSafeBottom>
+    <BrandthreadScreen noSafeTop noSafeBottom>
       {header}
       <ScrollView
         showsVerticalScrollIndicator={false}

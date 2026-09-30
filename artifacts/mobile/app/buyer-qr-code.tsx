@@ -13,7 +13,7 @@ import {
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
@@ -48,7 +48,7 @@ export default function BuyerQRCode() {
 
   return (
     <View style={s.page}>
-      <Header
+      <ScreenHeader
         title="QR Code"
         actions={[{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }]}
       />

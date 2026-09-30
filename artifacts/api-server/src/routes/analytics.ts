@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, notificationDeliveries, notificationEvents } from "@workspace/db";
+import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, storeVisits, notificationDeliveries, notificationEvents } from "@workspace/db";
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
@@ -182,7 +182,7 @@ router.get("/home", async (req, res) => {
   // skipped below rather than compared against an empty/fabricated window.
   const { start: previousStart, end: previousEnd } = previousPeriod(start, end);
 
-  const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow] = await Promise.all([
+  const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow, sourceRows] = await Promise.all([
     db.select({
       totalCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
       orderCount: sql<number>`count(*)::int`,
@@ -224,7 +224,40 @@ router.get("/home", async (req, res) => {
       gte(storefrontVisits.createdAt, previousStart),
       lt(storefrontVisits.createdAt, previousEnd),
     )),
+    // Real per-source traffic breakdown (Discover feed / Search / Your
+    // profile / External links) for the same range the rest of this
+    // response already uses. Grouped in SQL rather than four separate
+    // queries.
+    db.select({
+      source: storeVisits.source,
+      count: sql<number>`count(*)::int`,
+    }).from(storeVisits).where(and(
+      eq(storeVisits.sellerId, ownerId),
+      gte(storeVisits.createdAt, start),
+      lt(storeVisits.createdAt, end),
+    )).groupBy(storeVisits.source),
   ]);
+
+  const TRAFFIC_SOURCES = ["feed", "search", "profile", "external"] as const;
+  const sourceCountBySource = new Map<string, number>(
+    sourceRows.map((row) => [row.source, row.count]),
+  );
+  const totalSourceVisits = TRAFFIC_SOURCES.reduce(
+    (sum, key) => sum + (sourceCountBySource.get(key) ?? 0),
+    0,
+  );
+  const trafficSources = TRAFFIC_SOURCES.map((key) => {
+    const sourceCount = sourceCountBySource.get(key) ?? 0;
+    return {
+      source: key,
+      count: sourceCount,
+      // Real percentage-of-total, computed from the same counts. 0 (not
+      // fabricated, not NaN) when there is no traffic yet.
+      sharePercent: totalSourceVisits > 0
+        ? Math.round((sourceCount / totalSourceVisits) * 1000) / 10
+        : 0,
+    };
+  });
 
   const [bucketRows, visitorBucketRows] = await Promise.all([
     db.execute(sql`
@@ -283,6 +316,10 @@ router.get("/home", async (req, res) => {
       orderCount: previousSalesRow[0]?.orderCount ?? 0,
       visitorCount: previousVisitorRow[0]?.count ?? 0,
     },
+    // Real per-source breakdown for the Traffic sources panel — replaces the
+    // former "isn't tracked yet" lock row. Fresh stores with no visits yet
+    // get real zeros for every source, not a placeholder.
+    trafficSources,
     buckets: ((bucketRows as any).rows ?? []).map((row: any) => ({
       bucket: row.bucket,
       totalCents: Number(row.total_cents ?? 0),

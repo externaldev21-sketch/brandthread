@@ -20,6 +20,7 @@ import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { getBuyerProduct, addToCart, createBuyNowSession, getCart } from '@/services/cartService';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -408,33 +409,35 @@ export default function BuyerSaved() {
 
       {/* ─ New collection ─ */}
       <Modal transparent animationType="fade" visible={newCollectionModal} onRequestClose={() => setNewCollectionModal(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setNewCollectionModal(false)} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={styles.centerModal} pointerEvents="box-none">
-          <View style={styles.newCollectionCard}>
-            <Text style={styles.actionsTitle}>New collection</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Fall Fits"
-              placeholderTextColor={theme.subtle}
-              value={newCollectionName}
-              onChangeText={setNewCollectionName}
-              autoFocus
-              onSubmitEditing={handleCreateCollection}
-              returnKeyType="done"
-            />
-            <View style={styles.modalActions}>
-              <Button label="Cancel" variant="secondary" size="small" onPress={() => setNewCollectionModal(false)} />
-              <Button
-                label="Create"
-                variant="primary"
-                size="small"
-                onPress={handleCreateCollection}
-                loading={creatingCollection}
-                disabled={!newCollectionName.trim() || creatingCollection}
+        <ModalSafeArea>
+          <Pressable style={styles.backdrop} onPress={() => setNewCollectionModal(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={styles.centerModal} pointerEvents="box-none">
+            <View style={styles.newCollectionCard}>
+              <Text style={styles.actionsTitle}>New collection</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Fall Fits"
+                placeholderTextColor={theme.subtle}
+                value={newCollectionName}
+                onChangeText={setNewCollectionName}
+                autoFocus
+                onSubmitEditing={handleCreateCollection}
+                returnKeyType="done"
               />
+              <View style={styles.modalActions}>
+                <Button label="Cancel" variant="secondary" size="small" onPress={() => setNewCollectionModal(false)} />
+                <Button
+                  label="Create"
+                  variant="primary"
+                  size="small"
+                  onPress={handleCreateCollection}
+                  loading={creatingCollection}
+                  disabled={!newCollectionName.trim() || creatingCollection}
+                />
+              </View>
             </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
     </View>
   );

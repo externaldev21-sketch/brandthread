@@ -87,7 +87,7 @@ function extractFsScale(src) {
 const INTER_FAMILIES = extractFontFamilies(THEME_SRC); // e.g. Inter_400Regular, Inter_500Medium, ...
 const FS_SCALE = extractFsScale(THEME_SRC); // e.g. [11,12,13,15,17,19,22,26,30,36]
 
-const PLACEHOLDER_RE = /coming soon|TODO\b|lorem ipsum|placeholder|^Label$|^Title$|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
+const PLACEHOLDER_RE = /coming soon|isn't tracked yet|is not tracked yet|not available yet|TODO\b|lorem ipsum|placeholder|^Label$|^Title$|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
 
 // Dev's explicit rule: no visible preview/demo tell anywhere, ever — a fresh
 // (empty) real install must read exactly like this text, never like a demo
