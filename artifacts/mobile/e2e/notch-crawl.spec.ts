@@ -127,7 +127,9 @@ const ROUTE_ALLOWLIST = process.env.NOTCH_CRAWL_ROUTES
 // Fast mode only spends its deeper-tap budget on the PR's changed routes,
 // and never on the fresh-account pass (nightly's job) — depth 0 across
 // every route on the default demo account is still checked every time.
-const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = FAST ? ['demo'] : DATA_STATES;
+const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = process.env.NOTCH_CRAWL_STATES
+  ? (process.env.NOTCH_CRAWL_STATES.split(',') as (typeof DATA_STATES)[number][])
+  : FAST ? ['demo'] : DATA_STATES;
 const MAX_DEPTH = FAST ? 1 : CLICK_BREADTH.length;
 
 interface Failure {
