@@ -82,7 +82,7 @@ export type PayInput = {
   sellerId: string;
   buyerId: string;
   items: Array<{ variantId: string; productName: string; priceCents: number; quantity: number }>;
-  chargeModel: "destination" | "held";
+  chargeModel: "destination" | "held" | "transfer";
   dropId?: string | null;
   shippingCents?: number;
   taxCents?: number;

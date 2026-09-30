@@ -1,4 +1,10 @@
 import { afterAll } from "vitest";
+
+// The pre-guarantee money suites assert that a seller is paid at checkout.
+// Production defaults to PAYOUT_MODE=hold (paid after delivery); the delivery
+// guarantee suite (lib/delivery/__tests__) sets "hold" explicitly and
+// policy.test.ts pins the default.
+process.env.PAYOUT_MODE ??= "immediate";
 import pg from "pg";
 import { purgeTestData } from "@workspace/db/testing";
 

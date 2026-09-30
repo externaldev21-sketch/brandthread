@@ -149,4 +149,17 @@ describe('notification response navigation', () => {
     handler(targetResponse('payout-1', { targetType: 'payout', targetId: 'po_123' }));
     expect(router.push).toHaveBeenCalledWith('/payouts');
   });
+
+  it('opens a community message push in the community chat, never a DM', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('c1', { type: 'community_message', targetType: 'community', targetId: 'g1', communityId: 'g1' }));
+    handler(targetResponse('c2', { targetType: 'community', targetId: 'g 2' }));
+    handler(targetResponse('c3', { type: 'community_message', communityId: 'g3' }));
+    expect(router.push.mock.calls.map(([href]) => href)).toEqual([
+      '/community-chat?id=g1',
+      '/community-chat?id=g%202',
+      '/community-chat?id=g3',
+    ]);
+  });
 });

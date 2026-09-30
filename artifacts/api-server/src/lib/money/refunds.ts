@@ -42,7 +42,8 @@ import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "
 import { restoreStockForOrder } from "../stockReservation";
 
 export type RefundReason =
-  | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold";
+  | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
+  | "not_delivered";
 
 type StripeLike = Pick<Stripe, "refunds" | "transfers" | "applicationFees">;
 
@@ -67,6 +68,13 @@ export type RefundOptions = {
    * then cancel it on success (or put it back if Stripe refuses).
    */
   cancelOrder?: { reason: string; notes: string | null; restock: boolean };
+  /**
+   * The delivery guarantee's automatic refund may cancel an order that was
+   * shipped but never delivered. No other path may (a buyer or seller
+   * cancelling a shipped order goes through a return instead), so this is an
+   * explicit opt-in rather than an edge in the order state machine.
+   */
+  allowFromShipped?: boolean;
   /** Runs under the order lock before anything is recorded. Throw to refuse. */
   precondition?: (order: LockedOrder, tx: DbExecutor) => void | Promise<void>;
   /** Runs inside the success transaction (e.g. loyalty point reversal). */
@@ -201,7 +209,9 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
 
     if (options.cancelOrder && order.status !== "refund_pending") {
       const from = order.status as OrderStatus;
-      if (!orderStatusMachine.isState(from) || !orderStatusMachine.can(from, "refund_pending")) {
+      const parkable = orderStatusMachine.isState(from)
+        && (orderStatusMachine.can(from, "refund_pending") || (options.allowFromShipped === true && from === "shipped"));
+      if (!parkable) {
         throw new RefundError(`An order that is ${order.status} cannot be cancelled`, 409, "NOT_CANCELLABLE");
       }
       await tx.update(orders).set({ status: "refund_pending", updatedAt: new Date() })

@@ -337,7 +337,7 @@ describe('classification and routing', () => {
   });
 
   it("routes buyer order updates to the buyer's order screen, whatever targetType they were stored with", () => {
-    for (const type of ['order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'order_cancelled', 'order_exception', 'order_returned_to_sender']) {
+    for (const type of ['order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'order_cancelled', 'order_exception', 'order_returned_to_sender', 'order_preparing', 'order_auto_refunded', 'order_refund_warning']) {
       expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
       expect(activityHref(item({ type, category: 'orders', targetType: 'buyer_order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
       expect(isBuyerOrderNotification(type)).toBe(true);
@@ -352,6 +352,9 @@ describe('classification and routing', () => {
     expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
       .toBe('/return-detail?returnId=r1');
     expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
+    expect(activityIcon({ type: 'order_auto_refunded', category: 'orders' })).toBe('rotate-ccw');
+    expect(activityIcon({ type: 'order_refund_warning', category: 'orders' })).toBe('clock');
+    expect(activityIcon({ type: 'order_preparing', category: 'orders' })).toBe('box');
     expect(activityIcon({ type: 'order_cancelled_by_buyer', category: 'orders' })).toBe('x-circle');
     expect(activityIcon({ type: 'return_refunded', category: 'returns' })).toBe('rotate-ccw');
   });

@@ -13,6 +13,7 @@ export type RateLimitPolicyName =
   | "authenticated-read"
   | "public-read"
   | "messaging"
+  | "community-create"
   | "agent-chat"
   | "comment"
   | "follow"
@@ -98,6 +99,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: scaled(30),
     windowMs: 60_000,
     message: "Too many messages sent. Please wait a moment and try again.",
+  },
+  "community-create": {
+    id: "community-create",
+    // Per-account abuse limit on creating groups (a hard cap on owned groups
+    // also applies in routes/communities.ts).
+    limit: 5,
+    windowMs: 24 * 60 * 60_000,
+    message: "You've created a lot of groups today. Please try again tomorrow.",
   },
   "agent-chat": {
     id: "agent-chat",

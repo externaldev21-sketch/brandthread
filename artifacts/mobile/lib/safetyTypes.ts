@@ -6,7 +6,8 @@
 
 export type ReportTargetType =
   | 'post' | 'video' | 'live' | 'live_comment' | 'comment'
-  | 'story' | 'product' | 'profile' | 'message';
+  | 'story' | 'product' | 'profile' | 'message'
+  | 'community_message' | 'community';
 
 export type ReportReasonId =
   | 'spam' | 'harassment' | 'nudity' | 'hate' | 'violence'

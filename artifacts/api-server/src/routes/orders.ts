@@ -15,6 +15,9 @@ import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/or
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { shipItems } from "../lib/delivery/deliveryState";
+import { notifyBuyerPreparing } from "../lib/delivery/notifications";
+import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
 
 const router = Router();
 router.use(requireAuth);
@@ -97,6 +100,14 @@ router.get("/", async (req, res) => {
       // checkout order is stored as status "pending" (= new, not yet
       // processed), so the app needs this to show it as Paid — not Unpaid.
       paidAt: orders.paidAt,
+      // Delivery guarantee (docs/payments/delivery-guarantee.md): the seller's
+      // deadline countdown and the auto-refunded / dispute-paused states.
+      deliverBy: orders.deliverBy,
+      isPreorder: orders.isPreorder,
+      promisedShipDate: orders.promisedShipDate,
+      deliveredAt: orders.deliveredAt,
+      autoRefundedAt: orders.autoRefundedAt,
+      disputePausedAt: orders.disputePausedAt,
       // Prefer the explicit customers record; fall back to the buyer's user row
       // (covers Stripe-originated orders where customerId is null but buyerId is set),
       // then — for guest checkout, which has neither — the shipping name and
@@ -372,6 +383,16 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     res.status(400).json({ error: `status must be one of: ${valid.join(", ")}` }); return;
   }
 
+  // Delivered is decided by the carrier or the buyer, never the seller: it
+  // starts the seller's payout clock and ends the buyer's refund guarantee.
+  if (status === "delivered") {
+    res.status(409).json({
+      error: "Delivery is confirmed by the carrier or the buyer, not the seller.",
+      code: "DELIVERY_NOT_SELLER_CONFIRMED",
+    });
+    return;
+  }
+
   // Cancellation-specific validation
   if (status === "cancelled") {
     if (!reason) {
@@ -394,6 +415,13 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .limit(1);
   if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (current.autoRefundedAt) {
+    res.status(409).json({
+      error: "This order was refunded because it wasn't delivered in time, so it can no longer be changed.",
+      code: "AUTO_REFUNDED",
+    });
+    return;
+  }
   if (current.status === status) { res.json(current); return; }
   const conflict = orderStatusTransitionConflict(current.status);
   if (conflict) { res.status(409).json({ error: conflict }); return; }
@@ -422,6 +450,16 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   if (status === "shipped" && current.chargeModel === "held" && !current.trackingNumber) {
     res.status(409).json({
       error: "Add a tracking number to ship a preorder — that is what releases its funds.",
+      code: "TRACKING_REQUIRED",
+    });
+    return;
+  }
+
+  // A guaranteed order is only "shipped" with tracking: the carrier's
+  // delivery scan is what completes it (and releases the seller's payout).
+  if (status === "shipped" && current.deliverBy && !current.trackingNumber) {
+    res.status(409).json({
+      error: "Add a tracking number to ship this order. The carrier's delivery scan completes it.",
       code: "TRACKING_REQUIRED",
     });
     return;
@@ -544,6 +582,9 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
       logger.error({ err, orderId: transitioned!.id }, "Shipping email delivery failed");
     });
   }
+  if (status === "processing" || status === "fulfilled") {
+    void notifyBuyerPreparing(transitioned);
+  }
 
   res.json(transitioned);
 });
@@ -557,6 +598,25 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     trackingStatus,
     estimatedDelivery: rawEstimatedDelivery,
   } = req.body;
+
+  if (trackingStatus === "delivered") {
+    res.status(409).json({
+      error: "Delivery is confirmed by the carrier or the buyer, not the seller.",
+      code: "DELIVERY_NOT_SELLER_CONFIRMED",
+    });
+    return;
+  }
+  {
+    const [guard] = await db.select({ autoRefundedAt: orders.autoRefundedAt }).from(orders)
+      .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);
+    if (guard?.autoRefundedAt) {
+      res.status(409).json({
+        error: "This order was refunded because it wasn't delivered in time, so it can no longer be shipped.",
+        code: "AUTO_REFUNDED",
+      });
+      return;
+    }
+  }
 
   const hasTrackingNumber = rawTrackingNumber !== undefined;
   const trackingNumber = hasTrackingNumber
@@ -649,6 +709,10 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
   }
 
+  const [previous] = trackingNumber === undefined ? [] : await db.select({ trackingNumber: orders.trackingNumber })
+    .from(orders).where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);
+  const previousTrackingNumber = previous?.trackingNumber ?? null;
+
   const trackingNumberChanged = trackingNumber === undefined
     ? sql`FALSE`
     : sql`${orders.trackingNumber} IS DISTINCT FROM ${trackingNumber}`;
@@ -680,6 +744,18 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       sql`(${trackingNumberChanged} OR ${carrierChanged} OR ${trackingStatusChanged} OR ${estimatedDeliveryChanged})`,
     ))
     .returning();
+  // Item-level tracking mirrors the order's number for every item that has no
+  // shipment of its own (or still carries the number being replaced), so the
+  // carrier's delivery scan can complete each item (lib/delivery).
+  if (trackingChange && trackingNumber !== undefined) {
+    await db.execute(sql`
+      UPDATE order_items SET tracking_number = ${trackingNumber},
+        carrier = COALESCE(${carrier ?? null}, carrier), shipped_at = COALESCE(shipped_at, now())
+      WHERE order_id = ${trackingChange.id}::uuid AND refunded_at IS NULL AND delivered_at IS NULL
+        AND (tracking_number IS NULL OR tracking_number = ${previousTrackingNumber ?? ""})
+    `);
+    void registerTrackingWithCarrier(trackingChange.id, trackingChange.carrier, trackingNumber);
+  }
   const [current] = trackingChange
     ? [trackingChange]
     : await db.select().from(orders)
@@ -790,6 +866,49 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   }
 
   res.json(updated);
+});
+
+// PATCH /api/orders/:id/items-tracking — ship part of an order (staff+)
+// Each shipment carries its own tracking number; the delivery guarantee then
+// tracks, and if needed refunds, item by item (lib/delivery).
+router.patch("/:id/items-tracking", requireRole("staff"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const { itemIds, trackingNumber: rawTracking, carrier: rawCarrier } = req.body ?? {};
+  const trackingNumber = typeof rawTracking === "string" ? rawTracking.trim() : "";
+  if (!Array.isArray(itemIds) || itemIds.length === 0 || itemIds.some((id) => typeof id !== "string")) {
+    res.status(400).json({ error: "itemIds must be a non-empty array of order item ids" }); return;
+  }
+  if (!trackingNumber || trackingNumber.length > 100) {
+    res.status(400).json({ error: "trackingNumber is required" }); return;
+  }
+  if (rawCarrier !== undefined && rawCarrier !== null && typeof rawCarrier !== "string") {
+    res.status(400).json({ error: "carrier must be a string" }); return;
+  }
+  const carrier = typeof rawCarrier === "string" ? rawCarrier.trim() || null : null;
+
+  const result = await shipItems({ orderId: req.params.id, ownerId, itemIds, trackingNumber, carrier });
+  if (!result.ok) { res.status(result.status).json({ error: result.message, code: result.code }); return; }
+
+  void registerTrackingWithCarrier(req.params.id, carrier, trackingNumber);
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Shipped ${result.shippedItemIds.length} item(s) of order #${result.orderNumber}`,
+      "order", req.params.id, { itemIds: result.shippedItemIds, trackingNumber, carrier },
+    );
+  }
+  if (result.buyerId) {
+    publishNotification({
+      userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
+      title: "Part of your order has shipped!",
+      body: `Order #${result.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
+      targetId: req.params.id, targetType: "buyer_order",
+    }).catch(() => { /* non-critical */ });
+  }
+  const [order] = await db.select().from(orders).where(eq(orders.id, req.params.id)).limit(1);
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, req.params.id));
+  res.json({ ...order, items });
 });
 
 // PATCH /api/orders/:id/fulfillment-checklist — seller packing checklist

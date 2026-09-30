@@ -17,6 +17,8 @@ wrong before this change. Amounts are always **integer cents** (see
 
 ---
 
+> **Update — delivery guarantee.** New in-stock orders are no longer destination charges: they are charged on Brandthread's balance and the seller is paid by a transfer **after delivery + a buffer** (`PAYOUT_MODE=hold`, the default), and an order not delivered within 15 days (60 for pre-orders) is refunded automatically. §2.1 below describes the `PAYOUT_MODE=immediate` path, which is now the opt-out. See [delivery-guarantee.md](./delivery-guarantee.md).
+
 ## 1. The owner's rules
 
 | Rule | Where it is enforced |

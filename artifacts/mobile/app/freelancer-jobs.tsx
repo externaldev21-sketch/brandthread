@@ -284,17 +284,8 @@ export default function FreelancerJobsScreen() {
             <Text style={styles.emptyText}>
               {tab === 'gigs'
                 ? 'Gigs appear here when a brand hires you on Brandthread.'
-                : 'Hire a freelance creative to help build your streetwear brand.'}
+                : 'Jobs you post for a freelance creative will appear here.'}
             </Text>
-            {tab === 'hiring' && (
-              <TouchableOpacity
-                style={[styles.browseBtn, { backgroundColor: colors.accent }]}
-                activeOpacity={0.85}
-                onPress={() => router.push('/community' as any)}
-              >
-                <Text style={[styles.browseBtnText, { color: colors.primary }]}>Browse Freelancers</Text>
-              </TouchableOpacity>
-            )}
           </View>
         ) : (
           jobs.map((j) => renderJob(j, tab === 'gigs' ? 'freelancer' : 'hirer'))

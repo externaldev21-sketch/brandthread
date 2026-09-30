@@ -81,6 +81,7 @@ vi.mock('@clerk/expo', () => ({
 let mockPreviewMode = false;
 vi.mock('@/lib/devPreview', () => ({
   isSellerDevPreview: () => mockPreviewMode,
+  isPreviewDemoMode: () => false,
 }));
 
 vi.mock('@/components/BrandthreadUI', () => ({

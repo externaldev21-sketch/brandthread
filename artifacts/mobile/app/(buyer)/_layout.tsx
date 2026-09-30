@@ -12,6 +12,7 @@ import { getConversations, getNotifications, subscribeSocial } from '@/services/
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
+import { useCommunityBadgeCount } from '@/lib/communities/useCommunityInbox';
 // Instagram/TikTok-style directional slide — shared with the seller tab
 // layout (app/(tabs)/_layout.tsx) so both sides use the same duration/
 // easing. `current.progress` (from React Navigation's bottom-tabs) is
@@ -34,7 +35,10 @@ import {
 
 function BuyerTabLayout() {
   const colors = useColors();
-  const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
+  const [dmBadgeCount, setDmBadgeCount] = useState(0);
+  // Muted communities contribute nothing; a muted-only unread never lights the tab.
+  const communityBadgeCount = useCommunityBadgeCount();
+  const inboxBadgeCount = dmBadgeCount + communityBadgeCount;
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
 
@@ -80,7 +84,7 @@ function BuyerTabLayout() {
       const unreadNotifications = notifications.filter(
         n => !n.isRead && !n.isMuted,
       ).length;
-      setInboxBadgeCount(unreadMessages + unreadNotifications);
+      setDmBadgeCount(unreadMessages + unreadNotifications);
     } catch {
       // Badges are non-critical.
     }

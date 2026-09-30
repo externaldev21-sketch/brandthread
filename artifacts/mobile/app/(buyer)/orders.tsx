@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
@@ -13,11 +13,13 @@ import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
-import { getBuyerOrdersWithStatus } from '@/services/orderService';
+import { getBuyerOrdersWithStatus, mapApiBuyerOrder } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
-import { isBuyerDevPreview } from '@/lib/devPreview';
-import { getPreviewBuyerOrders, isPreviewCommerceId } from '@/lib/previewCommerce';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewBuyerOrders as getPreviewDeliveryBuyerOrders, isPreviewOrderId } from '@/lib/previewOrders';
+import { getPreviewBuyerOrders as getPreviewCommerceBuyerOrders, isPreviewCommerceId } from '@/lib/previewCommerce';
 import { formatCents } from '@/lib/money';
+import { deliveryHeadline } from '@/lib/deliveryGuarantee';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadScreen, FilterChip,
@@ -34,18 +36,9 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function statusBadgeVariant(status: OrderStatus): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
-  switch (status) {
-    case 'new':          return 'info';
-    case 'processing':   return 'purple';
-    case 'ready_to_ship': return 'warning';
-    case 'shipped':      return 'warning';
-    case 'delivered':    return 'success';
-    case 'cancelled':    return 'neutral';
-    case 'refunded':     return 'error';
-    case 'disputed':     return 'error';
-    default:             return 'neutral';
-  }
+// Monochrome: every order status reads as the same neutral pill; the label carries the meaning.
+function statusBadgeVariant(_status: OrderStatus): 'neutral' {
+  return 'neutral';
 }
 
 function statusBadgeLabel(status: OrderStatus): string {
@@ -110,7 +103,12 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
   const extraCount = order.lineItems.length - 1;
   const sellerInitial = order.sellerName.charAt(0).toUpperCase();
   const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
-  const isPreview = isPreviewCommerceId(order.id);
+  // Preview orders are list-only here: never pass their synthetic IDs into
+  // a detail or mutation route that can reach the live API.
+  const isPreview = isPreviewOrderId(order.id) || isPreviewCommerceId(order.id);
+  const autoRefunded = !!order.delivery?.autoRefund;
+  const headline = deliveryHeadline(order);
+  const thumbs = order.lineItems.slice(0, 4);
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
@@ -123,8 +121,42 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           <Text style={styles.sellerName}>{order.sellerName}</Text>
           <Text style={styles.orderMeta}>{order.orderNumber} · {fmtDate(order.createdAt)}</Text>
         </View>
-        <StatusBadge label={statusBadgeLabel(order.status)} variant={statusBadgeVariant(order.status)} small />
+        <StatusBadge
+          label={autoRefunded ? (order.delivery?.autoRefund?.partial ? 'PARTIAL REFUND' : 'REFUNDED') : statusBadgeLabel(order.status)}
+          variant={autoRefunded ? 'neutral' : statusBadgeVariant(order.status)}
+          small
+        />
       </View>
+
+      {/* Delivery headline — "Arriving Oct 15" / "Delivered" / "Refunded" */}
+      {headline && (
+        <Text
+          style={[styles.headline, headline.tone === 'muted' && { color: theme.muted }]}
+          numberOfLines={1}
+        >
+          {headline.text}
+        </Text>
+      )}
+
+      {/* Item thumbnails */}
+      {thumbs.length > 0 && (
+        <View style={styles.thumbRow}>
+          {thumbs.map((item, i) => (
+            item.imageUri ? (
+              <Image key={i} source={{ uri: item.imageUri }} style={styles.thumb} resizeMode="cover" accessibilityLabel={item.productName} />
+            ) : (
+              <View key={i} style={[styles.thumb, styles.thumbFallback]}>
+                <Feather name="image" size={16} color={theme.subtle} />
+              </View>
+            )
+          ))}
+          {order.lineItems.length > thumbs.length && (
+            <View style={[styles.thumb, styles.thumbFallback]}>
+              <Text style={styles.moreText}>+{order.lineItems.length - thumbs.length}</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Items */}
       <View style={{ marginTop: SP.sm }}>
@@ -139,9 +171,11 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
       </View>
 
       {/* Live status tracker — visual centerpiece of the card */}
-      <View style={styles.trackerWrap}>
-        <OrderStatusTimeline status={order.status} compact />
-      </View>
+      {!autoRefunded && (
+        <View style={styles.trackerWrap}>
+          <OrderStatusTimeline status={order.status} compact />
+        </View>
+      )}
 
       {/* Price + pre-order row */}
       <View style={styles.statusRow}>
@@ -153,7 +187,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
         <Text style={styles.totalText}>{formatCents(order.payment.totalCents)}</Text>
       </View>
 
-      {order.status === 'cancelled' && (
+      {order.status === 'cancelled' && !autoRefunded && (
         <View style={styles.cancellationBanner}>
           <Feather name="x-circle" size={ICON.sm} color={theme.error} />
           <View style={styles.cancellationCopy}>
@@ -166,13 +200,13 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
       )}
 
       {/* Tracking info */}
-      {order.trackingStatus && !isTerminalStatus && (
+      {order.trackingStatus && !isTerminalStatus && !order.delivery && (
         <View style={styles.trackingRow}>
           <Feather name="truck" size={ICON.xs} color={theme.secondary} />
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
-            {isPreviewCommerceId(order.id) && order.trackingNumber ? ` · ${order.trackingNumber}` : ''}
+            {isPreview && order.trackingNumber ? ` · ${order.trackingNumber}` : ''}
           </Text>
         </View>
       )}
@@ -182,7 +216,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} disabled={isPreview}>
           <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
         </TouchableOpacity>
-        {order.trackingNumber && !isPreviewCommerceId(order.id) && (
+        {order.trackingNumber && !isPreview && (
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
@@ -244,7 +278,7 @@ export default function BuyerOrdersScreen() {
   const openOrder = useCallback((orderId: string) => {
     // Synthetic preview orders are list-only; never hand their IDs to a
     // detail/mutation route backed by the live API.
-    if (isPreviewCommerceId(orderId)) return;
+    if (isPreviewOrderId(orderId) || isPreviewCommerceId(orderId)) return;
     router.push(('/buyer-order-detail?id=' + orderId) as never);
   }, [router]);
   const { userId } = useAuth();
@@ -268,7 +302,11 @@ export default function BuyerOrdersScreen() {
 
   const load = useCallback(async (generation: number) => {
     if (!userId) {
-      setOrders(buyerPreview ? getPreviewBuyerOrders() : []);
+      // The explicit demo cast includes delivery-guarantee states; a fresh
+      // buyer preview retains its list-only synthetic commerce orders.
+      setOrders(isPreviewDemoMode()
+        ? getPreviewDeliveryBuyerOrders().map(mapApiBuyerOrder)
+        : buyerPreview ? getPreviewCommerceBuyerOrders() : []);
       setOrdersOwnerId(userId);
       setLoading(false);
       setRefreshing(false);
@@ -370,6 +408,7 @@ export default function BuyerOrdersScreen() {
           for Activity, see app/activity-center.tsx's history). */}
       <FlatList
         horizontal
+        style={{ flexGrow: 0 }}
         data={FILTER_CHIPS}
         keyExtractor={i => i.key}
         showsHorizontalScrollIndicator={false}
@@ -485,6 +524,30 @@ function cardStyles(theme: AppThemePreset) {
       fontFamily: FONT.regular,
       color: theme.muted,
       marginTop: 1,
+    },
+    headline: {
+      fontSize: FS.base,
+      fontFamily: FONT.bold,
+      color: theme.text,
+      marginTop: SP.sm,
+    },
+    thumbRow: {
+      flexDirection: 'row',
+      gap: SP.sm,
+      marginTop: SP.sm,
+    },
+    thumb: {
+      width: 56,
+      height: 70,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: theme.border,
+      overflow: 'hidden',
+    },
+    thumbFallback: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.cardElevated,
     },
     itemText: {
       fontSize: FS.sm,
