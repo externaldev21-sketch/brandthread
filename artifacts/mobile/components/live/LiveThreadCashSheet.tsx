@@ -4,16 +4,21 @@
  * in the app's own monochrome + Thread Cash green tokens. Built on the same
  * Modal + SheetRise + useAppTheme() pattern as LiveProductsSheet.tsx.
  *
- * There is no host userId on a LiveRoom (sample or real) to wire a real
- * api.threadCash.send() transfer to yet, so — per spec — sending here posts
- * a `'You sent $X Thread Cash'` chat line and briefly deducts from the
- * displayed balance rather than pretending to complete a real transfer.
+ * When `recipientId` is a real host userId (the app/live.tsx pager), sending
+ * is a real `api.threadCash.send()` transfer, same call
+ * components/thread-cash/ChatAttachThreadCash.tsx uses to send in a DM — the
+ * server independently re-checks mutual follow at send/claim either way, so
+ * this affordance is never the actual security boundary. Without a
+ * `recipientId` (app/live-feed.tsx's sample rooms, which have no real host
+ * account to transfer to), sending stays local-only: it decrements the
+ * shown balance and the caller posts a chat line, same as before.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { randomUUID } from 'expo-crypto';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -26,13 +31,19 @@ import { hapticLight } from '@/lib/haptics';
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
 export function LiveThreadCashSheet({
-  visible, brandName, onClose, onSent,
+  visible, brandName, recipientId, onClose, onSent, onSendFailed,
 }: {
   visible: boolean;
   brandName: string;
+  /** Real host userId to transfer to. Omit for a sample room with no real
+   *  account behind it — sending then stays local-only (see module doc). */
+  recipientId?: string | null;
   onClose: () => void;
-  /** Fires once the gift is "sent" — the caller posts the chat line. */
+  /** Fires once the gift is actually sent (transferred, or locally mocked
+   *  when there's no `recipientId`) — the caller posts the chat line. */
   onSent: (amountCents: number) => void;
+  /** Fires when a real transfer attempt fails — the caller shows feedback. */
+  onSendFailed?: (message: string) => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -75,10 +86,23 @@ export function LiveThreadCashSheet({
     transform: [{ scale: 0.9 + pop.value * 0.1 }],
   }));
 
-  function handleSend() {
+  async function handleSend() {
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
     hapticLight();
+    if (recipientId && !isPreviewThreadCashEnabled()) {
+      try {
+        await api.threadCash.send({
+          recipientId,
+          amountCents: selected,
+          idempotencyKey: randomUUID(),
+        });
+      } catch (error: any) {
+        setSending(false);
+        onSendFailed?.(error?.message ?? 'Could not send Thread Cash. Try again.');
+        return;
+      }
+    }
     setBalanceCents(prev => (prev == null ? prev : Math.max(0, prev - selected)));
     setJustSentCents(selected);
     onSent(selected);

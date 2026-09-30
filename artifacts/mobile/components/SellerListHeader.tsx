@@ -167,7 +167,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     gap: 4,
   },
   titleText: {
-    fontSize: 20,
+    fontSize: FS.lg,
     fontFamily: FONT.bold,
     letterSpacing: -0.4,
   },
@@ -196,7 +196,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   searchBarFlex: { flex: 1, height: 36 },
   controlBtn: {
-    width: 36,
+    // 44x44: PressableScale's own accessibility floor already renders these
+    // at 44pt tall regardless of this height value, so keeping the width
+    // narrower than that (36) left a 36x44 rectangle short of the 44x44
+    // minimum comfortable touch target — width now matches.
+    width: 44,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',

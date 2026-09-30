@@ -30,7 +30,7 @@ function read(relPath: string): string {
 describe('seller fresh preview: no seeded/demo data by default', () => {
   it('seller-inbox.tsx only reads the seeded seller conversations behind isPreviewDemoMode()', () => {
     const src = read('app/seller-inbox.tsx');
-    expect(src).toContain("import { isPreviewDemoMode } from '@/lib/devPreview';");
+    expect(src).toContain("import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
     // The call to the seeded dataset must be guarded by isPreviewDemoMode()
     // in the same conditional that reaches it — not merely present somewhere
     // in the file (which the earlier, reverted PR attempt would also match).

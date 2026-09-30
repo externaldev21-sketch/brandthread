@@ -1307,7 +1307,6 @@ function PaymentTab({ order }: { order: Order }) {
                 <Text style={s.refundAmount}>{usd(r.totalAmountCents)}</Text>
               </View>
               <Text style={s.refundDate}>{fmt(r.createdAt)}</Text>
-              {r.isDemo && <Text style={s.demoTag}>Test refund</Text>}
             </BrandthreadCard>
           ))}
         </View>
@@ -1954,7 +1953,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   refundHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
   refundAmount:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginLeft: 'auto' },
   refundDate:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  demoTag:          { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
   // Fulfillment
   trackingStatusCard: { gap: SP.sm, borderColor: BORDER_ACTIVE },

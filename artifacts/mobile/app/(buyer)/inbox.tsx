@@ -41,6 +41,7 @@ import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
   subscribePreviewTyping, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
 } from '@/lib/requestActions';
@@ -370,7 +371,11 @@ export default function InboxScreen() {
   const isAuthorLive = useCallback((authorId: string) => !!liveDirectory.streamFor(authorId), [liveDirectory]);
 
   const loadStoryTray = useCallback(async () => {
-    if (!userId) {
+    // See loadData's identical isBuyerDevPreview() comment above — a
+    // fake-signed-in Clerk stub (audit/e2e harnesses) still reports a
+    // truthy userId, which must not be enough on its own to reach the real
+    // stories endpoints below.
+    if (!userId || isBuyerDevPreview()) {
       if (isPreviewStoriesEnabled()) {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
@@ -475,7 +480,15 @@ export default function InboxScreen() {
   }, []);
 
   const loadData = useCallback(async () => {
-    if (!userId) {
+    // isBuyerDevPreview() (not just !userId): a stubbed/fake-signed-in Clerk
+    // session (this app's own audit/e2e harnesses fake a signed-in user so
+    // protected screens render at all) still reports a truthy userId, which
+    // used to fall through to the real getConversations() call below and
+    // 404 against a harness with no backend. bt_preview is read straight
+    // off the URL/persisted role (lib/devPreview.ts), independent of
+    // Clerk's auth state, so it still routes to the preview branch however
+    // Clerk is stubbed.
+    if (!userId || isBuyerDevPreview()) {
       // The dev-web ?bt_preview=buyer bypass never signs in through Clerk
       // (see lib/devPreview.ts / boost.tsx's isSellerDevPreview pattern), so
       // `userId` is null here in that mode — without this check the seeded
@@ -525,7 +538,8 @@ export default function InboxScreen() {
   // whenever the social pub/sub fires (e.g. after a follow/unfollow changes
   // who counts as a suggestion).
   const loadSuggested = useCallback(async () => {
-    if (!userId) {
+    // See loadData's identical isBuyerDevPreview() comment above.
+    if (!userId || isBuyerDevPreview()) {
       setSuggestedPeople([]);
       setSuggestedLoading(false);
       return;
@@ -876,11 +890,23 @@ export default function InboxScreen() {
     if (!composeVisible) return;
     let cancelled = false;
     setComposeDirLoading(true);
-    Promise.all([
-      api.social.following().catch(() => []),
-      api.social.followers().catch(() => []),
-      getFriendSuggestions().catch(() => []),
-    ]).then(([followingRows, followerRows, suggestionRows]) => {
+    // Dev-preview never has a real follow graph to call out for (and the
+    // fake-signed-in Clerk stub audit/e2e harnesses use would otherwise let
+    // this reach the real, backend-less endpoints below and log a console
+    // 404) — the honest preview state is an empty directory, same as a
+    // fresh real account with no follows/suggestions yet.
+    const directoryCalls: [
+      ReturnType<typeof api.social.following>,
+      ReturnType<typeof api.social.followers>,
+      ReturnType<typeof getFriendSuggestions>,
+    ] = isBuyerDevPreview()
+      ? [Promise.resolve([]), Promise.resolve([]), Promise.resolve([])]
+      : [
+        api.social.following().catch(() => []),
+        api.social.followers().catch(() => []),
+        getFriendSuggestions().catch(() => []),
+      ];
+    Promise.all(directoryCalls).then(([followingRows, followerRows, suggestionRows]) => {
       if (cancelled) return;
       const followingList = Array.isArray(followingRows) ? followingRows : [];
       const followerList = Array.isArray(followerRows) ? followerRows : [];

@@ -24,6 +24,7 @@ import {
   BG, BORDER, FG, MUTED, SUBTLE, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
@@ -34,7 +35,6 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 
-const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only) ──────────────────────────────────────────────────

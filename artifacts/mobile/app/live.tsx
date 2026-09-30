@@ -31,6 +31,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { FONT, FS, RADIUS } from '@/lib/theme';
+import { formatCents } from '@/lib/money';
 import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
@@ -43,6 +44,7 @@ import {
   type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
+import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
 import { VideoVisual } from './(tabs)/feed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -243,6 +245,7 @@ export default function LiveScreen() {
   const [muted, setMuted] = useState(true);
   const [bagFor, setBagFor] = useState<LiveStream | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
+  const [giftFor, setGiftFor] = useState<LiveStream | null>(null);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
 
@@ -285,9 +288,23 @@ export default function LiveScreen() {
     } catch { /* dismissed */ }
   }, []);
 
-  const gift = useCallback(() => {
+  const gift = useCallback((stream: LiveStream) => {
     hapticLight();
-    setNotice('Thread Cash gifting is coming soon');
+    setGiftFor(stream);
+  }, []);
+
+  const handleGiftSent = useCallback(async (stream: LiveStream, amountCents: number) => {
+    setGiftFor(null);
+    try {
+      await pager.sendChat(`sent ${formatCents(amountCents)} Thread Cash`);
+    } catch {
+      // The transfer already went through — a failed chat post isn't worth
+      // surfacing as an error on top of a successful gift.
+    }
+  }, [pager]);
+
+  const handleGiftFailed = useCallback((message: string) => {
+    setNotice(message);
   }, []);
 
   const buy = useCallback((stream: LiveStream, productId: string) => {
@@ -377,7 +394,7 @@ export default function LiveScreen() {
                 onBuy={pid => buy(item, pid)}
                 onOpenBag={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
-                onGift={gift}
+                onGift={() => gift(item)}
                 onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
                   try { await pager.sendChat(text); } catch (e: any) {
@@ -414,6 +431,16 @@ export default function LiveScreen() {
           reduceMotion={reduceMotion}
         />
       )}
+      {giftFor && (
+        <LiveThreadCashSheet
+          visible
+          brandName={giftFor.host.name}
+          recipientId={giftFor.host.id}
+          onClose={() => setGiftFor(null)}
+          onSent={amountCents => { void handleGiftSent(giftFor, amountCents); }}
+          onSendFailed={handleGiftFailed}
+        />
+      )}
       <Snackbar visible={!!notice} message={notice} onDismiss={() => setNotice('')} />
     </View>
   );
@@ -429,7 +456,7 @@ const styles = StyleSheet.create({
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   topRow: { position: 'absolute', left: 12, right: 12, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  topIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3,
@@ -441,5 +468,5 @@ const styles = StyleSheet.create({
   // and anchors the top-fade gradient to the same box.
   chatWrap: { maxHeight: 210, justifyContent: 'flex-end' },
   chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 28 },
-  emptyClose: { position: 'absolute', right: 10, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  emptyClose: { position: 'absolute', right: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

@@ -21,8 +21,8 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 
-const LIVE_RED = '#FF3B30';
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
 
