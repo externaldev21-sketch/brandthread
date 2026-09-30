@@ -206,8 +206,6 @@ export function SettingsRow({
           value={!!switchValue}
           onValueChange={onSwitchChange}
           disabled={disabled}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={colors.background}
         />
       ) : onPress && !inert ? (
         <Feather name="chevron-right" size={17} color={colors.mutedForeground} />

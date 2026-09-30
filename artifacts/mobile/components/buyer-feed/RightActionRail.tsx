@@ -27,6 +27,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
+import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 export interface RailEngagement {
   liked?: boolean;
@@ -90,6 +91,13 @@ export function RightActionRail({
   // position/styling (from #288) is untouched, and the badge reappears in
   // its normal spot the moment the stream ends.
   const isLive = !!useLiveStreamForHost(hostId);
+  // Pads each plain (non-EngagementButton) rail control's real tap area up
+  // to 44x44 without growing its visible footprint — see
+  // useHitAreaBoost's doc comment. The EngagementButton-driven icons
+  // (like/repost/save) get the same treatment inside that component itself.
+  const avatarHit = useHitAreaBoost();
+  const commentHit = useHitAreaBoost();
+  const shareHit = useHitAreaBoost();
   const [badgeVisible, setBadgeVisible] = React.useState(!engagement?.following);
   const [showCheck, setShowCheck] = React.useState(!!engagement?.following);
   const wasFollowing = React.useRef(!!engagement?.following);
@@ -135,6 +143,8 @@ export function RightActionRail({
     <Animated.View style={[styles.rail, style]}>
       <View style={styles.avatarWrap}>
         <TouchableOpacity
+          style={avatarHit.boostStyle}
+          onLayout={avatarHit.onLayout}
           activeOpacity={0.8}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
           accessibilityRole="button"
@@ -245,7 +255,8 @@ export function RightActionRail({
       </View>
 
       <TouchableOpacity
-        style={styles.btn}
+        style={[styles.btn, commentHit.boostStyle]}
+        onLayout={commentHit.onLayout}
         activeOpacity={0.7}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         onPress={onOpenComments}
@@ -294,7 +305,8 @@ export function RightActionRail({
       />
 
       <TouchableOpacity
-        style={styles.btn}
+        style={[styles.btn, shareHit.boostStyle]}
+        onLayout={shareHit.onLayout}
         activeOpacity={0.7}
         hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
         accessibilityRole="button"
@@ -350,7 +362,15 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
   followBadgeTouchable: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
-  btn: { width: 38, alignItems: 'center', gap: 3 },
+  // `minWidth` (not a fixed `width`) here — unlike `actionContent` below,
+  // which sizes the *inner* content view EngagementButton wraps, this style
+  // lands directly on the outer TouchableOpacity that useHitAreaBoost also
+  // sizes, and a *fixed* width on that same box would take priority over —
+  // and suppress — the boost's own `minWidth`. `minWidth: 38` still renders
+  // exactly as wide as the old fixed `width: 38` did (content here is never
+  // wider than 38 at this column's icon/count sizes), so this is a no-op
+  // until the boost widens it further.
+  btn: { minWidth: 38, alignItems: 'center', gap: 3 },
   actionContent: { width: 38, alignItems: 'center', gap: 3 },
   likeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
   likeRing: {

@@ -182,8 +182,6 @@ export function ShippingSection({
           <HapticSwitch
             value={address.saveAddress !== false}
             onValueChange={saveAddress => set({ saveAddress })}
-            trackColor={{ false: ck.fieldBorder, true: ck.text }}
-            thumbColor={address.saveAddress !== false ? ck.bg : ck.text}
             accessibilityLabel="Save to my addresses"
           />
         </View>
