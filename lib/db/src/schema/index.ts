@@ -943,6 +943,8 @@ export const messages = pgTable('messages', {
   // read time, matching Instagram's own copy. An opportunistic sweep in the
   // messages routes hard-deletes anything past this, in place of a cron job.
   disappearAt:    timestamp('disappear_at', { withTimezone: true }),
+  // True for seller away auto-replies (migration 142).
+  isAutomated:    boolean('is_automated').notNull().default(false),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   conversationOrderIdx: index('messages_conversation_order_idx').on(table.conversationId, table.createdAt),
@@ -2238,3 +2240,4 @@ export const adCampaigns = pgTable('ad_campaigns', {
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
+export * from './sellerMessaging';

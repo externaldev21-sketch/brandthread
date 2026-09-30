@@ -14,7 +14,7 @@ import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useApi } from '@/lib/api';
+import { useApi, type SellerQuickReply } from '@/lib/api';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
@@ -66,6 +66,7 @@ import {
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { TypingBubble } from '@/components/chat/TypingBubble';
 import { ChatAttachmentCard } from '@/components/chat/ChatAttachmentCard';
 import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
@@ -120,6 +121,9 @@ interface Msg {
    *  message. Same field the API returns on app/buyer-conversation.tsx's
    *  Message type; see lib/chatGrouping.ts. */
   readAt?: string;
+  deliveredAt?: string;
+  /** True for the seller's own away auto-reply (server-marked). */
+  automated?: boolean;
   /** Swipe-to-reply — same shape as app/buyer-conversation.tsx's Message,
    *  resolved server-side (see api-server's adaptMessage/loadReplyPreviews)
    *  so both sides of a thread render the identical quoted context. */
@@ -457,6 +461,34 @@ export default function SellerConversationScreen() {
   function handleChangeText(next: string) {
     setText(next);
     sendTypingSignal(next.trim().length > 0);
+  }
+
+  // ── Quick replies (canned replies) ─────────────────────────────────────────
+  // Opened from the attach sheet's "Quick replies" row; picking one inserts
+  // its text into the existing composer input (never sends on its own).
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<SellerQuickReply[]>([]);
+  const [loadingQuickReplies, setLoadingQuickReplies] = useState(false);
+
+  async function openQuickReplies() {
+    setShowAttachPicker(false);
+    setShowQuickReplies(true);
+    if (isSellerDevPreview()) return; // preview: no protected API calls
+    setLoadingQuickReplies(true);
+    try {
+      const res = await api.seller.quickReplies.list();
+      setQuickReplies(res.quickReplies);
+    } catch {
+      setQuickReplies([]);
+    } finally {
+      setLoadingQuickReplies(false);
+    }
+  }
+
+  function insertQuickReply(reply: SellerQuickReply) {
+    hapticSelection();
+    handleChangeText(text.trim() ? `${text.trimEnd()} ${reply.body}` : reply.body);
+    setShowQuickReplies(false);
   }
 
   useEffect(() => {
@@ -1461,6 +1493,14 @@ export default function SellerConversationScreen() {
               Seen {formatTime(new Date(msg.readAt).getTime())}
             </Text>
           )}
+          {isOwn && msg.id === lastOwnMsgId && !msg.readAt && !!msg.deliveredAt && (
+            <Text style={s.seenReceipt} testID="seller-conversation-delivered">Delivered</Text>
+          )}
+          {!!msg.automated && (
+            <Text style={[s.seenReceipt, { alignSelf: isOwn ? 'flex-end' : 'flex-start' }]} testID="seller-conversation-automated-label">
+              Automated reply
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -1665,6 +1705,7 @@ export default function SellerConversationScreen() {
               : item.msg.id
           )}
           renderItem={renderItem}
+          ListFooterComponent={conv?.otherTyping ? <TypingBubble testID="seller-conversation-typing-bubble" /> : null}
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -2033,11 +2074,81 @@ export default function SellerConversationScreen() {
             </PressableScale>
           ) : null}
 
+          <PressableScale style={s.sheetOption} onPress={openQuickReplies} testID="seller-conversation-quick-replies-row">
+            <View style={s.sheetOptionIcon}>
+              <Feather name="message-square" size={ICON.md} color={PURPLE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetOptionLabel}>Quick replies</Text>
+              <Text style={s.sheetOptionDesc}>Insert a saved reply</Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+          </PressableScale>
+
           <PressableScale
             style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
             onPress={() => setShowAttachPicker(false)}
           >
             <Text style={[s.sheetOptionLabel, { color: MUTED, textAlign: 'center', flex: 1 }]}>Cancel</Text>
+          </PressableScale>
+        </SheetRise>
+      </Modal>
+
+      {/* ── Quick replies picker ────────────────────────────────────────────── */}
+      <Modal
+        visible={showQuickReplies}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQuickReplies(false)}
+      >
+        <PressableScale
+          style={s.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowQuickReplies(false)}
+        />
+        <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={s.sheetHandle} />
+          <View style={s.productSheetHeader}>
+            <Text style={s.sheetTitle}>Quick replies</Text>
+            <PressableScale onPress={() => setShowQuickReplies(false)} accessibilityLabel="Close">
+              <Feather name="x" size={ICON.md} color={MUTED} />
+            </PressableScale>
+          </View>
+
+          {loadingQuickReplies ? (
+            <View style={s.centerFill}><ActivityIndicator color={PURPLE} /></View>
+          ) : quickReplies.length === 0 ? (
+            <View style={s.emptyState}>
+              <Feather name="message-square" size={32} color={MUTED} />
+              <Text style={s.emptyText}>No quick replies yet</Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {quickReplies.map((reply) => (
+                <PressableScale
+                  key={reply.id}
+                  style={s.productRow}
+                  onPress={() => insertQuickReply(reply)}
+                  activeOpacity={0.7}
+                  testID={`seller-conversation-quick-reply-${reply.id}`}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.productName} numberOfLines={1}>
+                      {reply.title}{reply.shortcut ? `  ${reply.shortcut}` : ''}
+                    </Text>
+                    <Text style={s.productPrice} numberOfLines={2}>{reply.body}</Text>
+                  </View>
+                </PressableScale>
+              ))}
+            </ScrollView>
+          )}
+
+          <PressableScale
+            style={[s.sheetOption, { marginTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER }]}
+            onPress={() => { setShowQuickReplies(false); router.push('/quick-replies' as never); }}
+            testID="seller-conversation-quick-replies-manage"
+          >
+            <Text style={[s.sheetOptionLabel, { textAlign: 'center', flex: 1 }]}>Manage quick replies</Text>
           </PressableScale>
         </SheetRise>
       </Modal>

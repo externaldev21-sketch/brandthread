@@ -823,6 +823,20 @@ export interface PostAnalyticsResponse {
     };
   };
 }
+// ── Seller messaging tools types ─────────────────────────────────────────────
+export interface SellerQuickReply { id: string; title: string; body: string; shortcut: string | null; updatedAt: string }
+export interface SellerAwaySettings {
+  enabled: boolean;
+  message: string;
+  mode: 'always' | 'outside_hours';
+  timezone: string;
+  /** 7-bit mask, bit 0 = Sunday. */
+  openDays: number;
+  /** Minutes from local midnight. */
+  openMinute: number;
+  closeMinute: number;
+}
+
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
@@ -2056,6 +2070,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             '/api/seller/vacation', body
           ),
       },
+      // ── Seller messaging tools: quick replies + away auto-reply ───────────
+      quickReplies: {
+        list: () =>
+          get<{ quickReplies: SellerQuickReply[]; limit: number }>('/api/seller/quick-replies'),
+        create: (body: { title: string; body: string; shortcut?: string | null }) =>
+          post<SellerQuickReply>('/api/seller/quick-replies', body),
+        update: (id: string, body: { title: string; body: string; shortcut?: string | null }) =>
+          put<SellerQuickReply>(`/api/seller/quick-replies/${encodeURIComponent(id)}`, body),
+        remove: (id: string) =>
+          del<{ ok: true }>(`/api/seller/quick-replies/${encodeURIComponent(id)}`),
+      },
+      awayMessage: {
+        get: () => get<SellerAwaySettings>('/api/seller/away-message'),
+        update: (body: SellerAwaySettings) => put<SellerAwaySettings>('/api/seller/away-message', body),
+      },
+      // ── end seller messaging tools ────────────────────────────────────────
     },
     /** In-app support tickets */
     support: {

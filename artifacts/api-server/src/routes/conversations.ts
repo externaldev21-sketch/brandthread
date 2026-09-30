@@ -29,6 +29,7 @@ import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
 import { isFollowedBy, shouldRouteToRequests } from "../lib/conversationRouting";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
@@ -177,6 +178,8 @@ function adaptMessage(
     status:         m.status,
     deliveredAt:    m.deliveredAt?.toISOString() ?? undefined,
     readAt:         m.readAt?.toISOString() ?? undefined,
+    // Away auto-reply (migration 142): clients label these "Automated reply".
+    automated:      m.isAutomated === true ? true : undefined,
     deletedAt:      m.deletedAt?.toISOString() ?? undefined,
     ts:             new Date(m.createdAt!).getTime(),
     deletedForMe:   false,
@@ -807,6 +810,12 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       .set({ unreadCount: sql`unread_count + 1` })
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
   ]);
+
+  // Seller away auto-reply (non-critical). Awaited so the reply is already
+  // persisted when the sender's client next polls; errors never fail the send.
+  // This route only handles human sends, and the auto-reply is inserted
+  // directly (never through here), so it cannot loop.
+  await maybeSendAwayAutoReply({ conversationId: id, senderId: userId, otherIds }).catch(() => undefined);
 
   // Notify each recipient of the new message (non-critical, fire-and-forget).
   // Chat details > Mute: a recipient who muted this conversation gets no

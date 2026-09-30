@@ -93,6 +93,7 @@ import boostsRouter    from "./boosts";
 import adCampaignsRouter from "./ad-campaigns";
 import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
+import { quickRepliesRouter, awayMessageRouter } from "./seller-messaging-tools";
 import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
 import callRouter      from "./call";
@@ -245,6 +246,8 @@ router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
+router.use("/seller/quick-replies",     tc, quickRepliesRouter);
+router.use("/seller/away-message",      tc, awayMessageRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc

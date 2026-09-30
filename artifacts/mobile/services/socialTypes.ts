@@ -233,6 +233,8 @@ export interface Message {
   /** ISO timestamp the recipient read the message, when known — drives the
    *  double-check "read" receipt. */
   readAt?: string;
+  /** True for a seller's away auto-reply (server-marked). */
+  automated?: boolean;
   ts: number;              // Unix ms
   deletedForMe: boolean;
 }
