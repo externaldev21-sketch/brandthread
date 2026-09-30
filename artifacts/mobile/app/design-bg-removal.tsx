@@ -35,6 +35,7 @@ import { CenteredToast } from '@/components/social/CenteredToast';
 import Checkerboard from '@/components/design/Checkerboard';
 import BgRemovalGlowSweep from '@/components/ai-tools/BgRemovalGlowSweep';
 import { saveResult } from '@/services/bgRemovalService';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
 
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -282,6 +283,7 @@ export default function DesignBgRemovalScreen() {
               style={s.stageImage}
               resizeMode="contain"
             />
+            {showResult ? <AiGeneratedBadge /> : null}
             {phase === 'processing' && stageSize.width > 0 && (
               <BgRemovalGlowSweep
                 width={stageSize.width}

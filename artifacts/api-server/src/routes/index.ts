@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import productsRouter from "./products";
@@ -122,7 +123,7 @@ router.use("/webhooks/shopify", webhooksShopifyRouter);
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
-router.use("/support-chat",    supportChatRouter);
+router.use("/support-chat",    aiSafetyGuard("support-chat", { mode: "chat" }), supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
@@ -136,7 +137,7 @@ router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.
-router.use("/onboarding-sample", logoRouter);
+router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), logoRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);
@@ -145,12 +146,12 @@ router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
 router.use("/shopify",         tc, shopifyRouter);
 // ─── Growth-plan-gated AI design routes ───────────────────────────────────────
-router.use("/logo",            tc, requirePlan("growth"), logoRouter);
-router.use("/mockup",          tc, requirePlan("growth"), mockupRouter);
-router.use("/photography",     tc, requirePlan("growth"), photographyRouter);
-router.use("/bg-removal",      tc, requirePlan("growth"), bgRemovalRouter);
-router.use("/lifestyle",       tc, requirePlan("growth"), lifestyleRouter);
-router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
+router.use("/logo",            tc, requirePlan("growth"), aiSafetyGuard("logo"), logoRouter);
+router.use("/mockup",          tc, requirePlan("growth"), aiSafetyGuard("mockup"), mockupRouter);
+router.use("/photography",     tc, requirePlan("growth"), aiSafetyGuard("photography"), photographyRouter);
+router.use("/bg-removal",      tc, requirePlan("growth"), aiSafetyGuard("bg-removal"), bgRemovalRouter);
+router.use("/lifestyle",       tc, requirePlan("growth"), aiSafetyGuard("lifestyle"), lifestyleRouter);
+router.use("/techpack",        tc, requirePlan("growth"), aiSafetyGuard("techpack", { mode: "chat", scan: "all" }), techpackRouter);
 // Specific manufacturer sub-paths BEFORE the catch-all manufacturersRouter
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
@@ -162,7 +163,7 @@ router.use("/inventory",       tc, inventoryRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
 router.use("/notification-prefs", notificationPrefsRouter);
-router.use("/ai",              tc, aiRouter);
+router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), aiRouter);
 
 // ─── Buyer & Seller Connect / Subscription routes ─────────────────────────────
 // Mount specific sub-paths before the catch-all /buyer router so they don't
@@ -186,7 +187,7 @@ router.use("/conversations",             conversationsRouter);
 // Topic group chats (unlimited members). Public discovery + invite preview are
 // declared inside before the router applies requireAuth.
 router.use("/communities",               communitiesRouter);
-router.use("/brandthread-agent",         brandthreadAgentRouter);
+router.use("/brandthread-agent",         aiSafetyGuard("brandthread-agent", { mode: "chat" }), brandthreadAgentRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
@@ -216,7 +217,7 @@ router.use("/taxes",                     tc, taxesRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the
 // actual caller before any store-context rewrite.
 router.use("/team",                      teamRouter);
-router.use("/store/ai",                  tc, storeAiRouter);
+router.use("/store/ai",                  tc, aiSafetyGuard("store-ai", { mode: "chat", scan: "all" }), storeAiRouter);
 router.use("/store",                     tc, storeRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);

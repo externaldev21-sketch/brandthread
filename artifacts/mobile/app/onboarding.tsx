@@ -11,6 +11,7 @@
  * unit-testable and are not duplicated as hand-maintained index objects here.
  */
 import { LegalConsent } from '@/components/legal/LegalConsent';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { rememberPendingConsent } from '@/lib/legalConsent';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -1733,6 +1734,7 @@ function SellerPreviewStep({
         <Reveal>
           <View style={[spreview.resultCard, { borderColor: theme.border }]}>
             <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
+            <AiGeneratedBadge position="topLeft" />
             <View style={spreview.resultCaption}>
               <Feather name="check" size={15} color={theme.text} />
               <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
