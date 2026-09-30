@@ -80,3 +80,18 @@ export const sellerTrialReminderEvents = pgTable("seller_trial_reminder_events",
     .on(table.sellerId, table.trialEndAt),
   trialEndIdx: index("seller_trial_reminder_events_trial_end_idx").on(table.trialEndAt),
 }));
+/**
+ * Single-use email codes that re-authenticate password-less (OAuth-only)
+ * accounts before they schedule account deletion. Only the SHA-256 hash is
+ * stored; 15-minute expiry is enforced by the route.
+ */
+export const accountDeletionCodes = pgTable("account_deletion_codes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clerkId: text("clerk_id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  clerkIdx: index("account_deletion_codes_clerk_idx").on(table.clerkId, table.createdAt),
+}));

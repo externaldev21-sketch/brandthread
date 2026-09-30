@@ -10,6 +10,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
+import { purgeAccount } from "../../lib/accountDeletion";
 import {
   db, drops, dropWallets, mutedWords, orders, postComments, posts, reports, users,
 } from "@workspace/db";
@@ -29,7 +30,14 @@ vi.mock("../../middlewares/requireAuth", async (importOriginal) => {
 
 vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: null, sessionId: null }),
-  clerkClient: { users: { deleteUser: async (id: string) => { clerk.deleted.push(id); } } },
+  clerkClient: {
+    sessions: { getSessionList: async () => ({ data: [] }), revokeSession: async () => undefined },
+    users: {
+      getUser: async () => ({ passwordEnabled: true }),
+      verifyPassword: async ({ password }: { password: string }) => ({ verified: password === "correct horse" }),
+      deleteUser: async (id: string) => { clerk.deleted.push(id); },
+    },
+  },
 }));
 
 const RUN = `del${crypto.randomBytes(5).toString("hex")}`;
@@ -104,7 +112,7 @@ describe("account deletion safeguards", () => {
     expect(check.body.willDelete.length).toBeGreaterThan(0);
     expect(check.body.willRetain.join(" ")).toMatch(/tax records/);
 
-    const attempt = await call("/api/auth/account", SELLER, "DELETE", { confirmation: "DELETE" });
+    const attempt = await call("/api/auth/account", SELLER, "DELETE", { confirmation: "DELETE", password: "correct horse" });
     expect(attempt.status).toBe(409);
     expect(attempt.body.code).toBe("DELETION_BLOCKED");
     const [account] = await db.select({ deletedAt: users.deletedAt }).from(users).where(eq(users.clerkId, SELLER));
@@ -139,9 +147,11 @@ describe("account deletion safeguards", () => {
     await db.insert(reports).values({ reporterId: SELLER, targetType: "post", targetId: post.id, reason: "spam" });
 
     expect((await call("/api/auth/account/deletion-check", SELLER)).body.canDelete).toBe(true);
-    const deleted = await call("/api/auth/account", SELLER, "DELETE", { confirmation: "DELETE" });
+    const deleted = await call("/api/auth/account", SELLER, "DELETE", { confirmation: "DELETE", password: "correct horse" });
     expect(deleted.status).toBe(200);
-    expect(clerk.deleted).toContain(SELLER);
+    expect(clerk.deleted).not.toContain(SELLER); // only scheduled so far
+    // What jobs/accountPurge.ts does once the 30-day grace period has ended.
+    expect(await purgeAccount(SELLER)).toBe(true);
 
     expect(await db.select().from(postComments).where(eq(postComments.authorId, SELLER))).toEqual([]);
     expect(await db.select().from(mutedWords).where(eq(mutedWords.userId, SELLER))).toEqual([]);

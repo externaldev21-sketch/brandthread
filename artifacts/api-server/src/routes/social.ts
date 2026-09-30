@@ -852,7 +852,7 @@ router.get("/search", async (req, res) => {
         eq(users.isSystemAccount, false),
         ne(users.clerkId, myId),
         isNull(users.suspendedAt),
-        isNull(users.deletedAt),
+        isNull(users.deletedAt), isNull(users.deletionRequestedAt),
         notBlockedWith(myId, users.clerkId),
         or(
           fuzzyMatch(users.name,        term, pattern),
@@ -938,7 +938,7 @@ router.get("/suggested", async (req, res) => {
     .where(and(
       eq(users.accountType, "buyer"),
       isNull(users.suspendedAt),
-      isNull(users.deletedAt),
+      isNull(users.deletedAt), isNull(users.deletionRequestedAt),
       ne(users.clerkId, myId),
       excludeFromFresh.length > 0 ? notInArray(users.clerkId, excludeFromFresh) : undefined,
     ))
