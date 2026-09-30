@@ -1628,6 +1628,18 @@ export default function DesignCanvasScreen() {
   }
 
   // ─── LayersPanel handlers (components/design-studio/LayersPanel.tsx) ──────
+  /** Toggles the pinned "Background colour" row's visibility checkbox — flips
+   * the real canvas backgroundOpacity between 0 and 1, which both the live
+   * canvas and the export SVG's background Rect read (see bgOpacity above). */
+  function handleToggleCanvasBackgroundVisible() {
+    setProject(p => {
+      if (!p) return p;
+      const current = p.canvas.backgroundOpacity ?? 1;
+      return { ...p, canvas: { ...p.canvas, backgroundOpacity: current === 0 ? 1 : 0 } };
+    });
+    markDirty();
+  }
+
   function handleRenameLayer(id: string, name: string) {
     mutateLayer(prev => prev.map(l => l.id === id ? { ...l, name, updatedAt: new Date().toISOString() } : l));
   }
@@ -3037,6 +3049,11 @@ export default function DesignCanvasScreen() {
   }
 
   const bgHex = project?.canvas?.backgroundHex ?? BG;
+  // Real background-visibility toggle, driven from the Layers panel's pinned
+  // "Background colour" row checkbox — not a fake control. `backgroundOpacity`
+  // is an existing DesignCanvas field (services/designTypes.ts); undefined
+  // means fully visible (1), matching the old always-opaque default.
+  const bgOpacity = project?.canvas?.backgroundOpacity ?? 1;
 
   // ─── Selection handle positions (display px) ───────────────────────────────
   // Computed here so we can use them both in the SVG overlay and the Pressable overlays
@@ -3348,7 +3365,7 @@ export default function DesignCanvasScreen() {
               pointerEvents="none"
             >
               {/* Canvas background */}
-              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} />
+              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} opacity={bgOpacity} />
 
               {/* Layer paths and live strokes are stored in logical coordinates. */}
               <G transform={`scale(${dispScaleX} ${dispScaleY})`}>
@@ -3621,7 +3638,7 @@ export default function DesignCanvasScreen() {
               viewBox={`${exportX} ${exportY} ${exportW} ${exportH}`}
               pointerEvents="none"
             >
-              <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} />
+              <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} opacity={bgOpacity} />
               {/* Garment guide/template layers (layer.isTemplate) are a non-exportable
                   placement aid and are always excluded from the flattened export. */}
               {sortedLayers.filter(layer => !layer.isTemplate).map(layer =>
@@ -4104,15 +4121,16 @@ export default function DesignCanvasScreen() {
           </View>
         </View>
       </Modal>
-      {/* ── LAYER MANAGER ── */}
+      {/* ── LAYER MANAGER — Procreate's own full-height Layers sheet, dropping
+          down from the top under the status bar, not a small corner popover. ── */}
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
+        <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View>
+          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
             <LayersPanelComponent
               layers={layers}
               selectedLayerId={selectedLayerId}
-              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('select'); }}
+              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('transform'); }}
               onAddLayer={handleAddDrawingLayer}
               onDuplicateLayer={handleDuplicateLayer}
               onDeleteLayer={handleDeleteLayer}
@@ -4126,6 +4144,9 @@ export default function DesignCanvasScreen() {
               onReorder={handleReorderLayers}
               onMergeDown={handleMergeLayerDown}
               onClose={closeSheet}
+              canvasBackgroundHex={project?.canvas?.backgroundHex ?? '#FFFFFF'}
+              canvasBackgroundVisible={(project?.canvas?.backgroundOpacity ?? 1) !== 0}
+              onToggleBackgroundVisible={handleToggleCanvasBackgroundVisible}
             />
           </View>
         </View>
@@ -5522,6 +5543,10 @@ const styles = StyleSheet.create({
   wrenchItemText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
 
   modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  // Layers sheet drops from the top under the status bar — Procreate's own
+  // placement — rather than sitting at the bottom like the other sheets.
+  layersModalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-start' },
+  layersModalSheetWrap: { paddingTop: Platform.OS === 'ios' ? 54 : 32 },
   sheet: {
     backgroundColor: SURFACE,
     borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
