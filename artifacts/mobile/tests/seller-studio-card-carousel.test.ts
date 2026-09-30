@@ -32,9 +32,9 @@ describe('Studio card carousel: horizontal scrub, vertical dismiss decided withi
     expect(panBlock).toContain("cardGestureAxis.value = Math.abs(e.translationX) >= Math.abs(e.translationY) ? 'horizontal' : 'vertical'");
   });
 
-  it('a locked-vertical release runs the same dismiss logic as the header/handle detector (shared runDismissEnd)', () => {
+  it('a non-flick vertical release runs the same dismiss logic as the header/handle detector (shared runDismissEnd)', () => {
     const panBlock = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('const tapGesture ='));
-    expect(panBlock).toContain("if (cardGestureAxis.value === 'vertical') {\n        runDismissEnd(e);");
+    expect(panBlock).toContain('runDismissEnd(e);');
     expect(studio).toContain('const dismissGesture = useMemo(() => Gesture.Pan()');
     const dismissBlock = studio.slice(studio.indexOf('const dismissGesture ='), studio.indexOf('const cardAreaPan ='));
     expect(dismissBlock).toContain('runDismissEnd(e)');
@@ -44,10 +44,57 @@ describe('Studio card carousel: horizontal scrub, vertical dismiss decided withi
     expect(studio).toContain('Gesture.Race(cardAreaPan, tapGesture)');
   });
 
-  it('a plain tap (near-zero movement) also resolves to opening the current card', () => {
+  it('a plain tap (near-zero movement) resolves to opening the current card', () => {
     const tapBlock = studio.slice(studio.indexOf('const tapGesture ='), studio.indexOf('const cardAreaGesture ='));
     expect(tapBlock).toContain('.maxDistance(AXIS_LOCK_PX)');
     expect(tapBlock).toContain('runOnJS(openCurrentItem)()');
+  });
+});
+
+/**
+ * Dev's live-testing follow-up on the first cut of this carousel: releasing
+ * after a horizontal scrub was "too fast / accident-prone" as a way to
+ * navigate. Now a release only LOCKS the current card (snap + haptic +
+ * ring); opening it takes a deliberate second action — a tap, or a quick
+ * upward flick.
+ */
+describe('Studio card carousel: horizontal release LOCKS (does not navigate); tap or upward flick opens', () => {
+  it('a horizontal release never calls openCurrentItem — it snaps to the nearest card and fires the landed haptic instead', () => {
+    const endBlock = studio.slice(studio.indexOf('.onEnd((e) => {', studio.indexOf('const cardAreaPan =')), studio.indexOf('}), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse,'));
+    const horizontalBranch = endBlock.slice(endBlock.indexOf("cardGestureAxis.value === 'horizontal'"));
+    expect(horizontalBranch).not.toContain('runOnJS(openCurrentItem)()');
+    expect(horizontalBranch).toContain('const target = Math.round(cardIndex.value);');
+    expect(horizontalBranch).toContain('cardIndex.value = withTiming(target, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING });');
+    expect(horizontalBranch).toContain('landedPulse.value = withTiming(1, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING });');
+    expect(horizontalBranch).toContain('runOnJS(fireLandedHaptic)();');
+  });
+
+  it('fireLandedHaptic uses a firmer/distinct impact style from the per-card scrub tick (fireHapticTick)', () => {
+    expect(studio).toContain('const fireLandedHaptic = useCallback(() => {\n    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)');
+    expect(studio).toContain('Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)'); // fireHapticTick, unchanged
+  });
+
+  it('a quick upward flick on the vertical branch opens instantly instead of running dismiss logic', () => {
+    const panBlock = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('const tapGesture ='));
+    expect(panBlock).toContain('const isUpwardFlick = e.velocityY < -OPEN_FLICK_VELOCITY;');
+    const onEndBlock = panBlock.slice(panBlock.indexOf('.onEnd((e) => {'));
+    const upFlickIdx = onEndBlock.indexOf('if (isUpwardFlick) {');
+    const openIdx = onEndBlock.indexOf('runOnJS(openCurrentItem)();');
+    const dismissIdx = onEndBlock.indexOf('runDismissEnd(e);');
+    expect(upFlickIdx).toBeGreaterThan(-1);
+    expect(openIdx).toBeGreaterThan(upFlickIdx);
+    expect(dismissIdx).toBeGreaterThan(openIdx); // falls through to dismiss only when NOT an upward flick
+  });
+
+  it('a new gesture on the card area clears the landed ring immediately (onBegin), before axis is even known', () => {
+    const panBlock = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('const tapGesture ='));
+    const beginBlock = panBlock.slice(panBlock.indexOf('.onBegin(() => {'), panBlock.indexOf('.onUpdate('));
+    expect(beginBlock).toContain('landedPulse.value = 0;');
+  });
+
+  it('the sheet opens fresh with no card landed (landedPulse reset alongside cardIndex)', () => {
+    const resetBlock = studio.slice(studio.indexOf('if (open) {', studio.indexOf('useEffect(() => {\n    // Reset to the first card')), studio.indexOf('setCardIndexJS(0);'));
+    expect(resetBlock).toContain('landedPulse.value = 0;');
   });
 });
 
