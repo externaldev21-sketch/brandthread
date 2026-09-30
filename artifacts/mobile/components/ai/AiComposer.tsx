@@ -163,10 +163,11 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     paddingRight: 8,
     maxHeight: 120,
   },
+  // 44x44 minimum comfortable touch target (COMP.minTouchTarget); was 40x40.
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
