@@ -8,7 +8,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -371,8 +371,6 @@ export default function BuyerEditProfileScreen() {
     goBackOr(router);
   }
 
-  const topPad = useHeaderTopInset();
-
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof CoreFields, string>> = {};
     if (!fields.name.trim()) nextErrors.name = 'Name is required';
@@ -459,11 +457,7 @@ export default function BuyerEditProfileScreen() {
   if (!loaded) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-          <Feather name="chevron-left" size={24} color={theme.text} onPress={() => goBackOr(router)} />
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Edit profile</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <ScreenHeader title="Edit profile" onBack={() => goBackOr(router)} />
         <View style={{ alignItems: 'center', paddingTop: SP.lg }}>
           <SkeletonBlock width={92} height={92} radius={46} />
           <View style={{ height: SP.sm }} />
@@ -488,23 +482,23 @@ export default function BuyerEditProfileScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 44 : 0}
     >
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={handleBackPress}>
-            <Feather name="chevron-left" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>Edit profile</Text>
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={!isDirty || saving || avatarUploading}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={theme.accent} />
-            ) : (
-              <Text style={[styles.saveText, { color: theme.accent }, (!isDirty || avatarUploading) && { opacity: 0.35 }]}>Save</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader
+          title="Edit profile"
+          onBack={handleBackPress}
+          rightElement={
+            <TouchableOpacity
+              onPress={handleSave}
+              disabled={!isDirty || saving || avatarUploading}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color={theme.accent} />
+              ) : (
+                <Text style={[styles.saveText, { color: theme.accent }, (!isDirty || avatarUploading) && { opacity: 0.35 }]}>Save</Text>
+              )}
+            </TouchableOpacity>
+          }
+        />
 
         <Animated.View pointerEvents="none" style={[styles.toast, { opacity: toastOpacity, backgroundColor: theme.success }]}>
           <Feather name="check-circle" size={14} color={theme.onAccent} />
@@ -766,8 +760,6 @@ export default function BuyerEditProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 16 },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold' },
   saveText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   sectionLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', paddingHorizontal: 20, paddingTop: 16 },
   sectionHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
