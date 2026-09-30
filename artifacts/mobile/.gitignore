@@ -51,3 +51,4 @@ scratch/
 e2e/__screenshots__/
 test-results/
 playwright-report/
+e2e/.theme-consistency-crawl-out/

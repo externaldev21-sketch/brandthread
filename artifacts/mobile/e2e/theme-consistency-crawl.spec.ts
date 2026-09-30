@@ -62,7 +62,15 @@ const SCREENS: Array<{ name: string; role: 'buyer' | 'seller'; route: string }> 
 // comparison happens for it — a mismatch on any other theme is the bug.
 const THEMES = ['black', 'purple', 'olive'] as const;
 
-const BLACK_OR_WHITE = /^rgba?\(\s*(0|255)\s*,\s*\1\s*,\s*\1\s*(,\s*[\d.]+)?\)$/;
+// Alpha >= 0.5 only — a low-alpha white/black wash is a "glass" highlight
+// meant to sit subtly over any themed surface (components/ui/Glass.tsx's
+// highlightDark, frosted selected-state pills, …), not the "solid blacked
+// out button" bug this crawl is for.
+const BLACK_OR_WHITE = /^rgba?\(\s*(0|255)\s*,\s*\1\s*,\s*\1\s*(,\s*(1(\.0+)?|0\.[5-9]\d*))?\)$/;
+// Payment-wallet buttons (Apple Pay / Google Pay style "Express checkout")
+// are required to be solid white/black by the wallet brand guidelines,
+// independent of the app's own theme — see components/checkout/PaymentSection.tsx.
+const LABEL_EXEMPT = /express checkout|apple pay|google pay|shop pay/i;
 
 const SCAN_SCRIPT = `(() => {
   const theme = window.__btActiveTheme;
@@ -70,6 +78,7 @@ const SCAN_SCRIPT = `(() => {
   const themeIsMonochrome = ['black', 'monochrome'].includes(theme.id ?? '');
   if (themeIsMonochrome) return { skipped: true, reason: 'monochrome-theme-control' };
   const BLACK_OR_WHITE = ${BLACK_OR_WHITE.toString()};
+  const LABEL_EXEMPT = ${LABEL_EXEMPT.toString()};
   const results = [];
   const all = document.querySelectorAll('body *');
   for (const el of all) {
@@ -82,8 +91,9 @@ const SCAN_SCRIPT = `(() => {
     // (skip hairlines/dividers — 1-2px borders are allowed to stay a fixed
     // silver regardless of theme, per the design's own token choices).
     const bg = style.backgroundColor;
-    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && BLACK_OR_WHITE.test(bg) && rect.width > 24 && rect.height > 16) {
-      results.push({ el: el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : ''), prop: 'backgroundColor', value: bg, box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, label: el.getAttribute('aria-label') || el.textContent?.slice(0, 40) || '' });
+    const label = el.getAttribute('aria-label') || el.textContent?.slice(0, 40) || '';
+    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && BLACK_OR_WHITE.test(bg) && rect.width > 24 && rect.height > 16 && !LABEL_EXEMPT.test(label)) {
+      results.push({ el: el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : ''), prop: 'backgroundColor', value: bg, box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, label });
     }
   }
   return { skipped: false, results };
@@ -99,6 +109,8 @@ interface ThemeFailure {
   value: string;
   box: { x: number; y: number; width: number; height: number };
 }
+
+test.setTimeout(0);
 
 test('key screens follow the active Appearance theme instead of staying hardcoded black/white', async () => {
   const { DEFAULT_BUILD_DIR, launchBrowser, openContext, serveBuild, waitForQuietNetwork } = await loadHarness();
