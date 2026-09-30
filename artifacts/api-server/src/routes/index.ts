@@ -238,6 +238,12 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 import liveRouter from "./live";
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
+// Moderation + co-host routers MUST be mounted before liveRouter: they own
+// literal paths (/moderation-defaults, /cohost-*) that liveRouter's GET /:id would otherwise swallow.
+import liveModerationRouter from "./live-moderation";
+import liveCohostRouter from "./live-cohost";
+router.use("/live",                      tc, liveModerationRouter);
+router.use("/live",                      tc, liveCohostRouter);
 router.use("/live",                      tc, liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
