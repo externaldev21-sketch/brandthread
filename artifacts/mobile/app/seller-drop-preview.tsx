@@ -93,7 +93,7 @@ export default function SellerDropPreview() {
     return (
       <View style={[styles.center, { backgroundColor: theme.background, gap: 12 }]}>
         <Feather name="alert-triangle" size={28} color={theme.muted} />
-        <Text style={{ color: theme.text }}>Couldn't load this drop.</Text>
+        <Text style={{ color: theme.text, fontFamily: FONT.regular }}>Couldn't load this drop.</Text>
         <TouchableOpacity onPress={() => goBackOr(router)} style={{ padding: 12 }}>
           <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Back</Text>
         </TouchableOpacity>

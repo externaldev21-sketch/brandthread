@@ -443,7 +443,7 @@ export default function BuyerDropDetail() {
     return (
       <View style={[styles.center, { paddingHorizontal: 32, gap: 16 }]}>
         <Feather name="alert-triangle" size={32} color={theme.muted} />
-        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '600', textAlign: 'center' }}>
+        <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: 17, textAlign: 'center' }}>
           {loadError ? "Couldn't load this drop." : "This drop isn't available."}
         </Text>
         <View style={{ flexDirection: 'row', gap: 12 }}>
