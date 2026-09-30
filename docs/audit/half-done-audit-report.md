@@ -1,6 +1,6 @@
 # Half-done audit report
 
-Generated 2026-09-30T07:05:53.822Z (partial run — time budget hit).
+Generated 2026-09-30T07:12:17.118Z (partial run — time budget hit).
 
 - Route files discovered: 266
 - Route × role combinations audited: 1042
