@@ -1197,6 +1197,13 @@ export const reviews = pgTable('reviews', {
   productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
   rating:    integer('rating').notNull(),
   body:      text('body'),
+  sellerReply:     text('seller_reply'),
+  sellerRepliedAt: timestamp('seller_replied_at', { withTimezone: true }),
+  /** Private object paths; signed on read (migration 113). */
+  photos:          jsonb('photos').$type<string[]>().notNull().default([]),
+  sizeBought:      text('size_bought'),
+  fitNote:         text('fit_note'),
+  fitScale:        integer('fit_scale'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -1205,6 +1212,42 @@ export const reviews = pgTable('reviews', {
   buyerOrderUnique: uniqueIndex('reviews_buyer_order_unique')
     .on(table.buyerId, table.orderId)
     .where(sql`${table.orderId} IS NOT NULL`),
+}));
+
+export const reviewHelpfulVotes = pgTable('review_helpful_votes', {
+  reviewId:  uuid('review_id').notNull().references(() => reviews.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.reviewId, table.userId] }),
+  userIdx: index('review_helpful_votes_user_idx').on(table.userId),
+}));
+
+// ─── Product Q&A (migration 114) ──────────────────────────────────────────────
+
+export const productQuestions = pgTable('product_questions', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  sellerId:  text('seller_id').notNull(),
+  askerId:   text('asker_id').notNull(),
+  body:      text('body').notNull(),
+  status:    text('status').notNull().default('published'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  productIdx: index('product_questions_product_idx').on(table.productId, table.createdAt),
+  sellerIdx:  index('product_questions_seller_idx').on(table.sellerId, table.createdAt),
+  askerIdx:   index('product_questions_asker_idx').on(table.askerId, table.createdAt),
+}));
+
+export const productAnswers = pgTable('product_answers', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  questionId: uuid('question_id').notNull().references(() => productQuestions.id, { onDelete: 'cascade' }),
+  sellerId:   text('seller_id').notNull(),
+  body:       text('body').notNull(),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+  updatedAt:  timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  questionUnique: uniqueIndex('product_answers_question_unique').on(table.questionId),
 }));
 
 // ─── Shoppable post tagging ────────────────────────────────────────────────────
