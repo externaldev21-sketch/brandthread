@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput,
@@ -106,7 +106,7 @@ export default function HelpScreen() {
 
   return (
     <View style={s.root}>
-      <Header
+      <ScreenHeader
         title="Help & Support"
         actions={[
           { icon: 'life-buoy', onPress: scrollToContact, accessibilityLabel: 'Jump to contact support' },

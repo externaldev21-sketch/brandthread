@@ -17,7 +17,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type PointEntry = {
   id: string;
@@ -95,7 +95,7 @@ export default function LoyaltyScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Rewards" />
+      <ScreenHeader title="Rewards" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
 

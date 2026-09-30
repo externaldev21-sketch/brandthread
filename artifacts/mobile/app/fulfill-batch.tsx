@@ -13,7 +13,7 @@ import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
 import { getShippingRates, purchaseShippingLabel } from '@/services/orderService';
@@ -115,7 +115,7 @@ export default function FulfillBatchScreen() {
 
   return (
     <View style={s.root}>
-      <Header title={`Fulfill ${ids.length} Order${ids.length === 1 ? '' : 's'}`} />
+      <ScreenHeader title={`Fulfill ${ids.length} Order${ids.length === 1 ? '' : 's'}`} />
       <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: insets.bottom + SP.xxl }}>
         {loading ? (
           <View style={s.centered}>

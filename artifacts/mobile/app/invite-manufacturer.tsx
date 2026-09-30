@@ -19,7 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, ORANGE, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormInput, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { createInvitation, getInvitations } from '@/services/manufacturerService';
 import type { ManufacturerInvitation } from '@/services/manufacturerTypes';
@@ -119,7 +119,7 @@ export default function InviteManufacturerScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Invite a manufacturer" />
+      <ScreenHeader title="Invite a manufacturer" />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: SP.md }} keyboardShouldPersistTaps="handled">
