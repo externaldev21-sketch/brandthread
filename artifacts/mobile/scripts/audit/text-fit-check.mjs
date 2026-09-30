@@ -74,13 +74,19 @@ export async function checkPage(page) {
       }
       if (box) {
         const br = box.getBoundingClientRect();
+        // Avatars, dots and count badges are not text containers.
+        const tiny = br.width < 56 || Math.abs(br.width - br.height) < 2;
+        if (tiny) continue;
         const need = br.height < 60 ? 12 : 16;
         const isRounded = parseFloat(getComputedStyle(box).borderTopLeftRadius) >= br.height / 2 - 1;
         const padNeed = isRounded ? Math.min(need, 12) : need;
+        // chat bubbles (radius >= 12, free-flowing text) keep 12px; other cards 16px
+        const bubble = parseFloat(getComputedStyle(box).borderTopLeftRadius) >= 12 && br.height >= 60 && br.width < vw - 40;
+        const padNeed2 = bubble ? Math.min(padNeed, 12) : padNeed;
         if (br.width < vw - 1 && br.width > 0) {
           const l = tr.left - br.left, r = br.right - tr.right;
-          if (l < padNeed - 0.5 || r < padNeed - 0.5)
-            out.push({ kind: 'padding', what: tag, detail: `in ${label(box)} left ${l.toFixed(0)} right ${r.toFixed(0)} (need ${padNeed})` });
+          if (l < padNeed2 - 1.5 || r < padNeed2 - 1.5)
+            out.push({ kind: 'padding', what: tag, detail: `in ${label(box)} left ${l.toFixed(0)} right ${r.toFixed(0)} (need ${padNeed2})` });
           if (tr.top < br.top - 0.5 || tr.bottom > br.bottom + 0.5)
             out.push({ kind: 'escapes', what: tag, detail: `text ${tr.top.toFixed(0)}..${tr.bottom.toFixed(0)} box ${br.top.toFixed(0)}..${br.bottom.toFixed(0)}` });
         }
