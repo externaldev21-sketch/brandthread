@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, FlatList } from 'react-native';
+  StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,11 +13,13 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
-  GOLD, FONT, FS, SP, RADIUS,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 
 type PointEntry = {
   id: string;
@@ -39,34 +41,64 @@ export default function LoyaltyScreen() {
   const api    = useApi();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  // Monochrome-only: no gold/brand accent for "special" entries (signup/bonus)
+  // — pure black/white/silver everywhere on this screen except the shared
+  // success/warning status colors already used app-wide for +/- point rows.
   const sourceMeta: Record<string, { icon: string; label: string; color: string }> = {
     purchase: { icon: 'shopping-bag', label: 'Purchase', color: theme.accentLight },
     order_earn: { icon: 'shopping-bag', label: 'Purchase', color: theme.accentLight },
     referral: { icon: 'users', label: 'Referral', color: theme.secondary },
-    signup: { icon: 'gift', label: 'Welcome', color: GOLD },
-    bonus: { icon: 'star', label: 'Bonus', color: GOLD },
+    signup: { icon: 'gift', label: 'Welcome', color: theme.text },
+    bonus: { icon: 'star', label: 'Bonus', color: theme.text },
     redemption: { icon: 'tag', label: 'Redeemed', color: theme.warning },
     purchase_reversal: { icon: 'corner-up-left', label: 'Purchase refunded', color: theme.warning },
   };
 
-  const [loading,    setLoading]    = useState(true);
-  const [balance,    setBalance]    = useState(0);
-  const [history,    setHistory]    = useState<PointEntry[]>([]);
-  const [redeemPts,  setRedeemPts]  = useState('');
-  const [redeeming,  setRedeeming]  = useState(false);
+  const [loading,     setLoading]     = useState(true);
+  const [balance,     setBalance]     = useState(0);
+  const [history,     setHistory]     = useState<PointEntry[]>([]);
+  const [redeemPts,   setRedeemPts]   = useState('');
+  const [redeeming,   setRedeeming]   = useState(false);
+  // A failed fetch must never render as a genuine "0 points" balance — track
+  // it separately so a real outage shows a retry row instead of a fake zero.
+  const [loadError,   setLoadError]   = useState(false);
 
   const valueCents = Math.floor(balance);   // 100 pts = $1.00 = 100 cents
 
-  useFocusEffect(useCallback(() => {
+  const load = useCallback(() => {
     setLoading(true);
+    setLoadError(false);
+    // Dev web preview only: no real signed-in Clerk user behind this preview
+    // session, so skip the network round-trip and show clearly fresh/demo
+    // data instead — same convention as thread-cash.tsx. Never reachable
+    // outside __DEV__ web preview.
+    if (isBuyerDevPreview()) {
+      Promise.resolve().then(() => {
+        if (isPreviewDemoMode()) {
+          setBalance(1240);
+          setHistory([
+            { id: 'preview-1', points: 500, source: 'referral', createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+            { id: 'preview-2', points: 240, source: 'order_earn', createdAt: new Date(Date.now() - 6 * 86400000).toISOString() },
+            { id: 'preview-3', points: 100, source: 'signup', createdAt: new Date(Date.now() - 30 * 86400000).toISOString() },
+          ]);
+        } else {
+          setBalance(0);
+          setHistory([]);
+        }
+        setLoading(false);
+      });
+      return;
+    }
     (api as any).loyalty?.get?.()
       .then((d: any) => {
         setBalance(Number(d?.balance ?? 0));
         setHistory(d?.history ?? []);
       })
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [api]));
+  }, [api]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function handleRedeem() {
     const pts = parseInt(redeemPts, 10);
@@ -89,6 +121,17 @@ export default function LoyaltyScreen() {
     return (
       <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: headerTopInset }]}>
         <ActivityIndicator color={theme.accent} />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={s.root}>
+        <ScreenHeader title="Rewards" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+          <RetryRow label="Couldn't load your rewards" onRetry={load} />
+        </View>
       </View>
     );
   }
@@ -117,12 +160,14 @@ export default function LoyaltyScreen() {
         {/* How to earn */}
         <Text style={s.sectionLabel}>HOW TO EARN</Text>
         {[
-          { icon: '🛍', title: '1 point per $1 spent',        sub: 'Automatically earned on every completed purchase' },
-          { icon: '👋', title: '500 pts per referral',         sub: 'When a new friend joins using your invite link or code' },
-          { icon: '🎁', title: '100 pts on sign-up',           sub: 'One-time welcome bonus for new members' },
+          { icon: 'shopping-bag' as const, title: '1 point per $1 spent',  sub: 'Automatically earned on every completed purchase' },
+          { icon: 'users'        as const, title: '500 pts per referral',  sub: 'When a new friend joins using your invite link or code' },
+          { icon: 'gift'         as const, title: '100 pts on sign-up',    sub: 'One-time welcome bonus for new members' },
         ].map((item, i) => (
           <View key={i} style={s.earnCard}>
-            <Text style={s.earnIcon}>{item.icon}</Text>
+            <View style={[s.earnIconWrap, { backgroundColor: theme.accentDim }]}>
+              <Feather name={item.icon} size={18} color={theme.text} />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={s.earnTitle}>{item.title}</Text>
               <Text style={s.earnSub}>{item.sub}</Text>
@@ -217,7 +262,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   heroCard:       { margin: SP.md, padding: SP.xl, borderWidth: 1, borderRadius: RADIUS.xl, alignItems: 'center' },
   heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 2, textTransform: 'uppercase', marginBottom: SP.xs },
-  heroBalance:    { fontSize: 64, fontFamily: FONT.bold, color: FG, lineHeight: 72 },
+  heroBalance:    { fontSize: FS.h1, fontFamily: FONT.bold, color: FG, lineHeight: 42 },
   heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, marginBottom: SP.sm },
   heroValuePill:  { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
   heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -226,17 +271,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: SP.md, marginTop: SP.xs, marginBottom: SP.xs },
 
   earnCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: SP.md, marginBottom: SP.xs, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md },
-  earnIcon: { fontSize: 24, lineHeight: 28 },
+  earnIconWrap: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   earnTitle:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginBottom: 2 },
   earnSub:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 17 },
 
   redeemCard:         { marginHorizontal: SP.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md },
   redeemLabel:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.xs },
-  redeemRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+  redeemRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   redeemInput:        { flex: 1, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
-  discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8 },
+  discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8, flexShrink: 0 },
   discountPreviewText:{ fontSize: FS.sm, fontFamily: FONT.bold, color: SUCCESS },
-  redeemBtn:          { borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: 14 },
+  redeemBtn:          { borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: 14, minHeight: 48 },
    redeemBtnText:      { fontSize: FS.base, fontFamily: FONT.bold },
   redeemDisabledNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.xs },
 

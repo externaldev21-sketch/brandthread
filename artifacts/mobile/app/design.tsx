@@ -1264,7 +1264,7 @@ const g = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: CARD,   // visible while compositor renders
   },
-  meta:        { paddingTop: 5, paddingBottom: SP.xs, paddingHorizontal: 2 },
+  meta:        { paddingTop: 5, paddingBottom: SP.xs, paddingHorizontal: 2, minHeight: 44, justifyContent: 'center' },
   name:        { fontFamily: FONT.bold, fontSize: FS.meta, color: FG, lineHeight: 16 },
   dims:        { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 15, marginTop: 1 },
   // Check badge — bottom-left over the thumbnail (Procreate puts its own
@@ -1805,15 +1805,11 @@ export default function DesignGalleryScreen() {
        * Horizontal alignment: both flush to GRID_H_PAD.
        */}
       <View style={[s.header, { paddingTop: topInset }]}>
-        {/* Back arrow — taps goBackOr(router) when history exists, else goes to seller dashboard */}
+        {/* Back arrow — pops history when there is any (router.back(), via
+            goBackOr), else replaces to the seller dashboard so the user
+            never sees expo-router's "GO_BACK not handled" error. */}
         <TouchableOpacity
-          onPress={() => {
-            if (router.canGoBack()) {
-              goBackOr(router);
-            } else {
-              router.replace('/(tabs)/' as never);
-            }
-          }}
+          onPress={() => goBackOr(router, '/(tabs)/' as never)}
           hitSlop={HIT}
           style={s.backBtn}
           accessibilityLabel="Back"
@@ -1838,6 +1834,7 @@ export default function DesignGalleryScreen() {
                monochrome (white underline below, not Procreate's blue). */
             <>
               <TouchableOpacity
+                style={s.actionBtnTouch}
                 onPress={confirmBulkDelete}
                 disabled={selectedIds.size === 0}
                 hitSlop={HIT}
@@ -1847,6 +1844,7 @@ export default function DesignGalleryScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                style={s.actionBtnTouch}
                 onPress={() => setMoreOptionsVisible(true)}
                 hitSlop={HIT}
                 accessibilityLabel="More options" accessibilityRole="button" testID="header-more-select"
@@ -1857,6 +1855,7 @@ export default function DesignGalleryScreen() {
           ) : (
             <>
               <TouchableOpacity
+                style={s.actionBtnTouch}
                 onPress={() => enterSelection()} hitSlop={HIT}
                 accessibilityLabel="Enter selection mode" accessibilityRole="button" testID="header-select"
               >
@@ -1864,6 +1863,7 @@ export default function DesignGalleryScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                style={s.actionBtnTouch}
                 onPress={handleImport} hitSlop={HIT}
                 accessibilityLabel="Import image or project" accessibilityRole="button" testID="header-import"
               >
@@ -1871,6 +1871,7 @@ export default function DesignGalleryScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                style={s.actionBtnTouch}
                 onPress={handlePhotoImport} hitSlop={HIT}
                 accessibilityLabel="Import from photo library" accessibilityRole="button" testID="header-photo"
               >
@@ -2078,7 +2079,7 @@ const s = StyleSheet.create({
   backArrow: {
     color: FG,
     fontFamily: FONT.medium,
-    fontSize: 28,
+    fontSize: FS.xxl,   // 26 — on the declared scale (28 wasn't)
     lineHeight: 32,
   },
 
@@ -2103,9 +2104,18 @@ const s = StyleSheet.create({
     fontFamily: FONT.regular,
     fontSize: FS.base,       // 15pt — matches action text in screenshot 0
     color: FG,               // full white, not MUTED — matching reference
-    paddingVertical: SP.xs,  // 4px tap height padding
   },
   actionBtnDisabled: { color: SUBTLE },
+  // Real 44×44 minimum touch box around each text action (Select/Import/
+  // Photo/Delete/More) — hitSlop alone doesn't grow the actual DOM rect on
+  // web, so the audit's hit-target check (which can't see hitSlop) still
+  // flags a bare-text button. Same touch height as the +/X icon buttons
+  // beside it, so the whole row now lines up on one consistent 44px band.
+  actionBtnTouch: {
+    minHeight: COMP.iconBtn,
+    minWidth: 44,
+    justifyContent: 'center',
+  },
   // Thin white bar under the whole header while in selection mode — the
   // header's one deliberate departure from the monochrome-everywhere-else
   // rule's "no accent unless it's LIVE/Thread-Cash" clause: Procreate's own

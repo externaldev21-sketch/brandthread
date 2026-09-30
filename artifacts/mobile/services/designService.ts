@@ -39,7 +39,7 @@ export function initDesignService(userId: string | null, storeContext: string | 
   if (nextUser !== _designUserId || nextStore !== _designStoreContext) _designScopeGeneration += 1;
   _designUserId = nextUser;
   _designStoreContext = nextStore;
-  if (nextUser !== 'anon') void drainVerifiedUploadQueue(captureSyncContext());
+  if (nextUser !== 'anon') fireAndForget(drainVerifiedUploadQueue(captureSyncContext()));
 }
 
 function K(userId = _designUserId, storeContext = _designStoreContext) {
@@ -70,10 +70,34 @@ function captureSyncContext(): DesignSyncContext {
   };
 }
 
+const STALE_CONTEXT_MESSAGE = 'Design Studio store context changed during sync.';
+const STALE_PROJECT_MESSAGE = 'Design Studio project was deleted during sync.';
+const STALE_SYNC_MESSAGES: string[] = [STALE_CONTEXT_MESSAGE, STALE_PROJECT_MESSAGE];
+
 function assertCurrentContext(context: DesignSyncContext): void {
   if (context.generation !== _designScopeGeneration) {
-    throw new Error('Design Studio store context changed during sync.');
+    throw new Error(STALE_CONTEXT_MESSAGE);
   }
+}
+
+function isStaleContextError(error: unknown): boolean {
+  return error instanceof Error && STALE_SYNC_MESSAGES.includes(error.message);
+}
+
+// Background sync work (queue draining, upload flushing) is kicked off
+// fire-and-forget from several places below — it must never block the
+// caller. A generation/context change mid-flight (the user switched store
+// or signed out while a sync was in the air) is an EXPECTED abort, not a
+// bug: the in-flight work is for a scope that's no longer current, so
+// throwing `assertCurrentContext`/`assertProjectEpoch` mid-way is correct,
+// but letting that rejection go unhandled just to log a scary console
+// error is not. Route every fire-and-forget call through this so a stale
+// context aborts silently while a genuine failure still surfaces in dev.
+function fireAndForget(promise: Promise<unknown>): void {
+  promise.catch(error => {
+    if (isStaleContextError(error)) return;
+    if (__DEV__) console.error('[designService] background sync failed:', error);
+  });
 }
 
 function syncHeaders(context: DesignSyncContext, revision?: number): Record<string, string> {
@@ -180,7 +204,7 @@ function invalidateProjectOperations(context: DesignSyncContext, projectId: stri
 function assertProjectEpoch(context: DesignSyncContext, projectId: string, epoch: number): void {
   assertCurrentContext(context);
   if (captureProjectEpoch(context, projectId) !== epoch) {
-    throw new Error('Design Studio project was deleted during sync.');
+    throw new Error(STALE_PROJECT_MESSAGE);
   }
 }
 
@@ -622,7 +646,7 @@ export async function recoverLegacyDesignProjects(): Promise<number> {
     await AsyncStorage.setItem(context.keys.legacyRecovery, new Date().toISOString());
     return additions;
   });
-  void drainProjectSync(context);
+  fireAndForget(drainProjectSync(context));
   return recovered.length;
 }
 
@@ -672,7 +696,7 @@ export async function getProjects(): Promise<DesignProject[]> {
     all = await seedIfEmpty(keys.projects);
   }
   if (context.generation !== _designScopeGeneration) return [];
-  void drainProjectSync(context);
+  fireAndForget(drainProjectSync(context));
   return all.filter(p => !p.deletedAt);
 }
 
@@ -901,7 +925,7 @@ function scheduleVerifiedUploadRetry(context: DesignSyncContext): void {
   if (verifiedUploadRetryTimers.has(key)) return;
   const timer = setTimeout(() => {
     verifiedUploadRetryTimers.delete(key);
-    void drainVerifiedUploadQueue(context);
+    fireAndForget(drainVerifiedUploadQueue(context));
   }, 30_000);
   verifiedUploadRetryTimers.set(key, timer);
 }
@@ -991,7 +1015,7 @@ export async function syncVerifiedDesignAsset(
   // Persist before the first network attempt. Every upload then flows through
   // one FIFO lock, so an older retry cannot overtake and replace a newer master.
   await queueVerifiedUpload(uploadId, projectId, asset, kind, context);
-  void drainVerifiedUploadQueue(context);
+  fireAndForget(drainVerifiedUploadQueue(context));
   return null;
 }
 

@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   tileTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm, marginTop: 4 },
   tilePrice: { color: MUTED, fontSize: FS.xs },
   messageTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.sm, textAlign: 'center' },
-  messageDesc: { color: MUTED, fontSize: FS.sm, textAlign: 'center' },
+  messageDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   primaryBtn: { height: COMP.buttonHSm, borderRadius: RADIUS.pill, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, alignSelf: 'center' },
   primaryBtnText: { color: BG, fontFamily: FONT.semibold, fontSize: FS.sm },
 });

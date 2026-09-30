@@ -72,6 +72,7 @@ export function HeaderPillButton({ label, onPress }: { label: string; onPress: (
     <TouchableOpacity
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={s.btn}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
       accessibilityLabel={label}
     >

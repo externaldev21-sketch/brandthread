@@ -12,6 +12,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Feather } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ export default function MetaAdsConnectScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const api = useApi();
+  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>('loading');
   const [connection, setConnection] = useState<MetaAdsConnection | null>(null);
@@ -209,7 +211,10 @@ export default function MetaAdsConnectScreen() {
   return (
     <BrandthreadScreen noSafeTop>
       <ScreenHeader title="Connect Meta" onBack={() => goBackOr(router)} />
-      <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.lg, gap: SP.md }}
+        keyboardShouldPersistTaps="handled"
+      >
         {step === 'loading' && (
           <View style={s.center}>
             <ActivityIndicator color={theme.accentLight} size="large" />

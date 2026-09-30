@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
   dropType: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 1.2, marginTop: 2 },
-  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: 39, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
+  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: FS.h1, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
   eyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.7, marginBottom: 9 },
   timerRow: { flexDirection: 'row', justifyContent: 'space-between' },
   timerUnit: { minWidth: 58 },

@@ -20,7 +20,11 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { getProject, updateProject } from '@/services/designService';
-import { GARMENT_TYPES, GARMENT_TEMPLATES } from '@/services/designTypes';
+import { GARMENT_TYPES, GARMENT_TEMPLATES, GARMENT_VIEWS } from '@/services/designTypes';
+
+function viewLabel(view: string): string {
+  return GARMENT_VIEWS.find(v => v.value === view)?.label ?? view;
+}
 
 const GARMENT_SWATCH_COLORS = [
   { label: 'Black',  hex: '#000000' },
@@ -76,20 +80,21 @@ export default function DesignGarmentScreen() {
 
   const [garmentType, setGarmentType] = useState(params.garmentType ?? 'tshirt');
   const [garmentColor, setGarmentColor] = useState(params.garmentColor ?? '#FFFFFF');
-  const [currentView, setCurrentView] = useState('Front');
+  const [currentView, setCurrentView] = useState('front');
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [showSafeArea, setShowSafeArea] = useState(false);
   const [showEmbroidery, setShowEmbroidery] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const projectId = params.projectId ?? '';
-  const template = (GARMENT_TEMPLATES as any)[garmentType] ?? (GARMENT_TEMPLATES as any)['tshirt'];
+  const template = GARMENT_TEMPLATES.find(t => t.garmentType === garmentType)
+    ?? GARMENT_TEMPLATES.find(t => t.garmentType === 'tshirt')!;
   const availableViews = template.views;
-  const availableZones = template.placementZones ?? PLACEMENT_ZONES_ALL;
+  const availableZones = PLACEMENT_ZONES_ALL;
 
   // Reset view when garment type changes
   useEffect(() => {
-    if (!availableViews.includes(currentView)) {
+    if (!(availableViews as string[]).includes(currentView)) {
       setCurrentView(availableViews[0] ?? 'Front');
     }
     setSelectedZone(null);
@@ -158,7 +163,7 @@ export default function DesignGarmentScreen() {
               {garmentLabel(garmentType)}
             </Text>
             <Text style={[gs.garmentViewLabel, { color: garmentTextColor + 'AA' }]}>
-              {currentView} View
+              {viewLabel(currentView)} View
             </Text>
 
             {/* Selected placement overlay */}
@@ -196,7 +201,7 @@ export default function DesignGarmentScreen() {
                 style={[gs.viewTab, currentView === view && gs.viewTabActive]}
                 onPress={() => { Haptics.selectionAsync(); setCurrentView(view); }}
               >
-                <Text style={[gs.viewTabText, currentView === view && { color: PURPLE_LIGHT }]}>{view}</Text>
+                <Text style={[gs.viewTabText, currentView === view && { color: PURPLE_LIGHT }]}>{viewLabel(view)}</Text>
               </TouchableOpacity>
             ))}
           </View>

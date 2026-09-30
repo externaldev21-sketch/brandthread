@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
-import { FONT, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow } from '@/components/ui';
@@ -79,7 +79,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
   hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADII.card, borderWidth: 1, padding: 16, marginBottom: 16 },
   logo: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  logoText: { fontFamily: FONT.bold, fontSize: 24 },
+  logoText: { fontFamily: FONT.bold, fontSize: FS.xl },
   heroTitle: { fontFamily: FONT.bold, fontSize: 15 },
   heroSub: { fontFamily: FONT.regular, fontSize: 11.5, lineHeight: 16, marginTop: 3 },
   card: { padding: 0, paddingHorizontal: SP.md },
