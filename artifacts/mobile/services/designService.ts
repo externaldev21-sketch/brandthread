@@ -43,7 +43,16 @@ export function initDesignService(userId: string | null, storeContext: string | 
 }
 
 function K(userId = _designUserId, storeContext = _designStoreContext) {
-  const scope = `${userId}:${storeContext}`.replace(/[^a-zA-Z0-9:_-]/g, '_');
+  // Demo-mode preview data must live in its own storage namespace, never the
+  // same keys real (or fresh-preview) data uses. Without this, seedIfEmpty()
+  // below writes its 3 sample projects into the *same* key a later non-demo
+  // visit reads from — that visit then finds `existing.length > 0` (the old
+  // demo seeds) and returns them as-is, since seedIfEmpty only checks demo
+  // mode when the key is empty. That's the exact "demo data leaks into fresh
+  // mode" bug: not a one-off symptom to patch, but this key collision — so
+  // it's fixed here, once, for every key this function returns.
+  const demoSuffix = isPreviewDemoMode() ? ':demo' : '';
+  const scope = `${userId}:${storeContext}${demoSuffix}`.replace(/[^a-zA-Z0-9:_-]/g, '_');
   return {
     projects: `bt:design:${scope}:projects:v2`,
     assets: `bt:design:${scope}:brand-assets:v2`,
@@ -566,7 +575,7 @@ function makeSeedProject(
     name,
     type,
     status,
-    canvas: { width: 1080, height: 1080, backgroundHex: '#000000' },
+    canvas: { width: 1080, height: 1080, backgroundHex: '#FFFFFF' },
     layers: [],
     createdAt: now,
     updatedAt: now,
@@ -774,7 +783,11 @@ export async function createProject(
   const fullCanvas: DesignCanvas = {
     width: canvas.width ?? 1080,
     height: canvas.height ?? 1080,
-    backgroundHex: canvas.backgroundHex ?? '#000000',
+    // A blank canvas with no explicit background defaults to white — a real
+    // artboard, the way every other design tool starts a new canvas — never
+    // black, which used to be indistinguishable from the app's own black
+    // chrome around it ("no visible artboard, renders all black").
+    backgroundHex: canvas.backgroundHex ?? '#FFFFFF',
     backgroundImageUri: canvas.backgroundImageUri,
     backgroundOpacity: canvas.backgroundOpacity,
   };
