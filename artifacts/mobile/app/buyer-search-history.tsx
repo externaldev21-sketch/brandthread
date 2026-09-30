@@ -39,7 +39,7 @@ export default function BuyerSearchHistoryScreen() {
   useEffect(() => { load(); }, [load]);
 
   function submitTerm(term: string) {
-    router.replace({ pathname: '/buyer-search', params: { q: term } } as never);
+    router.push({ pathname: '/buyer-search', params: { q: term } } as never);
   }
 
   async function removeTerm(term: string) {

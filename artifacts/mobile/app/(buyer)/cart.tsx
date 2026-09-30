@@ -1051,7 +1051,7 @@ export default function CartScreen() {
           <Button
             label="Continue shopping"
             icon="compass"
-            onPress={() => router.push('/(buyer)/discover' as never)}
+            onPress={() => router.navigate('/(buyer)/discover' as never)}
             style={s.emptyCta}
             accessibilityHint="Opens Discover to browse products"
           />

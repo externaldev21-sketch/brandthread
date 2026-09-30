@@ -375,7 +375,7 @@ export default function BuyerOtherProfileScreen() {
         topRight={(
           <ProfileGlassButton
             icon="message-circle"
-            onPress={() => { hapticLight(); router.push('/(buyer)/inbox' as never); }}
+            onPress={() => { hapticLight(); router.navigate('/(buyer)/inbox' as never); }}
             accessibilityLabel="Messages"
           />
         )}

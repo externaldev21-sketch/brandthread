@@ -112,7 +112,7 @@ export default function LoyaltyScreen() {
     // Redemptions are deliberately created in the cart, where they are
     // persisted with the checkout session and applied to Stripe immediately.
     // Never mint a detached code here: it could be lost before checkout.
-    router.push('/(buyer)/cart' as never);
+    router.navigate('/(buyer)/cart' as never);
   }
 
   const previewDiscount = parseInt(redeemPts, 10) || 0;

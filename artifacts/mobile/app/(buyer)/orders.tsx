@@ -231,7 +231,7 @@ function BuyerOrdersListSkeleton() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerOrdersScreen() {
-  const scrollResetRef = useScrollReset<any>();
+  const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
@@ -407,7 +407,7 @@ export default function BuyerOrdersScreen() {
                 action={{
                   label: 'Discover Products',
                   icon: 'compass',
-                  onPress: () => router.push('/(buyer)/discover' as never),
+                  onPress: () => router.navigate('/(buyer)/discover' as never),
                 }}
                 style={{ flex: 1 }}
               />

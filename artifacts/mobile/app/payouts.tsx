@@ -94,7 +94,7 @@ export default function PayoutsScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    goBackOr(router);
+    goBackOr(router, '/(tabs)/more');
   }
 
   const refreshConnectStatus = useCallback(async () => {
