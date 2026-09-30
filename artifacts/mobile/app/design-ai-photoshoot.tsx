@@ -38,6 +38,7 @@ import { MODEL_STYLES, SCENE_STYLES, ImageRatioKind, ModelStyleKind, SceneStyleK
 import { generatePhotoshootShot, createBrandAsset } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 const MAX_REFS = 6; // seller-facing cap. NOTE: combined with product photos,
 // the real generate call can still be rejected by the backend's own,
@@ -83,6 +84,7 @@ function getAiToolDockBottomInset(insets: { bottom: number }): number {
 const DOCK_CONTENT_HEIGHT = 52 + SP.lg + SP.lg;
 
 export default function AIPhotoshootScreen() {
+  useHideTabBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dockBottomInset = getAiToolDockBottomInset(insets);
