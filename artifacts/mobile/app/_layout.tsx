@@ -270,6 +270,10 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Storefront-from-AI wizard and its full-screen generating/progress screen.
   'store-generate',
   'store-generating',
+  // Store Preview — full-bleed render of the actual storefront (an iframe/
+  // WebView filling the screen below its own close+device-toggle bar); the
+  // persistent tab bar has no business floating on top of that.
+  'store-preview',
   // Multi-step quote wizard with its own step header/footer.
   'quote-request',
   // Seller livestream — real full-screen camera/broadcast controls.
