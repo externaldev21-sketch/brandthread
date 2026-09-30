@@ -21,6 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerDevPreview, isPreviewDemoMode, isPreviewFreshMode } from '@/lib/devPreview';
+import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { ListSkeleton } from '@/components/layout';
@@ -49,13 +51,18 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production' | 'messages';
 
+// Alibaba's "My Alibaba" hub uses exactly this 5-segment strip (Discover,
+// My Manufacturers, Quotes, Samples, Orders); Messages stays reachable via
+// every "Message"/"Chat now" action and the Discover tab's own recent-
+// conversations preview (both already route via ?tab=messages, which this
+// isTab()/setActiveTab logic still honors), rather than taking a 6th slot
+// that clipped off the right edge of a 393pt screen with no affordance.
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: 'discover',         label: 'Discover',     icon: 'search' },
-  { key: 'my_manufacturers', label: 'My Mfgs',      icon: 'users' },
-  { key: 'quotes',           label: 'Quotes',        icon: 'file-text' },
-  { key: 'samples',          label: 'Samples',       icon: 'package' },
-  { key: 'production',       label: 'Production',    icon: 'layers' },
-  { key: 'messages',         label: 'Messages',      icon: 'message-circle' },
+  { key: 'discover',         label: 'Discover',       icon: 'search' },
+  { key: 'my_manufacturers', label: 'My Mfgs',        icon: 'users' },
+  { key: 'quotes',           label: 'Quotes',         icon: 'file-text' },
+  { key: 'samples',          label: 'Samples',        icon: 'package' },
+  { key: 'production',       label: 'Orders',         icon: 'layers' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -192,7 +199,9 @@ export default function ManufacturerHub() {
     <View style={s.root}>
       <HubHeader activeTab={activeTab} router={router} onLeave={leaveSetupDestination} />
 
-      {/* Tab bar */}
+      {/* Tab bar — 5 segments fit 393pt without scrolling in practice, but
+          the edge fade stays as a safety net for narrower devices/larger
+          text sizes rather than silently clipping the last tab again. */}
       <View style={s.tabBarWrapper}>
         <ScrollView
           horizontal
@@ -220,6 +229,13 @@ export default function ManufacturerHub() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        <LinearGradient
+          colors={[`${theme.surface}00`, theme.surface]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={s.tabBarFade}
+          pointerEvents="none"
+        />
       </View>
 
       {/* Tab content */}
@@ -309,11 +325,11 @@ function activeFilterCount(f: Filters) {
     + (f.verifiedOnly ? 1 : 0) + (f.hasPhotos ? 1 : 0);
 }
 
-// Alibaba-style sourcing categories, layered on top of the free-text
+// Alibaba's own sourcing-category rail, layered on top of the free-text
 // specialty filter already served by the directory facets.
 const CATEGORY_CHIPS = [
   'Cut & Sew', 'Knitwear', 'Denim', 'Screen Printing', 'Embroidery',
-  'Cut Labels & Tags', 'Packaging', 'Blanks',
+  'Leather', 'Footwear', 'Accessories', 'Packaging', 'Labels & Tags',
 ];
 
 function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
@@ -336,6 +352,11 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useFocusEffect(useCallback(() => {
+    // Signed-out preview never has a token, so these seller-scoped previews
+    // (unlike the shared demo directory below) simply have nothing to show —
+    // an empty "Recent conversations"/"Active orders" section is the honest
+    // preview-safe answer, not a stub API call that would 401 every time.
+    if (isSellerDevPreview()) { setConversationsPreview([]); setOrdersPreview([]); return; }
     Promise.all([getConversations(), getProductionOrders()])
       .then(([conversations, orders]) => {
         setConversationsPreview(conversations.filter((c) => c.unreadCount > 0 || c.lastMessage).slice(0, 3));
@@ -345,8 +366,26 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []));
 
   const load = useCallback(async (query = searchQuery, f = filters) => {
+    // Preview mode (?bt_preview=seller) never signs in via Clerk, so the
+    // real, requireAuth'd directory endpoint always 401s here — that's what
+    // produced the broken "Directory unavailable" error for every preview
+    // visitor. Fresh preview shows the honest empty state; &demo=1 shows a
+    // realistic seeded directory. A real signed-in seller never takes this
+    // branch and always hits the live API below.
+    if (isSellerDevPreview()) {
+      setLoadError(false);
+      setManufacturers(isPreviewDemoMode() ? getPreviewManufacturers() : []);
+      setSavedIds(new Set());
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
-      const [results, favoriteIds] = await Promise.all([
+      // allSettled (not all): favorites is a nice-to-have overlay on the
+      // directory, not a co-requirement. A favorites-only outage used to
+      // wipe the entire directory for a signed-in seller via Promise.all —
+      // now it just shows every card unfavourited instead of an error page.
+      const [resultsOutcome, favoritesOutcome] = await Promise.allSettled([
         searchManufacturers({
           query: query || undefined,
           country: f.country || undefined,
@@ -362,9 +401,11 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         }),
         getFavoriteManufacturerIds(),
       ]);
+      if (resultsOutcome.status === 'rejected') throw resultsOutcome.reason;
+      const results = resultsOutcome.value;
       setLoadError(false);
       setManufacturers(Array.isArray(results) ? results : []);
-      setSavedIds(new Set(favoriteIds));
+      setSavedIds(favoritesOutcome.status === 'fulfilled' ? new Set(favoritesOutcome.value) : new Set());
     } catch (e) {
       setManufacturers([]);
       setSavedIds(new Set());
@@ -396,6 +437,17 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
     if (savingIds.has(mfg.id)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setMutationError('');
+    // Preview mode has no signed-in seller to persist a favorite for — the
+    // heart still works, purely as local UI state, same as every other
+    // preview-safe screen's local-only interactions.
+    if (isSellerDevPreview()) {
+      setSavedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(mfg.id)) next.delete(mfg.id); else next.add(mfg.id);
+        return next;
+      });
+      return;
+    }
     setSavingIds(prev => new Set(prev).add(mfg.id));
     try {
       if (savedIds.has(mfg.id)) {
@@ -437,7 +489,31 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
     applyFilters(next);
   };
 
-  const featured = manufacturers.filter((mfg) => mfg.isVerified).slice(0, 8);
+  // Alibaba's four Hub Home rails, all derived client-side from the same
+  // directory response already in hand — no new endpoint needed for these.
+  // "Fast customization" reads as manufacturers that both take on
+  // custom/capability work (have at least one listed capability) and reply
+  // quickly, since there's no dedicated "customization" field in the data
+  // model yet (see docs/contracts/manufacturer-hub-api.md).
+  const railVerified = manufacturers.filter((mfg) => mfg.isVerified).slice(0, 8);
+  const railFastCustomization = [...manufacturers]
+    .filter((mfg) => mfg.capabilities.length > 0)
+    .sort((a, b) => a.responseTimeHours - b.responseTimeHours)
+    .slice(0, 8);
+  const railLowMoq = [...manufacturers]
+    .filter((mfg) => mfg.moq > 0)
+    .sort((a, b) => a.moq - b.moq)
+    .slice(0, 8);
+  const railTopRated = [...manufacturers]
+    .filter((mfg) => mfg.reviewCount > 0)
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 8);
+  const rails: { key: string; title: string; data: Manufacturer[] }[] = [
+    { key: 'verified', title: 'Verified manufacturers', data: railVerified },
+    { key: 'fast', title: 'Fast customization', data: railFastCustomization },
+    { key: 'moq', title: 'Low MOQ', data: railLowMoq },
+    { key: 'rated', title: 'Top-rated', data: railTopRated },
+  ];
 
   // Rendered as the grid's ListHeaderComponent (not a nested ScrollView) so
   // the whole Discover tab scrolls as one list.
@@ -479,18 +555,19 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           ))}
         </ScrollView>
 
-        {/* Featured / verified factories */}
-        {featured.length > 0 && (
-          <View style={s.featuredSection}>
-            <SectionHeader title="Featured verified factories" style={s.sectionHeaderTight} />
+        {/* Alibaba Hub Home rails: Verified manufacturers / Fast
+            customization / Low MOQ / Top-rated — same card, different sort. */}
+        {rails.map((rail) => rail.data.length > 0 && (
+          <View key={rail.key} style={s.featuredSection}>
+            <SectionHeader title={rail.title} style={s.sectionHeaderTight} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.featuredRow}>
-              {featured.map((mfg) => (
+              {rail.data.map((mfg) => (
                 <TouchableOpacity
                   key={mfg.id}
                   style={s.featuredCard}
                   activeOpacity={0.85}
                   onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}
-                  testID={`featured-${mfg.id}`}
+                  testID={`featured-${rail.key}-${mfg.id}`}
                 >
                   <View style={s.featuredCover}>
                     {mfg.profileImageUri ? (
@@ -498,9 +575,11 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
                     ) : (
                       <View style={s.featuredCoverFallback}><Text style={s.featuredCoverFallbackText}>{mfg.name.charAt(0)}</Text></View>
                     )}
-                    <View style={s.featuredVerifiedBadge}>
-                      <Feather name="check-circle" size={11} color={theme.onAccent} />
-                    </View>
+                    {mfg.isVerified && (
+                      <View style={s.featuredVerifiedBadge}>
+                        <Feather name="check-circle" size={11} color={theme.onAccent} />
+                      </View>
+                    )}
                   </View>
                   <Text style={s.featuredName} numberOfLines={1}>{mfg.name}</Text>
                   <Text style={s.featuredMeta} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
@@ -508,7 +587,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
               ))}
             </ScrollView>
           </View>
-        )}
+        ))}
 
         {/* Recent conversations preview */}
         {conversationsPreview.length > 0 && (
@@ -632,10 +711,11 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
               </View>
             ) : loadError ? (
               <EmptyState
-                icon="wifi-off"
-                title="Directory unavailable"
-                description="We couldn't load manufacturers. Check your connection and try again."
+                icon="alert-circle"
+                title="Couldn't load manufacturers"
+                description="Try again in a moment."
                 action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
+                style={s.emptyState}
               />
             ) : (
             <EmptyState
@@ -724,28 +804,37 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
         </View>
       </View>
 
+      {/* Alibaba-style price-per-unit range + MOQ line, ahead of specialties. */}
+      {mfg.unitPriceMinCents > 0 && (
+        <Text style={card.priceRange} numberOfLines={1}>
+          {mfg.unitPriceMinCents === mfg.unitPriceMaxCents
+            ? formatCents(mfg.unitPriceMinCents)
+            : `${formatCents(mfg.unitPriceMinCents)} – ${formatCents(mfg.unitPriceMaxCents)}`} <Text style={card.priceUnit}>/ unit</Text>
+        </Text>
+      )}
+      <Text style={card.moqLine} numberOfLines={1}>Min. order: {mfg.moq > 0 ? `${mfg.moq.toLocaleString('en-US')} pieces` : 'Contact for MOQ'}</Text>
       <Text style={card.specialties} numberOfLines={2}>
         {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
       <View style={card.detailStack}>
-        <Text style={card.stats} numberOfLines={1}>MOQ {mfg.moq || 'Contact'} · {mfg.leadTimeDays ? `${mfg.leadTimeDays}d lead` : 'Lead time varies'}</Text>
+        <Text style={card.stats} numberOfLines={1}>{mfg.leadTimeDays ? `${mfg.leadTimeDays}d lead time` : 'Lead time varies'}</Text>
         <Text style={card.response} numberOfLines={1}>{mfg.responseTimeHours > 0 ? `Replies in ~${mfg.responseTimeHours}h` : 'Response time not provided'}</Text>
       </View>
 
-      {/* Actions */}
+      {/* Actions — "Chat now" primary, matching the Alibaba directory card. */}
       <View style={card.actionRow}>
         <TouchableOpacity
           style={card.iconAction}
-          onPress={onMessage}
+          onPress={onQuote}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`Message ${mfg.name}`}
+          accessibilityLabel={`Request a quote from ${mfg.name}`}
         >
-          <Feather name="mail" size={15} color={theme.secondary} />
+          <Feather name="file-text" size={15} color={theme.secondary} />
         </TouchableOpacity>
-        <TouchableOpacity style={[card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onQuote} activeOpacity={0.7}>
-          <Text style={[card.profileBtnText, { color: theme.onAccent }]}>Request quote</Text>
-          <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
+        <TouchableOpacity style={[card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onMessage} activeOpacity={0.7}>
+          <Feather name="message-circle" size={ICON.sm} color={theme.onAccent} />
+          <Text style={[card.profileBtnText, { color: theme.onAccent }]}>Chat now</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -772,6 +861,9 @@ const makeCard = (theme: AppThemePreset) => StyleSheet.create({
   ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   ratingText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.warning },
   reviewCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  priceRange:    { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, marginTop: 2 },
+  priceUnit:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  moqLine:       { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.xs },
   specialties:   { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.xs, minHeight: 28 },
   detailStack:   { minHeight: 36, marginBottom: SP.sm },
   stats:         { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.text, marginBottom: 3 },
@@ -801,6 +893,22 @@ function FilterModal({ visible, filters, onApply, onClose }: {
     if (!visible) return;
     setLocal(filters);
     setFacetError(false);
+    if (isSellerDevPreview()) {
+      // Derived locally from the same demo/fresh directory, matching what
+      // the real facets endpoint would report for the directory in view.
+      const source = isPreviewDemoMode() ? getPreviewManufacturers() : [];
+      const count = (values: string[]) => {
+        const tally = new Map<string, number>();
+        for (const value of values) if (value) tally.set(value, (tally.get(value) ?? 0) + 1);
+        return [...tally.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+      };
+      setFacets({
+        countries: count(source.map((mfg) => mfg.country)),
+        specialties: count(source.flatMap((mfg) => mfg.categories)),
+        total: source.length,
+      });
+      return;
+    }
     getDirectoryFacets().then(setFacets).catch(() => setFacetError(true));
   }, [visible]);
 
@@ -939,6 +1047,9 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
+    // No signed-in seller in preview, so a fresh preview seller genuinely
+    // has zero relationships yet — the real empty state below, not an error.
+    if (isSellerDevPreview()) { setError(false); setRelationships([]); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       const rels = await getRelationships();
@@ -971,7 +1082,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   if (error) {
     return (
       <EmptyState
-        icon="wifi-off"
+        icon="alert-circle"
         title="Couldn't load your manufacturers"
         description="Check your connection and try again."
         action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
@@ -1082,6 +1193,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
+    if (isSellerDevPreview()) { setError(false); setQuoteRequests([]); setQuotes([]); setManufacturerNames({}); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       const [reqs, qs] = await Promise.all([getQuoteRequests(), getQuotes()]);
@@ -1123,7 +1235,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   if (error) {
     return (
       <EmptyState
-        icon="wifi-off"
+        icon="alert-circle"
         title="Couldn't load quotes"
         description="Check your connection and try again."
         action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
@@ -1296,6 +1408,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
+    if (isSellerDevPreview()) { setError(false); setSamples([]); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       const s = await getSamples();
@@ -1318,7 +1431,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   if (loading && samples.length === 0) return <View style={s.skeletonList}>{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
   if (error) {
     return (
-      <EmptyState icon="wifi-off" title="Couldn't load samples" description="Check your connection and try again."
+      <EmptyState icon="alert-circle" title="Couldn't load samples" description="Check your connection and try again."
         action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }} style={s.emptyState} />
     );
   }
@@ -1399,6 +1512,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
+    if (isSellerDevPreview()) { setError(false); setOrders([]); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       const rows = await getSellerOrders();
@@ -1421,7 +1535,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   if (loading && orders.length === 0) return <View style={s.skeletonList} testID="production-loading">{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
   if (error) {
     return (
-      <EmptyState icon="wifi-off" title="Couldn't load production orders" description="Check your connection and try again."
+      <EmptyState icon="alert-circle" title="Couldn't load production orders" description="Check your connection and try again."
         action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }} style={s.emptyState} />
     );
   }
@@ -1513,6 +1627,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
+    if (isSellerDevPreview()) { setError(false); setConversations([]); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       const convs = await getConversations();
@@ -1536,7 +1651,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   if (error) {
     return (
       <EmptyState
-        icon="wifi-off"
+        icon="alert-circle"
         title="Couldn't load messages"
         description="Check your connection and try again."
         action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
@@ -1618,8 +1733,9 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   headerTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
   headerActions:{ flexDirection: 'row', gap: SP.sm },
   headerBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.surfaceGlass },
+  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.surfaceGlass, position: 'relative' },
   tabBarContent:{ paddingHorizontal: SP.md },
+  tabBarFade:   { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28 },
   tabItem:      { marginRight: SP.sm, alignItems: 'center' },
   tabInner:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingVertical: SP.sm, paddingHorizontal: SP.sm },
   tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
@@ -1644,7 +1760,11 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning, backgroundColor: `${theme.warning}1F` },
   inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.warning },
-  emptyState:   { flex: 1, justifyContent: 'center' },
+  // paddingBottom keeps the description/action clear of the seller tab bar
+  // (COMP.tabBarH) even when flex-centering pushes content toward the
+  // bottom of a taller viewport — this was previously running text under
+  // the bar on several of these tabs' error states.
+  emptyState:   { flex: 1, justifyContent: 'center', paddingBottom: COMP.tabBarH + SP.lg },
 
   // Discover tab — Alibaba-style sourcing intro (RFQ CTA, categories, featured, previews)
   discoverIntroContent: { paddingHorizontal: SP.md, paddingTop: SP.xs, gap: SP.md },

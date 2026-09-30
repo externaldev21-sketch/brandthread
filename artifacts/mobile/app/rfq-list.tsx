@@ -7,6 +7,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Ale
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, StatusBadge, PrimaryButton } from '@/components/BrandthreadUI';
@@ -38,6 +39,7 @@ export default function RfqListScreen() {
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
+    if (isSellerDevPreview()) { setError(false); setRfqs([]); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       setRfqs(await getRfqs());
