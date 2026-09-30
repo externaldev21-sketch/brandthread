@@ -85,24 +85,30 @@ const GARMENT_STROKE = 'rgba(0,0,0,0.22)';
 function torsoBodyPath(sleeveLength: number): string {
   // Crew-neck tee/sweatshirt/jacket body: shoulders → sleeve → underarm →
   // hem → mirrored back up the other side, with a shallow front neckline.
+  // Real tee proportions: body width 80 (shoulder-to-shoulder, x 60–140),
+  // height 96 — 1.2× the width, y 40 (neckline) to 136 (hem). The previous
+  // path was ~64 wide by ~192 tall (a 1:3 column), which read as a dress,
+  // not a T-shirt.
   const s = sleeveLength; // how far the sleeve extends past the shoulder
-  return `M 70 18
-    C 78 8, 122 8, 130 18
-    L ${130 + s} 40
-    L ${118 + s} 68
-    L 132 56
-    L 132 210
-    L 68 210
-    L 68 56
-    L ${82 - s} 68
-    L ${70 - s} 40
+  return `M 75 40
+    C 80 33, 120 33, 125 40
+    L 140 48
+    L ${140 + s} 66
+    L ${132 + s} 84
+    L 140 92
+    L 140 136
+    L 60 136
+    L 60 92
+    L ${68 - s} 84
+    L ${60 - s} 66
+    L 60 48
     Z`;
 }
 
 function GarmentSilhouette({ type, view, colorHex }: { type: string; view: string; colorHex: string }) {
   const isDetail = view === 'detail';
   const isBack = view === 'back';
-  const viewBox = isDetail ? '55 30 90 90' : '0 0 200 240';
+  const viewBox = isDetail ? '65 45 70 60' : '0 0 200 240';
   const fill = colorHex;
   const isPants = type === 'sweatpants' || type === 'shorts';
   const isHat = type === 'hat';
@@ -150,13 +156,13 @@ function GarmentSilhouette({ type, view, colorHex }: { type: string; view: strin
             <Path d="M 76 20 C 76 2, 124 2, 124 20 C 124 30, 112 30, 100 34 C 88 30, 76 30, 76 20 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
           )}
           {!isBack && (type === 'jacket' || type === 'denim') && (
-            <Line x1={100} y1={24} x2={100} y2={208} stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.6} />
+            <Line x1={100} y1={44} x2={100} y2={136} stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.6} />
           )}
           {!isBack && type !== 'jacket' && type !== 'denim' && (
-            <Path d="M 88 20 Q 100 34 112 20" fill="none" stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.55} />
+            <Path d="M 88 40 Q 100 52 112 40" fill="none" stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.55} />
           )}
           {isBack && (
-            <Line x1={100} y1={16} x2={100} y2={208} stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.35} />
+            <Line x1={100} y1={40} x2={100} y2={136} stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.35} />
           )}
           {type === 'hoodie' && (
             <Path d="M 92 64 L 108 64 L 108 96 L 100 104 L 92 96 Z" fill="none" stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.5} />
@@ -294,7 +300,7 @@ export default function DesignGarmentScreen() {
                 style={[gs.viewTab, currentView === view && gs.viewTabActive]}
                 onPress={() => { Haptics.selectionAsync(); setCurrentView(view); }}
               >
-                <Text style={[gs.viewTabText, currentView === view && { color: PURPLE_LIGHT }]}>{viewLabel(view)}</Text>
+                <Text style={[gs.viewTabText, currentView === view && { color: '#000000', fontFamily: FONT.bold }]}>{viewLabel(view)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -398,7 +404,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   typePillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   previewContainer: { paddingHorizontal: SP.md, paddingTop: SP.md },
-  garmentPreview: { width: '100%', aspectRatio: 0.85, borderRadius: RADIUS.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER, position: 'relative', backgroundColor: CARD_ELEVATED },
+  // A near-square (0.85) preview card left almost nothing above the fold
+  // for Garment Color once View/Type picker chrome was accounted for — the
+  // swatch row landed right at the floating tab bar on first load, not
+  // just at the very end of scroll. Shorter card gives real headroom.
+  garmentPreview: { width: '100%', aspectRatio: 1.35, borderRadius: RADIUS.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER, position: 'relative', backgroundColor: CARD_ELEVATED },
   garmentCaption: { position: 'absolute', bottom: SP.md, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: 6 },
   garmentCaptionText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
 
@@ -408,7 +418,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   viewTab:      { flex: 1, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
-  viewTabActive:{ backgroundColor: PURPLE_DIM },
+  // Monochrome rule: the selected segment is a solid white fill with black
+  // text, not a tinted grey pill.
+  viewTabActive:{ backgroundColor: FG },
   viewTabText:  { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   colorGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

@@ -3202,7 +3202,7 @@ export default function DesignCanvasScreen() {
                 },
               ]} />
               <View style={styles.sizeTrack}>
-                <View style={[styles.sizeFill, { height: `${(activeSize / 80) * 100}%` }]} />
+                <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
               </View>
               {sizeSliderDragging && (
                 <View style={styles.sizeBubble}>
@@ -3219,7 +3219,7 @@ export default function DesignCanvasScreen() {
             >
               <Feather name="droplet" size={ICON.xs} color={MUTED} style={styles.opacityIcon} />
               <View style={styles.sizeTrack}>
-                <View style={[styles.sizeFill, { height: `${brushOpacity * 100}%` }]} />
+                <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
               </View>
               {opacitySliderDragging && (
                 <View style={styles.sizeBubble}>
@@ -5417,23 +5417,34 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, top: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', zIndex: 5,
   },
+  // Opaque black + a white outline, not a translucent black wash — a
+  // translucent pill was designed assuming a black canvas behind it, but
+  // once a blank canvas is a real white artboard (see the backgroundHex
+  // fix), that same translucency read as a solid grey blob instead.
+  // Monochrome rule: black/white only, no grey fill, regardless of what's
+  // behind the rail.
   sizeSlider: {
     width: 36, height: 220, alignItems: 'center', justifyContent: 'center',
     paddingVertical: SP.md, gap: SP.sm, borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(0,0,0,0.45)', marginLeft: SP.xs,
+    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    marginLeft: SP.xs,
   },
   opacitySlider: {
     width: 24, height: 180, alignItems: 'center', justifyContent: 'center',
     paddingVertical: SP.md, paddingTop: SP.lg, gap: SP.sm, borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(0,0,0,0.3)', marginLeft: SP.xs,
+    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    marginLeft: SP.xs,
   },
   opacityIcon: { marginBottom: 4 },
   // Fixed, clamped disc size — not derived from a track height that can
   // itself be wrong; this is what was reading as "a huge white circle"
   // once the rail's height stopped resolving correctly.
   sizeDisc:  { marginBottom: 8, maxWidth: 28, maxHeight: 28 },
-  sizeTrack: { width: 4, flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: RADIUS.pill, overflow: 'hidden', justifyContent: 'flex-end' },
-  sizeFill:  { width: '100%', backgroundColor: FG, borderRadius: RADIUS.pill },
+  // Procreate-style track: a thin white outline line the full rail height
+  // (not a grey/white filled bar growing from the bottom) with a single
+  // solid-white thumb dot marking the current value.
+  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', position: 'relative' },
+  sizeThumb: { position: 'absolute', left: '50%', width: 12, height: 12, marginLeft: -6, borderRadius: 6, backgroundColor: FG },
   sizeBubble:{ position: 'absolute', right: 50, top: '50%', backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER },
   sizeBubbleText: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
 
