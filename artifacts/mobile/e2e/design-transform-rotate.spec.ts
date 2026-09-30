@@ -18,9 +18,14 @@
  */
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { assertNoTextOrBoxOverflow } from './lib/textFitCheck.mjs';
 
 let harness: typeof import('../scripts/store-screenshots/harness.mjs');
 let demoImages: typeof import('../scripts/store-screenshots/demo-images.mjs');
+
+const SCREENSHOT_DIR = path.resolve(__dirname, '../../../docs/pr-assets/rotate-handle');
+mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
 let browser: any;
 let closeServer: () => void;
@@ -44,15 +49,7 @@ test.afterAll(() => {
   return browser?.close();
 });
 
-test('dragging the rotate handle actually rotates the selected layer', async () => {
-  const { context, page, activity } = await harness.openContext(browser, {
-    device: { viewport: { width: 393, height: 852 }, scale: 2, isMobile: true, userAgent: undefined },
-    role: 'seller',
-    origin,
-    images,
-    onUnseeded: () => {},
-  });
-
+async function openCanvasWithTextInTransformTool(page: import('@playwright/test').Page, activity: any) {
   await page.goto(`${origin}/design?bt_preview=seller`);
   await page.waitForFunction(() => (window as any).Clerk?.loaded === true, undefined, { timeout: 20_000 });
   await harness.waitForQuietNetwork(activity, 600, 10_000).catch(() => {});
@@ -77,6 +74,18 @@ test('dragging the rotate handle actually rotates the selected layer', async () 
   await page.locator('textarea, input[type="text"]').first().fill('Rotate me');
   await page.locator('text=Add to Canvas').first().click();
   await page.waitForTimeout(500);
+}
+
+test('dragging the rotate handle actually rotates the selected layer', async () => {
+  const { context, page, activity } = await harness.openContext(browser, {
+    device: { viewport: { width: 393, height: 852 }, scale: 2, isMobile: true, userAgent: undefined },
+    role: 'seller',
+    origin,
+    images,
+    onUnseeded: () => {},
+  });
+
+  await openCanvasWithTextInTransformTool(page, activity);
 
   const rotateHandle = page.locator('[data-testid="transform-handle-rotate"]');
   await expect(rotateHandle).toBeVisible({ timeout: 5000 });
@@ -102,6 +111,43 @@ test('dragging the rotate handle actually rotates the selected layer', async () 
   expect(boxAfter).not.toBeNull();
   const moved = Math.abs(boxAfter!.x - box!.x) > 3 || Math.abs(boxAfter!.y - box!.y) > 3;
   expect(moved).toBe(true);
+
+  await context.close();
+});
+
+test('Transform tool UI (mode bar + rotate handle) has no truncated/overflowing text or boxes, at 393×852', async () => {
+  const { context, page, activity } = await harness.openContext(browser, {
+    device: { viewport: { width: 393, height: 852 }, scale: 2, isMobile: true, userAgent: undefined },
+    role: 'seller',
+    origin,
+    images,
+    onUnseeded: () => {},
+  });
+
+  await openCanvasWithTextInTransformTool(page, activity);
+
+  const modeBar = page.locator('[data-testid="transform-mode-bar"]');
+  await expect(modeBar).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(200);
+
+  // Zoomed screenshots for PR review — the Freeform/Uniform/Distort/Warp
+  // chip row, and the canvas top area (top bar + rotate handle), not just a
+  // full-screen shot.
+  await modeBar.screenshot({ path: path.join(SCREENSHOT_DIR, '01-transform-mode-bar-zoomed.png') });
+  const rotateHandle = page.locator('[data-testid="transform-handle-rotate"]');
+  await expect(rotateHandle).toBeVisible({ timeout: 5000 });
+  const rhBox = await rotateHandle.boundingBox();
+  if (rhBox) {
+    // A slightly wider crop around the handle itself (its own box is tiny).
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, '02-rotate-handle-zoomed.png'),
+      clip: { x: Math.max(0, rhBox.x - 60), y: Math.max(0, rhBox.y - 20), width: 160, height: 120 },
+    });
+  }
+
+  // Permanent regression guard, scoped to the mode bar (the only new text
+  // this PR's UI introduces — the rotate handle itself has no text).
+  await assertNoTextOrBoxOverflow(page, '[data-testid="transform-mode-bar"]');
 
   await context.close();
 });
