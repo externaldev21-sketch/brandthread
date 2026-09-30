@@ -10,6 +10,7 @@
     "pretypecheck": "pnpm --filter @workspace/db --filter @workspace/api-zod --filter @workspace/integrations-openai-ai-server exec tsc -b tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:connectivity": "vitest run src/routes/__tests__/connectivity-suite.integration.test.ts src/routes/__tests__/connectivity-dm-routing.integration.test.ts src/routes/__tests__/connectivity-commerce-social.integration.test.ts",
     "db:purge-test-data": "tsx ./scripts/purgeTestData.ts",
     "backfill:agent-welcome": "tsx ./scripts/backfillAgentWelcome.ts",
     "benchmark:ai-providers": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts",
