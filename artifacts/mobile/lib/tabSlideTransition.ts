@@ -68,7 +68,26 @@ function currentValue(node: Animated.Value): number {
 export function forDirectionalSlide(width: number, settled = false) {
   return ({ current }: { current: { progress: Animated.Value } }) => {
     if (settled) {
-      const translateX = currentValue(current.progress) * width;
+      // The tab layout flips `settled` off a FIXED timer (see
+      // app/(tabs)/_layout.tsx / app/(buyer)/_layout.tsx), not a real
+      // "animation finished" callback — React Navigation's bottom-tabs
+      // doesn't expose one to a plain sceneStyleInterpolator. On a heavier
+      // screen (verified live: the seller profile tab, with its video
+      // header/avatar/grid) or under CPU load, the JS-driven fallback
+      // animation (useNativeDriver isn't supported on web — see the
+      // console warning) can still be mid-flight when that timer fires.
+      // Reading `current.progress` at that moment and baking it into a
+      // permanent, non-animated transform froze the whole screen at
+      // whatever fractional position the interpolation had reached —
+      // visibly different (and non-deterministic) on every tab switch,
+      // and never self-corrected since this branch never re-runs on its
+      // own afterward. Rounding to the nearest rest position (-1, 0, or 1)
+      // before using it guarantees the frozen snapshot is always a valid
+      // end state — fully on-screen or fully off-screen — never a stuck
+      // sliver, regardless of how early the timer fired relative to the
+      // real animation.
+      const restPosition = Math.round(currentValue(current.progress));
+      const translateX = restPosition * width;
       const transform = isIdentityTransform([{ translateX }]) ? undefined : [{ translateX }];
       return { sceneStyle: transform ? { transform } : {} };
     }
