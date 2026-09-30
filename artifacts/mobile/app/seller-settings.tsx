@@ -49,7 +49,7 @@ export default function SellerSettingsScreen() {
   const [signOutVisible, setSignOutVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [scopeVisible, setScopeVisible] = useState(false);
-  const [accountScope, setAccountScope] = useState<'global' | 'us'>('global');
+  const [accountScope, setAccountScope] = useState<'global' | 'us' | null>(null);
   const [scopeLoading, setScopeLoading] = useState(false);
   const [scopeSaving, setScopeSaving] = useState<'global' | 'us' | null>(null);
   const [scopeLoadError, setScopeLoadError] = useState<string | null>(null);
@@ -89,20 +89,22 @@ export default function SellerSettingsScreen() {
   async function openAccountScope() {
     setScopeVisible(true);
     setScopeLoading(true);
+    setAccountScope(null);
     setScopeLoadError(null);
     setScopeSaveError(null);
     try {
       const data = await api.seller.getSettings();
       setAccountScope(data.settings?.accountScope === 'us' ? 'us' : 'global');
     } catch {
-      setScopeLoadError('Could not load account reach. Check your connection and try again.');
+      setScopeLoadError('Could not load your current choice. Try again, or choose an option to save.');
     } finally {
       setScopeLoading(false);
     }
   }
 
   async function chooseAccountScope(nextScope: 'global' | 'us') {
-    if (scopeSaving || nextScope === accountScope) { setScopeVisible(false); return; }
+    if (scopeLoading || scopeSaving) return;
+    if (nextScope === accountScope) { setScopeVisible(false); return; }
     hapticLight();
     setScopeSaving(nextScope);
     setScopeSaveError(null);
@@ -111,7 +113,7 @@ export default function SellerSettingsScreen() {
       setAccountScope(nextScope);
       setScopeVisible(false);
     } catch {
-      setScopeSaveError('Could not save account reach. Choose an option to try again.');
+      setScopeSaveError('Could not save account reach. Check your connection and try again.');
     } finally {
       setScopeSaving(null);
     }
@@ -178,6 +180,7 @@ export default function SellerSettingsScreen() {
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
+                testID={item.action === 'account-scope' ? 'account-reach' : undefined}
                 destructive={item.destructive}
                 soon={item.soon}
                 badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : undefined}
@@ -296,6 +299,7 @@ function SettingsGroup({ title, children }: { title?: string; children: React.Re
 interface SettingsRowProps {
   icon: keyof typeof Feather.glyphMap;
   label: string;
+  testID?: string;
   onPress?: () => void;
   destructive?: boolean;
   soon?: boolean;
@@ -303,7 +307,7 @@ interface SettingsRowProps {
   last?: boolean;
 }
 
-function SettingsRow({ icon, label, onPress, destructive, soon, badge, last }: SettingsRowProps) {
+function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, last }: SettingsRowProps) {
   const colors = useColors();
   const s = useMemo(() => makeListStyles(colors), [colors]);
   const inert = !!soon;
@@ -331,7 +335,7 @@ function SettingsRow({ icon, label, onPress, destructive, soon, badge, last }: S
   if (!onPress || inert) return <View>{content}</View>;
 
   return (
-    <TouchableOpacity activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+    <TouchableOpacity testID={testID} activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
       {content}
     </TouchableOpacity>
   );
@@ -345,7 +349,7 @@ function AccountScopeSheet({
   saving: 'global' | 'us' | null;
   loadError: string | null;
   saveError: string | null;
-  value: 'global' | 'us';
+  value: 'global' | 'us' | null;
   onChoose: (v: 'global' | 'us') => void;
   onRetry: () => void;
   onClose: () => void;
@@ -371,25 +375,27 @@ function AccountScopeSheet({
             <View style={{ minHeight: 150, alignItems: 'center', justifyContent: 'center' }}>
               <ActivityIndicator color={colors.primary} />
             </View>
-          ) : loadError ? (
-            <View style={s.loadError}>
-              <Text accessibilityRole="alert" style={s.errorText}>{loadError}</Text>
-              <TouchableOpacity style={s.retryButton} onPress={onRetry} accessibilityRole="button">
-                <Text style={s.retryText}>Try again</Text>
-              </TouchableOpacity>
-            </View>
           ) : (
             <View style={{ gap: 10 }}>
+              {loadError && (
+                <View style={s.loadError}>
+                  <Text accessibilityRole="alert" style={s.errorText}>{loadError}</Text>
+                  <TouchableOpacity style={s.retryButton} onPress={onRetry} disabled={!!saving} accessibilityRole="button" accessibilityLabel="Retry loading account reach">
+                    <Text style={s.retryText}>Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               <View style={{ gap: 10 }} accessibilityRole="radiogroup">
                 {([
-                  { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
-                  { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
+                  { value: 'global' as const, label: 'Worldwide', description: 'Make your account available worldwide.', icon: 'globe' as const },
+                  { value: 'us' as const, label: 'United States', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
                 ]).map((option) => {
                   const selected = value === option.value;
                   const isSaving = saving === option.value;
                   return (
                     <TouchableOpacity
                       key={option.value}
+                      testID={`account-reach-${option.value}`}
                       activeOpacity={0.75}
                       disabled={!!saving}
                       accessibilityRole="radio"
@@ -470,7 +476,7 @@ function makeScopeStyles(colors: ReturnType<typeof useColors>) {
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
     title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
     subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },
-    loadError: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 16 },
+    loadError: { alignItems: 'center', gap: 10, marginBottom: 8 },
     errorText: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.destructive, textAlign: 'center' },
     retryButton: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 10 },
     retryText: { fontSize: 14, fontFamily: FONT.semibold, color: colors.foreground },
