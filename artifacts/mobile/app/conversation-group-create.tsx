@@ -17,6 +17,7 @@ import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib
 import { useApi } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/safety';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 
 interface Candidate {
   userId: string; name: string; username: string | null; handle: string; initials: string; color: string;
@@ -36,6 +37,15 @@ export default function ConversationGroupCreateScreen() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    // Dev-preview has no real follow graph to create a group from — the
+    // honest state is the same empty "Follow people to add them to a
+    // group" this screen already renders for a real account with no
+    // follows yet, not a real (here, backend-less) network call.
+    if (isSellerDevPreview() || isBuyerDevPreview()) {
+      setCandidates([]);
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const rows = await api.social.following();
