@@ -12,6 +12,29 @@ import BootScreen from '@/components/BootScreen';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
+/**
+ * Reads (and always consumes — a stored entry is one-shot, read-once,
+ * whether or not it's actually used below) the original path a preview
+ * session's page load requested, stashed by app/_layout.tsx's module-load
+ * block. Ignored if older than 10s: that block only ever writes it once per
+ * real page load, so anything older is a stale leftover from an earlier
+ * load in this same tab, not this one — never worth trusting over a plain
+ * dashboard redirect.
+ */
+function consumePreviewEntryPath(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  const raw = sessionStorage.getItem('bt_preview_entry_path');
+  if (!raw) return null;
+  sessionStorage.removeItem('bt_preview_entry_path');
+  try {
+    const { path, ts } = JSON.parse(raw) as { path?: string; ts?: number };
+    if (!path || path === '/' || typeof ts !== 'number' || Date.now() - ts > 10_000) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
 export default function Index() {
   const router = useRouter();
   const params = useLocalSearchParams<{ bt_preview?: string; bt_theme?: string; bt_capture?: string }>();
@@ -83,7 +106,14 @@ export default function Index() {
       // such dependency on React's render/commit timing at all, so trust it
       // over atRootRef whenever the two disagree.
       if (typeof window !== 'undefined' && window.location.pathname !== '/') return;
-      router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
+      // Restore the ORIGINAL requested path if this load ever had one and
+      // some other redirect (outside this file's control — e.g. an
+      // onboarding-skip path that runs ahead of AuthGate's own devRole
+      // check in app/_layout.tsx) bounced us back to "/" before we got a
+      // chance to land on it. Falls back to the plain dashboard root for a
+      // genuine bare "/" load, exactly as before.
+      const entryPath = consumePreviewEntryPath();
+      router.replace((entryPath ?? (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/')) as never);
     }, 150);
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router, atRoot]);
