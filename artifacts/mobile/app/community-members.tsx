@@ -12,6 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -168,7 +169,7 @@ export default function CommunityMembersScreen() {
     } else {
       router.push({
         pathname: '/buyer-other-profile' as never,
-        params: { userId: m.userId, name: m.name, handle: m.handle, initials: m.initials, color: '#3A3A3C' },
+        params: { userId: m.userId, name: m.name, handle: m.handle, initials: m.initials, color: colors.secondary },
       } as never);
     }
   };
@@ -387,10 +388,12 @@ function FullScreenModal({ visible, title, onClose, children }: { visible: boole
   const colors = useColors();
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <ScreenHeader title={title} variant="modal" onBack={onClose} />
-        {children}
-      </View>
+      <ModalSafeArea>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <ScreenHeader title={title} variant="modal" onBack={onClose} />
+          {children}
+        </View>
+      </ModalSafeArea>
     </Modal>
   );
 }
@@ -434,11 +437,11 @@ function InviteSheet({ visible, onClose, community }: { visible: boolean; onClos
     <BottomSheet visible={visible} onClose={onClose}>
       <View style={styles.sheet}>
         <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Invite to {community.name}</Text>
-        <View style={styles.qrBox}>
+        <View style={[styles.qrBox, { backgroundColor: colors.foreground }]}>
           {loading || !url ? (
-            <ActivityIndicator color="#000000" />
+            <ActivityIndicator color={colors.background} />
           ) : (
-            <QRCode value={url} size={168} backgroundColor="#FFFFFF" color="#000000" />
+            <QRCode value={url} size={168} backgroundColor={colors.foreground} color={colors.background} />
           )}
         </View>
         {message ? <Text style={[styles.sub, { color: colors.mutedForeground, textAlign: 'center' }]}>{message}</Text> : null}
@@ -590,7 +593,7 @@ const styles = StyleSheet.create({
   count: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.xs },
   notice: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 19, marginVertical: SP.sm },
   section: { marginTop: SP.md },
-  settings: { marginTop: SP.md, marginHorizontal: -SP.md },
+  settings: { marginTop: SP.md, marginBottom: 0 },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.md, letterSpacing: -0.2, marginBottom: SP.xs },
   membersTitle: { marginTop: SP.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, minHeight: 60 },
@@ -608,6 +611,6 @@ const styles = StyleSheet.create({
   sheet: { alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.md },
   sheetTitle: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.2, textAlign: 'center' },
   sheetButtons: { flexDirection: 'row', gap: SP.sm, width: '100%' },
-  qrBox: { width: 200, height: 200, borderRadius: RADIUS.lg, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  qrBox: { width: 200, height: 200, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
   editContent: { paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.md },
 });
