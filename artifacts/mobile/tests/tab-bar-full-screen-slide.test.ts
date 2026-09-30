@@ -8,7 +8,10 @@
  * (SellerGlobalTabBar.tsx, gated by app/_layout.tsx's SellerBarGate) and
  * the buyer tab bar (components/buyer-nav/BuyerTabBar.tsx, gated by its own
  * useSegments() check) — both drive the SAME TAB_BAR_SLIDE_MS/
- * TAB_BAR_SLIDE_EASING/tabBarSlideTargetY helper.
+ * TAB_BAR_SLIDE_EASING/tabBarSlideTargetY helper. Also guards the adjacent
+ * bug found in the same screen: buyer-story-create.tsx's LIVE mode item was
+ * gated on an `accountType` route param that every real seller entry point
+ * omits, so LIVE never showed for an actual seller.
  *
  * Source-inspection, same convention as lib/__tests__/freshInstallPreview.test.ts:
  * app/_layout.tsx pulls in Clerk/Notifications/etc. at module scope, which
@@ -119,6 +122,31 @@ describe('BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS + BuyerTabBar: same helper, same mo
     const earlyReturnIndex = bar.indexOf('if (BUYER_TAB_BAR_HIDDEN_ROUTES.has(activeRoute)) return null;');
     expect(slideHookIndex).toBeGreaterThan(0);
     expect(earlyReturnIndex).toBeGreaterThan(slideHookIndex);
+  });
+});
+
+describe("buyer-story-create.tsx: LIVE mode item is gated on the REAL role, not a route param", () => {
+  it('derives isSeller from useRole() (RoleContext), not params.accountType', () => {
+    const storyCreate = src('../app/buyer-story-create.tsx');
+    expect(storyCreate).toContain("import { useRole } from '@/contexts/RoleContext';");
+    expect(storyCreate).toMatch(/const \{ role \} = useRole\(\);\s*\n\s*const isSeller = role === 'seller';/);
+    // The actual bug: every seller entry point (camera-capture.tsx,
+    // create-post.tsx) pushes this route with no `accountType` param, so
+    // deriving isSeller from that param always read a seller as a buyer —
+    // LIVE never showed no matter the account.
+    expect(storyCreate).not.toMatch(/const isSeller = params\.accountType/);
+  });
+
+  it('camera-capture.tsx and create-post.tsx push to buyer-story-create with no accountType param — the real shape a seller actually hits', () => {
+    const cameraCapture = src('../app/camera-capture.tsx');
+    const createPost = src('../app/create-post.tsx');
+    expect(cameraCapture).toMatch(/router\.replace\('\/buyer-story-create' as never\)/);
+    expect(createPost).toMatch(/router\.replace\('\/buyer-story-create' as never\)/);
+  });
+
+  it('a seller sees LIVE in the mode carousel (isSeller drives the array, not a disabled/greyed item)', () => {
+    const storyCreate = src('../app/buyer-story-create.tsx');
+    expect(storyCreate).toMatch(/isSeller \? \(\['post', 'story', 'live'\] as CaptureMode\[\]\) : \(\['post', 'story'\] as CaptureMode\[\]\)/);
   });
 });
 
