@@ -45,6 +45,25 @@
     "console-error::/metafields::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
     "console-error::/metafields::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
     "console-error::/metafields::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
-    "console-error::/metafields::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)"
+    "console-error::/metafields::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payments::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payments::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payments::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payments::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payouts::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payouts::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payouts::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/payouts::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-bundles::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-bundles::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-bundles::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-bundles::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-size-chart::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-size-chart::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-size-chart::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/product-size-chart::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/production-detail::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/production-detail::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/production-detail::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)"
   ]
 }
