@@ -862,6 +862,22 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     // Solid black, deliberately not colors.background/a decorative glow —
     // Dev's rule: no translucent overlays, no grey fills, on this screen.
     backgroundColor: '#000000',
+    // Web only, defensive: a plain flex:1 chain on react-native-web
+    // ultimately resolves against html/body's own height, which browsers
+    // set from the "large" viewport (as if any collapsible browser
+    // chrome — e.g. a mobile browser's bottom URL bar — were already
+    // gone). While that chrome is still visible, the real visible
+    // viewport is shorter than that, leaving a gap between the last
+    // fixed-to-flex content (the composer) and the true bottom edge that
+    // no insets.bottom-based padding can see or account for, because it
+    // never reflects that temporary browser-chrome height. `100dvh`
+    // (dynamic viewport height) tracks the ACTUAL visible height as
+    // browser chrome shows/hides, closing that gap; it degrades
+    // harmlessly to the flex:1 behavior above in any environment that
+    // doesn't support it. Scoped to this screen and web only — not a
+    // global change, since it's unconfirmed against the live report this
+    // fixes (see the PR description for what was and wasn't verified).
+    ...(Platform.OS === 'web' ? { minHeight: '100dvh' as any } : null),
   },
   kav: {
     flex: 1,
