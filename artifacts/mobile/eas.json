@@ -41,12 +41,14 @@
       "distribution": "store",
       "channel": "testflight",
       "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0",
         "autoIncrement": "buildNumber"
       }
     },
     "preview-ios-simulator": {
       "extends": "preview",
       "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0",
         "simulator": true
       }
     },
