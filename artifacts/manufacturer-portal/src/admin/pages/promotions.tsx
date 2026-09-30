@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle, Pager } from "../ui";
+import { ActionButton, ActionGroup, Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle, Pager } from "../ui";
 import { money, useAdminMutation, useAdminQuery, when } from "../api";
 
 interface Boost {
@@ -25,8 +25,8 @@ export default function PromotionsPage() {
         columns={[
           { header: "Thread", primary: true, cell: (b) => (
             <div className="flex items-center gap-3">
-              {b.thread.thumbnailUrl && <img src={b.thread.thumbnailUrl} alt="" className="h-12 w-9 rounded object-cover" />}
-              <div className="min-w-0"><div className="line-clamp-2 max-w-xs font-medium">{b.thread.caption || "Untitled thread"}</div></div>
+              {b.thread.thumbnailUrl && <img src={b.thread.thumbnailUrl} alt="" className="h-12 w-9 shrink-0 rounded bg-secondary object-cover" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />}
+              <div className="min-w-0"><div className="max-w-xs font-medium">{b.thread.caption || "Untitled thread"}</div></div>
             </div>) },
           { header: "Seller", cell: (b) => b.seller.name ?? "—" },
           { header: "Goal", cell: (b) => <span className="capitalize">{b.objective.replaceAll("_", " ")}</span> },
@@ -34,10 +34,10 @@ export default function PromotionsPage() {
           { header: "Paid", cell: (b) => when(b.paidAt) },
           { header: status === "pending" ? "Decision" : "Outcome", cell: (b) => b.review
             ? <Badge tone={b.review.status === "approved" ? "solid" : "danger"}>{b.review.status}</Badge>
-            : <div className="flex justify-end gap-1.5">
-                <button className="rounded border border-foreground bg-foreground px-2.5 py-1 text-xs font-medium text-background" onClick={() => setTarget({ boost: b, decision: "approve" })}>Approve</button>
-                <button className="rounded border border-border px-2.5 py-1 text-xs hover:border-foreground" onClick={() => setTarget({ boost: b, decision: "reject" })}>Reject</button>
-              </div> },
+            : <ActionGroup>
+                <ActionButton solid onClick={() => setTarget({ boost: b, decision: "approve" })}>Approve</ActionButton>
+                <ActionButton onClick={() => setTarget({ boost: b, decision: "reject" })}>Reject</ActionButton>
+              </ActionGroup> },
         ]} />
       <Pager offset={offset} limit={LIMIT} hasMore={!!data?.hasMore} total={data?.total} onChange={setOffset} />
       <ConfirmAction open={!!target} confirmLabel={target?.decision === "approve" ? "Approve" : "Reject promotion"} destructive={target?.decision === "reject"}

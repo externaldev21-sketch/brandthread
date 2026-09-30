@@ -38,7 +38,7 @@ function OrderList() {
   return (
     <>
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <SearchBox value={q} onChange={(v) => { setQ(v); setOffset(0); }} placeholder="Order number or guest email" />
+        <SearchBox value={q} onChange={(v) => { setQ(v); setOffset(0); }} placeholder="Order number or email" />
         <Chips value={status} onChange={(s) => { setStatus(s); setOffset(0); }} options={[
           { id: "", label: "All" }, { id: "pending", label: "Pending" }, { id: "processing", label: "Processing" },
           { id: "shipped", label: "Shipped" }, { id: "fulfilled", label: "Fulfilled" }, { id: "cancelled", label: "Cancelled" },

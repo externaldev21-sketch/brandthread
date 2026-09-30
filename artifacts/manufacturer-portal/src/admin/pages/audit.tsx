@@ -13,7 +13,7 @@ export default function AuditPage() {
   return (
     <>
       <PageTitle title="Audit log" />
-      <div className="mb-4"><SearchBox value={action} onChange={(v) => { setAction(v); setOffset(0); }} placeholder="Filter by action, e.g. user.suspend" /></div>
+      <div className="mb-4"><SearchBox value={action} onChange={(v) => { setAction(v); setOffset(0); }} placeholder="Filter by action" /></div>
       <ErrorLine error={error} />
       <DataTable loading={isLoading} rows={data?.items} rowKey={(e) => e.id} empty="No admin actions recorded yet."
         columns={[

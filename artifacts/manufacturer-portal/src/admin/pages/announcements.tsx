@@ -37,14 +37,14 @@ export default function AnnouncementsPage() {
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">{reach ? `Reaches ${reach.recipients.toLocaleString()} people` : ""}</span>
-          <Button disabled={!valid} onClick={() => setConfirming(true)}>Send…</Button>
+          <Button className="h-10 px-5" disabled={!valid} onClick={() => setConfirming(true)}>Send…</Button>
         </div>
       </div>
       <ErrorLine error={error} />
       <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Sent</h2>
       <DataTable rows={history?.items} rowKey={(a) => a.id} empty="No announcements sent yet."
         columns={[
-          { header: "Announcement", primary: true, cell: (a) => (<div><div className="font-medium">{a.title}</div><div className="line-clamp-1 text-xs text-muted-foreground">{a.body}</div></div>) },
+          { header: "Announcement", primary: true, cell: (a) => (<div><div className="font-medium">{a.title}</div><div className="text-xs text-muted-foreground">{a.body}</div></div>) },
           { header: "Audience", cell: (a) => <Badge tone="outline">{a.audience}</Badge> },
           { header: "Channels", cell: (a) => [a.sendPush && "Push", a.sendInApp && "In-app"].filter(Boolean).join(" + ") },
           { header: "Status", cell: (a) => <Badge tone={a.status === "failed" ? "danger" : a.status === "sent" ? "neutral" : "outline"}>{a.status}</Badge> },

@@ -16,7 +16,7 @@ interface UserDetail extends AdminUser {
   reports: { total: number; open: number };
   aiSpend: { costMicros: number; calls: number };
 }
-type Kind = "all" | "sellers" | "buyers" | "suspended" | "admins";
+type Kind = "all" | "sellers" | "buyers" | "suspended";
 const LIMIT = 25;
 
 export default function UsersPage() {
@@ -31,10 +31,10 @@ export default function UsersPage() {
     <>
       <PageTitle title="Users & sellers" />
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <SearchBox value={q} onChange={(v) => { setQ(v); setOffset(0); }} placeholder="Search name, email, @handle or brand" />
+        <SearchBox value={q} onChange={(v) => { setQ(v); setOffset(0); }} placeholder="Name, email or brand" />
         <Chips value={kind} onChange={(k) => { setKind(k); setOffset(0); }} options={[
           { id: "all", label: "All" }, { id: "sellers", label: "Sellers" }, { id: "buyers", label: "Buyers" },
-          { id: "suspended", label: "Suspended" }, { id: "admins", label: "Admins" },
+          { id: "suspended", label: "Suspended" },
         ]} />
       </div>
       <ErrorLine error={error} />
@@ -96,12 +96,12 @@ function UserSheet({ clerkId, onClose }: { clerkId: string | null; onClose: () =
             <ErrorLine error={verify.error} />
             {!isAdmin && (
               <div className="mt-5 flex flex-col gap-2">
-                <Button variant="outline" disabled={verify.isPending} onClick={() => verify.mutate({ verified: !u.verified })}>
+                <Button variant="outline" className="h-10 w-full px-3" disabled={verify.isPending} onClick={() => verify.mutate({ verified: !u.verified })}>
                   {u.verified ? "Remove verified badge" : "Give verified badge"}
                 </Button>
                 {u.suspended
-                  ? <Button variant="outline" onClick={() => setConfirm("reinstate")}>Reinstate account</Button>
-                  : <Button variant="destructive" onClick={() => setConfirm("suspend")}>Suspend account</Button>}
+                  ? <Button variant="outline" className="h-10 w-full px-3" onClick={() => setConfirm("reinstate")}>Reinstate account</Button>
+                  : <Button variant="destructive" className="h-10 w-full px-3" onClick={() => setConfirm("suspend")}>Suspend account</Button>}
               </div>
             )}
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import type React from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,17 +51,39 @@ export function SearchBox({ value, onChange, placeholder }: { value: string; onC
   );
 }
 
+const MOBILE_COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 6: "grid-cols-3" };
+
+/** Filter chips: equal-width cells on one grid (3 per row on phones when there are more than 4). */
 export function Chips<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void }) {
+  // Always a full grid (never a ragged last row): 4 short labels fit in one row, 4 long ones go 2x2.
+  const cols = options.length === 4 ? (options.some((o) => o.label.length > 8) ? "grid-cols-2" : "grid-cols-4") : MOBILE_COLS[options.length] ?? "grid-cols-2";
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className={cn("grid gap-2 md:inline-grid md:auto-cols-fr md:grid-flow-col md:grid-cols-none", cols)}>
       {options.map((o) => (
         <button key={o.id} onClick={() => onChange(o.id)}
-          className={cn("rounded-full border px-3 py-1 text-xs font-medium", value === o.id ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground")}>
+          className={cn("inline-flex h-9 items-center justify-center whitespace-nowrap rounded-full border px-3 text-xs font-medium",
+            value === o.id ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground")}>
           {o.label}
         </button>
       ))}
     </div>
   );
+}
+
+/** Small outlined row action. Always used inside ActionGroup so siblings match in size. */
+export function ActionButton({ children, solid, ...props }: { solid?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button {...props}
+      className={cn("inline-flex h-8 min-w-[5rem] items-center justify-center whitespace-nowrap rounded-md border px-3 text-xs font-medium",
+        solid ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground")}>
+      {children}
+    </button>
+  );
+}
+
+/** Equal-width, equal-height button row. */
+export function ActionGroup({ children }: { children: ReactNode }) {
+  return <div className="grid auto-cols-fr grid-flow-col gap-2">{children}</div>;
 }
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "solid" | "outline" | "danger" }) {
@@ -111,8 +134,8 @@ export function DataTable<R>({ columns, rows, rowKey, onRowClick, empty, loading
             <dl className="space-y-1.5">
               {columns.filter((c) => c !== primary).map((c) => (
                 <div key={c.header} className="flex items-baseline justify-between gap-4 text-[13px]">
-                  <dt className="shrink-0 text-muted-foreground">{c.header}</dt>
-                  <dd className="min-w-0 truncate text-right">{c.cell(r)}</dd>
+                  <dt className="shrink-0 whitespace-nowrap text-muted-foreground">{c.header}</dt>
+                  <dd className="min-w-0 break-words text-right">{c.cell(r)}</dd>
                 </div>
               ))}
             </dl>
@@ -129,8 +152,8 @@ export function Pager({ offset, limit, hasMore, total, onChange }: { offset: num
     <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
       <span>{total != null ? `${offset + 1}–${Math.min(offset + limit, total)} of ${total}` : `Showing ${offset + 1}+`}</span>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))}>Previous</Button>
-        <Button size="sm" variant="outline" disabled={!hasMore} onClick={() => onChange(offset + limit)}>Next</Button>
+        <Button size="sm" variant="outline" className="h-8 w-24 px-3" disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))}>Previous</Button>
+        <Button size="sm" variant="outline" className="h-8 w-24 px-3" disabled={!hasMore} onClick={() => onChange(offset + limit)}>Next</Button>
       </div>
     </div>
   );
@@ -146,16 +169,16 @@ export function ConfirmAction({ open, title, description, confirmLabel, reasonLa
   return (
     <AlertDialog open={open} onOpenChange={(o) => !o && onCancel()}>
       <AlertDialogContent className="border-border bg-popover">
-        <AlertDialogHeader>
+        <AlertDialogHeader className="text-left sm:text-left">
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {reasonLabel && <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={reasonLabel} maxLength={500} rows={3} />}
         {error ? <p className="text-sm text-destructive">{errorMessage(error)}</p> : null}
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+        <AlertDialogFooter className="grid grid-cols-2 gap-2 sm:space-x-0">
+          <AlertDialogCancel onClick={onCancel} className="mt-0 h-10 w-full px-3">Cancel</AlertDialogCancel>
           <AlertDialogAction disabled={pending || (!!reasonRequired && !reason.trim())} onClick={(e) => { e.preventDefault(); onConfirm(reason.trim()); }}
-            className={cn(destructive && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}>
+            className={cn("h-10 w-full px-3", destructive && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}>
             {pending ? "Working…" : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

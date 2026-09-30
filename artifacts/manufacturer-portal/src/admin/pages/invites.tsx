@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge, DataTable, ErrorLine, PageTitle } from "../ui";
+import { ActionButton, ActionGroup, Badge, DataTable, ErrorLine, PageTitle } from "../ui";
 import { useAdminMutation, useAdminQuery, when } from "../api";
 
 interface Invite { id: string; code: string; label: string | null; maxUses: number | null; uses: number; expiresAt: string | null; status: string; createdAt: string }
@@ -35,7 +35,7 @@ export default function InvitesPage() {
           <Input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} aria-label="Expires" min={new Date().toISOString().slice(0, 10)} />
         </div>
         <ErrorLine error={create.error} />
-        <Button type="submit" disabled={create.isPending}>{create.isPending ? "Generating…" : "Generate"}</Button>
+        <Button type="submit" className="h-10 w-full px-4 md:w-auto" disabled={create.isPending}>{create.isPending ? "Generating…" : "Generate"}</Button>
         {fresh.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">
             {fresh.map((c) => (
@@ -55,8 +55,7 @@ export default function InvitesPage() {
           { header: "Expires", cell: (c) => (c.expiresAt ? when(c.expiresAt) : "Never") },
           { header: "Status", cell: (c) => <Badge tone={c.status === "active" ? "solid" : "neutral"}>{c.status}</Badge> },
           { header: "", className: "text-right", cell: (c) => (
-            <button className="rounded border border-border px-2 py-1 text-xs hover:border-foreground"
-              onClick={() => (c.status === "disabled" ? enable : disable).mutate({ id: c.id })}>{c.status === "disabled" ? "Enable" : "Disable"}</button>) },
+            <ActionGroup><ActionButton onClick={() => (c.status === "disabled" ? enable : disable).mutate({ id: c.id })}>{c.status === "disabled" ? "Enable" : "Disable"}</ActionButton></ActionGroup>) },
         ]} />
     </>
   );

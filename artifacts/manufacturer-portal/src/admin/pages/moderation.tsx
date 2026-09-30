@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle, Pager, StatCards } from "../ui";
+import { ActionButton, ActionGroup, Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle, Pager, StatCards } from "../ui";
 import { useModerationQuery, useModerationResolve, when } from "../api";
 
 /**
@@ -17,8 +17,8 @@ const LIMIT = 25;
 const who = (p: Person | null) => (p ? p.displayName || p.name || (p.username ? `@${p.username}` : "Unknown") : "Unknown");
 const ACTIONS = [
   { id: "dismiss", label: "Dismiss", title: "Dismiss this report?", body: "The content stays up (or is released if the filter held it).", destructive: false },
-  { id: "remove_content", label: "Remove content", title: "Remove this content?", body: "It's taken down for everyone. The owner's account is untouched.", destructive: true },
-  { id: "suspend_user", label: "Suspend owner", title: "Suspend the content owner?", body: "They're signed out everywhere and their content is hidden. Reinstate them any time from Users.", destructive: true },
+  { id: "remove_content", label: "Remove", title: "Remove this content?", body: "It's taken down for everyone. The owner's account is untouched.", destructive: true },
+  { id: "suspend_user", label: "Suspend", title: "Suspend the content owner?", body: "They're signed out everywhere and their content is hidden. Reinstate them any time from Users.", destructive: true },
 ] as const;
 
 export default function ModerationPage() {
@@ -43,7 +43,7 @@ export default function ModerationPage() {
           { header: "Reported", primary: true, cell: (r) => (
             <div className="max-w-md">
               <div className="font-medium capitalize">{r.targetType}{r.targetLabel ? ` · ${r.targetLabel}` : ""}</div>
-              {r.contentExcerpt && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{r.contentExcerpt}</div>}
+              {r.contentExcerpt && <div className="mt-0.5 text-xs text-muted-foreground">{r.contentExcerpt}</div>}
             </div>) },
           { header: "Reason", cell: (r) => <span className="capitalize">{r.reason.replaceAll("_", " ")}{r.source === "auto_filter" ? " · filter" : ""}</span> },
           { header: "Owner", cell: (r) => who(r.owner) },
@@ -51,15 +51,14 @@ export default function ModerationPage() {
           { header: "Reported at", cell: (r) => when(r.createdAt) },
           { header: status === "open" ? "Action" : "Outcome", cell: (r) => r.resolution
             ? <Badge>{(r.resolution.action ?? r.status).replaceAll("_", " ")}</Badge>
-            : <div className="flex flex-wrap justify-end gap-1.5">
+            : <ActionGroup>
                 {ACTIONS.map((a) => (
-                  <button key={a.id} onClick={(e) => { e.stopPropagation(); setPending({ report: r, action: a }); }}
-                    className="rounded border border-border px-2 py-1 text-xs hover:border-foreground">{a.label}</button>
+                  <ActionButton key={a.id} onClick={(e) => { e.stopPropagation(); setPending({ report: r, action: a }); }}>{a.label}</ActionButton>
                 ))}
-              </div> },
+              </ActionGroup> },
         ]} />
       <Pager offset={offset} limit={LIMIT} hasMore={!!data?.hasMore} onChange={setOffset} />
-      <ConfirmAction open={!!pending} title={pending?.action.title ?? ""} description={pending?.action.body ?? ""} confirmLabel={pending?.action.label ?? ""}
+      <ConfirmAction open={!!pending} title={pending?.action.title ?? ""} description={pending?.action.body ?? ""} confirmLabel={pending?.action.id === "suspend_user" ? "Suspend owner" : pending?.action.id === "remove_content" ? "Remove content" : "Dismiss"}
         destructive={pending?.action.destructive} reasonLabel="Note (optional)" pending={resolve.isPending} error={resolve.error}
         onCancel={() => setPending(null)}
         onConfirm={(note) => pending && resolve.mutate({ id: pending.report.id, action: pending.action.id, note }, { onSuccess: () => setPending(null) })} />

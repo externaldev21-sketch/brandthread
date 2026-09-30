@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle } from "../ui";
+import { ActionButton, ActionGroup, Badge, Chips, ConfirmAction, DataTable, ErrorLine, PageTitle } from "../ui";
 import { useAdminMutation, useAdminQuery } from "../api";
 
 interface Featured {
@@ -28,7 +28,7 @@ export default function FeaturedPage() {
         <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
           <Input value={targetId} onChange={(e) => setTargetId(e.target.value)} placeholder={kind === "brand" ? "Brand's user ID (from Users)" : "Thread ID"} required />
           <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (optional)" maxLength={120} />
-          <Button type="submit" disabled={add.isPending || !targetId.trim()}>{add.isPending ? "Adding…" : "Feature"}</Button>
+          <Button type="submit" className="h-10 w-full px-4 md:w-auto" disabled={add.isPending || !targetId.trim()}>{add.isPending ? "Adding…" : "Feature"}</Button>
         </div>
         <ErrorLine error={add.error} />
       </form>
@@ -40,10 +40,10 @@ export default function FeaturedPage() {
           { header: "Label", cell: (f) => f.label ?? "—" },
           { header: "Status", cell: (f) => f.target.missing ? <Badge tone="danger">Unavailable</Badge> : f.active ? <Badge tone="solid">Live</Badge> : <Badge>Hidden</Badge> },
           { header: "", className: "text-right", cell: (f) => (
-            <div className="flex justify-end gap-1.5">
-              <button className="rounded border border-border px-2 py-1 text-xs hover:border-foreground" onClick={() => patch.mutate({ id: f.id, active: !f.active })}>{f.active ? "Hide" : "Show"}</button>
-              <button className="rounded border border-border px-2 py-1 text-xs hover:border-foreground" onClick={() => setRemoving(f)}>Remove</button>
-            </div>) },
+            <ActionGroup>
+              <ActionButton onClick={() => patch.mutate({ id: f.id, active: !f.active })}>{f.active ? "Hide" : "Show"}</ActionButton>
+              <ActionButton onClick={() => setRemoving(f)}>Remove</ActionButton>
+            </ActionGroup>) },
         ]} />
       <ConfirmAction open={!!removing} title="Remove from Discover?" description="It stops being featured. The brand or thread itself isn't affected." confirmLabel="Remove"
         pending={remove.isPending} error={remove.error} onCancel={() => setRemoving(null)}

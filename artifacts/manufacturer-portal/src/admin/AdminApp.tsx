@@ -63,8 +63,8 @@ function Shell({ email, children }: { email?: string; children: ReactNode }) {
   const current = NAV.find((n) => (n.exact ? location === n.href : location.startsWith(n.href)))?.label ?? "Admin";
   const footer = (
     <div className="border-t border-border pt-3 text-xs text-muted-foreground">
-      <div className="truncate">{email}</div>
-      <button className="mt-1 hover:text-foreground" onClick={() => signOut()}>Sign out</button>
+      <div className="break-all px-3 py-1">{email}</div>
+      <button className="w-full rounded-md px-3 py-2 text-left hover:text-foreground" onClick={() => signOut()}>Sign out</button>
     </div>
   );
   return (
@@ -77,7 +77,7 @@ function Shell({ email, children }: { email?: string; children: ReactNode }) {
         {footer}
       </aside>
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background px-4 md:hidden">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 bg-background px-4 md:hidden">
           <button aria-label="Open menu" onClick={() => setOpen(true)}><Menu className="h-5 w-5" /></button>
           <span className="text-sm font-medium">{current}</span>
         </header>
