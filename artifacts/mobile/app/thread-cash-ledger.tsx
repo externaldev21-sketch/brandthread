@@ -109,7 +109,7 @@ export default function ThreadCashLedgerScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Ledger" onBack={() => goBackOr(router)} />
+      <ScreenHeader hideDivider title="Ledger" onBack={() => goBackOr(router)} />
       <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, SP.lg) + SP.md }} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Text style={[styles.heroValue, tabularType('display'), { color: theme.text }]} testID="thread-cash-ledger-balance">
