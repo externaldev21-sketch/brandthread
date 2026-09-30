@@ -98,7 +98,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/drops/[dropId].tsx',
   'app/forgot-password.tsx',
   'app/index.tsx',
-  'app/integrations/shopify-fulfillment.tsx',
   'app/ip-report.tsx',
   'app/live-feed.tsx',
   'app/live.tsx',
