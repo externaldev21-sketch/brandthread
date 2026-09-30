@@ -103,6 +103,8 @@ import { getSetupState, completionPercent, completedRequiredTaskCount, requiredT
 import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';
 import { SCRUB_PX_PER_CARD, indexForDrag } from '@/lib/studioCardCarousel';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { STUDIO_MENU_SCRUB_ROWS } from '@/lib/firstRunTips/content';
 import {
   ALL_ITEMS,
   type ControlCenterItem,
@@ -141,16 +143,20 @@ export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCent
 // the tab bar, and nothing anywhere pushes to it, so it doesn't count as a
 // real duplicate entry point).
 const MENU_EXCLUDED_IDS = [
-  'orders', 'discounts', 'products', 'post-video', 'messages', 'boost',
+  'orders', 'discounts', 'products', 'messages', 'boost',
   'store-preview', 'subscription', 'store-builder', 'shipping', 'team',
   'settings', 'help',
+  // Dev: "I want taxes and duties removed... Content can be removed.
+  // Finance can be removed" — from THIS menu only; each still has its own
+  // normal entry point elsewhere.
+  'taxes', 'content', 'finance',
 ];
-// Most-used first, per Dev — the rest of the catalog order doesn't matter
-// once everything reachable elsewhere has already been excluded above.
+// Dev: "Make the create post one the first one" — the menu opens on
+// whichever card is CARD_ORDER[0], so post-video (label "Create post")
+// leads. The rest keeps its prior most-used-first order.
 const CARD_ORDER = [
-  'add-product', 'go-live', 'analytics', 'payouts', 'community', 'taxes',
-  'content', 'finance', 'manufacturer', 'customers',
-  'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
+  'post-video', 'add-product', 'go-live', 'analytics', 'payouts', 'customers', 'community',
+  'manufacturer', 'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
 ];
 const CARD_ITEMS: ControlCenterItem[] = CARD_ORDER
   .map((id) => ALL_ITEMS.find((item) => item.id === id))
@@ -221,14 +227,12 @@ type MicroKind =
   | 'slide-click' | 'pie-pop' | 'turn-60' | 'nudge' | 'draw-stroke'
   | 'fade-outline' | 'snip' | 'twinkle' | 'blink' | 'target-pulse';
 const MICRO_KIND: Record<string, MicroKind> = {
+  'post-video': 'slide-click',   // clapper/frame slides/clicks into place
   'add-product': 'swing',        // hanger swings once and settles
   'go-live': 'pulse-dot',        // LIVE dot pulses once + lens-flare sweep
   'analytics': 'rise',           // rises from 0 into place
   'payouts': 'flip',             // coin flips once
   'community': 'pop-in',         // pops in
-  'taxes': 'rotate-notch',       // globe rotates a notch
-  'content': 'slide-click',      // film frame slides/clicks into place
-  'finance': 'pie-pop',          // pie slice pops out and back
   'manufacturer': 'turn-60',     // gear turns 60 degrees
   'customers': 'nudge',          // people nudge together
   'design-studio': 'draw-stroke',// pen draws one stroke
@@ -283,6 +287,11 @@ export default function SellerStudioRadialMenu({
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   const [brandName, setBrandName] = useState<string | null>(null);
+  // The seller's own account name/username — always populated by Clerk at
+  // sign-up, unlike brandName (which stays null until the seller explicitly
+  // names their store). Used as the header title's fallback instead of a
+  // "Name your store" placeholder, per Dev's "fresh seller" screenshot.
+  const [accountName, setAccountName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [setupPercent, setSetupPercent] = useState(0);
   const [setupDone, setSetupDone] = useState(0);
@@ -299,9 +308,16 @@ export default function SellerStudioRadialMenu({
       setSetupDone(completedRequiredTaskCount(state));
       setSetupTotal(requiredTaskCount(state));
     });
-    api.auth.me().then((profile: any) => {
+    api.seller.getProfile().then((profile) => {
       if (cancelled) return;
-      setBrandName(profile?.brandName ?? profile?.displayName ?? profile?.name ?? null);
+      // Real store name only here — NOT merged with the account's own
+      // name/username, which is a separate, always-available fallback (see
+      // accountName below) rather than being silently treated as the store
+      // name. `api.auth.me()`'s profile has no photo field at all, which is
+      // why avatarUrl was always null before — api.seller.getProfile() is
+      // the endpoint that actually carries profileImageUrl.
+      setBrandName(profile?.brandName ?? null);
+      setAccountName(profile?.displayName ?? profile?.username ?? null);
       setAvatarUrl(profile?.profileImageUrl ?? null);
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -705,6 +721,12 @@ export default function SellerStudioRadialMenu({
 
   const storeIsLive = setupPercent >= 100;
   const hasStoreName = !!brandName?.trim();
+  // The header title always shows something real — the store name once
+  // set, the seller's own account name/username until then — never a bare
+  // "Name your store" placeholder as the title itself (that's now the small
+  // link below instead).
+  const headerTitle = hasStoreName ? brandName!.trim() : (accountName?.trim() || null);
+  const headerMonogram = (hasStoreName ? brandName : accountName)?.trim()?.[0]?.toUpperCase() ?? null;
 
   // ── Card renderer ────────────────────────────────────────────────────────────
   // Every mounted card (the current one plus CARD_WINDOW_RADIUS neighbors on
@@ -753,19 +775,6 @@ export default function SellerStudioRadialMenu({
       const distance = itemIndex - cardIndex.value;
       return { opacity: interpolate(Math.abs(distance), [0.32, 0.48], [1, 0], Extrapolation.CLAMP) };
     });
-    // The "landed" ring — a plain white outline that fades/scales in around
-    // the icon only for the currently-centered card, once landedPulse ramps
-    // up on release.
-    const ringStyle = useAnimatedStyle(() => {
-      const distance = itemIndex - cardIndex.value;
-      const isCentered = Math.abs(distance) < 0.01;
-      const pulse = isCentered ? landedPulse.value : 0;
-      return {
-        opacity: pulse,
-        transform: [{ scale: interpolate(pulse, [0, 1], [0.9, 1], Extrapolation.CLAMP) }],
-      };
-    });
-
     // ── Signature micro-animation (see MICRO_KIND) ────────────────────────────
     const microScale = useSharedValue(1);
     const microScaleX = useSharedValue(1);
@@ -934,14 +943,16 @@ export default function SellerStudioRadialMenu({
         <StudioCoverBackdrop />
         <Animated.View style={[styles.cardContent, contentStyle]}>
           <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
-            <View style={styles.cardMedallionRing} pointerEvents="none" />
-            <Animated.View
-              style={[styles.cardLandedRing, ringStyle]}
-              pointerEvents="none"
-              testID={`seller-studio-card-landed-ring-${item.id}`}
-            />
-            <Feather name={item.icon as any} size={84} color="rgba(0,0,0,0.5)" style={styles.cardIconShadow} />
-            <Feather name={item.icon as any} size={84} color={theme.text} />
+            {/* Interim look until this card has real hero-art cover art
+                (see PR adding StudioCoverHeroArt's bitmap manifest): a
+                large, light-weight glyph sitting directly on the cover's own
+                lighting — never a ring around it. Dev, explicitly: "Never
+                the ring + box combo" (the old always-on medallion ring is
+                already gone; the interactive "landed" ring that used to
+                appear once a card locked is removed too, since the glyph
+                alone is what needs to read clean right now — landedPulse
+                still drives the card's own subtle scale-up on lock). */}
+            <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />
             {locked && (
               <View style={styles.cardLock}>
                 <Feather name="lock" size={14} color={theme.text} />
@@ -1017,31 +1028,33 @@ export default function SellerStudioRadialMenu({
         >
           <GestureDetector gesture={dismissGesture}>
             {/* ── Store header ──
-                Always the seller's real profile photo + real store name; an
-                initials circle (matching the store name's own first letter)
-                only when there's no photo yet, and a neutral store icon —
-                never a random letter — when there's no store name either.
-                No "?" help icon (Settings > Help & support covers it — see
-                services/settingsCatalog.ts). "View store" is a compact,
-                unfilled text+icon button. A close (X) replaces the old
-                swipe-only dismissal now that this is a full page, not a
+                Always the seller's real profile photo + real store name. No
+                photo yet: an initials monogram (from the store name once
+                set, else the seller's own account name/username — never a
+                generic bag icon, and never blank). No store name yet: the
+                title falls back to the seller's own account name/username
+                (always real, from Clerk) with a small tappable "Set store
+                name" link underneath — never a grey placeholder AS the
+                title. No "?" help icon (Settings > Help & support covers it
+                — see services/settingsCatalog.ts). "View store" is a
+                compact, unfilled text+icon button. A close (X) replaces the
+                old swipe-only dismissal now that this is a full page, not a
                 sheet with a visible "outside" to tap. */}
             <View style={styles.header}>
               <View style={styles.avatar}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : hasStoreName ? (
-                  <Text style={styles.avatarLetter}>{brandName!.trim()[0].toUpperCase()}</Text>
+                ) : headerMonogram ? (
+                  <Text style={styles.avatarLetter}>{headerMonogram}</Text>
                 ) : (
                   <Feather name="shopping-bag" size={18} color={theme.text} />
                 )}
               </View>
               <View style={styles.headerTextBlock}>
-                {hasStoreName ? (
-                  <Text style={styles.storeName} numberOfLines={1}>{brandName!.trim()}</Text>
-                ) : (
+                <Text style={styles.storeName} numberOfLines={1}>{headerTitle ?? 'Your store'}</Text>
+                {!hasStoreName && (
                   <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/settings' as never)); }}>
-                    <Text style={[styles.storeName, styles.storeNamePrompt]} numberOfLines={1}>Name your store</Text>
+                    <Text style={styles.setStoreNameLink} numberOfLines={1}>Set store name</Text>
                   </Pressable>
                 )}
                 {!storeIsLive && setupPercent > 0 && (
@@ -1166,6 +1179,13 @@ export default function SellerStudioRadialMenu({
           router.push('/subscription' as never);
         }}
       />
+
+      <FirstRunTip
+        id="studio-menu-scrub"
+        variant="fullscreen"
+        contentReady={open}
+        fullscreen={{ title: 'Studio', subtitle: 'Scrub through your tools', rows: STUDIO_MENU_SCRUB_ROWS }}
+      />
     </>
   );
 }
@@ -1197,7 +1217,15 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    backgroundColor: theme.background,
+    // Forced pure black regardless of the seller's chosen Appearance theme
+    // (theme.background varies per preset) — the covers themselves are a
+    // deliberately theme-independent black/white/silver series (see
+    // StudioCardCover.tsx), so the page shell around them (header included)
+    // must match exactly or a seam shows right where the header ends and
+    // the first card's cover begins, whatever theme is active. Fixes Dev's
+    // screenshot: "a visible seam/band between the header row (pure black)
+    // and the card."
+    backgroundColor: '#000000',
   },
 
   header: {
@@ -1233,9 +1261,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // shorter than its row siblings.
   headerTextBlock: { flex: 1, justifyContent: 'center', gap: 4 },
   storeName: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  // "Name your store" — a tappable prompt (not a static "Your store"
-  // placeholder) shown only when the seller hasn't set a store name yet.
-  storeNamePrompt: { color: theme.muted },
+  // A small secondary link, never the title itself — shown only until the
+  // seller sets a real store name (the title already reads their account
+  // name/username in the meantime, never a grey placeholder).
+  setStoreNameLink: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
   // A thin silver progress bar replaces the old tiny "X% set up" text —
   // Dev: clean, no clutter. Tappable (opens the setup checklist), and
   // hidden entirely once setup reaches 100% (see storeIsLive in the
@@ -1296,33 +1325,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // the whole time, just without any text on it until it's centered.
   cardContent: { flex: 1, alignItems: 'center', paddingTop: SP.xxl, paddingBottom: SP.xl },
   cardIconWrap: { flex: 1, width: 132, alignItems: 'center', justifyContent: 'center' },
-  // A subtle, always-on silver "medallion" ring behind the icon — reads as
-  // a coin/badge frame, distinct from (and concentric with) the brighter
-  // interactive landed ring, which only appears once a card locks.
-  cardMedallionRing: {
-    position: 'absolute',
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
-  // The "landed" ring — sized/positioned to sit just outside the 84pt icon.
-  // Purely decorative (pointerEvents "none"); its opacity/scale are driven
-  // entirely by CarouselCard's ringStyle (landedPulse), never toggled via
-  // conditional JSX, so it can fade/scale in smoothly instead of popping.
-  cardLandedRing: {
-    position: 'absolute',
-    width: 106,
-    height: 106,
-    borderRadius: 53,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  // A faint dark double of the icon, offset slightly down-right beneath the
-  // main white glyph — a cheap "emboss"/chrome pop that doesn't require a
-  // gradient-filled icon mask.
-  cardIconShadow: { position: 'absolute', transform: [{ translateX: 2 }, { translateY: 3 }] },
+  // The interim per-card glyph (see the "Interim look" comment above its
+  // usage) — no shadow-double/emboss treatment, which was part of what made
+  // it read as a boxed UI icon rather than art sitting on the cover.
+  cardIconGlyph: { opacity: 0.92 },
   // go-live's own extras — a small red "LIVE" dot and a soft diagonal
   // highlight sweep, both purely decorative (pointerEvents "none").
   liveDot: {

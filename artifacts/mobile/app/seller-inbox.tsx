@@ -34,6 +34,8 @@ import {
 import { subscribePendingConversationDeletes, DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -749,6 +751,12 @@ export default function SellerInboxScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <FirstRunTip
+        id="seller-inbox"
+        variant="gesture"
+        contentReady={!isLoading}
+        gesture={SELLER_INBOX_GESTURE}
+      />
     </View>
   );
 }

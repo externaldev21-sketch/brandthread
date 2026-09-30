@@ -310,7 +310,9 @@ export type StoryReplyPermission = 'everyone' | 'friends' | 'off';
 export type StoryOverlayType =
   | 'link' | 'gif' | 'text'
   | 'mention' | 'location' | 'time' | 'poll' | 'question'
-  | 'product' | 'shop' | 'threadcash';
+  | 'product' | 'shop' | 'threadcash'
+  /** The original story shown as a rounded card in a reshare ("Add to your story"). */
+  | 'reshare_card';
 
 export interface StoryPollOption {
   label: string;
@@ -351,8 +353,17 @@ export interface StoryOverlay {
    * playback, so today it only affects a light preview in the composer.
    */
   textAnimation?: string;
-  // mention sticker
+  // mention sticker — tags a real account; the server verifies and stores it
+  // regardless of the sticker's visible size/position/opacity.
   mentionHandle?: string;
+  mentionUserId?: string;
+  mentionName?: string;
+  mentionStyle?: 'classic' | 'outline' | 'solid' | 'neon';
+  /** 0–1. Sticker can be faded nearly out; the tag still registers. */
+  opacity?: number;
+  // reshare card (overlay type 'reshare_card')
+  cardImageUri?: string;
+  cardRadius?: number;
   // location sticker
   locationLabel?: string;
   // question sticker (answers are not yet persisted server-side — UI-only)
@@ -409,8 +420,40 @@ export interface Story {
   privacy: StoryPrivacySettings;
   viewers: StoryViewer[];
   repliesDisabled: boolean;
+  /** Set on a reshare; the credit + availability come from the server. */
+  original?: StoryOriginal | null;
   createdAt: number;         // Unix ms
   expiresAt: number;         // createdAt + 24h
+}
+
+export interface StoryOriginal {
+  storyId: string;
+  authorId: string;
+  authorHandle: string;
+  authorName: string;
+  /** false once the original expired or was deleted → render "Story unavailable". */
+  available: boolean;
+}
+
+/** One entry on the Activity "Story mentions" rail (GET /api/social/stories/mentions). */
+export interface StoryMentionItem {
+  storyId: string;
+  tagger: {
+    userId: string; name: string; handle: string; initials: string; color: string;
+    avatarUrl: string | null; accountType: string | null;
+  };
+  thumbnailUrl: string | null;
+  slide: number;
+  seen: boolean;
+  handled: boolean;
+  handledAction: 'reshared' | 'dismissed' | null;
+  mentionedAt: number;
+  story: Story;
+}
+
+export interface MentionPerson {
+  userId: string; name: string; username: string | null; handle: string;
+  avatarUrl: string | null; initials: string; color: string; isFollowing: boolean;
 }
 
 // ─── Notes (bubble above story-tray avatars, IG-style) ───────────────────────
@@ -437,7 +480,7 @@ export type NotificationCategory =
 
 export type NotificationType =
   | 'friend_request' | 'friend_accepted' | 'post_like' | 'post_comment'
-  | 'repost' | 'mention' | 'story_reaction' | 'story_reply' | 'new_follower'
+  | 'repost' | 'mention' | 'story_mention' | 'story_reshare' | 'story_reaction' | 'story_reply' | 'new_follower'
   | 'order_confirmed' | 'order_processing' | 'order_production'
   | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
   | 'order_out_for_delivery' | 'order_exception' | 'order_returned_to_sender'

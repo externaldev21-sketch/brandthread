@@ -59,6 +59,9 @@ import { CenteredToast } from '@/components/social/CenteredToast';
 import { Glass } from '@/components/ui/Glass';
 import { LiveRowEnter } from '@/components/motion/LiveRowEnter';
 import { findActivityArrivals } from '@/lib/activity';
+import StoryMentionsRail from '@/components/StoryMentionsRail';
+import { useStoryMentions } from '@/hooks/useStoryMentions';
+import { storyMentionViewerHref } from '@/lib/storyMentionsRail';
 import {
   deliverPreviewLiveArrival, hasPendingPreviewLiveArrival, PREVIEW_LIVE_ARRIVAL_DELAY_MS,
 } from '@/lib/previewActivity';
@@ -575,6 +578,14 @@ export default function ActivityCenterScreen() {
   const { role } = useRole();
   const api = useApi();
   const { user } = useUser();
+  // "Story mentions" rail above the feed (Activity is the same screen for
+  // buyers and sellers: the buyer tab re-exports it, sellers reach it at the
+  // root route). Hidden when nobody has tagged me.
+  const { items: storyMentions } = useStoryMentions();
+  const openStoryMention = useCallback((storyId: string) => {
+    router.push(storyMentionViewerHref(storyId) as never);
+  }, [router]);
+  const openAllStoryMentions = useCallback(() => router.push('/story-mentions' as never), [router]);
 
   const [items, setItems] = useState<ActivityItem[]>([]);
   // Ids that were unread when the page loaded. They stay in "New" for this
@@ -1302,6 +1313,9 @@ export default function ActivityCenterScreen() {
               onRefresh={() => { void loadFirstPage('refresh'); }}
             />
           )}
+          ListHeaderComponent={chip === 'all' ? (
+            <StoryMentionsRail items={storyMentions} onOpen={openStoryMention} onSeeAll={openAllStoryMentions} />
+          ) : null}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
               {/* A filter with nothing in it says so specifically, per role,

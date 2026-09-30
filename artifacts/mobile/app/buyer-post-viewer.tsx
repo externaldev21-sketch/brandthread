@@ -13,9 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -36,8 +37,10 @@ import { requestContextualPushPermission } from '@/lib/contextualPushPermission'
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 
-function PostVideo({ uri }: { uri: string }) {
+function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+  const isFocused = useIsFocused();
+  useMeaningfulVideoWatch(player, isFocused, onWatched);
   useEffect(() => {
     player.play();
     return () => { player.pause(); };
@@ -53,13 +56,14 @@ function PostVideo({ uri }: { uri: string }) {
 }
 
 function PostMedia({
-  mediaUrl, type, mediaColor1, mediaColor2, typeIcon,
+  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched,
 }: {
   mediaUrl?: string; type: BuyerPost['type'];
   mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
+  onWatched?: () => void;
 }) {
   if (mediaUrl && type === 'video') {
-    return <PostVideo uri={mediaUrl} />;
+    return <PostVideo uri={mediaUrl} onWatched={onWatched} />;
   }
   if (mediaUrl) {
     return (
@@ -133,6 +137,9 @@ export default function BuyerPostViewer() {
   const [editOpen, setEditOpen] = useState(false);
   const [editCaption, setEditCaption] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const handleVideoWatched = useCallback(() => {
+    if (userId && post?.id) void api.posts.recordWatchedVideo(post.id).catch(() => {});
+  }, [api, userId, post?.id]);
 
   // When post is null (not yet loaded or not found in my posts), assume non-owner
   // so report is visible and owner-only controls are hidden.
@@ -240,6 +247,7 @@ export default function BuyerPostViewer() {
             mediaColor1={mediaColor1}
             mediaColor2={mediaColor2}
             typeIcon={typeIcon}
+            onWatched={post?.type === 'video' ? handleVideoWatched : undefined}
           />
         </View>
 
