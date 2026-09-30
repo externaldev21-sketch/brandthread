@@ -5,7 +5,7 @@
  * redirect fires (previously "/" matched no route and rendered blank).
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
@@ -29,6 +29,20 @@ export default function Index() {
   // would stomp on a deep link the person actually meant to land on.
   const segments = useSegments();
   const atRoot = !segments[0] || (segments[0] as string) === 'index';
+  // Mirrors `atRoot` on every render, synchronously in the render body — not
+  // in an effect. The 50ms timer below re-checks this ref rather than the
+  // value it closed over when scheduled: relying on the effect's own
+  // cleanup+reschedule cycle (via the `atRoot` dependency) to cancel a stale
+  // timer left a real race — confirmed live, direct-loading a deep link
+  // whose route does extra work while resolving (e.g. "/seller-inbox?
+  // …&demo=1", which seeds a demo dataset) delayed the commit that would
+  // have cancelled the old timer past the 50ms mark, so it fired anyway with
+  // a stale atRoot === true and hard-redirected to the dashboard over the
+  // real destination. A ref update happens the instant this component
+  // re-renders, with no effect-flush to wait on, so the callback below sees
+  // the real, current segments even if the cancelling effect hasn't run yet.
+  const atRootRef = useRef(atRoot);
+  atRootRef.current = atRoot;
 
   useEffect(() => {
     if (!rootNavigationState?.key) return;
@@ -50,10 +64,9 @@ export default function Index() {
     }
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
-      // Re-check at fire time too: segments can change during the 50ms
-      // delay (e.g. the real deep-linked route finishes resolving), and a
-      // stale closure over an old "atRoot" would otherwise still fire.
-      if (!atRoot) return;
+      // Re-check the LIVE ref at fire time, not the atRoot this effect
+      // closed over — see atRootRef's own comment above for why.
+      if (!atRootRef.current) return;
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
     }, 50);
     return () => clearTimeout(redirect);
