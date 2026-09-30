@@ -258,6 +258,11 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // the other design-studio screens (template/asset pickers, AI tool forms)
   // are normal scrollable screens and keep the bar.
   'design-canvas',
+  // Create Ad wizard — has its own sticky two-row bottom bar (Meta-ads link
+  // + "Launch · $X"), same "Paywall"/"add-product" category: the bar
+  // literally overlapped it (audit: "Launch · $25" overlapping the tab
+  // bar's cart badge).
+  'design-campaign',
   // Mockup-to-Model — its own sticky "Create N photos" bottom CTA (audit:
   // "Create photos" overlapping the tab bar's cart badge), same category.
   'design-mockup-to-model',
