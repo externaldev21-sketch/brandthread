@@ -317,14 +317,13 @@ export function BrandthreadScreen({
 
 interface BrandthreadHeaderProps {
   title: string;
-  subtitle?: string;
   onBack?: () => void;
   rightElement?: React.ReactNode;
   gradient?: boolean;
 }
 
 export function BrandthreadHeader({
-  title, subtitle, onBack, rightElement, gradient = false,
+  title, onBack, rightElement, gradient = false,
 }: BrandthreadHeaderProps) {
   const { theme } = useAppTheme();
   const colors = useColors();
@@ -334,8 +333,9 @@ export function BrandthreadHeader({
         {onBack && (
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onBack(); }}
-            style={[hdrS.back, { backgroundColor: colors.card, borderColor: colors.border }]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={hdrS.back}
+            accessibilityRole="button"
+            accessibilityLabel={`Go back from ${title}`}
           >
             <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
           </PressableScale>
@@ -348,7 +348,6 @@ export function BrandthreadHeader({
           ) : (
             <Text style={[hdrS.title, { color: colors.foreground }]}>{title}</Text>
           )}
-          {subtitle && <Text style={[hdrS.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
         </View>
       </View>
       {rightElement && <View style={hdrS.right}>{rightElement}</View>}
@@ -360,10 +359,11 @@ const hdrS = StyleSheet.create({
   root:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                 paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.headerH },
   left:       { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1 },
-  back:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-                borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  // Bare arrow, no box/background/border — the one standard back control,
+  // matching ScreenHeader's closeBtnPlain. A fixed 44px hit area (not
+  // hitSlop-padded) so the touchable region is exactly what's visible.
+  back:       { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title:      { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-  subtitle:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
   gradTitleWrap: { borderRadius: 0 },
   gradTitle:  { fontSize: FS.xl, fontFamily: FONT.bold },
   right:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
