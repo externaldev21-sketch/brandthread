@@ -13,12 +13,14 @@ describe('buildPreviewSellerAnalytics — fresh mode (zero-state)', () => {
     it(`${range}: every bucket is a flat $0 baseline, never fabricated activity`, () => {
       const data = buildPreviewSellerAnalytics(range, 'fresh', NOW);
       expect(data.totalCents).toBe(0);
+      expect(data.netCents).toBe(0);
       expect(data.orderCount).toBe(0);
       expect(data.visitorCount).toBe(0);
-      expect(data.previous).toEqual({ totalCents: 0, orderCount: 0, visitorCount: 0 });
+      expect(data.previous).toEqual({ totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 });
       expect(data.buckets.length).toBeGreaterThan(0);
       for (const bucket of data.buckets) {
         expect(bucket.totalCents).toBe(0);
+        expect(bucket.netCents).toBe(0);
         expect(bucket.orderCount).toBe(0);
         expect(bucket.visitorCount).toBe(0);
       }
@@ -28,11 +30,14 @@ describe('buildPreviewSellerAnalytics — fresh mode (zero-state)', () => {
   it('still produces correct, range-appropriate x-axis labels even though the data is flat', () => {
     const week = buildPreviewSellerAnalytics('week', 'fresh', NOW);
     const weekLabels = week.buckets.map((b) => bucketLabel(b.bucket, 'week'));
-    expect(weekLabels).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    // Sunday-first calendar week — the app's convention, not ISO Monday-first.
+    expect(weekLabels).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
 
     const year = buildPreviewSellerAnalytics('year', 'fresh', NOW);
     const yearLabels = year.buckets.map((b) => bucketLabel(b.bucket, 'year'));
-    expect(new Set(yearLabels).size).toBe(12); // 12 distinct months, never the same one repeated
+    // NOW is Sep 2026, so the calendar year so far is Jan..Sep — 9 distinct
+    // months, never the same one repeated, and never a future month.
+    expect(yearLabels).toEqual(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']);
   });
 });
 
@@ -69,13 +74,14 @@ describe('buildPreviewSellerAnalytics — demo mode (populated)', () => {
     expect(new Set(values).size).toBeGreaterThan(1);
   });
 
-  it('"year" produces 12 distinct trailing months ending the current month, in order — the reported bug', () => {
+  it('"year" produces the calendar year so far (Jan..current month), never a trailing 12-month window or a future month', () => {
     const data = buildPreviewSellerAnalytics('year', 'demo', NOW);
-    expect(data.buckets).toHaveLength(12);
+    // NOW is Sep 2026 — Jan through Sep is 9 months, not 12; Oct-Dec haven't
+    // happened yet and must never be drawn.
+    expect(data.buckets).toHaveLength(9);
     const labels = data.buckets.map((b) => bucketLabel(b.bucket, 'year'));
-    // Trailing 12 months ending September (NOW is Sep 2026): Oct … Sep.
-    expect(labels).toEqual(['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']);
-    expect(new Set(labels).size).toBe(12); // never the same month repeated
+    expect(labels).toEqual(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']);
+    expect(new Set(labels).size).toBe(9); // never the same month repeated
   });
 
   it('"month" produces one bucket per day of the current calendar month, labeled "Mon D"', () => {
@@ -85,10 +91,10 @@ describe('buildPreviewSellerAnalytics — demo mode (populated)', () => {
     expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => `Sep ${i + 1}`));
   });
 
-  it('"week" produces Monday through Sunday of the current calendar week', () => {
+  it('"week" produces Sunday through Saturday of the current calendar week (Sunday-first)', () => {
     const data = buildPreviewSellerAnalytics('week', 'demo', NOW);
     expect(data.buckets).toHaveLength(7);
     const labels = data.buckets.map((b) => bucketLabel(b.bucket, 'week'));
-    expect(labels).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(labels).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
   });
 });

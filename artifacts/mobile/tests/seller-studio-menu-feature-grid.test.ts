@@ -5,16 +5,14 @@ import { describe, expect, it } from 'vitest';
 const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadialMenu.tsx'), 'utf8');
 
 /**
- * Studio sheet, second redesign (Dev's words: "every icon is its own
- * screen, swipe across and feel boom boom boom, release on the one you
- * want and it opens"). Replaces the 4-column grid (still covered
- * historically by this file's name) with a full-screen card carousel: one
- * destination shown at a time, scrubbed through by a horizontal drag.
- * Keeps the handle, the dismiss-swipe, the store header (with its avatar
- * fix — see seller-studio-avatar-fix.test.ts), and the "no close (X)
- * button" call — dismissal is still swipe/tap-backdrop only.
+ * Studio page — Dev's final layout call: a full-screen page (not a sheet),
+ * one destination shown at a time as a full-bleed cover, scrubbed through
+ * by a horizontal drag. Keeps the store header (with its avatar/profile-
+ * photo fix — see seller-studio-avatar-fix.test.ts) and now has a real
+ * close (X) button alongside swipe-down-to-dismiss (see
+ * seller-studio-menu-swipe-dismiss.test.ts).
  */
-describe('Seller Studio sheet: search bar, pinned shortcuts and grouped sections stay gone', () => {
+describe('Seller Studio page: search bar, pinned shortcuts and grouped sections stay gone', () => {
   it('no SearchBar, no pin editing, no per-section grouped list, no old 4-column grid', () => {
     expect(studio).not.toContain('SearchBar');
     expect(studio).not.toContain('Pinned shortcuts');
@@ -26,14 +24,15 @@ describe('Seller Studio sheet: search bar, pinned shortcuts and grouped sections
     expect(studio).not.toContain("gridCell: { width: '25%'");
   });
 
-  it('still keeps the store header row (avatar, store name, setup %, View store pill)', () => {
+  it('still keeps the store header row (avatar/photo, store name, setup progress, View store, close)', () => {
     expect(studio).toContain('accessibilityLabel="View store"');
-    expect(studio).toContain("storeIsLive ? 'Store live' : `${setupPercent}% set up`");
+    expect(studio).toContain('accessibilityLabel="Close Studio tools"');
+    expect(studio).toContain('setupBarTrack');
   });
 
-  it('still keeps the handle and dismiss-swipe, no close (X) button', () => {
-    expect(studio).toContain('<SheetHandle />');
-    expect(studio).not.toContain('testID="seller-studio-menu-close"');
+  it('no "?" help icon — Settings > Help & support covers it instead', () => {
+    expect(studio).not.toContain('accessibilityLabel="Help & Support"');
+    expect(studio).not.toContain('help-circle');
   });
 });
 

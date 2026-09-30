@@ -120,10 +120,10 @@ async function pressAndroidBack() {
   await request(`/session/${sessionId}/back`, {});
 }
 
-// Swipe down anywhere on the Studio sheet — the only iOS dismiss gesture
-// now that the close (X) button is gone (swipe or tap the backdrop).
+// Swipe down anywhere on the Studio page — a full-screen page now (Dev's
+// final layout call), closed by a downward swipe or the close (X) button.
 async function swipeDownToCloseStudio() {
-  await find('Studio tools dark backdrop');
+  await find('Close Studio tools');
   const { width, height } = await request(`/session/${sessionId}/window/rect`, undefined, 'GET');
   await request(`/session/${sessionId}/actions`, {
     actions: [{
@@ -140,12 +140,12 @@ async function swipeDownToCloseStudio() {
   });
 }
 
-// The Studio sheet is a scrub carousel now (one card at a time, dragged
-// through), not a grid where every destination was simultaneously visible —
-// so reaching a given label means dragging the card area left in short
-// steps (each step advances a few cards; see lib/studioCardCarousel.ts's
-// CARD_SCRUB_STEP_PX) until it appears, bounded so a missing/renamed label
-// fails fast instead of hanging.
+// The Studio page is a full-screen scrub carousel (one card at a time,
+// dragged through), not a grid where every destination was simultaneously
+// visible — so reaching a given label means dragging the card area left in
+// short steps (each step advances a few cards; see
+// lib/studioCardCarousel.ts's SCRUB_PX_PER_CARD) until it appears, bounded
+// so a missing/renamed label fails fast instead of hanging.
 async function scrubStudioCardsTo(label, maxSteps = 20) {
   const { width, height } = await request(`/session/${sessionId}/window/rect`, undefined, 'GET');
   const y = Math.round(height * 0.6);
@@ -211,7 +211,7 @@ try {
   await swipeDashboard();
 
   await tap('Open Studio tools');
-  await waitFor('Studio tools dark backdrop');
+  await waitFor('Close Studio tools');
   // The carousel shows one card at a time — scrub to each of the six Growth
   // Studio tools (they're grouped at the end of the list) rather than
   // expecting them all on screen together like the old grid.
@@ -225,7 +225,7 @@ try {
   ]) {
     await scrubStudioCardsTo(label);
   }
-  await tap('Dismiss Studio tools backdrop');
+  await tap('Close Studio tools');
   await absent('Design Studio');
 
   await tap('Open Studio tools');

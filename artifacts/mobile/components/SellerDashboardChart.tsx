@@ -51,6 +51,11 @@ const AXIS_LABEL_COUNT: Record<SellerDashboardRange, number> = {
   today: 4, week: 7, month: 5, year: 6, all: 6,
 };
 
+// Evenly spaced horizontal gridlines drawn behind the empty state — a
+// genuinely-zero chart (a fresh store) reads as an intentional, correctly
+// laid-out chart with no data yet, not as a rendering glitch.
+const EMPTY_GRIDLINE_COUNT = 3;
+
 export function SellerDashboardChart({
   values,
   labels,
@@ -60,6 +65,8 @@ export function SellerDashboardChart({
   onScrub,
   isEmpty,
   formatValue,
+  emptyMessage,
+  showNowMarker,
 }: {
   values: number[];
   labels: string[];
@@ -71,6 +78,10 @@ export function SellerDashboardChart({
   isEmpty: boolean;
   /** Formats a raw bucket value for the in-chart scrub tooltip (defaults to a plain string). */
   formatValue?: (value: number) => string;
+  /** Range-aware copy for the empty/fresh-store state (e.g. "No sales yet today"). Defaults to "No sales yet". */
+  emptyMessage?: string;
+  /** Today only: draws a static "Now" marker at the last (current-hour) point instead of a fabricated point further along the day. */
+  showNowMarker?: boolean;
 }) {
   const [width, setWidth] = useState(0);
   const [rangeRowWidth, setRangeRowWidth] = useState(0);
@@ -120,9 +131,16 @@ export function SellerDashboardChart({
     opacity: rangeSegmentWidth > 0 ? 1 : 0,
   }));
 
-  // A flat baseline for the empty/new-seller state — never fabricate activity.
-  const series = isEmpty || values.length === 0 ? values.map(() => 0) : values;
-  const points = useMemo(() => layoutSeriesPoints(series, Math.max(width, 1), CHART_HEIGHT), [series, width]);
+  // Empty/new-seller state: no curve at all (not even a flat one) — a
+  // drawn-but-flat line at $0 read as a broken/glitched chart. The empty
+  // state instead renders real gridlines + a baseline + a centered message
+  // below, so it's unambiguous that this is an intentional "no data yet"
+  // chart rather than a rendering failure.
+  const series = isEmpty ? [] : values;
+  const points = useMemo(
+    () => (series.length > 0 ? layoutSeriesPoints(series, Math.max(width, 1), CHART_HEIGHT) : []),
+    [series, width],
+  );
   const linePath = useMemo(() => smoothPath(points), [points]);
   const areaPath = useMemo(() => {
     if (points.length < 2) return '';
@@ -264,11 +282,51 @@ export function SellerDashboardChart({
               ) : null}
             </Svg>
           )}
+          {isEmpty && (
+            <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="seller-dashboard-chart-empty">
+              {Array.from({ length: EMPTY_GRIDLINE_COUNT }, (_, i) => (
+                <View
+                  key={`gridline-${i}`}
+                  style={[
+                    styles.emptyGridline,
+                    { top: ((i + 1) * CHART_HEIGHT) / (EMPTY_GRIDLINE_COUNT + 1), backgroundColor: theme.borderSubtle },
+                  ]}
+                />
+              ))}
+              <View style={[styles.emptyBaseline, { backgroundColor: theme.border }]} />
+              <View style={styles.emptyMessageWrap}>
+                <Text style={[styles.emptyMessageText, { color: theme.muted }]}>
+                  {emptyMessage ?? 'No sales yet'}
+                </Text>
+              </View>
+            </View>
+          )}
           {!isEmpty && (
             <>
               <Animated.View pointerEvents="none" style={[styles.cursorLine, { backgroundColor: theme.border }, cursorStyle]} />
               <Animated.View pointerEvents="none" style={[styles.cursorDot, { backgroundColor: theme.accent, borderColor: theme.background }, dotStyle]} />
             </>
+          )}
+          {/* "Now" marker for Today: a static dot at the current hour's point
+              (the line's real last point — nothing is drawn beyond it, since
+              the API never returns future hours), so it's clear the chart
+              stops at "now" rather than having simply run out of data.
+              Hidden while actively scrubbing so it never fights the scrub
+              cursor dot for the same spot. */}
+          {showNowMarker && !isEmpty && tooltipIndex === null && points.length > 0 && (
+            <View
+              pointerEvents="none"
+              testID="seller-dashboard-chart-now-marker"
+              style={[
+                styles.nowMarkerDot,
+                {
+                  backgroundColor: theme.accent,
+                  borderColor: theme.background,
+                  left: points[points.length - 1].x - 4,
+                  top: points[points.length - 1].y - 4,
+                },
+              ]}
+            />
           )}
           {!isEmpty && tooltipIndex !== null && points[tooltipIndex] && (
             <View
@@ -418,6 +476,39 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 2,
+  },
+  nowMarkerDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 2,
+  },
+  emptyGridline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+  },
+  emptyBaseline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+  },
+  emptyMessageWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyMessageText: {
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
   },
   tooltip: {
     position: 'absolute',

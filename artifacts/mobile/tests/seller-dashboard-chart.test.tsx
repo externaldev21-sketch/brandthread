@@ -191,7 +191,32 @@ describe('SellerDashboardChart', () => {
     expect(texts).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   });
 
-  it('renders a visible (non-transparent-border) flat line color for the empty state, not an invisible one', async () => {
+  it('renders gridlines + a baseline + a centered message for the empty state — no fake curve drawn at all', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[0, 0, 0]}
+          labels={['Mon', 'Tue', 'Wed']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty
+          emptyMessage="No sales yet this week"
+        />,
+      );
+    });
+    await layoutChart();
+    // A flat/fake $0 line used to be drawn here — a genuinely-empty chart
+    // must never render any Path (curve) at all, real or flat.
+    expect(renderer!.root.findAllByType('Path' as React.ElementType)).toHaveLength(0);
+    const emptyState = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-empty' });
+    expect(emptyState).toBeTruthy();
+    const texts = emptyState.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toContain('No sales yet this week');
+  });
+
+  it('falls back to plain "No sales yet" when no range-aware emptyMessage is given', async () => {
     await act(async () => {
       renderer = create(
         <SellerDashboardChart
@@ -206,9 +231,53 @@ describe('SellerDashboardChart', () => {
       );
     });
     await layoutChart();
-    const path = renderer!.root.findAllByType('Path' as React.ElementType).find((p) => p.props.fill === 'none');
-    expect(path?.props.stroke).toBe(theme.muted);
-    expect(path?.props.stroke).not.toBe(theme.borderSubtle);
+    const emptyState = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-empty' });
+    const texts = emptyState.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toContain('No sales yet');
+  });
+
+  it('shows a "Now" marker at the last point for Today, hides it for every other range', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 20, 30]}
+          labels={['12 AM', '6 AM', '12 PM']}
+          theme={theme}
+          range="today"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+          showNowMarker
+        />,
+      );
+    });
+    await layoutChart();
+    // findAllByProps matches both the composite `el('View')` wrapper and its
+    // rendered host node (this suite's `react-native` mock forwards props
+    // straight through) — count only the host element to get a true "how
+    // many markers rendered" answer.
+    const markers = renderer!.root.findAllByProps({ testID: 'seller-dashboard-chart-now-marker' })
+      .filter((m) => (m.type as unknown) === 'View');
+    expect(markers).toHaveLength(1);
+  });
+
+  it('never shows a "Now" marker when showNowMarker is false (every non-Today range)', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 20, 30]}
+          labels={['Mon', 'Tue', 'Wed']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+          showNowMarker={false}
+        />,
+      );
+    });
+    await layoutChart();
+    expect(renderer!.root.findAllByProps({ testID: 'seller-dashboard-chart-now-marker' })).toHaveLength(0);
   });
 
   it('calls onRangeChange with the tapped range id and marks it selected', async () => {

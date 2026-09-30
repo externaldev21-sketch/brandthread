@@ -11,11 +11,15 @@ describe('zeroSellerHomeAnalytics', () => {
     expect(zero).toEqual({
       range: 'today',
       totalCents: 0,
+      netCents: 0,
       orderCount: 0,
       visitorCount: 0,
+      conversionRate: 0,
+      averageOrderCents: 0,
+      threadCashReceivedCents: 0,
       toFulfill: 0,
       toCapture: 0,
-      previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
+      previous: { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 },
       trafficSources: [
         { source: 'feed', count: 0, sharePercent: 0 },
         { source: 'search', count: 0, sharePercent: 0 },
@@ -39,8 +43,10 @@ describe('selectSellerHomeAnalytics', () => {
 
   it('returns the snapshot only when its key matches the current seller and range exactly', () => {
     const data = {
-      range: 'today', totalCents: 500, orderCount: 2, visitorCount: 10, toFulfill: 1, toCapture: 0,
-      previous: { totalCents: 300, orderCount: 1, visitorCount: 8 },
+      range: 'today', totalCents: 500, netCents: 480, orderCount: 2, visitorCount: 10,
+      conversionRate: 20, averageOrderCents: 250, threadCashReceivedCents: 0,
+      toFulfill: 1, toCapture: 0,
+      previous: { totalCents: 300, netCents: 300, orderCount: 1, visitorCount: 8 },
       trafficSources: [
         { source: 'feed' as const, count: 6, sharePercent: 60 },
         { source: 'search' as const, count: 2, sharePercent: 20 },

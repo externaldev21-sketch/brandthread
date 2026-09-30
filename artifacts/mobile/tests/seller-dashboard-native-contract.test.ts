@@ -19,14 +19,13 @@ describe('seller dashboard native interaction contract', () => {
     expect(deviceFlow).toContain('markerAfter.y >= markerBefore.y - 20');
   });
 
-  it('keeps the Studio card carousel, backdrop, swipe/backdrop dismiss, navigation, and gating in the device contract', () => {
+  it('keeps the Studio full-screen page, close button, swipe dismiss, navigation, and gating in the device contract', () => {
     expect(studio).toContain('justifyContent: \'center\'');
-    expect(studio).toContain('testID="seller-studio-menu-backdrop"');
-    // No close (X) button anywhere — swipe-down and backdrop tap are the
-    // only dismiss affordances (Dev: "since you're adding that mechanism,
-    // you can remove the X").
-    expect(studio).not.toContain('testID="seller-studio-menu-close"');
-    expect(studio).not.toContain('Close Studio tools');
+    // Dev's final layout call: a full-screen page, not a sheet with a
+    // backdrop — closed by swipe-down or a real close (X) button.
+    expect(studio).not.toContain('testID="seller-studio-menu-backdrop"');
+    expect(studio).toContain('testID="seller-studio-menu-close"');
+    expect(studio).toContain('Close Studio tools');
     expect(studio).toContain('GestureDetector');
     expect(studio).toContain('GROWTH_PLAN_ENFORCEMENT_ENABLED');
     expect(studio).toContain("!hasPlan('growth')");
@@ -42,9 +41,8 @@ describe('seller dashboard native interaction contract', () => {
     ]) {
       expect(deviceFlow).toContain(`'${label}'`);
     }
-    expect(deviceFlow).not.toContain("await tap('Close Studio tools')");
+    expect(deviceFlow).toContain("await tap('Close Studio tools')");
     expect(deviceFlow).toContain('await swipeDownToCloseStudio()');
-    expect(deviceFlow).toContain("await tap('Dismiss Studio tools backdrop')");
     expect(deviceFlow).toContain("await tap('Design Studio')");
     expect(deviceFlow).toContain('await pressAndroidBack()');
   });
