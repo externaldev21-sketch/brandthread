@@ -538,6 +538,54 @@ const MANUFACTURER_THREADS = [
   { id: 'th-3', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', subject: 'Garment dye sample', lastMessage: 'Tracking uploaded — should land Thursday.', lastMessageAt: iso(2 * DAY), unreadCount: 0, createdAt: iso(8 * DAY) },
 ];
 
+const SELLER_QUOTE_REQUESTS = [
+  { id: 'qr-1', manufacturerId: MANUFACTURERS[2].id, productName: 'Field Shell Jacket — Onyx', status: 'quoted', type: 'bulk', quantity: 300, colorways: 'Onyx, Rust', quotedPriceCents: 1260000, quotedTurnaround: '35 days', quoteValidUntil: isoAhead(21 * DAY), notes: '30% deposit, balance before ship', createdAt: iso(14 * DAY), updatedAt: iso(3 * DAY) },
+  { id: 'qr-2', manufacturerId: MANUFACTURERS[0].id, productName: 'Heavyweight Hoodie — Bone', status: 'quoted', type: 'bulk', quantity: 250, quotedPriceCents: 575000, quotedTurnaround: '28 days', quoteValidUntil: isoAhead(14 * DAY), createdAt: iso(12 * DAY), updatedAt: iso(5 * DAY) },
+  { id: 'qr-3', manufacturerId: MANUFACTURERS[1].id, productName: 'Garment-Dyed Hoodie — Moss', status: 'submitted', type: 'bulk', quantity: 400, createdAt: iso(2 * DAY), updatedAt: iso(2 * DAY) },
+];
+
+const SAMPLE_ORDERS = [
+  { id: 'so-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'Heavyweight Hoodie — Bone', status: 'delivered', orderType: 'sample', priceCents: 8500, quantity: 1, revision: 2, threadId: 'th-1', createdAt: iso(21 * DAY), updatedAt: iso(3 * DAY) },
+  { id: 'so-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', title: 'Field Shell Proto', status: 'cut_and_sew', orderType: 'sample', priceCents: 14000, quantity: 1, revision: 1, createdAt: iso(10 * DAY), updatedAt: iso(2 * DAY) },
+  { id: 'bo-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'FW26 Core Hoodie Run', status: 'cut_and_sew', orderType: 'bulk', priceCents: 1680000, quantity: 300, revision: 3, threadId: 'th-1', createdAt: iso(33 * DAY), updatedAt: iso(4 * DAY) },
+  { id: 'bo-2', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', title: 'Moss Hoodie Restock', status: 'payment_received', orderType: 'bulk', priceCents: 468000, quantity: 400, revision: 1, createdAt: iso(7 * DAY), updatedAt: iso(6 * DAY) },
+];
+
+/**
+ * The half-done audit synthesizes dynamic-route params generically (see
+ * PARAM_VALUES in scripts/audit/half-done-audit.mjs) — e.g. every `:id`
+ * route gets the same product id, every otherwise-unmapped param gets
+ * 'sample-1'. None of those match a real seeded row here, so a strict
+ * byId() lookup 404s on every one of these detail screens even though the
+ * app itself already handles "not found" gracefully (EmptyState, no
+ * crash) — the 404 status itself is what the browser logs as a hard-tier
+ * console error, independent of the app's own try/catch. Falling back to
+ * the first seeded row (rather than a literal not-found) keeps these
+ * fixture-driven audit/screenshot runs deterministic and error-free
+ * without the app's real "not found" behavior ever being exercised here.
+ */
+const firstOr = (list) => (id) => list.find((item) => item.id === decodeURIComponent(id)) ?? list[0] ?? null;
+
+function productionTimelineFor(id) {
+  const bulkOrders = SAMPLE_ORDERS.filter((o) => o.orderType === 'bulk');
+  const order = bulkOrders.find((o) => o.id === decodeURIComponent(id)) ?? bulkOrders[0];
+  const snapshot = {
+    id: order.id, orderType: order.orderType, title: order.title, description: null,
+    quantity: order.quantity, priceCents: order.priceCents, currency: 'usd', status: order.status,
+    issuedBy: 'manufacturer', carrier: order.carrier ?? null, trackingNumber: order.trackingNumber ?? null,
+    paymentReviewState: 'none', manufacturerPayoutReady: true, revision: order.revision, updatedAt: order.updatedAt,
+  };
+  const steps = ['quote_accepted', 'deposit_paid', 'materials_sourcing', 'sewing', 'packaging', 'shipped', 'delivered'].map((stage, i) => ({
+    stage, label: stage.replace(/_/g, ' '), description: '', state: i === 0 ? 'done' : i === 1 ? 'current' : 'upcoming', at: i === 0 ? order.createdAt : null,
+  }));
+  return {
+    viewerRole: 'seller', order: snapshot,
+    manufacturer: { id: order.manufacturerId, businessName: order.manufacturerName, country: '', timeZone: null },
+    steps, events: [], createdAt: order.createdAt, paidAt: null,
+    tracking: { carrier: null, carrierName: null, trackingNumber: null, url: null },
+  };
+}
+
 function sellerConversations(count = 5) {
   const people = [
     ['Jordan Reyes', '@jordanreyes', 'JR', '#5E5E66', 'Any chance the Ember hoodie ships before Friday?', 'buyer_to_seller_order', '#NS-1048', 'Heavyweight Hoodie — Ember'],
@@ -1005,21 +1053,40 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/manufacturers/favorites') return [{ manufacturerId: MANUFACTURERS[0].id, createdAt: iso(50 * DAY) }, { manufacturerId: MANUFACTURERS[2].id, createdAt: iso(40 * DAY) }];
   if (p === '/manufacturers/relationships') return MANUFACTURERS.slice(0, 3).map((m, i) => ({ id: `rel-${i + 1}`, manufacturerId: m.id, status: 'active', createdAt: iso((90 - i * 20) * DAY), updatedAt: iso((i + 1) * DAY) }));
   if (p === '/manufacturers/threads') return MANUFACTURER_THREADS;
-  if (p === '/seller-hub/quote-requests') {
-    return [
-      { id: 'qr-1', manufacturerId: MANUFACTURERS[2].id, productName: 'Field Shell Jacket — Onyx', status: 'quoted', type: 'bulk', quantity: 300, colorways: 'Onyx, Rust', quotedPriceCents: 1260000, quotedTurnaround: '35 days', quoteValidUntil: isoAhead(21 * DAY), notes: '30% deposit, balance before ship', createdAt: iso(14 * DAY), updatedAt: iso(3 * DAY) },
-      { id: 'qr-2', manufacturerId: MANUFACTURERS[0].id, productName: 'Heavyweight Hoodie — Bone', status: 'quoted', type: 'bulk', quantity: 250, quotedPriceCents: 575000, quotedTurnaround: '28 days', quoteValidUntil: isoAhead(14 * DAY), createdAt: iso(12 * DAY), updatedAt: iso(5 * DAY) },
-      { id: 'qr-3', manufacturerId: MANUFACTURERS[1].id, productName: 'Garment-Dyed Hoodie — Moss', status: 'submitted', type: 'bulk', quantity: 400, createdAt: iso(2 * DAY), updatedAt: iso(2 * DAY) },
-    ];
+  if (p === '/seller-hub/quote-requests') return SELLER_QUOTE_REQUESTS;
+  if ((match = p.match(/^\/seller-hub\/quote-requests\/([^/]+)$/))) return firstOr(SELLER_QUOTE_REQUESTS)(match[1]);
+  if (p === '/sample-orders') return SAMPLE_ORDERS;
+  if ((match = p.match(/^\/sample-orders\/([^/]+)\/images$/))) return { imageUrls: [] };
+  if ((match = p.match(/^\/sample-orders\/([^/]+)$/))) return firstOr(SAMPLE_ORDERS)(match[1]);
+  // RFQ broadcast (app/rfq-list.tsx, rfq-post.tsx, rfq-compare.tsx): no RFQs
+  // exist yet in this fixture set (the seller hasn't posted one), so the
+  // list is a real empty state, and a detail lookup falls back to a
+  // representative quote-request-shaped RFQ rather than 404ing — same
+  // reasoning as SAMPLE_ORDERS/SELLER_QUOTE_REQUESTS above.
+  if (p === '/seller-hub/rfqs') return [];
+  if ((match = p.match(/^\/seller-hub\/rfqs\/([^/]+)$/))) {
+    const q = SELLER_QUOTE_REQUESTS[0];
+    return {
+      id: match[1], sellerId: SELLER_USER.id, garmentType: q.productName, category: 'Outerwear',
+      description: q.notes ?? '', quantity: q.quantity, targetPriceCents: q.quotedPriceCents, deadline: q.quoteValidUntil,
+      fileIds: [], status: 'matched', manufacturersCount: 3, quotesReceivedCount: 1,
+      createdAt: q.createdAt, updatedAt: q.updatedAt,
+      quotes: [{
+        id: 'rfq-quote-1', sellerId: SELLER_USER.id, manufacturerId: q.manufacturerId, rfqId: match[1],
+        productName: q.productName, quantity: q.quantity, status: 'quoted', quotedPriceCents: q.quotedPriceCents,
+        quotedTurnaround: q.quotedTurnaround, quoteValidUntil: q.quoteValidUntil, counteroffer: null, notes: q.notes ?? null,
+        manufacturerName: MANUFACTURERS.find((m) => m.id === q.manufacturerId)?.businessName ?? 'Manufacturer',
+        manufacturerCountry: MANUFACTURERS.find((m) => m.id === q.manufacturerId)?.country ?? '',
+        manufacturerIsVerified: true, createdAt: q.createdAt, updatedAt: q.updatedAt,
+      }],
+    };
   }
-  if (p === '/sample-orders') {
-    return [
-      { id: 'so-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'Heavyweight Hoodie — Bone', status: 'delivered', orderType: 'sample', priceCents: 8500, quantity: 1, revision: 2, threadId: 'th-1', createdAt: iso(21 * DAY), updatedAt: iso(3 * DAY) },
-      { id: 'so-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', title: 'Field Shell Proto', status: 'cut_and_sew', orderType: 'sample', priceCents: 14000, quantity: 1, revision: 1, createdAt: iso(10 * DAY), updatedAt: iso(2 * DAY) },
-      { id: 'bo-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'FW26 Core Hoodie Run', status: 'cut_and_sew', orderType: 'bulk', priceCents: 1680000, quantity: 300, revision: 3, threadId: 'th-1', createdAt: iso(33 * DAY), updatedAt: iso(4 * DAY) },
-      { id: 'bo-2', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', title: 'Moss Hoodie Restock', status: 'payment_received', orderType: 'bulk', priceCents: 468000, quantity: 400, revision: 1, createdAt: iso(7 * DAY), updatedAt: iso(6 * DAY) },
-    ];
-  }
+  if (p === '/seller-hub/manufacturers') return MANUFACTURERS.map((m) => ({ id: m.id, businessName: m.businessName, country: m.country, specialty: m.specialty, moq: m.moq, isVerified: !!m.isVerified }));
+  if ((match = p.match(/^\/manufacturers\/orders\/([^/]+)\/timeline$/))) return productionTimelineFor(match[1]);
+  if (p === '/manufacturers/invite-tokens') return [];
+  if (p === '/freelancer-jobs') return { isFreelancer: false, asHirer: [], asFreelancer: [] };
+  if ((match = p.match(/^\/freelancers\/(?!me$)([^/]+)$/))) return { freelancer: null };
+  if (p === '/call/availability') return { configured: false };
 
   // Authed endpoints the audit script (scripts/audit/half-done-audit.mjs)
   // found hitting the "not seeded" 404 below across dozens of routes — every
