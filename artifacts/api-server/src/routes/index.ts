@@ -59,6 +59,7 @@ import shippingZonesRouter from "./shipping-zones";
 import shippingLabelsRouter from "./shipping-labels";
 import disputesRouter from "./disputes";
 import financeRouter from "./finance";
+import financeStatementsRouter from "./finance-statements";
 import taxesRouter from "./taxes";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
@@ -211,6 +212,7 @@ router.use("/returns",                   tc, returnsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
+router.use("/finance/statements",        financeStatementsRouter);
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the

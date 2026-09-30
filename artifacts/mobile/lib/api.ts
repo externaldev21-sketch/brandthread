@@ -16,6 +16,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -2673,6 +2674,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       statementCsvUrl: () => '/api/finance/statement.csv',
       payout: (data: { idempotencyKey: string; amount: number; currency: string }) =>
         post<any>('/api/finance/payout', data),
+    },
+    /** Monthly seller statements (list, JSON summary, authenticated PDF/CSV bytes). */
+    statements: {
+      list: (limit?: number) => freshGet<StatementList>(`/api/finance/statements${limit ? `?limit=${limit}` : ''}`),
+      get:  (month: string) => freshGet<StatementDetail>(`/api/finance/statements/${encodeURIComponent(month)}`),
+      /** Bearer-authenticated file download; returns the raw bytes. */
+      download: async (month: string, format: StatementFormat): Promise<ArrayBuffer> => {
+        const token = await getCachedToken(getToken);
+        const res = await fetchWithTimeout(
+          `${BASE}${versionApiPath(`/api/finance/statements/${encodeURIComponent(month)}.${format}`)}`,
+          { method: 'GET', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() } },
+          EXPENSIVE_REQUEST_TIMEOUT_MS,
+        );
+        if (!res.ok) throw new ApiError(res.status, await res.text());
+        return res.arrayBuffer();
+      },
     },
     /** Taxes & Duties — Stripe Tax integration */
     taxes: {
