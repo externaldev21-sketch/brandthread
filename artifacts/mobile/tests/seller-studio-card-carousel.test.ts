@@ -59,14 +59,25 @@ describe('Studio card carousel: horizontal scrub, vertical dismiss decided withi
  * upward flick.
  */
 describe('Studio card carousel: horizontal release LOCKS (does not navigate); tap or upward flick opens', () => {
-  it('a horizontal release never calls openCurrentItem — it snaps to the nearest card and fires the landed haptic instead', () => {
+  it('a horizontal release never opens the card DIRECTLY — it snaps to the nearest card, fires the landed haptic, and only opens later via the auto-enter fill\'s own completion callback', () => {
     const endBlock = studio.slice(studio.indexOf('.onEnd((e) => {', studio.indexOf('const cardAreaPan =')), studio.indexOf('}), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse,'));
     const horizontalBranch = endBlock.slice(endBlock.indexOf("cardGestureAxis.value === 'horizontal'"));
-    expect(horizontalBranch).not.toContain('runOnJS(openCurrentItem)()');
+    // The only occurrence of openCurrentItem in this branch must be inside
+    // the fillProgress withTiming's OWN completion callback (i.e. after the
+    // full ENTER_FILL_MS elapses) — never called synchronously as part of
+    // locking itself.
+    const openIdx = horizontalBranch.indexOf('runOnJS(openCurrentItem)()');
+    const fillStartIdx = horizontalBranch.indexOf('fillProgress.value = withTiming(1,');
+    expect(openIdx).toBeGreaterThan(fillStartIdx);
     expect(horizontalBranch).toContain('const target = Math.round(cardIndex.value);');
-    expect(horizontalBranch).toContain('cardIndex.value = withTiming(target, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING });');
-    expect(horizontalBranch).toContain('landedPulse.value = withTiming(1, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING });');
+    expect(horizontalBranch).toContain('cardIndex.value = withTiming(target, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING, ...NO_REDUCE_MOTION });');
+    expect(horizontalBranch).toContain('landedPulse.value = withTiming(1, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING, ...NO_REDUCE_MOTION });');
     expect(horizontalBranch).toContain('runOnJS(fireLandedHaptic)();');
+  });
+
+  it('the fill and lock/scrub timings force NO_REDUCE_MOTION — they are functional (a real cancel window), not decorative, so Reduce Motion must never collapse them to instant', () => {
+    expect(studio).toContain('const NO_REDUCE_MOTION = { reduceMotion: ReduceMotion.Never } as const;');
+    expect(studio).toContain('fillProgress.value = withTiming(1, { duration: ENTER_FILL_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }');
   });
 
   it('fireLandedHaptic uses a firmer/distinct impact style from the per-card scrub tick (fireHapticTick)', () => {
@@ -124,26 +135,28 @@ describe('Studio card carousel: one rate-limited haptic tick per card-index chan
 
   it('rate-limits the real haptic call by elapsed wall-clock time, independent of how many index changes the UI thread reports', () => {
     expect(studio).toContain('const MIN_HAPTIC_INTERVAL_MS = 45;');
-    expect(studio).toContain('if (now - lastHapticAtRef.current < MIN_HAPTIC_INTERVAL_MS) return;');
+    expect(studio).toContain('if (now - lastStepAtRef.current < MIN_HAPTIC_INTERVAL_MS) {');
   });
 
   it('does not fire a tick for the very first render (only on an actual change from a previous value)', () => {
-    expect(studio).toContain('if (previous !== null) runOnJS(fireHapticTick)();');
+    const reactionBody = studio.slice(studio.indexOf('useAnimatedReaction(\n    () => Math.round(cardIndex.value),'));
+    expect(reactionBody).toContain('if (previous !== null) {');
+    expect(reactionBody).toContain('runOnJS(fireHapticTick)();');
   });
 });
 
 describe('Studio card carousel: release/tap opens instantly — no closing animation, no push animation', () => {
-  it('commitAndOpen cancels any in-flight sheet animation and sets open=false directly, with no withTiming close', () => {
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, backdropOpacity, planLoading'));
+  it('commitAndOpen cancels any in-flight page animation and sets open=false directly, with no withTiming close', () => {
+    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, fillProgress, planLoading'));
     expect(fnBody).toContain('cancelAnimation(translateY);');
-    expect(fnBody).toContain('cancelAnimation(backdropOpacity);');
+    expect(fnBody).toContain('cancelAnimation(fillProgress);');
     expect(fnBody).toContain('setOpen(false);');
     expect(fnBody).not.toContain('withTiming');
   });
 
   it('sets a one-shot "no animation" override immediately before pushing', () => {
     expect(studio).toContain("import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';");
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, backdropOpacity, planLoading'));
+    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, fillProgress, planLoading'));
     const setIdx = fnBody.indexOf('setNextPushAnimationNone();');
     const pushIdx = fnBody.indexOf('router.push(item.route as never);');
     expect(setIdx).toBeGreaterThan(-1);
@@ -151,7 +164,7 @@ describe('Studio card carousel: release/tap opens instantly — no closing anima
   });
 
   it('a Growth-gated, unpaid item shows the upsell modal instead of navigating, and never sets the animation override for that path', () => {
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, backdropOpacity, planLoading'));
+    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, fillProgress, planLoading'));
     const gateIdx = fnBody.indexOf('!hasPlan(\'growth\')');
     const upsellIdx = fnBody.indexOf('setUpsellFeature(item.label);');
     const returnIdx = fnBody.indexOf('return;', upsellIdx);
