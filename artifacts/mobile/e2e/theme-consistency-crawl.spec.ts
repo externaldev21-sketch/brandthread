@@ -190,7 +190,21 @@ const BORDER_SCREENS: Array<{ name: string; role: 'buyer' | 'seller'; route: str
   { name: 'settings', role: 'seller', route: '/seller-settings' },
 ];
 
+// components/ui/Glass.tsx is a real frosted-glass primitive — genuine
+// backdrop blur + a specular-highlight gradient + a translucent edge, the
+// standard way to render actual "glass" chrome (its own border deliberately
+// isn't opaque, unlike the flat-card/chip bug this crawl otherwise guards
+// against). Its BORDER_DARK/BORDER_LIGHT constants are exempted by their
+// known values; components/tab-bar/TabBarParts.tsx's TabBarGlass hairline
+// edge (already allowlisted in tests/no-translucent-border-lint.test.ts as
+// a deliberate "frosted glass" hairline) is exempted the same way.
+const EXEMPT_BORDER_VALUES = new Set([
+  'rgba(255, 255, 255, 0.22)', 'rgba(255, 255, 255, 0.55)', // Glass.tsx
+  'rgba(255, 255, 255, 0.18)', // TabBarParts.tsx's TabBarGlass
+]);
+
 const BORDER_SCAN_SCRIPT = `(() => {
+  const EXEMPT = ${JSON.stringify([...EXEMPT_BORDER_VALUES])};
   const results = [];
   const all = document.querySelectorAll('body *');
   for (const el of all) {
@@ -203,6 +217,7 @@ const BORDER_SCAN_SCRIPT = `(() => {
     const colors = [style.borderTopColor, style.borderRightColor, style.borderBottomColor, style.borderLeftColor];
     for (let i = 0; i < 4; i++) {
       if (widths[i] < 1) continue; // no visible border on this edge
+      if (EXEMPT.includes(colors[i])) continue;
       const m = colors[i].match(/^rgba\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\d.]+)\\s*\\)$/);
       if (!m) continue; // rgb(...) with no alpha channel is already opaque
       const alpha = parseFloat(m[4]);
