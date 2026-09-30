@@ -26,6 +26,14 @@ export interface ControlCenterItem {
   growthOnly?: boolean;
   /** Which live counter (if any) feeds this item's badge. */
   badgeKey?: 'orders' | 'messages';
+  /**
+   * A shorter form of `label` for the seller Studio sheet's tight 4-column
+   * grid cells (SellerStudioRadialMenu.tsx) — falls back to `label` when
+   * unset. `label` itself stays the full, canonical name everywhere else
+   * (search results, the plan-upsell modal's feature name, screen titles),
+   * per Dev's call that the grid may abbreviate but nothing else should.
+   */
+  shortLabel?: string;
 }
 
 export interface ControlCenterSection {
@@ -56,16 +64,35 @@ const STUDIO_TOOL_IDS = [
   'ai-photoshoot',
 ] as const;
 
+// campaign-gen's own icon (lib/growthTools.ts) is 'trending-up' — identical
+// to the 'boost' item just above it in the grid (Dev's own bug report: they
+// overlap visually). Overridden here, in the Studio-grid item shape, rather
+// than in growthTools.ts itself, so the Growth-plan upsell card (which reads
+// GROWTH_STUDIO_TOOLS directly, not this file) keeps its original icon —
+// only the two Studio-sheet grid tiles need to stop looking identical.
+const GROWTH_ICON_OVERRIDES: Partial<Record<string, string>> = {
+  'campaign-gen': 'target',
+};
+
+// Grid-only short forms for the two Studio tools whose full title spans two
+// words and made their grid cell taller than a 1-line label's — same
+// shortLabel convention as the plain (non-Studio) items below.
+const GROWTH_SHORT_LABELS: Partial<Record<string, string>> = {
+  'mockup-to-model': 'Mockup',
+  'remove-bg': 'Remove BG',
+};
+
 const STUDIO_ITEMS: ControlCenterItem[] = STUDIO_TOOL_IDS.map((id) => {
   const tool = GROWTH_STUDIO_TOOLS.find((t) => t.id === id);
   if (!tool) throw new Error(`Missing Studio tool definition: ${id}`);
   return {
     id: tool.id,
     label: tool.title,
-    icon: tool.icon,
+    icon: GROWTH_ICON_OVERRIDES[tool.id] ?? tool.icon,
     route: GROWTH_ROUTES[tool.id],
     description: tool.desc,
     growthOnly: true,
+    shortLabel: GROWTH_SHORT_LABELS[tool.id],
   };
 });
 
@@ -107,8 +134,8 @@ export const SECTIONS: ControlCenterSection[] = [
     items: [
       { id: 'payouts',      label: 'Payouts',         icon: 'dollar-sign', route: '/payouts', description: 'Bank account and payout history' },
       { id: 'finance',      label: 'Finance',         icon: 'pie-chart',   route: '/finance', description: 'Revenue summary' },
-      { id: 'subscription', label: 'Subscription',    icon: 'star',        route: '/subscription', description: 'Manage your Brandthread plan' },
-      { id: 'taxes',        label: 'Taxes and Duties', icon: 'percent',    route: '/taxes-duties', description: 'Tax rules and collection' },
+      { id: 'subscription', label: 'Subscription',    icon: 'star',        route: '/subscription', description: 'Manage your Brandthread plan', shortLabel: 'Plan' },
+      { id: 'taxes',        label: 'Taxes and Duties', icon: 'percent',    route: '/taxes-duties', description: 'Tax rules and collection', shortLabel: 'Taxes' },
     ],
   },
   {
@@ -119,7 +146,7 @@ export const SECTIONS: ControlCenterSection[] = [
       { id: 'store-builder', label: 'Store Builder', icon: 'layout', route: '/store-builder', description: 'Build your brand website' },
       { id: 'store-preview', label: 'Store Preview', icon: 'eye',    route: '/store-preview', description: 'See your live storefront' },
       { id: 'shipping',      label: 'Shipping',       icon: 'truck',  route: '/shipping', description: 'Rates, zones and carriers' },
-      { id: 'manufacturer',  label: 'Manufacturer Hub', icon: 'tool', route: '/manufacturer-hub', description: 'Find and manage manufacturers' },
+      { id: 'manufacturer',  label: 'Manufacturer Hub', icon: 'tool', route: '/manufacturer-hub', description: 'Find and manage manufacturers', shortLabel: 'Sourcing' },
       ...STUDIO_ITEMS,
       // 'collections' removed from the Store section (folded into Store Builder's
       // collection-grid blocks). 'brand-memory' unlinked from the seller menu per

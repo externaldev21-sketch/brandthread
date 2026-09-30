@@ -224,6 +224,30 @@ describe('Section/item integrity', () => {
       expect(item.route.length).toBeGreaterThan(0);
     });
   });
+
+  // Dev's bug report on the seller Studio sheet: Boost and Create Ad
+  // (campaign-gen) both rendered with the 'trending-up' icon and were
+  // visually indistinguishable in the grid. Dev decides whether the two
+  // features themselves should be merged — this only fixes the visual
+  // collision, so a grid render never shows two identical icons.
+  it('Boost and Create Ad no longer share an icon', () => {
+    const boost = ALL_ITEMS.find((i) => i.id === 'boost');
+    const createAd = ALL_ITEMS.find((i) => i.id === 'campaign-gen');
+    expect(boost?.icon).toBeTruthy();
+    expect(createAd?.icon).toBeTruthy();
+    expect(createAd?.icon).not.toBe(boost?.icon);
+  });
+
+  // shortLabel is grid-display-only — full `label` (used by search results,
+  // the plan-upsell modal's feature name, and this same integrity check
+  // above) must never be abbreviated.
+  it('shortLabel, where set, is genuinely shorter than the full label it stands in for', () => {
+    const withShortLabel = ALL_ITEMS.filter((i) => i.shortLabel);
+    expect(withShortLabel.length).toBeGreaterThan(0);
+    withShortLabel.forEach((item) => {
+      expect(item.shortLabel!.length).toBeLessThan(item.label.length);
+    });
+  });
 });
 
 // ─── 8. Growth studio tools preserved ──────────────────────────────────────────
