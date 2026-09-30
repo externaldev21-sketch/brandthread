@@ -20,6 +20,7 @@ import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } 
 import { NativeModules, Platform, StyleSheet, TurboModuleRegistry, View } from 'react-native';
 import { centsToAmountString, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import { FONT } from '@/lib/theme';
+import { useCheckoutColors } from './CheckoutPrimitives';
 import {
   APPLE_MERCHANT_ID, stripePublishableKey,
   type BillingDetails, type ConfirmOutcome, type ExpressPayProps, type GetClientSecret, type PaymentControllerApi,
@@ -120,6 +121,7 @@ async function confirm(stripe: StripeSdk, clientSecret: string, paymentMethodDat
 // ─── Card field ──────────────────────────────────────────────────────────────
 
 export function CardEntry({ onCompleteChange, disabled }: { onCompleteChange: (complete: boolean) => void; disabled?: boolean }) {
+  const ck = useCheckoutColors();
   const stripe = sdk();
   if (!stripe) return null;
   const { CardField } = stripe;
@@ -130,12 +132,12 @@ export function CardEntry({ onCompleteChange, disabled }: { onCompleteChange: (c
       disabled={disabled}
       placeholders={{ number: 'Card number' }}
       cardStyle={{
-        backgroundColor: '#000000',
-        textColor: '#FFFFFF',
-        placeholderColor: '#6B6B6B',
-        cursorColor: '#FFFFFF',
-        textErrorColor: '#FFFFFF',
-        borderColor: 'rgba(255,255,255,0.14)',
+        backgroundColor: ck.bg,
+        textColor: ck.text,
+        placeholderColor: ck.subtle,
+        cursorColor: ck.text,
+        textErrorColor: ck.text,
+        borderColor: ck.fieldBorder,
         borderWidth: 1,
         borderRadius: 12,
         fontSize: 16,
