@@ -44,6 +44,7 @@ import {
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
+import { shouldNotifyRestricted } from "../lib/connectOnboarding";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
@@ -1818,10 +1819,35 @@ async function handleAccountUpdated(account: any, providerEventId?: string) {
       ? "restricted"
       : "pending";
 
+  const [sellerBefore] = await db
+    .select({ clerkId: users.clerkId, stripeAccountStatus: users.stripeAccountStatus })
+    .from(users)
+    .where(eq(users.stripeAccountId, stripeAccountId))
+    .limit(1);
+
   await db
     .update(users)
     .set({ stripeAccountStatus: status, updatedAt: new Date() })
     .where(eq(users.stripeAccountId, stripeAccountId));
+
+  // Seller payout setup: tell the seller when Stripe newly restricts the
+  // account or a requirement goes past due (transition only, never repeats).
+  const pastDue: string[] = account.requirements?.past_due ?? [];
+  if (sellerBefore && shouldNotifyRestricted(sellerBefore.stripeAccountStatus, status, pastDue)) {
+    try {
+      await publishNotification({
+        userId: sellerBefore.clerkId,
+        category: "payout",
+        type: "payout_setup_restricted",
+        title: pastDue.length > 0 ? "Payout info is overdue" : "Payout setup needs attention",
+        body: "Open payout setup to finish what Stripe still needs.",
+        targetType: "payout_setup",
+        cta: "/payout-setup",
+      });
+    } catch (err) {
+      logger.warn({ err, stripeAccountId }, "Seller payout-setup notification failed");
+    }
+  }
 
   // Freelancer rows track the same Connect account status (the account may be
   // shared with a seller profile, or freelancer-only).
