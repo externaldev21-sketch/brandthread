@@ -994,6 +994,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
+      /** Ship part of an order: tracking for just these items (409 AUTO_REFUNDED on a refunded order). */
+      addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
+        patch(`/api/orders/${id}/items-tracking`, body),
       updateTracking: (id: string, body: {
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
@@ -1444,6 +1447,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
         get:    (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
+        /** "I received it": marks the order delivered (idempotent). 409 NOT_SHIPPED | ALREADY_REFUNDED. */
+        confirmReceipt: (id: string) => post<{ delivery: unknown }>(
+          `/api/buyer/orders/${encodeURIComponent(id)}/confirm-receipt`, {}
+        ),
         /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
         cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
