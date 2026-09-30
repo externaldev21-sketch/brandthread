@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, storeVisits, notificationDeliveries, notificationEvents } from "@workspace/db";
+import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, storeVisits, notificationDeliveries, notificationEvents, threadCashEntries } from "@workspace/db";
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
@@ -7,8 +7,11 @@ import {
   DAY_MS,
   TEN_MIN_MS,
   addLocalMonths,
+  capEndAtNow,
   floorToLocalMonth,
   floorToLocalStep,
+  floorToLocalWeek,
+  floorToLocalYear,
   parseTzOffsetMinutes,
   previousPeriod,
 } from "../lib/analyticsTime";
@@ -126,54 +129,102 @@ router.get("/home", async (req, res) => {
     : "today";
   const tzOffsetMinutes = parseTzOffsetMinutes(req.query.tz);
   const now = new Date();
+  const HOUR_MS = 60 * 60 * 1000;
+  const WEEK_MS = 7 * DAY_MS;
 
   // Local-midnight-anchored boundaries, so "today"/"yesterday"/"this week" match the
   // seller's own calendar day rather than the server's timezone.
   const today = floorToLocalStep(now, DAY_MS, tzOffsetMinutes);
   const tomorrow = new Date(today.getTime() + DAY_MS);
   const yesterday = new Date(today.getTime() - DAY_MS);
-  const weekStart = new Date(today.getTime() - 6 * DAY_MS);
-  const monthWindowStart = new Date(today.getTime() - 29 * DAY_MS);
   // Rounded to a clean 10-minute mark so bucket boundaries (and their labels) never
   // land on an arbitrary minute like ":53" — the last live bucket covers up to the
   // most recent completed 10-minute window.
   const liveEnd = floorToLocalStep(now, TEN_MIN_MS, tzOffsetMinutes);
   const liveStart = new Date(liveEnd.getTime() - 60 * 60 * 1000);
-  // Year: the trailing 12 local calendar months, bucketed monthly.
-  const thisMonthStart = floorToLocalMonth(now, tzOffsetMinutes);
-  const nextMonthStart = addLocalMonths(thisMonthStart, 1, tzOffsetMinutes);
-  const yearWindowStart = addLocalMonths(thisMonthStart, -11, tzOffsetMinutes);
 
-  // All: since the seller's first (non-cancelled) order, floored to a local
-  // month, capped at 36 months back so a very old store doesn't return an
-  // unbounded number of mostly-empty buckets. Falls back to the Year window
-  // when there is no order history yet.
-  let allWindowStart = yearWindowStart;
+  // Today: hourly buckets across the seller's own local calendar day (12 AM
+  // start), capped at the end of the CURRENT hour so no future hours are
+  // ever drawn — the line simply stops at "now" instead of faking zeros
+  // ahead of the present moment.
+  const todayEnd = capEndAtNow(tomorrow, now, { stepMs: HOUR_MS, tzOffsetMinutes });
+
+  // Week: Sunday-first calendar week (the app's week start — NOT the ISO
+  // Monday-first convention), capped at the end of today so future days
+  // within the current week are never drawn.
+  const weekStart = floorToLocalWeek(now, tzOffsetMinutes);
+  const weekEnd = capEndAtNow(new Date(weekStart.getTime() + WEEK_MS), now, { stepMs: DAY_MS, tzOffsetMinutes });
+
+  // Month: the true calendar month (1st through the last day), bucketed by
+  // date-of-month — NOT a rolling 30-day window — capped at the end of today
+  // so future days in the month are never drawn.
+  const monthStart = floorToLocalMonth(now, tzOffsetMinutes);
+  const monthNaturalEnd = addLocalMonths(monthStart, 1, tzOffsetMinutes);
+  const monthEnd = capEndAtNow(monthNaturalEnd, now, { stepMs: DAY_MS, tzOffsetMinutes });
+
+  // Year: the calendar year (Jan 1 – Dec 31), bucketed monthly — NOT a
+  // trailing 12-month window — capped at the end of the current month so
+  // future months are never drawn.
+  const yearStart = floorToLocalYear(now, tzOffsetMinutes);
+  const yearNaturalEnd = addLocalMonths(yearStart, 12, tzOffsetMinutes);
+  const currentMonthEnd = addLocalMonths(monthStart, 1, tzOffsetMinutes);
+  const yearEnd = capEndAtNow(yearNaturalEnd, now, { currentBucketEnd: currentMonthEnd, tzOffsetMinutes });
+
+  // All: real granularity that scales with account age — recent stores get
+  // daily buckets, established ones weekly, long-running ones monthly —
+  // anchored to the seller's first (non-cancelled) order, falling back to
+  // their account creation date when they have no order history yet. Always
+  // capped so no future bucket is ever drawn.
+  let allStart = today;
+  let allEnd: Date = todayEnd;
+  let allStep: "1 day" | "1 week" | "1 month" = "1 day";
   if (range === "all") {
-    const [firstOrderRow] = await db.select({ createdAt: sql<Date | null>`min(created_at)` }).from(orders)
-      .where(and(eq(orders.ownerId, ownerId), sql`status != 'cancelled'`));
-    const firstOrderAt = firstOrderRow?.createdAt ? new Date(firstOrderRow.createdAt) : null;
-    const cappedStart = addLocalMonths(thisMonthStart, -35, tzOffsetMinutes);
-    allWindowStart = firstOrderAt
-      ? new Date(Math.max(floorToLocalMonth(firstOrderAt, tzOffsetMinutes).getTime(), cappedStart.getTime()))
-      : yearWindowStart;
+    const [firstOrderRows, userRows] = await Promise.all([
+      db.select({ createdAt: sql<Date | null>`min(created_at)` }).from(orders)
+        .where(and(eq(orders.ownerId, ownerId), sql`status != 'cancelled'`)),
+      db.select({ createdAt: users.createdAt }).from(users)
+        .where(eq(users.clerkId, ownerId)).limit(1),
+    ]);
+    const firstOrderAt = firstOrderRows[0]?.createdAt ? new Date(firstOrderRows[0].createdAt) : null;
+    const accountCreatedAt = userRows[0]?.createdAt ? new Date(userRows[0].createdAt) : now;
+    const anchor = firstOrderAt ?? accountCreatedAt;
+    const accountAgeDays = Math.max(0, (now.getTime() - anchor.getTime()) / DAY_MS);
+
+    if (accountAgeDays < 60) {
+      allStep = "1 day";
+      allStart = floorToLocalStep(anchor, DAY_MS, tzOffsetMinutes);
+      allEnd = todayEnd;
+    } else if (accountAgeDays < 365) {
+      allStep = "1 week";
+      allStart = floorToLocalWeek(anchor, tzOffsetMinutes);
+      allEnd = weekEnd;
+    } else {
+      allStep = "1 month";
+      allStart = floorToLocalMonth(anchor, tzOffsetMinutes);
+      allEnd = currentMonthEnd;
+    }
   }
 
   const start = range === "live" ? liveStart
     : range === "yesterday" ? yesterday
     : range === "week" ? weekStart
-    : range === "month" ? monthWindowStart
-    : range === "year" ? yearWindowStart
-    : range === "all" ? allWindowStart
+    : range === "month" ? monthStart
+    : range === "year" ? yearStart
+    : range === "all" ? allStart
     : today;
   const end = range === "live" ? liveEnd
     : range === "yesterday" ? today
-    : range === "year" || range === "all" ? nextMonthStart
-    : tomorrow;
+    : range === "week" ? weekEnd
+    : range === "month" ? monthEnd
+    : range === "year" ? yearEnd
+    : range === "all" ? allEnd
+    : todayEnd;
   const step = range === "live" ? "10 minutes"
-    : range === "week" || range === "month" ? "1 day"
-    : range === "year" || range === "all" ? "1 month"
-    : "4 hours";
+    : range === "week" ? "1 day"
+    : range === "month" ? "1 day"
+    : range === "year" ? "1 month"
+    : range === "all" ? allStep
+    : "1 hour";
 
   // The immediately preceding period of the same length — e.g. yesterday for
   // "today", the prior week for "this week" — so the metric cards can show a
@@ -182,9 +233,13 @@ router.get("/home", async (req, res) => {
   // skipped below rather than compared against an empty/fabricated window.
   const { start: previousStart, end: previousEnd } = previousPeriod(start, end);
 
-  const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow, sourceRows] = await Promise.all([
+  const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow, sourceRows, threadCashRow] = await Promise.all([
     db.select({
+      // Gross = the order total as charged. Net subtracts anything actually
+      // refunded/cancelled-back-out, so sellers see real money kept, not a
+      // number that ignores refunds.
       totalCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
+      netCents: sql<number>`coalesce(sum(${orders.totalCents} - coalesce(${orders.refundedCents}, 0)), 0)::int`,
       orderCount: sql<number>`count(*)::int`,
     }).from(orders).where(and(
       eq(orders.ownerId, ownerId),
@@ -211,6 +266,7 @@ router.get("/home", async (req, res) => {
     )),
     db.select({
       totalCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
+      netCents: sql<number>`coalesce(sum(${orders.totalCents} - coalesce(${orders.refundedCents}, 0)), 0)::int`,
       orderCount: sql<number>`count(*)::int`,
     }).from(orders).where(and(
       eq(orders.ownerId, ownerId),
@@ -236,6 +292,17 @@ router.get("/home", async (req, res) => {
       gte(storeVisits.createdAt, start),
       lt(storeVisits.createdAt, end),
     )).groupBy(storeVisits.source),
+    // Thread Cash the seller actually received via Live gifting in this
+    // range — cashable, unlike a buyer's reward credit (see threadCash.ts).
+    // The column is still named buyer_id even for a seller-recipient row.
+    db.select({
+      totalCents: sql<number>`coalesce(sum(${threadCashEntries.amountCents}), 0)::int`,
+    }).from(threadCashEntries).where(and(
+      eq(threadCashEntries.buyerId, ownerId),
+      eq(threadCashEntries.source, "live_gift"),
+      gte(threadCashEntries.createdAt, start),
+      lt(threadCashEntries.createdAt, end),
+    )),
   ]);
 
   const TRAFFIC_SOURCES = ["feed", "search", "profile", "external"] as const;
@@ -260,9 +327,14 @@ router.get("/home", async (req, res) => {
   });
 
   const [bucketRows, visitorBucketRows] = await Promise.all([
+    // Uses the EXACT same predicates (owner, status, paid_at) as the
+    // headline salesRow query above, so `sum(buckets[].totalCents)` is
+    // mathematically guaranteed to equal the headline totalCents — never a
+    // divergent number from a differently-filtered query.
     db.execute(sql`
       SELECT series.bucket,
              coalesce(sum(o.total_cents), 0)::int AS total_cents,
+             coalesce(sum(o.total_cents - coalesce(o.refunded_cents, 0)), 0)::int AS net_cents,
              count(o.id)::int AS order_count
       FROM generate_series(
         ${start}::timestamp,
@@ -300,11 +372,33 @@ router.get("/home", async (req, res) => {
     visitorCountByBucket.set(String(row.bucket), Number(row.visitor_count ?? 0));
   }
 
+  const totalCents = salesRow[0]?.totalCents ?? 0;
+  const netCents = salesRow[0]?.netCents ?? 0;
+  const orderCount = salesRow[0]?.orderCount ?? 0;
+  const visitorCount = visitorRow[0]?.count ?? 0;
+  const previousTotalCents = previousSalesRow[0]?.totalCents ?? 0;
+  const previousNetCents = previousSalesRow[0]?.netCents ?? 0;
+  const previousOrderCount = previousSalesRow[0]?.orderCount ?? 0;
+  const previousVisitorCount = previousVisitorRow[0]?.count ?? 0;
+
   res.json({
     range,
-    totalCents: salesRow[0]?.totalCents ?? 0,
-    orderCount: salesRow[0]?.orderCount ?? 0,
-    visitorCount: visitorRow[0]?.count ?? 0,
+    // Single source of truth: every field below (and every bucket) is
+    // derived from the SAME [start, end) window and the SAME order
+    // predicates, so the metric cards and the chart can never disagree.
+    totalCents,
+    // Net of anything actually refunded/cancelled back out — real money the
+    // seller keeps, not just what was charged.
+    netCents,
+    orderCount,
+    visitorCount,
+    // Real conversion + average-order-value, derived from the exact same
+    // counts above rather than a separately-fetched number that could drift.
+    conversionRate: visitorCount > 0 ? Math.round((orderCount / visitorCount) * 1000) / 10 : 0,
+    averageOrderCents: orderCount > 0 ? Math.round(totalCents / orderCount) : 0,
+    // Thread Cash the seller actually received via Live gifting in this
+    // range (cashable — see threadCash.ts).
+    threadCashReceivedCents: threadCashRow[0]?.totalCents ?? 0,
     toFulfill: fulfillRow[0]?.count ?? 0,
     toCapture: captureRow[0]?.count ?? 0,
     // Real period-over-period comparison (e.g. today vs yesterday). Balances
@@ -312,17 +406,22 @@ router.get("/home", async (req, res) => {
     // — so there is deliberately no "previous" figure for them anywhere in
     // this response.
     previous: {
-      totalCents: previousSalesRow[0]?.totalCents ?? 0,
-      orderCount: previousSalesRow[0]?.orderCount ?? 0,
-      visitorCount: previousVisitorRow[0]?.count ?? 0,
+      totalCents: previousTotalCents,
+      netCents: previousNetCents,
+      orderCount: previousOrderCount,
+      visitorCount: previousVisitorCount,
     },
     // Real per-source breakdown for the Traffic sources panel — replaces the
     // former "isn't tracked yet" lock row. Fresh stores with no visits yet
-    // get real zeros for every source, not a placeholder.
+    // get real zeros for every source, not a placeholder. This is the
+    // `visitorsBySource`-equivalent field for the Traffic Sources redesign:
+    // `trafficSources: [{ source: 'feed'|'search'|'profile'|'external',
+    // count: number, sharePercent: number }]`.
     trafficSources,
     buckets: ((bucketRows as any).rows ?? []).map((row: any) => ({
       bucket: row.bucket,
       totalCents: Number(row.total_cents ?? 0),
+      netCents: Number(row.net_cents ?? 0),
       orderCount: Number(row.order_count ?? 0),
       visitorCount: visitorCountByBucket.get(String(row.bucket)) ?? 0,
     })),

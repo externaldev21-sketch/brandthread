@@ -63,3 +63,46 @@ export function addLocalMonths(date: Date, months: number, tzOffsetMinutes: numb
   );
   return new Date(shiftedLocalMs - tzOffsetMinutes * 60_000);
 }
+
+/**
+ * Floors `date` to the most recent SUNDAY at local midnight, in the given
+ * local timezone — the "Week" range's calendar week starts Sunday (not the
+ * ISO Monday-first convention), per product decision.
+ */
+export function floorToLocalWeek(date: Date, tzOffsetMinutes: number): Date {
+  const local = new Date(date.getTime() + tzOffsetMinutes * 60_000);
+  const dayOfWeek = local.getUTCDay(); // 0 = Sunday .. 6 = Saturday
+  const flooredLocalMs = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - dayOfWeek);
+  return new Date(flooredLocalMs - tzOffsetMinutes * 60_000);
+}
+
+/**
+ * Floors `date` to local January 1st at local midnight, in the given local
+ * timezone — the "Year" range is the current CALENDAR year (Jan–Dec), not a
+ * trailing 12-month window.
+ */
+export function floorToLocalYear(date: Date, tzOffsetMinutes: number): Date {
+  const local = new Date(date.getTime() + tzOffsetMinutes * 60_000);
+  const flooredLocalMs = Date.UTC(local.getUTCFullYear(), 0, 1);
+  return new Date(flooredLocalMs - tzOffsetMinutes * 60_000);
+}
+
+/**
+ * Caps `naturalEnd` (the range's full, calendar-defined end — e.g. next
+ * Sunday for this week, Jan 1 next year for this year) at the end of the
+ * bucket containing `now`, so a range never returns buckets for a future
+ * hour/day/month that hasn't happened yet — no fake flat zeros drawn ahead
+ * of the present moment. `stepMs` must be the bucket step in milliseconds
+ * for FIXED-length steps (hour/day/week); for variable-length steps
+ * (month/year) pass the already-computed "current bucket's own end" as
+ * `currentBucketEnd` instead and leave `stepMs` undefined.
+ */
+export function capEndAtNow(
+  naturalEnd: Date,
+  now: Date,
+  opts: { stepMs?: number; currentBucketEnd?: Date; tzOffsetMinutes: number },
+): Date {
+  const currentBucketEnd = opts.currentBucketEnd
+    ?? new Date(floorToLocalStep(now, opts.stepMs!, opts.tzOffsetMinutes).getTime() + opts.stepMs!);
+  return new Date(Math.min(naturalEnd.getTime(), currentBucketEnd.getTime()));
+}
