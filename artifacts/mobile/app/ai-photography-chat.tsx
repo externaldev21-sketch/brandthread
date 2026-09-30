@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { FS } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 
 interface UploadedPhoto {
   id: string;
@@ -339,7 +339,7 @@ export default function AIPhotographyChatScreen() {
         subtitle="AI-generated photos"
         rightElement={
           <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
+            <Text style={[styles.statusText, { color: colors.foreground }]}>Online</Text>
           </View>
         }
       />
@@ -559,34 +559,37 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   modeSwitch: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
   modeChip: { flex: 1, minHeight: 34, borderRadius: 17, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  modeChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  modeChipText: { fontSize: 12, fontFamily: FONT.semibold },
   outfitNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
-  outfitNoticeText: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  outfitNoticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
+  // Narrow enough that the badge never eats into the title's available
+  // width — a wider badge here previously clipped "AI Product Photography"
+  // (251px of text in a 246px box) once the header row split the space.
+  statusBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 12 },
+  statusText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   bubble: { maxWidth: '85%', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
+  bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   attachedRow: { flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   attachedItem: { alignItems: 'center', gap: 3 },
   attachedThumb: { width: 48, height: 48, borderRadius: 8 },
-  attachedLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
+  attachedLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
   resultImage: { width: 240, height: 240, borderRadius: 10, marginTop: 10 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
-  loadingText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  loadingText: { fontSize: 13, fontFamily: FONT.regular },
   retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 34, marginTop: 10, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1 },
-  retryBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  retryBtnText: { fontSize: 12, fontFamily: FONT.semibold },
   retryLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   retrySpinner: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 56, height: 56, borderRadius: 10 },
   lockedHeroTray: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   lockedHeroCopy: { flex: 1, marginLeft: 10 },
-  lockedHeroTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  lockedHeroSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  lockedHeroTitle: { fontSize: 12, fontFamily: FONT.semibold },
+  lockedHeroSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   resetHeroBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   trayRemove: {
     position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: 9,
@@ -595,7 +598,7 @@ const styles = StyleSheet.create({
   inputBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 6, gap: 8 },
   attachBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  input: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', maxHeight: 100, paddingTop: 6, paddingBottom: 6 },
-  sendBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  hint: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 6, marginBottom: 4 },
+  input: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, maxHeight: 100, paddingTop: 6, paddingBottom: 6 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, // 44x44 minimum touch target (COMP.minTouchTarget); was 36x36.
+  hint: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginTop: 6, marginBottom: 4 },
 });
