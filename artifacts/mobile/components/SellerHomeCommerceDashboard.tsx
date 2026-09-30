@@ -563,6 +563,12 @@ export default function SellerHomeCommerceDashboard({
   const isEmptyChart = newSeller || buckets.every((b) => b.totalCents === 0 && b.orderCount === 0 && b.visitorCount === 0);
   const activeValue = scrubIndex !== null && series[scrubIndex] != null ? series[scrubIndex] : metricAggregate.current;
   const heroDisplay = useCountUp(Math.round(activeValue), scrubIndex === null);
+  // The delta line is computed instantly from metricAggregate (no animation),
+  // but the hero number above it counts up over ~650ms — showing the delta
+  // before the count-up settles would briefly (or, if requestAnimationFrame
+  // stalls, not-so-briefly) show a total and a delta that don't agree. Only
+  // reveal the delta once the displayed hero number has actually caught up.
+  const heroSettled = heroDisplay === Math.round(activeValue);
   const scrubLabel = scrubIndex !== null ? labels[scrubIndex] : null;
 
   const periodLabel = PERIOD_LABEL[range];
@@ -662,7 +668,7 @@ export default function SellerHomeCommerceDashboard({
                   // brand-new/zero-sales account — matches Shopify's own
                   // zero-state chart ("$0.00 —", no percent).
                   <Text style={[styles.heroDelta, { color: theme.muted }]}>No sales yet</Text>
-                ) : deltaLine && scrubIndex === null ? (
+                ) : deltaLine && scrubIndex === null && heroSettled ? (
                   <Text
                     style={[
                       styles.heroDelta,
