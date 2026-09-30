@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T05:40:13.086Z (partial run — time budget hit).
+Generated 2026-09-30T05:58:16.503Z (partial run — time budget hit).
 
 - Route files discovered: 266
-- Route × role combinations audited: 618
+- Route × role combinations audited: 698
 - Unreachable: 4
-- Total findings: 3063 (hard: 572, warn: 2491)
+- Total findings: 3623 (hard: 644, warn: 2979)
 
 ## Scoreboard by area/owner
 
@@ -15,12 +15,13 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 |---|---|---|---|---|---|
 | profiles+social (session 01MjTkyh) | 132 | 941 | 39 | 0 | 39 |
 | buyer (session 01AaWLh1) | 118 | 568 | 34 | 0 | 34 |
-| growth (session 019SGXKf) | 84 | 234 | 19 | 0 | 19 |
-| design (session 01DgPbif) | 84 | 254 | 26 | 0 | 26 |
-| store+account (session 01Cdzzzi) | 64 | 236 | 17 | 0 | 17 |
-| seller commerce (session 011WGHYC) | 54 | 110 | 12 | 0 | 12 |
-| supply (session 01Lbcp8K) | 20 | 24 | 4 | 0 | 4 |
+| growth (session 019SGXKf) | 100 | 302 | 23 | 0 | 23 |
+| design (session 01DgPbif) | 86 | 282 | 27 | 0 | 27 |
+| store+account (session 01Cdzzzi) | 86 | 302 | 20 | 0 | 20 |
+| seller commerce (session 011WGHYC) | 68 | 226 | 16 | 0 | 16 |
+| supply (session 01Lbcp8K) | 36 | 234 | 11 | 0 | 11 |
 | live (session 01Kp8Jgx) | 16 | 124 | 4 | 0 | 4 |
+| headers/tab bar/crawl (session 0193ZtXu) | 2 | 0 | 1 | 0 | 1 |
 
 ## Notes on this run
 
@@ -38,18 +39,18 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| type-scale-drift | warn | 1011 |
-| hit-target-too-small | warn | 824 |
-| console-error | hard | 460 |
-| contrast-violation | warn | 241 |
-| overlapping-text | warn | 216 |
-| clipped-text | warn | 86 |
-| font-family | warn | 60 |
-| preview-demo-wording | hard | 56 |
+| type-scale-drift | warn | 1243 |
+| hit-target-too-small | warn | 904 |
+| console-error | hard | 524 |
+| contrast-violation | warn | 301 |
+| overlapping-text | warn | 220 |
+| clipped-text | warn | 134 |
+| min-size-violation | warn | 81 |
+| font-family | warn | 72 |
+| preview-demo-wording | hard | 60 |
 | placeholder-copy | hard | 44 |
-| min-size-violation | warn | 33 |
-| color-rule-violation | warn | 20 |
-| error-boundary | hard | 8 |
+| color-rule-violation | warn | 24 |
+| error-boundary | hard | 12 |
 | repeated-labels | hard | 4 |
 
 ## Unreachable routes
@@ -63,7 +64,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (1811)
+### Other (2041)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -372,7 +373,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/integrations` | seller | demo | placeholder-copy | hard | Text matches placeholder pattern: "Coming soon" | [view](../../docs/audit/screenshots/integrations/seller/00-initial.png) |
 | `/integrations` | seller | demo | placeholder-copy | hard | Text matches placeholder pattern: "Coming soon" | [view](../../docs/audit/screenshots/integrations/seller/00-initial.png) |
 
-### Profile / settings (328)
+### Profile / settings (388)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -468,6 +469,12 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/freelancer-profile` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/freelancer-profile/buyer/00-initial.png) |
 | `/general-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/general-settings/seller/00-initial.png) |
 | `/general-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/general-settings/seller/00-initial.png) |
+| `/manufacturer-profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-profile/seller/00-initial.png) |
+| `/manufacturer-profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-profile/seller/00-initial.png) |
+| `/notifications-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/notifications-settings/seller/00-initial.png) |
+| `/notifications-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/notifications-settings/seller/00-initial.png) |
+| `/notifications-settings` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/notifications-settings/buyer/00-initial.png) |
+| `/notifications-settings` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/notifications-settings/buyer/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Change profile photo or video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add profile video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
@@ -674,12 +681,6 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/delete-account` | buyer | demo | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/delete-account/buyer/00-initial.png) |
 | `/edit-profile` | seller | fresh | clipped-text | warn | Text clipped (243px into 190px): "brandthread.app/u/northlinestudio" | [view](../../docs/audit/screenshots/edit-profile/seller/00-initial.png) |
 | `/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/edit-profile/seller/00-initial.png) |
-| `/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/edit-profile/seller/00-initial.png) |
-| `/edit-profile` | seller | demo | clipped-text | warn | Text clipped (243px into 190px): "brandthread.app/u/northlinestudio" | [view](../../docs/audit/screenshots/edit-profile/seller/00-initial.png) |
-| `/edit-profile` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/edit-profile/seller/00-initial.png) |
-| `/edit-profile` | seller | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/edit-profile/seller/00-initial.png) |
-| `/edit-profile` | buyer | fresh | clipped-text | warn | Text clipped (243px into 190px): "brandthread.app/u/northlinestudio" | [view](../../docs/audit/screenshots/edit-profile/buyer/00-initial.png) |
-| `/edit-profile` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/edit-profile/buyer/00-initial.png) |
 
 ### Buyer discover / feed (240)
 
@@ -1167,7 +1168,228 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/analytics-store` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 | `/analytics-store` | buyer | demo | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 
-### Checkout / orders (130)
+### Manufacturer hub (216)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/invite-manufacturer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/manufacturer-compare` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-compare/seller/00-initial.png) |
+| `/manufacturer-compare` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-compare/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-product` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-product/seller/00-initial.png) |
+| `/manufacturer-product` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-product/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/manufacturer-compare` | seller | fresh | clipped-text | warn | Text clipped (129px into 126px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-compare/seller/00-initial.png) |
+| `/manufacturer-compare` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Compare Suppliers" | [view](../../docs/audit/screenshots/manufacturer-compare/seller/00-initial.png) |
+| `/manufacturer-compare` | seller | demo | clipped-text | warn | Text clipped (129px into 126px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-compare/seller/00-initial.png) |
+| `/manufacturer-compare` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Compare Suppliers" | [view](../../docs/audit/screenshots/manufacturer-compare/seller/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | clipped-text | warn | Text clipped (129px into 126px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Compare Suppliers" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | demo | clipped-text | warn | Text clipped (129px into 126px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Compare Suppliers" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | fresh | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | seller | demo | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/seller/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-onboard` | seller | fresh | overlapping-text | warn | "https://api.brandthread.test/manufacturers/join" overlaps "2" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer signup" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "List your factory on Brandthread" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Open the manufacturer portal" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Open the manufacturer portal" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | demo | overlapping-text | warn | "https://api.brandthread.test/manufacturers/join" overlaps "2" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer signup" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "List your factory on Brandthread" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Open the manufacturer portal" | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Open the manufacturer portal" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-onboard/seller/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer signup" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "List your factory on Brandthread" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Open the manufacturer portal" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Open the manufacturer portal" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer signup" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "List your factory on Brandthread" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Open the manufacturer portal" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Open the manufacturer portal" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-product` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product" | [view](../../docs/audit/screenshots/manufacturer-product/seller/00-initial.png) |
+| `/manufacturer-product` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-product/seller/00-initial.png) |
+| `/manufacturer-product` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product" | [view](../../docs/audit/screenshots/manufacturer-product/seller/00-initial.png) |
+| `/manufacturer-product` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-product/seller/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer` | seller | fresh | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | fresh | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | seller | demo | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/seller/00-initial.png) |
+| `/manufacturer` | buyer | fresh | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Request for Quotation" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+
+### Checkout / orders (180)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -1195,6 +1417,12 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/fulfill-order` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/fulfill-order/seller/00-initial.png) |
 | `/fulfill-order` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/fulfill-order/buyer/00-initial.png) |
 | `/fulfill-order` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/fulfill-order/buyer/00-initial.png) |
+| `/order-detail` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/order-detail/seller/00-initial.png) |
+| `/order-detail` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/order-detail/seller/00-initial.png) |
+| `/order-detail` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/order-detail/buyer/00-initial.png) |
+| `/order-detail` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/order-detail/buyer/00-initial.png) |
+| `/orders` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
 | `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
 | `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
 | `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
@@ -1301,6 +1529,167 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/fulfill-order` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Fulfill Order" | [view](../../docs/audit/screenshots/fulfill-order/seller/00-initial.png) |
 | `/fulfill-order` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Fulfill Order" | [view](../../docs/audit/screenshots/fulfill-order/buyer/00-initial.png) |
 | `/fulfill-order` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Fulfill Order" | [view](../../docs/audit/screenshots/fulfill-order/buyer/00-initial.png) |
+| `/order-detail` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Go Back" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/order-detail/seller/00-initial.png) |
+| `/order-detail` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Go Back" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/order-detail/seller/00-initial.png) |
+| `/order-detail` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Go Back" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/order-detail/buyer/00-initial.png) |
+| `/order-detail` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Go Back" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/order-detail/buyer/00-initial.png) |
+| `/orders` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "NEW" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Orders" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Ready" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | fresh | hit-target-too-small | warn | 115x36px control "Ready" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "NEW" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Orders" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Ready" | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | seller | demo | hit-target-too-small | warn | 115x36px control "Ready" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/seller/00-initial.png) |
+| `/orders` | buyer | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "NEW" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Orders" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Ready" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | fresh | hit-target-too-small | warn | 115x36px control "Ready" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "NEW" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Orders" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Ready" | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+| `/orders` | buyer | demo | hit-target-too-small | warn | 115x36px control "Ready" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/orders/buyer/00-initial.png) |
+
+### Messaging (112)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/(buyer)/inbox` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/ai-mockup-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/community-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/community-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
 
 ### Live (104)
 
@@ -1410,107 +1799,6 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/live` | buyer | demo | hit-target-too-small | warn | 57x32px control "Buy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/live/buyer/00-initial.png) |
 | `/live` | buyer | demo | hit-target-too-small | warn | 36x36px control "button" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/live/buyer/00-initial.png) |
 | `/live` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/live/buyer/00-initial.png) |
-
-### Messaging (96)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/(buyer)/inbox` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/ai-mockup-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/community-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/community-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
 
 ### AI / Studio tools (66)
 
@@ -1627,20 +1915,3 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/add-product` | buyer | demo | hit-target-too-small | warn | 361x27px control "Add description" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
 | `/add-product` | buyer | demo | hit-target-too-small | warn | 361x27px control "Select category" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
 | `/add-product` | buyer | demo | hit-target-too-small | warn | 86x16px control "+ Add options" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
-
-### Manufacturer hub (12)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/invite-manufacturer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Invite a manufacturer" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Create private invite link" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
