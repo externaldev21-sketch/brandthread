@@ -163,13 +163,17 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     case 'return_update':
     case 'refund_update':
     case 'dispute_update':
-      router.push('/(buyer)/orders' as any);
+      // navigate (not push): these are the buyer's tab roots — push always
+      // adds a new stack entry even when the tab is already mounted with its
+      // own history, which both duplicates it and breaks that tab's back
+      // behavior. navigate reuses the existing tab instance and its stack.
+      router.navigate('/(buyer)/orders' as any);
       break;
     case 'drop_live':
     case 'product_restocked':
     case 'price_drop':
     case 'saved_product_update':
-      router.push('/(buyer)/discover' as any);
+      router.navigate('/(buyer)/discover' as any);
       break;
     case 'new_friend_message':
     case 'new_order_message':
@@ -177,7 +181,7 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
       if (notif.targetId) {
         router.push(('/buyer-conversation?id=' + notif.targetId) as any);
       } else {
-        router.push('/(buyer)/inbox' as any);
+        router.navigate('/(buyer)/inbox' as any);
       }
       break;
     case 'story_reaction':
@@ -187,11 +191,11 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
           ('/buyer-story-viewer?storyId=' + notif.targetId + '&allStoryIds=' + notif.targetId) as any,
         );
       } else {
-        router.push('/(buyer)/friends' as any);
+        router.navigate('/(buyer)/friends' as any);
       }
       break;
     default:
-      router.push('/(buyer)/inbox' as any);
+      router.navigate('/(buyer)/inbox' as any);
       break;
   }
 }

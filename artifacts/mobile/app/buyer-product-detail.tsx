@@ -494,7 +494,7 @@ export default function BuyerProductDetailScreen() {
   const pathname = usePathname();
   const { push, back } = useThreadPull();
   const usesThreadPull = pathname === '/thread-product-detail';
-  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router);
+  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();

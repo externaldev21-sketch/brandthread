@@ -773,7 +773,7 @@ export default function OrderDetailScreen() {
           icon="alert-circle"
           title="Order not found"
           description="This order may have been deleted or the ID is invalid."
-          action={{ label: 'Go Back', onPress: () => goBackOr(router), icon: 'arrow-left' }}
+          action={{ label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
         />
       </View>
     );
@@ -788,7 +788,7 @@ export default function OrderDetailScreen() {
         title={order.orderNumber}
         subtitle={order.customer.name}
         variant="push"
-        onBack={() => goBackOr(router)}
+        onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
       />
 

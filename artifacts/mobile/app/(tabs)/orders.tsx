@@ -701,7 +701,7 @@ function SellerOrdersListSkeleton() {
 }
 
 export default function OrdersScreen() {
-  const scrollResetRef = useScrollReset<any>();
+  const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, success: SUCCESS, warning: ORANGE, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;

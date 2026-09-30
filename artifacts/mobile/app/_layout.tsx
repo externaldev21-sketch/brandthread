@@ -841,10 +841,22 @@ function AuthGate() {
     }
 
     // Role mismatch corrections (seller-only users can't be in buyer group, etc.)
+    // Preserve whatever comes after the group segment (e.g. "profile") rather
+    // than dropping to the group's own root — same reasoning as the devRole
+    // preview branch above: route groups add no path segment, so a bare route
+    // name that exists, identically, in BOTH (buyer) and (tabs) (e.g.
+    // "profile") resolves to whichever same-named file Expo Router statically
+    // prefers, regardless of the signed-in user's actual role. Blanket-
+    // replacing to the group root here used to bounce that mismatch straight
+    // to the dashboard/discover root instead of the equivalent screen in the
+    // correct group — which is indistinguishable, from the user's seat, from
+    // "the back button threw me to home."
     if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
-      router.replace('/(buyer)/' as never);
+      const rest = (segments as string[]).slice(1).join('/');
+      router.replace((rest ? `/(buyer)/${rest}` : '/(buyer)/') as never);
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
-      router.replace('/(tabs)/' as never);
+      const rest = (segments as string[]).slice(1).join('/');
+      router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
   }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
 

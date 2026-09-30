@@ -363,7 +363,7 @@ export default function BuyerSaved() {
           description={mainTab === 'drops'
             ? 'We’ll flag it here the moment something you saved gets cheaper.'
             : 'Tap the bookmark on anything to save it here.'}
-          action={{ label: 'Discover', onPress: () => router.push('/(buyer)/discover') }}
+          action={{ label: 'Discover', onPress: () => router.navigate('/(buyer)/discover') }}
           style={{ marginTop: SPACING.xxl }}
         />
       ) : (

@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { Feather } from '@expo/vector-icons';
 
 /**
@@ -13,10 +15,11 @@ import { Feather } from '@expo/vector-icons';
  * customer-account configuration has a real endpoint.
  */
 export default function CustomerAccountsScreen() {
+  const router = useRouter();
   const colors = useColors();
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Customer accounts" />
+      <ScreenHeader title="Customer accounts" onBack={() => goBackOr(router, "/seller-settings")} />
       <View style={styles.empty}>
         <Feather name="user" size={28} color={colors.mutedForeground} />
         <Text style={[styles.title, { color: colors.foreground }]}>Not configurable from the app</Text>

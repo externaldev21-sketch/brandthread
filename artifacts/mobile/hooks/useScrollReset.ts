@@ -4,6 +4,16 @@
  * focus: first mount, a stack push into it, going back to it, switching
  * tabs into it, or re-tapping its already-active tab.
  *
+ * EXCEPTION — long browsable lists/feeds (the buyer home feed, search
+ * results, a store's product grid, seller Orders/Products lists, the
+ * message threads list, notifications/activity): pass `resetOnReturn =
+ * false` as the second argument. Those screens still reset on first mount
+ * (scroll naturally starts at 0) and still jump to top on re-tapping their
+ * own already-active tab (`useScrollToTop`, unaffected by this flag), but
+ * do NOT reset just because the screen regained focus — so a user who
+ * scrolled through the feed, opened a post/product, and pressed back lands
+ * exactly where they left off instead of back at the top.
+ *
  * It must NOT reset for anything that isn't a real screen-level focus
  * change:
  *  - An overlay/sheet/modal opening or closing on top of it — that never
@@ -55,7 +65,22 @@ import type { FlatList, ScrollView, SectionList } from 'react-native';
 
 type Resettable = ScrollView | FlatList<any> | SectionList<any> | { scrollTo?: any; scrollToOffset?: any; scrollToLocation?: any };
 
-export function useScrollReset<T extends Resettable = ScrollView>(enabled = true) {
+export function useScrollReset<T extends Resettable = ScrollView>(
+  enabled = true,
+  /**
+   * false for the long browsable lists/feeds Dev's back-navigation rules
+   * name as the exception to "back always shows the top": the buyer home
+   * feed, search results, a store's product grid, seller Orders/Products
+   * lists, message threads list, notifications/activity. Those screens
+   * stay mounted (freezeOnBlur/detachInactiveScreens={false}) whether the
+   * user switched tabs away or pushed a child screen on top, so simply
+   * NOT forcing scrollTop back to 0 on refocus already restores exactly
+   * where they left off — the DOM never lost it. Re-tapping the already-
+   * active tab (useScrollToTop, below) still scrolls to top either way,
+   * matching the iOS/Instagram convention.
+   */
+  resetOnReturn = true,
+) {
   const ref = useRef<T>(null);
 
   // "Re-tap the active tab" — no-op when the screen isn't inside a tab navigator.
@@ -63,7 +88,7 @@ export function useScrollReset<T extends Resettable = ScrollView>(enabled = true
 
   useFocusEffect(
     useCallback(() => {
-      if (!enabled) return;
+      if (!enabled || !resetOnReturn) return;
       const node = ref.current as any;
       if (!node) return;
       if (typeof node.scrollToOffset === 'function') {
@@ -74,7 +99,7 @@ export function useScrollReset<T extends Resettable = ScrollView>(enabled = true
         node.scrollTo({ x: 0, y: 0, animated: false });
       }
       // Intentionally no cleanup: we only act when gaining focus, never on blur.
-    }, [enabled])
+    }, [enabled, resetOnReturn])
   );
 
   return ref;
