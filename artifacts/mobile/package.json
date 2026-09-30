@@ -17,6 +17,7 @@
     "screenshots": "node scripts/store-screenshots/capture.mjs",
     "test:layout-audit": "node tests/layout-audit.spec.ts",
     "audit:half-done": "node scripts/audit/half-done-audit.mjs",
+    "audit:half-done:full": "node scripts/audit/run-full-audit.mjs",
     "lint:no-thin-overlay": "node scripts/lint/no-thin-partial-opacity-overlay.mjs",
     "capture:layout-matrix": "node scripts/capture-layout-matrix.mjs",
     "thread-cash:generate-bill-icon": "node scripts/thread-cash/generate-bill-icon.mjs",

@@ -11,27 +11,172 @@ colors, non-Inter fonts, off-scale type sizes...) across the whole app.
 It reuses the same demo web build + fake Clerk/API harness as
 `scripts/store-screenshots/` — no real backend or network egress involved.
 
+## Data-state dimension: fresh vs. `&demo=1`
+
+Every route/role is audited under two data states:
+
+- **fresh** (default, no query param) — a brand-new/empty account. Most of
+  the app's preview data sources (`lib/previewInbox.ts`, `previewOrders.ts`,
+  `previewSellerProducts.ts`, `previewActivity.ts`, `previewNotes.ts`,
+  `previewStories.ts`, `previewThreadCash.ts`, `previewSellerChartData.ts`,
+  …) render empty/zero-state by default under this state.
+- **demo** (`&demo=1`) — the app's own populated-preview-dataset opt-in,
+  gated by `isPreviewDemoMode()` in `artifacts/mobile/lib/devPreview.ts`.
+  This switches the same preview data sources over to their seeded,
+  populated fixtures (sample orders, messages, followers, chart history,
+  etc). This was already implemented app-side (not something this audit
+  added) — the audit script just learned to toggle it.
+
+Pass `--data-states fresh,demo` to audit both (this is what
+`audit:half-done:full` does); the flag defaults to `fresh` only, to keep the
+historical single-state behavior for a quick local `--only` iteration.
+Findings and the report's route/area/owner breakdowns are all tagged with
+which data state they were found under.
+
 ## Running it locally
 
 ```
 pnpm --filter mobile run audit:half-done
 # or, iterating on one route without rebuilding each time:
-pnpm --filter mobile run audit:half-done -- --skip-build --only buyer-checkout
+pnpm --filter mobile run audit:half-done -- --skip-build --only buyer-checkout --data-states fresh,demo
 ```
 
 Useful flags: `--only <substring,...>` (matches route path or file),
-`--limit N`, `--roles seller,buyer`, `--time-budget-ms N` (global wall-clock
-cap — the script writes whatever it collected so far when the budget is hit,
-so a full run can be safely interrupted), `--per-route-budget-ms N`,
-`--max-taps N` (controls tapped per route/role before moving on), `--ci`
-(exit 1 on new hard-tier findings — see below).
+`--limit N`, `--roles seller,buyer`, `--data-states fresh,demo` (see above;
+default `fresh`), `--time-budget-ms N` (global wall-clock cap — the script
+writes whatever it collected so far when the budget is hit, so a full run
+can be safely interrupted), `--per-route-budget-ms N`, `--max-taps N`
+(controls taps per route/role/data-state before moving on), `--ci` (exit 1
+on new hard-tier findings — see below), `--shard-out <path.json>` (dump raw
+combo results to a file instead of writing the top-level report/baseline —
+used by the full shard runner below, not needed for ad hoc local runs).
+
+## Running the full 274-route × 2-role × 2-data-state audit
+
+A genuinely full run (~1,000+ combinations, each with up to `--max-taps`
+real taps) is too much for one bounded Playwright process, so
+`run-full-audit.mjs` splits the route list into fixed-size shards, runs each
+shard as its own bounded `half-done-audit.mjs --shard-out ...` child
+process, and re-merges every shard's raw results into the final
+`half-done-findings.json` / `half-done-audit-report.md` / baseline after
+*each* shard — not only at the end — committing (and pushing) as it goes:
+
+```
+pnpm --filter mobile run audit:half-done:full
+# tune it:
+pnpm --filter mobile run audit:half-done:full -- --chunk-size 15 --per-shard-budget-ms 1500000
+# resume a run that stopped partway (skips shards whose .audit-shards/shard-NNN.json already exists):
+pnpm --filter mobile run audit:half-done:full -- --resume
+# local dry run, no git:
+pnpm --filter mobile run audit:half-done:full -- --no-commit --no-push
+```
+
+Raw per-shard results live in `.audit-shards/shard-NNN.json` at the repo
+root (committed, so a run can be resumed across sessions/container
+restarts with `--resume` without redoing already-audited shards) and are
+combined by `merge-shard-results.mjs`, which can also be invoked directly
+against an arbitrary set of shard files:
+
+```
+node scripts/audit/merge-shard-results.mjs .audit-shards/*.json
+```
+
+**Re-running on every merge to `dev` / every few hours**: point a scheduled
+job (or a follow-up session) at `pnpm --filter mobile run audit:half-done:full
+-- --resume` if you want to pick up an interrupted run, or without
+`--resume` for a completely fresh pass (delete `.audit-shards/` first if you
+don't want the old shard files lying around). Either way it's the one
+command that (re)builds, shards, audits, merges, and updates the baseline —
+no manual multi-step process needed.
 
 Output:
 - `docs/audit/half-done-findings.json` — structured findings, this run
-- `docs/audit/half-done-audit-report.md` — human-readable report, grouped by
-  area (Seller dashboard, Buyer discover, Messaging, Live, Checkout, …)
+- `docs/audit/half-done-audit-report.md` — human-readable report, with a
+  scoreboard broken down by area/owner (see below) as well as the original
+  per-category and per-area (Seller dashboard, Buyer discover, Messaging,
+  Live, Checkout, …) breakdowns
 - `artifacts/mobile/docs/audit/screenshots/<route-slug>/<role>/*.png` — one
-  screenshot per route/role, plus one per dead-control finding
+  screenshot per route/role/data-state, plus one per dead-control finding
+
+## Area/owner mapping (the scoreboard)
+
+`route-ownership.json` (+ its `route-ownership.mjs` loader, which exposes
+`ownerForRoute(routePath)`) maps every route to one of the app's 9
+owner areas for tonight's whole-app audit:
+
+- **buyer** — the buyer-facing browse/discover/checkout/DM/wallet
+  experience: the `(buyer)` route group, `buyer-*` routes not claimed by a
+  more specific area below, `checkout`/`cart`/`thread-checkout`,
+  `thread-cash`/`thread-explainer`, `drops/`, `c/` (collections).
+- **supply** — manufacturer/supply-chain/B2B: `manufacturer*`,
+  `invite-manufacturer`, `freelancer-*`, `rfq-*`, `quote-*`,
+  `request-sample`/`sample-detail`, `production-detail`.
+- **store+account** — store builder/settings and generic account/security
+  settings that aren't seller-commerce-specific: `store-*` (builder, theme,
+  domain, SEO, publish, …), `account-type*`, `settings`/`security`/`privacy`
+  /`billing`/`subscription`/`plans`, sign-in/onboarding/setup, `team*`,
+  `roles`/`users`, `help`/`terms`, and the generic app-shell routes
+  (`splash`, root `index`).
+- **seller commerce** — products/inventory/orders/payouts:
+  `add-product`/`product-*`, `(tabs)/products`, `(tabs)/orders`/`orders`
+  /`order-detail`, `customer-*`, `fulfill-*`, `shipping*`, `discounts`,
+  `payouts`/`payments`/`finance`/`taxes-duties`, `dispute-detail`
+  /`refund-detail`/`return-detail` (the seller-side admin screens — the
+  buyer-initiated `buyer-refund-request`/`buyer-return-request` stay under
+  **buyer**).
+- **growth** — dashboard/analytics/marketing/growth tooling: `(tabs)`
+  (seller dashboard root) and `(tabs)/analytics`/`(tabs)/marketing`, every
+  `analytics-*` route, `meta-ads-*`, `automation`, `boost`, `integrations/*`,
+  `post-analytics`, `admin-reports`, `loyalty`, and the seller-side AI
+  assistant routes (`ai-assistant`, `ai-brain`, `ai-brand-memory`,
+  `ai-settings`). **Note**: the seller dashboard revenue chart itself (on
+  `(tabs)` root) is separately being rebuilt by this same session per the
+  "known exception" below — its findings are still counted under growth in
+  this scoreboard like any other route, just not something a follow-up PR
+  should pick up.
+- **live** — `live`/`live-feed`, `seller-live`/`seller-go-live`,
+  `buyer-live`, `call-screen`.
+- **profiles+social** — profile pages (`edit-profile`, `seller-profile`,
+  `buyer-other-profile`, `u/[username]`), the social graph
+  (`following`/`buyer-friends`/`connections`), messaging/DMs
+  (`seller-inbox`/`seller-conversation`, `conversation-*`,
+  `community-chat`), posts/stories (`create-post`, `buyer-post-*`,
+  `buyer-story-*`), and the notification/activity/moderation surface
+  (`activity-*`, `buyer-notifications`, `buyer-blocked`/`buyer-muted`
+  /`buyer-restricted`/`buyer-report`).
+- **design** — the design studio: `design`/`design-*` (canvas, mockup,
+  garment, campaign, templates, …), the creative AI tools (`ai-studio`,
+  `ai-mockup-chat`, `ai-photography-chat`, `bg-removal`, `camera-capture`,
+  `tech-pack-generator`, `lifestyle-images`, `mobile-app-builder`), and
+  `app-icon`/`app-theme`.
+- **headers/tab bar/crawl** — this is deliberately **cross-cutting**, not a
+  route set: every route has a header/tab-bar/safe-area surface to sweep, so
+  this area's real scope isn't well captured by "routes owned" the way the
+  other 8 areas are. The mapping gives it exactly one dedicated route
+  (`navigation-isolation-probe`, the nav-shell test harness route) so the
+  scoreboard has a row for it, but its actual audit signal is better read
+  off header/notch/hit-target-adjacent findings (contrast, hit-target-size,
+  clipped-text near the top/bottom safe areas) scattered across *every*
+  other area's rows, not a dedicated bucket. Documented here so nobody reads
+  "headers: 1 route" as "this area is basically done."
+
+The heuristic: match the most specific substring/prefix first (dynamic
+routes and route groups included, e.g. `/(tabs)/analytics` before the
+generic `/(tabs)` fallback, `/buyer-refund-request` before the generic
+`/buyer` fallback), fall through a chain of ~140 ordered rules, and default
+anything unmatched to **store+account** (the generic-app-shell catch-all) —
+in practice every one of the 266 discovered routes matches a specific rule
+before reaching that fallback; `unassigned (needs a route-ownership.json
+rule)` in a report means a genuinely new route was added and needs a rule.
+A handful of judgment calls worth flagging explicitly: seller/buyer DM
+inboxes went to **profiles+social** rather than **seller commerce** /
+**buyer** (messaging felt more "social surface" than "commerce logic");
+manufacturer messaging stayed under **supply** rather than
+**profiles+social** (it's B2B supply-chain communication, not the social
+graph); and `tech-pack-generator` / `bg-removal` / `camera-capture` went to
+**design** rather than **supply** even though they're used in the
+manufacturing flow, because they're creative/AI tooling, the same category
+as the rest of the design studio.
 
 ## Two-tier policy (why not "fail on any finding")
 
@@ -131,14 +276,19 @@ pick them up; check with that session first.
   isn't in that dictionary gets a generic fallback and may show as
   "unreachable" — check the report's Unreachable table before assuming a
   route is broken.
-- **Empty-data / fresh-install check**: the preview data layer
-  (`lib/previewInbox.ts`, `lib/previewCatalog.ts`, `lib/previewDiscover.ts`,
-  the `demo-data.mjs` fixtures) has no existing per-screen "render this route
-  with zero seeded items" switch. This audit does NOT attempt to build one —
-  that's a larger change (adding an empty-variant flag threaded through every
-  preview data source) left for a follow-up PR. This is a real gap: a screen
-  that only breaks on zero orders/zero products/zero messages will not be
-  caught by this audit today.
+- **Empty-data / fresh-install check — resolved**: earlier revisions of this
+  doc said the preview data layer had no "render this route with zero seeded
+  items" switch and that this audit didn't attempt one. That's no longer
+  true: `isPreviewDemoMode()` (`lib/devPreview.ts`) already gates the
+  populated-vs-empty split across every preview data source
+  (`previewInbox.ts`, `previewOrders.ts`, `previewSellerProducts.ts`,
+  `previewActivity.ts`, `previewNotes.ts`, `previewStories.ts`,
+  `previewThreadCash.ts`, `previewSellerChartData.ts`, …) via the `&demo=1`
+  query param, and the audit script now toggles it (`--data-states
+  fresh,demo`) — see "Data-state dimension" above. A screen that only breaks
+  on zero orders/zero products/zero messages is caught by the `fresh` pass
+  the same way a screen that only breaks once populated is caught by the
+  `demo` pass.
 - **Overlapping/clipped text** and **button-system-consistency** are
   heuristics, not a real layout engine: overlap is bounding-box intersection
   on on-screen elements only (off-screen/scrolled elements are excluded, but
