@@ -354,8 +354,8 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   // Grey 13pt text links, each a 44pt-tall target, left-aligned.
   textActions: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginLeft: -SP.xs },
   textAction: { height: 44, justifyContent: 'center', paddingHorizontal: SP.xs },
-  textActionLabel: { fontSize: 13, fontFamily: FONT.medium, color: theme.muted },
-  textActionDot: { fontSize: 13, color: theme.subtle, marginHorizontal: 2 },
+  textActionLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
+  textActionDot: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.subtle, marginHorizontal: 2 },
 });
 
 

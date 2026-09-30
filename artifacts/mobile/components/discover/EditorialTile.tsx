@@ -11,7 +11,7 @@ import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, GUTTER } from '@/lib/theme';
+import { FONT, FS, GUTTER } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
@@ -108,7 +108,7 @@ const tile = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3,
   },
   countdownText: { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
-  name: { fontSize: 14, fontFamily: FONT.semibold, marginTop: 6 },
+  name: { fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 6 },
   brand: { fontSize: 12, fontFamily: FONT.regular, marginTop: 4 },
   price: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 4 },
 });

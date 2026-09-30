@@ -11,7 +11,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { FONT, GUTTER } from '@/lib/theme';
+import { FONT, FS, GUTTER } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { IconButton } from '@/components/ui/IconButton';
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: GUTTER, paddingBottom: SPACING.sm,
   },
   title: {
-    fontSize: 20, lineHeight: 24, fontFamily: FONT.bold, letterSpacing: -0.4,
+    fontSize: FS.lg, lineHeight: 23, fontFamily: FONT.bold, letterSpacing: -0.4,
   },
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,

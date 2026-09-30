@@ -9,7 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
 export function DiscoverTileView({
@@ -74,7 +74,7 @@ export function DiscoverTileSkeleton({ width, height }: { width: number; height:
 const styles = StyleSheet.create({
   image: { width: '100%', height: '100%', backgroundColor: '#111' },
   fallback: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
-  fallbackInitials: { color: '#FFFFFF99', fontFamily: FONT.bold, fontSize: 18 },
+  fallbackInitials: { color: '#FFFFFF99', fontFamily: FONT.bold, fontSize: FS.md },
   fallbackCaption: { color: '#FFFFFF66', fontFamily: FONT.regular, fontSize: 11, textAlign: 'center' },
   glyphWrap: { position: 'absolute', top: 6, right: 6 },
 });
