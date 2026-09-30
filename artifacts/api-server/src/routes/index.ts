@@ -38,6 +38,7 @@ import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
 import sellerProfileRouter from "./seller-profile";
 import conversationsRouter from "./conversations";
+import communitiesRouter from "./communities";
 import brandthreadAgentRouter from "./brandthread-agent";
 import savedRouter from "./saved";
 import collectionsRouter from "./collections";
@@ -182,6 +183,9 @@ router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
+// Topic group chats (unlimited members). Public discovery + invite preview are
+// declared inside before the router applies requireAuth.
+router.use("/communities",               communitiesRouter);
 router.use("/brandthread-agent",         brandthreadAgentRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
