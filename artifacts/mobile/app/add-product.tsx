@@ -712,7 +712,11 @@ export default function AddProductScreen() {
        priceCents:        (v.priceCents ?? productPayload.pricing?.priceCents ?? 0) as number,
       stock:             typeof v.inventoryQuantity === 'number' ? v.inventoryQuantity : 0,
       lowStockThreshold: (productPayload.inventory as any)?.lowStockThreshold ?? 10,
-    })).filter((v: any) => v.priceCents > 0);
+    })).filter((v: any) => v.priceCents > 0).map((v: any) => {
+      // Persist the strike-through price (server requires it to exceed the variant price).
+      const compareAt = productPayload.pricing?.compareAtPriceCents;
+      return compareAt && compareAt > v.priceCents ? { ...v, compareAtPriceCents: compareAt } : v;
+    });
 
     const serverCreatePayload = {
       name:        productPayload.name ?? '',
@@ -738,6 +742,7 @@ export default function AddProductScreen() {
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
+      compareAtPriceCents: productPayload.pricing?.compareAtPriceCents ?? null,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
