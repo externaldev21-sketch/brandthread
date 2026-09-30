@@ -803,19 +803,23 @@ function RecentResultRow({
 }) {
   const s = createStyles(useAppTheme().theme);
   return (
-    <TouchableOpacity style={s.recentRow} onPress={onSelect} activeOpacity={0.85}>
-      <View style={s.recentThumbWrap}>
-        <Checkerboard />
-        <Image source={{ uri: result.localPath }} style={s.recentThumb} resizeMode="contain" />
-      </View>
-      <View style={s.recentInfo}>
-        <Text style={s.recentDate}>{new Date(result.createdAt).toLocaleDateString()}</Text>
-        <Text style={s.recentSize}>{(result.size / 1024).toFixed(0)} KB · PNG</Text>
-      </View>
+    <View style={s.recentRow}>
+      {/* Row-select and the trailing delete icon are siblings, not nested —
+          a <button> inside a <button> is invalid on web and React warns. */}
+      <TouchableOpacity style={s.recentRowMain} onPress={onSelect} activeOpacity={0.85}>
+        <View style={s.recentThumbWrap}>
+          <Checkerboard />
+          <Image source={{ uri: result.localPath }} style={s.recentThumb} resizeMode="contain" />
+        </View>
+        <View style={s.recentInfo}>
+          <Text style={s.recentDate}>{new Date(result.createdAt).toLocaleDateString()}</Text>
+          <Text style={s.recentSize}>{(result.size / 1024).toFixed(0)} KB · PNG</Text>
+        </View>
+      </TouchableOpacity>
       <TouchableOpacity style={s.recentDelete} onPress={onDelete} activeOpacity={0.7}>
         <Feather name="trash-2" size={ICON.xs} color={MUTED} />
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -882,6 +886,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   recentSection:    { gap: SP.sm },
   recentTitle:      { fontSize: FS.sm, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.5 },
   recentRow:        { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.sm },
+  recentRowMain:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.md },
   recentThumbWrap:  { width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   recentThumb:      { width: '100%', height: '100%' },
   recentInfo:       { flex: 1, gap: 2 },

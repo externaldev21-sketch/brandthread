@@ -197,6 +197,14 @@ export interface DesignProject {
   cloudRevision?: number;
   /** Soft-delete: timestamp of when the project was moved to Recently Deleted. */
   deletedAt?: string;
+  /**
+   * Groups this project into a Procreate-style "stack" with every other
+   * project sharing the same id — the gallery renders them as one fanned
+   * tile with an "N designs" caption instead of N separate tiles. Assigned
+   * by designService.ts's stack helpers (stackProjects/addToStack/
+   * removeFromStack); never set directly by a screen.
+   */
+  stackId?: string;
 }
 
 // DesignVersion — canonical version with snapshot

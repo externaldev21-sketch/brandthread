@@ -16,6 +16,7 @@ import {
   retainDesignUploadAsset,
 } from '@/lib/designCloudImageCache';
 import { ApiError } from '@/lib/networkNotice';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -506,6 +507,29 @@ async function loadAssets(key = K().assets): Promise<BrandAsset[]> {
 }
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
+/**
+ * A single full-canvas fill layer so a demo seed project's gallery thumbnail
+ * renders as a real (if plain) canvas preview instead of
+ * DesignLayerCompositor's grey type-icon placeholder, which is meant only
+ * for a genuinely blank, layer-less canvas.
+ */
+function fillLayer(fillHex: string): DesignLayer {
+  const now = new Date().toISOString();
+  return {
+    id: uid('layer'),
+    name: 'Background',
+    type: 'shape',
+    visible: true,
+    locked: false,
+    order: 0,
+    opacity: 1,
+    transform: { x: 0, y: 0, width: 1080, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
+    data: { kind: 'shape', shape: 'rect', fillColor: fillHex, fill: fillHex },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function makeSeedProject(
   name: string,
   type: DesignProjectType,
@@ -526,16 +550,30 @@ function makeSeedProject(
   };
 }
 
+/**
+ * A genuinely new seller (or a fresh dev/web preview, `?bt_preview=seller`
+ * with no `&demo=1`) must see Design Studio's real empty state — zero
+ * projects, not three fake ones. Sample projects only ever appear under the
+ * explicit `&demo=1` preview flag (see lib/devPreview.ts's isPreviewDemoMode
+ * doc comment); every other case, including real production accounts,
+ * returns the actually-empty list from AsyncStorage untouched.
+ */
 async function seedIfEmpty(projectsKey = K().projects): Promise<DesignProject[]> {
   const existing = await loadProjects(projectsKey);
   if (existing.length > 0) return existing;
+  if (!isPreviewDemoMode()) return existing;
   const seeds: DesignProject[] = [
     makeSeedProject('Spring Drop Hoodie', 'garment', 'saved', {
       garmentType: 'hoodie',
       garmentColor: '#1A1A2E',
+      layers: [fillLayer('#2A2A2E')],
     }),
-    makeSeedProject('Product Launch Mockup', 'mockup', 'draft'),
-    makeSeedProject('Campaign Assets', 'campaign', 'exported'),
+    makeSeedProject('Product Launch Mockup', 'mockup', 'draft', {
+      layers: [fillLayer('#3F3F46')],
+    }),
+    makeSeedProject('Campaign Assets', 'campaign', 'exported', {
+      layers: [fillLayer('#E4E4E7')],
+    }),
   ];
   await saveProjects(seeds, projectsKey);
   return seeds;
@@ -1025,6 +1063,44 @@ export async function purgeDeletedProjects(): Promise<void> {
   const deletedIds = projects.filter(p => !!p.deletedAt).map(p => p.id);
   for (const id of deletedIds) invalidateProjectOperations(context, id);
   await deleteProjectsSerialized(deletedIds, context);
+}
+
+// ─── Stacks ───────────────────────────────────────────────────────────────────
+// A "stack" is nothing more than a shared `stackId` across several projects —
+// no separate collection entity, matching Procreate's own model (a stack is
+// just how the gallery groups artworks that share a tag). Grouping/
+// ungrouping is a plain field update through the existing updateProject()
+// sync path, so it gets the same offline-safe merge/cloud-push behavior as
+// every other edit.
+
+let _uidStack = 0;
+function stackId(): string { return `stack_${Date.now()}_${++_uidStack}`; }
+
+/**
+ * Groups the given projects into one new stack (or, if any of them already
+ * belongs to a stack, reuses that stack's id so "select an existing stack
+ * tile + more items, then Stack" merges into it rather than creating a
+ * second one). Returns the resulting stack id.
+ */
+export async function stackProjects(projectIds: string[]): Promise<string> {
+  if (projectIds.length < 2) throw new Error('Select at least 2 designs to stack.');
+  const all = await getProjects();
+  const existing = projectIds
+    .map(id => all.find(p => p.id === id)?.stackId)
+    .find((id): id is string => !!id);
+  const id = existing ?? stackId();
+  for (const projectId of projectIds) await updateProject(projectId, { stackId: id });
+  return id;
+}
+
+/** Adds one project to an existing stack. */
+export async function addToStack(existingStackId: string, projectId: string): Promise<void> {
+  await updateProject(projectId, { stackId: existingStackId });
+}
+
+/** Removes a single project from whatever stack it's in (a no-op if it isn't in one). */
+export async function removeFromStack(projectId: string): Promise<void> {
+  await updateProject(projectId, { stackId: undefined });
 }
 
 export async function duplicateProject(id: string): Promise<DesignProject> {

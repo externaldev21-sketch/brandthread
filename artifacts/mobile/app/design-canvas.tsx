@@ -3916,7 +3916,8 @@ export default function DesignCanvasScreen() {
 
       {/* ── BRUSH LIBRARY ── */}
       <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={[styles.sheet, { maxHeight: '72%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
@@ -4011,13 +4012,14 @@ export default function DesignCanvasScreen() {
               </>
             )}
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── COLOR PICKER ── */}
       <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
+          <View>
             <ColorPickerComponent
               color={drawColor}
               onChange={applyColor}
@@ -4027,13 +4029,14 @@ export default function DesignCanvasScreen() {
               onRequestEyedropper={() => { closeSheet(); setEyedropperActive(true); }}
               onClose={closeSheet}
             />
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
       {/* ── LAYER MANAGER ── */}
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
+          <View>
             <LayersPanelComponent
               layers={layers}
               selectedLayerId={selectedLayerId}
@@ -4052,13 +4055,14 @@ export default function DesignCanvasScreen() {
               onMergeDown={handleMergeLayerDown}
               onClose={closeSheet}
             />
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* ── LAYER OPTIONS ── */}
       <Modal visible={activeSheet === 'layerOptions'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
@@ -4124,7 +4128,7 @@ export default function DesignCanvasScreen() {
               <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => { if (layerOptionsTarget) handleDeleteLayer(layerOptionsTarget); }} />
             </View>
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── TEXT SHEET ── */}
@@ -4139,7 +4143,8 @@ export default function DesignCanvasScreen() {
 
       {/* ── CANVAS RESIZE / CROP SHEET ── */}
       <Modal visible={activeSheet === 'canvasResize'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={styles.sheet}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Size & Crop</Text>
@@ -4207,12 +4212,13 @@ export default function DesignCanvasScreen() {
               )}
             </View>
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── EXPORT SHEET ── */}
       <Modal visible={activeSheet === 'export'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
@@ -4275,12 +4281,13 @@ export default function DesignCanvasScreen() {
               ));
             })()}
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── CANVAS INFO ── */}
       <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={styles.sheet}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Info</Text>
@@ -4305,7 +4312,7 @@ export default function DesignCanvasScreen() {
               <Text style={styles.addBtnText}>Close</Text>
             </TouchableOpacity>
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── QUICK MENU OVERLAY ── */}
@@ -4316,11 +4323,13 @@ export default function DesignCanvasScreen() {
         onRequestClose={() => setQuickMenuVisible(false)}
         testID="quick-menu-modal"
       >
-        <TouchableOpacity
-          style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}
-          activeOpacity={1}
-          onPress={() => setQuickMenuVisible(false)}
-        >
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setQuickMenuVisible(false)}
+            accessibilityLabel="Close quick menu"
+            accessibilityRole="button"
+          />
           <View style={{
             backgroundColor: CARD_ELEVATED,
             borderRadius: RADIUS.md,
@@ -4364,12 +4373,13 @@ export default function DesignCanvasScreen() {
               <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.medium }}>Dismiss</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── SELECTION SETTINGS MODAL ── */}
       <Modal visible={activeSheet === 'selection'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
@@ -4405,12 +4415,13 @@ export default function DesignCanvasScreen() {
               </TouchableOpacity>
             </View>
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── TRANSFORM SETTINGS MODAL ── */}
       <Modal visible={activeSheet === 'transformTool'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
@@ -4455,12 +4466,13 @@ export default function DesignCanvasScreen() {
               <Text style={styles.fontChipText}>Reset Transform</Text>
             </TouchableOpacity>
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ── ADJUSTMENTS (CURVES) PANEL ── */}
       <Modal visible={activeSheet === 'adjustments'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
@@ -4596,7 +4608,7 @@ export default function DesignCanvasScreen() {
               </>
             )}
           </SheetRise>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
     </View>
@@ -5195,7 +5207,8 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
         <SheetRise style={[styles.sheet, { maxHeight: '85%' }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -5274,7 +5287,7 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
             </TouchableOpacity>
           </ScrollView>
         </SheetRise>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }

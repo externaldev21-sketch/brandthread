@@ -8,6 +8,16 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// A static `import { Platform } from 'react-native'` anywhere in
+// designService.ts's own import graph (lib/devPreview.ts, used to gate demo
+// seed data) forces this file into an SSR-style source transform under
+// Vitest that can't parse react-native's own Flow-syntax entry point. This
+// suite never renders a component and only needs Platform.OS, so a minimal
+// mock sidesteps the real package entirely.
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+}));
+
 // ─── AsyncStorage mock ────────────────────────────────────────────────────────
 
 const store: Record<string, string> = {};

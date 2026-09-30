@@ -168,6 +168,21 @@ interface ConsistencyFailure {
   screenshot: string;
 }
 
+interface DomNestingFailure {
+  kind: 'dom-nesting';
+  route: string;
+  role: string;
+  dataState: string;
+  message: string;
+}
+
+// React's own validateDOMNesting warning for exactly this class of bug (a
+// <TouchableOpacity>/<Pressable> rendered inside another one becomes a
+// <button> inside a <button> on web) — matched loosely so it also catches
+// the sibling "cannot appear as a descendant of" phrasing React uses for
+// other invalid-nesting cases (e.g. a <View> inside a <Text>).
+const DOM_NESTING_WARNING = /cannot (?:contain a nested|appear as a descendant of)/i;
+
 const VIOLATION_SCRIPT = `(() => {
   const TOP_SAFE_LINE = ${TOP_SAFE_LINE};
   const BOTTOM_SAFE_LINE = ${BOTTOM_SAFE_LINE};
@@ -367,7 +382,12 @@ test('every screen clears the notch, the home indicator, and matches every other
   const failures: Failure[] = [];
   const consistencyFailures: ConsistencyFailure[] = [];
   const tabBarOverlapFailures: TabBarOverlapFailure[] = [];
+  const domNestingFailures: DomNestingFailure[] = [];
   let checked = 0;
+  // Updated on every navigation/tap so a console warning fired asynchronously
+  // (React's dev-mode DOM-nesting check runs on commit, not synchronously
+  // with the click that caused it) still gets attributed to the right screen.
+  let current = { route: '', role: '', dataState: '' };
   const device = { viewport: VIEWPORT, scale: 3, isMobile: true, userAgent: IPHONE_USER_AGENT };
   // The first screen-header-title geometry seen for each variant becomes
   // that variant's baseline every other screen of the same variant is
@@ -451,15 +471,26 @@ test('every screen clears the notch, the home indicator, and matches every other
         const { context, page } = await openContext(browser, {
           device, role, origin, images, onUnseeded: () => {}, ...contextOpts,
         });
+        page.on('console', (msg: { type: () => string; text: () => string }) => {
+          if (msg.type() !== 'error' && msg.type() !== 'warning') return;
+          const text = msg.text();
+          if (!DOM_NESTING_WARNING.test(text)) return;
+          domNestingFailures.push({
+            kind: 'dom-nesting', route: current.route, role: current.role, dataState: current.dataState,
+            message: text.slice(0, 500),
+          });
+        });
         try {
           // One full app boot per (role, data-state); every route after
           // this is a light client-side navigation on the same page.
+          current = { route: routes[0] ?? '/', role, dataState };
           await openScreen(page, activity, origin, role, routes[0] ?? '/');
           await waitForImages(page, 6000);
           await waitForQuietNetwork(activity, 500, 6000);
 
           for (const route of routes) {
             const deepen = !FAST || (ROUTE_ALLOWLIST && ROUTE_ALLOWLIST.has(route));
+            current = { route, role, dataState };
             await navigateTo(page, route, role);
             await waitForImages(page, 4000);
             await waitForQuietNetwork(activity, 400, 4000);
@@ -482,11 +513,12 @@ test('every screen clears the notch, the home indicator, and matches every other
       failureCount: failures.length, failures,
       consistencyFailureCount: consistencyFailures.length, consistencyFailures,
       tabBarOverlapFailureCount: tabBarOverlapFailures.length, tabBarOverlapFailures,
+      domNestingFailureCount: domNestingFailures.length, domNestingFailures,
       headerBaselines,
     }, null, 2),
   );
 
-  const total = failures.length + consistencyFailures.length + tabBarOverlapFailures.length;
+  const total = failures.length + consistencyFailures.length + tabBarOverlapFailures.length + domNestingFailures.length;
   if (total > 0) {
     const clearanceSummary = failures
       .slice(0, 20)
@@ -500,6 +532,23 @@ test('every screen clears the notch, the home indicator, and matches every other
       .slice(0, 20)
       .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} hidden behind tab bar`)
       .join('\n');
-    expect(total, `${failures.length} clearance + ${consistencyFailures.length} header-consistency + ${tabBarOverlapFailures.length} tab-bar-overlap failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}\n${tabBarOverlapSummary}`).toBe(0);
+    // Deduped by (route, message) — the same nested-pressable bug typically
+    // fires the identical warning once per render across a handful of
+    // re-renders on the same screen, which would otherwise flood this list.
+    const seenNesting = new Set<string>();
+    const domNestingSummary = domNestingFailures
+      .filter((f) => {
+        const key = `${f.route}|${f.message}`;
+        if (seenNesting.has(key)) return false;
+        seenNesting.add(key);
+        return true;
+      })
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}: ${f.message}`)
+      .join('\n');
+    expect(
+      total,
+      `${failures.length} clearance + ${consistencyFailures.length} header-consistency + ${tabBarOverlapFailures.length} tab-bar-overlap + ${domNestingFailures.length} DOM-nesting console-warning failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}\n${tabBarOverlapSummary}\n${domNestingSummary}`,
+    ).toBe(0);
   }
 });
