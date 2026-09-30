@@ -101,6 +101,12 @@ describe("fresh-install: personal preview modules gate their seeded cast on isPr
     expect(s).toMatch(/function previewForcesEmpty\(\)[\s\S]{0,80}return !\(BOOT_DEMO \|\| isPreviewDemoMode\(\)\);/);
   });
 
+  it("lib/live/previewLiveProvider.ts: the seeded upcoming-lives schedule and suggested creators (fake follower counts) only return under demo=1 — app/live.tsx's LiveEmptyState must see real empty arrays on a fresh install, not just an empty stream list", () => {
+    const s = src("../live/previewLiveProvider.ts");
+    expect(s).toMatch(/async listUpcoming\(\): Promise<UpcomingLive\[\]> \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*if \(forceEmpty\) return \[\];/);
+    expect(s).toMatch(/async listSuggestedCreators\(\): Promise<SuggestedCreator\[\]> \{\s*if \(forceEmpty\) return \[\];/);
+  });
+
   it("app/live-feed.tsx: the sample fashion-runway rooms (fake viewer counts, scripted chat) only render under demo=1, a fresh preview shows the real LiveEmptyState", () => {
     const s = src("../../app/live-feed.tsx");
     expect(s).toContain("import { isPreviewDemoMode } from '@/lib/devPreview';");
