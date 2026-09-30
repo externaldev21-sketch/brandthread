@@ -37,7 +37,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(MOBILE_ROOT, '..', '..');
-const SHARD_DIR = path.join(REPO_ROOT, '.audit-shards');
+const SHARD_DIR = path.join(REPO_ROOT, 'docs', 'audit', 'shards');
 
 function parseArgs(argv) {
   const opts = {
@@ -126,8 +126,8 @@ function main() {
 
     if (opts.commit) {
       try {
-        execSync('git add docs/audit .audit-shards artifacts/mobile/docs/audit/screenshots', { cwd: REPO_ROOT });
-        const status = execSync('git status --porcelain -- docs/audit .audit-shards artifacts/mobile/docs/audit/screenshots', { cwd: REPO_ROOT }).toString();
+        execSync('git add docs/audit artifacts/mobile/docs/audit/screenshots', { cwd: REPO_ROOT });
+        const status = execSync('git status --porcelain -- docs/audit artifacts/mobile/docs/audit/screenshots', { cwd: REPO_ROOT }).toString();
         if (status.trim()) {
           execSync(
             `git commit -m "Half-done audit: shard ${i + 1}/${shards.length} results" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"`,

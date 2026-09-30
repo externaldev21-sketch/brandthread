@@ -65,26 +65,25 @@ process, and re-merges every shard's raw results into the final
 pnpm --filter mobile run audit:half-done:full
 # tune it:
 pnpm --filter mobile run audit:half-done:full -- --chunk-size 15 --per-shard-budget-ms 1500000
-# resume a run that stopped partway (skips shards whose .audit-shards/shard-NNN.json already exists):
+# resume a run that stopped partway (skips shards whose docs/audit/shards/shard-NNN.json already exists):
 pnpm --filter mobile run audit:half-done:full -- --resume
 # local dry run, no git:
 pnpm --filter mobile run audit:half-done:full -- --no-commit --no-push
 ```
 
-Raw per-shard results live in `.audit-shards/shard-NNN.json` at the repo
-root (committed, so a run can be resumed across sessions/container
+Raw per-shard results live in `docs/audit/shards/shard-NNN.json` (committed, so a run can be resumed across sessions/container
 restarts with `--resume` without redoing already-audited shards) and are
 combined by `merge-shard-results.mjs`, which can also be invoked directly
 against an arbitrary set of shard files:
 
 ```
-node scripts/audit/merge-shard-results.mjs .audit-shards/*.json
+node scripts/audit/merge-shard-results.mjs docs/audit/shards/*.json
 ```
 
 **Re-running on every merge to `dev` / every few hours**: point a scheduled
 job (or a follow-up session) at `pnpm --filter mobile run audit:half-done:full
 -- --resume` if you want to pick up an interrupted run, or without
-`--resume` for a completely fresh pass (delete `.audit-shards/` first if you
+`--resume` for a completely fresh pass (delete `docs/audit/shards/` first if you
 don't want the old shard files lying around). Either way it's the one
 command that (re)builds, shards, audits, merges, and updates the baseline —
 no manual multi-step process needed.
