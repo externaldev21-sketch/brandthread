@@ -79,7 +79,7 @@ import { StickyFooter } from '@/components/layout';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { Button, ErrorState, IconButton } from '@/components/ui';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
-import { CK, CheckoutSection, GUTTER } from '@/components/checkout/CheckoutPrimitives';
+import { CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { ContactSection } from '@/components/checkout/ContactSection';
 import { ShippingSection, type CheckoutAddressDraft, type SavedAddress } from '@/components/checkout/ShippingSection';
 import {
@@ -119,6 +119,8 @@ function wait(ms: number) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function BuyerCheckoutScreen() {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
   const { source } = useLocalSearchParams<{ source?: string }>();
   const router = useRouter();
   const pathname = usePathname();
@@ -992,7 +994,7 @@ export default function BuyerCheckoutScreen() {
         >
           {error ? (
             <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="checkout-error">
-              <Feather name="alert-circle" size={18} color={CK.text} style={{ marginTop: 1 }} />
+              <Feather name="alert-circle" size={18} color={ck.text} style={{ marginTop: 1 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.errorTitle}>{error.title}</Text>
                 <Text style={styles.errorText}>{error.message}</Text>
@@ -1081,8 +1083,8 @@ export default function BuyerCheckoutScreen() {
                   accessibilityHint={ack.required ? 'Required before payment' : undefined}
                   rippleEnabled={false}
                 >
-                  <View style={[styles.checkbox, { borderColor: ack.acknowledged ? CK.text : CK.subtle }]}>
-                    {ack.acknowledged ? <Feather name="check" size={13} color={CK.text} /> : null}
+                  <View style={[styles.checkbox, { borderColor: ack.acknowledged ? ck.text : ck.subtle }]}>
+                    {ack.acknowledged ? <Feather name="check" size={13} color={ck.text} /> : null}
                   </View>
                   <Text style={styles.ackText}>{ack.label}</Text>
                 </PressableScale>
@@ -1108,11 +1110,11 @@ export default function BuyerCheckoutScreen() {
 
         {/* Sticky footer: one primary action carrying the live total, what's
             still missing (while disabled), and the terms line. */}
-        <StickyFooter style={{ paddingBottom: footerBottomPad, paddingTop: SP.sm + 4, backgroundColor: CK.bg, borderTopColor: CK.divider }}>
+        <StickyFooter style={{ paddingBottom: footerBottomPad, paddingTop: SP.sm + 4, backgroundColor: ck.bg, borderTopColor: ck.divider }}>
           <View onLayout={event => setFooterHeight(event.nativeEvent.layout.height + footerBottomPad + SP.sm + 4)} testID="checkout-footer">
             {!ready && nextStep ? (
               <View style={styles.hintRow} testID="checkout-next-step">
-                <Feather name="info" size={13} color={CK.muted} />
+                <Feather name="info" size={13} color={ck.muted} />
                 <Text style={styles.hint}>{nextStep}</Text>
               </View>
             ) : null}
@@ -1146,29 +1148,32 @@ function cardReadyForWallet(session: CheckoutSession): boolean {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: CK.bg },
-  scroll: { flex: 1, backgroundColor: CK.bg },
-  // Opaque black bar, fully below the notch; the page scrolls under it.
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.xs, paddingBottom: SP.xs,
-    backgroundColor: CK.bg, borderBottomWidth: 1, borderBottomColor: CK.divider,
-    zIndex: 2,
-  },
-  headerTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md, color: CK.text },
-  headerSpacer: { width: 44, height: 44 },
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 2,
-    borderWidth: 1, borderColor: CK.fieldBorder, borderRadius: 12,
-    padding: SP.md - 2, paddingRight: SP.xs, marginTop: SP.md,
-  },
-  errorTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: CK.text },
-  errorText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 3, color: CK.muted },
-  ack: { flexDirection: 'row', gap: SP.sm + 4, alignItems: 'flex-start', paddingVertical: SP.xs },
-  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  ackText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: CK.muted },
-  trust: { paddingVertical: SP.md, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: CK.divider },
-  hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: SP.sm },
-  hint: { fontFamily: FONT.medium, fontSize: FS.sm, color: CK.muted },
-});
+function makeStyles(ck: CheckoutColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: ck.bg },
+    scroll: { flex: 1, backgroundColor: ck.bg },
+    // Opaque bar (matches the theme's background), fully below the notch;
+    // the page scrolls under it.
+    header: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: SP.xs, paddingBottom: SP.xs,
+      backgroundColor: ck.bg, borderBottomWidth: 1, borderBottomColor: ck.divider,
+      zIndex: 2,
+    },
+    headerTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
+    headerSpacer: { width: 44, height: 44 },
+    errorBanner: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 2,
+      borderWidth: 1, borderColor: ck.fieldBorder, borderRadius: 12,
+      padding: SP.md - 2, paddingRight: SP.xs, marginTop: SP.md,
+    },
+    errorTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
+    errorText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 3, color: ck.muted },
+    ack: { flexDirection: 'row', gap: SP.sm + 4, alignItems: 'flex-start', paddingVertical: SP.xs },
+    checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+    ackText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: ck.muted },
+    trust: { paddingVertical: SP.md, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: ck.divider },
+    hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: SP.sm },
+    hint: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.muted },
+  });
+}

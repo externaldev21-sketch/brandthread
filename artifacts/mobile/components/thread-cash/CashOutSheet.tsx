@@ -142,11 +142,11 @@ export function CashOutSheet({
         <Pressable
           onPress={handleConfirm}
           disabled={!canSubmit}
-          style={[styles.confirmBtn, { backgroundColor: theme.text }, !canSubmit && styles.confirmBtnDisabled]}
+          style={[styles.confirmBtn, { backgroundColor: theme.accent }, !canSubmit && styles.confirmBtnDisabled]}
           accessibilityRole="button"
           accessibilityLabel={amountCents > 0 ? `Cash out ${formatCents(amountCents)}` : 'Cash out'}
         >
-          <Text style={[styles.confirmBtnText, { color: theme.background }]}>
+          <Text style={[styles.confirmBtnText, { color: theme.onAccent }]}>
             {confirming ? 'Cashing out…' : amountCents > 0 ? `Cash out ${formatCents(amountCents)}` : 'Enter an amount'}
           </Text>
         </Pressable>

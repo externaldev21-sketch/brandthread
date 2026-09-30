@@ -89,7 +89,7 @@ export function Chip({
           {label}
         </Text>
         {count !== undefined && (
-          <View style={[styles.count, { backgroundColor: selected ? `${theme.onAccent}26` : 'rgba(255,255,255,0.08)' }]}>
+          <View style={[styles.count, { backgroundColor: selected ? `${theme.onAccent}26` : theme.borderSubtle }]}>
             <Text style={[TYPE_SCALE.caption, { color: contentColor }]}>{count}</Text>
           </View>
         )}

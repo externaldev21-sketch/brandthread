@@ -67,13 +67,13 @@ export function LiveEmptyState({
                 onPress={() => onRemind(u.id, !u.reminderSet)}
                 style={[styles.pillBtn, u.reminderSet
                   ? { backgroundColor: 'transparent', borderColor: theme.border, borderWidth: 1 }
-                  : { backgroundColor: theme.text }]}
+                  : { backgroundColor: theme.accent }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: u.reminderSet }}
                 accessibilityLabel={u.reminderSet ? `Reminder set for ${u.title}` : `Remind me about ${u.title}`}
               >
                 {u.reminderSet && <Feather name="bell" size={12} color={theme.text} style={{ marginRight: 4 }} />}
-                <Text style={[styles.pillText, { color: u.reminderSet ? theme.text : theme.background }]}>
+                <Text style={[styles.pillText, { color: u.reminderSet ? theme.text : theme.onAccent }]}>
                   {u.reminderSet ? 'Reminder set' : 'Remind me'}
                 </Text>
               </Pressable>
@@ -97,11 +97,11 @@ export function LiveEmptyState({
                   onPress={() => onFollow(c.host.id, !c.following)}
                   style={[styles.cardFollow, c.following
                     ? { borderColor: theme.border, borderWidth: 1 }
-                    : { backgroundColor: theme.text }]}
+                    : { backgroundColor: theme.accent }]}
                   accessibilityRole="button"
                   accessibilityLabel={c.following ? `Following ${c.host.name}` : `Follow ${c.host.name}`}
                 >
-                  <Text style={[styles.pillText, { color: c.following ? theme.text : theme.background }]}>{c.following ? 'Following' : 'Follow'}</Text>
+                  <Text style={[styles.pillText, { color: c.following ? theme.text : theme.onAccent }]}>{c.following ? 'Following' : 'Follow'}</Text>
                 </Pressable>
               </View>
             ))}

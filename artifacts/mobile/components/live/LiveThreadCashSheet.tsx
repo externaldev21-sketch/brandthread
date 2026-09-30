@@ -151,8 +151,8 @@ export function LiveThreadCashSheet({
                 onPress={() => { hapticLight(); setSelected(cents); }}
                 style={[
                   styles.tip,
-                  { borderColor: isSelected ? theme.text : theme.border },
-                  isSelected && { backgroundColor: theme.text },
+                  { borderColor: isSelected ? theme.accent : theme.border },
+                  isSelected && { backgroundColor: theme.accent },
                   !affordable && styles.tipDisabled,
                 ]}
                 accessibilityRole="button"
@@ -160,7 +160,7 @@ export function LiveThreadCashSheet({
                 accessibilityLabel={`Select ${formatCents(cents)}`}
               >
                 <ThreadCashBillIcon size={18} style={isSelected ? { opacity: 0.85 } : undefined} />
-                <Text style={[styles.tipText, { color: isSelected ? theme.background : theme.text }]}>{formatCents(cents)}</Text>
+                <Text style={[styles.tipText, { color: isSelected ? theme.onAccent : theme.text }]}>{formatCents(cents)}</Text>
               </Pressable>
             );
           })}
@@ -171,13 +171,13 @@ export function LiveThreadCashSheet({
           disabled={!selected || sending || balanceCents == null || selected > balanceCents}
           style={[
             styles.sendBtn,
-            { backgroundColor: theme.text },
+            { backgroundColor: theme.accent },
             (!selected || sending || balanceCents == null || selected > balanceCents) && styles.sendBtnDisabled,
           ]}
           accessibilityRole="button"
           accessibilityLabel={selected ? `Send ${formatCents(selected)}` : 'Send'}
         >
-          <Text style={[styles.sendBtnText, { color: theme.background }]}>{selected ? `Send ${formatCents(selected)}` : 'Select an amount'}</Text>
+          <Text style={[styles.sendBtnText, { color: theme.onAccent }]}>{selected ? `Send ${formatCents(selected)}` : 'Select an amount'}</Text>
         </Pressable>
       </SheetRise>
     </Modal>

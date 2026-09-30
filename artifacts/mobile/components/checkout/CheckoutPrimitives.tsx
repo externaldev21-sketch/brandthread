@@ -1,15 +1,17 @@
 /**
- * Checkout building blocks: a flat, pure-black page (Shop "Review & Pay",
- * reskinned for Brandthread). There are no card containers:
+ * Checkout building blocks: a flat page that follows the active app theme
+ * (Shop "Review & Pay", reskinned for Brandthread). There are no card
+ * containers:
  *  - every section is a small uppercase label with its content sitting
- *    directly on black;
- *  - sections are split by a 1px hairline, rgba(255,255,255,0.08);
- *  - inputs are dark fields with a hairline border only;
+ *    directly on the theme's background;
+ *  - sections are split by a 1px hairline;
+ *  - inputs are fields with a hairline border only;
  *  - 16px side gutters (the page's padding), 24px between sections.
- * Monochrome only: selection and focus use white. Validation text is white
- * with an alert icon, never red (red is reserved for LIVE and end-call).
+ * Selection and focus use the theme's text color. Validation text uses the
+ * theme's text color with an alert icon, never red (red is reserved for
+ * LIVE and end-call).
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   FlatList, Modal, Platform, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextInputProps, type ViewStyle,
@@ -18,21 +20,74 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { COMP, FONT, FS, SP } from '@/lib/theme';
 
-/** The checkout's fixed palette: pure black, white, and white at set opacities. */
-export const CK = {
-  bg: '#000000',
-  text: '#FFFFFF',
-  muted: 'rgba(255,255,255,0.56)',
-  subtle: 'rgba(255,255,255,0.38)',
-  divider: 'rgba(255,255,255,0.08)',
-  fieldBorder: 'rgba(255,255,255,0.14)',
-  fieldFocus: 'rgba(255,255,255,0.6)',
-} as const;
+/** The checkout's palette, derived from the active app theme. */
+export function useCheckoutColors() {
+  const { theme } = useAppTheme();
+  return useMemo(() => ({
+    bg: theme.background,
+    text: theme.text,
+    muted: theme.muted,
+    subtle: theme.subtle,
+    divider: theme.borderSubtle,
+    fieldBorder: theme.border,
+    fieldFocus: theme.text,
+  }), [theme]);
+}
+
+export type CheckoutColors = ReturnType<typeof useCheckoutColors>;
 
 export const SECTION_GAP = 24;
 export const GUTTER = SP.md;
+
+function makeStyles(ck: CheckoutColors) {
+  return StyleSheet.create({
+    section: { paddingVertical: SECTION_GAP / 2 + 2 },
+    sectionDivider: { borderTopWidth: 1, borderTopColor: ck.divider },
+    labelRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      marginBottom: SP.sm + 4, minHeight: 18,
+    },
+    label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
+    radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+    radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: ck.text },
+    option: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm + 6, minHeight: 52 },
+    optionDivider: { borderBottomWidth: 1, borderBottomColor: ck.divider },
+    optionCopy: { flex: 1, minWidth: 0 },
+    optionTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
+    optionLine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted, marginTop: 1 },
+    field: { marginBottom: SP.sm + 4 },
+    fieldLabel: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: 6, color: ck.muted },
+    input: {
+      minHeight: 48, borderRadius: 12, borderWidth: 1,
+      paddingHorizontal: 14, paddingVertical: 12,
+      fontFamily: FONT.regular, fontSize: FS.base, color: ck.text, backgroundColor: ck.bg,
+      // The field's own border already shows focus; drop the browser outline.
+      ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
+    },
+    picker: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
+    pickerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base },
+    messageRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+    fieldError: { fontFamily: FONT.medium, fontSize: FS.meta, color: ck.text },
+    fieldHint: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 6, color: ck.subtle },
+    hairline: { height: 1, backgroundColor: ck.divider, marginVertical: SP.sm + 4 },
+    textAction: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline', color: ck.text },
+    sheet: { flex: 1, backgroundColor: ck.bg },
+    sheetHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: SP.sm, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: ck.divider,
+    },
+    sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
+  });
+}
+
+function useCheckoutStyles() {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
+  return { ck, styles };
+}
 
 export function CheckoutSection({
   title, trailing, children, first, style, testID,
@@ -46,6 +101,7 @@ export function CheckoutSection({
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
+  const { styles } = useCheckoutStyles();
   return (
     <View style={[styles.section, first ? null : styles.sectionDivider, style]} testID={testID}>
       {(title || trailing) ? (
@@ -59,10 +115,11 @@ export function CheckoutSection({
   );
 }
 
-/** A monochrome radio dot. Purely visual: the row owns the press. */
+/** A radio dot that follows the theme's text color when selected. */
 export function RadioDot({ selected }: { selected: boolean }) {
+  const { ck, styles } = useCheckoutStyles();
   return (
-    <View style={[styles.radio, { borderColor: selected ? CK.text : CK.subtle }]}>
+    <View style={[styles.radio, { borderColor: selected ? ck.text : ck.subtle }]}>
       {selected ? <View style={styles.radioInner} /> : null}
     </View>
   );
@@ -81,6 +138,7 @@ export function OptionRow({
   last?: boolean;
   testID?: string;
 }) {
+  const { styles } = useCheckoutStyles();
   return (
     <PressableScale
       onPress={onPress}
@@ -104,10 +162,11 @@ export function OptionRow({
 }
 
 function FieldMessage({ error, hint }: { error?: string; hint?: string }) {
+  const { ck, styles } = useCheckoutStyles();
   if (error) {
     return (
       <View style={styles.messageRow} accessibilityLiveRegion="polite">
-        <Feather name="alert-circle" size={12} color={CK.text} />
+        <Feather name="alert-circle" size={12} color={ck.text} />
         <Text style={styles.fieldError}>{error}</Text>
       </View>
     );
@@ -116,7 +175,7 @@ function FieldMessage({ error, hint }: { error?: string; hint?: string }) {
 }
 
 /**
- * A labeled dark field with a hairline border. The label sits above the
+ * A labeled field with a hairline border. The label sits above the
  * box (never placeholder-only), so it stays readable once filled.
  */
 export function CheckoutField({
@@ -132,6 +191,7 @@ export function CheckoutField({
   style?: StyleProp<ViewStyle>;
   testID?: string;
 } & Omit<TextInputProps, 'value' | 'onChangeText' | 'style'>) {
+  const { ck, styles } = useCheckoutStyles();
   const [focused, setFocused] = useState(false);
   const [blurred, setBlurred] = useState(false);
   const visibleError = error && (showError || blurred) ? error : undefined;
@@ -144,12 +204,12 @@ export function CheckoutField({
         onChangeText={onChangeText}
         onFocus={(event) => { setFocused(true); inputProps.onFocus?.(event); }}
         onBlur={(event) => { setFocused(false); setBlurred(true); inputProps.onBlur?.(event); }}
-        placeholderTextColor={CK.subtle}
-        selectionColor={CK.text}
+        placeholderTextColor={ck.subtle}
+        selectionColor={ck.text}
         accessibilityLabel={inputProps.accessibilityLabel ?? label}
         accessibilityHint={visibleError ?? hint}
         testID={testID}
-        style={[styles.input, { borderColor: focused || visibleError ? CK.fieldFocus : CK.fieldBorder }]}
+        style={[styles.input, { borderColor: focused || visibleError ? ck.fieldFocus : ck.fieldBorder }]}
       />
       <FieldMessage error={visibleError} hint={hint} />
     </View>
@@ -175,6 +235,7 @@ export function PickerField({
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
+  const { ck, styles } = useCheckoutStyles();
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const selected = options.find(option => option.value === value);
@@ -184,17 +245,17 @@ export function PickerField({
       <Text style={styles.fieldLabel}>{label}</Text>
       <PressableScale
         onPress={() => setOpen(true)}
-        style={[styles.input, styles.picker, { borderColor: visibleError ? CK.fieldFocus : CK.fieldBorder }]}
+        style={[styles.input, styles.picker, { borderColor: visibleError ? ck.fieldFocus : ck.fieldBorder }]}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? 'not chosen'}`}
         accessibilityHint={`Opens a list of ${label.toLowerCase()} options`}
         rippleEnabled={false}
         testID={testID}
       >
-        <Text style={[styles.pickerText, { color: selected ? CK.text : CK.subtle }]} numberOfLines={1}>
+        <Text style={[styles.pickerText, { color: selected ? ck.text : ck.subtle }]} numberOfLines={1}>
           {selected?.label ?? placeholder ?? 'Select'}
         </Text>
-        <Feather name="chevron-down" size={16} color={CK.muted} />
+        <Feather name="chevron-down" size={16} color={ck.muted} />
       </PressableScale>
       <FieldMessage error={visibleError} />
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
@@ -228,11 +289,13 @@ export function PickerField({
 }
 
 export function Hairline({ style }: { style?: StyleProp<ViewStyle> }) {
+  const { styles } = useCheckoutStyles();
   return <View style={[styles.hairline, style]} />;
 }
 
 /** A plain underlined text action (e.g. "Change", "Remove"). */
 export function TextAction({ label, onPress, accessibilityLabel, testID }: { label: string; onPress: () => void; accessibilityLabel?: string; testID?: string }) {
+  const { styles } = useCheckoutStyles();
   return (
     <PressableScale
       onPress={onPress}
@@ -247,42 +310,3 @@ export function TextAction({ label, onPress, accessibilityLabel, testID }: { lab
     </PressableScale>
   );
 }
-
-const styles = StyleSheet.create({
-  section: { paddingVertical: SECTION_GAP / 2 + 2 },
-  sectionDivider: { borderTopWidth: 1, borderTopColor: CK.divider },
-  labelRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: SP.sm + 4, minHeight: 18,
-  },
-  label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: CK.muted },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: CK.text },
-  option: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm + 6, minHeight: 52 },
-  optionDivider: { borderBottomWidth: 1, borderBottomColor: CK.divider },
-  optionCopy: { flex: 1, minWidth: 0 },
-  optionTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: CK.text },
-  optionLine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: CK.muted, marginTop: 1 },
-  field: { marginBottom: SP.sm + 4 },
-  fieldLabel: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: 6, color: CK.muted },
-  input: {
-    minHeight: 48, borderRadius: 12, borderWidth: 1,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontFamily: FONT.regular, fontSize: FS.base, color: CK.text, backgroundColor: CK.bg,
-    // The field's own border already shows focus; drop the browser outline.
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
-  },
-  picker: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
-  pickerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base },
-  messageRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  fieldError: { fontFamily: FONT.medium, fontSize: FS.meta, color: CK.text },
-  fieldHint: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 6, color: CK.subtle },
-  hairline: { height: 1, backgroundColor: CK.divider, marginVertical: SP.sm + 4 },
-  textAction: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline', color: CK.text },
-  sheet: { flex: 1, backgroundColor: CK.bg },
-  sheetHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.sm, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: CK.divider,
-  },
-  sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: CK.text },
-});

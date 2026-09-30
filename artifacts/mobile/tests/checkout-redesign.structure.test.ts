@@ -75,7 +75,7 @@ describe('checkout screen structure', () => {
     // (deliberately flat, theme-independent) header bar can't drift from it.
     expect(screen).toContain("import { useHeaderTopInset } from '@/hooks/useHeaderTopInset'");
     expect(screen).toContain('const headerTop = useHeaderTopInset();');
-    expect(screen).toMatch(/header: \{[^}]*backgroundColor: CK\.bg/);
+    expect(screen).toMatch(/header: \{[^}]*backgroundColor: ck\.bg/);
   });
 
   it('is one flat page: no card containers, hairline dividers, uppercase section labels', () => {
@@ -84,8 +84,14 @@ describe('checkout screen structure', () => {
       expect(source, file).not.toMatch(/\bCheckoutCard\b/);
       expect(source, file).not.toMatch(/from '@\/components\/ui\/Glass'/);
     }
-    expect(primitives).toContain("divider: 'rgba(255,255,255,0.08)'");
-    expect(primitives).toContain("bg: '#000000'");
+    // The checkout's palette now follows the active app theme (useCheckoutColors)
+    // instead of a hardcoded black/white CK constant; the default (Monochrome)
+    // theme still resolves to the same pure black/white the old CK hardcoded.
+    expect(primitives).toContain('export function useCheckoutColors()');
+    expect(primitives).toContain('divider: theme.borderSubtle');
+    expect(primitives).toContain('bg: theme.background');
+    const themeCtx = read('contexts/AppThemeContext.tsx');
+    expect(themeCtx).toContain("const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF'");
     expect(primitives).toContain("textTransform: 'uppercase'");
     // Contact, shipping and payment all live on this one screen: no address sheet, no second screen.
     expect(screen).toContain('<ContactSection');
@@ -197,11 +203,11 @@ describe('cart matches the flat checkout', () => {
 
   it('has no card containers, only checkout sections and hairlines', () => {
     expect(cart).not.toMatch(/<Card\b/);
-    expect(cart).toContain("import { CK, CheckoutSection } from '@/components/checkout/CheckoutPrimitives'");
+    expect(cart).toContain("import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives'");
     expect(cart).toContain('<CheckoutSection first={first}');
     expect(cart).toContain('<CheckoutSection title="Order summary"');
     expect(cart).not.toMatch(/cardGlass|cardElevatedGlass, borderBottomWidth/);
-    expect(cart).toContain('backgroundColor: CK.bg');
+    expect(cart).toContain('backgroundColor: theme.background');
     expect(cart).not.toContain('opacity: 0.06');
   });
 });

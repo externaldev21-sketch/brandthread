@@ -334,7 +334,7 @@ export function BrandthreadHeader({
         {onBack && (
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onBack(); }}
-            style={hdrS.back}
+            style={[hdrS.back, { backgroundColor: colors.card, borderColor: colors.border }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
@@ -819,7 +819,7 @@ export function BrandedLoader({ label = 'Stitching things together…', style }:
         <View style={[brLoaderS.thread, { borderColor: theme.accentLight }]} />
         <Feather name="scissors" size={22} color={theme.accentLight} />
       </Animated.View>
-      <Text style={brLoaderS.label}>{label}</Text>
+      <Text style={[brLoaderS.label, { color: theme.muted }]}>{label}</Text>
     </View>
   );
 }
@@ -844,7 +844,7 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   return (
     <View style={[shS.root, style]}>
       <View style={shS.titleWrap}>
-        <Text style={shS.title} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       </View>
       {action && (
         <PressableScale
@@ -896,8 +896,8 @@ export function StatCard({ label, value, icon, change, positive, accent, style }
       <View style={[scS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
         <Feather name={icon} size={ICON.sm} color={resolvedAccent} />
       </View>
-      <Text style={scS.value}>{value}</Text>
-      <Text style={scS.label}>{label}</Text>
+      <Text style={[scS.value, { color: theme.text }]}>{value}</Text>
+      <Text style={[scS.label, { color: theme.muted }]}>{label}</Text>
       {change && (
         <View style={scS.changeRow}>
           <Feather name={positive ? 'trending-up' : 'trending-down'} size={10} color={positive ? SUCCESS : RED} />
@@ -934,7 +934,7 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
   return (
     <PressableScale
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
-      style={[qaS.root, style]}
+      style={[qaS.root, { backgroundColor: theme.card, borderColor: theme.border }, style]}
       testID={`quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
       <View style={[qaS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
@@ -942,7 +942,7 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
         {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
       <Text
-        style={qaS.label}
+        style={[qaS.label, { color: theme.muted }]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.9}
@@ -1041,10 +1041,10 @@ export function FormInput({
   const { theme } = useAppTheme();
   return (
     <View style={[fiS.wrap, style]}>
-      {label && <Text style={fiS.label}>{label}</Text>}
-      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], multiline && fiS.multilineRow]}>
+      {label && <Text style={[fiS.label, { color: theme.muted }]}>{label}</Text>}
+      <View style={[fiS.inputRow, { backgroundColor: theme.card, borderColor: theme.border }, focused && [fiS.focusedRow, { borderColor: theme.accent }], multiline && fiS.multilineRow]}>
         <TextInput
-          style={[fiS.input, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
+          style={[fiS.input, { color: theme.text }, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
@@ -1096,8 +1096,8 @@ export function ProgressCard({ percent, label, nextLabel, onContinue, style }: P
     <GradientCard colors={[theme.accentDim, theme.secondaryDim]} style={[pcS.root, style]} glow>
       <View style={pcS.top}>
         <View>
-          <Text style={pcS.pct}>{percent}% complete</Text>
-          {label && <Text style={pcS.label}>{label}</Text>}
+          <Text style={[pcS.pct, { color: theme.text }]}>{percent}% complete</Text>
+          {label && <Text style={[pcS.label, { color: theme.muted }]}>{label}</Text>}
         </View>
         {onContinue && (
           <PrimaryButton label="Continue" onPress={onContinue} small style={{ alignSelf: 'flex-end', minWidth: 108 }} />
@@ -1106,7 +1106,7 @@ export function ProgressCard({ percent, label, nextLabel, onContinue, style }: P
       <View style={pcS.track}>
         <Animated.View style={[pcS.fill, { backgroundColor: theme.accent, width: width.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
       </View>
-      {nextLabel && <Text style={pcS.next}>Next: {nextLabel}</Text>}
+      {nextLabel && <Text style={[pcS.next, { color: theme.muted }]}>Next: {nextLabel}</Text>}
     </GradientCard>
   );
 }
@@ -1142,21 +1142,21 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
       onPress={() => { hapticLight(); onPress(); }}
       accessibilityLabel={description ? `${label}. ${description}` : label}
       accessibilityHint="Opens this section"
-      style={[ncS.root, style]}
+      style={[ncS.root, { backgroundColor: theme.card, borderColor: theme.border }, style]}
     >
       <View style={[ncS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
         <Feather name={icon} size={ICON.md} color={resolvedAccent} />
       </View>
       <View style={ncS.body}>
         <View style={ncS.labelRow}>
-          <Text style={ncS.label}>{label}</Text>
+          <Text style={[ncS.label, { color: theme.text }]}>{label}</Text>
           {badge !== undefined && badge !== false && (
             typeof badge === 'number'
               ? <View style={[ncS.badgeCount, { backgroundColor: theme.accent }]}><Text style={[ncS.badgeText, { color: theme.onAccent }]}>{badge}</Text></View>
               : <View style={[ncS.dot, { backgroundColor: theme.accent }]} />
           )}
         </View>
-        {description && <Text style={ncS.desc} numberOfLines={1}>{description}</Text>}
+        {description && <Text style={[ncS.desc, { color: theme.muted }]} numberOfLines={1}>{description}</Text>}
       </View>
       {right ?? <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
     </PressableScale>

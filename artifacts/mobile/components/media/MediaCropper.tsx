@@ -280,8 +280,8 @@ function ZoomTrack({ value, min, max, onChange }: { value: number; min: number; 
   return (
     <GestureDetector gesture={pan}>
       <View style={[s.track, { width: TRACK_WIDTH, backgroundColor: theme.border }]} testID="media-cropper-zoom-track">
-        <View style={[s.trackFill, { width: TRACK_WIDTH * progress, backgroundColor: theme.text }]} />
-        <View style={[s.trackThumb, { left: TRACK_WIDTH * progress - 8, backgroundColor: theme.text }]} />
+        <View style={[s.trackFill, { width: TRACK_WIDTH * progress, backgroundColor: theme.accent }]} />
+        <View style={[s.trackThumb, { left: TRACK_WIDTH * progress - 8, backgroundColor: theme.accent }]} />
       </View>
     </GestureDetector>
   );

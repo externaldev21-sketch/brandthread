@@ -32,7 +32,9 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { text: '#FAFAFA', background: '#281235', subtle: '#999', muted: '#aaa', border: '#333' } }),
 }));
 vi.mock('@/components/checkout/CheckoutPrimitives', () => ({
-  CK: { text: '#FFFFFF', bg: '#000000', muted: '#999', subtle: '#777', divider: '#111', fieldBorder: '#222' },
+  // Mirrors the colored theme mocked above (useAppTheme): the wallet button
+  // must not pick any of it up, so this stands in for useCheckoutColors().
+  useCheckoutColors: () => ({ text: '#FAFAFA', bg: '#281235', muted: '#aaa', subtle: '#999', divider: '#333', fieldBorder: '#333', fieldFocus: '#FAFAFA' }),
   CheckoutSection: nativeComponent('CheckoutSection'),
   OptionRow: nativeComponent('OptionRow'),
 }));

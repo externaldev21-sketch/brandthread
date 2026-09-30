@@ -306,7 +306,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
         <Text style={sr.sub}>{sub}</Text>
       </View>
       <View style={[sr.circle, selected && { borderColor: theme.text }]}>
-        {selected && <View style={[sr.dot, { backgroundColor: theme.text }]} />}
+        {selected && <View style={[sr.dot, { backgroundColor: theme.accent }]} />}
       </View>
     </PressableScale>
   );
@@ -492,7 +492,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
           {items.map((item, i) => (
             <Reveal key={item} index={i + 4}>
               <View style={sn.exampleRow}>
-                <View style={[sn.exampleDot, { backgroundColor: theme.text }]} />
+                <View style={[sn.exampleDot, { backgroundColor: theme.accent }]} />
                 <Text style={sn.exampleText}>{item}</Text>
               </View>
             </Reveal>

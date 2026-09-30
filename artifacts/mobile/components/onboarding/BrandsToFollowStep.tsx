@@ -129,11 +129,11 @@ export function BrandsToFollowStep() {
                       </Text>
                     </View>
                   )}
-                  <View style={[styles.followBadge, isFollowing && { backgroundColor: theme.text, borderColor: theme.text }]}>
+                  <View style={[styles.followBadge, isFollowing && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
                     {isPending ? (
-                      <ActivityIndicator size="small" color={isFollowing ? theme.background : theme.muted} />
+                      <ActivityIndicator size="small" color={isFollowing ? theme.onAccent : theme.muted} />
                     ) : (
-                      <Feather name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.background : theme.muted} />
+                      <Feather name={isFollowing ? 'check' : 'plus'} size={13} color={isFollowing ? theme.onAccent : theme.muted} />
                     )}
                   </View>
                 </View>

@@ -3,7 +3,7 @@
  * shipping and delivery window, then the one price breakdown (subtotal,
  * shipping, tax, discounts, total). Flat on black, hairlines between groups.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { formatCents } from '@/lib/money';
@@ -12,27 +12,27 @@ import type { CheckoutDisplayTotals } from '@/lib/checkoutReadiness';
 import type { CheckoutSession } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { CK, CheckoutSection } from './CheckoutPrimitives';
+import { CheckoutSection, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 
 type Group = CheckoutSession['deliveryGroups'][number];
 type LineItem = Group['items'][number];
 
 const THUMB = { width: 60, height: 80 }; // 3:4
 
-function Thumb({ uri }: { uri?: string }) {
+function Thumb({ uri, ck, styles }: { uri?: string; ck: CheckoutColors; styles: ReturnType<typeof makeStyles> }) {
   if (uri) return <Image source={{ uri }} style={[styles.thumb, THUMB]} resizeMode="cover" />;
   return (
     <View style={[styles.thumb, THUMB, styles.thumbFallback]}>
-      <Feather name="image" size={16} color={CK.subtle} />
+      <Feather name="image" size={16} color={ck.subtle} />
     </View>
   );
 }
 
-function ItemRow({ item }: { item: LineItem }) {
+function ItemRow({ item, ck, styles }: { item: LineItem; ck: CheckoutColors; styles: ReturnType<typeof makeStyles> }) {
   const meta = [item.variantTitle, `Qty ${item.quantity}`].filter(Boolean).join(' · ');
   return (
     <View style={styles.itemRow} accessible accessibilityLabel={`${item.productName}, ${meta}, ${formatCents(item.priceCents * item.quantity)}`}>
-      <Thumb uri={item.imageUri} />
+      <Thumb uri={item.imageUri} ck={ck} styles={styles} />
       <View style={styles.itemCopy}>
         <Text style={styles.itemName} numberOfLines={2}>{item.productName}</Text>
         <Text style={styles.itemMeta} numberOfLines={1}>{meta}</Text>
@@ -56,8 +56,9 @@ export function groupDeliveryWindow(group: Group, processingDays?: number | null
   });
 }
 
-function SellerGroup({ group, shippingCents, processingDays, first }: {
+function SellerGroup({ group, shippingCents, processingDays, first, ck, styles }: {
   group: Group; shippingCents: number | null; processingDays: number | null; first: boolean;
+  ck: CheckoutColors; styles: ReturnType<typeof makeStyles>;
 }) {
   const method = group.availableMethods.find(m => m.id === group.selectedMethodId);
   const shipping = shippingCents ?? method?.priceCents ?? null;
@@ -65,10 +66,10 @@ function SellerGroup({ group, shippingCents, processingDays, first }: {
     <View style={first ? undefined : styles.groupDivider} testID={`checkout-seller-group-${group.sellerId}`}>
       <Text style={styles.seller} numberOfLines={1}>From {group.sellerName}</Text>
       <View style={styles.items}>
-        {group.items.map(item => <ItemRow key={item.id} item={item} />)}
+        {group.items.map(item => <ItemRow key={item.id} item={item} ck={ck} styles={styles} />)}
       </View>
       <View style={styles.deliveryRow} testID="checkout-delivery-window">
-        <Feather name="truck" size={14} color={CK.muted} style={{ marginTop: 2 }} />
+        <Feather name="truck" size={14} color={ck.muted} style={{ marginTop: 2 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.deliveryTitle}>
             {method ? method.service : 'No delivery option available'}
@@ -83,7 +84,7 @@ function SellerGroup({ group, shippingCents, processingDays, first }: {
   );
 }
 
-function Line({ label, value, strong, testID }: { label: string; value: string; strong?: boolean; testID?: string }) {
+function Line({ label, value, strong, testID, styles }: { label: string; value: string; strong?: boolean; testID?: string; styles: ReturnType<typeof makeStyles> }) {
   return (
     <View style={styles.line} testID={testID}>
       <Text style={strong ? styles.totalLabel : styles.label}>{label}</Text>
@@ -103,6 +104,8 @@ export function OrderSummarySection({
   /** Per-seller numbers from the server's quote, when available. */
   quotedGroups?: Array<{ sellerId: string; shippingCents: number; processingDays: number | null }>;
 }) {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
   return (
     <CheckoutSection title="Order summary" testID="checkout-order-summary">
       {session.deliveryGroups.map((group, index) => {
@@ -114,29 +117,33 @@ export function OrderSummarySection({
             first={index === 0}
             shippingCents={quoted?.shippingCents ?? null}
             processingDays={quoted?.processingDays ?? null}
+            ck={ck}
+            styles={styles}
           />
         );
       })}
       <View style={styles.totals} testID="checkout-price-breakdown">
-        <Line label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={formatCents(totals.subtotalCents)} />
-        <Line label="Shipping" value={totals.shippingCents === 0 ? 'Free' : formatCents(totals.shippingCents)} />
+        <Line styles={styles} label={`Subtotal (${itemCount} ${itemCount === 1 ? 'item' : 'items'})`} value={formatCents(totals.subtotalCents)} />
+        <Line styles={styles} label="Shipping" value={totals.shippingCents === 0 ? 'Free' : formatCents(totals.shippingCents)} />
         <Line
+          styles={styles}
           label="Tax"
           value={taxNote ?? formatCents(totals.taxCents)}
           testID="checkout-tax-line"
         />
         {totals.promoCents > 0 ? (
-          <Line label="Discount" value={`−${formatCents(totals.promoCents)}`} testID="checkout-discount-line" />
+          <Line styles={styles} label="Discount" value={`−${formatCents(totals.promoCents)}`} testID="checkout-discount-line" />
         ) : null}
-        {totals.rewardsCents > 0 ? <Line label="Rewards" value={`−${formatCents(totals.rewardsCents)}`} /> : null}
+        {totals.rewardsCents > 0 ? <Line styles={styles} label="Rewards" value={`−${formatCents(totals.rewardsCents)}`} /> : null}
         {totals.threadCashCents > 0 ? (
           <>
-            <Line label="Order total" value={formatCents(totals.orderTotalCents)} testID="checkout-order-total-line" />
-            <Line label="Thread Cash" value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
+            <Line styles={styles} label="Order total" value={formatCents(totals.orderTotalCents)} testID="checkout-order-total-line" />
+            <Line styles={styles} label="Thread Cash" value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
           </>
         ) : null}
         <View style={styles.totalDivider} />
         <Line
+          styles={styles}
           label={totals.threadCashCents > 0 ? 'Charged to card' : 'Total'}
           value={formatCents(totals.totalCents)}
           strong
@@ -147,25 +154,27 @@ export function OrderSummarySection({
   );
 }
 
-const styles = StyleSheet.create({
-  groupDivider: { borderTopWidth: 1, borderTopColor: CK.divider, marginTop: SP.md, paddingTop: SP.md },
-  seller: { fontFamily: FONT.semibold, fontSize: FS.sm, color: CK.text, marginBottom: SP.sm + 2 },
-  items: { gap: SP.sm + 4 },
-  thumb: { borderRadius: 6, overflow: 'hidden', backgroundColor: '#111111' },
-  thumbFallback: { alignItems: 'center', justifyContent: 'center' },
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 4 },
-  itemCopy: { flex: 1, minWidth: 0, paddingTop: 2 },
-  itemName: { fontFamily: FONT.medium, fontSize: FS.base, lineHeight: 20, color: CK.text },
-  itemMeta: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: 3, color: CK.muted },
-  itemPrice: { fontFamily: FONT.medium, fontSize: FS.base, paddingTop: 2, color: CK.text, ...TABULAR_NUMS },
-  deliveryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.sm + 4 },
-  deliveryTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: CK.text },
-  deliverySub: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: CK.muted },
-  totals: { borderTopWidth: 1, borderTopColor: CK.divider, marginTop: SP.md + 2, paddingTop: SP.sm + 4 },
-  line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: SP.sm, paddingVertical: 5 },
-  label: { fontFamily: FONT.regular, fontSize: FS.base, flexShrink: 1, color: CK.muted },
-  value: { fontFamily: FONT.medium, fontSize: FS.base, color: CK.text, ...TABULAR_NUMS },
-  totalDivider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.sm },
-  totalLabel: { fontFamily: FONT.semibold, fontSize: FS.md, color: CK.text },
-  totalValue: { fontFamily: FONT.bold, fontSize: FS.lg, color: CK.text, ...TABULAR_NUMS },
-});
+function makeStyles(ck: CheckoutColors) {
+  return StyleSheet.create({
+    groupDivider: { borderTopWidth: 1, borderTopColor: ck.divider, marginTop: SP.md, paddingTop: SP.md },
+    seller: { fontFamily: FONT.semibold, fontSize: FS.sm, color: ck.text, marginBottom: SP.sm + 2 },
+    items: { gap: SP.sm + 4 },
+    thumb: { borderRadius: 6, overflow: 'hidden', backgroundColor: ck.divider },
+    thumbFallback: { alignItems: 'center', justifyContent: 'center' },
+    itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 4 },
+    itemCopy: { flex: 1, minWidth: 0, paddingTop: 2 },
+    itemName: { fontFamily: FONT.medium, fontSize: FS.base, lineHeight: 20, color: ck.text },
+    itemMeta: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: 3, color: ck.muted },
+    itemPrice: { fontFamily: FONT.medium, fontSize: FS.base, paddingTop: 2, color: ck.text, ...TABULAR_NUMS },
+    deliveryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.sm + 4 },
+    deliveryTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text },
+    deliverySub: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: ck.muted },
+    totals: { borderTopWidth: 1, borderTopColor: ck.divider, marginTop: SP.md + 2, paddingTop: SP.sm + 4 },
+    line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: SP.sm, paddingVertical: 5 },
+    label: { fontFamily: FONT.regular, fontSize: FS.base, flexShrink: 1, color: ck.muted },
+    value: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text, ...TABULAR_NUMS },
+    totalDivider: { height: 1, backgroundColor: ck.divider, marginVertical: SP.sm },
+    totalLabel: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
+    totalValue: { fontFamily: FONT.bold, fontSize: FS.lg, color: ck.text, ...TABULAR_NUMS },
+  });
+}

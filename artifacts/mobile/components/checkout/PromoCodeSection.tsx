@@ -4,13 +4,13 @@
  * code, Remove). The saving itself shows once, as the Discount line in the
  * order summary.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui';
 import type { CheckoutDiscount } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
-import { CK, CheckoutField, CheckoutSection, TextAction } from './CheckoutPrimitives';
+import { CheckoutField, CheckoutSection, TextAction, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 
 export function PromoCodeSection({
   discounts, onApply, onRemove, unavailableReason,
@@ -22,6 +22,8 @@ export function PromoCodeSection({
   /** Shown instead of the field when codes can't apply to this order. */
   unavailableReason?: string;
 }) {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
   const [code, setCode] = useState('');
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function PromoCodeSection({
     <CheckoutSection title="Promo code" testID="checkout-promo">
       {applied.map(discount => (
         <View key={discount.code} style={styles.applied} testID="checkout-promo-applied">
-          <Feather name="check-circle" size={18} color={CK.text} />
+          <Feather name="check-circle" size={18} color={ck.text} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.appliedCode}>{discount.code} applied</Text>
             {discount.description ? <Text style={styles.appliedDesc} numberOfLines={2}>{discount.description}</Text> : null}
@@ -92,12 +94,14 @@ export function PromoCodeSection({
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  // Aligns with the input box (below the field's label line).
-  apply: { marginTop: 25, minWidth: 84 },
-  applied: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.xs },
-  appliedCode: { fontFamily: FONT.semibold, fontSize: FS.base, color: CK.text },
-  appliedDesc: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: CK.muted },
-  unavailable: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: CK.muted },
-});
+function makeStyles(ck: CheckoutColors) {
+  return StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
+    // Aligns with the input box (below the field's label line).
+    apply: { marginTop: 25, minWidth: 84 },
+    applied: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.xs },
+    appliedCode: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
+    appliedDesc: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: ck.muted },
+    unavailable: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
+  });
+}

@@ -163,8 +163,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   textOnInverted: { color: '#0A0A0B' },
   mutedOnInverted: { color: 'rgba(10,10,11,0.6)' },
 
-  recBadge: { alignSelf: 'center', backgroundColor: theme.text, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 2 },
-  recBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.background, letterSpacing: 0.6 },
+  recBadge: { alignSelf: 'center', backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 2 },
+  recBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.onAccent, letterSpacing: 0.6 },
   recBadgeOnInverted: { backgroundColor: '#0A0A0B' },
   recBadgeTextOnInverted: { color: '#FFFFFF' },
 

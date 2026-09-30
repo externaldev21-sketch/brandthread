@@ -179,13 +179,13 @@ export default function ReturnDetailScreen() {
                 <View style={s.railCol}>
                   <View style={[
                     s.dot,
-                    step.state === 'done' && { backgroundColor: theme.text, borderColor: theme.text },
-                    step.state === 'current' && { borderColor: theme.text },
+                    step.state === 'done' && { backgroundColor: theme.accent, borderColor: theme.accent },
+                    step.state === 'current' && { borderColor: theme.accent },
                   ]}>
-                    {step.state === 'done' ? <Feather name="check" size={12} color={theme.background} /> : null}
+                    {step.state === 'done' ? <Feather name="check" size={12} color={theme.onAccent} /> : null}
                     {step.state === 'current' ? <View style={s.dotInner} /> : null}
                   </View>
-                  {i < steps.length - 1 ? <View style={[s.connector, step.state === 'done' && { backgroundColor: theme.text }]} /> : null}
+                  {i < steps.length - 1 ? <View style={[s.connector, step.state === 'done' && { backgroundColor: theme.accent }]} /> : null}
                 </View>
                 <View style={s.stepBody}>
                   <Text style={[s.stepLabel, step.state === 'upcoming' && { color: theme.muted }, step.state === 'current' && { fontFamily: FONT.bold }]}>
@@ -337,7 +337,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   stepRow: { flexDirection: 'row' },
   railCol: { alignItems: 'center', width: 28 },
   dot: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  dotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.text },
+  dotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.accent },
   connector: { width: 2, flex: 1, minHeight: 16, marginVertical: 2, backgroundColor: theme.border, borderRadius: 1 },
   stepBody: { flex: 1, paddingLeft: SP.sm, paddingBottom: SP.md },
   stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, paddingTop: 2 },
