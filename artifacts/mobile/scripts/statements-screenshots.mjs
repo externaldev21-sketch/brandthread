@@ -67,10 +67,11 @@ async function open(browser, images, origin, target, ready, months) {
 }
 
 /** Text-fit pass: flags clipped/ellipsised text (scrollWidth > clientWidth) and text escaping its parent. */
-async function textFit(page, name) {
-  const issues = await page.evaluate((vw) => {
+async function textFit(page, name, scope) {
+  const target = scope ?? page.locator('body');
+  const issues = await target.evaluate((root, vw) => {
     const out = [];
-    for (const el of document.querySelectorAll('div, span')) {
+    for (const el of root.querySelectorAll('div, span')) {
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
       if (!own) continue;
       const r = el.getBoundingClientRect();
@@ -87,11 +88,13 @@ async function textFit(page, name) {
 }
 
 async function shot(page, name) {
-  if (!name.startsWith('05')) await textFit(page, name); // 05 is the pre-existing Finance screen
+  if (!name.startsWith('05') && !name.startsWith('08')) await textFit(page, name); // 05/08 are scoped to the Finance Documents card
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(OUT, `${name}.png`), animations: 'disabled', caret: 'hide' });
   console.log(`  ok ${name}`);
 }
+
+const BEFORE = process.argv.includes('--before');
 
 async function run() {
   if (!process.argv.includes('--skip-build') || !existsSync(path.join(DEFAULT_BUILD_DIR, 'index.html'))) buildPreviewWeb(DEFAULT_BUILD_DIR);
@@ -112,9 +115,13 @@ async function run() {
     }
     {
       // Touches existing UI: the new row under Finance > Documents.
-      const { context, page } = await open(browser, images, server.origin, '/finance', (p) => p.getByText('Monthly Statements (PDF / CSV)'), MONTHS);
-      await page.getByText('Monthly Statements (PDF / CSV)').scrollIntoViewIfNeeded();
-      await shot(page, '05-finance-documents-row-after');
+      const { context, page } = await open(browser, images, server.origin, '/finance', (p) => p.getByText(BEFORE ? 'Download Statement (CSV)' : 'Monthly Statements (PDF / CSV)'), MONTHS);
+      const card = page.getByText('Download Statement (CSV)').locator('xpath=../..');
+      await card.scrollIntoViewIfNeeded();
+      await textFit(page, BEFORE ? '08-finance-documents-before' : '05-finance-documents-row-after', card);
+      await shot(page, BEFORE ? '08-finance-documents-before' : '05-finance-documents-row-after');
+      await card.screenshot({ path: path.join(OUT, BEFORE ? '09-zoom-documents-before.png' : '10-zoom-documents-after.png') });
+      if (BEFORE) { await context.close(); return; }
       await page.getByText('Monthly Statements (PDF / CSV)').click();
       await page.getByTestId('statement-month-2026-09').waitFor({ timeout: 15_000 });
       await context.close();
