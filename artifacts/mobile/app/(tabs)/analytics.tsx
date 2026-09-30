@@ -25,6 +25,7 @@ import {
   AnalyticsFilterState, AnalyticsPoint, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
 } from '@/services/analyticsTypes';
 import { AnalyticsBarChart, AnalyticsSkeleton, Card, SectionTitle, StatTile } from '@/components/analytics/AnalyticsKit';
+import { AnalyticsReportsList } from '@/components/analytics/AnalyticsReportsList';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
@@ -201,6 +202,9 @@ export default function AnalyticsScreen() {
             <SectionTitle>Daily Revenue</SectionTitle>
             <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" />
           </Card>
+
+          {/* ── Reports (appended) ─────────────────────────────────────────── */}
+          <AnalyticsReportsList />
 
           <View style={{ height: 120 }} />
         </ResponsiveContainer>
