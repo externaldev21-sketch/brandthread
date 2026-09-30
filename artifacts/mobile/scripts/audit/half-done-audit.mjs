@@ -656,7 +656,7 @@ async function main() {
   }
 
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
-  const browser = await launchBrowser();
+  let browser = await launchBrowser();
 
   const images = await ensureDemoImages(browser, path.join(MOBILE_ROOT, '.audit', 'demo-images'));
 
@@ -665,22 +665,58 @@ async function main() {
   const globalBudget = opts.timeBudgetMs ?? Infinity;
   let interrupted = false;
 
+  // A crashed/killed Chromium process (OOM under resource contention from
+  // other concurrent Playwright processes on the same box is the observed
+  // cause) leaves `browser` disconnected; every subsequent
+  // openContext()/page call then throws "Target page, context or browser
+  // has been closed", which — before this fix — silently fell through to
+  // the generic catch below and got recorded as a per-route "unreachable"
+  // finding for every remaining route in the run, a false-negative cascade
+  // (the routes aren't actually broken, the browser process is dead). Detect
+  // that specific failure, relaunch the browser, and retry the current
+  // route once before giving up on it.
+  const BROWSER_DIED_RE = /Target page, context or browser has been closed|Browser has been closed|Browser closed|has been closed$/i;
+  async function runOneCombo(route, role, dataState) {
+    return Promise.race([
+      auditRoute({ browser, origin, role, route, images, budgetMs: opts.perRouteBudgetMs, maxTaps: opts.maxTaps, dataState }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('route timed out')), opts.perRouteBudgetMs + 15_000)),
+    ]);
+  }
+
   outer:
   for (const route of routes) {
     for (const role of opts.roles) {
       for (const dataState of opts.dataStates) {
         if (Date.now() - overallStart > globalBudget) { interrupted = true; break outer; }
+        if (!browser.isConnected()) {
+          console.log('  [browser was disconnected before this route — relaunching]');
+          await browser.close().catch(() => {});
+          browser = await launchBrowser();
+        }
         process.stdout.write(`  [${role}/${dataState}] ${route.routePath}${route.query ? '?' + route.query : ''} … `);
         try {
-          const r = await Promise.race([
-            auditRoute({ browser, origin, role, route, images, budgetMs: opts.perRouteBudgetMs, maxTaps: opts.maxTaps, dataState }),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('route timed out')), opts.perRouteBudgetMs + 15_000)),
-          ]);
+          const r = await runOneCombo(route, role, dataState);
           results.push({ route: route.routePath, file: route.file, role, dataState, ...r });
           console.log(r.reachable ? `${r.findings.length} finding(s)` : `unreachable (${r.unreachableReason})`);
         } catch (err) {
-          results.push({ route: route.routePath, file: route.file, role, dataState, reachable: false, unreachableReason: String(err?.message || err), findings: [] });
-          console.log(`ERROR: ${err?.message || err}`);
+          const msg = String(err?.message || err);
+          if (BROWSER_DIED_RE.test(msg)) {
+            console.log(`browser crashed (${msg.slice(0, 80)}) — relaunching and retrying once`);
+            await browser.close().catch(() => {});
+            browser = await launchBrowser();
+            try {
+              const r = await runOneCombo(route, role, dataState);
+              results.push({ route: route.routePath, file: route.file, role, dataState, ...r });
+              console.log(`  [retry] ${r.reachable ? `${r.findings.length} finding(s)` : `unreachable (${r.unreachableReason})`}`);
+              continue;
+            } catch (err2) {
+              results.push({ route: route.routePath, file: route.file, role, dataState, reachable: false, unreachableReason: `browser crashed, retry also failed: ${String(err2?.message || err2)}`.slice(0, 300), findings: [] });
+              console.log(`  [retry] ERROR: ${err2?.message || err2}`);
+              continue;
+            }
+          }
+          results.push({ route: route.routePath, file: route.file, role, dataState, reachable: false, unreachableReason: msg.slice(0, 300), findings: [] });
+          console.log(`ERROR: ${msg}`);
         }
       }
     }
