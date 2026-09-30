@@ -8,6 +8,27 @@
 
 export type ProfileAccountType = 'buyer' | 'seller';
 
+/**
+ * Where the buyer navigated FROM, attached as `?src=` to a store/product
+ * href so the destination screen's mount effect can record a real
+ * `store_visits` row with an honest source instead of guessing. Matches the
+ * four categories the seller Dashboard's Traffic sources panel shows.
+ * Omitted (undefined) at a call site that isn't one of these three surfaces
+ * — the recording screen then falls back to 'external', which is also the
+ * correct answer for a cold deep link / share link open.
+ */
+export type StoreVisitSource = 'feed' | 'search' | 'profile';
+
+/**
+ * Turns whatever `?src=` a route param came in as into one of the four real
+ * categories the store-visits endpoint accepts, defaulting to 'external' —
+ * the honest answer for a cold deep link, a shared link, or any in-app
+ * navigation that wasn't tagged above.
+ */
+export function resolveStoreVisitSource(src: unknown): 'feed' | 'search' | 'profile' | 'external' {
+  return src === 'feed' || src === 'search' || src === 'profile' ? src : 'external';
+}
+
 function qs(params: Record<string, string | number | boolean | null | undefined>): string {
   const parts = Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -25,6 +46,7 @@ export function profileHref(target: {
   name?: string;
   handle?: string;
   initials?: string;
+  src?: StoreVisitSource;
 }): string {
   if (target.accountType === 'buyer') {
     return `/buyer-other-profile${qs({
@@ -34,7 +56,7 @@ export function profileHref(target: {
       initials: target.initials,
     })}`;
   }
-  return `/seller-profile${qs({ id: target.userId })}`;
+  return `/seller-profile${qs({ id: target.userId, src: target.src })}`;
 }
 
 export type VideoFeedSource = 'creator' | 'product';
@@ -67,9 +89,9 @@ export function profileProductsHref(opts: { sellerId: string; sellerName?: strin
 }
 
 /** Product detail — the buyer page for shoppers, the seller's own product screen for its owner. */
-export function productDetailHref(productId: string, opts: { isOwner?: boolean; sourcePostId?: string | null } = {}): string {
+export function productDetailHref(productId: string, opts: { isOwner?: boolean; sourcePostId?: string | null; src?: StoreVisitSource } = {}): string {
   if (opts.isOwner) return `/product-detail${qs({ id: productId })}`;
-  return `/buyer-product-detail${qs({ productId, sourcePostId: opts.sourcePostId ?? undefined })}`;
+  return `/buyer-product-detail${qs({ productId, sourcePostId: opts.sourcePostId ?? undefined, src: opts.src })}`;
 }
 
 /** Follower / following list of a specific profile (omit userId for your own). */

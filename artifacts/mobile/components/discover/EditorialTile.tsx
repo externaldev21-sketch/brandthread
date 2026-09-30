@@ -45,7 +45,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
     <Pressable
       onPress={() => {
         hapticLight();
-        push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
+        push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}&src=feed`) as never);
       }}
       accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}

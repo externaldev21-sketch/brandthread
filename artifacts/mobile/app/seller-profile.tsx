@@ -26,7 +26,7 @@ import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProf
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  connectionsHref, messageSellerHref, profileProductsHref, profileVideosHref,
+  connectionsHref, messageSellerHref, profileProductsHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
@@ -107,7 +107,7 @@ export default function SellerProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string }>();
+  const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string; src?: string }>();
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
@@ -157,6 +157,11 @@ export default function SellerProfileScreen() {
         } else {
           if (!routeSellerId) throw new Error('Seller not found.');
           api.publicSellers.recordVisit(routeSellerId).catch(() => {});
+          // Real per-source traffic tracking for the seller's own Dashboard —
+          // fire-and-forget, never blocks this screen's own load.
+          api.publicSellers
+            .recordStoreVisit(routeSellerId, { source: resolveStoreVisitSource(params.src) })
+            .catch(() => {});
           const data = await api.publicSellers.get(routeSellerId);
           view = toSellerView(data.profile ?? {}, routeSellerId);
         }
