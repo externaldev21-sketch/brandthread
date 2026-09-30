@@ -259,7 +259,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         id: checkoutIdValue,
         buyerId: null, guestEmail: email, guestAccessTokenHash: tokenHash(accessToken), sellerId, items: cartItems,
         shippingAddress: shippingAddressValue, ...(key ? { clientIdempotencyKey: key } : {}),
-        chargeModel: chargePlan.chargeModel,
+        chargeModel: money.chargeModel,
         dropId: chargePlan.dropId,
         platformFeeCents: money.platformFeeCents,
         processingFeeEstimateCents: money.processingFeeEstimateCents,

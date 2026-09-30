@@ -14,6 +14,8 @@ import {
   ensureStripeCustomer,
   mapStripeError,
 } from "../lib/stripe";
+import { buildBuyerDelivery, deliveryColumns, loadBuyerDelivery } from "../lib/delivery/buyerView";
+import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
@@ -1026,7 +1028,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       buyerId,
       sellerId,
       items: cartItems,
-      chargeModel: chargePlan.chargeModel,
+      chargeModel: money.chargeModel,
       dropId: chargePlan.dropId,
       platformFeeCents: money.platformFeeCents,
       processingFeeEstimateCents: money.processingFeeEstimateCents,
@@ -1364,12 +1366,15 @@ router.get("/orders", async (req, res) => {
         threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,
         createdAt:               orders.createdAt,
+        ...deliveryColumns,
       })
       .from(orders)
       .leftJoin(users, eq(users.clerkId, orders.ownerId))
       .where(eq(orders.buyerId, buyerId))
       .orderBy(desc(orders.createdAt));
-    res.json(rows);
+    // The list carries the timeline and guarantee but not the scan history
+    // (events are loaded with the order detail).
+    res.json(rows.map((row) => ({ ...row, delivery: buildBuyerDelivery(row) })));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch buyer orders");
     res.status(500).json({ error: "Failed to fetch orders" });
@@ -1403,6 +1408,7 @@ router.get("/orders/:id", async (req, res) => {
         cancellationReason:      orders.cancellationReason,
         cancellationNotes:       orders.cancellationNotes,
         createdAt:               orders.createdAt,
+        ...deliveryColumns,
       })
       .from(orders)
       .leftJoin(users, eq(users.clerkId, orders.ownerId))
@@ -1430,10 +1436,41 @@ router.get("/orders/:id", async (req, res) => {
       cancellationNotes: isCustomerVisible ? row.cancellationNotes : null,
       isCustomerVisible,
       items,
+      delivery: await loadBuyerDelivery(row.id, row),
     });
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to fetch buyer order");
     res.status(500).json({ error: "Failed to fetch order" });
+  }
+});
+
+// ─── Buyer confirms receipt ──────────────────────────────────────────────────
+/**
+ * POST /api/buyer/orders/:id/confirm-receipt
+ * "I received it": delivery confirmed by the buyer (the other way an order
+ * becomes delivered is the carrier). Ends the delivery guarantee for the
+ * order and starts the seller's payout clock. Idempotent.
+ */
+router.post("/orders/:id/confirm-receipt", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
+  try {
+    const buyerId = (req as any).clerkUserId as string;
+    const [order] = await db.select().from(orders)
+      .where(and(eq(orders.id, req.params.id as string), eq(orders.buyerId, buyerId))).limit(1);
+    if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+    if (order.status === "cancelled" || order.status === "refund_pending") {
+      res.status(409).json({ error: "This order was cancelled or refunded.", code: "ALREADY_REFUNDED" }); return;
+    }
+    const shipped = order.status === "shipped" || order.status === "delivered"
+      || ["accepted", "in_transit", "out_for_delivery", "exception"].includes(order.trackingStatus ?? "");
+    if (!shipped) {
+      res.status(409).json({ error: "This order hasn't shipped yet.", code: "NOT_SHIPPED" }); return;
+    }
+    await recordDelivery({ orderId: order.id, source: "buyer" });
+    const [fresh] = await db.select().from(orders).where(eq(orders.id, order.id)).limit(1);
+    res.json({ delivery: await loadBuyerDelivery(order.id, fresh) });
+  } catch (err) {
+    req.log.error({ err, orderId: req.params.id }, "Failed to confirm receipt");
+    res.status(500).json({ error: "Failed to confirm receipt" });
   }
 });
 

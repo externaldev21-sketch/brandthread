@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
+import { validatePreorderListing } from "../lib/delivery/policy";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
@@ -151,6 +152,15 @@ router.post("/", requireRole("manager"), async (req, res) => {
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
   }
+  {
+    // A pre-order must carry the ship date the seller promises the buyer.
+    const problem = validatePreorderListing({
+      effectiveIsPreorder: isPreOrder === true,
+      suppliedShipDate: preOrderEstShipDate,
+      effectiveShipDate: preOrderEstShipDate ? new Date(preOrderEstShipDate) : null,
+    });
+    if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
+  }
 
   // Reject if `variants` is present but is not an array — silently treating it as
   // "no variants" would create an active product with no purchasable SKUs.
@@ -282,6 +292,21 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   if (compareAtPriceCents !== undefined && compareAtPriceCents !== null &&
       (!Number.isInteger(compareAtPriceCents) || compareAtPriceCents <= 0)) {
     res.status(400).json({ error: "compareAtPriceCents must be a positive integer or null" }); return;
+  }
+
+  {
+    const [stored] = await db.select({ isPreOrder: products.isPreOrder, shipDate: products.preOrderEstShipDate })
+      .from(products).where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
+    if (stored) {
+      const problem = validatePreorderListing({
+        effectiveIsPreorder: isPreOrder !== undefined ? isPreOrder === true : stored.isPreOrder,
+        suppliedShipDate: preOrderEstShipDate,
+        effectiveShipDate: preOrderEstShipDate !== undefined
+          ? (preOrderEstShipDate ? new Date(preOrderEstShipDate) : null)
+          : stored.shipDate,
+      });
+      if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
+    }
   }
 
   const updateValues = {

@@ -93,3 +93,59 @@ export async function refundTransaction(transactionId: string) {
     body: { transaction: transactionId, async: false },
   });
 }
+
+// ─── Carrier tracking ─────────────────────────────────────────────────────────
+// Shippo's tracking API works for any tracking number (not only labels bought
+// through Brandthread). The API key stays server-side in the connector proxy.
+
+export type ShippoTrackStatus = {
+  status?: string;
+  status_details?: string;
+  status_date?: string;
+  location?: { city?: string; state?: string; country?: string } | null;
+};
+
+export type ShippoTrack = {
+  carrier?: string;
+  tracking_number?: string;
+  eta?: string | null;
+  tracking_status?: ShippoTrackStatus | null;
+  tracking_history?: ShippoTrackStatus[];
+};
+
+/** Shippo carrier tokens for the carriers sellers type into the tracking field. */
+export function shippoCarrierToken(carrier: string | null | undefined): string | null {
+  const key = (carrier ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!key) return null;
+  if (key.includes("usps") || key.includes("postal")) return "usps";
+  if (key.includes("ups")) return "ups";
+  if (key.includes("fedex")) return "fedex";
+  if (key.includes("dhl")) return key.includes("ecom") ? "dhl_ecommerce" : "dhl_express";
+  if (key.includes("canadapost")) return "canada_post";
+  if (key.includes("royalmail")) return "royal_mail";
+  if (key.includes("ontrac")) return "ontrac";
+  return null;
+}
+
+/** Current carrier status + scan history for a tracking number. Read-only, safe to retry. */
+export async function getTrack(carrierToken: string, trackingNumber: string): Promise<ShippoTrack> {
+  return withRetry(
+    () => shippoRequest<ShippoTrack>(`/tracks/${encodeURIComponent(carrierToken)}/${encodeURIComponent(trackingNumber)}`),
+    { label: "shippo.getTrack" },
+  );
+}
+
+/**
+ * Asks Shippo to push `track_updated` webhooks for a tracking number (needed
+ * for numbers the seller typed in; label purchases are registered by Shippo).
+ * Registering the same number twice is harmless.
+ */
+export async function registerTrack(carrierToken: string, trackingNumber: string, metadata: string): Promise<void> {
+  await withRetry(
+    () => shippoRequest<unknown>("/tracks", {
+      method: "POST",
+      body: { carrier: carrierToken, tracking_number: trackingNumber, metadata },
+    }),
+    { label: "shippo.registerTrack" },
+  );
+}
