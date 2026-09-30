@@ -11,7 +11,7 @@ describe('settings catalog', () => {
       '/account-type-settings',
       '/notifications-settings',
       '/vacation-mode',
-      '/app-theme',
+      '/appearance',
       '/login-methods',
       '/shopping-preferences',
       '/store-settings',

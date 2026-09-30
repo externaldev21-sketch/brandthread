@@ -1,0 +1,5 @@
+{
+  "warnCount": 1702,
+  "updatedAt": "2026-09-29T22:25:24.484Z",
+  "note": "Seeded from the committed docs/audit/half-done-findings.json full run (interrupted at 451/548 route×role combinations audited — see that file's summary.routesAudited vs summary.routesDiscovered). Update with `pnpm --filter mobile run audit:gate:update-baseline` after a genuine warn-tier improvement lands; never raise this number by hand."
+}

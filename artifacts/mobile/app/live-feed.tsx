@@ -8,14 +8,16 @@
  * underneath, so its video resumes/stays paused exactly as it was).
  *
  * Swipe up/down between live rooms, same vertical pager feel as the For You
- * feed. Real active streams (fetched from /api/live/active) play first; with
- * none live right now, a couple of sample rooms render instead so the screen
- * never looks empty or "under construction" — full video, full chat, full
- * chrome, with no "Sample"/"Preview" label anywhere on screen.
+ * feed. Real active streams (fetched from /api/live/active) play first. The
+ * fashion-runway sample rooms are dev-preview-only content, gated on
+ * isPreviewDemoMode() same as every other seeded preview dataset in the app
+ * (lib/devPreview.ts) — they must never appear for a real signed-in account,
+ * and a fresh `?bt_preview=…` preview with no streams and no `&demo=1` shows
+ * the real "nobody is live" empty state, not fake viewer counts/chat.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Platform, Share, useWindowDimensions,
+  View, Text, StyleSheet, FlatList, TextInput, Platform, Pressable, Share, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
@@ -39,13 +41,17 @@ import { FONT, FS, RADIUS } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveMoreSheet } from '@/components/live/LiveMoreSheet';
+import { LiveEmptyState } from '@/components/live/LiveEmptyState';
 import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
-// looping video instead of a flat color card.
+// looping video instead of a flat color card. Dev-preview-only: gated on
+// isPreviewDemoMode() below, never shown to a real signed-in account or a
+// fresh (no `&demo=1`) preview.
 const SAMPLE_ROOMS_SOURCE = [
   {
     id: 'sample-live-maison-vela',
@@ -106,20 +112,28 @@ export default function LiveFeedScreen() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const api = useApi();
   const [activeIndex, setActiveIndex] = useState(0);
+  const showDemoRooms = isPreviewDemoMode();
   const [rooms, setRooms] = useState<LiveRoom[]>(
-    SAMPLE_ROOMS_SOURCE.map(sample => ({
-      id: sample.id,
-      isSample: true,
-      brandName: sample.brandName,
-      title: sample.title,
-      viewerCount: sample.viewerCount,
-      videoSource: sample.video,
-      posterSource: sample.poster,
-      avatarSource: sample.avatar,
-      productName: sample.productName,
-      priceCents: sample.priceCents,
-    })),
+    showDemoRooms
+      ? SAMPLE_ROOMS_SOURCE.map(sample => ({
+        id: sample.id,
+        isSample: true,
+        brandName: sample.brandName,
+        title: sample.title,
+        viewerCount: sample.viewerCount,
+        videoSource: sample.video,
+        posterSource: sample.poster,
+        avatarSource: sample.avatar,
+        productName: sample.productName,
+        priceCents: sample.priceCents,
+      }))
+      : [],
   );
+  // Only meaningful while there's a real fetch to wait on — the demo cast
+  // above renders immediately, and a fresh preview with no `&demo=1` has
+  // nothing to fetch (see below), so the empty state shows right away
+  // instead of behind a placeholder spinner.
+  const [loadingReal, setLoadingReal] = useState(!showDemoRooms);
 
   useEffect(() => {
     let active = true;
@@ -127,21 +141,23 @@ export default function LiveFeedScreen() {
       .then((data: { streams: any[] }) => {
         if (!active) return;
         const rows = Array.isArray(data?.streams) ? data.streams : [];
-        if (!rows.length) return;
-        setRooms(rows.map((s: any): LiveRoom => ({
-          id: `live_${s.id}`,
-          isSample: false,
-          streamId: s.id,
-          brandName: s.brand_name ?? s.seller_name ?? 'Live',
-          title: s.title ?? '',
-          viewerCount: s.viewer_count ?? 0,
-          avatarUri: s.avatar_url ?? null,
-          thumbnailUrl: s.thumbnail_url ?? null,
-          productName: s.product_tags?.[0]?.productName,
-          priceCents: s.product_tags?.[0]?.priceCents,
-        })));
+        if (rows.length) {
+          setRooms(rows.map((s: any): LiveRoom => ({
+            id: `live_${s.id}`,
+            isSample: false,
+            streamId: s.id,
+            brandName: s.brand_name ?? s.seller_name ?? 'Live',
+            title: s.title ?? '',
+            viewerCount: s.viewer_count ?? 0,
+            avatarUri: s.avatar_url ?? null,
+            thumbnailUrl: s.thumbnail_url ?? null,
+            productName: s.product_tags?.[0]?.productName,
+            priceCents: s.product_tags?.[0]?.priceCents,
+          })));
+        }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) setLoadingReal(false); });
     return () => { active = false; };
   }, [api]);
 
@@ -164,32 +180,53 @@ export default function LiveFeedScreen() {
           use, scoped to this full-screen route rather than relying on
           whatever provider (if any) wraps app/(tabs)/feed.tsx underneath. */}
       <FeedToastProvider>
-        <FlatList
-          data={rooms}
-          keyExtractor={item => item.id}
-          renderItem={({ item, index }) => (
-            <LiveRoomPage
-              room={item}
-              isActive={index === activeIndex}
-              pageWidth={windowWidth}
-              pageHeight={windowHeight}
-              insetTop={topInset}
-              insetBottom={insets.bottom}
-              onClose={close}
-              onJoinReal={(streamId) => router.push(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never)}
+        {loadingReal ? (
+          <View style={styles.center}>
+            <ActivityIndicator color="#fff" />
+          </View>
+        ) : rooms.length === 0 ? (
+          <>
+            <LiveEmptyState
+              upcoming={[]}
+              suggested={[]}
+              topInset={topInset}
+              bottomInset={insets.bottom}
+              onRemind={() => {}}
+              onFollow={() => {}}
+              onOpenCreator={() => {}}
             />
-          )}
-          pagingEnabled
-          disableIntervalMomentum
-          showsVerticalScrollIndicator={false}
-          decelerationRate="fast"
-          bounces={false}
-          alwaysBounceVertical={false}
-          overScrollMode="never"
-          getItemLayout={(_, index) => ({ length: windowHeight, offset: windowHeight * index, index })}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-        />
+            <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 8 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads">
+              <Feather name="x" size={22} color="#888" />
+            </Pressable>
+          </>
+        ) : (
+          <FlatList
+            data={rooms}
+            keyExtractor={item => item.id}
+            renderItem={({ item, index }) => (
+              <LiveRoomPage
+                room={item}
+                isActive={index === activeIndex}
+                pageWidth={windowWidth}
+                pageHeight={windowHeight}
+                insetTop={topInset}
+                insetBottom={insets.bottom}
+                onClose={close}
+                onJoinReal={(streamId) => router.push(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never)}
+              />
+            )}
+            pagingEnabled
+            disableIntervalMomentum
+            showsVerticalScrollIndicator={false}
+            decelerationRate="fast"
+            bounces={false}
+            alwaysBounceVertical={false}
+            overScrollMode="never"
+            getItemLayout={(_, index) => ({ length: windowHeight, offset: windowHeight * index, index })}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+          />
+        )}
       </FeedToastProvider>
     </View>
   );
@@ -595,6 +632,8 @@ function LiveRoomPage({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyClose: { position: 'absolute', right: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   page: { width: '100%', backgroundColor: '#000' },
   video: { position: 'absolute', top: 0, left: 0 },
   thumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },

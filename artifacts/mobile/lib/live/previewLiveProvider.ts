@@ -31,7 +31,8 @@ export interface PreviewLiveMedia {
 export interface PreviewLiveOptions {
   media: PreviewLiveMedia;
   seed?: number;
-  /** Render the "nobody is live" empty state (`?bt_live=empty`). */
+  /** Render the "nobody is live" empty state — the default in preview
+   *  unless `?bt_preview=…&demo=1` is set (see liveProvider.ts). */
   forceEmpty?: boolean;
   viewerTickMs?: number;
   chatTickMs?: number;

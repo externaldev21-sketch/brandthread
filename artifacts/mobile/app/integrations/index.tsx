@@ -9,6 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
+import { ApiError } from '@/lib/networkNotice';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, ICON, RADIUS } from '@/lib/theme';
 
@@ -16,7 +17,6 @@ interface IntegrationDef {
   key: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
-  iconBg: string;
   description: string;
   route?: string;
   /** Auto-connected by the platform; never offers a Connect/Disconnect action. */
@@ -26,10 +26,10 @@ interface IntegrationDef {
 // Only integrations with a real, working connect flow ship here — no
 // "Coming soon" placeholder rows for OAuth flows that don't exist yet.
 const INTEGRATION_DEFS: IntegrationDef[] = [
-  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', iconBg: '#1A1A1A', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
+  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
   // Description omits "(auto-connected)" — it clipped at the row's
   // available width, and the "Connected" pill already says as much.
-  { key: 'stripe', label: 'Stripe', icon: 'credit-card', iconBg: '#635BFF', description: 'Payments and payouts', autoConnected: true },
+  { key: 'stripe', label: 'Stripe', icon: 'credit-card', description: 'Payments and payouts', autoConnected: true },
 ];
 
 export default function IntegrationsScreen() {
@@ -48,8 +48,14 @@ export default function IntegrationsScreen() {
       const data = await api.seller.integrationStatus() as any;
       const integrations: Array<{ key: string }> = data.integrations ?? [];
       setConnectedKeys(new Set(integrations.map(i => i.key)));
-    } catch {
-      setLoadError(true);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        // No session yet (e.g. a fresh/demo preview) — that just means
+        // nothing is connected, not that the list failed to load.
+        setConnectedKeys(new Set());
+      } else {
+        setLoadError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -131,8 +137,8 @@ export default function IntegrationsScreen() {
                     activeOpacity={item.autoConnected ? 1 : 0.7}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
-                    <View style={[s.iconWrap, { backgroundColor: item.iconBg }]}>
-                      <Feather name={item.icon} size={15} color="#FFFFFF" />
+                    <View style={s.iconWrap}>
+                      <Feather name={item.icon} size={ICON.sm} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
@@ -179,7 +185,7 @@ const s = StyleSheet.create({
   retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
-  iconWrap: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
   rowDesc: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },

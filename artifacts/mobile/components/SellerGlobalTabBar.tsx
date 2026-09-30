@@ -90,7 +90,7 @@ const TABS: {
     matchSegments: [
       'profile', 'settings', 'seller-settings', 'edit-profile',
       'billing', 'users', 'roles', 'security', 'general-settings',
-      'push-notifications', 'biometric-unlock', 'app-icon', 'plan-details',
+      'push-notifications', 'biometric-unlock', 'app-icon', 'app-theme', 'appearance', 'plan-details',
       'payouts', 'subscription', 'seller-data-export', 'account-switcher',
       'login-methods', 'account-type-settings', 'seller-verification',
     ],
@@ -138,6 +138,8 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'push-notifications': 'profile',
   'biometric-unlock': 'profile',
   'app-icon': 'profile',
+  'app-theme': 'profile',
+  'appearance': 'profile',
   'plan-details': 'profile',
   'payouts': 'profile',
   'subscription': 'profile',

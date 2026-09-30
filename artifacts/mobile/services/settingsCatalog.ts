@@ -92,8 +92,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Appearance',
     items: [
-      { label: 'App theme', description: 'Choose your Brandthread color finish', aliases: ['theme', 'color', 'dark mode', 'appearance'], icon: 'droplet', route: '/app-theme', audience: 'shared' },
-      { label: 'App icon', description: 'Choose the icon used on your device', aliases: ['home screen icon'], icon: 'smartphone', route: '/app-icon', audience: 'shared' },
+      { label: 'Appearance', description: 'App theme and app icon', aliases: ['theme', 'color', 'dark mode', 'appearance', 'app icon', 'home screen icon'], icon: 'droplet', route: '/appearance', audience: 'shared' },
       { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
       { label: 'Accessibility & data usage', description: 'Media quality, data usage, and accessibility options', aliases: ['accessibility', 'media quality', 'data usage', 'wifi'], icon: 'eye', route: '/buyer-settings-detail?section=accessibility', audience: 'buyer' },
@@ -226,8 +225,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Appearance',
     items: [
-      { label: 'App theme', description: 'Choose your Brandthread color finish', aliases: ['theme', 'color', 'dark mode', 'appearance'], icon: 'droplet', route: '/app-theme', audience: 'shared' },
-      { label: 'App icon', description: 'Choose the icon used on your device', aliases: ['home screen icon'], icon: 'smartphone', route: '/app-icon', audience: 'shared' },
+      { label: 'Appearance', description: 'App theme and app icon', aliases: ['theme', 'color', 'dark mode', 'appearance', 'app icon', 'home screen icon'], icon: 'droplet', route: '/appearance', audience: 'shared' },
       { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
     ],
