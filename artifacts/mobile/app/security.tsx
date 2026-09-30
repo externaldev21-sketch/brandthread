@@ -34,7 +34,7 @@ export default function SecurityScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
             <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Monitor and review user activities</Text>
           </View>
-          <Button label="View" variant="secondary" size="compact" onPress={viewActivityLog} />
+          <Button label="View" variant="secondary" size="small" onPress={viewActivityLog} />
         </View>
       </View>
     </View>

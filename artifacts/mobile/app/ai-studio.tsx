@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { FS } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { getProjects } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -231,7 +231,9 @@ export default function AIStudioScreen() {
           </View>
           {tool.badge != null && (
             <View style={[styles.toolBadge, { backgroundColor: colors.accent }]}>
-              <Text style={[styles.toolBadgeText, { color: tool.badge === 'Popular' ? colors.primary : colors.success }]}>{tool.badge}</Text>
+              {/* Monochrome only — no green "success" accent for the "New"
+                  badge; it isn't one of the app's 3 allowed color accents. */}
+              <Text style={[styles.toolBadgeText, { color: colors.primary }]}>{tool.badge}</Text>
             </View>
           )}
           <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
@@ -295,46 +297,47 @@ export default function AIStudioScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  sectionTitle: { fontSize: FS.md, fontFamily: FONT.semibold, marginBottom: 12 },
 
   modeRow: { paddingHorizontal: 20, marginBottom: 16 },
   modeSwitch: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 4 },
   modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
-  modeBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  modeBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 
   manualTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
   manualLinks: { flexDirection: 'row', gap: 18 },
-  manualLink: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  newCanvasBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  manualLink: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  // 44x44 minimum comfortable touch target (COMP.minTouchTarget); was 34x34.
+  newCanvasBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
   canvasCell: { width: '31.333%' },
   canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  canvasLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  canvasDims: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  canvasLabel: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  canvasDims: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
   toolIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   toolInfo: { flex: 1 },
-  toolLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  toolDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  toolLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  toolDesc: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  toolBadgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
+  toolBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
 
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
   sheetCard: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   sheetCancel: { position: 'absolute', top: 16, right: 20 },
-  sheetCancelText: { fontSize: 16, fontFamily: 'Inter_400Regular' },
-  sheetTitle: { fontSize: 30, fontFamily: 'Inter_700Bold', marginBottom: 8 },
+  sheetCancelText: { fontSize: FS.md, fontFamily: FONT.regular },
+  sheetTitle: { fontSize: FS.h2, fontFamily: FONT.bold, marginBottom: 8 },
   sheetSubRow: { flexDirection: 'row', gap: 18, marginBottom: 16 },
-  sheetSubActive: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  sheetSubMuted: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  sheetSubActive: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  sheetSubMuted: { fontSize: FS.sm, fontFamily: FONT.regular },
   sheetSoloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 14 },
   sheetGroup: { borderRadius: 12, overflow: 'hidden' },
   sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   sheetRowBorder: { borderTopWidth: 1 },
-  sheetRowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  sheetRowLabel: { fontSize: FS.base, fontFamily: FONT.regular },
   sheetRowRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  sheetRowProfile: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  sheetRowDims: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  sheetRowProfile: { fontSize: FS.xs, fontFamily: FONT.regular },
+  sheetRowDims: { fontSize: FS.sm, fontFamily: FONT.regular },
 });

@@ -231,7 +231,7 @@ const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText:    { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
+  errorText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
   retryBtn:     { marginTop: 8 },
 
   custCard:     { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
@@ -250,9 +250,9 @@ const s = StyleSheet.create({
   tagText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   notes:        { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 
-  sectionTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
   emptyCard:    { borderRadius: 14, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
-  emptyText:    { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  emptyText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   orderList:    { borderRadius: 14, borderWidth: 1 },
   orderRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 14, gap: 12 },
   orderLeft:    { flex: 1, gap: 3 },
@@ -260,5 +260,5 @@ const s = StyleSheet.create({
   orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular' },
   trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
   orderRight:   { alignItems: 'flex-end', gap: 6 },
-  orderTotal:   { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  orderTotal:   { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
 });

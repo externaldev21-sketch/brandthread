@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 export default function Index() {
   const router = useRouter();
@@ -18,11 +19,22 @@ export default function Index() {
   const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
-    const effectivePreviewRole = Platform.OS === 'web'
-      ? (previewRole === 'seller' || previewRole === 'buyer' ? previewRole : null)
-      : DEV_BYPASS_ROLE;
+    // Web preview must be gated the same way isSellerDevPreview/PREVIEW_ROLE
+    // in app/_layout.tsx are (`__DEV__ || EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST`),
+    // not bare `__DEV__` — an exported preview build (the screenshot/audit
+    // harness, design review) has __DEV__ === false but the isolation-test
+    // flag set, and AuthGate's own devRole check (see app/_layout.tsx) skips
+    // redirecting in that same case, deferring to this effect. Gating this
+    // one on bare __DEV__ left "/" stuck on the bare boot logo forever under
+    // ?bt_preview=... in that build — neither redirect ever fired.
+    let effectivePreviewRole: 'buyer' | 'seller' | null = null;
+    if (Platform.OS === 'web') {
+      if (isSellerDevPreview()) effectivePreviewRole = 'seller';
+      else if (isBuyerDevPreview()) effectivePreviewRole = 'buyer';
+    } else {
+      effectivePreviewRole = DEV_BYPASS_ROLE;
+    }
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);

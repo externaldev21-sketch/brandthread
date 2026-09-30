@@ -107,7 +107,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/navigation-isolation-probe.tsx',
   'app/onboarding.tsx',
   'app/orders.tsx',
-  'app/plans.tsx',
   'app/privacy.tsx',
   'app/product-bundle-edit.tsx',
   'app/product-bundles.tsx',

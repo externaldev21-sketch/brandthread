@@ -10,10 +10,17 @@
  * Apple-style PNGs used by Twemoji-alternative pickers like emoji-mart.
  *
  * Falls back to the plain unicode glyph (via `AppleEmojiText`) if the image
- * 404s, so a CDN hiccup never blanks a reaction.
+ * 404s, so a CDN hiccup never blanks a reaction. Also skipped outright in
+ * dev-preview (isSellerDevPreview()/isBuyerDevPreview()) — this app's own
+ * audit/e2e harnesses run with no real internet access, so this real,
+ * external jsdelivr CDN fetch would otherwise always fail there and log a
+ * console error even though the same onError fallback below still catches
+ * it visually; going straight to the text glyph is the identical fallback,
+ * just proactive instead of reactive.
  */
 import React, { useState } from 'react';
 import { Image, Platform, StyleSheet, Text, TextStyle } from 'react-native';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 
 /** codepoint (lowercase, hyphen-joined, no leading zeros) per quick reaction */
 const APPLE_EMOJI_CODEPOINTS: Record<string, string> = {
@@ -35,8 +42,9 @@ const NEEDS_IMAGE_FALLBACK = Platform.OS !== 'ios';
 export function AppleEmoji({ emoji, size = 22 }: { emoji: string; size?: number }) {
   const codepoint = APPLE_EMOJI_CODEPOINTS[emoji];
   const [failed, setFailed] = useState(false);
+  const skipCdn = isSellerDevPreview() || isBuyerDevPreview();
 
-  if (!NEEDS_IMAGE_FALLBACK || !codepoint || failed) {
+  if (!NEEDS_IMAGE_FALLBACK || !codepoint || failed || skipCdn) {
     return <Text style={{ fontSize: size, fontFamily: EMOJI_FONT_STACK }}>{emoji}</Text>;
   }
 
