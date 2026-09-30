@@ -23,7 +23,11 @@
  * Every row still opens that person's profile — the brand profile for
  * sellers, the buyer profile for buyers.
  */
+<<<<<<< Updated upstream
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+=======
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+>>>>>>> Stashed changes
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -132,6 +136,7 @@ export default function ConnectionsScreen() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generationRef = useRef(0);
 
+<<<<<<< Updated upstream
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(message);
@@ -149,6 +154,18 @@ export default function ConnectionsScreen() {
       setLoading(false);
       return;
     }
+=======
+  const load = useCallback(() => {
+    // Only wait on Clerk finishing its resolve, not on there being a real
+    // signed-in user — `user?.id` is only used below to decide whether this
+    // is the viewer's own list, and `!userId` (no profile param) already
+    // covers that case with no user object at all. Gating on `user?.id` too
+    // meant a signed-out/logged-out-looking session (e.g. the dev web
+    // preview, which never creates a real Clerk session) never reached this
+    // point, so `loading` stayed true forever and the screen was stuck on
+    // its skeleton indefinitely instead of showing real data or an error.
+    if (!clerkLoaded) return;
+>>>>>>> Stashed changes
     const generation = ++generationRef.current;
     setError(false);
     setLoading(true);
@@ -269,6 +286,22 @@ export default function ConnectionsScreen() {
     initials: removeTarget.initials || initialsFor(removeTarget.name),
     avatarUrl: removeTarget.avatarUrl,
   } : null;
+
+  // `load()` was a no-op (leaving `loading` stuck true, so the screen shows
+  // its skeleton forever) until Clerk finished resolving. useFocusEffect
+  // only re-runs on a focus transition, not whenever its callback identity
+  // changes — so a screen opened before Clerk resolves (a fresh cold start,
+  // or a fast tap right after sign-in) never got a second chance to load
+  // once `clerkLoaded` actually became true while it stayed focused. This
+  // effect fires load() exactly on that not-ready -> ready transition
+  // (never on mount, so it doesn't duplicate useFocusEffect's own initial
+  // call and double the network request in the common case where Clerk is
+  // already resolved by the time this screen opens).
+  const wasClerkLoadedRef = useRef(clerkLoaded);
+  useEffect(() => {
+    if (!wasClerkLoadedRef.current && clerkLoaded) load();
+    wasClerkLoadedRef.current = clerkLoaded;
+  }, [clerkLoaded, load]);
 
   function renderItem({ item }: { item: ConnectionUser }) {
     const initials = item.initials || initialsFor(item.name ?? item.username ?? '?');

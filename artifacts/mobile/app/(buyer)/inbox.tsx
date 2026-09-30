@@ -1446,6 +1446,7 @@ export default function InboxScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
+<<<<<<< Updated upstream
       {isSearchBarOpen ? (
         <Animated.View style={{ opacity: searchHeaderFade }}>
           <View style={[s.searchHeaderRow, { paddingTop: headerTopPad + 12, paddingHorizontal: gutter }]}>
@@ -1501,6 +1502,54 @@ export default function InboxScreen() {
             >
               <Text style={[s.searchCancelText, { color: theme.text }]}>Cancel</Text>
             </PressableScale>
+=======
+      {/* Header — big bold large-title style, no back arrow */}
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingHorizontal: gutter }]}>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Messages</Text>
+        <IconButton
+          name="edit-3"
+          size={22}
+          variant="filled"
+          color={theme.text}
+          onPress={openCompose}
+          accessibilityLabel="New message"
+          testID="inbox-header-compose"
+        />
+      </View>
+
+      {/* Search — always available, not gated behind a tab */}
+      {!loading && (
+        <View style={{ paddingHorizontal: gutter }}>
+          <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
+            <Feather name="search" size={16} color={theme.muted} />
+            <TextInput
+              style={[
+                s.searchInput,
+                { color: theme.text },
+                // See SearchBar in BrandthreadUI.tsx for why this is needed
+                // on web: without it, the browser's own focus ring stacks
+                // with this row's border-color focus affordance.
+                Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null,
+              ]}
+              value={messagesSearchQuery}
+              onChangeText={setMessagesSearchQuery}
+              placeholder="Search conversations"
+              placeholderTextColor={theme.muted}
+              autoCorrect={false}
+              testID="inbox-search-input"
+              accessibilityLabel="Search conversations"
+            />
+            {messagesSearchQuery.length > 0 && (
+              <PressableScale
+                onPress={() => setMessagesSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Feather name="x" size={16} color={theme.muted} />
+              </PressableScale>
+            )}
+>>>>>>> Stashed changes
           </View>
         </Animated.View>
       ) : (

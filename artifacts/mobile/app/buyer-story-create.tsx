@@ -1095,9 +1095,54 @@ export default function StoryComposer() {
               )}
             </TouchableOpacity>
 
+<<<<<<< Updated upstream
             {/* Shutter — tap for photo, hold for video (or hands-free/boomerang/grid-cell capture) */}
             <Pressable
               style={styles.shutterWrap}
+=======
+        {/* TEXT CONTROLS */}
+        {type === 'text' && (
+          <View style={styles.controlsPanel}>
+            <Text style={styles.controlLabel}>Background</Text>
+            <View style={styles.colorRow}>
+              {BG_COLORS.map((c, i) => (
+                <PressableScale
+                  key={`${c}-${i}`}
+                  style={[styles.colorCircle, { backgroundColor: c }, bgColor === c && styles.colorCircleActive]}
+                  onPress={() => { hapticToggle(); setBgColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Background color"
+                  accessibilityState={{ selected: bgColor === c }}
+                />
+              ))}
+            </View>
+            <Text style={[styles.controlLabel, { marginTop: SP.md }]}>Text color</Text>
+            <View style={styles.colorRow}>
+              {TEXT_COLORS.map((c, i) => (
+                <PressableScale
+                  key={`${c}-${i}`}
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: c },
+                    textColor === c && styles.colorCircleActive,
+                    c === '#000000' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+                  ]}
+                  onPress={() => { hapticToggle(); setTextColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Text color"
+                  accessibilityState={{ selected: textColor === c }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* PRIVACY */}
+        <View style={styles.privacySection}>
+          <View style={styles.privacyCard}>
+            <PressableScale
+              style={styles.privacyRow}
+>>>>>>> Stashed changes
               onPress={() => {
                 if (compositing) return;
                 if (gridSpec) { void takePhoto(); return; }
@@ -1564,6 +1609,7 @@ export default function StoryComposer() {
               ]}
               maxLength={200}
             />
+<<<<<<< Updated upstream
           </View>
 
           <View style={[styles.textToolBottom, { paddingBottom: insets.bottom + SP.md }]}>
@@ -1657,6 +1703,18 @@ export default function StoryComposer() {
                 <PressableScale
                   key={c}
                   style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
+=======
+            <View style={[styles.colorRow, { marginTop: SP.sm }]}>
+              {TEXT_COLORS.map((c, i) => (
+                <PressableScale
+                  key={`${c}-${i}`}
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: c },
+                    textDraftColor === c && styles.colorCircleActive,
+                    c === '#000000' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+                  ]}
+>>>>>>> Stashed changes
                   onPress={() => { hapticToggle(); setTextDraftColor(c); }}
                   accessibilityRole="button"
                   accessibilityLabel={`Text color ${c}`}

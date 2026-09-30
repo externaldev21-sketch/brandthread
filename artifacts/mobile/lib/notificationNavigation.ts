@@ -19,6 +19,7 @@ type NotificationResponseIdentifier = {
 export function createNotificationResponseHandler(
   router: NotificationRouter,
   handledResponseIds = new Set<string>(),
+  currentRole?: 'buyer' | 'seller' | null,
 ) {
   return (response: Notifications.NotificationResponse | NotificationResponseIdentifier) => {
     const request = response.notification?.request;
@@ -65,6 +66,7 @@ export function createNotificationResponseHandler(
       return;
     }
     if (data?.targetType === 'conversation' && typeof data.targetId === 'string' && data.targetId) {
+<<<<<<< Updated upstream
       // There is no `/chat/:id` route — the real 1:1 conversation screens are
       // `/buyer-conversation` (buyer_to_buyer threads, the common case — see
       // `notifType` in routes/conversations.ts) and `/seller-conversation`
@@ -75,6 +77,14 @@ export function createNotificationResponseHandler(
       } else {
         router.push(`/buyer-conversation?id=${encodeURIComponent(data.targetId)}`);
       }
+=======
+      // There is no `/chat/:id` route — the Messages stack's DM screens are
+      // `/buyer-conversation` and `/seller-conversation`, matching the same
+      // role-based routing used by lib/activity.ts for the in-app activity
+      // feed's "conversation" entries.
+      const screen = currentRole === 'seller' ? 'seller-conversation' : 'buyer-conversation';
+      router.push(`/${screen}?id=${encodeURIComponent(data.targetId)}`);
+>>>>>>> Stashed changes
       return;
     }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {

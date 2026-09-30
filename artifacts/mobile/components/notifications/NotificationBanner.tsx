@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { setNotificationBannerListener, type BannerPayload } from '@/lib/notificationBannerBus';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
@@ -33,6 +34,7 @@ export default function NotificationBanner() {
   const { theme } = useAppTheme();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
+  const { role } = useRole();
   const [payload, setPayload] = useState<BannerPayload | null>(null);
   const translateY = useRef(new Animated.Value(-200)).current;
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,7 +89,11 @@ export default function NotificationBanner() {
 
   const handlePress = () => {
     hide();
-    const navigate = createNotificationResponseHandler({ push: (href) => router.push(href as never) });
+    const navigate = createNotificationResponseHandler(
+      { push: (href) => router.push(href as never) },
+      undefined,
+      role,
+    );
     navigate({
       notification: {
         request: {

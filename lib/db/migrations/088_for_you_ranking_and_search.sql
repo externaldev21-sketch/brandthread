@@ -82,10 +82,33 @@ CREATE INDEX IF NOT EXISTS posts_created_published_idx
   WHERE post_status = 'published';
 
 -- Style-tag candidate generation filters posts by JSONB containment, which
--- needs jsonb (not json, what these columns were declared as) both for the
--- containment operators and for the jsonb_path_ops GIN opclass below.
-ALTER TABLE posts ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
-ALTER TABLE products ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
+-- needs jsonb (not json, what these columns were declared as by migration
+-- 001) both for the containment operators and for the jsonb_path_ops GIN
+-- opclass below. `ALTER ... TYPE jsonb USING col::jsonb` is itself safe to
+-- re-run once the column is already jsonb (Postgres just re-applies the same
+-- type), but we still gate on the column's current type so this block reads
+-- as explicitly idempotent and does zero work (no table rewrite) on a
+-- database that already has jsonb here — e.g. one bootstrapped via
+-- `drizzle-kit push` (whose schema declares these columns as jsonb already)
+-- or one that already ran this migration once. Verified against a real
+-- Postgres 16 instance: both a fresh `push-force && migrate` bootstrap and a
+-- direct re-run of this file's SQL against an already-migrated database
+-- succeed with no errors.
+DO $$
+BEGIN
+  IF (
+    SELECT data_type FROM information_schema.columns
+    WHERE table_name = 'posts' AND column_name = 'style_tags'
+  ) = 'json' THEN
+    ALTER TABLE posts ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
+  END IF;
+  IF (
+    SELECT data_type FROM information_schema.columns
+    WHERE table_name = 'products' AND column_name = 'style_tags'
+  ) = 'json' THEN
+    ALTER TABLE products ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS posts_style_tags_gin_idx
   ON posts USING GIN (style_tags jsonb_path_ops);

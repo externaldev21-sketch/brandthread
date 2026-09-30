@@ -19,6 +19,22 @@ import { injectWebFocusOutlineStyles, injectWebScrollbarHideStyles, injectWebTex
 // stops it from also painting an in-app banner over the real UI.
 LogBox.ignoreAllLogs(true);
 
+if (__DEV__) {
+  // React logs its own dev-only render warnings (duplicate list keys, prop
+  // deprecations, act() reminders, etc.) through `console.error`, not
+  // `console.warn`. LogBox — which mirrors the app's console.error output
+  // on native and web — treats every console.error as a fatal-looking red
+  // "error" notification/box by default, so a harmless React warning ends
+  // up rendered as an in-app error banner indistinguishable from a real
+  // crash. These are diagnostics, not runtime failures (nothing threw, no
+  // ErrorBoundary caught anything), so they should stay visible in the
+  // terminal/browser console but never take over the screen. Only messages
+  // matching React's own "Warning: ..." console.error convention are
+  // ignored here — an application `console.error(...)` call (or anything
+  // an ErrorBoundary reports) does not match this pattern and still shows.
+  LogBox.ignoreLogs([/^Warning: /]);
+}
+
 initMonitoring();
 startBackgroundUpdateChecks();
 injectWebTextRenderingStyles();

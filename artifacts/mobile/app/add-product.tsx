@@ -26,8 +26,13 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII } from '@/constants/radii';
 import { TYPE_SCALE } from '@/constants/typography';
+<<<<<<< Updated upstream
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
+=======
+import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { ScreenHeader } from '@/components/ScreenHeader';
+>>>>>>> Stashed changes
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
@@ -533,6 +538,15 @@ export default function AddProductScreen() {
     showExitAlert(leaveProductFlow);
   }
 
+<<<<<<< Updated upstream
+=======
+  async function handleSaveDraftAndExit() {
+    await saveDraftAndClear(buildDraftSnapshot());
+    Alert.alert('Draft saved', 'You can continue editing later.');
+    leaveProductFlow();
+  }
+
+>>>>>>> Stashed changes
   // ── Pricing helpers ──
   function getPricing() {
     return calcPricing({
@@ -1950,6 +1964,7 @@ export default function AddProductScreen() {
   return (
     <View style={s.root}>
 
+<<<<<<< Updated upstream
       {/* ── Header: Cancel · status · Save, one row, vertically centered,
           standard 44pt height below the notch. No wizard, no bottom footer —
           Save is the only publish action, right here. ── */}
@@ -1983,6 +1998,48 @@ export default function AddProductScreen() {
             testID="add-product-save"
           />
         </View>
+=======
+      {/* ── Header ──
+          No rightElement here: "Save as draft & exit" in the sticky footer
+          below is the wizard's one save-draft action. This screen used to
+          also offer an in-place "Save draft" button in the header, which
+          both duplicated that action and crowded the title against the
+          back button on narrower widths. */}
+      <ScreenHeader
+        title={isEditMode ? 'Edit Product' : 'Add Product'}
+        variant="push"
+        onBack={handleExit}
+        backTestID="add-product-exit"
+      />
+
+      {/* ── Sticky step progress ── */}
+      <View style={s.progressBar}>
+        {FLOW_STEPS.map((step, i) => {
+          const done = i < stepIndex;
+          const active = i === stepIndex;
+          return (
+            <TouchableOpacity
+              key={step.key}
+              style={s.progressStep}
+              onPress={() => goToStep(i)}
+              accessibilityLabel={`Step ${i + 1}: ${step.label}`}
+              testID={`add-product-step-${step.key}`}
+            >
+              <View style={[s.progressDot, done && s.progressDotDone, active && s.progressDotActive]}>
+                {done ? (
+                  <Feather name="check" size={11} color={theme.onAccent} />
+                ) : (
+                  <Text style={[s.progressDotText, active && { color: theme.onAccent }]}>{i + 1}</Text>
+                )}
+              </View>
+              <Text style={[s.progressLabel, active && { color: FG, fontFamily: FONT.semibold }]} numberOfLines={1}>
+                {step.label}
+              </Text>
+              {i < FLOW_STEPS.length - 1 && <View style={[s.progressConnector, done && s.progressConnectorDone]} />}
+            </TouchableOpacity>
+          );
+        })}
+>>>>>>> Stashed changes
       </View>
 
       {/* ── One scrolling page, Shopify-iOS-style ── */}

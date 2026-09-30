@@ -1313,6 +1313,101 @@ const createStyles = (theme: any) => {
     flex: 1,
     backgroundColor: SCREEN_BG,
   },
+<<<<<<< Updated upstream
+=======
+  // Header
+  header: {
+    backgroundColor: BG,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    paddingBottom: SP.sm,
+    minHeight: 44,
+  },
+  titleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  titleText: {
+    fontSize: FS.xl,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.3,
+  },
+  titleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconBtn: {
+    width: COMP.iconBtn,
+    height: COMP.iconBtn,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Search row
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.sm,
+    height: 36,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    height: 36,
+  },
+  controlBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  controlBtnActive: {
+    borderColor: BORDER_ACTIVE,
+    backgroundColor: PURPLE_DIM,
+  },
+
+  // Status pills
+  pillsRow: {
+    paddingLeft: SP.md,
+    // Wider than the left inset on purpose: with 5 chips (All / Unfulfilled
+    // / Unpaid / Open / Archived) this row is wider than the screen on a
+    // phone, so the last chip always sits at the scrollable edge. A plain
+    // SP.md here left it flush against the viewport edge, reading as a
+    // clipped chip rather than a scrollable list with more content past it.
+    paddingRight: SP.xl,
+    paddingBottom: SP.sm,
+    paddingTop: 2,
+    gap: SP.xs,
+  },
+
+>>>>>>> Stashed changes
   // List header
   listHeader: {
     paddingTop: SP.sm,

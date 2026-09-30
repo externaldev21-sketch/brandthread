@@ -55,6 +55,7 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenNthCalledWith(2, '/subscription');
   });
 
+<<<<<<< Updated upstream
   it('routes a buyer_to_buyer conversation notification to the buyer conversation screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
@@ -66,6 +67,19 @@ describe('notification response navigation', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
     handler(targetResponse('msg-2', { targetType: 'conversation', targetId: 'convo-xyz', type: 'new_order_message' }));
+=======
+  it('routes a conversation notification to the buyer conversation screen by default', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('msg-1', { targetType: 'conversation', targetId: 'convo-abc' }));
+    expect(router.push).toHaveBeenCalledWith('/buyer-conversation?id=convo-abc');
+  });
+
+  it('routes a conversation notification to the seller conversation screen for a seller', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router, undefined, 'seller');
+    handler(targetResponse('msg-2', { targetType: 'conversation', targetId: 'convo-xyz' }));
+>>>>>>> Stashed changes
     expect(router.push).toHaveBeenCalledWith('/seller-conversation?id=convo-xyz');
   });
 

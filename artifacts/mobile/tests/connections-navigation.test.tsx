@@ -8,10 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // right screen for their account type, and another profile's list is loaded
 // by its userId (not the viewer's own list).
 
-const { routerMock, apiMock, paramsMock } = vi.hoisted(() => ({
+const { routerMock, apiMock, paramsMock, clerkMock } = vi.hoisted(() => ({
   routerMock: { push: vi.fn(), back: vi.fn() },
   apiMock: { social: { followers: vi.fn(), following: vi.fn() } },
   paramsMock: vi.fn(() => ({ type: 'followers', userId: 'user_seller' } as Record<string, string | undefined>)),
+  clerkMock: vi.fn(() => ({ user: { id: 'viewer-1' }, isLoaded: true } as { user: { id: string } | undefined; isLoaded: boolean })),
 }));
 
 vi.mock('react-native', () => {
@@ -43,7 +44,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 
-vi.mock('@clerk/expo', () => ({ useUser: () => ({ user: { id: 'viewer-1' }, isLoaded: true }) }));
+vi.mock('@clerk/expo', () => ({ useUser: () => clerkMock() }));
 vi.mock('@/hooks/useApi', () => ({ useApi: () => apiMock }));
 vi.mock('@expo/vector-icons', () => ({ Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }) }));
 vi.mock('expo-haptics', () => ({
@@ -114,6 +115,7 @@ describe('connections list', () => {
 
   beforeEach(() => {
     routerMock.push.mockReset();
+    clerkMock.mockReset().mockReturnValue({ user: { id: 'viewer-1' }, isLoaded: true });
     paramsMock.mockReset().mockReturnValue({ type: 'followers', userId: 'user_seller' });
     apiMock.social.followers.mockReset().mockResolvedValue([
       { userId: 'user_buyer', name: 'Ava Buyer', username: 'ava', handle: '@ava', initials: 'AB', accountType: 'buyer', isFollowing: true },
@@ -146,6 +148,36 @@ describe('connections list', () => {
     renderer = await renderScreen();
     expect(apiMock.social.following).toHaveBeenCalledWith(undefined, 'default');
     expect(apiMock.social.followers).toHaveBeenCalledWith(undefined);
+  });
+
+  it('loads as soon as Clerk resolves after mount, with no focus transition required', async () => {
+    // Regression test: useFocusEffect only re-runs on a focus transition, so
+    // a screen that mounted before Clerk resolved used to be stuck on its
+    // skeleton forever once Clerk became ready while the screen stayed
+    // focused (no re-navigation to trigger another useFocusEffect run).
+    clerkMock.mockReturnValue({ user: { id: 'viewer-1' }, isLoaded: false });
+    renderer = await renderScreen();
+    expect(apiMock.social.followers).not.toHaveBeenCalled();
+    expect(renderer.root.findAll((node) => node.props.testID === 'list-skeleton').length).toBe(1);
+
+    clerkMock.mockReturnValue({ user: { id: 'viewer-1' }, isLoaded: true });
+    await act(async () => { renderer!.update(<ConnectionsScreen />); await flush(); });
+    expect(apiMock.social.followers).toHaveBeenCalledWith('user_seller');
+    expect(renderer.root.findAll((node) => node.props.testID === 'list-skeleton').length).toBe(0);
+  });
+
+  it("does not hang on the loading skeleton forever when Clerk has resolved but there is no real user object (e.g. the dev web preview)", async () => {
+    // Regression test: the own-list guard used to be
+    // `if (!clerkLoaded || !user?.id) return;`, which left `loading` stuck
+    // true forever whenever Clerk finished loading without a real signed-in
+    // user object — exactly what happens in the dev web preview, which
+    // never creates a real Clerk session. `!userId` already establishes
+    // "own list" with no user object required.
+    clerkMock.mockReturnValue({ user: undefined, isLoaded: true });
+    paramsMock.mockReturnValue({ type: 'followers', userId: undefined });
+    renderer = await renderScreen();
+    expect(apiMock.social.followers).toHaveBeenCalledWith(undefined);
+    expect(renderer.root.findAll((node) => node.props.testID === 'list-skeleton').length).toBe(0);
   });
 
   it('shows ErrorState with Retry instead of an endless spinner when the list fails', async () => {

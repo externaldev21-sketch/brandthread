@@ -191,10 +191,25 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
         );
         rest.onPressOut?.(e);
       }}
-      style={typeof style === 'function' ? style : undefined}
+      // The caller's `style` (function or plain array/object — Pressable
+      // supports both natively) must land on THIS outer element, because
+      // this is the node the parent's flex layout actually sees. It used
+      // to be routed to the inner Animated.View below instead whenever it
+      // wasn't a function, which silently orphaned this Pressable with no
+      // size of its own — any caller passing e.g. `style={{ flex: 1 }}` to
+      // split a footer 50/50 (SecondaryButton/PrimaryButton "Cancel"/"Next"
+      // pairs, sheet actions, etc.) had it applied one level too deep to
+      // affect this element's participation in the parent row, so the
+      // button collapsed to its content's width and rows left-aligned
+      // instead of splitting the available space.
+      style={style}
     >
       {(state) => (
+<<<<<<< Updated upstream
         <Animated.View style={[typeof style === 'function' ? undefined : style, !noMinHeight && { minHeight: COMP.minTouchTarget }, !settled.value && { transform: [{ scale }], opacity }]}>
+=======
+        <Animated.View style={{ minHeight: COMP.minTouchTarget, transform: [{ scale }], opacity }}>
+>>>>>>> Stashed changes
           {typeof children === 'function' ? children(state) : children}
         </Animated.View>
       )}
@@ -612,7 +627,22 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
     <View style={[srS.root, { backgroundColor: palette.card }, focused && srS.focused, style]}>
       <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
       <TextInput
+<<<<<<< Updated upstream
         style={[srS.input, { color: palette.foreground }, WEB_INPUT_RESET]}
+=======
+        style={[
+          srS.input,
+          { color: palette.foreground },
+          // RN Web renders TextInput as a plain <input>, which keeps the
+          // browser's own focus ring by default. This bar already draws its
+          // own focus affordance (the border color swaps to theme.accent
+          // above), so without this the two stack — the reported "doubled
+          // white focus outline" — and the browser outline (drawn outside
+          // the border box) visually collides with the clear (x) button
+          // that sits right at the field's edge.
+          Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null,
+        ]}
+>>>>>>> Stashed changes
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
