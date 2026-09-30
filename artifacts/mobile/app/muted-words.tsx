@@ -11,6 +11,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -18,6 +19,7 @@ import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorMessage } from '@/lib/safety';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import type { MutedWord } from '@/lib/safetyTypes';
 
 const MAX_LENGTH = 60;
@@ -28,8 +30,11 @@ export default function MutedWordsScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const api = useApi();
   const inputRef = useRef<TextInput>(null);
+  const previewNeedsSignIn = authLoaded && !isSignedIn && (isBuyerDevPreview() || isSellerDevPreview());
+  const canEdit = authLoaded && !!isSignedIn;
 
   const [words, setWords] = useState<MutedWord[]>([]);
   const [limit, setLimit] = useState(200);
@@ -40,7 +45,16 @@ export default function MutedWordsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!authLoaded) return;
     setError(null);
+    if (previewNeedsSignIn) {
+      // Demo navigation is not a Clerk session. Never request or mutate
+      // account-specific muted words on behalf of a synthetic preview user.
+      setWords([]);
+      setLimit(200);
+      setLoading(false);
+      return;
+    }
     try {
       const result = await api.safety.mutedWords();
       setWords(result.words);
@@ -50,13 +64,13 @@ export default function MutedWordsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, authLoaded, previewNeedsSignIn]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function add(raw: string) {
     const phrase = raw.trim();
-    if (!phrase || saving) return;
+    if (!canEdit || !phrase || saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -75,6 +89,7 @@ export default function MutedWordsScreen() {
   }
 
   async function remove(phrase: string) {
+    if (!canEdit) return;
     setRemoving(phrase);
     setError(null);
     try {
@@ -100,7 +115,21 @@ export default function MutedWordsScreen() {
           Comments and posts that contain these words are hidden from you everywhere on Brandthread. Nobody is notified.
         </Text>
 
-        <View style={[s.inputShell, atLimit && { opacity: 0.5 }]}>
+        {previewNeedsSignIn && (
+          <View style={s.signInNotice}>
+            <Text style={s.signInText}>Sign in to save muted words to your account.</Text>
+            <PressableScale
+              onPress={() => router.push('/sign-in' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in to manage muted words"
+              style={s.signInButton}
+            >
+              <Text style={s.signInButtonText}>Sign in</Text>
+            </PressableScale>
+          </View>
+        )}
+
+        <View style={[s.inputShell, (!canEdit || atLimit) && { opacity: 0.5 }]}>
           <Feather name="plus" size={18} color={theme.muted} />
           <TextInput
             ref={inputRef}
@@ -113,13 +142,13 @@ export default function MutedWordsScreen() {
             autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={() => add(draft)}
-            editable={!atLimit}
+            editable={canEdit && !atLimit}
             accessibilityLabel="Word or phrase to mute"
             maxLength={MAX_LENGTH}
           />
           <PressableScale
             onPress={() => add(draft)}
-            disabled={!draft.trim() || saving || atLimit}
+            disabled={!canEdit || !draft.trim() || saving || atLimit}
             style={[s.addBtn, (!draft.trim() || atLimit) && { opacity: 0.35 }]}
             accessibilityRole="button"
             accessibilityLabel="Mute"
@@ -143,7 +172,7 @@ export default function MutedWordsScreen() {
             <Text style={s.sectionLabel}>SUGGESTIONS</Text>
             <View style={s.chips}>
               {available.map((suggestion) => (
-                <PressableScale key={suggestion} style={s.suggestion} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
+                <PressableScale key={suggestion} style={[s.suggestion, !canEdit && { opacity: 0.5 }]} disabled={!canEdit} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
                   <Feather name="plus" size={12} color={theme.muted} />
                   <Text style={s.suggestionText}>{suggestion}</Text>
                 </PressableScale>
@@ -192,6 +221,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md },
+  signInNotice: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, marginBottom: SP.md },
+  signInText: { flex: 1, color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm },
+  signInButton: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.accent },
+  signInButtonText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.sm },
   inputShell: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingLeft: SP.md, paddingRight: 6, height: 54,
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
