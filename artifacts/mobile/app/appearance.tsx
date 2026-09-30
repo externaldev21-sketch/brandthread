@@ -112,7 +112,12 @@ export default function AppearanceScreen() {
               Automatically matches your icon to {theme.name}
             </Text>
           </View>
-          <HapticSwitch value={followsTheme} onValueChange={toggleFollowTheme} />
+          <HapticSwitch
+            value={followsTheme}
+            onValueChange={toggleFollowTheme}
+            trackColor={{ false: theme.border, true: theme.accent }}
+            thumbColor={followsTheme ? theme.onAccent : theme.text}
+          />
         </View>
 
         {/* Icon grid — icons only, white ring + check on the selected one */}
