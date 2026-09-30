@@ -309,9 +309,6 @@ export default function ReportScreen() {
                 <HapticSwitch
                   value={alsoBlock}
                   onValueChange={setAlsoBlock}
-                  trackColor={{ false: theme.border, true: theme.accent }}
-                  thumbColor={alsoBlock ? theme.onAccent : theme.text}
-                  {...({ activeThumbColor: theme.onAccent } as object)}
                   accessibilityLabel={`Also block ${ownerName}`}
                 />
               </View>
