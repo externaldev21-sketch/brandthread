@@ -1,10 +1,14 @@
 /**
- * Guard against the "floating seller tab bar renders on top of a full-screen
+ * Guard against the "floating tab bar renders on top of a full-screen
  * camera/creation flow" regression class (e.g. 'buyer-story-create' was
- * missing from the deny-list, so the bar rendered jammed under the story
- * camera's shutter row) — and asserts the deny-list drives a real slide
- * animation (never a spring, never a bare jump) rather than an instant
- * mount/unmount.
+ * missing from the SELLER deny-list, so the bar rendered jammed under the
+ * story camera's shutter row) — and asserts each deny-list drives a real
+ * slide animation (never a spring, never a bare jump) rather than an
+ * instant mount/unmount. Covers BOTH the seller tab bar
+ * (SellerGlobalTabBar.tsx, gated by app/_layout.tsx's SellerBarGate) and
+ * the buyer tab bar (components/buyer-nav/BuyerTabBar.tsx, gated by its own
+ * useSegments() check) — both drive the SAME TAB_BAR_SLIDE_MS/
+ * TAB_BAR_SLIDE_EASING/tabBarSlideTargetY helper.
  *
  * Source-inspection, same convention as lib/__tests__/freshInstallPreview.test.ts:
  * app/_layout.tsx pulls in Clerk/Notifications/etc. at module scope, which
@@ -72,6 +76,49 @@ describe('tab bar slide motion: fast, plain ease-out, no spring', () => {
   it('while hidden, the bar does not block taps (pointerEvents flips to none, not just visually offscreen)', () => {
     const bar = src('../components/SellerGlobalTabBar.tsx');
     expect(bar).toMatch(/pointerEvents=\{hidden \? 'none' : 'box-none'\}/);
+  });
+});
+
+describe('BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS + BuyerTabBar: same helper, same motion, same guarantees', () => {
+  it('covers every buyer-reachable creation/story/video/live route', () => {
+    const bar = src('../components/buyer-nav/BuyerTabBar.tsx');
+    const setMatch = bar.match(/const BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\);/);
+    expect(setMatch).toBeTruthy();
+    const setBody = setMatch![1];
+    for (const name of [
+      'camera-capture', 'create-post', 'buyer-story-create', 'buyer-story-viewer',
+      'buyer-live', 'live-feed', 'live',
+    ]) {
+      expect(setBody, `'${name}' is a buyer-reachable full-screen route but missing from BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS`)
+        .toMatch(new RegExp(`'${name}'`));
+    }
+  });
+
+  it('reads the true current route via useSegments(), not the Tabs navigator\'s own state (which can\'t see a root-Stack sibling)', () => {
+    const bar = src('../components/buyer-nav/BuyerTabBar.tsx');
+    expect(bar).toContain("import { useSegments, type Tabs } from 'expo-router';");
+    expect(bar).toMatch(/const segments = useSegments\(\);/);
+    expect(bar).toMatch(/const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS\.has\(firstSegment\);/);
+  });
+
+  it('drives translateY via the SAME TAB_BAR_SLIDE_MS/EASING/tabBarSlideTargetY helper as the seller bar, never a spring', () => {
+    const bar = src('../components/buyer-nav/BuyerTabBar.tsx');
+    expect(bar).toContain("import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';");
+    expect(bar).toContain("import { tabBarSlideTargetY } from '@/lib/tabBarSlide';");
+    expect(bar).toMatch(/withTiming\(tabBarSlideTargetY\(isFullScreenRoute, offscreenY\), \{\s*duration: TAB_BAR_SLIDE_MS,\s*easing: TAB_BAR_SLIDE_EASING,/);
+    expect(bar).not.toMatch(/withSpring/);
+    expect(bar).not.toContain('Animated.spring');
+  });
+
+  it('while hidden, does not block taps and stays mounted (keeps BUYER_TAB_BAR_HIDDEN_ROUTES\' early return unreachable for this path)', () => {
+    const bar = src('../components/buyer-nav/BuyerTabBar.tsx');
+    expect(bar).toMatch(/pointerEvents=\{isFullScreenRoute \? 'none' : 'box-none'\}/);
+    // The slide hooks must run before the BUYER_TAB_BAR_HIDDEN_ROUTES early
+    // return, or hook order breaks whenever that branch fires.
+    const slideHookIndex = bar.indexOf('const [barHeight, setBarHeight] = useState(96);');
+    const earlyReturnIndex = bar.indexOf('if (BUYER_TAB_BAR_HIDDEN_ROUTES.has(activeRoute)) return null;');
+    expect(slideHookIndex).toBeGreaterThan(0);
+    expect(earlyReturnIndex).toBeGreaterThan(slideHookIndex);
   });
 });
 
