@@ -9,11 +9,14 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import {
   db, messages, postComments, posts, products, stories, users,
+  communities, communityMessages,
 } from "@workspace/db";
 import type { ReportTargetType } from "./safety";
+import { closeCommunityRoom } from "../ws/communityHub";
 
 export const REPORT_TARGET_TYPES: readonly ReportTargetType[] = [
   "post", "video", "live", "live_comment", "comment", "story", "product", "profile", "message",
+  "community_message", "community",
 ] as const;
 
 export const REPORT_REASONS = [
@@ -164,6 +167,23 @@ export async function resolveReportTarget(type: ReportTargetType, rawId: string)
       if (!row) return null;
       return { targetId: row.id, ownerId: row.senderId, excerpt: clip(row.body), label: "Direct message", containerId: row.conversationId };
     }
+    case "community_message": {
+      if (!UUID_RE.test(id)) return null;
+      const [row] = await db
+        .select({ id: communityMessages.id, senderId: communityMessages.senderId, body: communityMessages.body, communityId: communityMessages.communityId, deletedAt: communityMessages.deletedAt, attachments: communityMessages.attachments })
+        .from(communityMessages).where(eq(communityMessages.id, id)).limit(1);
+      if (!row || row.deletedAt) return null;
+      const first = Array.isArray(row.attachments) ? (row.attachments[0] as { url?: string } | undefined) : undefined;
+      return { targetId: row.id, ownerId: row.senderId, excerpt: clip(row.body) ?? (first ? "Photo" : null), label: "Community message", containerId: row.communityId, mediaUrl: first?.url ?? null };
+    }
+    case "community": {
+      if (!UUID_RE.test(id)) return null;
+      const [row] = await db
+        .select({ id: communities.id, ownerId: communities.ownerId, kind: communities.kind, name: communities.name, description: communities.description, coverUrl: communities.coverUrl, iconUrl: communities.iconUrl })
+        .from(communities).where(and(eq(communities.id, id), sql`${communities.deletedAt} IS NULL`)).limit(1);
+      if (!row || row.kind === "official") return null;
+      return { targetId: row.id, ownerId: row.ownerId, excerpt: clip([row.name, row.description].filter(Boolean).join(" — ")), label: row.name, mediaUrl: row.coverUrl ?? row.iconUrl };
+    }
     case "live": {
       if (!UUID_RE.test(id)) return null;
       const row = await rawFirstRow(sql`SELECT id, seller_id, title FROM live_streams WHERE id = ${id}::uuid LIMIT 1`);
@@ -224,6 +244,19 @@ export async function removeReportedContent(type: ReportTargetType, id: string, 
       const rows = await db.update(messages)
         .set({ moderationStatus: "removed", deletedAt: now, deletedBy: moderatorId })
         .where(eq(messages.id, id)).returning({ id: messages.id });
+      return rows.length > 0;
+    }
+    case "community_message": {
+      const rows = await db.update(communityMessages)
+        .set({ deletedAt: now, deletedBy: moderatorId })
+        .where(eq(communityMessages.id, id)).returning({ id: communityMessages.id });
+      return rows.length > 0;
+    }
+    case "community": {
+      const rows = await db.update(communities)
+        .set({ deletedAt: now, inviteCode: null, updatedAt: now })
+        .where(eq(communities.id, id)).returning({ id: communities.id });
+      if (rows.length > 0) closeCommunityRoom(id);
       return rows.length > 0;
     }
     case "live": {
