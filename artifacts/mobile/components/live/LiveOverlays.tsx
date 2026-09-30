@@ -23,7 +23,7 @@ const ND = Platform.OS !== 'web';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
  *  the same translucent circle — no bare icons mixed with disc'd ones. */
 const RAIL_ICON_SIZE = 28;
-const RAIL_ICON_CIRCLE = 40;
+const RAIL_ICON_CIRCLE = 44;
 
 // ─── Host pill (top-left) ─────────────────────────────────────────────────────
 
@@ -343,14 +343,15 @@ export const LiveHeartLayer = forwardRef<LiveHeartLayerHandle, { originOffset?: 
 // ─── Comment bar (bottom) ────────────────────────────────────────────────────
 
 export function LiveCommentBar({
-  onSend, disabled, onGift, onShare,
+  onSend, disabled, onGift, onShare, onMore,
 }: {
   onSend: (text: string) => Promise<void> | void;
   disabled?: boolean;
   /** Quick icons to the right of the pill, TikTok-style (gift/Thread Cash,
-   *  share) — omitted has no effect on the pill itself. */
+   *  share, report/block overflow) — each omitted has no effect on the pill itself. */
   onGift?: () => void;
   onShare?: () => void;
+  onMore?: () => void;
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -396,6 +397,11 @@ export function LiveCommentBar({
           <Feather name="share" size={22} color="#fff" />
         </Pressable>
       )}
+      {onMore && (
+        <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
+          <Feather name="more-horizontal" size={22} color="#fff" />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -403,9 +409,15 @@ export function LiveCommentBar({
 const styles = StyleSheet.create({
   hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   hostInitials: { color: '#fff', fontFamily: FONT.bold },
+  // flexShrink so this compresses (its own text truncates via numberOfLines)
+  // before the viewer stack/count/close button on the other side of the row
+  // ever overlap it — neither side shrinks by default in RN's flexbox, so
+  // without this the two sides overflowed into each other on narrower
+  // screens once the viewer stack + count + close button reached their
+  // combined natural width.
   hostPill: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 3, paddingRight: 4, paddingVertical: 3,
-    borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250,
+    borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250, flexShrink: 1, minWidth: 0,
   },
   hostTap: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
   hostText: { flexShrink: 1, minWidth: 0 },
@@ -413,13 +425,13 @@ const styles = StyleSheet.create({
   hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 13, flexShrink: 1 },
   hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11 },
-  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 0.5 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
+  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
+  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   followBtn: {
-    minWidth: 58, height: 28, paddingHorizontal: 12, borderRadius: RADIUS.pill,
+    minWidth: 58, height: 32, paddingHorizontal: 12, borderRadius: RADIUS.pill,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 28 },
+  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 32 },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
   // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each
@@ -432,7 +444,7 @@ const styles = StyleSheet.create({
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
   },
-  viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: 9 },
+  viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerCountPill: { marginLeft: 6 },
   viewerCountText: { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 },
 
@@ -452,7 +464,7 @@ const styles = StyleSheet.create({
   // Nested inside the chat Text (not a row View) so "username HOST message"
   // flows and wraps as one line of text instead of the tag forcing a break.
   hostTagText: {
-    color: '#000', backgroundColor: '#fff', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.6,
+    color: '#000', backgroundColor: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.6,
     borderRadius: 3,
   },
   eventPill: {
@@ -471,10 +483,10 @@ const styles = StyleSheet.create({
   // text color subpixel-antialiases against the live video underneath, which
   // reads as a soft/smudgy mid-grey rather than a crisp silver (see
   // lib/theme.ts's ON_DARK_MUTED doc comment).
-  pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 },
-  pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 14, marginTop: 1 },
+  pinnedEyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.6 },
+  pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 1 },
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
-  pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
+  pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm },
   pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
   buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: RADIUS.pill, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
@@ -487,20 +499,20 @@ const styles = StyleSheet.create({
   },
   railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3 },
   railBadge: {
-    position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3,
+    position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  railBadgeText: { color: '#000', fontFamily: FONT.bold, fontSize: 9 },
+  railBadgeText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.xs },
 
   commentRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   commentPill: {
-    flex: 1, height: 36, borderRadius: RADIUS.pill, overflow: 'hidden', flexDirection: 'row', alignItems: 'center',
+    flex: 1, height: 44, borderRadius: RADIUS.pill, overflow: 'hidden', flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.42)',
   },
   commentInput: {
-    flex: 1, height: 36, paddingHorizontal: 16, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm,
+    flex: 1, height: 44, paddingHorizontal: 16, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm,
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
-  sendBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 4 },
-  quickIconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+  quickIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

@@ -127,7 +127,9 @@ const ROUTE_ALLOWLIST = process.env.NOTCH_CRAWL_ROUTES
 // Fast mode only spends its deeper-tap budget on the PR's changed routes,
 // and never on the fresh-account pass (nightly's job) — depth 0 across
 // every route on the default demo account is still checked every time.
-const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = FAST ? ['demo'] : DATA_STATES;
+const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = process.env.NOTCH_CRAWL_STATES
+  ? (process.env.NOTCH_CRAWL_STATES.split(',') as (typeof DATA_STATES)[number][])
+  : FAST ? ['demo'] : DATA_STATES;
 const MAX_DEPTH = FAST ? 1 : CLICK_BREADTH.length;
 
 interface Failure {
@@ -143,6 +145,30 @@ interface Failure {
   screenshot: string;
 }
 
+interface TabBarOverlapFailure {
+  kind: 'tab-bar-overlap';
+  route: string;
+  role: string;
+  dataState: string;
+  depth: number;
+  via?: string[];
+  element: string;
+  box: { x: number; y: number; width: number; height: number };
+  screenshot: string;
+}
+
+interface BoxedHeaderButtonFailure {
+  kind: 'boxed-header-button';
+  route: string;
+  role: string;
+  dataState: string;
+  depth: number;
+  via?: string[];
+  element: string;
+  box: { x: number; y: number; width: number; height: number };
+  screenshot: string;
+}
+
 interface ConsistencyFailure {
   kind: 'consistency';
   route: string;
@@ -153,6 +179,21 @@ interface ConsistencyFailure {
   actual: unknown;
   screenshot: string;
 }
+
+interface DomNestingFailure {
+  kind: 'dom-nesting';
+  route: string;
+  role: string;
+  dataState: string;
+  message: string;
+}
+
+// React's own validateDOMNesting warning for exactly this class of bug (a
+// <TouchableOpacity>/<Pressable> rendered inside another one becomes a
+// <button> inside a <button> on web) — matched loosely so it also catches
+// the sibling "cannot appear as a descendant of" phrasing React uses for
+// other invalid-nesting cases (e.g. a <View> inside a <Text>).
+const DOM_NESTING_WARNING = /cannot (?:contain a nested|appear as a descendant of)/i;
 
 const VIOLATION_SCRIPT = `(() => {
   const TOP_SAFE_LINE = ${TOP_SAFE_LINE};
@@ -216,6 +257,56 @@ const VIOLATION_SCRIPT = `(() => {
   return results;
 })()`;
 
+/** Flags visible text PERMANENTLY sitting underneath the floating tab bar's
+ * own footprint — the bar is `position: absolute` (see the deny-list comment
+ * in app/_layout.tsx) so it physically covers whatever is laid out beneath
+ * it; a screen with a sticky footer that only pads for the safe-area inset
+ * (not the bar's own height) gets its last line of text hidden behind the
+ * bar forever, exactly like Boost's payment note (a flex sibling of the
+ * screen's ScrollView, never scrollable itself). A screen this crawl reaches
+ * should either have the bar hidden (deny-listed) or pad its footer clear of
+ * it.
+ *
+ * Ordinary list/scroll content that merely scrolls PAST the bar as the user
+ * scrolls (e.g. the last row of a long Settings list, momentarily behind the
+ * bar's translucent glass mid-scroll) is exempt — same reasoning as
+ * VIOLATION_SCRIPT's `isBottomPinned` bottom-edge check: the user reaches it
+ * by scrolling, nothing hides it forever. Only text with no scrollable
+ * ancestor (so it can never scroll clear of the bar) counts as a real,
+ * permanent overlap. */
+const TAB_BAR_OVERLAP_SCRIPT = `(() => {
+  const bar = document.querySelector('[data-testid="seller-global-tab-bar"], [data-testid="buyer-bottom-tab-bar"]');
+  if (!bar) return [];
+  const barStyle = window.getComputedStyle(bar);
+  if (barStyle.display === 'none' || barStyle.visibility === 'hidden' || Number(barStyle.opacity) === 0) return [];
+  const barRect = bar.getBoundingClientRect();
+  if (barRect.width === 0 || barRect.height === 0) return [];
+  const hasScrollableAncestor = (node) => {
+    for (let a = node.parentElement; a; a = a.parentElement) {
+      const s = window.getComputedStyle(a);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && a.scrollHeight > a.clientHeight + 1) return true;
+    }
+    return false;
+  };
+  const results = [];
+  const all = document.querySelectorAll('body *');
+  for (const el of all) {
+    if (el.closest('[data-notch-exempt]')) continue;
+    if (bar.contains(el)) continue;
+    const isText = el.childNodes.length > 0 && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent && n.textContent.trim());
+    if (!isText) continue;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    const overlaps = rect.left < barRect.right && rect.right > barRect.left && rect.top < barRect.bottom && rect.bottom > barRect.top;
+    if (!overlaps) continue;
+    if (hasScrollableAncestor(el)) continue;
+    results.push({ box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (el.tagName + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || '').slice(0, 40) + '"') });
+  }
+  return results;
+})()`;
+
 /** Reads the ScreenHeader-rendered title's geometry + font, if this screen
  * has one, for the cross-screen consistency assertion below. Returns null
  * when there's no `screen-header-title` node currently on screen (e.g. a
@@ -243,7 +334,48 @@ const HEADER_GEOMETRY_SCRIPT = `(() => {
   return {
     top: Math.round(rect.top), left: Math.round(rect.left),
     fontSize: parseFloat(style.fontSize), fontWeight: style.fontWeight,
+    // ScreenHeader renders variant via dataSet={{ variant }}, which
+    // react-native-web serializes as data-variant on the title node —
+    // 'push' and 'modal' legitimately have different left positions (and
+    // which side the back/close button is on), so consistency is compared
+    // within a variant, not across both.
+    variant: el.dataset.variant || 'push',
   };
+})()`;
+
+/** Flags a boxed/bordered back or close button sitting at the top of a
+ * screen — the exact "old header" look Dev reported after #418: a screen
+ * migrated onto ScreenHeader still looked wrong because ScreenHeader's own
+ * push-variant back button was a bordered circular chip (fixed since, but
+ * this guards against it — or any hand-rolled equivalent — coming back).
+ * Only considers a `role=button`/`BUTTON` near the top-left or top-right of
+ * the viewport (top < 130px, within 80px of either edge — where a header's
+ * primary dismiss control lives) with BOTH a visible background color (not
+ * transparent) and a visible border — a plain icon on a transparent
+ * background is fine; a filled/bordered chip there is the regression. */
+const BOXED_HEADER_BUTTON_SCRIPT = `(() => {
+  const results = [];
+  const candidates = [...document.querySelectorAll('button, [role="button"]')];
+  for (const el of candidates) {
+    if (el.closest('[data-notch-exempt]')) continue;
+    if (el.closest('[data-testid="buyer-bottom-tab-bar"], [data-testid="seller-global-tab-bar"]')) continue;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    if (rect.top >= 130) continue;
+    const nearLeft = rect.left < 80;
+    const nearRight = rect.right > window.innerWidth - 80;
+    if (!nearLeft && !nearRight) continue;
+    const bg = style.backgroundColor;
+    const hasVisibleBg = bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)';
+    const borderWidth = parseFloat(style.borderTopWidth) || 0;
+    const hasVisibleBorder = borderWidth > 0 && style.borderTopStyle !== 'none';
+    if (hasVisibleBg && hasVisibleBorder) {
+      results.push({ box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (el.tagName + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || el.getAttribute('aria-label') || '').slice(0, 40) + '"') });
+    }
+  }
+  return results;
 })()`;
 
 test.setTimeout(0);
@@ -296,19 +428,28 @@ test('every screen clears the notch, the home indicator, and matches every other
   }
   const failures: Failure[] = [];
   const consistencyFailures: ConsistencyFailure[] = [];
+  const tabBarOverlapFailures: TabBarOverlapFailure[] = [];
+  const boxedHeaderButtonFailures: BoxedHeaderButtonFailure[] = [];
+  const domNestingFailures: DomNestingFailure[] = [];
   let checked = 0;
+  // Updated on every navigation/tap so a console warning fired asynchronously
+  // (React's dev-mode DOM-nesting check runs on commit, not synchronously
+  // with the click that caused it) still gets attributed to the right screen.
+  let current = { route: '', role: '', dataState: '' };
   const device = { viewport: VIEWPORT, scale: 3, isMobile: true, userAgent: IPHONE_USER_AGENT };
-  // The first screen-header-title geometry seen becomes the baseline every
-  // other screen's title is compared against — recorded once, globally
-  // (not per role/data-state), since the whole point is that it must never
-  // differ anywhere in the app.
-  let headerBaseline: { top: number; left: number; fontSize: number; fontWeight: string } | null = null;
+  // The first screen-header-title geometry seen for each variant becomes
+  // that variant's baseline every other screen of the same variant is
+  // compared against — recorded once per variant, globally (not per
+  // role/data-state). 'push' and 'modal' have deliberately different left
+  // positions (and button side), so they get separate baselines; within a
+  // variant, every screen must still match exactly.
+  const headerBaselines: Record<string, { top: number; left: number; fontSize: number; fontWeight: string; variant: string }> = {};
 
   async function checkScreen(page: any, route: string, role: string, dataState: string, depth: number, via: string[]) {
     checked += 1;
     const violations: any[] = await page.evaluate(VIOLATION_SCRIPT).catch(() => []);
     for (const v of violations) {
-      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length}.png`);
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
       await page.screenshot({ path: shot }).catch(() => {});
       failures.push({
         kind: 'clearance', route, role, dataState, depth, via: via.length ? via : undefined,
@@ -316,22 +457,43 @@ test('every screen clears the notch, the home indicator, and matches every other
       });
     }
 
+    const tabBarOverlaps: any[] = await page.evaluate(TAB_BAR_OVERLAP_SCRIPT).catch(() => []);
+    for (const o of tabBarOverlaps) {
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
+      await page.screenshot({ path: shot }).catch(() => {});
+      tabBarOverlapFailures.push({
+        kind: 'tab-bar-overlap', route, role, dataState, depth, via: via.length ? via : undefined,
+        element: o.element, box: o.box, screenshot: shot,
+      });
+    }
+
+    const boxedButtons: any[] = await page.evaluate(BOXED_HEADER_BUTTON_SCRIPT).catch(() => []);
+    for (const b of boxedButtons) {
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
+      await page.screenshot({ path: shot }).catch(() => {});
+      boxedHeaderButtonFailures.push({
+        kind: 'boxed-header-button', route, role, dataState, depth, via: via.length ? via : undefined,
+        element: b.element, box: b.box, screenshot: shot,
+      });
+    }
+
     const geo = await page.evaluate(HEADER_GEOMETRY_SCRIPT).catch(() => null);
     if (geo) {
-      if (!headerBaseline) {
-        headerBaseline = geo;
+      const baseline = headerBaselines[geo.variant];
+      if (!baseline) {
+        headerBaselines[geo.variant] = geo;
       } else {
         const mismatches: string[] = [];
-        if (Math.abs(geo.top - headerBaseline.top) > 1) mismatches.push(`top ${geo.top} vs baseline ${headerBaseline.top}`);
-        if (Math.abs(geo.left - headerBaseline.left) > 1) mismatches.push(`left ${geo.left} vs baseline ${headerBaseline.left}`);
-        if (Math.abs(geo.fontSize - headerBaseline.fontSize) > 1) mismatches.push(`fontSize ${geo.fontSize} vs baseline ${headerBaseline.fontSize}`);
-        if (geo.fontWeight !== headerBaseline.fontWeight) mismatches.push(`fontWeight ${geo.fontWeight} vs baseline ${headerBaseline.fontWeight}`);
+        if (Math.abs(geo.top - baseline.top) > 1) mismatches.push(`top ${geo.top} vs baseline ${baseline.top}`);
+        if (Math.abs(geo.left - baseline.left) > 1) mismatches.push(`left ${geo.left} vs baseline ${baseline.left}`);
+        if (Math.abs(geo.fontSize - baseline.fontSize) > 1) mismatches.push(`fontSize ${geo.fontSize} vs baseline ${baseline.fontSize}`);
+        if (geo.fontWeight !== baseline.fontWeight) mismatches.push(`fontWeight ${geo.fontWeight} vs baseline ${baseline.fontWeight}`);
         if (mismatches.length) {
-          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length}.png`);
+          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
           await page.screenshot({ path: shot }).catch(() => {});
           consistencyFailures.push({
             kind: 'consistency', route, role, dataState, mismatch: mismatches.join('; '),
-            expected: headerBaseline, actual: geo, screenshot: shot,
+            expected: baseline, actual: geo, screenshot: shot,
           });
         }
       }
@@ -367,15 +529,26 @@ test('every screen clears the notch, the home indicator, and matches every other
         const { context, page } = await openContext(browser, {
           device, role, origin, images, onUnseeded: () => {}, ...contextOpts,
         });
+        page.on('console', (msg: { type: () => string; text: () => string }) => {
+          if (msg.type() !== 'error' && msg.type() !== 'warning') return;
+          const text = msg.text();
+          if (!DOM_NESTING_WARNING.test(text)) return;
+          domNestingFailures.push({
+            kind: 'dom-nesting', route: current.route, role: current.role, dataState: current.dataState,
+            message: text.slice(0, 500),
+          });
+        });
         try {
           // One full app boot per (role, data-state); every route after
           // this is a light client-side navigation on the same page.
+          current = { route: routes[0] ?? '/', role, dataState };
           await openScreen(page, activity, origin, role, routes[0] ?? '/');
           await waitForImages(page, 6000);
           await waitForQuietNetwork(activity, 500, 6000);
 
           for (const route of routes) {
             const deepen = !FAST || (ROUTE_ALLOWLIST && ROUTE_ALLOWLIST.has(route));
+            current = { route, role, dataState };
             await navigateTo(page, route, role);
             await waitForImages(page, 4000);
             await waitForQuietNetwork(activity, 400, 4000);
@@ -397,11 +570,14 @@ test('every screen clears the notch, the home indicator, and matches every other
       checked, routeCount: routes.length,
       failureCount: failures.length, failures,
       consistencyFailureCount: consistencyFailures.length, consistencyFailures,
-      headerBaseline,
+      tabBarOverlapFailureCount: tabBarOverlapFailures.length, tabBarOverlapFailures,
+      boxedHeaderButtonFailureCount: boxedHeaderButtonFailures.length, boxedHeaderButtonFailures,
+      domNestingFailureCount: domNestingFailures.length, domNestingFailures,
+      headerBaselines,
     }, null, 2),
   );
 
-  const total = failures.length + consistencyFailures.length;
+  const total = failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length + domNestingFailures.length;
   if (total > 0) {
     const clearanceSummary = failures
       .slice(0, 20)
@@ -411,6 +587,31 @@ test('every screen clears the notch, the home indicator, and matches every other
       .slice(0, 20)
       .map((f) => `  [${f.role}/${f.dataState}] ${f.route}: header ${f.mismatch}`)
       .join('\n');
-    expect(total, `${failures.length} clearance + ${consistencyFailures.length} header-consistency failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}`).toBe(0);
+    const tabBarOverlapSummary = tabBarOverlapFailures
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} hidden behind tab bar`)
+      .join('\n');
+    const boxedHeaderButtonSummary = boxedHeaderButtonFailures
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} is a boxed/bordered header button`)
+      .join('\n');
+    // Deduped by (route, message) — the same nested-pressable bug typically
+    // fires the identical warning once per render across a handful of
+    // re-renders on the same screen, which would otherwise flood this list.
+    const seenNesting = new Set<string>();
+    const domNestingSummary = domNestingFailures
+      .filter((f) => {
+        const key = `${f.route}|${f.message}`;
+        if (seenNesting.has(key)) return false;
+        seenNesting.add(key);
+        return true;
+      })
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}: ${f.message}`)
+      .join('\n');
+    expect(
+      total,
+      `${failures.length} clearance + ${consistencyFailures.length} header-consistency + ${tabBarOverlapFailures.length} tab-bar-overlap + ${boxedHeaderButtonFailures.length} boxed-header-button + ${domNestingFailures.length} DOM-nesting console-warning failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}\n${tabBarOverlapSummary}\n${boxedHeaderButtonSummary}\n${domNestingSummary}`,
+    ).toBe(0);
   }
 });

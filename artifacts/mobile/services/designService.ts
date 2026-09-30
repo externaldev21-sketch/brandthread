@@ -16,6 +16,7 @@ import {
   retainDesignUploadAsset,
 } from '@/lib/designCloudImageCache';
 import { ApiError } from '@/lib/networkNotice';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -38,7 +39,7 @@ export function initDesignService(userId: string | null, storeContext: string | 
   if (nextUser !== _designUserId || nextStore !== _designStoreContext) _designScopeGeneration += 1;
   _designUserId = nextUser;
   _designStoreContext = nextStore;
-  if (nextUser !== 'anon') void drainVerifiedUploadQueue(captureSyncContext());
+  if (nextUser !== 'anon') fireAndForget(drainVerifiedUploadQueue(captureSyncContext()));
 }
 
 function K(userId = _designUserId, storeContext = _designStoreContext) {
@@ -69,10 +70,34 @@ function captureSyncContext(): DesignSyncContext {
   };
 }
 
+const STALE_CONTEXT_MESSAGE = 'Design Studio store context changed during sync.';
+const STALE_PROJECT_MESSAGE = 'Design Studio project was deleted during sync.';
+const STALE_SYNC_MESSAGES: string[] = [STALE_CONTEXT_MESSAGE, STALE_PROJECT_MESSAGE];
+
 function assertCurrentContext(context: DesignSyncContext): void {
   if (context.generation !== _designScopeGeneration) {
-    throw new Error('Design Studio store context changed during sync.');
+    throw new Error(STALE_CONTEXT_MESSAGE);
   }
+}
+
+function isStaleContextError(error: unknown): boolean {
+  return error instanceof Error && STALE_SYNC_MESSAGES.includes(error.message);
+}
+
+// Background sync work (queue draining, upload flushing) is kicked off
+// fire-and-forget from several places below — it must never block the
+// caller. A generation/context change mid-flight (the user switched store
+// or signed out while a sync was in the air) is an EXPECTED abort, not a
+// bug: the in-flight work is for a scope that's no longer current, so
+// throwing `assertCurrentContext`/`assertProjectEpoch` mid-way is correct,
+// but letting that rejection go unhandled just to log a scary console
+// error is not. Route every fire-and-forget call through this so a stale
+// context aborts silently while a genuine failure still surfaces in dev.
+function fireAndForget(promise: Promise<unknown>): void {
+  promise.catch(error => {
+    if (isStaleContextError(error)) return;
+    if (__DEV__) console.error('[designService] background sync failed:', error);
+  });
 }
 
 function syncHeaders(context: DesignSyncContext, revision?: number): Record<string, string> {
@@ -179,7 +204,7 @@ function invalidateProjectOperations(context: DesignSyncContext, projectId: stri
 function assertProjectEpoch(context: DesignSyncContext, projectId: string, epoch: number): void {
   assertCurrentContext(context);
   if (captureProjectEpoch(context, projectId) !== epoch) {
-    throw new Error('Design Studio project was deleted during sync.');
+    throw new Error(STALE_PROJECT_MESSAGE);
   }
 }
 
@@ -506,6 +531,29 @@ async function loadAssets(key = K().assets): Promise<BrandAsset[]> {
 }
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
+/**
+ * A single full-canvas fill layer so a demo seed project's gallery thumbnail
+ * renders as a real (if plain) canvas preview instead of
+ * DesignLayerCompositor's grey type-icon placeholder, which is meant only
+ * for a genuinely blank, layer-less canvas.
+ */
+function fillLayer(fillHex: string): DesignLayer {
+  const now = new Date().toISOString();
+  return {
+    id: uid('layer'),
+    name: 'Background',
+    type: 'shape',
+    visible: true,
+    locked: false,
+    order: 0,
+    opacity: 1,
+    transform: { x: 0, y: 0, width: 1080, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
+    data: { kind: 'shape', shape: 'rect', fillColor: fillHex, fill: fillHex },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function makeSeedProject(
   name: string,
   type: DesignProjectType,
@@ -526,16 +574,30 @@ function makeSeedProject(
   };
 }
 
+/**
+ * A genuinely new seller (or a fresh dev/web preview, `?bt_preview=seller`
+ * with no `&demo=1`) must see Design Studio's real empty state — zero
+ * projects, not three fake ones. Sample projects only ever appear under the
+ * explicit `&demo=1` preview flag (see lib/devPreview.ts's isPreviewDemoMode
+ * doc comment); every other case, including real production accounts,
+ * returns the actually-empty list from AsyncStorage untouched.
+ */
 async function seedIfEmpty(projectsKey = K().projects): Promise<DesignProject[]> {
   const existing = await loadProjects(projectsKey);
   if (existing.length > 0) return existing;
+  if (!isPreviewDemoMode()) return existing;
   const seeds: DesignProject[] = [
     makeSeedProject('Spring Drop Hoodie', 'garment', 'saved', {
       garmentType: 'hoodie',
       garmentColor: '#1A1A2E',
+      layers: [fillLayer('#2A2A2E')],
     }),
-    makeSeedProject('Product Launch Mockup', 'mockup', 'draft'),
-    makeSeedProject('Campaign Assets', 'campaign', 'exported'),
+    makeSeedProject('Product Launch Mockup', 'mockup', 'draft', {
+      layers: [fillLayer('#3F3F46')],
+    }),
+    makeSeedProject('Campaign Assets', 'campaign', 'exported', {
+      layers: [fillLayer('#E4E4E7')],
+    }),
   ];
   await saveProjects(seeds, projectsKey);
   return seeds;
@@ -584,7 +646,7 @@ export async function recoverLegacyDesignProjects(): Promise<number> {
     await AsyncStorage.setItem(context.keys.legacyRecovery, new Date().toISOString());
     return additions;
   });
-  void drainProjectSync(context);
+  fireAndForget(drainProjectSync(context));
   return recovered.length;
 }
 
@@ -634,7 +696,7 @@ export async function getProjects(): Promise<DesignProject[]> {
     all = await seedIfEmpty(keys.projects);
   }
   if (context.generation !== _designScopeGeneration) return [];
-  void drainProjectSync(context);
+  fireAndForget(drainProjectSync(context));
   return all.filter(p => !p.deletedAt);
 }
 
@@ -863,7 +925,7 @@ function scheduleVerifiedUploadRetry(context: DesignSyncContext): void {
   if (verifiedUploadRetryTimers.has(key)) return;
   const timer = setTimeout(() => {
     verifiedUploadRetryTimers.delete(key);
-    void drainVerifiedUploadQueue(context);
+    fireAndForget(drainVerifiedUploadQueue(context));
   }, 30_000);
   verifiedUploadRetryTimers.set(key, timer);
 }
@@ -953,7 +1015,7 @@ export async function syncVerifiedDesignAsset(
   // Persist before the first network attempt. Every upload then flows through
   // one FIFO lock, so an older retry cannot overtake and replace a newer master.
   await queueVerifiedUpload(uploadId, projectId, asset, kind, context);
-  void drainVerifiedUploadQueue(context);
+  fireAndForget(drainVerifiedUploadQueue(context));
   return null;
 }
 
@@ -1025,6 +1087,44 @@ export async function purgeDeletedProjects(): Promise<void> {
   const deletedIds = projects.filter(p => !!p.deletedAt).map(p => p.id);
   for (const id of deletedIds) invalidateProjectOperations(context, id);
   await deleteProjectsSerialized(deletedIds, context);
+}
+
+// ─── Stacks ───────────────────────────────────────────────────────────────────
+// A "stack" is nothing more than a shared `stackId` across several projects —
+// no separate collection entity, matching Procreate's own model (a stack is
+// just how the gallery groups artworks that share a tag). Grouping/
+// ungrouping is a plain field update through the existing updateProject()
+// sync path, so it gets the same offline-safe merge/cloud-push behavior as
+// every other edit.
+
+let _uidStack = 0;
+function stackId(): string { return `stack_${Date.now()}_${++_uidStack}`; }
+
+/**
+ * Groups the given projects into one new stack (or, if any of them already
+ * belongs to a stack, reuses that stack's id so "select an existing stack
+ * tile + more items, then Stack" merges into it rather than creating a
+ * second one). Returns the resulting stack id.
+ */
+export async function stackProjects(projectIds: string[]): Promise<string> {
+  if (projectIds.length < 2) throw new Error('Select at least 2 designs to stack.');
+  const all = await getProjects();
+  const existing = projectIds
+    .map(id => all.find(p => p.id === id)?.stackId)
+    .find((id): id is string => !!id);
+  const id = existing ?? stackId();
+  for (const projectId of projectIds) await updateProject(projectId, { stackId: id });
+  return id;
+}
+
+/** Adds one project to an existing stack. */
+export async function addToStack(existingStackId: string, projectId: string): Promise<void> {
+  await updateProject(projectId, { stackId: existingStackId });
+}
+
+/** Removes a single project from whatever stack it's in (a no-op if it isn't in one). */
+export async function removeFromStack(projectId: string): Promise<void> {
+  await updateProject(projectId, { stackId: undefined });
 }
 
 export async function duplicateProject(id: string): Promise<DesignProject> {

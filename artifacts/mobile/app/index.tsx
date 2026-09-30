@@ -7,28 +7,57 @@
 
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 export default function Index() {
   const router = useRouter();
   const params = useLocalSearchParams<{ bt_preview?: string; bt_theme?: string; bt_capture?: string }>();
   const previewRole = params.bt_preview;
   const rootNavigationState = useRootNavigationState();
+  // This screen is the "/" route only, but it stays mounted (and its
+  // effects keep running) for a beat during Expo Router's client-side
+  // hydration on any full-page load, including a deep link straight to a
+  // real route (e.g. "/design?bt_preview=seller" on reload) — the router
+  // briefly resolves through the root before the matched route takes over.
+  // Reading segments here (rather than trusting "this component only
+  // renders at '/'") means the scheduled redirect below can bail out the
+  // instant the router has actually settled on some other route, instead
+  // of blindly firing a stale router.replace('/(tabs)/'|'/(buyer)/') that
+  // would stomp on a deep link the person actually meant to land on.
+  const segments = useSegments();
+  const atRoot = !segments[0] || (segments[0] as string) === 'index';
 
   useEffect(() => {
-    if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
-    const effectivePreviewRole = Platform.OS === 'web'
-      ? (previewRole === 'seller' || previewRole === 'buyer' ? previewRole : null)
-      : DEV_BYPASS_ROLE;
+    if (!atRoot) return;
+    // Web preview must be gated the same way isSellerDevPreview/PREVIEW_ROLE
+    // in app/_layout.tsx are (`__DEV__ || EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST`),
+    // not bare `__DEV__` — an exported preview build (the screenshot/audit
+    // harness, design review) has __DEV__ === false but the isolation-test
+    // flag set, and AuthGate's own devRole check (see app/_layout.tsx) skips
+    // redirecting in that same case, deferring to this effect. Gating this
+    // one on bare __DEV__ left "/" stuck on the bare boot logo forever under
+    // ?bt_preview=... in that build — neither redirect ever fired.
+    let effectivePreviewRole: 'buyer' | 'seller' | null = null;
+    if (Platform.OS === 'web') {
+      if (isSellerDevPreview()) effectivePreviewRole = 'seller';
+      else if (isBuyerDevPreview()) effectivePreviewRole = 'buyer';
+    } else {
+      effectivePreviewRole = DEV_BYPASS_ROLE;
+    }
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
+      // Re-check at fire time too: segments can change during the 50ms
+      // delay (e.g. the real deep-linked route finishes resolving), and a
+      // stale closure over an old "atRoot" would otherwise still fire.
+      if (!atRoot) return;
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
     }, 50);
     return () => clearTimeout(redirect);
-  }, [previewRole, rootNavigationState?.key, router]);
+  }, [previewRole, rootNavigationState?.key, router, atRoot]);
 
   if (__DEV__ && Platform.OS === 'web' && params.bt_capture === '1') {
     return (

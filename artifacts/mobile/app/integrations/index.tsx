@@ -9,32 +9,27 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
+import { ApiError } from '@/lib/networkNotice';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS, ICON, RADIUS } from '@/lib/theme';
 
 interface IntegrationDef {
   key: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
-  iconBg: string;
   description: string;
   route?: string;
-  /** No real OAuth flow exists yet — show a non-tappable "Coming soon" chip instead of a fake Connect action. */
-  comingSoon?: boolean;
   /** Auto-connected by the platform; never offers a Connect/Disconnect action. */
   autoConnected?: boolean;
 }
 
+// Only integrations with a real, working connect flow ship here — no
+// "Coming soon" placeholder rows for OAuth flows that don't exist yet.
 const INTEGRATION_DEFS: IntegrationDef[] = [
-  { key: 'klaviyo',     label: 'Klaviyo',      icon: 'mail',         iconBg: '#1A1A1A', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
-  { key: 'instagram',   label: 'Instagram',    icon: 'instagram',    iconBg: '#D62976', description: 'Sync products to Instagram Shopping', comingSoon: true },
-  { key: 'tiktok',      label: 'TikTok Shop',  icon: 'music',        iconBg: '#0B0B0B', description: 'Sell through TikTok\'s shopping channel', comingSoon: true },
-  { key: 'shopify',     label: 'Shopify',      icon: 'shopping-bag', iconBg: '#95BF47', description: 'Import your Shopify catalog and orders', comingSoon: true },
-  { key: 'stripe',      label: 'Stripe',       icon: 'credit-card',  iconBg: '#635BFF', description: 'Payments and payouts (auto-connected)', autoConnected: true },
-  { key: 'shipstation', label: 'ShipStation',  icon: 'truck',        iconBg: '#4A5568', description: 'Multi-carrier shipping management', comingSoon: true },
-  { key: 'mailchimp',   label: 'Mailchimp',    icon: 'mail',         iconBg: '#FFE01B', description: 'Email campaigns and audience management', comingSoon: true },
-  { key: 'google',      label: 'Google Ads',   icon: 'search',       iconBg: '#4285F4', description: 'Track conversions and run shopping ads', comingSoon: true },
-  { key: 'meta',        label: 'Meta Ads',     icon: 'target',       iconBg: '#1877F2', description: 'Facebook and Instagram ad integration', comingSoon: true },
+  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
+  // Description omits "(auto-connected)" — it clipped at the row's
+  // available width, and the "Connected" pill already says as much.
+  { key: 'stripe', label: 'Stripe', icon: 'credit-card', description: 'Payments and payouts', autoConnected: true },
 ];
 
 export default function IntegrationsScreen() {
@@ -43,16 +38,24 @@ export default function IntegrationsScreen() {
   const api = useApi();
   const [connectedKeys, setConnectedKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await api.seller.integrationStatus() as any;
       const integrations: Array<{ key: string }> = data.integrations ?? [];
       setConnectedKeys(new Set(integrations.map(i => i.key)));
-    } catch {
-      setConnectedKeys(new Set());
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        // No session yet (e.g. a fresh/demo preview) — that just means
+        // nothing is connected, not that the list failed to load.
+        setConnectedKeys(new Set());
+      } else {
+        setLoadError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +64,7 @@ export default function IntegrationsScreen() {
   useFocusEffect(useCallback(() => { load(); }, []));
 
   async function handleConnect(item: IntegrationDef) {
-    if (item.comingSoon || item.autoConnected) return;
+    if (item.autoConnected) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.route) { router.push(item.route as never); return; }
 
@@ -114,32 +117,34 @@ export default function IntegrationsScreen() {
 
           {loading ? (
             <View style={s.loadingRow}><ActivityIndicator color={colors.primary} /></View>
+          ) : loadError ? (
+            <View style={s.errorBox}>
+              <Feather name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
+              <Text style={[s.errorText, { color: colors.mutedForeground }]}>Couldn't load your integrations.</Text>
+              <TouchableOpacity onPress={load} style={[s.retryBtn, { borderColor: colors.border }]}>
+                <Text style={[s.retryBtnText, { color: colors.foreground }]}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {INTEGRATION_DEFS.map((item, i) => {
                 const connected = connectedKeys.has(item.key);
                 const isToggling = toggling === item.key;
-                const isInert = item.comingSoon || item.autoConnected;
                 return (
                   <TouchableOpacity
                     key={item.key}
                     onPress={() => handleConnect(item)}
-                    activeOpacity={isInert ? 1 : 0.7}
-                    disabled={item.comingSoon}
+                    activeOpacity={item.autoConnected ? 1 : 0.7}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
-                    <View style={[s.iconWrap, { backgroundColor: item.iconBg }, item.comingSoon && { opacity: 0.5 }]}>
-                      <Feather name={item.icon} size={15} color="#FFFFFF" />
+                    <View style={s.iconWrap}>
+                      <Feather name={item.icon} size={ICON.sm} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.rowLabel, { color: colors.foreground }, item.comingSoon && { color: colors.mutedForeground }]}>{item.label}</Text>
+                      <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
                       <Text style={[s.rowDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
                     </View>
-                    {item.comingSoon ? (
-                      <View style={[s.connectBtn, { borderColor: colors.border }]}>
-                        <Text style={[s.connectBtnText, { color: colors.mutedForeground }]}>Coming soon</Text>
-                      </View>
-                    ) : isToggling ? (
+                    {isToggling ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (connected || item.autoConnected) ? (
                        <View style={[s.connectedPill, { backgroundColor: `${colors.success}26` }]}>
@@ -158,7 +163,7 @@ export default function IntegrationsScreen() {
           )}
 
           {/* Connected count summary */}
-          {!loading && (
+          {!loading && !loadError && (
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
               {connectedKeys.size} of {INTEGRATION_DEFS.length} integrations connected
             </Text>
@@ -174,10 +179,14 @@ const s = StyleSheet.create({
   section: { paddingHorizontal: 20, paddingVertical: 18 },
   sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 16 },
   loadingRow: { alignItems: 'center', paddingVertical: 30 },
+  errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
+  errorText: { fontSize: FS.sm, fontFamily: FONT.regular },
+  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 2 },
+  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
-  iconWrap: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  iconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  rowLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
   rowDesc: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },

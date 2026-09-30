@@ -290,6 +290,19 @@ const PAGE_SCAN_FN = () => {
         const parts = m[1].split(',').map((s) => parseFloat(s));
         if ((parts[3] ?? 1) > 0.5) return cs.backgroundColor;
       }
+      // A gradient (expo-linear-gradient's <LinearGradient>, which renders
+      // on web as a plain div with `background-image: linear-gradient(...)`
+      // and no `background-color`) is an opaque, real background the app's
+      // own buttons rely on (see PrimaryButton) — but its actual color is
+      // unknowable from here without rasterizing the canvas. Treating it as
+      // "no background found" and walking straight past it to whatever sits
+      // behind the button in the DOM (often the page's near-black backdrop)
+      // produces a false low-contrast reading against text that's actually
+      // sitting on a bright gradient. Stop and report "unknown" instead of
+      // guessing either way.
+      if (cs.backgroundImage && cs.backgroundImage !== 'none' && /gradient/.test(cs.backgroundImage)) {
+        return null;
+      }
       node = node.parentElement;
     }
     return 'rgb(10,10,11)'; // app BG fallback
@@ -440,13 +453,34 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
     const byY = {};
     for (const t of shortTexts) {
       const key = Math.round(t.rect.y / 4);
-      (byY[key] ??= []).push(t.text);
+      (byY[key] ??= []).push(t);
     }
     for (const [, group] of Object.entries(byY)) {
       if (group.length >= 3) {
-        const uniq = new Set(group);
+        const uniq = new Set(group.map((t) => t.text));
         if (uniq.size === 1) {
-          findings.push({ type: 'repeated-labels', severity: 'hard', detail: `${group.length} adjacent identical labels: "${group[0]}"`, text: group[0] });
+          // Distinguish a real bug (chart tick labels, a copy-paste bug —
+          // nothing tells the repeats apart) from a false positive: several
+          // *different* stat cells/cards that legitimately all read the same
+          // value (e.g. a fresh seller with 0 published, 0 scheduled, 0
+          // drafts, 0 archived posts — see content.tsx's overview row).
+          // A legitimate case has its own distinct caption close beneath
+          // each repeated value; a genuine bug does not.
+          const companions = group.map((item) => {
+            let best = null;
+            let bestDy = Infinity;
+            for (const t of scan.texts) {
+              if (group.includes(t)) continue; // ignore other repeated members
+              const dy = t.rect.y - item.rect.y;
+              const dx = Math.abs(t.rect.x - item.rect.x);
+              if (dy > 0 && dy < 40 && dx < 80 && dy < bestDy) { bestDy = dy; best = t.text; }
+            }
+            return best;
+          });
+          const distinctCompanions = new Set(companions.filter(Boolean));
+          if (distinctCompanions.size < group.length) {
+            findings.push({ type: 'repeated-labels', severity: 'hard', detail: `${group.length} adjacent identical labels: "${group[0].text}"`, text: group[0].text });
+          }
         }
       }
     }

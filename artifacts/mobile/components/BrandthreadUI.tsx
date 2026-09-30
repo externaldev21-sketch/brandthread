@@ -10,7 +10,7 @@ import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
   StyleSheet, ActivityIndicator, Animated, Platform,
   ViewStyle, TextStyle, StyleProp, Pressable,
-  Switch, SwitchProps, PressableProps,
+  Switch, SwitchProps, PressableProps, LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -142,6 +142,23 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const { theme } = useAppTheme();
+  // Auto hit-slop: pads a visually-small control's TAP area up to the 44x44
+  // minimum comfortable touch target without changing its rendered size —
+  // hitSlop only extends where taps are still recognized, it never affects
+  // layout or appearance. Measured once the rendered box is known (onLayout)
+  // and only applied when the caller hasn't already set their own hitSlop
+  // (an explicit hitSlop always wins, including `undefined` padding meaning
+  // "none" is not distinguishable from "not set yet" — callers that need
+  // exactly zero hitSlop are rare enough that this default is the safer
+  // choice for the ~100 call sites that set none today).
+  const [autoHitSlop, setAutoHitSlop] = useState<{ top: number; bottom: number; left: number; right: number } | undefined>(undefined);
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    if (hitSlop !== undefined) return;
+    const { width, height } = e.nativeEvent.layout;
+    const padX = Math.max(0, (COMP.minTouchTarget - width) / 2);
+    const padY = Math.max(0, (COMP.minTouchTarget - height) / 2);
+    setAutoHitSlop((padX === 0 && padY === 0) ? undefined : { top: padY, bottom: padY, left: padX, right: padX });
+  }, [hitSlop]);
   // Text-crispness fix: this wrapper used to carry `transform: [{ scale }]`
   // (plus `opacity`) unconditionally, even fully at rest (scale===1,
   // opacity===1) — an identity transform still forces react-native-web to
@@ -163,7 +180,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       accessibilityRole={rest.accessibilityRole ?? 'button'}
       onPress={onPress}
       disabled={disabled}
-      hitSlop={hitSlop}
+      hitSlop={hitSlop ?? autoHitSlop}
       android_ripple={rippleEnabled ? { color: `${theme.accent}2E`, borderless: false } : undefined}
       onPressIn={(e) => {
         // Not settled for the whole pressed duration — the visible
@@ -194,7 +211,9 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       style={typeof style === 'function' ? style : undefined}
     >
       {(state) => (
-        <Animated.View style={[typeof style === 'function' ? undefined : style, !noMinHeight && { minHeight: COMP.minTouchTarget }, !settled.value && { transform: [{ scale }], opacity }]}>
+        <Animated.View
+          onLayout={(e) => { handleLayout(e); rest.onLayout?.(e); }}
+          style={[typeof style === 'function' ? undefined : style, !noMinHeight && { minHeight: COMP.minTouchTarget }, !settled.value && { transform: [{ scale }], opacity }]}>
           {typeof children === 'function' ? children(state) : children}
         </Animated.View>
       )}

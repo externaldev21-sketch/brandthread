@@ -443,7 +443,7 @@ export default function BuyerDropDetail() {
     return (
       <View style={[styles.center, { paddingHorizontal: 32, gap: 16 }]}>
         <Feather name="alert-triangle" size={32} color={theme.muted} />
-        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '600', textAlign: 'center' }}>
+        <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: 17, textAlign: 'center' }}>
           {loadError ? "Couldn't load this drop." : "This drop isn't available."}
         </Text>
         <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
   dropType: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 1.2, marginTop: 2 },
-  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: 39, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
+  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: FS.h1, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
   eyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.7, marginBottom: 9 },
   timerRow: { flexDirection: 'row', justifyContent: 'space-between' },
   timerUnit: { minWidth: 58 },

@@ -15,6 +15,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -35,6 +36,7 @@ export default function MetaAdsManageScreen() {
   const api = useApi();
   const { theme } = useAppTheme();
   const colors = useColors();
+  const insets = useSafeAreaInsets();
 
   const [checking, setChecking] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -171,7 +173,7 @@ export default function MetaAdsManageScreen() {
         rightElement={<IconButton name="plus" accessibilityLabel="New campaign" onPress={() => router.push('/meta-ads-setup')} />}
       />
       <ScrollView
-        contentContainerStyle={{ padding: SP.md, gap: SP.md }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.lg, gap: SP.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accentLight} />}
       >
         {loading && (

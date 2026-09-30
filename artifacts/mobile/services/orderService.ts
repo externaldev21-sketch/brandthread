@@ -7,16 +7,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { centsAtPercent, formatCents } from '@/lib/money';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
   HeldFundsRecord, PayoutMilestone, Fulfillment, FulfillmentGroup,
   Shipment, ShippingLabel, TrackingEvent, OrderTimelineEvent, OrderNote,
-  Cancellation, ReturnRequest, ReturnItem, ReturnInspection, Refund,
-  RefundLineItem, Dispute, DisputeEvidence, RiskFlag, BuyerOrderView,
+  Cancellation, ReturnRequest, ReturnItem, ReturnInspection,
+  Dispute, DisputeEvidence, RiskFlag, BuyerOrderView,
   OrderStatus, PaymentStatus, FulfillmentStatus, FulfillmentType,
-  ReturnStatus, ReturnReason, RefundStatus, RefundType, DisputeStatus, DisputeType,
+  ReturnStatus, ReturnReason, DisputeStatus, DisputeType,
   TrackingStatus, CancellationReason, OrderFilterKey, OrderSortKey,
-  ShippingRate, DEMO_CARRIER_RATES, PAYOUT_MILESTONES,
+  ShippingRate, PAYOUT_MILESTONES,
 } from './orderTypes';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
@@ -329,10 +330,6 @@ export async function markDelivered(orderId: string): Promise<Order | undefined>
   return o;
 }
 
-export async function getDemoShippingRates(): Promise<ShippingRate[]> {
-  return new Promise(resolve => setTimeout(() => resolve(DEMO_CARRIER_RATES), 800));
-}
-
 export async function getShippingRates(orderId: string, parcel: {
   fromAddress: OrderAddress;
   weight: string;
@@ -438,36 +435,6 @@ export async function voidShippingLabel(orderId: string, labelId: string): Promi
   };
 }
 
-export async function buyDemoLabel(orderId: string, rateId: string): Promise<ShippingLabel | undefined> {
-  await ensureInitialized();
-  const o = _orders.find(x => x.id === orderId);
-  const rate = DEMO_CARRIER_RATES.find(r => r.id === rateId);
-  if (!o || !rate) return undefined;
-  const tracking = '9400' + Math.floor(Math.random() * 1e16).toString().slice(0, 16);
-  const label: ShippingLabel = {
-    id: 'lbl_' + uid(), orderId,
-    carrier: rate.carrier, service: rate.service,
-    trackingNumber: tracking, priceCents: rate.priceCents,
-    status: 'active', isDemo: true, purchasedAt: now(),
-  };
-  o.labels.push(label);
-  // add shipment
-  const shipment: Shipment = {
-    id: 'shp_' + uid(), orderId,
-    fulfillmentGroupId: o.fulfillment.groups[0]?.id ?? '',
-    carrier: rate.carrier, trackingNumber: tracking,
-    trackingStatus: 'label_created',
-    trackingEvents: [{ id: 'te_' + uid(), status: 'label_created', description: `${rate.carrier} ${rate.service} label created`, timestamp: now() }],
-    estimatedDelivery: rate.estimatedDelivery,
-    labelId: label.id, isDemo: true,
-  };
-  o.shipments.push(shipment);
-  addTimeline(o, 'label_purchased', `${rate.carrier} ${rate.service} label purchased — ${formatCents(rate.priceCents)}`);
-  o.updatedAt = now();
-  await persistOrders();
-  return label;
-}
-
 export async function voidLabel(orderId: string, labelId: string): Promise<void> {
   await ensureInitialized();
   const o = _orders.find(x => x.id === orderId);
@@ -541,46 +508,6 @@ export async function updateReturnStatus(orderId: string, returnId: string, stat
   ret.updatedAt = now();
   if (o) o.updatedAt = now();
   await persistOrders();
-}
-
-// ─── Refunds ──────────────────────────────────────────────────────────────────
-
-export async function createRefund(orderId: string, data: {
-  type: RefundType;
-  lineItems: RefundLineItem[];
-  shippingAmountCents: number;
-  taxAmountCents: number;
-  reason?: string;
-  restockInventory: boolean;
-  returnId?: string;
-}): Promise<Refund | undefined> {
-  await ensureInitialized();
-  const o = _orders.find(x => x.id === orderId);
-  if (!o) return undefined;
-  const totalAmountCents = data.lineItems.reduce((sum, item) => sum + item.amountCents, 0) + data.shippingAmountCents + data.taxAmountCents;
-  const refund: Refund = {
-    id: 'ref_' + uid(), orderId, returnId: data.returnId,
-    type: data.type, status: 'processing',
-    lineItems: data.lineItems, shippingAmountCents: data.shippingAmountCents,
-    taxAmountCents: data.taxAmountCents, totalAmountCents,
-    reason: data.reason, restockInventory: data.restockInventory,
-    notifyCustomer: true, isDemo: true,
-    createdAt: now(),
-  };
-  o.refunds.push(refund);
-  o.payment.amountRefundedCents += totalAmountCents;
-  // simulate completion
-  setTimeout(async () => {
-    const freshO = _orders.find(x => x.id === orderId);
-    const freshR = freshO?.refunds.find(r => r.id === refund.id);
-    if (freshR) { freshR.status = 'completed'; freshR.processedAt = now(); }
-    if (freshO) freshO.updatedAt = now();
-    await persistOrders();
-  }, 1500);
-  addTimeline(o, 'refund_issued', `Refund of ${formatCents(totalAmountCents)} initiated (demo)`, true);
-  o.updatedAt = now();
-  await persistOrders();
-  return refund;
 }
 
 // ─── Disputes ─────────────────────────────────────────────────────────────────
@@ -795,18 +722,22 @@ export async function getBuyerOrdersWithStatus(
 }
 
 export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefined> {
-  // Try real API first for a single order fetch
-  try {
-    const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as any;
-    if (apiOrder?.id) {
-      const mapped = mapApiBuyerOrder(apiOrder);
-      // Update in-memory cache
-      const idx = _buyerOrders.findIndex(o => o.id === id);
-      if (idx >= 0) _buyerOrders[idx] = mapped; else _buyerOrders.push(mapped);
-      return mapped;
+  // Try real API first for a single order fetch (skipped in dev-preview,
+  // where a made-up preview order id has nothing real to fetch and would
+  // only ever 404).
+  if (!isSellerDevPreview() && !isBuyerDevPreview()) {
+    try {
+      const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as any;
+      if (apiOrder?.id) {
+        const mapped = mapApiBuyerOrder(apiOrder);
+        // Update in-memory cache
+        const idx = _buyerOrders.findIndex(o => o.id === id);
+        if (idx >= 0) _buyerOrders[idx] = mapped; else _buyerOrders.push(mapped);
+        return mapped;
+      }
+    } catch {
+      // Fall through to local cache
     }
-  } catch {
-    // Fall through to local cache
   }
   await ensureInitialized();
   return _buyerOrders.find(o => o.id === id);

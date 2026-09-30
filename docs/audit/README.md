@@ -217,6 +217,70 @@ huge existing surface are tracked but not gated, until follow-up PRs bring
 each area's baseline down and a future PR can promote it to hard-gated
 per-area.
 
+## Zero-tolerance CI gate + warn-tier ratchet (`audit:gate`)
+
+The two-tier split above (hard blocks on *new* only, warn never blocks) was
+the right call for the audit's first pass, but it's no longer the whole
+story: Dev wants a real zero-tolerance gate on hard-tier findings now that
+the app is being actively driven to a clean state, plus a warn-tier count
+that can only ever go down. `artifacts/mobile/scripts/audit/audit-gate.mjs`
+(`pnpm --filter mobile run audit:gate`) sits on top of `half-done-audit.mjs`
+and adds both, without changing that script's own `--ci` flag (the
+new-findings-only baseline gate described above is still there for anyone
+who wants that specific check):
+
+1. Runs the audit (any flags after `--` — `--only`, `--roles`, `--limit`,
+   `--skip-build`, `--time-budget-ms`, etc. — pass straight through to
+   `half-done-audit.mjs`; see that script's own header for the full list).
+2. **Hard tier is zero-tolerance**: fails if this run has *any* hard-tier
+   finding, full stop — `half-done-baseline.json`'s new-vs-existing
+   exemption is not consulted. "Already broken before this PR" is no longer
+   an acceptable reason for a hard-tier issue to ship.
+3. **Warn tier is a strict ratchet**: fails if this run's warn-tier count is
+   `>=` the count recorded in `docs/audit/warn-baseline.json`. Equal counts
+   fail *on purpose* — a PR that touches audited surface must show a real
+   improvement, not just hold steady while adding debt elsewhere that nets
+   out even.
+
+CI scope: a full run takes on the order of hours locally, and the existing
+`half-done-audit` CI job (`docs/ci/ci-cd.yml.disabled`) already budgets 60
+minutes for exactly one full run. Rather than doubling that cost with a
+second full pass, the CI job now calls `audit:gate` directly with no extra
+flags (replacing the old `audit:half-done -- --ci` step) — still exactly one
+full run per PR, its results now judged by the zero-tolerance/ratchet rules
+above instead of the baseline-exemption rule. For fast local iteration on
+one area, pass `--only`/`--limit`/`--skip-build` through (e.g.
+`pnpm --filter mobile run audit:gate -- --only buyer-checkout
+--skip-build`) to check hard-tier zero-tolerance quickly — just note a
+narrowly-scoped run's warn count is not a meaningful number to compare
+against a baseline recorded from a full run, so treat a scoped run's warn
+gate result as informational only, not as a reason to skip a full run before
+merging a warn-affecting change.
+
+### Updating the warn-tier baseline
+
+After a PR genuinely reduces the warn-tier count (fixes contrast/type-scale/
+hit-target/etc. issues rather than just avoiding new ones), record the new,
+lower count as the baseline:
+
+```
+pnpm --filter mobile run audit:gate:update-baseline
+```
+
+This runs a full audit and, only if hard-tier findings are 0 and the new
+warn count is strictly lower than what's currently recorded, overwrites
+`docs/audit/warn-baseline.json` with the new count and a timestamp. It
+refuses to write (exits 1) if either condition isn't met — in particular, it
+will never let the baseline move up. Do not run this as a side effect of a
+PR that doesn't itself improve warn-tier findings; wiring the mechanism up
+is not the same as using it opportunistically to paper over an unrelated
+regression.
+
+`docs/audit/warn-baseline.json`'s current count was seeded from the
+`half-done-findings.json` full run already committed alongside it (see that
+file's `summary` for the exact run it reflects) — it is a real, current
+number, not a placeholder.
+
 ## Refreshing the baseline
 
 After a follow-up PR fixes hard-tier findings in an area, regenerate the

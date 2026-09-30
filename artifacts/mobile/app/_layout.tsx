@@ -8,7 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { isProductionPreviewHost } from '@/lib/devPreview';
+import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -86,6 +86,7 @@ import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
+import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -258,6 +259,11 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // the other design-studio screens (template/asset pickers, AI tool forms)
   // are normal scrollable screens and keep the bar.
   'design-canvas',
+  // Create Ad wizard — has its own sticky two-row bottom bar (Meta-ads link
+  // + "Launch · $X"), same "Paywall"/"add-product" category: the bar
+  // literally overlapped it (audit: "Launch · $25" overlapping the tab
+  // bar's cart badge).
+  'design-campaign',
   // Storefront-from-AI wizard and its full-screen generating/progress screen.
   'store-generate',
   'store-generating',
@@ -281,6 +287,16 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // rendered underneath the bar. Deny-listing it here removes the overlap
   // outright and matches the other full-bleed screens above.
   'ai-brain',
+  // Same full-screen chat takeover as ai-brain above — its own composer is
+  // pinned to the safe-area bottom inset only, so the floating tab bar
+  // (which these two screens weren't deny-listed against) rendered on top
+  // of the input bar, suggestion chips, and photo tray.
+  'ai-mockup-chat',
+  'ai-photography-chat',
+  // Boost flow — sticky "Boost post · $X" CTA + payment-note footer pinned to
+  // the bottom; the bar previously floated on top of the payment note (it
+  // only pads for the safe-area inset, not the bar's own height), covering it.
+  'boost',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -652,7 +668,24 @@ function AuthGate() {
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
+    // PREVIEW_ROLE only reads the query string once, at module load — it
+    // deliberately does NOT fall back to the persisted role (see its own
+    // comment: an explicit ?bt_preview= on a real reload must reset state).
+    // But isSellerDevPreview/isBuyerDevPreview (same gates: __DEV__ ||
+    // NAVIGATION_ISOLATION_TEST, web only, never on a production host) DO
+    // fall back to the persisted role for exactly the case that matters
+    // here — a full-page reload of a deep link (e.g. "/design", query
+    // string dropped by earlier in-app navigation, or simply not repeated
+    // on every reload) while a preview session is already active. Without
+    // this fallback, AuthGate stopped recognizing preview mode on such a
+    // reload and fell through into the real Clerk/onboarding gate below,
+    // which requires a genuinely signed-in account this bypass never sets
+    // up — leaving the deep link stuck rather than rendering the route it
+    // was pointed at.
+    const webPreviewRole = Platform.OS === 'web'
+      ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null)
+      : null;
+    const devRole = PREVIEW_ROLE ?? webPreviewRole ?? DEV_BYPASS_ROLE;
     if (devRole) {
       // The index route handles the preview redirect after the root Stack has
       // mounted. Redirecting from this root-level effect races Expo Router's
@@ -1190,6 +1223,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="appearance"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1300,6 +1334,15 @@ export default function RootLayout() {
     Inter_700Bold,
   });
   const [fontGateExpired, setFontGateExpired] = useState(false);
+
+  useEffect(() => {
+    // Fire-and-forget: warms the Appearance screen's icon/theme thumbnails
+    // in the background so it never has to show a loading/fade state for a
+    // bitmap that was already resolved before the screen ever mounts. Never
+    // gates app-ready — a slow preload just means the first Appearance visit
+    // pays the (already-fast, bundled-locally) resolve cost instead.
+    void preloadAppearanceAssets();
+  }, []);
 
   useEffect(() => {
     // Last-resort safety net only: expo-font can occasionally hang (a stale

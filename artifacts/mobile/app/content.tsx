@@ -13,6 +13,8 @@ import {
 } from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 type FilterTab = 'all' | ContentStatus;
@@ -30,12 +32,14 @@ function formatScheduledDate(iso: string): string {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// Monochrome only on this screen — status is conveyed by the label text
+// itself (Published/Scheduled/Draft/Archived), not by hue.
 function statusColor(s: ContentStatus, colors: ReturnType<typeof useColors>): string {
   switch (s) {
-    case 'published':  return colors.success;
-    case 'scheduled':  return colors.info;
+    case 'published':  return colors.foreground;
+    case 'scheduled':  return colors.foreground;
     case 'draft':      return colors.mutedForeground;
-    case 'archived':   return colors.warning;
+    case 'archived':   return colors.mutedForeground;
   }
 }
 
@@ -74,10 +78,14 @@ export default function ContentScreen() {
 
   const [content, setContent] = useState<ContentPost[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed fetch must never collapse into "No posts yet" — that reads as a
+  // real, permanent empty library instead of a retryable outage.
+  const [loadError, setLoadError] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   const loadContent = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const posts = await getSellerPosts();
       setContent(posts.map((post): ContentPost => ({
@@ -103,6 +111,11 @@ export default function ContentScreen() {
       })));
     } catch {
       setContent([]);
+      // A dev web preview has no real signed-in account behind it, so a
+      // 401/404 there is expected and benign — show the normal empty state
+      // instead of an error banner. Only a real, authenticated account's
+      // fetch failure is a genuine outage worth a retry row for.
+      setLoadError(!isSellerDevPreview());
     } finally {
       setLoading(false);
     }
@@ -211,12 +224,17 @@ export default function ContentScreen() {
         {/* Overview stats */}
         <View style={s.statsRow}>
           {[
-            { label: 'Published', value: stats.published, color: colors.success },
-            { label: 'Scheduled', value: stats.scheduled, color: colors.info },
-            { label: 'Drafts',    value: stats.drafts,    color: colors.warning },
+            { label: 'Published', value: stats.published, color: colors.foreground },
+            { label: 'Scheduled', value: stats.scheduled, color: colors.foreground },
+            { label: 'Drafts',    value: stats.drafts,    color: colors.foreground },
             { label: 'Archived',  value: stats.archived,  color: colors.mutedForeground },
           ].map(item => (
-            <View key={item.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View
+              key={item.label}
+              style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              accessible
+              accessibilityLabel={`${item.value} ${item.label.toLowerCase()}`}
+            >
               <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
               <Text style={[s.statLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
             </View>
@@ -290,6 +308,10 @@ export default function ContentScreen() {
               <ActivityIndicator color={colors.primary} />
               <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading your content…</Text>
             </View>
+          ) : loadError ? (
+            <View style={s.loading}>
+              <RetryRow label="Couldn't load your content" onRetry={loadContent} />
+            </View>
           ) : posts.length === 0 ? (
             <View style={s.empty}>
               <View style={[s.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -338,7 +360,7 @@ export default function ContentScreen() {
                       </View>
                     )}
                     {post.status === 'scheduled' && post.scheduledFor && (
-                      <Text style={[s.scheduledText, { color: colors.info }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
+                      <Text style={[s.scheduledText, { color: colors.mutedForeground }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
                     )}
                   </View>
                   <TouchableOpacity
@@ -395,7 +417,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   libraryCount: { fontSize: FS.xs, fontFamily: FONT.regular },
   filterScroll: { flexGrow: 0, marginBottom: SP.md },
   filterRow: { flexDirection: 'row', gap: SP.xs },
-  filterTab: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1 },
+  filterTab: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
   filterText: { fontSize: FS.sm, fontFamily: FONT.medium },
 
   // Post cards
@@ -412,7 +434,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   metric: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   metricText: { fontSize: FS.xs, fontFamily: FONT.regular },
   scheduledText: { fontSize: FS.xs, fontFamily: FONT.medium },
-  moreBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', marginRight: -SP.xs },
+  moreBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -SP.sm },
 
   // Loading / empty
   loading: { alignItems: 'center', paddingVertical: SP.xl + SP.md, gap: SP.sm },

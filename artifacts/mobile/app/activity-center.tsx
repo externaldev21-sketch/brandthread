@@ -748,13 +748,18 @@ export default function ActivityCenterScreen() {
   }, []);
 
   const loadSuggested = useCallback(async () => {
+    // Skip the real call entirely in dev-web preview (rather than trying it
+    // and falling back once it fails/returns nothing) — that mode has no
+    // live backend to begin with (see loadFirstPage's identical comment),
+    // and the audit/e2e harnesses that fake a signed-in Clerk user would
+    // otherwise still reach this real, backend-less endpoint first and log
+    // a console 404 before the fallback ever ran.
+    if (isPreviewActivityEnabled()) { showPreviewSuggestions(); return; }
     try {
       const people = await getSuggestedPeople();
-      if (people.length > 0 || !isPreviewActivityEnabled()) { setSuggested(people); return; }
-      showPreviewSuggestions();
+      setSuggested(people);
     } catch {
-      if (isPreviewActivityEnabled()) showPreviewSuggestions();
-      else setSuggested([]);
+      setSuggested([]);
     }
   }, [showPreviewSuggestions]);
 
@@ -762,31 +767,31 @@ export default function ActivityCenterScreen() {
     const id = ++requestId.current;
     if (mode === 'initial') setStatus('loading');
     if (mode === 'refresh') setRefreshing(true);
+    // Skip the real call entirely in dev-web preview — that mode has no
+    // live backend to seed a real feed from, so go straight to the same
+    // rich seeded world every other preview screen uses instead of trying
+    // a fetch that can only fail (and, under the audit/e2e harnesses that
+    // fake a signed-in Clerk user, would log a real console 404 before this
+    // exact same fallback ran anyway).
+    if (isPreviewActivityEnabled()) {
+      retriedRef.current = false;
+      const seeded = withoutPendingDeletes(applyPreviewFollowState(getVisiblePreviewActivity()));
+      applyPage(seeded, mode);
+      setHasMore(false);
+      setNow(Date.now());
+      setStatus('ready');
+      return;
+    }
     try {
       const page = await getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: 0 });
       if (id !== requestId.current) return;
       retriedRef.current = false;
-      // The dev-web preview has no live backend to seed a real feed from —
-      // show the same rich seeded world every other preview screen uses
-      // instead of an empty "Activity will show up here".
-      const resolved = withoutPendingDeletes(page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getVisiblePreviewActivity()) : page);
-      applyPage(resolved, mode);
+      applyPage(withoutPendingDeletes(page), mode);
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
       setNow(Date.now());
       setStatus('ready');
     } catch (err) {
       if (id !== requestId.current) return;
-      if (isPreviewActivityEnabled()) {
-        // Never show a false error in the dev-web preview — there is no
-        // backend to reach at all, so a fetch failure here is expected.
-        retriedRef.current = false;
-        const seeded = withoutPendingDeletes(applyPreviewFollowState(getVisiblePreviewActivity()));
-        applyPage(seeded, mode);
-        setHasMore(false);
-        setNow(Date.now());
-        setStatus('ready');
-        return;
-      }
       // Keep what's on screen if a background refresh fails.
       if (itemsRef.current.length > 0) { setStatus('ready'); return; }
       if (!retriedRef.current) {

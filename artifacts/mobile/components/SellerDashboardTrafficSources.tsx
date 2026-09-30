@@ -32,10 +32,13 @@ export function SellerDashboardTrafficSources({
   /** Real store-visit count for the selected period (same figure the hero/tiles use). Never fabricated. */
   totalVisits: number;
   /** Real per-source counts + share of total for the same period. */
-  trafficSources: Array<{ source: TrafficSource; count: number; sharePercent: number }>;
+  trafficSources: Array<{ source: TrafficSource; count: number; sharePercent: number }> | null | undefined;
   theme: AppThemePreset;
 }) {
-  const bySource = new Map(trafficSources.map((row) => [row.source, row]));
+  // Defensive: an older/partial analytics payload missing this field must
+  // never crash the whole dashboard into the error boundary — fall back to
+  // the same real "0 for every source" zero state a brand-new store shows.
+  const bySource = new Map((trafficSources ?? []).map((row) => [row.source, row]));
 
   return (
     <View testID="seller-dashboard-traffic-sources">

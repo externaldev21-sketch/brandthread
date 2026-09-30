@@ -14,6 +14,8 @@ import { useApi } from '@/hooks/useApi';
 import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -71,8 +73,12 @@ export default function MarketingScreen() {
   const api = useApi();
   const [klaviyo, setKlaviyo] = useState<KlaviyoStatus | null>(null);
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
+  const [campaignsError, setCampaignsError] = useState(false);
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
+  const [discountsError, setDiscountsError] = useState(false);
   const [referrals, setReferrals] = useState<ReferralStats | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const retryAll = useCallback(() => setReloadToken((n) => n + 1), []);
 
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
@@ -83,16 +89,22 @@ export default function MarketingScreen() {
         .then((res) => { if (!cancelled) setKlaviyo(res); })
         .catch(() => { if (!cancelled) setKlaviyo({ connected: false }); });
       api.adCampaigns.list()
-        .then((res) => { if (!cancelled) setCampaigns(Array.isArray(res?.campaigns) ? res.campaigns : []); })
-        .catch(() => { if (!cancelled) setCampaigns([]); });
+        .then((res) => { if (!cancelled) { setCampaigns(Array.isArray(res?.campaigns) ? res.campaigns : []); setCampaignsError(false); } })
+        // A failed fetch on a real, authenticated account must never
+        // collapse into "No campaigns yet" — that reads as a real,
+        // permanent empty state instead of a retryable outage. But a dev
+        // web preview has no real signed-in account behind it at all, so a
+        // 401/404 there is expected and benign, not a genuine failure —
+        // show the normal empty state instead of an error banner.
+        .catch(() => { if (!cancelled) { setCampaigns([]); setCampaignsError(!isSellerDevPreview()); } });
       api.discountCodes.list()
-        .then((res) => { if (!cancelled) setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); })
-        .catch(() => { if (!cancelled) setDiscounts([]); });
+        .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
+        .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
       api.referrals.stats()
         .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0 }); })
         .catch(() => { if (!cancelled) setReferrals(null); });
       return () => { cancelled = true; };
-    }, [api]),
+    }, [api, reloadToken]),
   );
 
   const copyDiscountCode = useCallback(async (code: string) => {
@@ -153,7 +165,11 @@ export default function MarketingScreen() {
         action="New +"
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/design-campaign' as never); }}
       />
-      {campaigns.length === 0 ? (
+      {campaignsError ? (
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border, padding: SP.md }]}>
+          <RetryRow label="Couldn't load campaigns" onRetry={retryAll} />
+        </View>
+      ) : campaigns.length === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <EmptyState
             compact
@@ -198,7 +214,11 @@ export default function MarketingScreen() {
         action="New +"
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
       />
-      {discounts.length === 0 ? (
+      {discountsError ? (
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border, padding: SP.md }]}>
+          <RetryRow label="Couldn't load discount codes" onRetry={retryAll} />
+        </View>
+      ) : discounts.length === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <EmptyState
             compact
@@ -269,37 +289,37 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   statChip: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget },
-  statVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  statVal: { fontSize: FS.base, fontFamily: FONT.bold },
+  statLabel: { fontSize: FS.xs, fontFamily: FONT.regular },
   klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24, minHeight: COMP.buttonH },
-  klaviyoText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  klaviyoText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   emptyCard: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
-  emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  emptyText: { fontSize: FS.sm, fontFamily: FONT.regular },
   campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, minHeight: COMP.minTouchTarget },
   campaignIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   campaignInfo: { flex: 1, gap: 4 },
-  campaignName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  campaignName: { fontSize: FS.sm, fontFamily: FONT.semibold },
   campaignMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  campaignStat: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  campaignRevenue: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  campaignStat: { fontSize: FS.xs, fontFamily: FONT.regular },
+  campaignRevenue: { fontSize: FS.sm, fontFamily: FONT.bold },
   discountRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   codeWrap: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  code: { fontSize: 12, fontFamily: 'Inter_700Bold', letterSpacing: 1 },
+  code: { fontSize: FS.meta, fontFamily: FONT.bold, letterSpacing: 1 },
   discountInfo: { flex: 1 },
-  discountType: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  discountMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  discountType: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  discountMeta: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   postRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
   dayBadge: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  dayText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  dayText: { fontSize: FS.xs, fontFamily: FONT.bold },
   postInfo: { flex: 1 },
-  postText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  postPlatform: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  postText: { fontSize: FS.sm, fontFamily: FONT.medium },
+  postPlatform: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   autoRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   autoInfo: { flex: 1 },
-  autoName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  autoTrigger: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  autoName: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  autoTrigger: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   referralCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 16, borderWidth: 1, gap: 14, marginBottom: 24 },
-  referralTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  referralSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  referralTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  referralSub: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
 });
