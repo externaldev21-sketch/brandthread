@@ -13,6 +13,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { isAuthError } from '@/lib/networkNotice';
+import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -87,20 +88,32 @@ export default function StorePreview() {
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Fresh preview never has a real store to fetch — see the file doc
-  // comment. This screen is seller-only, but the dev/web preview bypass can
-  // still land here under `?bt_preview=buyer` (e.g. a route crawl testing
-  // every screen under both roles) with no real session either — checking
-  // only isSellerDevPreview() missed that case and let the real endpoint
-  // 404 every time. Demo preview (&demo=1) and real signed-in accounts both
-  // load the real endpoint, same as production.
-  const freshPreview = useMemo(
-    () => (isSellerDevPreview() || isBuyerDevPreview()) && !isPreviewDemoMode(),
-    [],
-  );
+  // Fresh preview (no &demo=1) never has a real store to fetch — see the
+  // file doc comment.
+  //
+  // Demo preview (&demo=1) ALSO never calls the real endpoint: GET
+  // /api/store/preview requires a real signed-in session server-side (see
+  // artifacts/api-server/src/routes/store.ts's router.use(requireAuth)),
+  // which a dev/web preview session never has by construction — that call
+  // cannot structurally succeed here, so routing demo mode through it was
+  // always going to fail one way or another (a 401, or nothing visible).
+  // Demo mode instead renders a local, self-contained storefront built
+  // from the same seeded catalog every other demo-gated seller screen
+  // uses (lib/previewSellerProducts.ts) — see lib/previewStorefrontHtml.ts.
+  //
+  // This screen is seller-only, but the dev/web preview bypass can still
+  // land here under `?bt_preview=buyer` (e.g. a route crawl testing every
+  // screen under both roles) with no real session either — checking only
+  // isSellerDevPreview() missed that case and let the real endpoint 404
+  // every time. Only a real signed-in account outside preview mode calls
+  // the network.
+  const inDevPreview = useMemo(() => isSellerDevPreview() || isBuyerDevPreview(), []);
+  const freshPreview = useMemo(() => inDevPreview && !isPreviewDemoMode(), [inDevPreview]);
+  const demoPreview  = useMemo(() => inDevPreview && isPreviewDemoMode(), [inDevPreview]);
 
   const load = useCallback(async () => {
     if (freshPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return; }
+    if (demoPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return; }
     if (inFlight.current) return;
     inFlight.current = true;
     setLoading(true);
@@ -119,7 +132,7 @@ export default function StorePreview() {
       if (mountedRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, freshPreview]);
+  }, [api, freshPreview, demoPreview]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
