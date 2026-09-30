@@ -195,13 +195,33 @@ const DEMO_TRAFFIC_WEIGHTS: Array<{ source: SellerHomeAnalytics['trafficSources'
   { source: 'external', weight: 0.15 },
 ];
 
+/**
+ * Splits visitorCount across the four sources with a per-source wobble for a
+ * plausible-looking shape, then reconciles the rounded counts back onto
+ * visitorCount via the largest-remainder method — so the rows always sum to
+ * exactly visitorCount (the same number shown as the headline) instead of
+ * drifting from independently-rounded per-source values. sharePercent is
+ * likewise derived from visitorCount, not the row sum, so it can never
+ * disagree with the headline either.
+ */
 function buildDemoTrafficSources(visitorCount: number, range: PreviewSellerChartRange): SellerHomeAnalytics['trafficSources'] {
   const rand = mulberry32(SEED_BY_RANGE[range] + 2);
-  const counts = DEMO_TRAFFIC_WEIGHTS.map(({ weight }) => Math.round(visitorCount * weight * (0.9 + rand() * 0.2)));
-  const total = counts.reduce((sum, c) => sum + c, 0);
+  const raw = DEMO_TRAFFIC_WEIGHTS.map(({ weight }) => visitorCount * weight * (0.9 + rand() * 0.2));
+  const rawTotal = raw.reduce((sum, v) => sum + v, 0);
+  const scaled = rawTotal > 0 ? raw.map(v => (v / rawTotal) * visitorCount) : raw.map(() => 0);
+  const counts = scaled.map(v => Math.floor(v));
+  let remainder = visitorCount - counts.reduce((sum, c) => sum + c, 0);
+  const order = scaled
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (const { i } of order) {
+    if (remainder <= 0) break;
+    counts[i] += 1;
+    remainder -= 1;
+  }
   return DEMO_TRAFFIC_WEIGHTS.map(({ source }, i) => ({
     source,
     count: counts[i],
-    sharePercent: total > 0 ? Math.round((counts[i] / total) * 1000) / 10 : 0,
+    sharePercent: visitorCount > 0 ? Math.round((counts[i] / visitorCount) * 1000) / 10 : 0,
   }));
 }

@@ -84,11 +84,21 @@ describe('SellerDashboardTrafficSources', () => {
   }
 
   it('shows the real total visit count, compactly formatted, with a delta line', async () => {
+    // totalVisits deliberately does NOT match the row sum here (12480 vs.
+    // 12480 — see the row counts below) to prove the headline is derived
+    // from trafficSources, not from the totalVisits prop, whenever rows are
+    // present — this is exactly what keeps the two numbers from disagreeing.
+    const rowsSummingTo12480 = [
+      { source: 'feed' as const, count: 4992, sharePercent: 40 },
+      { source: 'search' as const, count: 3120, sharePercent: 25 },
+      { source: 'profile' as const, count: 2496, sharePercent: 20 },
+      { source: 'external' as const, count: 1872, sharePercent: 15 },
+    ];
     await act(async () => {
       renderer = create(
         <SellerDashboardTrafficSources
-          totalVisits={12480} previousVisits={10000} periodLabel="last week"
-          trafficSources={REAL_SOURCES} theme={theme}
+          totalVisits={999999} previousVisits={10000} periodLabel="last week"
+          trafficSources={rowsSummingTo12480} theme={theme}
           onSeeAll={noop} onOpenSource={noop} onShareStore={noop}
         />,
       );
@@ -97,6 +107,35 @@ describe('SellerDashboardTrafficSources', () => {
     expect(t).toContain('12.5K');
     expect(t.join(' ')).toContain('store visits this period');
     expect(t.join(' ')).toContain('vs last week');
+  });
+
+  it('the headline always equals the sum of the row counts, even when totalVisits disagrees with it', async () => {
+    const rows = [
+      { source: 'feed' as const, count: 123, sharePercent: 40.1 },
+      { source: 'search' as const, count: 75, sharePercent: 24.4 },
+      { source: 'profile' as const, count: 62, sharePercent: 20.2 },
+      { source: 'external' as const, count: 47, sharePercent: 15.3 },
+    ];
+    const rowSum = rows.reduce((sum, r) => sum + r.count, 0); // 307
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardTrafficSources
+          totalVisits={300} previousVisits={250} periodLabel="this week"
+          trafficSources={rows} theme={theme}
+          onSeeAll={noop} onOpenSource={noop} onShareStore={noop}
+        />,
+      );
+    });
+    const t = texts();
+    // The headline must read the row sum (307), never the disagreeing
+    // totalVisits prop (300) — and the row percentages must be recomputed
+    // from that same 307, not the stale sharePercent values passed in.
+    expect(t).toContain(String(rowSum));
+    expect(t).not.toContain('300');
+    expect(t).toContain('40.1%');
+    expect(t).toContain('24.4%');
+    expect(t).toContain('20.2%');
+    expect(t).toContain('15.3%');
   });
 
   it('a fresh store shows exactly ONE clean empty state — never both the message AND a table of zero rows', async () => {
