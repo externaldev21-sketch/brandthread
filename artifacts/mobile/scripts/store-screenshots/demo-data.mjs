@@ -609,6 +609,29 @@ export function respond({ method, path, query, role, options = {} }) {
 
   if (p === '/config/features') return { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null };
   if (p === '/auth/me') return profileFor(role);
+  // Buyer account/settings screens the half-done audit crawls on load —
+  // previously unseeded, so every one of these 404'd as soon as the screen
+  // mounted (lib/safetyTypes.ts has the AccountDeletionCheck/AccountSession shapes).
+  if (p === '/auth/feed-gestures-tip') return { seenVersion: 1 };
+  if (p === '/auth/account/deletion-check') {
+    return {
+      canDelete: true,
+      accountType: role,
+      blockers: [],
+      willDelete: ['Your posts, comments, likes and saved items', 'Your profile and follower/following lists'],
+      willRetain: ['Order history required for tax and dispute records'],
+    };
+  }
+  if (p === '/auth/sessions') {
+    return {
+      sessions: [{
+        id: 'sess_demo_current', current: true, status: 'active',
+        device: 'This device', browser: 'Chrome', isMobile: false,
+        location: 'Portland, OR', ipAddress: null, lastActiveAt: iso(0), createdAt: iso(30 * DAY),
+      }],
+    };
+  }
+  if (p === '/auth/privacy') return { dmPrivacy: 'requests' };
   if (p === '/seller/subscription/status') return { plan: 'growth', status: 'active', trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: 'Oct 14, 2026', amountCents: 2900, paymentMethodLabel: 'Visa ···4242', effectiveProvider: 'stripe' };
   if (p === '/team/context') return { role: 'owner', storeOwnerId: SELLER_USER.id, teamMembershipId: null };
   if (p === '/team/my-memberships') return { memberships: [] };
@@ -664,6 +687,51 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/buyer/notifications/unread-count') return { count: 0 };
   if (p === '/buyer/saved') return [];
   if (p === '/buyer/orders') return [];
+  // A single populated order so buyer-order-detail / -refund-request /
+  // -return-request / -problem-report (all keyed by :orderId) render real
+  // content instead of 404ing on load — see services/orderTypes.ts's
+  // BuyerOrderView for the shape. Any id resolves to the same order
+  // (there's no order list to link a *specific* id from in this harness).
+  if ((match = p.match(/^\/buyer\/orders\/([^/]+)$/))) {
+    const item = CATALOGUE[1]; // Field Shell Jacket — Rust
+    const brand = BRANDS[item.brand];
+    return {
+      id: decodeURIComponent(match[1]),
+      orderNumber: 'BT-10482',
+      sellerId: brand.clerkId,
+      sellerName: brand.name,
+      sellerHandle: brand.handle,
+      status: 'shipped',
+      paymentStatus: 'paid',
+      fulfillmentStatus: 'fulfilled',
+      lineItems: [{
+        productId: item.id, productName: item.name, variant: 'L',
+        quantity: 1, unitPriceCents: item.priceCents, imageUri: img(item.image),
+      }],
+      shippingAddress: {
+        name: BUYER_USER.name, line1: '1120 NW Everett Street', line2: 'Apt 5C',
+        city: 'Portland', state: 'OR', zip: '97209', country: 'US', phone: '+1 (503) 555-0142',
+      },
+      payment: { subtotalCents: item.priceCents, shippingTotalCents: 1200, taxTotalCents: 0, totalCents: item.priceCents + 1200 },
+      trackingNumber: '1Z999AA10123456784',
+      trackingCarrier: 'UPS',
+      trackingStatus: 'in_transit',
+      estimatedDelivery: isoAhead(2 * DAY),
+      shippedAt: iso(1 * DAY),
+      paidAt: iso(2 * DAY),
+      isPreOrder: false,
+      hasReturnRequest: false,
+      isCustomerVisible: true,
+      createdAt: iso(2 * DAY),
+    };
+  }
+  if (p === '/buyer/addresses') return [];
+  if (p === '/buyer/payment-methods') return { paymentMethods: [] };
+  if (p === '/buyer/recently-viewed') return [];
+  if (p === '/buyer/collections') return [];
+  if (p.match(/^\/buyer\/collections\/[^/]+\/items$/)) return [];
+  if (p === '/returns/buyer') return [];
+  if (p === '/loyalty') return { balance: 0, valueCents: 0, history: [] };
   if (p === '/profile/cover-coachmark') return { seen: true };
   if (p === '/thread-cash') return { balanceCents: 0, history: [] };
   if (p === '/seller/profile') {
@@ -678,10 +746,72 @@ export function respond({ method, path, query, role, options = {} }) {
   if ((match = p.match(/^\/public\/products\/([^/]+)\/related$/))) return PUBLIC_PRODUCTS.filter((item) => item.id !== match[1]).slice(0, 5);
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p.startsWith('/reviews/product/')) return REVIEWS;
+  if (p.startsWith('/reviews/seller/')) return REVIEWS;
   if (p === '/public/posts' || p === '/posts/feed') return role === 'buyer' ? feedPosts() : [];
   if (p === '/posts/repost-context') return {};
   if (p === '/live/active') return { streams: [] };
   if (p.startsWith('/social/status/')) return { isFollowing: false, followersCount: 24800 };
+  // Previously-unseeded buyer/social GETs hit on plain screen load (Activity,
+  // Discover, Inbox, Friends, Search, own Profile, Blocked list) — every one
+  // of these 404'd before the screen ever rendered. Real empty states (no
+  // suggestions/activity/stories yet) rather than fabricated rows, since
+  // none of these screens are the primary subject of a demo walkthrough.
+  if (p === '/social/suggested') return [];
+  if (p === '/social/friends/activity') return [];
+  if (p === '/social/notes/following') return [];
+  if (p === '/social/stories/following') return [];
+  if (p === '/social/stories/me') return [];
+  if (p.match(/^\/social\/stories\/user\/[^/]+$/)) return [];
+  if (p === '/social/blocks') return [];
+  if (p === '/safety/muted-words') return { words: [], limit: 50 };
+  if (p.match(/^\/posts\/[^/]+\/comments$/)) return { comments: [], total: 0, hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null };
+  if ((match = p.match(/^\/social\/posts\/([^/]+)$/))) {
+    // Real BuyerPost shape (services/socialTypes.ts) — not feedPosts()'s
+    // different (seller/public feed) shape, so buyer-post-viewer's
+    // post?.caption / post?.authorName actually override the placeholder
+    // nav params instead of silently staying undefined.
+    const buyerName = `${BUYER_USER.firstName} ${BUYER_USER.lastName}`;
+    return {
+      id: decodeURIComponent(match[1]),
+      authorId: BUYER_USER.id, authorName: buyerName, authorHandle: '@' + BUYER_USER.username,
+      authorInitials: buyerName.slice(0, 2).toUpperCase(), authorColor: '#7A7A7A',
+      authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'friends_only',
+      type: 'photo', caption: 'Fit check', hashtags: [], mediaColors: ['#7A7A7A', '#07070f'],
+      likesCount: 12, commentsCount: 3, repostsCount: 0,
+      likedByMe: false, repostedByMe: false, savedByMe: false, isArchived: false, isDraft: false,
+      createdAt: iso(2 * HOUR), updatedAt: iso(2 * HOUR),
+    };
+  }
+  if (p === '/referrals/code') return { code: 'JORDAN20', link: 'https://brandthread.app/r/JORDAN20', shareText: "Join me on Brandthread — use code JORDAN20 for $10 off your first order." };
+  if (p === '/referrals/stats') return { invitesSent: 0, signups: 0, rewardsEarnedCents: 0 };
+  if (p === '/public/discover/feed') return { items: [], computedAt: iso(0), source: 'empty', nextOffset: null };
+  if (p.match(/^\/public\/users\/[^/]+\/videos$/)) return { user: null, restricted: null, total: 0, hasMore: false, videos: [] };
+  if ((match = p.match(/^\/public\/drops\/([^/]+)\/notify$/))) return { subscribed: false };
+  // u/[username] (a raw fetch, not the lib/api.ts client — see
+  // app/u/[username].tsx's PublicProfileDto). Unknown handles correctly
+  // fall through to `undefined` (a real 404), matching production.
+  if ((match = p.match(/^\/public\/profiles\/([^/]+)$/))) {
+    const handle = decodeURIComponent(match[1]);
+    const brand = Object.values(BRANDS).find((b) => b.handle === handle);
+    if (!brand) return undefined;
+    return {
+      id: brand.clerkId, username: brand.handle, accountType: 'seller',
+      displayName: brand.name, bio: `${brand.name} — independent label.`,
+      avatarUrl: brand.avatar, verified: brand.verified === true,
+    };
+  }
+  // c/[collectionId] (also a raw fetch — see app/c/[collectionId].tsx's
+  // PublicCollectionDto). Any id resolves to the same demo collection.
+  if ((match = p.match(/^\/public\/collections\/([^/]+)$/))) {
+    const items = PUBLIC_PRODUCTS.slice(0, 4).map((product, i) => ({
+      id: `citem_${i}`, type: 'product', targetId: product.id, title: product.name,
+      image: product.imageUrl, brand: product.sellerDisplayName, priceCents: product.priceCents,
+    }));
+    return {
+      collection: { id: decodeURIComponent(match[1]), name: 'Ember favorites', coverImageUrl: items[0]?.image ?? null, itemCount: items.length, ownerName: BUYER_USER.name },
+      items,
+    };
+  }
   // Discover's "From Brands You Follow" rail: the buyer follows Ember & Ash
   // and Field Office; each seller's public storefront lists their catalogue.
   if (p === '/social/following') {
