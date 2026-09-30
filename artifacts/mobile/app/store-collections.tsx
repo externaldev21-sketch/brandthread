@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header } from '@/components/layout';
+import { EmptyState, Header } from '@/components/layout';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -23,7 +23,7 @@ import {
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
+  StatCard,
 } from '@/components/BrandthreadUI';
 import {
   getCollections, createCollection, updateCollection, deleteCollection,
@@ -264,8 +264,9 @@ export default function StoreCollectionsScreen() {
             <EmptyState
               icon="grid"
               title="No collections yet"
-              description="Group products into collections. Buyers can shop by category, style, or any criteria you choose."
-              action={{ label: '+ Create Collection', onPress: openNew, icon: 'plus' }}
+              message="Group products into collections. Buyers can shop by category, style, or any criteria you choose."
+              actionLabel="Create collection"
+              onAction={openNew}
             />
           </View>
         ) : (

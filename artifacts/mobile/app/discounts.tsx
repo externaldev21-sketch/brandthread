@@ -27,9 +27,10 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton, TertiaryButton,
-  StatusBadge, SectionHeader, EmptyState, HapticSwitch,
+  StatusBadge, SectionHeader, HapticSwitch,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products';
@@ -365,15 +366,18 @@ export default function DiscountsScreen() {
             <EmptyState
               icon="alert-circle"
               title="Couldn't load your codes"
-              description="Pull to refresh."
-              action={{ label: 'Try again', onPress: () => { void loadDiscounts(); }, icon: 'refresh-cw' }}
+              message="Pull to refresh."
+              actionLabel="Try again"
+              onAction={() => { void loadDiscounts(); }}
+              variant="error"
             />
           ) : discounts.length === 0 && (
             <EmptyState
               icon="tag"
               title="No discount codes yet"
-              description="Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item."
-              action={{ label: 'Create code', onPress: openNewModal }}
+              message="Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item."
+              actionLabel="Create code"
+              onAction={openNewModal}
             />
           )}
 
