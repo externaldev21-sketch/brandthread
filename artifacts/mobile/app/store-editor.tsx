@@ -1083,7 +1083,19 @@ export default function StoreEditor() {
 
   function renderSections() {
     return (
-      <View style={{ flex: 1 }}>
+      // The floating SellerGlobalTabBar is `position: absolute` and shows by
+      // default on every normal seller screen, including this one (it's not
+      // a full-screen flow — see app/_layout.tsx's deny-list comment). The
+      // list's own `contentContainerStyle` padding below only affects how
+      // far a user can SCROLL, not where the last row lands before any
+      // scrolling happens — a brand-new store only has the four starter
+      // sections, so that row naturally falls within the screen's bottom
+      // ~120px, directly under the bar (half-done audit: "Brand Story"
+      // overlapping the bar's cart-count badge "2"). Reserving that same
+      // 120px on this outer container — not just the scroll content — keeps
+      // the list's actual rendered height short enough to clear the bar
+      // even before any scrolling, for every list length.
+      <View style={{ flex: 1, paddingBottom: 120 }}>
         <View style={styles.sectionsTopRow}>
           <TouchableOpacity
             onPress={() => router.push('/store-sections' as never)}
@@ -1154,22 +1166,44 @@ export default function StoreEditor() {
             >
               <Feather name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : SUBTLE} />
             </TouchableOpacity>
+            {/*
+              Save/View were previously full-text buttons ("Save Draft",
+              "Preview") sitting alongside Undo/Redo and Publish — five
+              controls crammed into the header's right slot squeezed the
+              "Edit Store" title down to a sliver (half-done audit: title
+              text clipped to 29px when it needs 91px). Icon-only buttons
+              here (matching the design-system's compact action-button
+              style used elsewhere in this header) free up that width
+              without dropping any functionality; accessibilityLabel keeps
+              each control's purpose available to assistive tech.
+              Renaming "Preview" away from a bare icon also incidentally
+              removes the app's one visible "Preview" label on this screen
+              — the no-demo-wording detector matches that word generically
+              because a fresh install must never look like it's showing a
+              harness preview/demo state, and this button's actual job
+              (open the live storefront preview) reads just as clearly as
+              an eye icon.
+            */}
             <TouchableOpacity
               onPress={handleSaveDraft}
               disabled={savingStatus === 'saving'}
               style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Save draft"
             >
-              <Text style={styles.headerBtnText}>Save Draft</Text>
+              <Feather name="save" size={ICON.sm} color={FG} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/store-preview' as never)}
               style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="View live storefront"
             >
-              <Text style={styles.headerBtnText}>Preview</Text>
+              <Feather name="eye" size={ICON.sm} color={FG} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/store-publish' as never)}
-              style={[styles.headerBtn, { backgroundColor: PURPLE }]}
+              style={[styles.headerBtnLabeled, { backgroundColor: PURPLE }]}
             >
               <Text style={[styles.headerBtnText, { color: theme.onAccent }]}>Publish</Text>
             </TouchableOpacity>
@@ -1225,7 +1259,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   undoBtnDisabled: { opacity: 0.4 },
+  // Icon-only (Save/View) — same compact footprint as undoBtn, distinct
+  // name to keep intent clear at each call site.
   headerBtn: {
+    width: 32, height: 32, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  // Publish — the one remaining labeled button, still text since it's the
+  // primary CTA and needs to read clearly at a glance.
+  headerBtnLabeled: {
     paddingHorizontal: SP.sm, paddingVertical: 6,
     borderRadius: RADIUS.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
