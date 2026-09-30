@@ -404,6 +404,61 @@ export async function sendReturnStatusEmail(options: {
   });
 }
 
+export async function sendPayoutEmail(options: {
+  to: string;
+  amountCents: number;
+  currency?: string | null;
+  payoutId: string;
+  idempotencyKey?: string;
+}): Promise<boolean> {
+  const currency = (options.currency ?? "USD").toUpperCase();
+  const amount = currency === "USD"
+    ? formatCents(options.amountCents)
+    : `${(Math.max(0, options.amountCents) / 100).toFixed(2)} ${escapeHtml(currency)}`;
+  const html = renderBrandthreadEmail({
+    preheader: `${amount} was sent to your bank account.`,
+    eyebrow: "Payout sent",
+    title: "Your payout is on its way",
+    subtitle: `${amount} was sent to your bank account.`,
+    bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr><td style="padding:12px 0;border-bottom:1px solid #eeeeee;color:#666666;">Amount</td><td align="right" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-weight:700;">${amount}</td></tr><tr><td style="padding:12px 0;color:#666666;">Sent</td><td align="right" style="padding:12px 0;">${formatDate()}</td></tr></table><p style="margin-bottom:0;color:#666666;">Banks can take a few business days to show the deposit.</p>`,
+    cta: { label: "View payouts", url: "https://brandthread.app/payouts" },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Brandthread payout of ${amount} sent`,
+    html,
+    idempotencyKey: options.idempotencyKey ?? `payout-sent/${options.payoutId}`,
+  });
+}
+
+export async function sendAbandonedCartEmail(options: {
+  to: string;
+  items: EmailLineItem[];
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const shown = options.items.slice(0, 4);
+  const more = options.items.length - shown.length;
+  const itemsHtml = shown.map((item) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #eeeeee;"><strong>${escapeHtml(item.productName)}</strong>${item.variantLabel ? `<br /><span style="color:#777777;font-size:13px;">${escapeHtml(item.variantLabel)}</span>` : ""}<br /><span style="color:#777777;font-size:13px;">Qty ${escapeHtml(item.quantity)}</span></td>
+      <td align="right" style="padding:10px 0;border-bottom:1px solid #eeeeee;vertical-align:top;">${formatCents(item.priceCents * item.quantity)}</td>
+    </tr>`).join("");
+  const html = renderBrandthreadEmail({
+    preheader: "The items in your cart are still waiting.",
+    eyebrow: "Your cart",
+    title: "You left something behind",
+    subtitle: "The items below are still in your cart.",
+    bodyHtml: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${itemsHtml}</table>${more > 0 ? `<p style="margin-bottom:0;color:#666666;">and ${more} more</p>` : ""}`,
+    cta: { label: "Return to your cart", url: "https://brandthread.app/cart" },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: "You left something in your Brandthread cart",
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export async function sendManufacturerSignupEmail(options: {
   to: string;
   businessName: string;
