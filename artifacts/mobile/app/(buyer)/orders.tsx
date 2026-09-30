@@ -13,7 +13,9 @@ import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
-import { getBuyerOrdersWithStatus } from '@/services/orderService';
+import { getBuyerOrdersWithStatus, mapApiBuyerOrder } from '@/services/orderService';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewBuyerOrders } from '@/lib/previewOrders';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
 import { deliveryHeadline } from '@/lib/deliveryGuarantee';
@@ -300,7 +302,8 @@ export default function BuyerOrdersScreen() {
 
   const load = useCallback(async (generation: number) => {
     if (!userId) {
-      setOrders([]);
+      // No account: empty, except the demo=1 preview cast (lib/previewOrders.ts).
+      setOrders(isPreviewDemoMode() ? getPreviewBuyerOrders().map(mapApiBuyerOrder) : []);
       setOrdersOwnerId(null);
       setLoading(false);
       setRefreshing(false);

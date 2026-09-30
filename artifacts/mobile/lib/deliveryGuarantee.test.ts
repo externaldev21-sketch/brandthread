@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   autoRefundSummary, deliveryHeadline, formatCalendarDate, formatLocalDate, formatTimeLeft, guaranteeLine,
-  mapDelivery, normalizeDeliverySteps, preOrderShipDateError, safeTrackingUrl, sellerCountdown, sellerShipByLine,
+  mapDelivery, normalizeDeliverySteps, sellerOrderConflictMessage, unshippedItems, preOrderShipDateError, safeTrackingUrl, sellerCountdown, sellerShipByLine,
 } from './deliveryGuarantee';
 import type { BuyerDelivery } from '@/services/orderTypes';
 
@@ -164,5 +164,18 @@ describe('preOrderShipDateError', () => {
     expect(preOrderShipDateError(true, '2026-10-01', now)).toMatch(/future/);
     expect(preOrderShipDateError(true, '2026-09-30', now)).toMatch(/future/);
     expect(preOrderShipDateError(true, '2026-10-02', now)).toBeNull();
+  });
+});
+
+describe('seller conflicts', () => {
+  it('explains the 409 codes', () => {
+    expect(sellerOrderConflictMessage('AUTO_REFUNDED')).toMatch(/automatically refunded/);
+    expect(sellerOrderConflictMessage('DELIVERY_NOT_SELLER_CONFIRMED')).toMatch(/carrier or the buyer/);
+    expect(sellerOrderConflictMessage('OTHER')).toBeNull();
+    expect(sellerOrderConflictMessage(undefined)).toBeNull();
+  });
+  it('lists items still to ship', () => {
+    const items = [{ id: 'a', trackingNumber: 'T1' }, { id: 'b' }, { id: 'c', refundedAt: '2026-10-01' }];
+    expect(unshippedItems(items).map(i => i.id)).toEqual(['b']);
   });
 });

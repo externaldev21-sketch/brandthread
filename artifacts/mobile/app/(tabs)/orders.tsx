@@ -30,7 +30,10 @@ import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewSellerOrders } from '@/lib/previewOrders';
+import { sellerCountdown } from '@/lib/deliveryGuarantee';
+import { DeadlineChip } from '@/components/orders/SellerDelivery';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
@@ -146,6 +149,7 @@ function getFulfillmentLabel(status: string): string {
 }
 
 export function getCancellationReasonLabel(reason: string): string {
+  if (reason === 'not_delivered_in_time') return 'Not delivered in time';
   return CANCELLATION_REASONS.find(r => r.key === reason)?.label ?? reason.replace(/_/g, ' ');
 }
 
@@ -255,7 +259,12 @@ export function apiRowToOrder(row: any): OrderListOrder {
       notifyCustomer: true,
       cancelledAt: typeof row.updatedAt === 'string' ? row.updatedAt : new Date(row.updatedAt).toISOString(),
     } : undefined,
-    hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
+    hasUnreadMessage: false, isPreOrder: row.isPreorder === true, isManufacturerFulfilled: false,
+    deliverBy: row.deliverBy ?? null,
+    promisedShipDate: row.promisedShipDate ?? null,
+    deliveredAt: row.deliveredAt ?? null,
+    autoRefundedAt: row.autoRefundedAt ?? null,
+    disputePausedAt: row.disputePausedAt ?? null,
     currency: 'USD', tags: [],
     listItemCount: Number.isSafeInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : undefined,
     listItemLabel: typeof row.dropName === 'string' && row.dropName.trim() ? row.dropName.trim() : undefined,
@@ -352,6 +361,8 @@ export function OrderRow({
   const hasReturn = order.returns.length > 0;
   const hasDispute = order.disputes.length > 0;
   const isArchived = order.status === 'cancelled';
+  // Deadline chip: only while there is still something to ship (or once auto-refunded).
+  const countdown = sellerCountdown(order, order.status === 'shipped' || order.status === 'delivered');
 
   const firstItem = order.lineItems[0];
   const itemCount = order.listItemCount ?? order.lineItems.length;
@@ -431,6 +442,7 @@ export function OrderRow({
           <View style={s.orderRight}>
             <Text style={s.orderAmount}>{fmtMoney(order.payment.totalCents)}</Text>
             <Text style={s.orderTime}>{fmtTime(order.createdAt)}</Text>
+            {countdown && <View style={{ marginTop: 4 }}><DeadlineChip countdown={countdown} /></View>}
           </View>
         </View>
 
@@ -767,8 +779,10 @@ export default function OrdersScreen() {
     // fetch failure shows.
     if (isPreviewMode && !userId) {
       if (generationRef.current === generation) {
-        setOrders([]);
-        setStats(computeStats([]));
+        // ?demo=1 only: the seeded delivery-guarantee fixtures.
+        const demo = isPreviewDemoMode() ? getPreviewSellerOrders().map(apiRowToOrder) : [];
+        setOrders(demo);
+        setStats(computeStats(demo));
         setLoadError(false);
         setLoading(false);
         setRefreshing(false);

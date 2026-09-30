@@ -285,3 +285,24 @@ export function preOrderShipDateError(
   if (date.getTime() <= today.getTime()) return 'Ship date must be in the future.';
   return null;
 }
+
+// ─── Seller write errors ──────────────────────────────────────────────────────
+
+export const DELIVERY_CONFIRMED_BY_NOTE = 'Delivery is confirmed by the carrier or the buyer.';
+
+/** Clear copy for the 409 codes a seller can hit on status/tracking writes. Null for anything else. */
+export function sellerOrderConflictMessage(code: string | undefined | null): string | null {
+  switch (code) {
+    case 'AUTO_REFUNDED':
+      return "This order was automatically refunded because it wasn't delivered in time, so it can no longer be updated.";
+    case 'DELIVERY_NOT_SELLER_CONFIRMED':
+      return `You can't mark an order delivered. ${DELIVERY_CONFIRMED_BY_NOTE}`;
+    default:
+      return null;
+  }
+}
+
+/** Shipped = every item has tracking (or the order status says so). Partially shipped orders are not. */
+export function unshippedItems<T extends { trackingNumber?: string | null; refundedAt?: string | null }>(items: T[]): T[] {
+  return items.filter(i => !i.trackingNumber && !i.refundedAt);
+}
