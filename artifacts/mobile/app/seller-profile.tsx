@@ -25,6 +25,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { useStoreGiftCards } from '@/hooks/useStoreGiftCards';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
@@ -153,6 +154,7 @@ export default function SellerProfileScreen() {
   const barInset = useBuyerTabBarInset();
 
   const [seller, setSeller] = useState<SellerView | null>(null);
+  const sellsGiftCards = useStoreGiftCards(seller?.sellerId);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
@@ -418,6 +420,12 @@ export default function SellerProfileScreen() {
         onPress: () => router.push(viewAsVisitorHref('seller', sellerId) as never),
       });
     }
+    if (caps.showVisitorMenu && sellsGiftCards) {
+      items.push({
+        key: 'gift-cards', icon: 'gift', label: 'Gift cards',
+        onPress: () => router.push(`/gift-card-buy?sellerId=${encodeURIComponent(sellerId)}&name=${encodeURIComponent(seller.brandName)}` as never),
+      });
+    }
     if (caps.showVisitorMenu) {
       items.push(
         {
@@ -438,7 +446,7 @@ export default function SellerProfileScreen() {
       );
     }
     return items;
-  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, router, seller]);
+  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, router, seller, sellsGiftCards]);
 
   const openVideo = useCallback((item: ProfileGridItem) => {
     if (!seller) return;

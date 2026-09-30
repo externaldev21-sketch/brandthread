@@ -95,6 +95,7 @@ export default function BuyerSettingsMenuScreen() {
         { key: 'orders', icon: 'package', label: 'Orders', onPress: () => router.push('/(buyer)/orders') },
         { key: 'rewards', icon: 'gift', label: 'Rewards', onPress: () => router.push('/loyalty' as any) },
         { key: 'thread-cash', icon: 'credit-card', label: 'Thread Cash wallet', onPress: () => router.push('/thread-cash' as any) },
+        { key: 'gift-cards', icon: 'gift', label: 'Gift cards', onPress: () => router.push('/buyer-gift-cards' as any) },
       ],
     },
     {

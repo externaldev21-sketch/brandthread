@@ -14,6 +14,8 @@ import { publishNotification } from "../../routes/notifications-feed";
 import { reversePurchasePointsOnce } from "../../routes/loyalty";
 import { advanceDropEscrow, recoverLabelCost, sweepOrderReleases } from "./escrow";
 import { expireStockReservations, sweepTransferOrders } from "./cartTransfers";
+import { sweepGiftCardPayouts } from "../giftCards/payout";
+import { stripe as giftCardStripe } from "../stripe";
 import { refundOrder, RefundError } from "./refunds";
 import { DROP_OPEN_STATES, orderStatusMachine, type OrderStatus } from "./stateMachines";
 
@@ -218,6 +220,7 @@ export async function runMoneySweep(now = new Date()): Promise<{
 
   try {
     await sweepTransferOrders();
+    await sweepGiftCardPayouts(giftCardStripe);
     await expireStockReservations({ now });
   } catch (error) {
     logger.error({ err: error }, "One-page checkout sweep failed; the next run retries");

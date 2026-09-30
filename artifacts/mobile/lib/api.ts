@@ -20,6 +20,7 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
 import type {
@@ -2958,6 +2959,30 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>('/api/loyalty/earn', body),
       redeem: (body: { points: number }) =>
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
+    },
+    /** Store gift cards: buy, send, wallet, and the store's own settings and list. */
+    giftCards: {
+      store: (sellerId: string) => get<GiftCardStoreInfo>(`/api/gift-cards/store/${encodeURIComponent(sellerId)}`),
+      purchase: (body: {
+        sellerId: string; amountCents: number; recipientEmail: string; recipientName?: string; message?: string;
+        forSelf?: boolean; clientIdempotencyKey: string;
+      }) => post<{ giftCardId: string; paymentIntentId: string; clientSecret: string | null; amountCents: number }>('/api/gift-cards/purchase', body),
+      confirmPurchase: (giftCardId: string) =>
+        post<{ status: 'paid' | 'processing' | 'unpaid'; card: GiftCard; code: string | null }>(
+          `/api/gift-cards/purchase/${encodeURIComponent(giftCardId)}/confirm`, {}),
+      claim: (code: string) => post<{ card: GiftCard; storeName: string }>('/api/gift-cards/claim', { code }),
+      mine: () => freshGet<{ cards: GiftCard[]; totalCents: number }>('/api/gift-cards/mine'),
+      get: (id: string) =>
+        get<{ card: GiftCard; history: GiftCardHistoryEntry[] }>(`/api/gift-cards/mine/${encodeURIComponent(id)}`),
+      seller: {
+        settings: () => freshGet<GiftCardSettings>('/api/gift-cards/seller/settings'),
+        saveSettings: (body: { enabled?: boolean; denominations?: number[]; allowCustom?: boolean; expiryMonths?: number | null }) =>
+          put<GiftCardSettings>('/api/gift-cards/seller/settings', body),
+        cards: () => freshGet<{ cards: GiftCard[]; outstandingCents: number }>('/api/gift-cards/seller/cards'),
+        issue: (body: { amountCents: number; recipientEmail: string; recipientName?: string; message?: string }) =>
+          post<{ card: GiftCard; code: string; emailed: boolean }>('/api/gift-cards/seller/issue', body),
+        void: (id: string) => post<{ card: GiftCard }>(`/api/gift-cards/seller/cards/${encodeURIComponent(id)}/void`, {}),
+      },
     },
     /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
     threadCash: {

@@ -36,6 +36,9 @@ import {
   releaseThreadCashRedemption,
 } from "../lib/threadCash/wallet";
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
+import { GIFT_CARD_PURCHASE_KIND, handleGiftCardPaymentSucceeded } from "../lib/giftCards/purchase";
+import { finalizeGiftCardsForGroup } from "../lib/giftCards/checkout";
+import { giftCentsForCheckouts } from "../lib/giftCards/service";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
@@ -302,6 +305,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const pi = event.data.object as any;
         if (pi.metadata?.kind === CART_CHECKOUT_KIND) {
           await handleCartPaymentSucceeded(pi, event.id, new Date(event.created * 1000));
+        } else if (pi.metadata?.kind === GIFT_CARD_PURCHASE_KIND) {
+          await handleGiftCardPaymentSucceeded(pi);
         }
         break;
       }
@@ -576,6 +581,8 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
   const shipping = pi.shipping?.address
     ? { name: pi.shipping.name ?? undefined, address: pi.shipping.address }
     : undefined;
+  // Gift card cents held on each group: part of its value, not a discount.
+  const giftByGroup = await giftCentsForCheckouts(db, groups.map((group) => group.id));
   for (const group of groups) {
     if (!group.stripeSessionId) continue;
     const subtotal = (group.items ?? []).reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
@@ -590,11 +597,14 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
       total_details: {
         amount_tax: tax,
         amount_shipping: shippingCents,
-        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal),
+        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal - (giftByGroup.get(group.id) ?? 0)),
       },
       shipping_details: shipping,
       metadata: { csRef: group.id },
     }, providerEventId, paidAt);
+    await finalizeGiftCardsForGroup(stripe, group).catch((err) => {
+      logger.error({ err, checkoutSessionId: group.id }, "Gift card settlement failed; redelivery retries it");
+    });
     await recordCartTaxTransaction(group).catch((err) => {
       logger.error({ err, checkoutSessionId: group.id }, "Stripe Tax transaction record failed");
     });
