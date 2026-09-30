@@ -62,13 +62,14 @@ export async function resolveToClerkId(
       clerkId:     users.clerkId,
       accountType: users.accountType,
       deletedAt:   users.deletedAt,
+      deletionRequestedAt: users.deletionRequestedAt,
     })
     .from(users)
     .where(isUuid ? eq(users.id, idOrClerkId) : eq(users.clerkId, idOrClerkId))
     .limit(1);
 
   if (!user) return null;
-  if (user.deletedAt) return null;
+  if (user.deletedAt || user.deletionRequestedAt) return null;
   if (requiredAccountType && user.accountType !== requiredAccountType) return null;
   return user.clerkId;
 }
@@ -590,7 +591,7 @@ router.get("/search", async (req, res): Promise<void> => {
           eq(users.accountType, "seller"),
           eq(users.isSystemAccount, false),
           isNull(users.suspendedAt),
-          isNull(users.deletedAt),
+          isNull(users.deletedAt), isNull(users.deletionRequestedAt),
           notBlockedWith(viewerId, users.clerkId),
           or(
             fuzzyMatch(users.displayName, term, pattern),
@@ -865,7 +866,7 @@ router.get("/search/trending", async (req, res) => {
       db.select({ sellerId: follows.followingId, followerCount: count() })
         .from(follows)
         .innerJoin(users, eq(users.clerkId, follows.followingId))
-        .where(and(eq(users.accountType, "seller"), isNull(users.suspendedAt), isNull(users.deletedAt)))
+        .where(and(eq(users.accountType, "seller"), isNull(users.suspendedAt), isNull(users.deletedAt), isNull(users.deletionRequestedAt)))
         .groupBy(follows.followingId)
         .orderBy(desc(count()))
         .limit(lim),
@@ -965,7 +966,7 @@ router.get("/search/suggested", async (req, res) => {
         .where(and(
           eq(users.accountType, "seller"),
           isNull(users.suspendedAt),
-          isNull(users.deletedAt),
+          isNull(users.deletedAt), isNull(users.deletionRequestedAt),
           notBlockedWith(viewerId, follows.followingId),
         ))
         .groupBy(follows.followingId)
@@ -1126,7 +1127,7 @@ router.get("/brands/discover", async (req, res) => {
       .where(and(
         eq(users.accountType, "seller"),
         isNull(users.suspendedAt),
-        isNull(users.deletedAt),
+        isNull(users.deletedAt), isNull(users.deletionRequestedAt),
         eq(users.policyRestricted, false),
         notBlockedWith(viewerId, users.clerkId),
       ))
@@ -1839,6 +1840,7 @@ router.get("/profiles/:username", async (req, res) => {
         profileImageUrl: users.profileImageUrl,
         verified:    users.verified,
         deletedAt:   users.deletedAt,
+        deletionRequestedAt: users.deletionRequestedAt,
         coverVideoUrl:  users.coverVideoUrl,
         coverPosterUrl: users.coverPosterUrl,
         coverVideoModerationStatus: users.coverVideoModerationStatus,
@@ -1855,7 +1857,7 @@ router.get("/profiles/:username", async (req, res) => {
     }
 
     // Tombstoned / deleted account.
-    if (user.deletedAt) {
+    if (user.deletedAt || user.deletionRequestedAt) {
       res.status(404).json({ error: "Profile not found" });
       return;
     }

@@ -37,6 +37,7 @@ import type {
   CreateReport200,
   CreateReportInput,
   CreatedComment,
+  DeleteAccount200,
   DeleteAccount409,
   DeleteAccountInput,
   DropBroadcastPreview,
@@ -4949,11 +4950,11 @@ export const getDeleteAccountUrl = () => {
 }
 
 /**
- * @summary Permanently delete the account, its data, and the Clerk user
+ * @summary Schedule account deletion (30-day grace, then permanent). Hides the account and revokes every session. Needs a password, or an emailed code for password-less accounts.
  */
-export const deleteAccount = async (deleteAccountInput: DeleteAccountInput, options?: RequestInit): Promise<OkResponse> => {
+export const deleteAccount = async (deleteAccountInput: DeleteAccountInput, options?: RequestInit): Promise<DeleteAccount200> => {
 
-  return customFetch<OkResponse>(getDeleteAccountUrl(),
+  return customFetch<DeleteAccount200>(getDeleteAccountUrl(),
   {
     ...options,
     method: 'DELETE',
@@ -4965,7 +4966,7 @@ export const deleteAccount = async (deleteAccountInput: DeleteAccountInput, opti
 
 
 
-export const getDeleteAccountMutationOptions = <TError = ErrorType<DeleteAccount409>,
+export const getDeleteAccountMutationOptions = <TError = ErrorType<void | DeleteAccount409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAccount>>, TError,{data: BodyType<DeleteAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteAccount>>, TError,{data: BodyType<DeleteAccountInput>}, TContext> => {
 
@@ -4994,12 +4995,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteAccountMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAccount>>>
     export type DeleteAccountMutationBody = BodyType<DeleteAccountInput>
-    export type DeleteAccountMutationError = ErrorType<DeleteAccount409>
+    export type DeleteAccountMutationError = ErrorType<void | DeleteAccount409>
 
     /**
- * @summary Permanently delete the account, its data, and the Clerk user
+ * @summary Schedule account deletion (30-day grace, then permanent). Hides the account and revokes every session. Needs a password, or an emailed code for password-less accounts.
  */
-export const useDeleteAccount = <TError = ErrorType<DeleteAccount409>,
+export const useDeleteAccount = <TError = ErrorType<void | DeleteAccount409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAccount>>, TError,{data: BodyType<DeleteAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteAccount>>,
@@ -5008,6 +5009,146 @@ export const useDeleteAccount = <TError = ErrorType<DeleteAccount409>,
         TContext
       > => {
       return useMutation(getDeleteAccountMutationOptions(options));
+    }
+
+export const getRequestAccountDeletionCodeUrl = () => {
+
+
+
+
+  return `/api/auth/account/deletion-code`
+}
+
+/**
+ * @summary Email a single-use 6-digit re-auth code to an account without a password
+ */
+export const requestAccountDeletionCode = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getRequestAccountDeletionCodeUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRequestAccountDeletionCodeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestAccountDeletionCode>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestAccountDeletionCode>>, TError,void, TContext> => {
+
+const mutationKey = ['requestAccountDeletionCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestAccountDeletionCode>>, void> = () => {
+
+
+          return  requestAccountDeletionCode(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestAccountDeletionCodeMutationResult = NonNullable<Awaited<ReturnType<typeof requestAccountDeletionCode>>>
+
+    export type RequestAccountDeletionCodeMutationError = ErrorType<void>
+
+    /**
+ * @summary Email a single-use 6-digit re-auth code to an account without a password
+ */
+export const useRequestAccountDeletionCode = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestAccountDeletionCode>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestAccountDeletionCode>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRequestAccountDeletionCodeMutationOptions(options));
+    }
+
+export const getRestoreAccountUrl = () => {
+
+
+
+
+  return `/api/auth/account/restore`
+}
+
+/**
+ * @summary Cancel a pending account deletion during the grace period
+ */
+export const restoreAccount = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getRestoreAccountUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRestoreAccountMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreAccount>>, TError,void, TContext> => {
+
+const mutationKey = ['restoreAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreAccount>>, void> = () => {
+
+
+          return  restoreAccount(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreAccountMutationResult = NonNullable<Awaited<ReturnType<typeof restoreAccount>>>
+
+    export type RestoreAccountMutationError = ErrorType<void>
+
+    /**
+ * @summary Cancel a pending account deletion during the grace period
+ */
+export const useRestoreAccount = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof restoreAccount>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRestoreAccountMutationOptions(options));
     }
 
 export const getAcceptLegalTermsUrl = () => {

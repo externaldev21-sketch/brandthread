@@ -146,6 +146,11 @@ export const users = pgTable('users', {
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  // Soft-delete grace: the person asked to delete their account. It is hidden
+  // everywhere immediately and purged (see jobs/accountPurge.ts) once
+  // deletionScheduledFor passes, unless they restore it first.
+  deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
+  deletionScheduledFor: timestamp('deletion_scheduled_for', { withTimezone: true }),
   // Platform suspension set by a moderator. Suspended accounts cannot publish
   // and their public content is hidden from every surface.
   suspendedAt: timestamp('suspended_at', { withTimezone: true }),

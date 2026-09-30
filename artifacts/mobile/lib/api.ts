@@ -759,6 +759,9 @@ export interface LocalUserProfile {
   termsAcceptedAt?: string | null;
   /** Set when a moderator suspends the account. */
   suspendedAt?: string | null;
+  /** True during the 30-day grace period after the person asked to delete the account. */
+  pendingDeletion?: boolean;
+  deletionScheduledFor?: string | null;
 }
 
 export interface ShopifyImportJob {
@@ -918,14 +921,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  endpoint — any authenticated user owns exactly one `profileImageUrl`. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
-      /** Permanently erase this account after the explicit DELETE confirmation. */
-      deleteAccount: () => request<{ ok: true }>(
+      /** Schedule deletion (30-day grace) after the typed DELETE confirmation plus
+       *  fresh proof: `password`, or `code` for accounts without a password. */
+      deleteAccount: (reauth: { password?: string; code?: string } = {}) => request<{ ok: true; scheduledFor: string | null; graceDays: number }>(
         '/api/auth/account',
-        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE' }) },
+        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE', ...reauth }) },
         getToken,
         false,
         getCacheScope,
       ),
+      /** Email a 6-digit re-auth code to an account that has no password. */
+      requestDeletionCode: () => post<{ ok: true }>('/api/auth/account/deletion-code', {}),
+      /** Cancel a pending deletion during the grace period. */
+      restoreAccount: () => post<{ ok: true }>('/api/auth/account/restore', {}),
       /** Everything deletion removes/retains, plus anything that must be settled first. */
       deletionCheck: () => freshGet<AccountDeletionCheck>('/api/auth/account/deletion-check'),
       /** Send a branded, server-issued (Resend) 6-digit password reset code.

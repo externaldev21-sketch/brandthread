@@ -5,9 +5,11 @@
  * 1. Overview: explains exactly what is deleted and what the law requires us
  *    to keep, and lists anything that must be settled first (open orders,
  *    held drop funds, disputes, payouts in flight…) with a shortcut to fix it.
- * 2. Confirm: type DELETE and acknowledge it can't be undone.
- * 3. Done: server data is erased/anonymized, the Clerk user is deleted and
- *    every session is signed out.
+ * 2. Confirm: type DELETE, acknowledge, and re-authenticate (password, or an
+ *    emailed code for accounts that sign in without one).
+ * 3. Done: the account is hidden and scheduled for deletion in 30 days, every
+ *    session is signed out, and signing back in within 30 days restores it.
+ *    The hard delete runs server-side after the grace period.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -28,6 +30,7 @@ import { clearAccountLifecycleState } from '@/lib/accountService';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
+import { formatScheduledDate } from '@/components/account/AccountDeletionGate';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 
 type Step = 'overview' | 'confirm' | 'done';
@@ -50,6 +53,11 @@ export default function DeleteAccountScreen() {
   const [acknowledged, setAcknowledged] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState<string | null>(null);
 
   const loadCheck = useCallback(async () => {
     setLoading(true);
@@ -70,18 +78,36 @@ export default function DeleteAccountScreen() {
   const isSeller = check?.accountType === 'seller';
   const blockers = check?.blockers ?? [];
   const canContinue = !!check && check.canDelete;
-  const confirmValid = typed.trim() === CONFIRM_WORD && acknowledged;
+  const graceDays = check?.graceDays ?? 30;
+  const usesCode = check?.reauth === 'email_code';
+  const reauthFilled = usesCode ? /^\d{6}$/.test(code.trim()) : password.length > 0;
+  const confirmValid = typed.trim() === CONFIRM_WORD && acknowledged && reauthFilled;
+
+  async function sendCode() {
+    if (sendingCode) return;
+    setSendingCode(true);
+    setDeleteError(null);
+    try {
+      await api.auth.requestDeletionCode();
+      setCodeSent(true);
+    } catch (err) {
+      setDeleteError(apiErrorMessage(err, 'We couldn’t send the code. Try again in a moment.'));
+    } finally {
+      setSendingCode(false);
+    }
+  }
 
   async function deleteNow() {
     if (!confirmValid || deleting) return;
     setDeleting(true);
     setDeleteError(null);
     try {
-      await api.auth.deleteAccount();
+      const result = await api.auth.deleteAccount(usesCode ? { code: code.trim() } : { password });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await clearAccountLifecycleState().catch(() => {});
+      setScheduledFor(result.scheduledFor);
       setStep('done');
-      // The Clerk user no longer exists; clear the local session too.
+      // Every session was revoked server-side; clear the local one too.
       signOut().catch(() => {});
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -92,7 +118,7 @@ export default function DeleteAccountScreen() {
         setTyped('');
         setAcknowledged(false);
       } else {
-        setDeleteError(apiErrorMessage(err, 'We couldn’t delete your account. Nothing was changed on this device — please try again or contact support@brandthread.app.'));
+        setDeleteError(apiErrorMessage(err, 'We couldn’t schedule your account deletion. Please try again or contact support@brandthread.app.'));
       }
     } finally {
       setDeleting(false);
@@ -109,9 +135,9 @@ export default function DeleteAccountScreen() {
       <View style={[s.root, { paddingTop: headerTopInset + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
         <View style={s.doneBody}>
           <View style={s.doneIcon}><Feather name="check" size={30} color={theme.onAccent} /></View>
-          <Text style={s.title}>Your account has been deleted</Text>
+          <Text style={s.title}>Your account is scheduled for deletion</Text>
           <Text style={s.lead}>
-            Your profile and personal data have been removed and you’ve been signed out on every device. Thanks for being part of Brandthread.
+            {`Your profile is now hidden and you’ve been signed out on every device. Your account and personal data will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then if you change your mind.`}
           </Text>
         </View>
         <View style={{ paddingHorizontal: SP.md }}>
@@ -131,7 +157,7 @@ export default function DeleteAccountScreen() {
             <View style={s.heroIcon}><Feather name="trash-2" size={24} color={theme.error} /></View>
             <Text style={s.title}>Delete your Brandthread account</Text>
             <Text style={s.lead}>
-              This permanently deletes your account{isSeller ? ' and takes your storefront offline' : ''}. You can’t undo it, and you’ll need to sign up again to use Brandthread.
+              {`Your account${isSeller ? ' and storefront are' : ' is'} hidden right away and permanently deleted after ${graceDays} days. Sign back in any time during those ${graceDays} days to restore it. After that it can’t be recovered.`}
             </Text>
 
             {loading ? (
@@ -236,7 +262,7 @@ export default function DeleteAccountScreen() {
             <View style={s.heroIcon}><Feather name="alert-octagon" size={24} color={theme.error} /></View>
             <Text style={s.title}>Are you absolutely sure?</Text>
             <Text style={s.lead}>
-              Your account will be deleted immediately and you’ll be signed out on every device. This can’t be undone.
+              {`Your account will be hidden now and you’ll be signed out on every device. It is permanently deleted after ${graceDays} days, unless you sign back in to restore it.`}
             </Text>
 
             <Text style={s.fieldLabel}>Type <Text style={{ color: theme.text, fontFamily: FONT.bold }}>{CONFIRM_WORD}</Text> to confirm</Text>
@@ -251,6 +277,46 @@ export default function DeleteAccountScreen() {
               accessibilityLabel="Type DELETE to confirm"
             />
 
+            {usesCode ? (
+              <>
+                <Text style={s.fieldLabel}>Enter the 6-digit code we email you</Text>
+                <TextInput
+                  style={s.input}
+                  value={code}
+                  onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  placeholderTextColor={theme.subtle}
+                  keyboardType="number-pad"
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  maxLength={6}
+                  accessibilityLabel="Email verification code"
+                />
+                <PressableScale onPress={sendCode} disabled={sendingCode} style={s.codeLink} accessibilityRole="button">
+                  {sendingCode
+                    ? <ActivityIndicator color={theme.text} />
+                    : <Text style={s.link}>{codeSent ? 'Send a new code' : 'Email me a code'}</Text>}
+                </PressableScale>
+              </>
+            ) : (
+              <>
+                <Text style={s.fieldLabel}>Enter your password to confirm it’s you</Text>
+                <TextInput
+                  style={[s.input, s.passwordInput]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Password"
+                  placeholderTextColor={theme.subtle}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="current-password"
+                  textContentType="password"
+                  accessibilityLabel="Password"
+                />
+              </>
+            )}
+
             <PressableScale
               onPress={() => { Haptics.selectionAsync(); setAcknowledged((v) => !v); }}
               style={s.ackRow}
@@ -261,7 +327,7 @@ export default function DeleteAccountScreen() {
                 {acknowledged ? <Feather name="check" size={14} color={theme.onAccent} /> : null}
               </View>
               <Text style={s.ackText}>
-                I understand my {isSeller ? 'storefront, listings, ' : ''}profile, posts, comments and messages will be permanently deleted.
+                I understand my {isSeller ? 'storefront, listings, ' : ''}profile, posts, comments and messages will be permanently deleted after {graceDays} days.
               </Text>
             </PressableScale>
 
@@ -277,11 +343,11 @@ export default function DeleteAccountScreen() {
               disabled={!confirmValid || deleting}
               style={[s.deleteBtn, (!confirmValid || deleting) && { opacity: 0.4 }]}
               accessibilityRole="button"
-              accessibilityLabel="Permanently delete account"
+              accessibilityLabel="Delete account"
             >
               {deleting
                 ? <ActivityIndicator color={theme.onAccent} />
-                : <Text style={s.deleteText}>Permanently delete account</Text>}
+                : <Text style={s.deleteText}>Delete account</Text>}
             </PressableScale>
             <SecondaryButton label="Cancel" onPress={goBack} accent={theme.text} style={{ marginTop: SP.sm }} />
           </>
@@ -350,6 +416,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 54, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
     color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: 2, paddingHorizontal: SP.md,
   },
+  passwordInput: { fontFamily: FONT.medium, fontSize: FS.base, letterSpacing: 0 },
+  codeLink: { alignSelf: 'flex-start', marginTop: SP.sm, minHeight: 28, justifyContent: 'center' },
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginTop: SP.lg },
   checkbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.muted,

@@ -11,7 +11,19 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 import { isMailerConfigured, sendPasswordResetEmail } from "../lib/mailer";
-import { getDeletionBlockers, hasDeletionConfirmation } from "../lib/accountDeletion";
+import {
+  DELETION_GRACE_DAYS,
+  deletionState,
+  getDeletionBlockers,
+  getReauthMethod,
+  hasDeletionConfirmation,
+  isPendingDeletion,
+  issueDeletionCode,
+  restoreAccount,
+  revokeAllSessions,
+  scheduleAccountDeletion,
+  verifyDeletionReauth,
+} from "../lib/accountDeletion";
 import { getAuth } from "@clerk/express";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -156,6 +168,8 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
       if (!existing) throw new Error("User sync conflict did not yield a user record");
+      // Inside the 30-day grace window the person may still sign in (to
+      // restore); only a purged tombstone is gone for good.
       if (existing.deletedAt) {
         const error = new Error("This account has been deleted");
         (error as any).statusCode = 410;
@@ -197,7 +211,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });
     }
-    res.status(created ? 201 : 200).json(user);
+    res.status(created ? 201 : 200).json({ ...user, ...deletionState(user) });
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
       res.status(410).json({ error: "This account has been deleted." });
@@ -327,11 +341,16 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Account record was not found." });
       return;
     }
-    const blockers = await getDeletionBlockers(clerkUserId);
+    const [blockers, reauth] = await Promise.all([
+      getDeletionBlockers(clerkUserId),
+      getReauthMethod(clerkUserId),
+    ]);
     const isSeller = account.accountType === "seller";
     res.json({
       canDelete: blockers.length === 0,
       accountType: account.accountType,
+      graceDays: DELETION_GRACE_DAYS,
+      reauth,
       blockers,
       willDelete: [
         "Your profile, username, photo and bio",
@@ -342,7 +361,7 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
           "Your storefront, product listings, discount codes and shipping settings",
           "Payout and subscription links to Stripe",
         ] : []),
-        "Your sign-in (you'll be signed out on every device)",
+        "Your sign-in, removed for good once the grace period ends",
       ],
       willRetain: [
         "Order, payment, refund and tax records, with your name and address removed — kept as long as the law requires",
@@ -356,131 +375,115 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/account/deletion-code ───────────────────────────────────
+// Re-auth for accounts without a password (Google/Apple sign-in): emails a
+// hashed, single-use, 15-minute code that DELETE /account then requires.
+router.post("/account/deletion-code", requireAuth, rateLimit("authentication"), async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  try {
+    const [account] = await db.select({ email: users.email, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    if (!account || account.deletedAt) {
+      res.status(404).json({ error: "Account record was not found." });
+      return;
+    }
+    const result = await issueDeletionCode(clerkUserId, account.email);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error, code: result.code });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Account deletion code request failed");
+    res.status(502).json({ error: "We couldn't send the code. Try again in a moment.", code: "MAIL_SEND_FAILED" });
+  }
+});
+
 // ─── DELETE /api/auth/account ───────────────────────────────────────────────
-// Permanently erase an authenticated account. Financial/tax records are kept,
-// but are stripped of direct personal data. The user row is deliberately kept
-// as a tombstone so an old app cannot re-create it with /auth/sync.
-router.delete("/account", requireAuth, async (req, res) => {
+// Schedules deletion with a 30-day grace period. Needs the typed confirmation
+// AND fresh proof of identity (password, or an emailed code for password-less
+// accounts). The account is hidden immediately and every session is revoked;
+// the hard delete happens in jobs/accountPurge.ts (purgeAccount), which keeps
+// the user row as a tombstone so an old app cannot re-create it via /sync.
+router.delete("/account", requireAuth, rateLimit("authentication"), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   if (!hasDeletionConfirmation(req.body)) {
-    res.status(400).json({ error: 'Type DELETE exactly to permanently delete your account.' });
+    res.status(400).json({ error: 'Type DELETE exactly to delete your account.' });
     return;
   }
 
   try {
     const [account] = await db.select({
       id: users.id, deletedAt: users.deletedAt,
+      deletionRequestedAt: users.deletionRequestedAt, deletionScheduledFor: users.deletionScheduledFor,
     }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
     if (!account) {
       res.status(404).json({ error: "Account record was not found." });
       return;
     }
 
-    if (!account.deletedAt) {
-      // Never strand a buyer or a seller's customers: open orders, held drop
-      // funds, disputes and in-flight payouts must be settled first.
-      const blockers = await getDeletionBlockers(clerkUserId);
-      if (blockers.length > 0) {
-        res.status(409).json({
-          error: "Settle the items below before deleting your account.",
-          code: "DELETION_BLOCKED",
-          blockers,
-        });
-        return;
-      }
-      await db.transaction(async (tx) => {
-        const deletedSubject = `deleted:${account.id}`;
-        // Private, device, social, preference and draft data.
-        await tx.execute(sql`DELETE FROM push_tokens WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM buyer_addresses WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM saved_items WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM notifications_feed WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM blocks WHERE blocker_id = ${clerkUserId} OR blocked_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM follows WHERE follower_id = ${clerkUserId} OR following_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM story_likes WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM story_views WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM interactions WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM posts WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM stories WHERE author_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM product_reserves WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM waitlist_entries WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM drop_alert_subscriptions WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM checkout_sessions WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM loyalty_points WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM referrals WHERE inviter_id = ${clerkUserId} OR invitee_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM klaviyo_integrations WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM seller_subscription_entitlements WHERE clerk_user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM post_comment_likes WHERE user_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM muted_words WHERE user_id = ${clerkUserId}`);
-        // Reports the person filed stay in the moderation record without
-        // their identity; reports about their content keep the snapshot.
-        await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE reports SET target_owner_id = ${deletedSubject} WHERE target_owner_id = ${clerkUserId}`);
-
-        // Conversations are private content. Preserve a counterpart's thread,
-        // but remove the deleted person's messages, participant profile, and
-        // cached message preview.
-        await tx.execute(sql`UPDATE conversations SET last_message = NULL
-          WHERE id IN (SELECT conversation_id FROM conversation_participants WHERE user_id = ${clerkUserId})`);
-        await tx.execute(sql`DELETE FROM messages WHERE sender_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM conversation_participants WHERE user_id = ${clerkUserId}`);
-
-        // Retained commerce records keep amounts/statuses/payment references for
-        // legal and accounting purposes while removing customer-facing PII.
-        await tx.execute(sql`UPDATE orders SET buyer_id = NULL, guest_email = NULL,
-          shipping_address = NULL, notes = NULL, updated_at = NOW()
-          WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE orders SET owner_id = ${deletedSubject}, updated_at = NOW()
-          WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE customers SET owner_id = ${deletedSubject},
-          email = 'deleted@deleted.brandthread.invalid', name = 'Deleted customer',
-          phone = NULL, address = NULL, updated_at = NOW() WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE returns SET notes = NULL, seller_response = NULL, evidence_urls = '[]'::json
-          WHERE buyer_id = ${clerkUserId} OR seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE returns SET buyer_id = ${deletedSubject} WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE returns SET seller_id = ${deletedSubject} WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE disputes SET seller_id = ${deletedSubject}, customer_claim = '', evidence_json = '[]'::json,
-          stripe_evidence_details = '{}'::json, updated_at = NOW() WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE reviews SET buyer_id = 'deleted', body = NULL WHERE buyer_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE reviews SET seller_id = ${deletedSubject} WHERE seller_id = ${clerkUserId}`);
-
-        // Seller catalog/profile content is no longer public. Products are
-        // archived rather than deleted because historical order line items can
-        // reference their variants.
-        await tx.execute(sql`UPDATE products SET status = 'archived', images = '[]'::json,
-          description = NULL, updated_at = NOW() WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM storefronts WHERE owner_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM seller_quote_requests WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM seller_tax_config WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`DELETE FROM shipping_rates WHERE seller_id = ${clerkUserId}`);
-        await tx.execute(sql`UPDATE discount_codes SET active = false WHERE seller_id = ${clerkUserId}`);
-
-        // Remove all direct identity, auth/billing linkage and public profile
-        // details. clerk_id remains solely as the non-reusable tombstone key.
-        await tx.update(users).set({
-          email: `deleted+${account.id}@deleted.brandthread.invalid`,
-          name: "Deleted user", displayName: "Deleted user", avatarUrl: null,
-          bio: null, profileImageUrl: null, username: null, brandName: null,
-          brandType: null, brandStage: null, sellModel: null, website: null,
-          stripeCustomerId: null, stripeAccountId: null, subscriptionId: null,
-          stripeVerificationSessionId: null, notificationPreferences: {},
-          termsAcceptedAt: null, termsVersion: null,
-          deletedAt: new Date(), updatedAt: new Date(),
-        }).where(eq(users.clerkId, clerkUserId));
-      });
+    // Already purged but Clerk removal failed earlier: finish it.
+    if (account.deletedAt) {
+      await clerkClient.users.deleteUser(clerkUserId);
+      res.json({ ok: true, purged: true });
+      return;
+    }
+    // Idempotent: a repeated request keeps the original date.
+    if (isPendingDeletion(account)) {
+      res.json({ ok: true, scheduledFor: account.deletionScheduledFor?.toISOString() ?? null, graceDays: DELETION_GRACE_DAYS });
+      return;
     }
 
-    // This happens only after the database cleanup commits. If Clerk rejects
-    // it, the tombstone remains and a retry is safe and explicit.
-    await clerkClient.users.deleteUser(clerkUserId);
-    res.json({ ok: true });
+    const reauth = await verifyDeletionReauth(clerkUserId, req.body ?? {});
+    if (!reauth.ok) {
+      res.status(reauth.status).json({ error: reauth.error, code: reauth.code });
+      return;
+    }
+
+    // Never strand a buyer or a seller's customers: open orders, held drop
+    // funds, disputes and in-flight payouts must be settled first. Checked
+    // again when the grace period ends.
+    const blockers = await getDeletionBlockers(clerkUserId);
+    if (blockers.length > 0) {
+      res.status(409).json({
+        error: "Settle the items below before deleting your account.",
+        code: "DELETION_BLOCKED",
+        blockers,
+      });
+      return;
+    }
+
+    const scheduledFor = await scheduleAccountDeletion(clerkUserId);
+    try {
+      await revokeAllSessions(clerkUserId);
+    } catch (err) {
+      // The account is already hidden and scheduled; a failed revoke must not
+      // report the whole request as failed.
+      req.log.warn({ err, clerkUserId }, "Could not revoke sessions after scheduling account deletion");
+    }
+    res.json({ ok: true, scheduledFor: scheduledFor?.toISOString() ?? null, graceDays: DELETION_GRACE_DAYS });
   } catch (err) {
     req.log.error({ err, clerkUserId }, "Account deletion failed");
     res.status(502).json({
-      error: "We could not complete account deletion. Database cleanup may have completed, but Clerk sign-in removal failed. Retry the request or contact support.",
+      error: "We couldn't schedule your account deletion. Try again or contact support.",
     });
+  }
+});
+
+// ─── POST /api/auth/account/restore ─────────────────────────────────────────
+// Cancels a pending deletion during the grace period.
+router.post("/account/restore", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  try {
+    const restored = await restoreAccount(clerkUserId);
+    if (!restored) {
+      res.status(409).json({ error: "This account isn't scheduled for deletion.", code: "NOT_PENDING_DELETION" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Account restore failed");
+    res.status(502).json({ error: "We couldn't restore your account. Try again." });
   }
 });
 
@@ -1092,7 +1095,7 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found — call POST /auth/sync first" });
     return;
   }
-  res.json(user);
+  res.json({ ...user, ...deletionState(user) });
 });
 
 // ─── POST /api/auth/password-reset/request ──────────────────────────────────

@@ -86,6 +86,7 @@ import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
+import AccountDeletionGate from '@/components/account/AccountDeletionGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
@@ -1448,6 +1449,7 @@ function RootLayoutNav() {
       <PushRegistrar />
       <MarketingPixelTracker />
       <LegalAcceptanceGate />
+      <AccountDeletionGate />
       <AppLockGate />
     </View>
   );
