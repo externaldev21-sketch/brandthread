@@ -374,6 +374,23 @@ function raceAuthTokenTimeout(inFlight: Promise<string | null>): Promise<string 
 // Share the in-flight promise so the second caller just awaits the first.
 const inFlightGetRequests = new Map<string, Promise<any>>();
 
+export interface LiveReplay {
+  streamId: string;
+  sellerId: string;
+  postId: string | null;
+  title: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  replayUrl: string;
+  peakViewerCount: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  isOwner: boolean;
+  /** Owner only. */
+  visibility?: 'public' | 'hidden';
+}
+
 function request<T = any>(
   path: string,
   options: RequestInit,
@@ -840,6 +857,23 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
     },
+    // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
+    liveReplays: {
+      bySeller: (sellerId: string, opts: { limit?: number; offset?: number } = {}) =>
+        get<{ replays: LiveReplay[]; hasMore: boolean }>(
+          `/api/live-replays/by-seller/${encodeURIComponent(sellerId)}?limit=${opts.limit ?? 30}&offset=${opts.offset ?? 0}`,
+        ),
+      get: (streamId: string) => get<{ replay: LiveReplay }>(`/api/live-replays/${encodeURIComponent(streamId)}`),
+      setVisibility: (streamId: string, visibility: 'public' | 'hidden') =>
+        patch<{ ok: boolean; visibility: 'public' | 'hidden' }>(`/api/live-replays/${encodeURIComponent(streamId)}`, { visibility }),
+      remove: (streamId: string) => del<{ ok: boolean }>(`/api/live-replays/${encodeURIComponent(streamId)}`),
+    },
+    liveTips: {
+      /** Host only. `enabled: false` when the live_tips flag is OFF. */
+      total: (streamId: string) =>
+        get<{ enabled: boolean; totalCents: number; giftCount: number }>(`/api/live-tips/${encodeURIComponent(streamId)}/total`),
+    },
+    // ── end live replays + tips ───────────────────────────────────────────────
     auth: {
       /** Create the matching local user record after Clerk authentication.
        * During onboarding, pass the name that the person explicitly entered so

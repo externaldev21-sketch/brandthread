@@ -46,6 +46,7 @@ import {
   LiveViewerCount, LiveViewerStack, type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveStreamOptionsSheet } from '@/components/live/LiveStreamOptionsSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
@@ -81,7 +82,8 @@ function LivePage({
   onBuy: (productId: string) => void;
   onOpenBag: () => void;
   onShare: () => void;
-  onGift: () => void;
+  /** Undefined while the `live_tips` flag is OFF: the gift button is then not rendered. */
+  onGift?: () => void;
   /** Report this live stream / block its host. */
   onMore: () => void;
   onLike: (x: number, y: number, count?: number) => void;
@@ -258,6 +260,9 @@ export default function LiveScreen() {
   const [bagFor, setBagFor] = useState<LiveStream | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [giftFor, setGiftFor] = useState<LiveStream | null>(null);
+  // Server-side `live_tips` flag via the existing feature-flags context; a failed
+  // flag call keeps the OFF default, so the gift button just stays hidden.
+  const liveTipsEnabled = useFeatureFlag('live_tips');
   const [optionsFor, setOptionsFor] = useState<LiveStream | null>(null);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
@@ -434,7 +439,7 @@ export default function LiveScreen() {
                 onBuy={pid => buy(item, pid)}
                 onOpenBag={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
-                onGift={() => gift(item)}
+                onGift={liveTipsEnabled ? () => gift(item) : undefined}
                 onMore={() => openStreamOptions(item)}
                 onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
@@ -472,7 +477,7 @@ export default function LiveScreen() {
           reduceMotion={reduceMotion}
         />
       )}
-      {giftFor && (
+      {liveTipsEnabled && giftFor && (
         <LiveThreadCashSheet
           visible
           brandName={giftFor.host.name}

@@ -1940,6 +1940,9 @@ export const liveStreams = pgTable('live_streams', {
   recordingStartedAt:   timestamp('recording_started_at', { withTimezone: true }),
   recordingStoppedAt:   timestamp('recording_stopped_at', { withTimezone: true }),
   recordingError:       text('recording_error'),
+  // Migration 130 — owner controls for the saved replay.
+  replayVisibility:     text('replay_visibility').notNull().default('public'), // 'public' | 'hidden'
+  replayDeletedAt:      timestamp('replay_deleted_at', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   statusViewerIdx: index('live_streams_status_viewer_idx')

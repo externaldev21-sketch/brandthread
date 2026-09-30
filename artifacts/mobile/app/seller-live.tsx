@@ -15,6 +15,7 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
@@ -72,6 +73,22 @@ function SellerLiveNativeScreen() {
   const [allProducts, setAllProducts]     = useState<any[]>([]);
   const [ending, setEnding]               = useState(false);
   const [agoraReady, setAgoraReady]       = useState(false);
+  // Host-only tips total; stays null (and renders nothing) while the
+  // `live_tips` flag is OFF or the call fails.
+  const liveTipsEnabled = useFeatureFlag('live_tips');
+  const [tipsTotalCents, setTipsTotalCents] = useState<number | null>(null);
+  useEffect(() => {
+    if (!liveTipsEnabled || !params.streamId) return undefined;
+    let cancelled = false;
+    const load = () => {
+      api.liveTips.total(params.streamId)
+        .then(r => { if (!cancelled) setTipsTotalCents(r.enabled ? r.totalCents : null); })
+        .catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 8000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [api, liveTipsEnabled, params.streamId]);
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
@@ -315,6 +332,16 @@ function SellerLiveNativeScreen() {
         </View>
       </View>
 
+      {/* Tips total (live_tips flag ON and at least one tip) */}
+      {tipsTotalCents != null && tipsTotalCents > 0 && (
+        <View style={[s.tipsRow, { paddingTop: headerTopInset + 78 }]} pointerEvents="none">
+          <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]} testID="seller-live-tips-total">
+            <Feather name="gift" size={13} color="#fff" />
+            <Text style={s.viewerText}>{formatCents(tipsTotalCents)} in tips</Text>
+          </View>
+        </View>
+      )}
+
       {/* Right action rail */}
       <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
         {/* Products */}
@@ -461,6 +488,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13 },
   viewerRow:        { position: 'absolute', top: 0, left: 16, zIndex: 9 },
+  tipsRow:          { position: 'absolute', top: 0, left: 16, zIndex: 9 },
   viewerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
   viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 12 },
   rightRail:        { position: 'absolute', right: 12, top: 0, zIndex: 10, gap: 16 },
