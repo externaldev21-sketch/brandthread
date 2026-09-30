@@ -618,6 +618,7 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/public/products') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? PUBLIC_PRODUCTS.length));
   if (p === '/public/drops') return DROPS.map(publicDrop);
   if ((match = p.match(/^\/public\/drops\/([^/]+)$/))) return DROPS.map(publicDrop).find((d) => d.id === match[1]);
+  if ((match = p.match(/^\/public\/drops\/[^/]+\/notify$/))) return { subscribed: false };
   if (p === '/public/trending') return { trending: TRENDING.slice(0, Number(query.get('limit') ?? 20)) };
   if (p === '/public/search') return publicSearch(query.get('q') ?? '');
   if (p === '/public/search/trending') return { trending: [{ term: 'Hoodies', type: 'category' }, { term: 'Northline Studio', type: 'brand' }, { term: 'trail runner', type: 'query' }, { term: 'Outerwear', type: 'category' }] };
@@ -778,6 +779,18 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
 
   // Seller
+  if ((match = p.match(/^\/drops\/([^/]+)$/))) {
+    const drop = DROPS.find((d) => d.id === match[1]);
+    if (!drop) return undefined;
+    const products = drop.products.map((id) => PUBLIC_PRODUCTS.find((pp) => pp.id === id)).filter(Boolean);
+    return {
+      id: drop.id, name: drop.name, status: drop.live ? 'live' : 'scheduled',
+      releaseAt: isoAhead(drop.releaseIn), endsAt: isoAhead(drop.endsIn),
+      heroImageUrl: products[0]?.images?.[0] ?? null, heroVideoUrl: null,
+      earlyAccessMinutes: 30,
+      products: products.map((pp) => ({ id: pp.id, name: pp.name, images: pp.images, stockRemaining: pp.remainingUnits })),
+    };
+  }
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
   if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
@@ -803,6 +816,62 @@ export function respond({ method, path, query, role, options = {} }) {
       { id: 'bo-2', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', title: 'Moss Hoodie Restock', status: 'payment_received', orderType: 'bulk', priceCents: 468000, quantity: 400, revision: 1, createdAt: iso(7 * DAY), updatedAt: iso(6 * DAY) },
     ];
   }
+
+  // Authed endpoints the audit script (scripts/audit/half-done-audit.mjs)
+  // found hitting the "not seeded" 404 below across dozens of routes — every
+  // one of them is a real, already-implemented api-server route (verified
+  // against artifacts/api-server/src/routes/*.ts one by one; see the PR
+  // description). The app was never missing a backend endpoint — this mock
+  // simply hadn't grown a handler for anything past the public/buyer-preview
+  // surface the original screenshot script needed. Zero-state ("fresh
+  // preview") shapes throughout, matching this file's existing convention
+  // and every consumer's own defensive `?? []`/`Array.isArray` handling.
+  if (p === '/products') return [];
+  if (p === '/posts/mine') return [];
+  if (p === '/inventory') return [];
+  if (p === '/ad-campaigns') return [];
+  if (p === '/discount-codes') return [];
+  if (p === '/loyalty') return { enrolled: false, pointsBalance: 0, tiers: [] };
+  if (p === '/referrals/stats') return { referralCode: null, totalReferred: 0, totalRewardCents: 0, pending: [] };
+  if (p === '/design-studio/projects') return [];
+  if (p === '/moderation/me') return { flags: [], strikes: 0, restricted: false };
+  if (p === '/safety/muted-words') return [];
+  if (p === '/social/blocks') return [];
+  if (p === '/social/suggested') return [];
+  if (p === '/social/friends/activity') return [];
+  if (p === '/social/notes/following') return { notes: [] };
+  if (p === '/social/stories/following') return { stories: [] };
+  if (p === '/social/stories/me') return null;
+  if (p === '/buyer/addresses') return [];
+  if (p === '/buyer/payment-methods') return [];
+  if (p === '/buyer/recently-viewed') return [];
+  if ((match = p.match(/^\/buyer\/collections\/[^/]+\/items$/))) return [];
+  if (p === '/boosts') return [];
+  if (p === '/boosts/summary') return { activeCount: 0, totalSpendCents: 0, totalImpressions: 0, totalClicks: 0 };
+  if (p === '/boosts/targets') return [];
+  if (p === '/auth/feed-gestures-tip') return { seenVersion: 0 };
+  if (p === '/auth/account/deletion-check') return { canDelete: true, accountType: role, blockers: [], willDelete: [], willRetain: [] };
+  if (p === '/auth/sessions') return { sessions: [] };
+  if (p === '/freelancers') return { freelancers: [] };
+  if (p === '/freelancers/me') return { freelancer: null };
+  if (p === '/seller/connect/status') return { connected: false, stripeAccountId: null, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, status: 'not_connected', verified: false, bankLast4: null, providerConfigured: false };
+  if (p === '/seller/subscription/invoices') return [];
+  if (p === '/integrations/klaviyo') return { connected: false };
+  if (p === '/analytics/revenue') return { totalCents: 0, orderCount: 0, daily: [] };
+  if (p === '/analytics/products') return [];
+  if (p === '/analytics/customers') return { stats: {} };
+  if (p === '/public/discover/feed') return { items: [], computedAt: iso(0), source: 'empty', nextOffset: null };
+  // 'col_nl_ember' is the audit's fixed dynamic-route param value for
+  // [collectionId] (see PARAM_VALUES in scripts/audit/half-done-audit.mjs) —
+  // give it a real "Save to collection" board so /c/[collectionId] renders
+  // its ready state instead of a 404-driven "not found" every run.
+  if (p === '/public/collections/col_nl_ember') {
+    return {
+      collection: { id: 'col_nl_ember', name: 'Ember Season Picks', coverImageUrl: img('hoodie-ember'), itemCount: 1, ownerName: BRANDS.ember.name },
+      items: [{ id: 'ci-1', type: 'product', targetId: PUBLIC_PRODUCTS[0]?.id ?? 'p1', title: PUBLIC_PRODUCTS[0]?.name ?? 'Heavyweight Hoodie', image: img('hoodie-ember'), brand: BRANDS.ember.name, priceCents: PUBLIC_PRODUCTS[0]?.priceCents ?? 8800 }],
+    };
+  }
+
   return undefined;
 }
 
