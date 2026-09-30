@@ -284,7 +284,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, marginRight: AVATAR_GAP, marginBottom: 2 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarSpacer: { width: AVATAR_SIZE, marginRight: AVATAR_GAP },
-  avatarInitials: { fontSize: 11, fontFamily: FONT.bold, color: '#FFFFFF' },
+  avatarInitials: { fontSize: 11, fontFamily: FONT.bold, color: theme.text },
   column: { maxWidth: BUBBLE_MAX, flexShrink: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, marginLeft: 4, maxWidth: BUBBLE_MAX },
   name: { flexShrink: 1, fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.muted },
