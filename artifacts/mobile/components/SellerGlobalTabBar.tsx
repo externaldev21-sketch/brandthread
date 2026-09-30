@@ -263,11 +263,21 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
 
   const openAI = () => {
     hapticLight();
-    // Map active tab to AI context
+    // Map active tab to AI context. `activeTab === 'index'` is ambiguous on
+    // its own — getActiveTab() returns 'index' both for the genuine
+    // Dashboard tab AND as its safe fallback for every unmapped screen
+    // (Settings, Customers, Analytics, …), so the fallback used to collapse
+    // both into 'home' — every screen outside Products/Orders showed the AI
+    // Brain header as "Seller Home", wrong and misleading everywhere else.
+    // Only pass 'home' when segments actually resolve to the Dashboard tab
+    // itself; anything else falls back to 'general' ("Brandthread AI").
+    const segmentStrings = segments as string[];
+    const onDashboard = segmentStrings[0] === '(tabs)' && (segmentStrings[1] ?? 'index') === 'index';
     const screen =
       activeTab === 'products' ? 'products' :
       activeTab === 'orders' ? 'orders' :
-      'home';
+      onDashboard ? 'home' :
+      'general';
     router.push({
       pathname: '/ai-brain',
       params: { context: JSON.stringify({ screen }) },
