@@ -49,6 +49,15 @@ web (dev or export) keep it; warn/error always kept. New devDependency:
   Flags truncated text, text overflowing its parent, text off the viewport,
   tight button/chip padding, and unequal sibling buttons.
 
+Verification status: vitest guard, growth/navigation/devPreview suites, `tsc`
+typecheck, the dead-UI crawler (`--ci` exit 0) and the babel console-strip
+matrix all ran locally. `text-fit-check.mjs` passes `node --check` but has NOT
+been run: `expo export --platform web` for the preview build did not finish in
+this sandbox (Metro sat idle after "Bundler cache is empty"), so no text-fit
+findings or screenshots exist for existing screens yet. Run
+`pnpm --filter mobile run check:text-fit -- --routes /buyer-inbox,/help,/general-settings`
+on a machine where the preview build completes.
+
 ## Findings and dispositions
 
 ### Production gating
