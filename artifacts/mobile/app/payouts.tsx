@@ -23,6 +23,10 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashCard';
+import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
+import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
+import { formatCents } from '@/lib/money';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -84,6 +88,8 @@ export default function PayoutsScreen() {
   const [previewNotice, setPreviewNotice] = useState('');
   const connectRequestRef = useRef(false);
   const onboardingOpenRef = useRef(false);
+  const threadCash = useSellerThreadCashBalance();
+  const [cashOutVisible, setCashOutVisible] = useState(false);
 
   function leaveSetupDestination() {
     if (launchedFromSellerSetup) {
@@ -150,6 +156,13 @@ export default function PayoutsScreen() {
   }, [api, isPreview, refreshConnectStatus]);
 
   useEffect(() => { load(); }, [load]);
+
+  function handleCashedOut(result: { threadCashCents: number; payoutCents: number; feeCents: number }) {
+    setCashOutVisible(false);
+    void threadCash.reload();
+    void load(); // the cash-out is a real Stripe transfer — refresh the payout balance too
+    Alert.alert('Cashed out', `${formatCents(result.threadCashCents)} Thread Cash moved to your payout balance as ${formatCents(result.payoutCents)}.`);
+  }
 
   useFocusEffect(useCallback(() => {
     void refreshConnectStatus();
@@ -229,6 +242,20 @@ export default function PayoutsScreen() {
           onPress: () => { haptic(); router.push('/help' as never); },
           accessibilityLabel: 'Payouts help',
         }]}
+      />
+
+      <SellerThreadCashCard
+        balanceCents={threadCash.balanceCents}
+        loading={threadCash.loading}
+        error={threadCash.error}
+        onReload={threadCash.reload}
+        onCashOutPress={() => setCashOutVisible(true)}
+      />
+      <CashOutSheet
+        visible={cashOutVisible}
+        balanceCents={threadCash.balanceCents ?? 0}
+        onClose={() => setCashOutVisible(false)}
+        onCashedOut={handleCashedOut}
       />
 
       {/* Balance hero */}
