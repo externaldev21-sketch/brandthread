@@ -19,6 +19,12 @@ const rootLayout = readFileSync(resolve(__dirname, '..', 'app/_layout.tsx'), 'ut
  * early `if (devRole) { ...; return; }` that every preview-mode request
  * hits first, so preview sessions never reached it. Fixed by mirroring the
  * same correction inside that early-return branch for devRole.
+ *
+ * Follow-up (also caught live): the first version of this fix redirected to
+ * the bare group root ("/(tabs)/"), which landed on the seller Dashboard
+ * instead of the Profile that "/profile?bt_preview=seller" actually asked
+ * for. Fixed to preserve whatever comes after the group segment instead of
+ * dropping it.
  */
 describe('AuthGate corrects a (buyer)/(tabs) route-group mismatch in dev preview too, not just for a real signed-in account', () => {
   const devRoleBlock = () => {
@@ -29,16 +35,21 @@ describe('AuthGate corrects a (buyer)/(tabs) route-group mismatch in dev preview
     return rootLayout.slice(start, end);
   };
 
-  it('corrects a buyer devRole landing in the (tabs) group back to (buyer)', () => {
+  it('corrects a buyer devRole landing in the (tabs) group back to (buyer), preserving the sub-path', () => {
     const block = devRoleBlock();
     expect(block).toContain("devRole === 'buyer' && inTabsGroup");
-    expect(block).toContain("router.replace('/(buyer)/' as never);");
+    expect(block).toContain('router.replace(`/(buyer)/${rest}` as never);');
   });
 
-  it('corrects a seller devRole landing in the (buyer) group back to (tabs)', () => {
+  it('corrects a seller devRole landing in the (buyer) group back to (tabs), preserving the sub-path', () => {
     const block = devRoleBlock();
     expect(block).toContain("devRole === 'seller' && inBuyerGroup");
-    expect(block).toContain("router.replace('/(tabs)/' as never);");
+    expect(block).toContain('router.replace(`/(tabs)/${rest}` as never);');
+  });
+
+  it('derives the preserved sub-path from every segment after the group itself', () => {
+    const block = devRoleBlock();
+    expect(block).toContain("const rest = (segments as string[]).slice(1).join('/');");
   });
 
   it("never fires this correction at the bare '/' root — that redirect is app/index.tsx's own job, and firing here too would race it", () => {

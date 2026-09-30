@@ -265,6 +265,9 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // literally overlapped it (audit: "Launch · $25" overlapping the tab
   // bar's cart badge).
   'design-campaign',
+  // Mockup-to-Model — its own sticky "Create N photos" bottom CTA (audit:
+  // "Create photos" overlapping the tab bar's cart badge), same category.
+  'design-mockup-to-model',
   // Storefront-from-AI wizard and its full-screen generating/progress screen.
   'store-generate',
   'store-generating',
@@ -726,12 +729,17 @@ function AuthGate() {
       // mismatch can happen here too (confirmed live:
       // "/profile?bt_preview=seller" loaded the buyer's own profile).
       // Mirroring that same correction for devRole, still without racing
-      // the atRoot redirect above.
+      // the atRoot redirect above. Preserves whatever comes after the group
+      // segment (e.g. "profile") rather than dropping to the group's own
+      // root — confirmed live that redirecting to the bare group root landed
+      // on the seller Dashboard instead of the seller Profile that
+      // "/profile?bt_preview=seller" actually asked for.
       if (!atRoot) {
+        const rest = (segments as string[]).slice(1).join('/');
         if (devRole === 'buyer' && inTabsGroup) {
-          router.replace('/(buyer)/' as never);
+          router.replace(`/(buyer)/${rest}` as never);
         } else if (devRole === 'seller' && inBuyerGroup) {
-          router.replace('/(tabs)/' as never);
+          router.replace(`/(tabs)/${rest}` as never);
         }
       }
       return;

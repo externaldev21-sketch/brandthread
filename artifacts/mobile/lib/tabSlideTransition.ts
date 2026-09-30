@@ -13,7 +13,7 @@
  * screen order must match its tab bar's left-to-right visual order for the
  * direction to read correctly.
  */
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, Platform } from 'react-native';
 import { isIdentityTransform } from '@/lib/animationUtils';
 
 // Exported (not just used locally) so the tab layouts can time their own
@@ -64,28 +64,46 @@ function currentValue(node: Animated.Value): number {
  * the full explanation (this is the same fix `PressableScale` applies).
  * Off-screen tabs parked at ±width keep a real, non-identity transform —
  * they were never the bug being fixed here.
+ *
+ * On web, this whole progress-driven slide is skipped outright (see the
+ * `Platform.OS === 'web'` branch below) — see that branch's own comment for
+ * why: this isn't a mid-flight timing race, it's `current.progress` never
+ * advancing off its starting value at all on that platform.
  */
 export function forDirectionalSlide(width: number, settled = false) {
   return ({ current }: { current: { progress: Animated.Value } }) => {
+    if (Platform.OS === 'web') {
+      // Live verification (real device/preview, not just this harness) ruled
+      // out the original "mid-flight" theory: an entering screen's
+      // `current.progress` was found frozen at exactly its pre-animation
+      // starting value (1, i.e. `translateX(width)`, fully off-screen) no
+      // matter how long the tab had been focused — including well past any
+      // conceivable settle delay. So `current.progress` never actually
+      // advances toward its target on web at all (React Navigation's
+      // bottom-tabs disables the native driver there — see the console
+      // warning — and something about the resulting JS-driven `Animated`
+      // update loop never ticks this value forward on this platform).
+      // Reading it — live, or rounded once "settled" as this file used to —
+      // can only ever reproduce whatever the stuck starting value happens to
+      // be; there is no correct moment to sample it. Skip the slide (and the
+      // whole live/settled split above) entirely on web instead: every
+      // scene renders with no transform at all, an instant cut between tabs.
+      // This is safe — React Navigation's BottomTabView already gives the
+      // focused screen `zIndex: 0` over every other screen's `zIndex: -1`
+      // and an opaque `sceneStyle` background, so the non-focused screens
+      // stay fully hidden behind it regardless of any transform.
+      return { sceneStyle: {} };
+    }
     if (settled) {
       // The tab layout flips `settled` off a FIXED timer (see
       // app/(tabs)/_layout.tsx / app/(buyer)/_layout.tsx), not a real
       // "animation finished" callback — React Navigation's bottom-tabs
-      // doesn't expose one to a plain sceneStyleInterpolator. On a heavier
-      // screen (verified live: the seller profile tab, with its video
-      // header/avatar/grid) or under CPU load, the JS-driven fallback
-      // animation (useNativeDriver isn't supported on web — see the
-      // console warning) can still be mid-flight when that timer fires.
-      // Reading `current.progress` at that moment and baking it into a
-      // permanent, non-animated transform froze the whole screen at
-      // whatever fractional position the interpolation had reached —
-      // visibly different (and non-deterministic) on every tab switch,
-      // and never self-corrected since this branch never re-runs on its
-      // own afterward. Rounding to the nearest rest position (-1, 0, or 1)
-      // before using it guarantees the frozen snapshot is always a valid
-      // end state — fully on-screen or fully off-screen — never a stuck
-      // sliver, regardless of how early the timer fired relative to the
-      // real animation.
+      // doesn't expose one to a plain sceneStyleInterpolator. Rounding to
+      // the nearest rest position (-1, 0, or 1) before using it guarantees
+      // the frozen snapshot is always a valid end state — fully on-screen or
+      // fully off-screen — never a stuck sliver, regardless of how early the
+      // timer fired relative to the real (native-driven, so genuinely
+      // running) animation on this platform.
       const restPosition = Math.round(currentValue(current.progress));
       const translateX = restPosition * width;
       const transform = isIdentityTransform([{ translateX }]) ? undefined : [{ translateX }];
