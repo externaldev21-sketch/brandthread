@@ -91,6 +91,8 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import { SHEET_EASING, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
 import { StudioCoverBackdrop, StudioCoverGrain } from '@/components/StudioCardCover';
+import { CachedImage } from '@/components/CachedImage';
+import { prefetchImage } from '@/lib/prefetch';
 
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
@@ -294,6 +296,10 @@ export default function SellerStudioRadialMenu({
   const [setupPercent, setSetupPercent] = useState(0);
   const [setupDone, setSetupDone] = useState(0);
   const [setupTotal, setSetupTotal] = useState(0);
+  // AI-generated cover photo per card (see api-server's src/lib/
+  // studioCoverArt.ts) — a card with no entry here falls back to the plain
+  // StudioCoverBackdrop + icon glyph, unchanged.
+  const [coverArt, setCoverArt] = useState<Record<string, { url: string; blurhash: string | null }>>({});
 
   // ── Store header data — refreshed each time the page opens ────────────────
 
@@ -317,6 +323,14 @@ export default function SellerStudioRadialMenu({
       setBrandName(profile?.brandName ?? null);
       setAccountName(profile?.displayName ?? profile?.username ?? null);
       setAvatarUrl(profile?.profileImageUrl ?? null);
+    }).catch(() => {});
+    api.config.studioCoverArt().then(({ covers }) => {
+      if (cancelled) return;
+      setCoverArt(covers);
+      // Prefetch every cover up front (not just the current card) so
+      // scrubbing through the whole carousel never shows a loading flash —
+      // per spec, "prefetch all when the Studio page opens".
+      Object.values(covers).forEach((cover) => prefetchImage(cover.url));
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [open, api, userId]);
@@ -740,6 +754,7 @@ export default function SellerStudioRadialMenu({
     const locked = isLocked(item);
     const microKind = MICRO_KIND[item.id] ?? 'pop-in';
     const isGoLive = item.id === 'go-live';
+    const cover = coverArt[item.id];
 
     const cardStyle = useAnimatedStyle(() => {
       const distance = itemIndex - cardIndex.value;
@@ -938,19 +953,31 @@ export default function SellerStudioRadialMenu({
         accessibilityLabel={item.label}
         testID={`seller-control-center-item-${item.id}`}
       >
-        <StudioCoverBackdrop />
+        {cover ? (
+          <CachedImage
+            source={{ uri: cover.url }}
+            placeholder={cover.blurhash ? { blurhash: cover.blurhash } : undefined}
+            style={StyleSheet.absoluteFill}
+            testID={`seller-studio-cover-art-${item.id}`}
+          />
+        ) : (
+          <StudioCoverBackdrop />
+        )}
         <Animated.View style={[styles.cardContent, contentStyle]}>
           <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
-            {/* Interim look until this card has real hero-art cover art
-                (see PR adding StudioCoverHeroArt's bitmap manifest): a
-                large, light-weight glyph sitting directly on the cover's own
-                lighting — never a ring around it. Dev, explicitly: "Never
-                the ring + box combo" (the old always-on medallion ring is
-                already gone; the interactive "landed" ring that used to
-                appear once a card locked is removed too, since the glyph
-                alone is what needs to read clean right now — landedPulse
-                still drives the card's own subtle scale-up on lock). */}
-            <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />
+            {/* Interim look until this card has real hero-art cover art (see
+                `cover` above — once a card has a real AI-generated photo,
+                the icon glyph disappears entirely rather than layering both,
+                same as it always has for the plain-backdrop fallback vs. a
+                real cover): a large, light-weight glyph sitting directly on
+                the cover's own lighting — never a ring around it. Dev,
+                explicitly: "Never the ring + box combo" (the old always-on
+                medallion ring is already gone; the interactive "landed" ring
+                that used to appear once a card locked is removed too, since
+                the glyph alone is what needs to read clean right now —
+                landedPulse still drives the card's own subtle scale-up on
+                lock). */}
+            {!cover && <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />}
             {locked && (
               <View style={styles.cardLock}>
                 <Feather name="lock" size={14} color={theme.text} />

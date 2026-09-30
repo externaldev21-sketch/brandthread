@@ -815,6 +815,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     config: {
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
+      /** Studio carousel cover art (see SellerStudioRadialMenu.tsx) — one
+       *  chosen AI-generated cover photo per card, keyed by card id. Public
+       *  (no auth required), same as featureFlags above. */
+      studioCoverArt: () =>
+        get<{ covers: Record<string, { url: string; blurhash: string | null }> }>('/api/config/studio-cover-art'),
     },
     auth: {
       /** Create the matching local user record after Clerk authentication.

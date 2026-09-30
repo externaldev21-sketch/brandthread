@@ -94,6 +94,7 @@ import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
+import studioCoverArtRouter from "./studio-cover-art";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
@@ -107,6 +108,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/config/studio-cover-art", studioCoverArtRouter);
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
