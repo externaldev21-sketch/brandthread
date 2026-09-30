@@ -13,7 +13,7 @@ const src = readFileSync(resolve(process.cwd(), 'app/seller-inbox.tsx'), 'utf8')
  */
 describe('seller-inbox.tsx: search', () => {
   it('has a search toggle in the header and an inline SearchBar', () => {
-    expect(src).toContain("import { PressableScale, SearchBar } from '@/components/BrandthreadUI';");
+    expect(src).toContain("import { PressableScale, SearchBar, useUndoToast } from '@/components/BrandthreadUI';");
     expect(src).toContain("icon: 'search',");
     expect(src).toContain('onPress: () => setSearchOpen((open) => !open),');
     expect(src).toContain('<SearchBar value={query} onChange={setQuery} placeholder="Search messages…" />');
@@ -23,8 +23,11 @@ describe('seller-inbox.tsx: search', () => {
     expect(src).toContain('const haystack = [other?.name, other?.handle, c.lastMessage, c.contextOrderNumber, c.contextProductName]');
   });
 
-  it('never filters out unread/read state — only archived rows and the search query', () => {
-    expect(src).toContain('if (c.isArchived) return false;');
+  it('never filters out unread/read state — only archived/request rows and the search query', () => {
+    // Message requests now get their own Requests tab (item 76 — every
+    // role pair can land a seller in Requests, not just buyer<->buyer), so
+    // the main Inbox list also excludes c.isRequest alongside c.isArchived.
+    expect(src).toContain('if (c.isArchived || c.isRequest || pendingDeleteIds.has(c.id)) return false;');
   });
 });
 

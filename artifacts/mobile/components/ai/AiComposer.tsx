@@ -1,7 +1,7 @@
 /**
  * AiComposer — the floating glass input pill for the Brandthread AI screen.
  *
- * A compact frosted input with a silver edge glow that intensifies on focus,
+ * A premium frosted pill with a silver edge glow that intensifies on focus,
  * and a send control that morphs into a stop square while the AI is
  * generating. Purely presentational — sending/stopping/text state all stay
  * owned by app/ai-brain.tsx; this component never talks to the AI backend.
@@ -127,32 +127,32 @@ export default function AiComposer({
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wrap: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
   pillShadowWrap: {
-    borderRadius: 23,
+    borderRadius: 26,
   },
   edgeGlow: {
     position: 'absolute',
-    top: -1,
-    left: -1,
-    right: -1,
-    bottom: -1,
-    borderRadius: 24,
-    borderWidth: 1,
+    top: -1.5,
+    left: -1.5,
+    right: -1.5,
+    bottom: -1.5,
+    borderRadius: 27.5,
+    borderWidth: 1.5,
   },
   pill: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 23,
+    alignItems: 'flex-end',
+    borderRadius: 26,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.14)',
-    paddingLeft: 14,
-    paddingRight: 3,
-    paddingVertical: 2,
-    minHeight: 44,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
+    minHeight: 52,
   },
   pillTint: {
     ...StyleSheet.absoluteFill,
@@ -160,20 +160,14 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   textInput: {
     flex: 1,
-    // Keep the composer one line tall at rest; longer text scrolls inside it.
-    // The frosted layers are absolutely positioned, so explicitly paint the
-    // text above them (otherwise typing works but the characters are hidden).
+    // The frosted layers are absolutely positioned; paint the text above them.
     zIndex: 1,
-    height: 36,
-    minHeight: 36,
     color: colors.text,
     fontSize: FS.base,
     fontFamily: FONT.regular,
-    lineHeight: 20,
-    paddingVertical: 7,
-    paddingRight: 4,
-    textAlignVertical: 'center',
-    includeFontPadding: false,
+    paddingVertical: 10,
+    paddingRight: 8,
+    maxHeight: 120,
   },
   // 44x44 minimum comfortable touch target (COMP.minTouchTarget); was 40x40.
   sendBtn: {
@@ -183,6 +177,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 2,
   },
   sendIconWrap: {
     alignItems: 'center',

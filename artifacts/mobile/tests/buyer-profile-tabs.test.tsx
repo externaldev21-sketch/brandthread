@@ -450,6 +450,20 @@ describe('buyer profile tabs', () => {
     }
   });
 
+  it('owner mode: adds Tagged next to the private tabs and offers View as visitor in the ... menu', async () => {
+    renderer = await renderScreen();
+    for (const tab of ['Posts', 'Tagged', 'Saved', 'Liked', 'Orders']) {
+      expect(renderer.root.findAll(
+        node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
+      ).length, tab).toBeGreaterThan(0);
+    }
+    const row = renderer.root.findAll(
+      node => node.props.testID === 'profile-menu-sheet-view-as-visitor' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { row.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-other-profile?userId=buyer-1&asVisitor=1');
+  });
+
   it('renders all four tabs, each selectable', async () => {
     renderer = await renderScreen();
 

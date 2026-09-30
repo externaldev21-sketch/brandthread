@@ -192,6 +192,11 @@ vi.mock('@/lib/theme', async (importOriginal) => {
 
 import SellerInboxScreen from '@/app/seller-inbox';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
+// Message requests (item 76) added a Requests tab that reuses the shared
+// "Delete" undo toast (lib/sellerRequestActions.ts's scheduleDelete…, via
+// useUndoToast()) — the real context provider, not a mock, matching how the
+// app actually wraps every screen at the root layout.
+import { UndoToastProvider } from '@/components/BrandthreadUI';
 
 type Conversation = {
   id: string;
@@ -248,7 +253,7 @@ function textContent(renderer: ReactTestRenderer): string {
 async function renderScreen(): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
   await act(async () => {
-    renderer = create(<SellerInboxScreen />);
+    renderer = create(<UndoToastProvider><SellerInboxScreen /></UndoToastProvider>);
     await flushPromises();
   });
   return renderer;

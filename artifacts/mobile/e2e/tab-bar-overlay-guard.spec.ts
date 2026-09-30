@@ -3,15 +3,20 @@ import { clerkStubScript } from './clerkStub';
 
 /**
  * Runtime guard for the "thin dark bar flashing over the tab bar" bug (see
- * this PR's description for the full investigation and root causes). Reuses
- * this file's sibling `tab-bar-glass-zone.spec.ts`'s launch/preview setup —
- * read that spec first for the intended design this guard must NOT flag:
- * the TabBarGlassZone strip is a real, always-mounted, full-strip frosted
- * treatment that sits behind the tab bar by design, not a flash.
+ * this PR's description for the full investigation and root causes).
  *
- * How this was actually run (same sandbox notes as tab-bar-glass-zone.spec.ts):
- *   1. Local Postgres 16 + api-server + `expo start --web` exactly as that
- *      spec's header documents.
+ * `TabBarGlassZone` — a full-width frosted strip that used to sit behind the
+ * floating tab bar on every buyer/seller screen — was deleted outright per
+ * Dev's own live measurement of the exact bug this guard exists to catch
+ * (a translucent `backdrop-filter` + `rgba(10,10,11,0.22)` band that
+ * flickered as the bar animated). The only surfaces now allowed behind the
+ * tab bar are the pill-shaped bar segments themselves and the separate round
+ * buttons — no full-width backdrop, blur strip, tint, or scrim of any kind.
+ * This guard has no built-in exemption for such a strip; if one reappears,
+ * it should fail here.
+ *
+ * How this was actually run:
+ *   1. Local Postgres 16 + api-server + `expo start --web`.
  *   2. From artifacts/mobile:
  *      BASE_URL=http://127.0.0.1:8081 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
  *      pnpm exec playwright test -c e2e/playwright.config.ts e2e/tab-bar-overlay-guard.spec.ts
@@ -73,8 +78,7 @@ async function sampleFrame(page: Page, tabBarTestId: string): Promise<string[]> 
       // Only `position: fixed`/`absolute` elements are candidates for "an
       // extra overlay painting over the tab bar" — ordinary in-flow scroll
       // content naturally passes UNDER the floating tab bar's own bounding
-      // box as the list scrolls (the tab bar's own glass sits on top of
-      // it, by design — see TabBarGlassZone); that's not this bug.
+      // box as the list scrolls; that's not this bug.
       const positionedEl = style.position === 'absolute' || style.position === 'fixed';
 
       // (a) painting over the tab bar's own region at nonzero, non-fully-

@@ -373,8 +373,8 @@ function AccountScopeSheet({
             <View style={{ gap: 10 }}>
               <View style={{ gap: 10 }} accessibilityRole="radiogroup">
                 {([
-                  { value: 'global' as const, label: 'Worldwide', description: 'Make your account available worldwide.', icon: 'globe' as const },
-                  { value: 'us' as const, label: 'United States', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
+                  { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
+                  { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
                 ]).map((option) => {
                   const selected = value === option.value;
                   const isSaving = saving === option.value;

@@ -34,7 +34,7 @@ import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
@@ -51,6 +51,10 @@ import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
+import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
+import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -93,16 +97,13 @@ const CONTENT_TAB_ITEMS: ProfileTab[] = [
   { key: 'Tagged', label: 'Tagged', icon: 'tag' },
 ];
 
-function shopTile(product: ShopProduct): ProfileGridItem {
-  return { id: product.id, kind: 'photo', posterUri: product.imageUri, caption: product.name, productCount: 0 };
-}
-
 // Grid cell union — an Instagram-style folder tile (first cell, only when
 // there's at least one draft/scheduled post) alongside the normal post/
 // product tiles, so the Posts grid can show it without a second filter row.
 type GridRow =
   | { kind: 'draftsTile'; count: number }
-  | { kind: 'item'; item: ProfileGridItem };
+  | { kind: 'item'; item: ProfileGridItem }
+  | { kind: 'product'; product: ShopProduct };
 
 function DraftsFolderTile({
   count, width, height, onPress,
@@ -151,12 +152,15 @@ export default function ProfileScreen() {
     cover: { videoUrl: profile?.coverVideoUrl ?? null, posterUrl: profile?.coverPosterUrl ?? null },
     userId,
   });
+  const tagged = useTaggedPosts(userId, activeTab === 'Tagged' && !!userId && !isSellerDevPreview());
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const caps = profileCapabilities('seller', 'owner');
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -495,6 +499,12 @@ export default function ProfileScreen() {
     router.push('/content?tab=draft' as never);
   }, [router]);
 
+  const handleTaggedPress = useCallback((item: ProfileGridItem) => {
+    const entry = tagged.items.find((candidate) => candidate.id === item.id);
+    if (!entry) return;
+    router.push(taggedItemHref(entry) as never);
+  }, [router, tagged.items]);
+
   const showingProductsGrid = activeTab === 'Shop';
   const renderTile = useCallback(({ item, index }: { item: GridRow; index: number }) => {
     if (item.kind === 'draftsTile') {
@@ -507,16 +517,28 @@ export default function ProfileScreen() {
         />
       );
     }
+    if (item.kind === 'product') {
+      // Owner mode: an edit affordance instead of Buy; tap opens the seller's own product screen.
+      return (
+        <ProfileProductTile
+          product={item.product}
+          width={layout.tileWidth}
+          height={layout.tileHeight}
+          owner={caps.canEditProducts}
+          onPress={(product) => handleShopTilePress({ id: product.id } as ProfileGridItem)}
+        />
+      );
+    }
     return (
       <ProfileVideoTile
         item={item.item}
         index={index}
         width={layout.tileWidth}
         height={layout.tileHeight}
-        onPress={showingProductsGrid ? handleShopTilePress : handleTilePress}
+        onPress={activeTab === 'Tagged' ? handleTaggedPress : handleTilePress}
       />
     );
-  }, [showingProductsGrid, handleShopTilePress, handleTilePress, handleDraftsTilePress, layout.tileHeight, layout.tileWidth]);
+  }, [activeTab, caps.canEditProducts, handleShopTilePress, handleTaggedPress, handleTilePress, handleDraftsTilePress, layout.tileHeight, layout.tileWidth]);
 
   // Followers · Following · Likes — Posts was dropped (dev: a seller with a
   // high count of any of these was getting cut off; three columns instead of
@@ -555,12 +577,21 @@ export default function ProfileScreen() {
   const empty = profileEmptyState(emptyKey, true);
   const postsGridData: GridRow[] = postsLoading ? [] : publishedPosts.map(p => ({ kind: 'item' as const, item: gridItemFromThreadPost(p) }));
   const gridData: GridRow[] = showingProductsGrid
-    ? (shopLoading ? [] : shopProducts.map(p => ({ kind: 'item' as const, item: shopTile(p) })))
+    ? (shopLoading ? [] : shopProducts.map(p => ({ kind: 'product' as const, product: p })))
     : activeTab === 'Posts'
       ? (draftPosts.length > 0 ? [{ kind: 'draftsTile' as const, count: draftPosts.length }, ...postsGridData] : postsGridData)
-      : [];
-  const gridLoading = showingProductsGrid ? shopLoading && shopProducts.length === 0 : activeTab === 'Posts' ? postsLoading : false;
-  const gridError = showingProductsGrid ? shopError : activeTab === 'Posts' ? postsError : false;
+      : tagged.items.map(entry => ({
+          kind: 'item' as const,
+          item: {
+            id: entry.id,
+            kind: entry.mediaType === 'video' ? 'video' as const : entry.mediaType === 'slideshow' ? 'slideshow' as const : 'photo' as const,
+            posterUri: entry.posterUri,
+            caption: entry.caption ?? '',
+            productCount: 0,
+          },
+        }));
+  const gridLoading = showingProductsGrid ? shopLoading && shopProducts.length === 0 : activeTab === 'Posts' ? postsLoading : tagged.loading;
+  const gridError = showingProductsGrid ? shopError : activeTab === 'Posts' ? postsError : tagged.error;
   const shopLabel = productsCount && productsCount > 0
     ? `Shop ${productsCount} product${productsCount === 1 ? '' : 's'}`
     : 'Set up your shop';
@@ -615,6 +646,12 @@ export default function ProfileScreen() {
               accessibilityLabel="Share profile"
               accessibilityHint="Opens a shareable profile card, QR code, and link"
               testID="seller-share-profile-btn"
+            />
+            <ProfileTopBarIcon
+              name="more-horizontal"
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMenuOpen(true); }}
+              accessibilityLabel="More options"
+              testID="seller-profile-more"
             />
             <ProfileTopBarIcon name="settings" onPress={() => nav('/settings')} accessibilityLabel="Seller settings" />
           </ProfileTopBarIconRow>
@@ -680,7 +717,7 @@ export default function ProfileScreen() {
         ) : null}
         data={gridData}
         renderItem={renderTile}
-        keyExtractor={(row) => row.kind === 'draftsTile' ? 'drafts-tile' : row.item.id}
+        keyExtractor={(row) => row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'product' ? `p-${row.product.id}` : row.item.id}
         numColumns={layout.gridColumns}
         listKey={`seller-own-${layout.gridColumns}`}
         ListEmptyComponent={(
@@ -689,6 +726,7 @@ export default function ProfileScreen() {
             error={gridError}
             onRetry={() => {
               if (showingProductsGrid) { void loadShopProducts(); return; }
+              if (activeTab === 'Tagged') { void tagged.reload(); return; }
               setPostsLoading(true); void loadPosts();
             }}
             layout={layout}
@@ -704,6 +742,19 @@ export default function ProfileScreen() {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         bottomInset={sellerBarInset}
+      />
+
+      <ProfileMenuSheet
+        visible={menuOpen}
+        title={brandTitle}
+        onClose={() => setMenuOpen(false)}
+        items={[
+          caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: () => setShareSheetVisible(true) },
+          caps.showViewAsVisitor && userId && {
+            key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
+            onPress: () => nav(viewAsVisitorHref('seller', userId)),
+          },
+        ].filter(Boolean) as ProfileMenuItem[]}
       />
 
       {/* ── Profile Editor Modal ── */}

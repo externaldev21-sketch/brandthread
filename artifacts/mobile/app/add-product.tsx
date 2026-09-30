@@ -571,6 +571,7 @@ export default function AddProductScreen() {
   }
 
   // ── Publish ──
+  // Alert.alert is a no-op on web, so surface the failure inline everywhere.
   function showPublishError(title: string, message: string) {
     setPublishError(`${title}: ${message}`);
     if (Platform.OS !== 'web') Alert.alert(title, message);

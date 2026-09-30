@@ -143,7 +143,15 @@ describe("Two real accounts, real backend: full conversation lifecycle", () => {
     const sellerConvAfterSend = await asSeller(`/api/conversations/${conv.id}`).then((r) => r.json()) as { otherTyping?: boolean };
     expect(sellerConvAfterSend.otherTyping).toBe(false);
 
-    // Seller replies.
+    // This buyer has no real order with this seller and the seller doesn't
+    // follow the buyer, so the conversation landed in the seller's Requests
+    // (lib/conversationRouting.ts) — the seller can't reply until accepting.
+    const replyBeforeAccept = await asSeller(`/api/conversations/${conv.id}/messages`, { method: "POST", body: JSON.stringify({ text: "Too soon" }) });
+    expect(replyBeforeAccept.status).toBe(403);
+    const acceptRes = await asSeller(`/api/conversations/${conv.id}/accept`, { method: "PATCH" });
+    expect(acceptRes.status).toBe(200);
+
+    // Seller replies — now allowed, post-acceptance.
     const sellerReply = await asSeller(`/api/conversations/${conv.id}/messages`, { method: "POST", body: JSON.stringify({ text: "Yep, still have it — and yes, we do!" }) });
     expect(sellerReply.status).toBe(201);
 

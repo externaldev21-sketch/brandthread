@@ -265,8 +265,10 @@ router.get("/users/:userId/videos", async (req, res) => {
     if (!owner || owner.suspendedAt) return res.status(404).json({ error: "Profile not found" });
 
     const viewerId = viewerFrom(req);
-    const isSelf = viewerId === clerkId;
-    if (viewerId && !isSelf && await isBlockedEitherWay(viewerId, clerkId)) {
+    // `?as=visitor` lets an owner preview their profile exactly as a stranger
+    // sees it — it can only ever REMOVE owner access, never grant it.
+    const isSelf = viewerId === clerkId && req.query.as !== "visitor";
+    if (viewerId && viewerId !== clerkId && await isBlockedEitherWay(viewerId, clerkId)) {
       return res.status(404).json({ error: "Profile not found" });
     }
 

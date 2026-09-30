@@ -10,16 +10,17 @@
  *   either direction) is dropped silently — the sticker disappears from the
  *   published story and the tagger is never told why.
  * - `routeStoryReply` decides whether a reply to a mention story lands in the
- *   recipient's main inbox or in Requests (Dev's rule: the recipient follows the
- *   sender, OR the recipient is a seller and the sender has a paid order with
- *   them). Kept in its own function so the shared DM-routing implementation can
- *   replace it in one place.
+ *   recipient's main inbox or in Requests — delegates to the single shared
+ *   DM-routing rule in `conversationRouting.ts` (same rule POST
+ *   /api/conversations uses), so this is never a second implementation to
+ *   keep in sync.
  */
 import {
-  db, users, follows, blocks, orders, stories, storyMentions, conversations, conversationParticipants,
+  db, users, blocks, stories, storyMentions, conversations, conversationParticipants,
 } from "@workspace/db";
-import { and, eq, gt, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { extractMentions } from "./activityEvents";
+import { shouldRouteToRequests } from "./conversationRouting";
 
 /** Instagram allows up to 10 mentions on a story. */
 export const MAX_STORY_MENTIONS = 10;
@@ -161,37 +162,18 @@ export async function sanitizeStoryMentions(
 export type ReplyRoute = "inbox" | "requests";
 
 /**
- * Where a reply from `senderId` to `recipientId` lands. Main inbox when the
- * recipient follows the sender, or when the recipient is a seller and the
- * sender has a paid order with them on that account; Requests otherwise.
+ * Where a reply from `senderId` to `recipientId` lands — the exact same
+ * rule every other DM/conversation-creation path uses (see
+ * conversationRouting.ts's shouldRouteToRequests for the rule itself).
  */
 export async function routeStoryReply(senderId: string, recipientId: string): Promise<ReplyRoute> {
-  const [follow] = await db
-    .select({ followerId: follows.followerId })
-    .from(follows)
-    .where(and(eq(follows.followerId, recipientId), eq(follows.followingId, senderId)))
-    .limit(1);
-  if (follow) return "inbox";
-
   const [recipient] = await db
     .select({ accountType: users.accountType })
     .from(users)
     .where(eq(users.clerkId, recipientId))
     .limit(1);
-  if (recipient?.accountType === "seller") {
-    const [paid] = await db
-      .select({ id: orders.id })
-      .from(orders)
-      .where(and(
-        eq(orders.ownerId, recipientId),
-        eq(orders.buyerId, senderId),
-        isNotNull(orders.paidAt),
-        ne(orders.status, "cancelled"),
-      ))
-      .limit(1);
-    if (paid) return "inbox";
-  }
-  return "requests";
+  const isRequest = await shouldRouteToRequests(recipientId, senderId, recipient?.accountType);
+  return isRequest ? "requests" : "inbox";
 }
 
 /**

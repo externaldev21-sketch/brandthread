@@ -1220,6 +1220,19 @@ export const postTaggedProducts = pgTable('post_tagged_products', {
   productIdx: index('ptp_product_id_idx').on(table.productId),
 }));
 
+// ─── People tags ("Tagged" tab) ───────────────────────────────────────────────
+// A post author tagging another account. The tagged account's profile "Tagged"
+// tab lists these posts. `source_type` leaves room for story tags.
+export const postUserTags = pgTable('post_user_tags', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+  taggedUserId: text('tagged_user_id').notNull(), // Clerk user ID of the tagged account
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
+  uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
+}));
+
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
 
 export const stories = pgTable('stories', {

@@ -5,7 +5,7 @@
 import { LogBox } from 'react-native';
 import { initMonitoring } from '@/lib/monitoring';
 import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
-import { injectWebFocusOutlineStyles, injectWebScrollbarHideStyles, injectWebTextRenderingStyles } from '@/lib/webTextRendering';
+import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollbarHideStyles, injectWebTextRenderingStyles } from '@/lib/webTextRendering';
 
 // React's own dev-only console.error warnings (e.g. "Encountered two
 // children with the same key") are logged at the *error* level, so React
@@ -24,3 +24,4 @@ startBackgroundUpdateChecks();
 injectWebTextRenderingStyles();
 injectWebFocusOutlineStyles();
 injectWebScrollbarHideStyles();
+injectWebRootClipStyles();

@@ -126,6 +126,11 @@ function toConversation(seed: PreviewConversationSeed): Conversation {
     isFriendshipActive: true,
     isArchived: false,
     isRequest: seed.isRequest,
+    // 'me' (MY_USER_ID) when the viewer started it, the seeded participant's
+    // real id when they did — same convention lastMessageSenderId above
+    // already uses. undefined for a non-request seed, matching the real
+    // API's contract (requestedBy only set while isRequest is true).
+    requestedBy: seed.requestedBy === 'me' ? 'me' : seed.requestedBy === 'them' ? seed.participantUserId : undefined,
     contextOrderNumber: seed.contextOrderNumber,
     contextProductName: seed.contextProductName,
     updatedAt: new Date(ts).toISOString(),
@@ -489,19 +494,48 @@ function toSellerConversation(seed: PreviewConversationSeed): Conversation {
     isFriendshipActive: true,
     isArchived: false,
     isRequest: seed.isRequest,
+    // Same 'me'/real-participant-id convention as toConversation() above —
+    // 'me' means THIS seller started the request (e.g. messaged a buyer with
+    // no follow-back/paid order first, per the new every-role-pair routing
+    // rule), the buyer's real id means they did.
+    requestedBy: seed.requestedBy === 'me' ? 'me' : seed.requestedBy === 'them' ? seed.participantUserId : undefined,
     contextOrderNumber: seed.contextOrderNumber,
     contextProductName: seed.contextProductName,
     updatedAt: new Date(ts).toISOString(),
   };
 }
 
+// Mutable, session-lifetime cache — same trick as `cachedConversations`
+// above (accept/delete have nothing real to persist to, but the mutation
+// needs to be visible to every screen reading these getters for the rest of
+// the session, e.g. seller-inbox.tsx's Requests tab immediately reflecting a
+// request accepted/deleted from app/seller-conversation.tsx).
+let cachedSellerConversations: Conversation[] | null = null;
+
 export function getSellerPreviewConversations(): Conversation[] {
-  return SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation);
+  if (!cachedSellerConversations) cachedSellerConversations = SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation);
+  return cachedSellerConversations;
 }
 
 export function getSellerPreviewConversation(id: string): Conversation | null {
-  const seed = sellerSeedById(id);
-  return seed ? toSellerConversation(seed) : null;
+  return getSellerPreviewConversations().find(c => c.id === id) ?? null;
+}
+
+/** Accepts a seeded SELLER-side message request in place — the seller-side
+ *  mirror of acceptPreviewConversationRequest() above. See that function's
+ *  doc comment; same mechanics, separate cache. */
+export function acceptSellerPreviewConversationRequest(id: string): Conversation | null {
+  const list = getSellerPreviewConversations();
+  if (!list.some(c => c.id === id)) return null;
+  cachedSellerConversations = acceptConversationInList(list, id);
+  return cachedSellerConversations[0];
+}
+
+/** Permanently removes a seeded SELLER-side conversation from the cache —
+ *  the seller-side mirror of deletePreviewConversationRequest() above, used
+ *  for both "Delete" and "Block" on a seeded seller-side request. */
+export function deleteSellerPreviewConversationRequest(id: string): void {
+  cachedSellerConversations = removeConversationFromList(getSellerPreviewConversations(), id);
 }
 
 export function getSellerPreviewMessages(conversationId: string): Message[] {

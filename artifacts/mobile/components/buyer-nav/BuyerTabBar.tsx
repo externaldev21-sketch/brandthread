@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSegments, type Tabs } from 'expo-router';
 import Animated, {
   Easing,
-  interpolate,
   useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
@@ -20,7 +19,6 @@ import {
 } from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
-import { TabBarGlassZone } from './TabBarGlassZone';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 
@@ -129,7 +127,6 @@ export function BuyerTabBar({
   const compactMetrics = useBuyerTabBarMetrics(1, 'compact');
   const { theme } = useAppTheme();
   const activityUnread = useActivityUnreadCount();
-  const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
 
   const activeRoute = state.routes[state.index]?.name ?? 'index';
@@ -166,39 +163,14 @@ export function BuyerTabBar({
   // waiting for React to commit the real navigation state and competing with
   // that mount for the JS thread.
   const progress = useSharedValue(isCompact ? 1 : 0);
-  const modeTarget = useSharedValue(isCompact ? 1 : 0);
   useAnimatedReaction(
-    () => activeIndex >= 0 && indicatorTarget.value === 0,
-    (nowCompact) => {
-      const target = nowCompact ? 1 : 0;
-      if (modeTarget.value === target) return;
-      modeTarget.value = target;
-      progress.set(reducedMotion ? target : withTiming(target, BAR_MODE_TIMING));
+    () => indicatorTarget.value === 0,
+    (nowCompact, wasCompact) => {
+      if (nowCompact === wasCompact) return;
+      progress.set(reducedMotion ? (nowCompact ? 1 : 0) : withTiming(nowCompact ? 1 : 0, BAR_MODE_TIMING));
     },
-    [activeIndex, reducedMotion],
+    [reducedMotion],
   );
-
-  // A Profile press hides the pill without changing its tab index. Reconcile
-  // against the committed route as well, so Profile always gets the regular
-  // size and returning to Home restores compact even if the pill target stayed
-  // at zero. A press-in that already chose the right size isn't restarted.
-  React.useEffect(() => {
-    const target = isCompact ? 1 : 0;
-    if (modeTarget.get() === target) return;
-    modeTarget.set(target);
-    progress.set(reducedMotion ? target : withTiming(target, BAR_MODE_TIMING));
-  }, [isCompact, reducedMotion, modeTarget, progress]);
-
-  // Clip a stable glass surface to the animated bar height on the UI thread.
-  // With the incoming transform-based capsule resize, its top stays centered
-  // inside the regular-height row: only HALF the height delta moves its top.
-  // Match that actual visible top rather than the compact layout height.
-  const glassClipStyle = useAnimatedStyle(() => ({
-    height: interpolate(progress.value, [0, 1], [
-      regularMetrics.barTopInset,
-      regularMetrics.barTopInset - (regularMetrics.capsuleHeight - compactMetrics.capsuleHeight) / 2,
-    ]),
-  }));
 
   // Capsule/circle scale factors, in "regular -> compact" ratio form so the
   // capsule and circle can each be rendered at a FIXED (regular) layout size
@@ -338,20 +310,6 @@ export function BuyerTabBar({
         slideStyle,
       ]}
     >
-      {/* Clip a fixed-size glass surface from its bottom; its feather remains
-          at the animated top edge as the capsule scales on the UI thread. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.glassClip, { bottom: -metrics.bottomOffset }, glassClipStyle]}
-      >
-        <TabBarGlassZone
-          height={regularMetrics.barTopInset}
-          width={width}
-          tint="dark"
-          style={{ top: 0, bottom: undefined }}
-        />
-      </Animated.View>
-
       {/* ── Capsule ─────────────────────────────────────────────────────── */}
       {/* Fixed at its regular layout size always — `capsuleAnimatedStyle`
           resizes it purely via `transform: scale`, so this box (and the
@@ -456,12 +414,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  glassClip: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    overflow: 'hidden',
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,

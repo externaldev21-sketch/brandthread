@@ -123,6 +123,7 @@ export function ShareProfileSheet({
     if (!authLoaded) return;
     setError(false);
     setLoading(true);
+    // Signed-out previews must never call the protected profile API.
     if (!isSignedIn) {
       setIdentity(null);
       setLoading(false);
@@ -316,10 +317,7 @@ export function ShareProfileSheet({
             ) : !isSignedIn ? (
               <View style={[styles.card, styles.stateCard]}>
                 <Feather name="link-2" size={28} color="#0A0A0B" />
-                <Text style={styles.stateText}>Share your real profile</Text>
-                <Text style={styles.stateDetail}>
-                  This design preview has no public profile link. Sign in to share your profile anywhere.
-                </Text>
+                <Text style={styles.stateText}>Sign in to share your profile</Text>
               </View>
             ) : error ? (
               <View style={[styles.card, styles.stateCard]}>

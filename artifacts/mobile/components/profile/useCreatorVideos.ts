@@ -19,7 +19,7 @@ export interface CreatorVideosState {
  * (stays in the loading state — never an error, never a spinner forever:
  * callers resolve the id or show their own error state).
  */
-export function useCreatorVideos(userId: string | null | undefined, opts: { fresh?: boolean } = {}): CreatorVideosState {
+export function useCreatorVideos(userId: string | null | undefined, opts: { fresh?: boolean; asVisitor?: boolean } = {}): CreatorVideosState {
   const [posts, setPosts] = useState<SellerThreadPost[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -31,13 +31,14 @@ export function useCreatorVideos(userId: string | null | undefined, opts: { fres
   const generationRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const fresh = !!opts.fresh;
+  const asVisitor = !!opts.asVisitor;
 
   const reload = useCallback(async (reloadOpts: { fresh?: boolean } = {}) => {
     if (!userId) return;
     const generation = ++generationRef.current;
     setError(false);
     try {
-      const page = await getCreatorVideosPage(userId, 0, undefined, { fresh: fresh || reloadOpts.fresh });
+      const page = await getCreatorVideosPage(userId, 0, undefined, { fresh: fresh || reloadOpts.fresh, asVisitor });
       if (generation !== generationRef.current) return;
       setPosts(page.posts);
       setTotal(page.total);
@@ -50,7 +51,7 @@ export function useCreatorVideos(userId: string | null | undefined, opts: { fres
     } finally {
       if (generation === generationRef.current) setLoading(false);
     }
-  }, [userId, fresh]);
+  }, [userId, fresh, asVisitor]);
 
   useEffect(() => {
     setPosts([]);
@@ -67,7 +68,7 @@ export function useCreatorVideos(userId: string | null | undefined, opts: { fres
     loadingMoreRef.current = true;
     setLoadingMore(true);
     const generation = generationRef.current;
-    getCreatorVideosPage(userId, offsetRef.current, undefined, { fresh })
+    getCreatorVideosPage(userId, offsetRef.current, undefined, { fresh, asVisitor })
       .then((page) => {
         if (generation !== generationRef.current) return;
         setPosts((prev) => {
@@ -82,7 +83,7 @@ export function useCreatorVideos(userId: string | null | undefined, opts: { fres
         loadingMoreRef.current = false;
         setLoadingMore(false);
       });
-  }, [userId, hasMore, fresh]);
+  }, [userId, hasMore, fresh, asVisitor]);
 
   return { posts, total, loading, loadingMore, error, hasMore, restricted, reload, loadMore };
 }

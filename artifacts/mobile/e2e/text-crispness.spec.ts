@@ -341,8 +341,7 @@ for (const screen of SCREENS) {
 
         // ── 3. No text node has a `filter`/`backdrop-filter` ANCESTOR. ────
         // A `filter`/`backdrop-filter` on a node the text sits *behind* (a
-        // sibling background layer, e.g. Glass's own backdrop div, or
-        // whatever content a frosted strip like TabBarGlassZone floats over)
+        // sibling background layer, e.g. Glass's own backdrop div)
         // is fine and intentional — that's the whole point of a frosted
         // surface. What's never fine is a `filter`/`backdrop-filter` on an
         // element that the text node is INSIDE (an ancestor in the DOM
