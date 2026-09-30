@@ -116,9 +116,6 @@ export default function AppLockSettingsScreen() {
                   value={settings.enabled}
                   onValueChange={toggle}
                   disabled={!available}
-                  trackColor={{ false: theme.border, true: theme.accent }}
-                  thumbColor={settings.enabled ? theme.onAccent : theme.text}
-                  {...({ activeThumbColor: theme.onAccent } as object)}
                   accessibilityLabel={`Require ${label}`}
                 />
               )}

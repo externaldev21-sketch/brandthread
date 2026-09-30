@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 export interface RepostFriend {
   userId: string;
@@ -78,6 +79,16 @@ export function CaptionBlock({
   const handleLayout = onHeightChange
     ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
     : undefined;
+  // Pads each control's real tap area up to 44x44 without changing its
+  // visual footprint — see useHitAreaBoost's doc comment. `soundHit` and
+  // `repostHit` apply to controls with a painted pill background, so their
+  // boost lands on an outer, unstyled wrapper around the unchanged visual
+  // pill rather than on the pill itself (growing padding on the pill's own
+  // style would visibly enlarge the pill).
+  const repostHit = useHitAreaBoost();
+  const creatorHit = useHitAreaBoost();
+  const captionHit = useHitAreaBoost();
+  const soundHit = useHitAreaBoost();
   return (
     <Animated.View
       style={[styles.root, hasRepostIdentity && styles.rootWithRepost, style]}
@@ -87,41 +98,46 @@ export function CaptionBlock({
       {!!topSlot && <View style={styles.topSlotWrap}>{topSlot}</View>}
       {hasRepostIdentity && (
         <TouchableOpacity
-          style={styles.repostIdentity}
+          style={repostHit.boostStyle}
+          onLayout={repostHit.onLayout}
           activeOpacity={friendReposts.length > 0 ? 0.8 : 1}
           disabled={friendReposts.length === 0}
           onPress={onOpenRepostIdentity}
           accessibilityRole={friendReposts.length > 0 ? 'button' : 'text'}
           accessibilityLabel={repostLabel}
         >
-          <View style={styles.repostAvatarStack}>
-            {friendReposts.slice(0, 3).map((friend, index) => (
-              <View
-                key={friend.userId}
-                style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
-              >
-                {friend.avatarUrl ? (
-                  <CachedImage source={{ uri: friend.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, styles.repostAvatarFallback]}>
-                    <Text style={styles.repostAvatarInitials}>
-                      {friend.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ))}
-            {friendReposts.length === 0 && (
-              <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                <Feather name="user" size={13} color={ON_DARK} />
-              </View>
-            )}
+          <View style={styles.repostIdentity}>
+            <View style={styles.repostAvatarStack}>
+              {friendReposts.slice(0, 3).map((friend, index) => (
+                <View
+                  key={friend.userId}
+                  style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
+                >
+                  {friend.avatarUrl ? (
+                    <CachedImage source={{ uri: friend.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, styles.repostAvatarFallback]}>
+                      <Text style={styles.repostAvatarInitials}>
+                        {friend.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+              {friendReposts.length === 0 && (
+                <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
+                  <Feather name="user" size={13} color={ON_DARK} />
+                </View>
+              )}
+            </View>
+            <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
           </View>
-          <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
         </TouchableOpacity>
       )}
 
       <TouchableOpacity
+        style={creatorHit.boostStyle}
+        onLayout={creatorHit.onLayout}
         activeOpacity={0.8}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenCreator(); }}
         accessibilityRole="button"
@@ -138,6 +154,8 @@ export function CaptionBlock({
       </TouchableOpacity>
 
       <TouchableOpacity
+        style={captionHit.boostStyle}
+        onLayout={captionHit.onLayout}
         onPress={() => caption.length > 86 && onToggleCaptionExpanded()}
         activeOpacity={caption.length > 86 ? 0.7 : 1}
         accessibilityRole={caption.length > 86 ? 'button' : 'text'}
@@ -153,7 +171,8 @@ export function CaptionBlock({
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.soundRow}
+        style={soundHit.boostStyle}
+        onLayout={soundHit.onLayout}
         onPress={onToggleSound}
         activeOpacity={0.75}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -161,8 +180,10 @@ export function CaptionBlock({
         accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
         accessibilityState={{ checked: soundOn }}
       >
-        <Feather name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
-        <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
+        <View style={styles.soundRow}>
+          <Feather name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
+          <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );

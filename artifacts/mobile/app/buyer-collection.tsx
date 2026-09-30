@@ -206,8 +206,6 @@ export default function BuyerCollection() {
           <HapticSwitch
             value={collection.isPublic}
             onValueChange={togglePublic}
-            trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor={theme.onAccent}
           />
         </View>
       )}

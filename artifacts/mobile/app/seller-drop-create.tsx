@@ -523,7 +523,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>SET AN END TIME</Text>
-              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} trackColor={{ true: theme.accent }} />
+              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} />
             </View>
             {hasEndDate && (
               <View style={{ marginTop: 8 }}>
@@ -541,7 +541,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>EARLY ACCESS FOR FOLLOWERS</Text>
-              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} trackColor={{ true: theme.accent }} />
+              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} />
             </View>
             {earlyAccessEnabled && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>

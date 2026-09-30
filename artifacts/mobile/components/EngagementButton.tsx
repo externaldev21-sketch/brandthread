@@ -32,6 +32,7 @@ import Reanimated, {
 import type { FeatherNames } from '@/lib/featherNames';
 import { TickingCount } from '@/components/ui/TickingCount';
 import { IconFillTransition } from '@/components/ui/IconFillTransition';
+import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 import { useColors } from '@/hooks/useColors';
 import {
   FONT,
@@ -269,6 +270,10 @@ export function EngagementButton({
 }: EngagementButtonProps) {
   const inflight = useRef(false);
   const [pending, setPending] = useState(false);
+  // Pads the real tap area up to 44x44 without changing the rail's tight,
+  // icon-plus-count visual footprint — see useHitAreaBoost's doc comment for
+  // why this (not `hitSlop` alone) is needed on web.
+  const { boostStyle, onLayout: onHitAreaLayout } = useHitAreaBoost();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef<Animated.CompositeAnimation | null>(null);
   // Like-icon-only spring (see `tapSpring` doc above). Reanimated shared
@@ -417,7 +422,8 @@ export function EngagementButton({
 
   return (
     <TouchableOpacity
-      style={ebStyles.btn}
+      style={[ebStyles.btn, boostStyle]}
+      onLayout={onHitAreaLayout}
       activeOpacity={0.7}
       hitSlop={hitSlop}
       onPress={handlePress}

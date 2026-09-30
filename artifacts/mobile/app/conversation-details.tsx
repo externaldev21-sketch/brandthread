@@ -324,8 +324,6 @@ export default function ConversationDetailsScreen() {
               <HapticSwitch
                 value={disappearing}
                 onValueChange={toggleDisappearing}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={theme.onAccent}
                 testID="chat-details-disappearing-switch"
               />
             )}

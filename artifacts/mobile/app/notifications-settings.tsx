@@ -1,23 +1,23 @@
 /**
  * Notification Settings — seller push notification preferences.
- * Includes digest mode toggle (real-time vs daily summary) backed by real API.
+ * Every account gets real-time pushes; there's no frequency control in the
+ * UI (the stored/API `digest` value still defaults to 'realtime' server-side
+ * so nothing else that reads it breaks).
  */
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticToggle } from '@/lib/haptics';
-import { ListRow, SegmentedControl, ChipGroup } from '@/components/ui';
+import { ListRow, ChipGroup } from '@/components/ui';
 import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 
-type DigestMode = 'realtime' | 'daily';
 type Role = 'buyer' | 'seller';
 
 interface NotifRow {
@@ -54,23 +54,14 @@ const QUIET_HOURS_PRESETS: { id: string; start: string; end: string; label: stri
 
 const QUIET_HOURS_OPTIONS = [{ id: 'off', label: 'Off' }, ...QUIET_HOURS_PRESETS.map(p => ({ id: p.id, label: p.label }))];
 
-const DIGEST_OPTIONS = [
-  { id: 'realtime', label: 'Real-time' },
-  { id: 'daily', label: 'Daily digest' },
-];
-
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
   const api    = useApi();
   const colors = useColors();
-  const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(), []);
   const [role, setRole] = useState<Role>('seller');
-  const [digest, setDigest] = useState<DigestMode>('realtime');
   const [pushEnabled, setPushEnabled] = useState(true);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
   const [categories, setCategories] = useState<Record<string, boolean>>({});
 
   const rows = role === 'buyer' ? BUYER_ROWS : SELLER_ROWS;
@@ -78,33 +69,18 @@ export default function NotificationsSettingsScreen() {
   // Load current preference from API. This screen adapts to whichever role
   // the signed-in account has — the server resolves that from the auth
   // token, so the same endpoint serves both buyer and seller accounts.
+  // `digest` isn't read here: every account gets real-time pushes and
+  // there's no UI to change it, so there's nothing to hydrate into state.
   useEffect(() => {
     api.notificationPrefs.get()
       .then(data => {
-        setDigest(data.digest);
         setCategories(data.categories);
         setRole(data.role);
         setPushEnabled(data.pushEnabled ?? true);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
       })
-      .catch(() => {/* fallback to realtime, push on, quiet hours off */})
-      .finally(() => setLoading(false));
+      .catch(() => {/* fallback to push on, quiet hours off */});
   }, []);
-
-  async function handleDigestChange(id: string) {
-    const next: DigestMode = id === 'daily' ? 'daily' : 'realtime';
-    if (next === digest) return;
-    const prior = digest;
-    setDigest(next);
-    setSaving(true);
-    try {
-      await api.notificationPrefs.update({ digest: next });
-    } catch {
-      setDigest(prior);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleMasterToggle(value: boolean) {
     hapticToggle();
@@ -158,10 +134,36 @@ export default function NotificationsSettingsScreen() {
               icon={pushEnabled ? 'bell' : 'bell-off'}
               title="Push notifications"
               subtitle="Turn all push notifications on or off for this device"
+              subtitleNumberOfLines={2}
               toggle={{ value: pushEnabled, onChange: handleMasterToggle }}
             />
           </Card>
         </View>
+
+        <View style={s.divider} />
+
+        {/* ── Notification types ── */}
+        <View style={s.section}>
+          <Card style={s.listCard}>
+            {rows.map((row, i) => (
+              <React.Fragment key={row.key}>
+                <ListRow
+                  icon={row.icon}
+                  title={row.label}
+                  subtitle={row.description}
+                  subtitleNumberOfLines={2}
+                  toggle={{
+                    value: categories[row.key] ?? true,
+                    onChange: (value) => handleCategory(row.key, value),
+                  }}
+                />
+                {i !== rows.length - 1 && <View style={[s.rowDivider, { backgroundColor: colors.border }]} />}
+              </React.Fragment>
+            ))}
+          </Card>
+        </View>
+
+        <View style={s.divider} />
 
         {/* ── Quiet hours ── */}
         <View style={s.section}>
@@ -176,63 +178,6 @@ export default function NotificationsSettingsScreen() {
           />
         </View>
 
-        <View style={s.divider} />
-
-        {/* ── Push frequency ── */}
-        <View style={s.section}>
-          <Text style={[TYPE_SCALE.footnote, s.sectionTitle, { color: colors.foreground }]}>Push notification frequency</Text>
-          <Text style={[TYPE_SCALE.footnote, s.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Control how often Brandthread sends push notifications to your device. Daily digest reduces interruptions by batching updates into a single morning summary.
-          </Text>
-
-          {loading ? (
-            <Card style={s.loadingCard}>
-              <ActivityIndicator color={theme.accent} size="small" />
-            </Card>
-          ) : (
-            <>
-              <SegmentedControl
-                options={DIGEST_OPTIONS}
-                selectedId={digest}
-                onChange={handleDigestChange}
-              />
-              <Text style={[TYPE_SCALE.footnote, s.digestHint, { color: colors.mutedForeground }]}>
-                {digest === 'realtime'
-                  ? 'Get a push for every event as it happens.'
-                  : 'One morning summary of everything from the past 24 hours.'}
-              </Text>
-              {saving && (
-                <View style={s.savingRow}>
-                  <ActivityIndicator color={theme.accent} size="small" />
-                  <Text style={[TYPE_SCALE.footnote, { color: colors.mutedForeground }]}>Saving…</Text>
-                </View>
-              )}
-            </>
-          )}
-        </View>
-
-        <View style={s.divider} />
-
-        {/* ── Notification types ── */}
-        <View style={s.section}>
-          <Card style={s.listCard}>
-            {rows.map((row, i) => (
-              <React.Fragment key={row.key}>
-                <ListRow
-                  icon={row.icon}
-                  title={row.label}
-                  subtitle={row.description}
-                  toggle={{
-                    value: categories[row.key] ?? true,
-                    onChange: (value) => handleCategory(row.key, value),
-                  }}
-                />
-                {i !== rows.length - 1 && <View style={[s.rowDivider, { backgroundColor: colors.border }]} />}
-              </React.Fragment>
-            ))}
-          </Card>
-        </View>
-
       </ScrollView>
     </View>
   );
@@ -245,9 +190,6 @@ function makeStyles() {
     sectionTitle:     { fontFamily: FONT.semibold, marginBottom: SPACING.xxs + 2 },
     sectionSubtitle:  { marginBottom: SPACING.sm + 2, lineHeight: 17 },
     divider:          { height: 10 },
-    loadingCard:      { alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-    digestHint:       { marginTop: SPACING.sm, lineHeight: 17 },
-    savingRow:        { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
     listCard:         { padding: SPACING.sm },
     rowDivider:       { height: StyleSheet.hairlineWidth },
   });

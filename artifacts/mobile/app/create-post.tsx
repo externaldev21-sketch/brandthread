@@ -1977,8 +1977,6 @@ export default function CreatePostScreen() {
                   <HapticSwitch
                     value={visibility[key] as boolean}
                     onValueChange={(v) => setVisibility(prev => ({ ...prev, [key]: v }))}
-                    thumbColor={(visibility[key] as boolean) ? PURPLE : theme.muted}
-                    trackColor={{ false: BORDER, true: PURPLE + '44' }}
                   />
                 </View>
               ))}

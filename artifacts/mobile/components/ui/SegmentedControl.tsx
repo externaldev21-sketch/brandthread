@@ -18,6 +18,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
+import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 export interface SegmentedControlProps {
   options: { id: string; label: string }[];
@@ -265,45 +266,15 @@ function UnderlineTabs({
       {options.map((option) => {
         const selected = option.id === selectedId;
         return (
-          <Pressable
+          <UnderlineTab
             key={option.id}
-            accessibilityRole="tab"
-            accessibilityLabel={option.label}
-            accessibilityState={{ selected }}
+            option={option}
+            selected={selected}
             onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
-            style={styles.underlineSegment}
+            onLabelRef={(node) => { textRefs.current[option.id] = node; }}
+            onLabelLayout={() => handleTabLayout(option.id)}
             testID={testID ? `${testID}-${option.id}` : undefined}
-          >
-            <Text
-              ref={(node) => { textRefs.current[option.id] = node; }}
-              onLayout={() => handleTabLayout(option.id)}
-              style={[
-                styles.underlineLabel,
-                {
-                  fontFamily: selected ? FONT.bold : FONT.medium,
-                  // Solid opaque grey, not a translucent white — a
-                  // sub-1-alpha text color subpixel-antialiases against
-                  // whatever's behind it (varies as the feed's video plays),
-                  // which reads as a soft/smudgy mid-grey instead of a crisp
-                  // silver. See lib/theme.ts's ON_DARK_MUTED doc comment.
-                  color: selected ? '#FFFFFF' : ON_DARK_MUTED,
-                },
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-              // Caps how far iOS/Android "larger text" accessibility
-              // settings can inflate this label. Uncapped Dynamic Type
-              // could grow "Following"/"Threads" enough to visually
-              // overlap the fixed-size icon clusters flanking this
-              // control in the buyer feed's top bar (see feed.tsx) —
-              // 1.2x still respects the setting without letting it blow
-              // the tab strip out past the space it's given.
-              maxFontSizeMultiplier={1.2}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
+          />
         );
       })}
       {!!activeLayout && (
@@ -313,6 +284,71 @@ function UnderlineTabs({
         />
       )}
     </View>
+  );
+}
+
+/**
+ * One underline tab's Pressable + label. Split out of `UnderlineTabs`'s
+ * `options.map` so `useHitAreaBoost` — a hook — has a stable per-tab
+ * component instance to attach to, instead of being called a
+ * variable/options-length-dependent number of times inside a single parent
+ * render (unsafe under the rules of hooks whenever `options` itself can
+ * change length between renders, even though every *current* call site
+ * happens to pass a fixed-length array).
+ */
+function UnderlineTab({
+  option, selected, onPress, onLabelRef, onLabelLayout, testID,
+}: {
+  option: { id: string; label: string };
+  selected: boolean;
+  onPress: () => void;
+  onLabelRef: (node: Text | null) => void;
+  onLabelLayout: () => void;
+  testID?: string;
+}) {
+  // Pads the real tap area up to 44x44 without changing this tab's
+  // content-sized visual footprint — see useHitAreaBoost's doc comment.
+  const { boostStyle, onLayout } = useHitAreaBoost();
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityLabel={option.label}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.underlineSegment, boostStyle]}
+      onLayout={onLayout}
+      testID={testID}
+    >
+      <Text
+        ref={onLabelRef}
+        onLayout={onLabelLayout}
+        style={[
+          styles.underlineLabel,
+          {
+            fontFamily: selected ? FONT.bold : FONT.medium,
+            // Solid opaque grey, not a translucent white — a
+            // sub-1-alpha text color subpixel-antialiases against
+            // whatever's behind it (varies as the feed's video plays),
+            // which reads as a soft/smudgy mid-grey instead of a crisp
+            // silver. See lib/theme.ts's ON_DARK_MUTED doc comment.
+            color: selected ? '#FFFFFF' : ON_DARK_MUTED,
+          },
+        ]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+        // Caps how far iOS/Android "larger text" accessibility
+        // settings can inflate this label. Uncapped Dynamic Type
+        // could grow "Following"/"Threads" enough to visually
+        // overlap the fixed-size icon clusters flanking this
+        // control in the buyer feed's top bar (see feed.tsx) —
+        // 1.2x still respects the setting without letting it blow
+        // the tab strip out past the space it's given.
+        maxFontSizeMultiplier={1.2}
+      >
+        {option.label}
+      </Text>
+    </Pressable>
   );
 }
 

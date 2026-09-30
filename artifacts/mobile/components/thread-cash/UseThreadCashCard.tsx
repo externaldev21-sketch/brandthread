@@ -140,8 +140,6 @@ export function UseThreadCashCard({
           value={!!redemption}
           onValueChange={handleToggle}
           disabled={isDisabled || (proposedCents < 1 && !redemption)}
-          trackColor={{ false: theme.borderSubtle, true: theme.accent }}
-          thumbColor={theme.onAccent}
           accessibilityLabel="Use Thread Cash"
         />
       )}

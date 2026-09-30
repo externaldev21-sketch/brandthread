@@ -150,8 +150,6 @@ export default function AiBrandMemoryScreen() {
                   <HapticSwitch
                     value={field.enabled}
                     onValueChange={() => handleToggle(key)}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                    thumbColor={colors.foreground}
                   />
                 </View>
 

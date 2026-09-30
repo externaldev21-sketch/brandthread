@@ -192,8 +192,6 @@ export default function BuyerProblemReportScreen() {
               <HapticSwitch
                 value={contactedSeller}
                 onValueChange={setContactedSeller}
-                trackColor={{ true: PURPLE, false: BORDER }}
-                thumbColor={FG}
               />
             </View>
             {!contactedSeller && (

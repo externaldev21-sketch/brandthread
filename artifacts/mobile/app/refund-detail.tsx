@@ -281,8 +281,6 @@ export default function RefundDetailScreen() {
               <HapticSwitch
                 value={includeShipping}
                 onValueChange={setIncludeShipping}
-                trackColor={{ false: BORDER, true: PURPLE }}
-                thumbColor={FG}
               />
             </View>
           </BrandthreadCard>
@@ -304,8 +302,6 @@ export default function RefundDetailScreen() {
             <HapticSwitch
               value={restockInventory}
               onValueChange={setRestockInventory}
-              trackColor={{ false: BORDER, true: PURPLE }}
-              thumbColor={FG}
             />
           </View>
         </BrandthreadCard>
@@ -314,7 +310,7 @@ export default function RefundDetailScreen() {
         <BrandthreadCard style={styles.section}>
           <View style={styles.switchRow}>
             <Text style={[styles.switchLabel, { color: SUBTLE }]}>Notify customer (always on)</Text>
-            <HapticSwitch value={true} disabled trackColor={{ false: BORDER, true: PURPLE }} thumbColor={FG} />
+            <HapticSwitch value={true} disabled />
           </View>
         </BrandthreadCard>
 

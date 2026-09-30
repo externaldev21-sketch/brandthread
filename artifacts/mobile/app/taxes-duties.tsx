@@ -111,8 +111,6 @@ export default function TaxesDutiesScreen() {
               value={stripeTaxEnabled}
               onValueChange={handleToggleTax}
               disabled={savingTax || loading}
-              trackColor={{ false: colors.secondary, true: colors.primary }}
-              thumbColor={colors.background}
             />
           </View>
 
@@ -147,8 +145,6 @@ export default function TaxesDutiesScreen() {
               value={chargeShippingTax}
               onValueChange={handleToggleShipping}
               disabled={savingShipping || loading || !stripeTaxEnabled}
-              trackColor={{ false: colors.secondary, true: colors.primary }}
-              thumbColor={colors.background}
             />
           </View>
           {!stripeTaxEnabled && (

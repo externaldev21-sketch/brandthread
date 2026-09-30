@@ -15,6 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -52,6 +54,16 @@ export default function RfqPostScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(() => {
+    if (isSellerDevPreview()) {
+      setLoadingManufacturers(false);
+      setLoadError(false);
+      setManufacturers(isPreviewDemoMode() ? getPreviewManufacturers().map((mfg) => ({
+        id: mfg.id, businessName: mfg.name, country: mfg.country, specialty: mfg.specialties[0] ?? '',
+        moq: mfg.moq, priceRange: mfg.priceRangeLabel ?? null, bulkTurnaround: mfg.bulkTurnaround ?? null,
+        photo: mfg.profileImageUri ?? null, isVerified: mfg.isVerified,
+      })) : []);
+      return;
+    }
     setLoadingManufacturers(true);
     setLoadError(false);
     getRfqTargetManufacturers()

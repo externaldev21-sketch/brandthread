@@ -158,8 +158,6 @@ function SwitchRow({ label, value, onChange }: { label: string; value: boolean; 
       <HapticSwitch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: BORDER, true: theme.accent }}
-        thumbColor={value ? theme.accentLight : MUTED}
       />
     </View>
   );

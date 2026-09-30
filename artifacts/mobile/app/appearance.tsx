@@ -115,8 +115,6 @@ export default function AppearanceScreen() {
           <HapticSwitch
             value={followsTheme}
             onValueChange={toggleFollowTheme}
-            trackColor={{ false: theme.border, true: theme.accent }}
-            thumbColor={followsTheme ? theme.onAccent : theme.text}
           />
         </View>
 

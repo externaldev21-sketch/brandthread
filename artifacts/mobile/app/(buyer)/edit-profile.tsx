@@ -686,8 +686,6 @@ export default function BuyerEditProfileScreen() {
               <HapticSwitch
                 value={extra.aiCreator}
                 onValueChange={v => setExtra(prev => ({ ...prev, aiCreator: v }))}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor="#FFFFFF"
               />
             </View>
           </View>
@@ -701,8 +699,6 @@ export default function BuyerEditProfileScreen() {
               <HapticSwitch
                 value={badge.enabled}
                 onValueChange={v => setBadge(b => ({ ...b, enabled: v }))}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor="#FFFFFF"
               />
             </View>
             <Divider theme={theme} />

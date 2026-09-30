@@ -198,8 +198,6 @@ export default function ShoppingPreferences() {
                 <HapticSwitch
                   value={Boolean(settings[item.key])}
                   onValueChange={v => patch({ [item.key]: v })}
-                  trackColor={{ false: '#333344', true: colors.primary }}
-                  thumbColor="#fff"
                 />
               </View>
               {i < arr.length - 1 && <View style={s.divider} />}
@@ -218,8 +216,6 @@ export default function ShoppingPreferences() {
             <HapticSwitch
               value={Boolean(settings.showShoppingActivity)}
               onValueChange={v => patch({ showShoppingActivity: v })}
-              trackColor={{ false: '#333344', true: colors.primary }}
-              thumbColor="#fff"
             />
           </View>
           <View style={s.divider} />
@@ -232,8 +228,6 @@ export default function ShoppingPreferences() {
             <HapticSwitch
               value={Boolean(settings.personalizedRecommendations)}
               onValueChange={v => patch({ personalizedRecommendations: v })}
-              trackColor={{ false: '#333344', true: colors.primary }}
-              thumbColor="#fff"
             />
           </View>
         </View>

@@ -238,7 +238,6 @@ function ToggleRow({ label, description, value, onChange }: {
   onChange: (v: boolean) => void;
 }) {
   const { theme } = useAppTheme();
-  const { accent: PURPLE } = theme;
   const s = createStyles(theme);
   return (
     <View style={s.toggleRow}>
@@ -246,7 +245,7 @@ function ToggleRow({ label, description, value, onChange }: {
         <Text style={s.toggleLabel}>{label}</Text>
         <Text style={s.toggleDesc}>{description}</Text>
       </View>
-      <HapticSwitch value={value} onValueChange={onChange} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={value ? theme.onAccent : theme.muted} />
+      <HapticSwitch value={value} onValueChange={onChange} />
     </View>
   );
 }
