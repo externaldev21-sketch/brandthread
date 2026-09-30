@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 export type UserRole = 'buyer' | 'seller' | null;
 
@@ -26,8 +27,10 @@ const RoleContext = createContext<RoleContextValue>({
 
 function getDevPreviewRole(): UserRole {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
-  const value = new URLSearchParams(window.location.search).get('bt_preview');
-  return value === 'seller' ? 'seller' : 'buyer';
+  // isSellerDevPreview() reads ?bt_preview= and, once in-app navigation has dropped the query
+  // string, the role the first load persisted. Reading only the URL here flipped the preview
+  // seller to a buyer whenever this provider remounted after a tab switch.
+  return isSellerDevPreview() ? 'seller' : 'buyer';
 }
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {

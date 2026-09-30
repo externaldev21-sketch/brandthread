@@ -658,9 +658,9 @@ const styles = StyleSheet.create({
 
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 4,
   },
-  chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
+  chipText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 16 },
 
   rail: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.md },
 });

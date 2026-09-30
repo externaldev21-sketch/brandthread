@@ -23,6 +23,7 @@ import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { Avatar } from '@/components/ui/Avatar';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -57,7 +58,7 @@ type ImageSlotKey = 'avatar' | 'logo' | 'banner';
 // so this is never reachable outside a dev web preview.
 const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'shop']);
 const PREVIEW_SELLER_FIELDS: Fields = {
-  name: 'Preview Studio', username: 'preview_studio', bio: 'Handmade goods, made to order.',
+  name: PREVIEW_SELLER_IDENTITY.brandName, username: PREVIEW_SELLER_IDENTITY.username, bio: PREVIEW_SELLER_IDENTITY.bio,
   website: 'https://example.com', category: 'Streetwear', tagsText: 'handmade, small batch',
   location: 'Los Angeles, CA', contactEmail: 'hello@example.com', instagram: '@previewstudio', tiktok: '@previewstudio',
 };

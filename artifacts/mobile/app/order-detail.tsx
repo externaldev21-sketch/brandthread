@@ -25,6 +25,7 @@ import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
+import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
@@ -507,6 +508,19 @@ export default function OrderDetailScreen() {
     // poll can overlap the next tick and an older success can clear the
     // paused state after a later failure has already stopped the timer.
     if (requestGenerationRef.current === generation) return;
+    // Preview demo orders (lib/previewSellerOrders.ts) live only on this
+    // device: never fetch them (or returns) from the API.
+    if (isGeneratedSellerOrderId(id)) {
+      const raw = getGeneratedSellerOrder(id);
+      if (raw) {
+        setOrder(adaptApiOrder(raw));
+        queryClient.setQueryData(queryKeys.order(id), raw);
+      } else if (!hasLoadedRef.current) setOrder(null);
+      setOrderReturns([]);
+      setLoading(false);
+      hasLoadedRef.current = true;
+      return;
+    }
     requestGenerationRef.current = generation;
     if (!hasLoadedRef.current) setLoading(true);
     api.returns.listSeller()
