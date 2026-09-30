@@ -6,10 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { getSetupState, type SetupState } from '@/lib/setupStore';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { SP, RADIUS, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_DASHBOARD_STEPS } from '@/lib/firstRunTips/content';
 
 const DEFAULT_SETUP: SetupState = {
   started: false,
@@ -33,7 +36,7 @@ export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
-  const { userId } = useAuth();
+  const { userId, isLoaded, isSignedIn } = useAuth();
   const api = useApi();
 
   const [loading, setLoading] = useState(true);
@@ -53,12 +56,19 @@ export default function SellerHomeScreen() {
   }, [api, userId]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!isLoaded || !isSignedIn || !userId) {
       setLoading(false);
       return;
     }
     void loadSetup();
-  }, [loadSetup, userId]);
+  }, [isLoaded, isSignedIn, loadSetup, userId]);
+
+  // AuthGate redirects signed-out native routes, but this screen can mount
+  // first on a deep link. Never mount seller request-making children until a
+  // Clerk session exists. Web's intentional design preview is unaffected.
+  if ((!isLoaded || !isSignedIn || !userId) && !isSellerDevPreview()) {
+    return <View style={styles.root} />;
+  }
 
   if (loading) {
     return (
@@ -85,6 +95,12 @@ export default function SellerHomeScreen() {
         userId={userId}
         setupState={setupState}
         onSetupStateChange={setSetupState}
+      />
+      <FirstRunTip
+        id="seller-dashboard"
+        variant="anchored"
+        contentReady={!loading}
+        anchored={{ steps: SELLER_DASHBOARD_STEPS }}
       />
     </View>
   );

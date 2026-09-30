@@ -162,6 +162,7 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
       setThemeId((current) => current === localThemeId ? current : localThemeId);
       setIsHydrated(true);
 
+      if (!userId) return;
       try {
         const profile: any = await api.auth.me();
         if (!active || reconciliationVersion !== selectionVersionRef.current) return;
@@ -175,18 +176,18 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     })();
 
     return () => { active = false; };
-  }, [api, storageKey]);
+  }, [api, storageKey, userId]);
   const selectTheme = useCallback(async (id: AppThemeId) => {
     if (!isThemeId(id)) return;
     selectionVersionRef.current += 1;
     setThemeId(id);
     try {
       await AsyncStorage.setItem(storageKey, id);
-      await api.auth.updateProfile({ appThemeId: id });
+      if (userId) await api.auth.updateProfile({ appThemeId: id });
     } catch {
       // Local state/storage remain authoritative while offline.
     }
-  }, [api, storageKey]);
+  }, [api, storageKey, userId]);
   const value = useMemo(() => ({ theme: getTheme(themeId), isHydrated, selectTheme }), [isHydrated, selectTheme, themeId]);
   useEffect(() => {
     // Exposes the live theme for the theme-consistency crawl (e2e/theme-consistency-crawl.spec.ts)

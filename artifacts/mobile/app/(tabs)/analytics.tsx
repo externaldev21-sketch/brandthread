@@ -25,6 +25,9 @@ import {
   AnalyticsFilterState, AnalyticsPoint, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
 } from '@/services/analyticsTypes';
 import { AnalyticsBarChart, AnalyticsSkeleton, Card, SectionTitle, StatTile } from '@/components/analytics/AnalyticsKit';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
+import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +99,7 @@ export default function AnalyticsScreen() {
 
   const filterRef = useRef<AnalyticsFilterState | null>(null);
   const loadGenerationRef = useRef(0);
+  const { ref: revenueTileRef, rect: revenueTileRect, onLayout: revenueTileOnLayout } = useMeasuredTarget();
 
   // Only the 7-day range has real backing data today — see the header note.
   const activeDays = useCallback((): string[] => lastNDays(7), []);
@@ -187,7 +191,9 @@ export default function AnalyticsScreen() {
           {/* ── Summary stats ──────────────────────────────────────────────── */}
           <View style={s.statsRow}>
             <StatTile label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} />
-            <StatTile label="Revenue" value={displayRevenue} changePct={summary.revenueChangePct} featured />
+            <View ref={revenueTileRef} onLayout={revenueTileOnLayout} collapsable={false}>
+              <StatTile label="Revenue" value={displayRevenue} changePct={summary.revenueChangePct} featured />
+            </View>
           </View>
 
           {/* ── Daily revenue bar chart ────────────────────────────────────── */}
@@ -199,6 +205,12 @@ export default function AnalyticsScreen() {
           <View style={{ height: 120 }} />
         </ResponsiveContainer>
       </ScrollView>
+      <FirstRunTip
+        id="seller-analytics"
+        variant="spotlight"
+        contentReady={!loading}
+        spotlight={{ target: revenueTileRect, ...SELLER_ANALYTICS_SPOTLIGHT }}
+      />
     </View>
   );
 }

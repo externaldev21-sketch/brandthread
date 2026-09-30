@@ -96,6 +96,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
       { label: 'Accessibility & data usage', description: 'Media quality, data usage, and accessibility options', aliases: ['accessibility', 'media quality', 'data usage', 'wifi'], icon: 'eye', route: '/buyer-settings-detail?section=accessibility', audience: 'buyer' },
+      { label: 'Tips', description: 'Replay first-run tips, or turn them off', aliases: ['tips', 'tutorial', 'walkthrough', 'replay tips', 'skip tips', 'coach marks', 'gestures'], icon: 'help-circle', route: '/first-run-tips-settings', audience: 'shared' },
     ],
   },
   {
@@ -228,6 +229,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Appearance', description: 'App theme and app icon', aliases: ['theme', 'color', 'dark mode', 'appearance', 'app icon', 'home screen icon'], icon: 'droplet', route: '/appearance', audience: 'shared' },
       { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
+      { label: 'Tips', description: 'Replay first-run tips, or turn them off', aliases: ['tips', 'tutorial', 'walkthrough', 'replay tips', 'skip tips', 'coach marks', 'gestures'], icon: 'help-circle', route: '/first-run-tips-settings', audience: 'shared' },
     ],
   },
   {
