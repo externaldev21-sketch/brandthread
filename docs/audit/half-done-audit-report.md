@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T03:55:03.467Z (partial run — time budget hit).
+Generated 2026-09-30T04:13:10.217Z (partial run — time budget hit).
 
 - Route files discovered: 266
-- Route × role combinations audited: 138
+- Route × role combinations audited: 218
 - Unreachable: 0
-- Total findings: 1025 (hard: 114, warn: 911)
+- Total findings: 1327 (hard: 178, warn: 1149)
 
 ## Scoreboard by area/owner
 
@@ -13,11 +13,11 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 
 | Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |
 |---|---|---|---|---|---|
-| profiles+social (session 01MjTkyh) | 34 | 419 | 11 | 0 | 11 |
-| growth (session 019SGXKf) | 30 | 100 | 11 | 0 | 11 |
-| buyer (session 01AaWLh1) | 22 | 290 | 6 | 0 | 6 |
-| store+account (session 01Cdzzzi) | 12 | 16 | 2 | 0 | 2 |
-| design (session 01DgPbif) | 10 | 54 | 4 | 0 | 4 |
+| profiles+social (session 01MjTkyh) | 48 | 491 | 15 | 0 | 15 |
+| buyer (session 01AaWLh1) | 44 | 348 | 11 | 0 | 11 |
+| growth (session 019SGXKf) | 44 | 140 | 16 | 0 | 16 |
+| store+account (session 01Cdzzzi) | 20 | 58 | 5 | 0 | 5 |
+| design (session 01DgPbif) | 16 | 80 | 7 | 0 | 7 |
 | seller commerce (session 011WGHYC) | 6 | 32 | 1 | 0 | 1 |
 
 ## Notes on this run
@@ -36,14 +36,15 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| hit-target-too-small | warn | 358 |
-| type-scale-drift | warn | 291 |
-| overlapping-text | warn | 166 |
-| console-error | hard | 106 |
-| contrast-violation | warn | 61 |
-| clipped-text | warn | 14 |
+| hit-target-too-small | warn | 430 |
+| type-scale-drift | warn | 415 |
+| overlapping-text | warn | 176 |
+| console-error | hard | 162 |
+| contrast-violation | warn | 77 |
+| clipped-text | warn | 26 |
 | color-rule-violation | warn | 12 |
-| font-family | warn | 8 |
+| font-family | warn | 12 |
+| preview-demo-wording | hard | 8 |
 | error-boundary | hard | 4 |
 | placeholder-copy | hard | 4 |
 | min-size-violation | warn | 1 |
@@ -54,7 +55,7 @@ None.
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (285)
+### Other (475)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -82,6 +83,44 @@ None.
 | `/admin-reports` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
 | `/admin-reports` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
 | `/admin-reports` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
+| `/app-icon` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/app-icon/seller/00-initial.png) |
+| `/app-icon` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/app-icon/seller/00-initial.png) |
+| `/app-theme` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/app-theme/seller/00-initial.png) |
+| `/app-theme` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/app-theme/seller/00-initial.png) |
+| `/automation` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/automation/seller/00-initial.png) |
+| `/automation` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/automation/seller/00-initial.png) |
+| `/bg-removal` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/bg-removal/seller/00-initial.png) |
+| `/bg-removal` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/bg-removal/seller/00-initial.png) |
+| `/biometric-unlock` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/biometric-unlock/seller/00-initial.png) |
+| `/biometric-unlock` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/biometric-unlock/seller/00-initial.png) |
+| `/boost` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/boost/seller/00-initial.png) |
+| `/boost` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/boost/seller/00-initial.png) |
+| `/boost` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/boost/buyer/00-initial.png) |
+| `/boost` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/boost/buyer/00-initial.png) |
+| `/brand` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/brand/seller/00-initial.png) |
+| `/brand` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/brand/seller/00-initial.png) |
+| `/buyer-addresses` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-addresses/seller/00-initial.png) |
+| `/buyer-addresses` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-addresses/seller/00-initial.png) |
+| `/buyer-addresses` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-addresses/buyer/00-initial.png) |
+| `/buyer-addresses` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-addresses/buyer/00-initial.png) |
+| `/buyer-archive` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-archive/seller/00-initial.png) |
+| `/buyer-archive` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-archive/seller/00-initial.png) |
+| `/buyer-blocked` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-blocked/seller/00-initial.png) |
+| `/buyer-blocked` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-blocked/seller/00-initial.png) |
+| `/buyer-blocked` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-blocked/seller/00-initial.png) |
+| `/buyer-blocked` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-blocked/seller/00-initial.png) |
+| `/buyer-blocked` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-blocked/buyer/00-initial.png) |
+| `/buyer-blocked` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-blocked/buyer/00-initial.png) |
+| `/buyer-blocked` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-blocked/buyer/00-initial.png) |
+| `/buyer-blocked` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-blocked/buyer/00-initial.png) |
+| `/buyer-close-friends` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-close-friends/seller/00-initial.png) |
+| `/buyer-close-friends` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-close-friends/seller/00-initial.png) |
+| `/buyer-collection` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-collection/seller/00-initial.png) |
+| `/buyer-collection` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-collection/seller/00-initial.png) |
+| `/buyer-collection` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-collection/buyer/00-initial.png) |
+| `/buyer-collection` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-collection/buyer/00-initial.png) |
+| `/buyer-conversation` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-conversation/seller/00-initial.png) |
+| `/buyer-conversation` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-conversation/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | fresh | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | fresh | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | fresh | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
@@ -320,31 +359,8 @@ None.
 | `/activity-center` | buyer | demo | hit-target-too-small | warn | 41x34px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
 | `/activity-center` | buyer | demo | hit-target-too-small | warn | 74x34px control "Follows" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
 | `/activity-center` | buyer | demo | hit-target-too-small | warn | 58x34px control "Likes" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 95x34px control "Comments" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 69x34px control "Orders" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 234x40px control "PSPriya Shah started following you  6h" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 234x40px control "MWMarcus Webb started following you  1d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 305x40px control "JLJordan Lee liked your post  3d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-people` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "People" | [view](../../docs/audit/screenshots/activity-people/seller/00-initial.png) |
-| `/activity-people` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "People" | [view](../../docs/audit/screenshots/activity-people/seller/00-initial.png) |
-| `/activity-people` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "People" | [view](../../docs/audit/screenshots/activity-people/buyer/00-initial.png) |
-| `/activity-people` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "People" | [view](../../docs/audit/screenshots/activity-people/buyer/00-initial.png) |
-| `/admin-reports` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Review queue" | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
-| `/admin-reports` | seller | fresh | hit-target-too-small | warn | 176x36px control "Open" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
-| `/admin-reports` | seller | fresh | hit-target-too-small | warn | 176x36px control "Resolved" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
-| `/admin-reports` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Review queue" | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
-| `/admin-reports` | seller | demo | hit-target-too-small | warn | 176x36px control "Open" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
-| `/admin-reports` | seller | demo | hit-target-too-small | warn | 176x36px control "Resolved" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/seller/00-initial.png) |
-| `/admin-reports` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Review queue" | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | fresh | hit-target-too-small | warn | 176x36px control "Open" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | fresh | hit-target-too-small | warn | 176x36px control "Resolved" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Review queue" | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | hit-target-too-small | warn | 176x36px control "Open" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | hit-target-too-small | warn | 176x36px control "Resolved" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
 
-### Seller dashboard / analytics (200)
+### Seller dashboard / analytics (236)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -376,6 +392,14 @@ None.
 | `/analytics-products` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
 | `/analytics-products` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
 | `/analytics-products` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
+| `/analytics-profit` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-sales` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
+| `/analytics-sales` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
+| `/analytics-sales` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
+| `/analytics-sales` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
+| `/analytics-store` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/analytics-store` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
 | `/(tabs)/analytics` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Analytics" | [view](../../docs/audit/screenshots/-tabs-analytics/seller/00-initial.png) |
 | `/(tabs)/analytics` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "$0" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/seller/00-initial.png) |
 | `/(tabs)/analytics` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 12" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/seller/00-initial.png) |
@@ -548,6 +572,34 @@ None.
 | `/analytics-products` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
 | `/analytics-products` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
 | `/analytics-products` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
+| `/analytics-profit` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | fresh | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | fresh | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | fresh | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | demo | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | demo | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | demo | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | fresh | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | fresh | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | fresh | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | demo | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | demo | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-profit` | buyer | demo | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
+| `/analytics-sales` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
+| `/analytics-sales` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
+| `/analytics-sales` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
+| `/analytics-sales` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
+| `/analytics-store` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/analytics-store` | seller | fresh | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/analytics-store` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/analytics-store` | seller | demo | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/analytics-store` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
+| `/analytics-store` | buyer | fresh | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
+| `/analytics-store` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
+| `/analytics-store` | buyer | demo | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 
 ### Buyer discover / feed (184)
 
@@ -738,7 +790,7 @@ None.
 | `/(buyer)/feed` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
 | `/(buyer)/feed` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
 
-### Profile / settings (108)
+### Profile / settings (158)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -766,6 +818,20 @@ None.
     at http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:1626:25 | [view](../../docs/audit/screenshots/account-type/buyer/00-initial.png) |
 | `/ai-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-settings/seller/00-initial.png) |
 | `/ai-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-settings/seller/00-initial.png) |
+| `/billing` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/billing/seller/00-initial.png) |
+| `/billing` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/billing/seller/00-initial.png) |
+| `/billing` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/billing/buyer/00-initial.png) |
+| `/billing` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/billing/buyer/00-initial.png) |
+| `/buyer-account-center` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-control` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-account-control` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-account-control` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-account-control` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Change profile photo or video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add profile video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
@@ -854,6 +920,143 @@ None.
 | `/ai-settings` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Settings" | [view](../../docs/audit/screenshots/ai-settings/seller/00-initial.png) |
 | `/ai-settings` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Settings" | [view](../../docs/audit/screenshots/ai-settings/buyer/00-initial.png) |
 | `/ai-settings` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Settings" | [view](../../docs/audit/screenshots/ai-settings/buyer/00-initial.png) |
+| `/billing` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Billing" | [view](../../docs/audit/screenshots/billing/seller/00-initial.png) |
+| `/billing` | seller | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "$0.00" | [view](../../docs/audit/screenshots/billing/seller/00-initial.png) |
+| `/billing` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Billing" | [view](../../docs/audit/screenshots/billing/seller/00-initial.png) |
+| `/billing` | seller | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "$0.00" | [view](../../docs/audit/screenshots/billing/seller/00-initial.png) |
+| `/billing` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Billing" | [view](../../docs/audit/screenshots/billing/buyer/00-initial.png) |
+| `/billing` | buyer | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "$0.00" | [view](../../docs/audit/screenshots/billing/buyer/00-initial.png) |
+| `/billing` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Billing" | [view](../../docs/audit/screenshots/billing/buyer/00-initial.png) |
+| `/billing` | buyer | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "$0.00" | [view](../../docs/audit/screenshots/billing/buyer/00-initial.png) |
+| `/buyer-account-center` | seller | fresh | clipped-text | warn | Text clipped (324px into 253px): "Password, two-factor authentication and login alerts" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | fresh | clipped-text | warn | Text clipped (270px into 253px): "Ad and recommendation preferences" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | fresh | clipped-text | warn | Text clipped (262px into 253px): "Permanently delete your account and data" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Accounts Center" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | fresh | type-scale-drift | warn | font-size 24px not on declared FS scale (nearest 22) on "B" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | demo | clipped-text | warn | Text clipped (324px into 253px): "Password, two-factor authentication and login alerts" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | demo | clipped-text | warn | Text clipped (270px into 253px): "Ad and recommendation preferences" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | demo | clipped-text | warn | Text clipped (262px into 253px): "Permanently delete your account and data" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Accounts Center" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | seller | demo | type-scale-drift | warn | font-size 24px not on declared FS scale (nearest 22) on "B" | [view](../../docs/audit/screenshots/buyer-account-center/seller/00-initial.png) |
+| `/buyer-account-center` | buyer | fresh | clipped-text | warn | Text clipped (324px into 253px): "Password, two-factor authentication and login alerts" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | fresh | clipped-text | warn | Text clipped (270px into 253px): "Ad and recommendation preferences" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | fresh | clipped-text | warn | Text clipped (262px into 253px): "Permanently delete your account and data" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Accounts Center" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | fresh | type-scale-drift | warn | font-size 24px not on declared FS scale (nearest 22) on "B" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | demo | clipped-text | warn | Text clipped (324px into 253px): "Password, two-factor authentication and login alerts" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | demo | clipped-text | warn | Text clipped (270px into 253px): "Ad and recommendation preferences" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | demo | clipped-text | warn | Text clipped (262px into 253px): "Permanently delete your account and data" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Accounts Center" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-center` | buyer | demo | type-scale-drift | warn | font-size 24px not on declared FS scale (nearest 22) on "B" | [view](../../docs/audit/screenshots/buyer-account-center/buyer/00-initial.png) |
+| `/buyer-account-control` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | seller | fresh | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | seller | demo | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-account-control/seller/00-initial.png) |
+| `/buyer-account-control` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-account-control` | buyer | fresh | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-account-control` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-account-control` | buyer | demo | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+
+### Checkout / orders (96)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/(buyer)/cart` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/orders` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
+| `/(buyer)/orders` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
+| `/(buyer)/orders` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
+| `/(buyer)/orders` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
+| `/(buyer)/orders` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
+| `/(buyer)/orders` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
+| `/(buyer)/orders` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
+| `/(buyer)/orders` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
+| `/(buyer)/orders` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
+| `/(buyer)/orders` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | overlapping-text | warn | "Apt, suite, etc. (optional)" overlaps "Enter a valid email to continue" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | fresh | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | overlapping-text | warn | "Apt, suite, etc. (optional)" overlaps "Enter a valid email to continue" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | seller | demo | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
+| `/buyer-checkout` | buyer | fresh | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | fresh | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | fresh | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | demo | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | demo | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-checkout` | buyer | demo | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
 
 ### Messaging (86)
 
@@ -945,81 +1148,6 @@ None.
 | `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
 | `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
 | `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-
-### Checkout / orders (70)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/(buyer)/cart` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/orders` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
-| `/(buyer)/orders` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | seller | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | fresh | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "Only 3 left" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "·" | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x16px control "Edit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 217x30px control "M" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 217x30px control "L" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/cart` | buyer | demo | hit-target-too-small | warn | 32x32px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-cart/buyer/00-initial.png) |
-| `/(buyer)/orders` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
-| `/(buyer)/orders` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
-| `/(buyer)/orders` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
-| `/(buyer)/orders` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/seller/00-initial.png) |
-| `/(buyer)/orders` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
-| `/(buyer)/orders` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
-| `/(buyer)/orders` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "My Orders" | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
-| `/(buyer)/orders` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Discover Products" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-orders/buyer/00-initial.png) |
 
 ### AI / Studio tools (54)
 
