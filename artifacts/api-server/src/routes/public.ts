@@ -1986,13 +1986,47 @@ router.get("/username-check", async (req, res) => {
     const [existing] = await db
       .select({ clerkId: users.clerkId })
       .from(users)
-      .where(eq(users.username, raw))
+      .where(eq(sql`lower(${users.username})`, raw))
       .limit(1);
     res.json(existing ? { available: false, error: "Username is already taken." } : { available: true });
   } catch (err) {
     req.log.error({ err }, "Failed to check username availability");
     // Fail open: never block sign-up on a transient check failure — the
     // server still enforces uniqueness at submit time regardless.
+    res.json({ available: true });
+  }
+});
+
+// ─── GET /api/public/email-check ────────────────────────────────────────────
+// Unauthenticated, case-insensitive email-availability check for a new
+// account's signup step (including "Add account -> Create new account" from
+// the account switcher, where the caller may or may not already have a
+// session for a *different* account). Never leaks anything beyond
+// taken/available — the message points at logging in rather than confirming
+// which account owns the address.
+const PUBLIC_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.get("/email-check", async (req, res) => {
+  const raw = (req.query.email as string || "").trim().toLowerCase();
+
+  if (!raw || raw.length > 320 || !PUBLIC_EMAIL_REGEX.test(raw)) {
+    res.json({ available: false, error: "Enter a valid email address." });
+    return;
+  }
+
+  try {
+    const [existing] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(sql`lower(${users.email})`, raw))
+      .limit(1);
+    res.json(existing
+      ? { available: false, error: "An account with this email already exists. Log in instead.", code: "EMAIL_TAKEN" }
+      : { available: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to check email availability");
+    // Fail open: never block sign-up on a transient check failure — Clerk
+    // itself still enforces email uniqueness for the actual signup.
     res.json({ available: true });
   }
 });

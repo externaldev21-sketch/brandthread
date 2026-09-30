@@ -14,26 +14,36 @@
  * that opens a small follow-up sheet ("Log into existing account" / "Create
  * new account").
  *
+ * Multi-account: any mix of buyer/seller accounts, up to MAX_ACCOUNTS (8) on
+ * one device. Every row (not just the active one) shows its real Buyer/Seller
+ * label, sourced from the server (Clerk's own session/user object carries no
+ * such signal) via GET /auth/account-types. Any signed-in row can be logged
+ * out individually (Clerk's per-session signOut) without touching the rest.
+ *
  * Preview mode (`?bt_preview=buyer|seller`, no real Clerk session) shows two
  * fixed demo accounts — @ava (Buyer) and @atelier.noire (Brand) — so the
  * switcher is fully explorable without a backend. Switching between them in
  * preview just flips the local preview role; there's no real second session
  * to activate.
  */
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAuth, useSessionList } from '@clerk/expo';
+import { useAuth, useClerk, useSessionList } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { ListRow } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
+import { useApi } from '@/hooks/useApi';
 import { SPACING } from '@/constants/spacing';
 import { TYPE_SCALE } from '@/constants/typography';
 import { FONT } from '@/lib/theme';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { useRole } from '@/contexts/RoleContext';
+import {
+  MAX_ACCOUNTS_MESSAGE, getHandle, getDisplayName, resolveAccountTypeLabel, isAtAccountCap,
+} from '@/lib/accountSwitcherHelpers';
 
 export interface AccountSwitcherSheetProps {
   visible: boolean;
@@ -45,72 +55,73 @@ interface AccountRow {
   displayName: string;
   handle: string;
   imageUri?: string | null;
-  accountType: 'Buyer' | 'Brand';
+  accountType: 'Buyer' | 'Seller';
   current: boolean;
-  /** Only ever populated for the two demo rows — see the file header note on
-   *  why real cross-account unread counts aren't wired yet. */
-  unreadCount?: number;
-}
-
-function getHandle(sessionUser: {
-  username?: string | null;
-  primaryEmailAddress?: { emailAddress: string } | null;
-}): string {
-  if (sessionUser.username) return `@${sessionUser.username}`;
-  const email = sessionUser.primaryEmailAddress?.emailAddress;
-  return email ? `@${email.split('@')[0]}` : '@you';
-}
-
-function getDisplayName(sessionUser: {
-  firstName?: string | null;
-  lastName?: string | null;
-  username?: string | null;
-}): string {
-  const parts = [sessionUser.firstName, sessionUser.lastName].filter(Boolean);
-  if (parts.length) return parts.join(' ');
-  return sessionUser.username ?? 'Your account';
 }
 
 export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetProps) {
   const colors = useColors();
   const router = useRouter();
+  const api = useApi();
   const { sessionId: activeSessionId } = useAuth();
   const { sessions, setActive } = useSessionList();
+  const clerk = useClerk();
   const { role, setRole } = useRole();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [loggingOutId, setLoggingOutId] = useState<string | null>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
+  const [serverInfo, setServerInfo] = useState<Record<string, {
+    accountType: 'buyer' | 'seller' | null;
+    username: string | null;
+    avatarUrl: string | null;
+    displayName: string | null;
+  }>>({});
 
   const isPreview = isBuyerDevPreview() || isSellerDevPreview();
 
+  // "Only real sessions on this device" — Clerk's session list is itself
+  // device/client-scoped; filtering to active just drops any session Clerk
+  // has already ended (e.g. a token that expired elsewhere).
+  const activeSessions = (sessions ?? []).filter((session) => session.status === 'active' && session.user);
+
+  useEffect(() => {
+    if (isPreview || activeSessions.length === 0) return;
+    const ids = activeSessions.map((session) => session.user!.id);
+    let cancelled = false;
+    api.auth.accountTypes(ids).then((res) => {
+      if (!cancelled) setServerInfo(res.accountTypes);
+    }).catch(() => {
+      // Falls back to Clerk-only data (role label defaults to Buyer below) —
+      // never blocks the switcher from opening over a network hiccup.
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPreview, activeSessions.map((s) => s.id).join(',')]);
+
   const previewAccounts: AccountRow[] = [
     { id: 'preview-buyer', displayName: 'Ava', handle: '@ava', accountType: 'Buyer', current: role === 'buyer' },
-    { id: 'preview-seller', displayName: 'Atelier Noire', handle: '@atelier.noire', accountType: 'Brand', current: role === 'seller' },
+    { id: 'preview-seller', displayName: 'Atelier Noire', handle: '@atelier.noire', accountType: 'Seller', current: role === 'seller' },
   ];
 
-  const realAccounts: AccountRow[] = (sessions ?? [])
-    .filter((session) => session.status === 'active' && session.user)
-    .map((session) => {
-      const sessionUser = session.user!;
-      // No per-account role signal exists in Clerk's own session/user object
-      // (role lives in this device's own RoleContext, per-user-scoped) — the
-      // active session's row can read the live role; a different, inactive
-      // session's account type isn't knowable without a dedicated backend
-      // field, so it's labelled generically rather than guessed.
-      const isActive = session.id === activeSessionId;
-      return {
-        id: session.id,
-        displayName: getDisplayName(sessionUser),
-        handle: getHandle(sessionUser),
-        imageUri: sessionUser.imageUrl,
-        accountType: isActive ? (role === 'seller' ? 'Brand' : 'Buyer') : 'Buyer',
-        current: isActive,
-      } as AccountRow;
-    });
+  const realAccounts: AccountRow[] = activeSessions.map((session) => {
+    const sessionUser = session.user!;
+    const isActive = session.id === activeSessionId;
+    const info = serverInfo[sessionUser.id];
+    return {
+      id: session.id,
+      displayName: getDisplayName(sessionUser, info?.displayName),
+      handle: getHandle(sessionUser, info?.username),
+      imageUri: info?.avatarUrl ?? sessionUser.imageUrl,
+      accountType: resolveAccountTypeLabel(isActive, role, info?.accountType),
+      current: isActive,
+    };
+  });
 
   const accounts = isPreview ? previewAccounts : realAccounts;
+  const atCap = !isPreview && isAtAccountCap(activeSessions.length);
 
   async function handleSwitch(account: AccountRow) {
-    if (account.current || switchingId) return;
+    if (account.current || switchingId || loggingOutId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (isPreview) {
       // No real second session in preview — just flip the local role so the
@@ -124,11 +135,51 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
     try {
       await setActive({ session: account.id });
       onClose();
-      // AuthGate re-routes to the right buyer/seller shell once Clerk
+      // AuthGate re-routes to the right buyer/seller shell (reading the
+      // now-active account's own server-authoritative role) once Clerk
       // propagates the new session; no manual navigation needed here.
     } catch {
       setSwitchingId(null);
     }
+  }
+
+  async function handleLogOut(account: AccountRow) {
+    if (isPreview || switchingId || loggingOutId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      `Log out @${account.handle.replace(/^@/, '')}?`,
+      account.current
+        ? "You'll stay logged into your other accounts."
+        : undefined,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log out', style: 'destructive',
+          onPress: async () => {
+            setLoggingOutId(account.id);
+            try {
+              // Ends just this one session — the documented way to sign a
+              // single account out of a multi-session device without
+              // touching any other signed-in session.
+              await clerk.signOut({ sessionId: account.id });
+            } catch {
+              Alert.alert('Error', "Couldn't log out that account. Try again.");
+            } finally {
+              setLoggingOutId(null);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleAddAccountPress() {
+    if (atCap) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert('Account limit reached', MAX_ACCOUNTS_MESSAGE);
+      return;
+    }
+    setShowAddAccount(true);
   }
 
   function handleLogIntoExisting() {
@@ -222,21 +273,35 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
                 avatar={{ uri: account.imageUri, name: account.displayName }}
                 title={account.handle}
                 subtitle={account.accountType}
-                disabled={!!switchingId}
+                disabled={!!switchingId || !!loggingOutId}
                 onPress={account.current ? undefined : () => handleSwitch(account)}
                 testID={`account-switcher-row-${account.id}`}
                 right={
-                  switchingId === account.id ? (
-                    <Feather name="loader" size={18} color={colors.mutedForeground} />
-                  ) : account.current ? (
-                    <View style={[s.checkBadge, { backgroundColor: colors.primary }]}>
-                      <Feather name="check" size={13} color={colors.primaryForeground} />
-                    </View>
-                  ) : account.unreadCount ? (
-                    <View style={s.unreadBadge}>
-                      <Text style={s.unreadBadgeText}>{account.unreadCount > 9 ? '9+' : account.unreadCount}</Text>
-                    </View>
-                  ) : null
+                  <View style={s.rowRight}>
+                    {switchingId === account.id || loggingOutId === account.id ? (
+                      <Feather name="loader" size={18} color={colors.mutedForeground} />
+                    ) : (
+                      <>
+                        {account.current && (
+                          <View style={[s.checkBadge, { backgroundColor: colors.primary }]}>
+                            <Feather name="check" size={13} color={colors.primaryForeground} />
+                          </View>
+                        )}
+                        {!isPreview && (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Log out ${account.handle}`}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            disabled={!!switchingId || !!loggingOutId}
+                            onPress={() => handleLogOut(account)}
+                            style={s.logOutBtn}
+                          >
+                            <Feather name="log-out" size={16} color={colors.mutedForeground} />
+                          </Pressable>
+                        )}
+                      </>
+                    )}
+                  </View>
                 }
               />
             ))}
@@ -247,7 +312,9 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
           <ListRow
             icon="plus-circle"
             title="Add account"
-            onPress={() => setShowAddAccount(true)}
+            subtitle={atCap ? MAX_ACCOUNTS_MESSAGE : undefined}
+            disabled={atCap}
+            onPress={handleAddAccountPress}
             testID="account-switcher-add-account"
           />
         </>
@@ -265,13 +332,10 @@ function styles(colors: ReturnType<typeof useColors>) {
     headerTitle: { ...TYPE_SCALE.title2, fontFamily: FONT.semibold, color: colors.foreground },
     list: { paddingHorizontal: SPACING.md },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: SPACING.xs },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
     checkBadge: {
       width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
     },
-    unreadBadge: {
-      minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5,
-      alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent,
-    },
-    unreadBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, color: colors.accentForeground },
+    logOutBtn: { padding: 2 },
   });
 }
