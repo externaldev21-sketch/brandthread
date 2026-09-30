@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T07:00:18.586Z (partial run — time budget hit).
+Generated 2026-09-30T07:05:53.822Z (partial run — time budget hit).
 
 - Route files discovered: 266
-- Route × role combinations audited: 1018
+- Route × role combinations audited: 1042
 - Unreachable: 12
-- Total findings: 4887 (hard: 962, warn: 3925)
+- Total findings: 5002 (hard: 984, warn: 4018)
 
 ## Scoreboard by area/owner
 
@@ -13,10 +13,10 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 
 | Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |
 |---|---|---|---|---|---|
-| store+account (session 01Cdzzzi) | 250 | 831 | 58 | 0 | 58 |
+| store+account (session 01Cdzzzi) | 258 | 847 | 60 | 0 | 60 |
 | seller commerce (session 011WGHYC) | 166 | 478 | 37 | 0 | 37 |
-| profiles+social (session 01MjTkyh) | 146 | 995 | 45 | 0 | 45 |
-| buyer (session 01AaWLh1) | 122 | 599 | 36 | 0 | 36 |
+| profiles+social (session 01MjTkyh) | 150 | 999 | 46 | 0 | 46 |
+| buyer (session 01AaWLh1) | 132 | 672 | 39 | 0 | 39 |
 | growth (session 019SGXKf) | 102 | 310 | 24 | 0 | 24 |
 | design (session 01DgPbif) | 88 | 294 | 28 | 0 | 28 |
 | supply (session 01Lbcp8K) | 66 | 294 | 20 | 0 | 20 |
@@ -39,18 +39,18 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| type-scale-drift | warn | 1750 |
-| hit-target-too-small | warn | 1076 |
-| console-error | hard | 766 |
-| contrast-violation | warn | 433 |
-| overlapping-text | warn | 248 |
+| type-scale-drift | warn | 1786 |
+| hit-target-too-small | warn | 1100 |
+| console-error | hard | 787 |
+| contrast-violation | warn | 438 |
+| overlapping-text | warn | 254 |
 | clipped-text | warn | 176 |
+| min-size-violation | warn | 111 |
 | preview-demo-wording | hard | 104 |
-| min-size-violation | warn | 97 |
-| font-family | warn | 92 |
+| font-family | warn | 100 |
 | placeholder-copy | hard | 72 |
 | color-rule-violation | warn | 53 |
-| error-boundary | hard | 16 |
+| error-boundary | hard | 17 |
 | repeated-labels | hard | 4 |
 
 ## Unreachable routes
@@ -72,7 +72,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (2751)
+### Other (2775)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -995,7 +995,7 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/customer-accounts` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer accounts" | [view](../../docs/audit/screenshots/customer-accounts/seller/00-initial.png) |
 | `/customer-accounts` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer accounts" | [view](../../docs/audit/screenshots/customer-accounts/seller/00-initial.png) |
 
-### Buyer discover / feed (240)
+### Buyer discover / feed (248)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -1027,6 +1027,10 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/live-feed` | seller | demo | console-error | hard | Failed to load because no supported source was found. | [view](../../docs/audit/screenshots/live-feed/seller/00-initial.png) |
 | `/live-feed` | buyer | fresh | console-error | hard | Failed to load because no supported source was found. | [view](../../docs/audit/screenshots/live-feed/buyer/00-initial.png) |
 | `/live-feed` | buyer | demo | console-error | hard | Failed to load because no supported source was found. | [view](../../docs/audit/screenshots/live-feed/buyer/00-initial.png) |
+| `/u/northlinestudio` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/u-northlinestudio/seller/00-initial.png) |
+| `/u/northlinestudio` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/u-northlinestudio/seller/00-initial.png) |
+| `/u/northlinestudio` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/u-northlinestudio/buyer/00-initial.png) |
+| `/u/northlinestudio` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/u-northlinestudio/buyer/00-initial.png) |
 | `/(buyer)/discover-feed` | seller | fresh | contrast-violation | warn | contrast 1.06:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(10, 10, 11) | [view](../../docs/audit/screenshots/-buyer-discover-feed/seller/00-initial.png) |
 | `/(buyer)/discover-feed` | seller | demo | contrast-violation | warn | contrast 1.06:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(10, 10, 11) | [view](../../docs/audit/screenshots/-buyer-discover-feed/seller/00-initial.png) |
 | `/(buyer)/discover-feed` | buyer | fresh | contrast-violation | warn | contrast 1.06:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(10, 10, 11) | [view](../../docs/audit/screenshots/-buyer-discover-feed/buyer/00-initial.png) |
@@ -1239,6 +1243,10 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/live-feed` | buyer | demo | hit-target-too-small | warn | 38x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/live-feed/buyer/00-initial.png) |
 | `/live-feed` | buyer | demo | hit-target-too-small | warn | 38x44px control "button" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/live-feed/buyer/00-initial.png) |
 | `/live-feed` | buyer | demo | hit-target-too-small | warn | 38x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/live-feed/buyer/00-initial.png) |
+| `/u/northlinestudio` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profile" | [view](../../docs/audit/screenshots/u-northlinestudio/seller/00-initial.png) |
+| `/u/northlinestudio` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profile" | [view](../../docs/audit/screenshots/u-northlinestudio/seller/00-initial.png) |
+| `/u/northlinestudio` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profile" | [view](../../docs/audit/screenshots/u-northlinestudio/buyer/00-initial.png) |
+| `/u/northlinestudio` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profile" | [view](../../docs/audit/screenshots/u-northlinestudio/buyer/00-initial.png) |
 
 ### Manufacturer hub (216)
 
@@ -1460,6 +1468,227 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/manufacturer` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Broadcast one request to up to 10 manufacturers" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
 | `/manufacturer` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
 | `/manufacturer` | buyer | demo | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+
+### Messaging (214)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/(buyer)/inbox` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/ai-mockup-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/community-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/thread-cash` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-checkout` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-explainer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | buyer | demo | error-boundary | hard | Error-boundary fallback UI rendered | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
+| `/thread-explainer` | buyer | demo | console-error | hard | TypeError: t.__internal_state.signUpSignal is not a function
+    at http://127.0.0.1:38127/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:1626:25 | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
+| `/thread-product-detail` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-product-detail/seller/00-initial.png) |
+| `/thread-product-detail` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-product-detail/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | seller | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
+| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/community-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
+| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | hit-target-too-small | warn | 268x36px control "Couldn't load balance — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | fresh | hit-target-too-small | warn | 361x36px control "Couldn't load history — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | hit-target-too-small | warn | 268x36px control "Couldn't load balance — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | seller | demo | hit-target-too-small | warn | 361x36px control "Couldn't load history — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "$0.00" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "$18.45" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
+| `/thread-checkout` | seller | fresh | overlapping-text | warn | "Apt, suite, etc. (optional)" overlaps "Enter a valid email to continue" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | fresh | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | fresh | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | fresh | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | overlapping-text | warn | "Apt, suite, etc. (optional)" overlaps "Enter a valid email to continue" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | seller | demo | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/seller/00-initial.png) |
+| `/thread-checkout` | buyer | fresh | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | fresh | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | fresh | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | demo | overlapping-text | warn | "City" overlaps "Terms of Service" | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif" on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | demo | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-checkout` | buyer | demo | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-checkout/buyer/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Dashboard" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 52px not on declared FS scale (nearest 36) on "$0.00" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Mon" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Tue" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Wed" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Thu" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Fri" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Sat" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Sun" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Mon" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Tue" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Wed" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Thu" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Fri" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Sat" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Sun" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 69x36px control "Today" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 69x36px control "Week" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 69x36px control "Month" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 69x36px control "Year" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 69x36px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 94x40px control "Withdraw" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | fresh | hit-target-too-small | warn | 35x16px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Dashboard" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 52px not on declared FS scale (nearest 36) on "$1.2K" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Mon" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Tue" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Wed" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Thu" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Fri" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Sat" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | type-scale-drift | warn | font-size 9px not on declared FS scale (nearest 11) on "Sun" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Mon" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Tue" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Wed" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Thu" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Fri" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Sat" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | min-size-violation | warn | font-size 9px below the 11pt caption floor on "Sun" | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 69x36px control "Today" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 69x36px control "Week" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 69x36px control "Month" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 69x36px control "Year" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 69x36px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 94x40px control "Withdraw" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | seller | demo | hit-target-too-small | warn | 35x16px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/seller/00-initial.png) |
+| `/thread-explainer` | buyer | fresh | type-scale-drift | warn | font-size 40px not on declared FS scale (nearest 36) on "Welcome to
+the Thread." | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
+| `/thread-explainer` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 3:1) for "Enter the Thread" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
+| `/thread-explainer` | buyer | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "Something went wrong" | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
+| `/thread-explainer` | buyer | demo | hit-target-too-small | warn | 119x24px control "Go back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
+| `/thread-explainer` | buyer | demo | hit-target-too-small | warn | 123x24px control "Go home" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-explainer/buyer/00-initial.png) |
 
 ### Checkout / orders (180)
 
@@ -1949,142 +2178,6 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/shipping-delivery` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "3" | [view](../../docs/audit/screenshots/shipping-delivery/buyer/00-initial.png) |
 | `/shipping-delivery` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "0" | [view](../../docs/audit/screenshots/shipping-delivery/buyer/00-initial.png) |
 | `/shipping-delivery` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "0" | [view](../../docs/audit/screenshots/shipping-delivery/buyer/00-initial.png) |
-
-### Messaging (131)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/(buyer)/inbox` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/ai-mockup-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/community-chat` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/manufacturer-messages` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/thread-cash` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (400px into 260px): "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (325px into 253px): "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | clipped-text | warn | Text clipped (273px into 257px): "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Any chance the Ember hoodie ships before Friday? · #NS-1048" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "How does the Field Shell fit? I’m usually a medium." | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Got it, thanks for the tracking!" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Can I swap the hoodie to Bone? · #NS-1045" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Read" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Pin" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Mute" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | overlapping-text | warn | "Delete" overlaps "Will the cargo come back in rust?" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | seller | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/seller/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | clipped-text | warn | Text clipped (128px into 64px): "Your thoughts go here..." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Messages" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Send a message" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 36x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/seller/00-initial.png) |
-| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | overlapping-text | warn | "Tap the camera icon to add product or reference photos first." overlaps "2" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/seller/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Product Photography" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/community-chat` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/seller/00-initial.png) |
-| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Community chat" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Back to dashboard" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/manufacturer-messages` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | seller | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
-| `/manufacturer-messages` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/manufacturer-messages` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
-| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | fresh | hit-target-too-small | warn | 268x36px control "Couldn't load balance — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | fresh | hit-target-too-small | warn | 361x36px control "Couldn't load history — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | demo | hit-target-too-small | warn | 268x36px control "Couldn't load balance — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | seller | demo | hit-target-too-small | warn | 361x36px control "Couldn't load history — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/thread-cash/seller/00-initial.png) |
-| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
-| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "$0.00" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
-| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
-| `/thread-cash` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "How it works" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
-| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Thread Cash" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
-| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "$18.45" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
-| `/thread-cash` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "History" | [view](../../docs/audit/screenshots/thread-cash/buyer/00-initial.png) |
 
 ### AI / Studio tools (99)
 
