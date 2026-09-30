@@ -125,7 +125,7 @@ export default function NotificationsSettingsScreen() {
   return (
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Notifications" onBack={() => goBackOr(router, '/(tabs)/more')} />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Master switch ── */}
         <View style={s.section}>
@@ -176,6 +176,22 @@ export default function NotificationsSettingsScreen() {
             selectedIds={[selectedQuietHoursId]}
             onChange={handleQuietHoursChange}
           />
+        </View>
+
+        <View style={s.divider} />
+
+        {/* ── Other channels ── */}
+        <View style={s.section}>
+          <Card>
+            <ListRow
+              icon="mail"
+              title="Email & in-app"
+              subtitle="Choose what reaches your inbox and your activity feed"
+              subtitleNumberOfLines={2}
+              chevron
+              onPress={() => router.push('/notification-channels' as never)}
+            />
+          </Card>
         </View>
 
       </ScrollView>
