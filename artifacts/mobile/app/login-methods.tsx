@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -424,20 +425,14 @@ export default function LoginMethods() {
         presentationStyle="pageSheet"
         onRequestClose={closePasswordSetup}
       >
+        <ModalSafeArea>
         <View style={s.modal}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Add a password</Text>
-            <IconButton
-              name="x"
-              variant="plain"
-              size={20}
-              color={colors.foreground}
-              onPress={closePasswordSetup}
-              disabled={passwordSetupSaving}
-              testID="close-password-setup"
-              accessibilityLabel="Close"
-            />
-          </View>
+          <ScreenHeader
+            title="Add a password"
+            variant="modal"
+            onBack={closePasswordSetup}
+            backTestID="close-password-setup"
+          />
 
           <KeyboardAwareScrollViewCompat
             contentContainerStyle={s.passwordSetupBody}
@@ -516,22 +511,18 @@ export default function LoginMethods() {
             />
           </KeyboardAwareScrollViewCompat>
         </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* TOTP setup modal */}
-      <Modal visible={!!totpModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={!!totpModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setTotpModal(null); setVerifyCode(''); }}>
+        <ModalSafeArea>
         <View style={s.modal}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Set up authenticator app</Text>
-            <IconButton
-              name="x"
-              variant="plain"
-              size={20}
-              color={colors.foreground}
-              onPress={() => { setTotpModal(null); setVerifyCode(''); }}
-              accessibilityLabel="Close"
-            />
-          </View>
+          <ScreenHeader
+            title="Set up authenticator app"
+            variant="modal"
+            onBack={() => { setTotpModal(null); setVerifyCode(''); }}
+          />
 
           <ScrollView contentContainerStyle={s.modalBody}>
             <Text style={s.modalStep}>1. Open your authenticator app (Google Authenticator, Authy, 1Password, etc.)</Text>
@@ -582,6 +573,7 @@ export default function LoginMethods() {
             />
           </ScrollView>
         </View>
+        </ModalSafeArea>
       </Modal>
     </View>
   );
@@ -658,12 +650,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
 
   // TOTP modal
   modal: { flex: 1, backgroundColor: colors.background },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md, paddingTop: SPACING.xl, paddingBottom: SPACING.md,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
-  },
-  modalTitle: { ...TYPE_SCALE.headline, color: colors.foreground },
   modalBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
   modalStep: {
     ...TYPE_SCALE.callout, color: colors.foreground,

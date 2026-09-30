@@ -7,6 +7,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -416,17 +417,17 @@ export default function EditProfileScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? topPad + 44 : 0}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-        <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={handleBackPress}>
-          <Feather name="chevron-left" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit profile</Text>
-        <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
-            <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { opacity: 0.4 }]}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Edit profile"
+        onBack={handleBackPress}
+        rightElement={
+          <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
+              <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { opacity: 0.4 }]}>Save</Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       {/* Toast */}
       <Animated.View pointerEvents="none" style={[styles.toast, { opacity: toastOpacity }]}>
@@ -760,11 +761,6 @@ function ImageUploadRow({
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingBottom: 16,
-  },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
   saveText:    { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.accentLight },
 
   toast: {

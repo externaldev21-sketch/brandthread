@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
@@ -225,17 +226,15 @@ export default function LocationsScreen() {
       )}
 
       {/* Add / Edit Modal */}
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
+        <ModalSafeArea>
         <View style={[s.modal, { backgroundColor: colors.background }]}>
-          <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={s.modalCloseBtn}>
-              <Feather name="x" size={22} color={colors.foreground} />
-            </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: colors.foreground }]}>
-              {editTarget ? 'Edit location' : 'Add location'}
-            </Text>
-            <Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />
-          </View>
+          <ScreenHeader
+            title={editTarget ? 'Edit location' : 'Add location'}
+            variant="modal"
+            onBack={() => setModalVisible(false)}
+            rightElement={<Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />}
+          />
           <ScrollView contentContainerStyle={s.modalBody}>
             {[
               { label: 'Location name *', key: 'name', placeholder: 'e.g. Main Warehouse' },
@@ -259,6 +258,7 @@ export default function LocationsScreen() {
             ))}
           </ScrollView>
         </View>
+        </ModalSafeArea>
       </Modal>
     </View>
   );
@@ -294,9 +294,6 @@ const s = StyleSheet.create({
   iconAction: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Modal
   modal: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1 },
-  modalCloseBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  modalTitle: { fontSize: FS.base, fontFamily: FONT.bold },
   modalBody: { padding: 20, gap: 16, paddingBottom: 60 },
   formField: { gap: 6 },
   formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },

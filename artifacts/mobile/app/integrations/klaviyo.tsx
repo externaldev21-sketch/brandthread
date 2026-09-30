@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -97,7 +97,7 @@ export default function KlaviyoIntegrationScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <Header title="Klaviyo" />
+      <ScreenHeader title="Klaviyo" />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>

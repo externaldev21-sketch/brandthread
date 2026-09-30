@@ -14,7 +14,6 @@ import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
@@ -48,7 +47,6 @@ export default function LoginActivity() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
 
@@ -162,7 +160,7 @@ export default function LoginActivity() {
   );
 
   return (
-    <View style={[s.root, { paddingTop: headerTopInset }]}>
+    <View style={s.root}>
       <ScreenHeader title="Login activity" onBack={() => goBackOr(router)} />
 
       {loading ? (
