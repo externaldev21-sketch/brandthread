@@ -194,8 +194,8 @@ describe('seller bar full-screen deny-list', () => {
     });
   }
 
-  it('keeps the seller bar visible on the AI chat route', () => {
-    expect(setBlock()![1]).not.toContain("'ai-brain'");
+  it('hides the seller bar on the full-screen AI chat route', () => {
+    expect(setBlock()![1]).toContain("'ai-brain'");
   });
 
   // Normal pushed seller management screens — the bar must show on all of

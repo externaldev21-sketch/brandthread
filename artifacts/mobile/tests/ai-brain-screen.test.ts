@@ -21,22 +21,21 @@ const rootLayout = read('app/_layout.tsx');
 const aurora = read('components/ai/AuroraGlow.tsx');
 const composer = read('components/ai/AiComposer.tsx');
 
-// ─── Bug fix: composer/content must clear the tab bar + home indicator ───────
+// ─── Full-screen composer clears the home indicator without a seller bar ─────
 
-describe('ai-brain input is never behind the seller tab bar', () => {
-  it('the ai-brain route keeps the global seller tab bar mounted', () => {
+describe('ai-brain uses a full-screen composer', () => {
+  it('deny-lists the ai-brain route so the global seller tab bar stays hidden', () => {
     const setBlock = rootLayout.match(
       /const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
     );
     expect(setBlock, 'deny-list set must exist').toBeTruthy();
-    expect(setBlock![1]).not.toContain("'ai-brain'");
+    expect(setBlock![1]).toContain("'ai-brain'");
   });
 
-  it('reserves the shared seller tab-bar height at rest and a small gap above the keyboard', () => {
-    expect(screen).toContain('useTabBarMetrics(2)');
-    expect(screen).toContain('sellerBar.occupiedHeight');
-    expect(screen).toContain('keyboardVisible ? 8 : Math.max(sellerBar.occupiedHeight, noticeClearance)');
-    expect(screen).toContain('composerBottomInset');
+  it('uses only the safe-area bottom inset for the composer', () => {
+    expect(screen).toContain('const composerBottomInset = Math.max(insets.bottom, 8);');
+    expect(screen).toContain('bottomInset={composerBottomInset}');
+    expect(screen).not.toContain('sellerBar.occupiedHeight');
   });
 
   it('uses KeyboardAvoidingView so the composer rises with the keyboard', () => {
@@ -59,10 +58,11 @@ describe('ai-brain input is never behind the seller tab bar', () => {
     expect(composer).toContain('minHeight: 36');
   });
 
-  it('directs signed-out preview users to real sign-in instead of pretending AI can answer', () => {
-    expect(screen).toContain("router.push('/sign-in'");
+  it('uses preview replies for signed-out previews and guards signed-in token failures', () => {
     expect(screen).toContain('if (!isSignedIn)');
-    expect(screen).toContain('const token = await getToken()');
+    expect(screen).toContain('sendPreviewMessageStream(');
+    expect(screen).toContain('const token = await getToken().catch(() => null)');
+    expect(screen).toContain("Couldn't verify your session. Tap Retry.");
   });
 });
 
