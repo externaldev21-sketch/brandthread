@@ -5,7 +5,7 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
-import { activeShippingProvider, createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippingProvider";
+import { createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippo";
 import { parcelInputError, suggestParcel } from "../lib/parcelSuggestion";
 import { isPendingProviderPurchase } from "../lib/shippingOperationPolicy";
 import {
@@ -204,7 +204,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       }
 
       [label] = await tx.insert(shippingLabels).values({
-        orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId, provider: activeShippingProvider(),
+        orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId,
         providerShipmentId: quote.providerShipmentId,
         carrier: quote.carrier, service: quote.service,
         priceCents, status: "purchasing", previousOrderStatus: order.status,

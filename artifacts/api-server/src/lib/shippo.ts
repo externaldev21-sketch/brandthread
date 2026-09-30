@@ -3,24 +3,12 @@ import { withRetry } from "./retry";
 
 const connectors = new ReplitConnectors();
 
-const SHIPPO_API_BASE = "https://api.goshippo.com";
-
-/** Shippo API key from the environment; when unset the Replit connector is used. */
-export function shippoApiKey(): string | null {
-  return process.env.SHIPPO_API_KEY?.trim() || null;
-}
-
 async function shippoRequest<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const apiKey = shippoApiKey();
-  const headers = { "Content-Type": "application/json", Accept: "application/json" };
-  const body = init.body === undefined ? undefined : JSON.stringify(init.body);
-  const response = apiKey
-    ? await fetch(`${SHIPPO_API_BASE}${path}`, {
-      method: init.method ?? "GET",
-      headers: { ...headers, Authorization: `ShippoToken ${apiKey}` },
-      body,
-    })
-    : await connectors.proxy("shippo", path, { method: init.method ?? "GET", headers, body });
+  const response = await connectors.proxy("shippo", path, {
+    method: init.method ?? "GET",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
   const text = await response.text();
   if (!response.ok) {
     throw Object.assign(new Error(`Shipping provider request failed (${response.status})`), {
