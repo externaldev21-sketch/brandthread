@@ -26,8 +26,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
@@ -96,7 +96,6 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>('pick');
@@ -540,16 +539,11 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
-          <Feather name="arrow-left" size={ICON.sm} color={FG} />
-        </TouchableOpacity>
-        <View style={s.headerText}>
-          <Text style={s.headerTitle}>Remove Background</Text>
-          <Text style={s.headerSub}>Clean product cutouts in seconds</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Remove Background"
+        subtitle="Clean product cutouts in seconds"
+        onBack={() => goBackOr(router)}
+      />
 
       <View style={s.modeRow}>
         <SegmentedControl
@@ -757,13 +751,8 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         presentationStyle="formSheet"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <View style={[s.pickerRoot, { paddingTop: headerTopInset + SP.md }]}>
-          <View style={s.pickerHeader}>
-            <Text style={s.pickerTitle}>Choose a product</Text>
-            <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
-              <Feather name="x" size={ICON.sm} color={FG} />
-            </TouchableOpacity>
-          </View>
+        <SafeAreaProvider style={s.pickerRoot}>
+          <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
           <Text style={s.pickerSub}>The cutout will be added to the product's media gallery</Text>
 
           {loadingProducts ? (
@@ -795,7 +784,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
               )}
             />
           )}
-        </View>
+        </SafeAreaProvider>
       </Modal>
     </View>
   );
@@ -839,13 +828,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:             { flex: 1 },
   scroll:           { flex: 1 },
   scrollContent:    { padding: SP.md, gap: SP.lg },
-
-  // Header
-  header:           { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
-  backBtn:          { width: 36, height: 36, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  headerText:       { flex: 1 },
-  headerTitle:      { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  headerSub:        { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
 
   // Upload zone
   uploadSection:    { gap: SP.sm },
@@ -913,9 +895,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Product picker modal
   pickerRoot:       { flex: 1, backgroundColor: SURFACE },
-  pickerHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  pickerTitle:      { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  pickerSub:        { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, paddingHorizontal: SP.md, marginBottom: SP.sm },
+  pickerSub:        { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, paddingHorizontal: SP.md, marginTop: SP.sm, marginBottom: SP.sm },
   productRow:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
   productThumb:     { width: 52, height: 52, borderRadius: RADIUS.sm, backgroundColor: CARD },
   productThumbEmpty:{ alignItems: 'center', justifyContent: 'center' },

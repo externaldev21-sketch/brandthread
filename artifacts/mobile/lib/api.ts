@@ -1007,6 +1007,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           // for "today"). No equivalent exists for balances — those are a
           // point-in-time snapshot, not a period sum.
           previous: { totalCents: number; orderCount: number; visitorCount: number };
+          // Real per-source breakdown (Discover feed / Search / Your profile /
+          // External links), for the same range as everything else above.
+          trafficSources: Array<{ source: 'feed' | 'search' | 'profile' | 'external'; count: number; sharePercent: number }>;
           buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
           // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
           // buckets land on the seller's local calendar day, not the server's.
@@ -2240,6 +2243,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
       recordVisit: (sellerId: string) =>
         post<void>(`/api/public/sellers/${encodeURIComponent(sellerId)}/visit`, {}),
+      /**
+       * Real, per-source traffic tracking for the seller Dashboard's Traffic
+       * sources panel. Works for signed-out shoppers too (no auth required) —
+       * this is analytics, not a user action. Fire-and-forget by design: never
+       * await this from a screen's own render/loading path.
+       */
+      recordStoreVisit: (sellerId: string, opts: { source: 'feed' | 'search' | 'profile' | 'external'; productId?: string | null }) =>
+        post<void>(`/api/public/sellers/${encodeURIComponent(sellerId)}/store-visits`, {
+          source: opts.source,
+          productId: opts.productId ?? undefined,
+        }),
     },
     /** Buyer-facing drops listing (active, with countdown releaseAt) */
     publicDrops: {

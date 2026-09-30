@@ -1,8 +1,9 @@
 /**
- * SellerDashboardTrafficSources — item 126 (traffic sources half). The
- * backend's storefront_visits table has no source/referrer column, so this
- * card must show the one real number that exists (total visits) and never
- * fabricate a per-source split.
+ * SellerDashboardTrafficSources — real per-source breakdown (item 126,
+ * finished). Backed by the `store_visits` table (migration 108) and the
+ * `trafficSources` field GET /api/analytics/home now returns for the same
+ * range as the rest of the dashboard. No lock row, no dashes — a fresh
+ * store with no visits yet shows a real 0 for every source.
  */
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -27,6 +28,7 @@ vi.mock('@expo/vector-icons', () => {
 });
 
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
+import { EMPTY_TRAFFIC_SOURCES } from '@/lib/sellerHomeAnalytics';
 
 const theme = {
   text: '#F7F7FA',
@@ -35,6 +37,13 @@ const theme = {
   borderSubtle: 'rgba(255,255,255,0.04)',
   cardElevated: '#1E1E22',
 } as any;
+
+const REAL_SOURCES = [
+  { source: 'feed' as const, count: 500, sharePercent: 40 },
+  { source: 'search' as const, count: 312, sharePercent: 25 },
+  { source: 'profile' as const, count: 250, sharePercent: 20 },
+  { source: 'external' as const, count: 188, sharePercent: 15 },
+];
 
 describe('SellerDashboardTrafficSources', () => {
   let renderer: ReactTestRenderer | null = null;
@@ -46,7 +55,9 @@ describe('SellerDashboardTrafficSources', () => {
 
   it('shows the real total visit count, compactly formatted', async () => {
     await act(async () => {
-      renderer = create(<SellerDashboardTrafficSources totalVisits={12480} theme={theme} />);
+      renderer = create(
+        <SellerDashboardTrafficSources totalVisits={12480} trafficSources={REAL_SOURCES} theme={theme} />,
+      );
     });
     const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
     expect(texts).toContain('12.5K');
@@ -55,27 +66,53 @@ describe('SellerDashboardTrafficSources', () => {
 
   it('shows a plain "No store visits yet" line for the zero/fresh state — never a bold "0"', async () => {
     await act(async () => {
-      renderer = create(<SellerDashboardTrafficSources totalVisits={0} theme={theme} />);
+      renderer = create(
+        <SellerDashboardTrafficSources totalVisits={0} trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme} />,
+      );
     });
     const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
     expect(texts).toContain('No store visits yet');
-    expect(texts).not.toContain('0');
     expect(texts).not.toContain('store visits this period');
   });
 
-  it('never fabricates a per-source number: every source category reads em-dash, not a number', async () => {
+  it('shows a real count and share for every source — no lock row, no dashes', async () => {
     await act(async () => {
-      renderer = create(<SellerDashboardTrafficSources totalVisits={500} theme={theme} />);
+      renderer = create(
+        <SellerDashboardTrafficSources totalVisits={1250} trafficSources={REAL_SOURCES} theme={theme} />,
+      );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
-    const dashCount = texts.filter((t) => t === '—').length;
-    expect(dashCount).toBe(4); // Discover, Search, Profile, External — one row each
-    expect(texts.join(' ')).toContain("isn't tracked yet");
+    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => String(t.props.children));
+    expect(texts).not.toContain('—');
+    expect(texts.join(' ')).not.toContain("isn't tracked yet");
+    expect(texts).toContain('500');
+    expect(texts).toContain('40%');
+    expect(texts).toContain('312');
+    expect(texts).toContain('25%');
+    expect(texts).toContain('250');
+    expect(texts).toContain('20%');
+    expect(texts).toContain('188');
+    expect(texts).toContain('15%');
+  });
+
+  it('a fresh store with no visits yet shows a real 0 (not a dash) for every source', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardTrafficSources totalVisits={0} trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme} />,
+      );
+    });
+    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => String(t.props.children));
+    expect(texts).not.toContain('—');
+    const zeroCount = texts.filter((t) => t === '0').length;
+    expect(zeroCount).toBe(4);
+    const zeroPercentCount = texts.filter((t) => t === '0%').length;
+    expect(zeroPercentCount).toBe(4);
   });
 
   it('lists all four real source categories by name', async () => {
     await act(async () => {
-      renderer = create(<SellerDashboardTrafficSources totalVisits={0} theme={theme} />);
+      renderer = create(
+        <SellerDashboardTrafficSources totalVisits={0} trafficSources={EMPTY_TRAFFIC_SOURCES} theme={theme} />,
+      );
     });
     const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
     expect(texts).toContain('Discover feed');

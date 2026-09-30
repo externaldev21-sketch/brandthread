@@ -26,7 +26,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { clearAccountLifecycleState } from '@/lib/accountService';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 
@@ -123,7 +123,7 @@ export default function DeleteAccountScreen() {
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Header title="Delete account" onBack={goBack} />
+      <ScreenHeader title="Delete account" onBack={goBack} />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
         {step === 'overview' ? (

@@ -17,10 +17,10 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   PressableScale, PrimaryButton, SecondaryButton, HapticSwitch, AnimatedEntrance,
 } from '@/components/BrandthreadUI';
@@ -38,7 +38,6 @@ export default function ReportScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{
@@ -127,23 +126,16 @@ export default function ReportScreen() {
   }
 
   const header = (
-    <View style={s.header}>
-      <PressableScale
-        onPress={step === 'details' ? () => setStep('reason') : close}
-        style={s.headerBtn}
-        accessibilityLabel={step === 'details' ? 'Back to reasons' : 'Close'}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Feather name={step === 'details' ? 'arrow-left' : 'x'} size={ICON.md} color={theme.text} />
-      </PressableScale>
-      <Text style={s.headerTitle}>Report</Text>
-      <View style={s.headerBtn} />
-    </View>
+    <ScreenHeader
+      title="Report"
+      variant={step === 'details' ? 'push' : 'modal'}
+      onBack={step === 'details' ? () => setStep('reason') : close}
+    />
   );
 
   if (!params.targetId) {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
+      <View style={s.root}>
         {header}
         <View style={s.centerState}>
           <Feather name="alert-circle" size={36} color={theme.muted} />
@@ -157,7 +149,8 @@ export default function ReportScreen() {
 
   if (step === 'done') {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset, paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[s.root, { paddingBottom: insets.bottom + SP.md }]}>
+        {header}
         <ScrollView contentContainerStyle={s.doneScroll} showsVerticalScrollIndicator={false}>
           <AnimatedEntrance>
             <View style={s.doneIcon}>
@@ -222,7 +215,7 @@ export default function ReportScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[s.root, { paddingTop: headerTopInset }]}
+      style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {header}
@@ -351,12 +344,6 @@ export default function ReportScreen() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-  },
-  headerBtn: { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   contextCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.md,
     backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border,

@@ -27,6 +27,7 @@ import { AppleEmoji } from '@/components/ui/AppleEmoji';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import {
   getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
   MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR,
@@ -899,39 +900,41 @@ export default function BuyerStoryViewer() {
         animationType="slide"
         onRequestClose={() => setViewerModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setViewerModalVisible(false)}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        />
-        <View style={[styles.viewerModal, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={styles.viewerModalHeader}>
-            <Text style={styles.viewerModalTitle}>
-              {serverViewers.length} {serverViewers.length === 1 ? 'viewer' : 'viewers'}
-            </Text>
-            <IconButton name="x" variant="plain" size={ICON.lg} color={FG} accessibilityLabel="Close" onPress={() => setViewerModalVisible(false)} />
-          </View>
-          <FlatList
-            data={serverViewers}
-            keyExtractor={item => item.userId}
-            renderItem={({ item }) => (
-              <View style={styles.viewerRow}>
-                <View style={[styles.viewerAvatar, { backgroundColor: PURPLE }]}>
-                  <Text style={styles.viewerInitials}>{item.name.charAt(0).toUpperCase()}</Text>
-                </View>
-                <View style={{ marginLeft: SP.sm, flex: 1 }}>
-                  <Text style={styles.viewerName}>{item.name}</Text>
-                  <Text style={styles.viewerHandle}>{item.handle}</Text>
-                </View>
-                <Text style={styles.viewerTime}>{timeAgo(new Date(item.viewedAt).getTime())}</Text>
-              </View>
-            )}
-            ListEmptyComponent={
-              <Text style={styles.noViewers}>{viewersLoading ? 'Loading…' : 'No viewers yet'}</Text>
-            }
+        <ModalSafeArea>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setViewerModalVisible(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           />
-        </View>
+          <View style={[styles.viewerModal, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.viewerModalHeader}>
+              <Text style={styles.viewerModalTitle}>
+                {serverViewers.length} {serverViewers.length === 1 ? 'viewer' : 'viewers'}
+              </Text>
+              <IconButton name="x" variant="plain" size={ICON.lg} color={FG} accessibilityLabel="Close" onPress={() => setViewerModalVisible(false)} />
+            </View>
+            <FlatList
+              data={serverViewers}
+              keyExtractor={item => item.userId}
+              renderItem={({ item }) => (
+                <View style={styles.viewerRow}>
+                  <View style={[styles.viewerAvatar, { backgroundColor: PURPLE }]}>
+                    <Text style={styles.viewerInitials}>{item.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ marginLeft: SP.sm, flex: 1 }}>
+                    <Text style={styles.viewerName}>{item.name}</Text>
+                    <Text style={styles.viewerHandle}>{item.handle}</Text>
+                  </View>
+                  <Text style={styles.viewerTime}>{timeAgo(new Date(item.viewedAt).getTime())}</Text>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.noViewers}>{viewersLoading ? 'Loading…' : 'No viewers yet'}</Text>
+              }
+            />
+          </View>
+        </ModalSafeArea>
       </Modal>
 
       {showGestureGuide && myUserId && (

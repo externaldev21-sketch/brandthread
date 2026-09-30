@@ -1176,7 +1176,8 @@ export default function OrdersScreen() {
       ) : (
         <EmptyState
           icon="shopping-bag"
-          message="Your orders will show up here once a buyer checks out."
+          title="No orders yet"
+          message="Orders show up here once a buyer checks out."
         />
       )}
     </View>

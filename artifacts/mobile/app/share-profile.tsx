@@ -29,7 +29,7 @@ import { useAuth, useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
@@ -168,7 +168,7 @@ export default function ShareProfileScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title="Share Profile" />
+      <ScreenHeader title="Share Profile" />
 
       <ScrollView
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + SP.xxl }]}
@@ -309,7 +309,7 @@ export default function ShareProfileScreen() {
 // Theme-aware factory (re-derived per render via useMemo) so every color reacts
 // to all 12 themes instead of a fixed static palette. The header/back-button
 // styles that used to live here are unused now that the screen renders the
-// shared <Header> component — removed rather than left as dead code.
+// shared <ScreenHeader> component — removed rather than left as dead code.
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },

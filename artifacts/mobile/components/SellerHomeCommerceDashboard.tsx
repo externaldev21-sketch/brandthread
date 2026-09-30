@@ -758,9 +758,17 @@ export default function SellerHomeCommerceDashboard({
                 </View>
               )}
 
-              {!newSeller && data && (
+              {/* Shown even for a brand-new seller — traffic can exist before
+                  the first sale, and the panel already has a real "No store
+                  visits yet" zero state below (never hidden behind the
+                  sales-only newSeller setup card). */}
+              {data && (
                 <View style={styles.section}>
-                  <SellerDashboardTrafficSources totalVisits={data.visitorCount} theme={theme} />
+                  <SellerDashboardTrafficSources
+                    totalVisits={data.visitorCount}
+                    trafficSources={data.trafficSources}
+                    theme={theme}
+                  />
                 </View>
               )}
 

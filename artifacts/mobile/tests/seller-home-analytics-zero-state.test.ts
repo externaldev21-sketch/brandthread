@@ -16,6 +16,12 @@ describe('zeroSellerHomeAnalytics', () => {
       toFulfill: 0,
       toCapture: 0,
       previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
+      trafficSources: [
+        { source: 'feed', count: 0, sharePercent: 0 },
+        { source: 'search', count: 0, sharePercent: 0 },
+        { source: 'profile', count: 0, sharePercent: 0 },
+        { source: 'external', count: 0, sharePercent: 0 },
+      ],
       buckets: [],
     });
   });
@@ -34,7 +40,14 @@ describe('selectSellerHomeAnalytics', () => {
   it('returns the snapshot only when its key matches the current seller and range exactly', () => {
     const data = {
       range: 'today', totalCents: 500, orderCount: 2, visitorCount: 10, toFulfill: 1, toCapture: 0,
-      previous: { totalCents: 300, orderCount: 1, visitorCount: 8 }, buckets: [],
+      previous: { totalCents: 300, orderCount: 1, visitorCount: 8 },
+      trafficSources: [
+        { source: 'feed' as const, count: 6, sharePercent: 60 },
+        { source: 'search' as const, count: 2, sharePercent: 20 },
+        { source: 'profile' as const, count: 1, sharePercent: 10 },
+        { source: 'external' as const, count: 1, sharePercent: 10 },
+      ],
+      buckets: [],
     };
     const snapshot = { key: sellerHomeAnalyticsKey('seller_1', 'today'), data };
     expect(selectSellerHomeAnalytics(snapshot, 'seller_1', 'today')).toEqual(data);

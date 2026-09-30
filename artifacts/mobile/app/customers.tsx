@@ -11,7 +11,7 @@ import { serviceRequest } from '@/lib/serviceConfig';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
 
@@ -197,7 +197,7 @@ export default function CustomersScreen() {
         <EmptyState
           icon="users"
           title={search.trim() ? 'No matching customers' : 'No customers yet'}
-          description={
+          message={
             search.trim()
               ? 'Try a different name, email or tag.'
               : 'Once someone buys from your store, they will show up here.'
@@ -206,7 +206,6 @@ export default function CustomersScreen() {
           // there's nothing a seller can "do" from an empty customer list
           // (see the fresh-preview empty-state action audit in this PR's
           // description).
-          action={undefined}
           compact
         />
       ) : (

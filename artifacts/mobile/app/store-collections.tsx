@@ -10,7 +10,8 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -23,7 +24,7 @@ import {
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
+  StatCard,
 } from '@/components/BrandthreadUI';
 import {
   getCollections, createCollection, updateCollection, deleteCollection,
@@ -254,7 +255,7 @@ export default function StoreCollectionsScreen() {
   if (mode === 'list') {
     return (
       <View style={styles.root}>
-        <Header
+        <ScreenHeader
           title="Collections"
           actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'Create collection' }]}
         />
@@ -264,8 +265,9 @@ export default function StoreCollectionsScreen() {
             <EmptyState
               icon="grid"
               title="No collections yet"
-              description="Group products into collections. Buyers can shop by category, style, or any criteria you choose."
-              action={{ label: '+ Create Collection', onPress: openNew, icon: 'plus' }}
+              message="Group products into collections. Buyers can shop by category, style, or any criteria you choose."
+              actionLabel="Create collection"
+              onAction={openNew}
             />
           </View>
         ) : (
@@ -312,7 +314,7 @@ export default function StoreCollectionsScreen() {
 
   return (
     <View style={styles.root}>
-      <Header
+      <ScreenHeader
         title={mode === 'new' ? 'New Collection' : 'Edit Collection'}
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
       />

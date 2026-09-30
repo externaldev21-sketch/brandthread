@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
@@ -1514,6 +1514,56 @@ router.post("/sellers/:sellerId/visit", requireAuth, async (req, res): Promise<v
     res.status(204).end();
   } catch (err) {
     req.log.error({ err, sellerId, visitorId }, "Storefront visit recording failed");
+    res.status(500).json({ error: "failed" });
+  }
+});
+
+// POST /api/public/sellers/:sellerId/store-visits
+// Real, per-source traffic tracking for the seller Dashboard's Traffic
+// sources panel (Discover feed / Search / Your profile / External links).
+// Deliberately NOT behind requireAuth — an anonymous, signed-out shopper's
+// visit is still real traffic and must still be counted (viewerUserId is
+// nullable). Distinct from the deduped /visit endpoint above, which feeds
+// the conversion-rate denominator; this one records every real visit so the
+// per-source breakdown isn't a fabricated split of that other number.
+// Accepts users.clerkId or users.id (UUID alias) — resolves to canonical clerkId.
+const STORE_VISIT_SOURCES = new Set(["feed", "search", "profile", "external"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.post("/sellers/:sellerId/store-visits", async (req, res): Promise<void> => {
+  const { sellerId } = req.params;
+  if (!sellerId || typeof sellerId !== "string") {
+    res.status(400).json({ error: "sellerId required" });
+    return;
+  }
+  const rawSource = typeof req.body?.source === "string" ? req.body.source : "external";
+  const source = STORE_VISIT_SOURCES.has(rawSource) ? rawSource : "external";
+  const rawProductId = typeof req.body?.productId === "string" ? req.body.productId : null;
+  const productId = rawProductId && UUID_RE.test(rawProductId) ? rawProductId : null;
+  // Optional — a signed-out shopper still counts; getAuth() never throws when
+  // there is no session, it just returns a null userId.
+  const { userId: viewerUserId } = getAuth(req);
+
+  try {
+    const canonicalClerkId = await resolveToClerkId(sellerId, "seller");
+    if (!canonicalClerkId) {
+      res.status(404).json({ error: "Seller not found" });
+      return;
+    }
+    // Don't count the seller viewing their own store/products.
+    if (viewerUserId && canonicalClerkId === viewerUserId) {
+      res.status(204).end();
+      return;
+    }
+    await db.insert(storeVisits).values({
+      sellerId: canonicalClerkId,
+      productId,
+      source,
+      viewerUserId: viewerUserId ?? null,
+    });
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err, sellerId, source, productId }, "Store visit recording failed");
     res.status(500).json({ error: "failed" });
   }
 });

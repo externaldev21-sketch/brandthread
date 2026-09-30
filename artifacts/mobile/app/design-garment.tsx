@@ -8,8 +8,8 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -71,7 +71,6 @@ export default function DesignGarmentScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const gs = createStyles(theme);
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ projectId?: string; garmentType?: string; garmentColor?: string }>();
 
@@ -118,20 +117,19 @@ export default function DesignGarmentScreen() {
 
   return (
     <View style={gs.root}>
-      {/* ── TOP BAR ── */}
-      <View style={[gs.topBar, { paddingTop: headerTopInset + 4 }]}>
-        <TouchableOpacity style={gs.backBtn} onPress={() => goBackOr(router)}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={gs.topTitle}>Garment Design</Text>
-        <TouchableOpacity
-          style={gs.openEditorBtn}
-          onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
-        >
-          <Feather name="edit-2" size={ICON.sm} color={PURPLE_LIGHT} />
-          <Text style={gs.openEditorText}>Open Editor</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Garment Design"
+        onBack={() => goBackOr(router)}
+        rightElement={(
+          <TouchableOpacity
+            style={gs.openEditorBtn}
+            onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
+          >
+            <Feather name="edit-2" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Text style={gs.openEditorText}>Open Editor</Text>
+          </TouchableOpacity>
+        )}
+      />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* ── GARMENT TYPE PICKER ── */}
@@ -288,9 +286,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  topBar:       { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
-  backBtn:      { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  topTitle:     { flex: 1, fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   openEditorBtn:{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderWidth: 1, borderColor: BORDER_ACTIVE },
   openEditorText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
 

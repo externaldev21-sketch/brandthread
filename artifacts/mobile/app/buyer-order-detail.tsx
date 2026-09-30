@@ -37,9 +37,11 @@ import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } 
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ResponsiveContainer } from '@/components/layout';
 import { OrderProgressTimeline } from '@/components/orders/OrderProgressTimeline';
 import { ShipmentHeadline, ShipmentMapPlaceholder, hasShipped, type ShipmentInfo } from '@/components/orders/ShipmentTracking';
@@ -264,6 +266,7 @@ function ReviewSheet({
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <ModalSafeArea>
       <TouchableOpacity
         style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' } as any}
         activeOpacity={1}
@@ -331,6 +334,7 @@ function ReviewSheet({
           </TouchableOpacity>
         </View>
       </SheetRise>
+      </ModalSafeArea>
     </Modal>
   );
 }
@@ -758,16 +762,19 @@ export default function BuyerOrderDetailScreen() {
 
   if (visibleLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.accent} size="large" />
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Order Details" onBack={() => goBackOr(router)} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.accent} size="large" />
+        </View>
       </View>
     );
   }
 
   if (fetchError && !order) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Order Details" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Order Details" onBack={() => goBackOr(router)} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
           <Feather name="wifi-off" size={40} color={theme.muted} />
           <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
@@ -781,8 +788,8 @@ export default function BuyerOrderDetailScreen() {
 
   if (!order) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Order Details" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Order Details" onBack={() => goBackOr(router)} />
         <View style={{ flex: 1 }} />
       </BrandthreadScreen>
     );
@@ -803,9 +810,9 @@ export default function BuyerOrderDetailScreen() {
   const canLeaveReview = order.status === 'delivered' && !reviewSubmitted && isRealOrderId(order.id);
 
   return (
-    <BrandthreadScreen>
+    <BrandthreadScreen noSafeTop>
       {/* Header */}
-      <BrandthreadHeader
+      <ScreenHeader
         title={`Order ${order.orderNumber}`}
         subtitle={order.sellerName}
         onBack={() => goBackOr(router)}
@@ -1149,29 +1156,31 @@ export default function BuyerOrderDetailScreen() {
 
       {/* ── Cancel Confirmation Modal ─────────────────────────────────────── */}
       <Modal visible={showCancelModal} transparent animationType="slide" onRequestClose={() => setShowCancelModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
-            <View style={{ alignItems: 'center', marginBottom: SP.md }}>
-              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.error}24`, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
-                <Feather name="x-circle" size={24} color={theme.error} />
+        <ModalSafeArea>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+              <View style={{ alignItems: 'center', marginBottom: SP.md }}>
+                <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.error}24`, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
+                  <Feather name="x-circle" size={24} color={theme.error} />
+                </View>
+                <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Cancel this order?</Text>
               </View>
-              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Cancel this order?</Text>
-            </View>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
-              Your payment will be fully refunded. Refunds typically appear within 5–10 business days depending on your bank.
-            </Text>
-            <View style={{ flexDirection: 'row', gap: SP.sm }}>
-              <SecondaryButton label="Keep Order" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
-              <TouchableOpacity
-                style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: `${theme.error}24`, borderWidth: 1, borderColor: `${theme.error}60`, alignItems: 'center', justifyContent: 'center' }}
-                onPress={handleCancelOrder}
-                activeOpacity={0.8}
-              >
-                <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Yes, Cancel</Text>
-              </TouchableOpacity>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
+                Your payment will be fully refunded. Refunds typically appear within 5–10 business days depending on your bank.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: SP.sm }}>
+                <SecondaryButton label="Keep Order" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
+                <TouchableOpacity
+                  style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: `${theme.error}24`, borderWidth: 1, borderColor: `${theme.error}60`, alignItems: 'center', justifyContent: 'center' }}
+                  onPress={handleCancelOrder}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Yes, Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* ── Depop-style Review Sheet ──────────────────────────────────────── */}
