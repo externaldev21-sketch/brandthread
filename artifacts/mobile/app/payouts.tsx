@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -64,7 +64,7 @@ function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
 export default function PayoutsScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
+  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const router = useRouter();
   const params = useLocalSearchParams();
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
@@ -295,7 +295,11 @@ export default function PayoutsScreen() {
       </View>
 
       {activeTab === 'payouts' ? (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + COMP.tabBarH + SP.md }]}>
+        <ScrollView contentContainerStyle={[
+          styles.list,
+          { paddingBottom: tabBarMetrics.occupiedHeight + SP.md },
+          payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
+        ]}>
           {loading ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
@@ -331,7 +335,7 @@ export default function PayoutsScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + COMP.tabBarH + SP.md }]}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: tabBarMetrics.occupiedHeight + SP.md }]}>
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
