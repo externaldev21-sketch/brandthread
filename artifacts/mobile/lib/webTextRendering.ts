@@ -51,6 +51,47 @@ export function injectWebTextRenderingStyles() {
 }
 
 /**
+ * Clips the whole app to exactly one viewport (the device frame, in a
+ * phone-frame preview like Replit's): `html`/`body`/`#root` are pinned to
+ * `100%`/`100dvh` with `overflow: hidden`, so the outer document itself can
+ * never scroll or grow taller than the viewport. Every screen's own content
+ * still scrolls normally — this only removes the OUTER page's ability to
+ * scroll, which is what let content spill out past the bottom of a
+ * phone-frame preview's rounded device edge when some element's layout
+ * pushed the real document height taller than the visible frame (seen live:
+ * the seller dashboard's "Traffic sources" section visible under the
+ * floating tab bar and past the frame's own bottom edge).
+ *
+ * `100dvh` (dynamic viewport height, falls back silently to `100vh` on
+ * browsers that don't support it) rather than a fixed `100vh`, so a mobile
+ * browser's own address-bar show/hide doesn't leave a stale, too-tall value.
+ *
+ * Same reasoning as the other injectors here: this needs to run before any
+ * screen mounts, from lib/bootstrap.ts, since there's no live index.html/
+ * global stylesheet for this build to hand-edit.
+ */
+export function injectWebRootClipStyles() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById('bt-root-clip')) return; // idempotent (fast refresh, re-imports)
+
+  const style = document.createElement('style');
+  style.id = 'bt-root-clip';
+  style.textContent = `
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+    #root {
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/**
  * Kills the browser's default focus ring on every text input/textarea on
  * web — react-native-web renders `<TextInput>` as a real `<input>`/
  * `<textarea>`, which Chromium outlines with its native focus ring
