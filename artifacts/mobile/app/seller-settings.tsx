@@ -52,7 +52,6 @@ export default function SellerSettingsScreen() {
   const [accountScope, setAccountScope] = useState<'global' | 'us' | null>(null);
   const [scopeLoading, setScopeLoading] = useState(false);
   const [scopeSaving, setScopeSaving] = useState<'global' | 'us' | null>(null);
-  const [scopeLoadError, setScopeLoadError] = useState<string | null>(null);
   const [scopeSaveError, setScopeSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,13 +89,12 @@ export default function SellerSettingsScreen() {
     setScopeVisible(true);
     setScopeLoading(true);
     setAccountScope(null);
-    setScopeLoadError(null);
     setScopeSaveError(null);
     try {
       const data = await api.seller.getSettings();
       setAccountScope(data.settings?.accountScope === 'us' ? 'us' : 'global');
     } catch {
-      setScopeLoadError('Could not load your current choice. Try again, or choose an option to save.');
+      // Leave both choices unselected; saving one still requires a successful request.
     } finally {
       setScopeLoading(false);
     }
@@ -113,7 +111,7 @@ export default function SellerSettingsScreen() {
       setAccountScope(nextScope);
       setScopeVisible(false);
     } catch {
-      setScopeSaveError('Could not save account reach. Check your connection and try again.');
+      setScopeSaveError('Your choice was not saved. Check your connection.');
     } finally {
       setScopeSaving(null);
     }
@@ -216,11 +214,9 @@ export default function SellerSettingsScreen() {
         visible={scopeVisible}
         loading={scopeLoading}
         saving={scopeSaving}
-        loadError={scopeLoadError}
         saveError={scopeSaveError}
         value={accountScope}
         onChoose={chooseAccountScope}
-        onRetry={() => { void openAccountScope(); }}
         onClose={() => { if (!scopeSaving) setScopeVisible(false); }}
       />
     </View>
@@ -342,16 +338,14 @@ function SettingsRow({ icon, label, testID, onPress, destructive, soon, badge, l
 }
 
 function AccountScopeSheet({
-  visible, loading, saving, loadError, saveError, value, onChoose, onRetry, onClose,
+  visible, loading, saving, saveError, value, onChoose, onClose,
 }: {
   visible: boolean;
   loading: boolean;
   saving: 'global' | 'us' | null;
-  loadError: string | null;
   saveError: string | null;
   value: 'global' | 'us' | null;
   onChoose: (v: 'global' | 'us') => void;
-  onRetry: () => void;
   onClose: () => void;
 }) {
   const colors = useColors();
@@ -377,14 +371,6 @@ function AccountScopeSheet({
             </View>
           ) : (
             <View style={{ gap: 10 }}>
-              {loadError && (
-                <View style={s.loadError}>
-                  <Text accessibilityRole="alert" style={s.errorText}>{loadError}</Text>
-                  <TouchableOpacity style={s.retryButton} onPress={onRetry} disabled={!!saving} accessibilityRole="button" accessibilityLabel="Retry loading account reach">
-                    <Text style={s.retryText}>Try again</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
               <View style={{ gap: 10 }} accessibilityRole="radiogroup">
                 {([
                   { value: 'global' as const, label: 'Worldwide', description: 'Make your account available worldwide.', icon: 'globe' as const },
@@ -419,7 +405,7 @@ function AccountScopeSheet({
                   );
                 })}
               </View>
-              {saveError && <Text accessibilityRole="alert" style={s.errorText}>{saveError}</Text>}
+              {saveError && <Text accessibilityRole="alert" style={s.saveNotice}>{saveError}</Text>}
             </View>
           )}
         </View>
@@ -476,10 +462,7 @@ function makeScopeStyles(colors: ReturnType<typeof useColors>) {
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
     title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
     subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },
-    loadError: { alignItems: 'center', gap: 10, marginBottom: 8 },
-    errorText: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.destructive, textAlign: 'center' },
-    retryButton: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 10 },
-    retryText: { fontSize: 14, fontFamily: FONT.semibold, color: colors.foreground },
+    saveNotice: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center' },
     close: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
     option: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
     optionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondary },
