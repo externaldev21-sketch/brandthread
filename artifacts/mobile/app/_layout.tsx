@@ -715,12 +715,17 @@ function AuthGate() {
       // mismatch can happen here too (confirmed live:
       // "/profile?bt_preview=seller" loaded the buyer's own profile).
       // Mirroring that same correction for devRole, still without racing
-      // the atRoot redirect above.
+      // the atRoot redirect above. Preserves whatever comes after the group
+      // segment (e.g. "profile") rather than dropping to the group's own
+      // root — confirmed live that redirecting to the bare group root landed
+      // on the seller Dashboard instead of the seller Profile that
+      // "/profile?bt_preview=seller" actually asked for.
       if (!atRoot) {
+        const rest = (segments as string[]).slice(1).join('/');
         if (devRole === 'buyer' && inTabsGroup) {
-          router.replace('/(buyer)/' as never);
+          router.replace(`/(buyer)/${rest}` as never);
         } else if (devRole === 'seller' && inBuyerGroup) {
-          router.replace('/(tabs)/' as never);
+          router.replace(`/(tabs)/${rest}` as never);
         }
       }
       return;
