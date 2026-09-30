@@ -66,6 +66,36 @@ describe('seller tab switch transition', () => {
 });
 
 /**
+ * Live verification (a real device/preview session, not just this harness)
+ * caught the seller profile tab rendering shifted right by a varying amount
+ * on every load, never settling. Root cause: the tab layout's `settled`
+ * flag flips off a FIXED 280ms timer (app/(tabs)/_layout.tsx), not a real
+ * "animation finished" callback — React Navigation's bottom-tabs gives a
+ * plain sceneStyleInterpolator no such callback. On a heavier screen (the
+ * profile tab's video header/avatar/grid) or under load, the JS-driven
+ * fallback animation (native driver isn't supported on web) can still be
+ * mid-flight when that timer fires; reading `current.progress` at that
+ * moment used to bake the CURRENT (fractional, non-deterministic) value
+ * into a permanent transform that never corrected itself afterward.
+ */
+describe('forDirectionalSlide never freezes a settled scene at a fractional, off-target position', () => {
+  const shared = read('lib/tabSlideTransition.ts');
+
+  it('rounds the settled progress value to its nearest rest position (-1, 0, or 1) before using it', () => {
+    expect(shared).toContain('const restPosition = Math.round(currentValue(current.progress));');
+    expect(shared).toContain('const translateX = restPosition * width;');
+    // The old, buggy line this replaced — must not still be present.
+    expect(shared).not.toContain('const translateX = currentValue(current.progress) * width;');
+  });
+
+  it("the unsettled (live) branch is untouched — only the settled snapshot's read was rounded", () => {
+    const unsettledBranch = shared.slice(shared.indexOf('return {\n      sceneStyle: {\n        transform: [{'));
+    expect(unsettledBranch).toContain('current.progress.interpolate({');
+    expect(unsettledBranch).not.toContain('Math.round');
+  });
+});
+
+/**
  * The clipped press-highlight bug ("the transparency of the button is cut
  * off on each side"): mobile browsers draw their own translucent
  * tap-highlight rectangle on every pressed element, which doesn't share a

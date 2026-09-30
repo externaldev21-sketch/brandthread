@@ -176,6 +176,11 @@ describe('seller bar full-screen deny-list', () => {
     // never render underneath it (it previously did, and the AI composer
     // rendered behind it).
     'ai-brain',
+    // Seller<->buyer conversation thread: same full-screen-chat-with-its-own-
+    // composer category as ai-brain — confirmed live that the floating bar
+    // sat on top of it and silently intercepted every tap on the composer,
+    // including the Thread Cash attach button.
+    'seller-conversation',
   ];
 
   for (const route of mustHideBar) {
