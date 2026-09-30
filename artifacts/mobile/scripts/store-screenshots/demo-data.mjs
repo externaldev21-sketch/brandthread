@@ -859,7 +859,7 @@ export function respond({ method, path, query, role, options = {} }) {
   // user's own social profile + posts through these — used only by
   // scripts/share-profile-1to1-screenshots.mjs for the share-profile
   // rebuild's live verification; not part of the shipped app.
-  if ((match = p.match(/^\/social\/profile\/([^/]+)$/))) {
+  if ((match = p.match(/^\/social\/profile\/([^/]+)$/)) && decodeURIComponent(match[1]) === 'me') {
     const user = role === 'seller' ? SELLER_USER : BUYER_USER;
     const p2 = profileFor(role);
     return {

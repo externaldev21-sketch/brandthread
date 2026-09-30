@@ -38,11 +38,17 @@ async function open(page, activity, origin, role, target) {
   await page.goto(`${origin}/?bt_preview=${role}`);
   await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
   await waitForQuietNetwork(activity, 800, 15_000);
+  await page.waitForTimeout(3000);
   await page.evaluate(() => { localStorage.removeItem('user_role'); });
-  await page.evaluate((url) => {
-    history.pushState(history.state, '', url);
-    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-  }, target);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await page.evaluate((url) => {
+      history.pushState(history.state, '', url);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    }, target);
+    await page.waitForTimeout(1200);
+    const here = target.split('?')[0];
+    if (await page.evaluate((h) => location.pathname === h && document.querySelectorAll('[data-testid]').length > 2, here)) return;
+  }
 }
 
 async function settle(page, activity) {
