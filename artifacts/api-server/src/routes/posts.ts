@@ -25,6 +25,10 @@ import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { screenText, MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
+import {
+  isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs, signedUrlForObjectPath,
+} from "../lib/mediaModerationStore";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import {
   authorInGoodStanding,
@@ -723,6 +727,43 @@ router.post("/", requireAuth, async (req, res) => {
   }
   const safeSlideOverlays = slideOverlaysResult.records;
 
+  // Automatic media screening (off when the AI integration env is missing).
+  // Clear violations are rejected; anything flagged or unverifiable is held
+  // for a moderator and stays visible to its author only.
+  const isVideoPost = mediaType === "video";
+  const signed = async (path: string | undefined) => (path ? signedUrlForObjectPath(path) : undefined);
+  const storedUrls = mediaPath || resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []));
+  const composedPrimary = await signed(mediaPath);
+  const composedSlides = await Promise.all(resolvedMediaPaths.map((path) => signedUrlForObjectPath(path)));
+  const composedThumb = await signed(thumbnailPath);
+  const mediaRefs = {
+    images: [
+      ...(isVideoPost ? [] : [composedPrimary, ...storedUrls]),
+      ...composedSlides,
+      composedThumb ?? thumbnailUrl,
+    ].filter((v): v is string => !!v && v.length > 0),
+    videos: isVideoPost ? [composedPrimary ?? mediaUrl].filter((v): v is string => !!v) : [],
+    extraHosts: [req.get("host") ?? ""].filter(Boolean),
+  };
+  const mediaVerdict = mediaRefs.images.length + mediaRefs.videos.length > 0
+    ? await screenMediaRefs(mediaRefs)
+    : null;
+  if (mediaVerdict?.verdict === "reject") {
+    void recordRejectedUpload({ ownerId: clerkId, surface: "post", verdict: mediaVerdict });
+    return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED", categories: mediaVerdict.categories });
+  }
+  let textVerdict: Awaited<ReturnType<typeof screenText>> | null = null;
+  if (!captionHeld) {
+    textVerdict = await screenText(publicPostText(caption, hashtags));
+    if (textVerdict.verdict === "reject") {
+      void recordRejectedUpload({ ownerId: clerkId, surface: "post_text", verdict: textVerdict });
+      return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "CONTENT_REJECTED", categories: textVerdict.categories });
+    }
+  }
+  const screenHeld = (!!mediaVerdict && isFlagged(mediaVerdict)) || (!!textVerdict && isFlagged(textVerdict));
+  const heldVerdict = mediaVerdict && isFlagged(mediaVerdict) ? mediaVerdict : textVerdict;
+  const postHeld = captionHeld || screenHeld;
+
   const [post] = await db.insert(posts).values({
     userId:    clerkId,
     mediaUrl,
@@ -740,10 +781,24 @@ router.post("/", requireAuth, async (req, res) => {
     postStatus,
     scheduledAt: postStatus === "scheduled" ? parsedScheduledAt : null,
     publishedAt: postStatus === "published" ? now : null,
-    moderationStatus: captionHeld ? "held" : "visible",
-    moderationReason: captionDecision.action === "hold" ? captionDecision.category : null,
+    moderationStatus: postHeld ? "held" : "visible",
+    moderationReason: captionDecision.action === "hold"
+      ? captionDecision.category
+      : screenHeld ? `media:${(heldVerdict?.categories ?? []).join(",")}`.slice(0, 200) : null,
     updatedAt: now,
   }).returning();
+
+  if (!captionHeld && screenHeld && heldVerdict) {
+    await recordHeldMedia({
+      targetType: post.mediaType === "video" ? "video" : "post",
+      targetId: post.id,
+      ownerId: clerkId,
+      verdict: heldVerdict,
+      refs: [...mediaRefs.videos, ...mediaRefs.images].filter((ref) => !ref.includes("?")).slice(0, 4),
+      excerpt: publicPostText(caption, hashtags),
+      label: post.mediaType === "video" ? "Video" : "Post",
+    });
+  }
 
   if (captionDecision.action === "hold") {
     await enqueueAutoFilterReport({
@@ -800,8 +855,13 @@ router.post("/", requireAuth, async (req, res) => {
   return res.status(201).json({
     ...post,
     taggedProducts,
-    moderation: captionHeld
-      ? { status: "held", message: "Your caption is in review. The post stays hidden from others until a moderator approves it." }
+    moderation: postHeld
+      ? {
+          status: "held",
+          message: captionHeld
+            ? "Your caption is in review. The post stays hidden from others until a moderator approves it."
+            : MEDIA_HELD_MESSAGE,
+        }
       : { status: "visible" },
   });
 });
