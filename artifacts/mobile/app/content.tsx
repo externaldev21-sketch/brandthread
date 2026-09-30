@@ -14,6 +14,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 type FilterTab = 'all' | ContentStatus;
@@ -110,7 +111,11 @@ export default function ContentScreen() {
       })));
     } catch {
       setContent([]);
-      setLoadError(true);
+      // A dev web preview has no real signed-in account behind it, so a
+      // 401/404 there is expected and benign — show the normal empty state
+      // instead of an error banner. Only a real, authenticated account's
+      // fetch failure is a genuine outage worth a retry row for.
+      setLoadError(!isSellerDevPreview());
     } finally {
       setLoading(false);
     }
