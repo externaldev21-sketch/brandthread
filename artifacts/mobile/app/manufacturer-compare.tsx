@@ -11,6 +11,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { formatCents } from '@/lib/money';
 import { getFavoriteManufacturerIds, getManufacturer } from '@/services/manufacturerService';
 import { Manufacturer } from '@/services/manufacturerTypes';
@@ -43,6 +45,13 @@ export default function ManufacturerCompareScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
+    if (isSellerDevPreview()) {
+      const list = isPreviewDemoMode() ? getPreviewManufacturers() : [];
+      setSaved(list);
+      setSelected(new Set(list.slice(0, MIN_COMPARE).map((m) => m.id)));
+      setLoading(false);
+      return;
+    }
     try {
       const ids = await getFavoriteManufacturerIds();
       const profiles = await Promise.all(ids.map((id) => getManufacturer(id)));

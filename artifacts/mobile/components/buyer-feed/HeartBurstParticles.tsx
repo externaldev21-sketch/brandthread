@@ -74,6 +74,11 @@ export function HeartBurstParticles({ trigger }: { trigger: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
+  // At progress 0 every particle is opaque and still at the origin. Mounting
+  // them before the first double-tap stacks eight tiny white hearts into a
+  // permanent dot in the middle of every feed video.
+  if (trigger === 0) return null;
+
   return (
     <Animated.View pointerEvents="none" style={styles.host}>
       {PARTICLES.map((p, i) => (

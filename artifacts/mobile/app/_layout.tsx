@@ -68,6 +68,7 @@ import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
+import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
@@ -333,6 +334,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // seller tab bar rendered on top of the story camera's shutter row.
   'buyer-story-create',
   'buyer-story-viewer',
+  'story-mention-viewer',
   'buyer-live',
   'live-feed',
 ]);
@@ -1318,6 +1320,8 @@ function RootLayoutNav() {
             it — the floating bar is hidden automatically. */}
         <Stack.Screen name="buyer-search"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="story-mention-viewer"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="story-mentions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1502,8 +1506,10 @@ export default function RootLayout() {
                             <RuntimeThemeShell>
                               <ThreadPullProvider>
                                 <CallSessionProvider>
-                                  <RootLayoutNav />
-                                  <GlobalCallOverlay />
+                                  <FirstRunTipsProvider>
+                                    <RootLayoutNav />
+                                    <GlobalCallOverlay />
+                                  </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>
                             </RuntimeThemeShell>

@@ -21,6 +21,7 @@
  */
 import { getBlockedUsers, getMutedUsers } from '@/services/socialService';
 import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
+import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import { getPreviewDiscoverPosts, getPreviewBrandCards, getPreviewDiscoverPeople, getPreviewDrops } from '@/lib/previewDiscover';
 
 export type DiscoverPostMedia = 'photo' | 'video' | 'slideshow';
@@ -189,6 +190,12 @@ export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30
   }
 
   if (filter === 'fits') posts = posts.filter((p) => p.authorAccountType === 'buyer');
+  if (!isSignedIn) {
+    // Guests keep their list on this device; signed-in accounts are filtered
+    // server-side. An unreadable local list must not blank the whole grid.
+    const phrases = (await readGuestMutedWords().catch(() => [])).map((word) => word.phrase);
+    posts = posts.filter((post) => !matchesGuestMutedWords(post.caption, phrases));
+  }
 
   // Recency + engagement, interleaved so one account never dominates a run
   // of consecutive tiles (a simple, explainable v1 — no personalization

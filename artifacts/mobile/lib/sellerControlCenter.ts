@@ -108,7 +108,7 @@ export const SECTIONS: ControlCenterSection[] = [
     icon: 'shopping-bag',
     items: [
       { id: 'add-product', label: 'Add product', icon: 'plus-square', route: '/add-product', description: 'List a new item' },
-      { id: 'post-video',  label: 'Post video',   icon: 'video',       route: '/create-post', description: 'Share a shoppable post' },
+      { id: 'post-video',  label: 'Create post',  icon: 'video',       route: '/create-post', description: 'Share a shoppable post' },
       { id: 'go-live',     label: 'Go Live',      icon: 'radio',       route: '/seller-go-live', description: 'Start a live shopping stream' },
       { id: 'products',    label: 'Products',     icon: 'grid',        route: '/(tabs)/products', description: 'Your full catalog' },
       { id: 'orders',      label: 'Orders',       icon: 'shopping-bag', route: '/(tabs)/orders', description: 'Fulfill and track orders', badgeKey: 'orders' },

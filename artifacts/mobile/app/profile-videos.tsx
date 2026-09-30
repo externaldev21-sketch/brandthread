@@ -16,7 +16,7 @@ import FeedScreen from './(tabs)/feed';
 import { EmptyState } from '@/components/BrandthreadUI';
 
 export default function ProfileVideosScreen() {
-  const params = useLocalSearchParams<{ source?: string; id?: string; startPostId?: string; title?: string }>();
+  const params = useLocalSearchParams<{ source?: string; id?: string; startPostId?: string; title?: string; exactPost?: string }>();
   const source = params.source === 'product' ? 'product' : 'creator';
   const id = typeof params.id === 'string' ? params.id : '';
 
@@ -34,6 +34,7 @@ export default function ProfileVideosScreen() {
           id,
           startPostId: typeof params.startPostId === 'string' ? params.startPostId : undefined,
           title: typeof params.title === 'string' ? params.title : undefined,
+          exactPost: params.exactPost === '1',
         }}
       />
     </>

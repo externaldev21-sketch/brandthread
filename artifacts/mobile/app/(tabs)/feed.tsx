@@ -26,6 +26,7 @@ import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
+import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
 import {
@@ -84,7 +85,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
+import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
@@ -105,6 +106,8 @@ export interface CreatorFeedConfig {
   id: string;
   startPostId?: string;
   title?: string;
+  /** Explicit history replay: fetch the exact post even if the creator grid omits it. */
+  exactPost?: boolean;
 }
 
 const THREAD_PAGE_SIZE = 30;
@@ -1019,6 +1022,7 @@ type VideoVisualProps = {
   source: VideoSource;
   isActive: boolean;
   paused: boolean;
+  onWatched?: () => void;
   muted?: boolean;
   posterUri?: string;
   posterSource?: ImageSourcePropType;
@@ -1099,15 +1103,10 @@ const FULL_PAGE_COVER_CROP_THRESHOLD = 0.3;
  * Height of the sharp video frame. Full-bleed: the video always fills the
  * WHOLE page, all the way to the bottom edge — there is no shorter "stops at
  * the line" frame any more (that was PR #196's approach, rejected for
- * reading as an instant dead-stop). The floating tab-bar zone is instead a
- * frosted-glass overlay drawn on TOP of this same full-bleed frame, sampling
- * the live video/list actually behind it, rather than a separate shorter
- * frame plus a blurred copy of a poster image. That overlay (TabBarGlassZone)
- * is now rendered once, centrally, by BuyerTabBar itself (the one shared tab-
- * bar container mounted for the whole buyer navigator) rather than per video
- * page here — a fixed strip at the bottom of the viewport blurs whichever
- * page is currently in view exactly the same way a per-page copy would,
- * since only one page is ever visible at a time.
+ * reading as an instant dead-stop). There is no overlay of any kind behind
+ * the floating tab bar either (a later frosted-glass strip there was itself
+ * deleted — it read as a flickering dark band); clearance from the tab bar
+ * is handled purely by bottom padding on the scrollable content.
  *
  * `bottomStripHeight` is accepted purely so existing callers don't need to
  * change, but it no longer shrinks the frame itself or renders anything.
@@ -1165,6 +1164,7 @@ function LiveVideoVisual({
   source,
   isActive,
   paused,
+  onWatched,
   muted = false,
   posterUri,
   posterSource,
@@ -1255,6 +1255,7 @@ function LiveVideoVisual({
     return () => subscription.remove();
   }, [isActive, player, progressBottom]);
   const isScreenFocused = useIsFocused();
+  useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   React.useEffect(() => {
     // isFocused is required (not just isActive) so navigating to a modal on
     // top of the feed (e.g. the comments sheet) pauses this clip, and — the
@@ -1280,15 +1281,10 @@ function LiveVideoVisual({
   }, [player, rate]);
 
   // Full-bleed: the sharp video plays all the way to the bottom of the page
-  // again (frameHeight === pageHeight, see immersiveFrameHeight above). The
-  // frosted glass over the tab-bar zone is a real backdrop blur (CSS
-  // `backdrop-filter` on web, a native blur material on iOS/Android) of the
-  // live video actually behind it, not a separate shorter frame plus a
-  // blurred copy of a poster image — but it's rendered once by BuyerTabBar
-  // (see the shared TabBarGlassZone usage there), not per page here, since a
-  // fixed strip at the bottom of the viewport already blurs whichever page
-  // is currently visible. As the video plays, the blur updates in real time
-  // because it's sampling the live layer, not a frozen mirror.
+  // again (frameHeight === pageHeight, see immersiveFrameHeight above). There
+  // is no overlay behind the floating tab bar at all any more — clearance
+  // from it is handled by bottom padding on the scrollable content, not a
+  // blurred strip.
   //
   // Explicit size on the sharp-clip wrapper itself rather than trusting it
   // to inherit height from an ancestor: on web, absoluteFill inside a
@@ -1404,7 +1400,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1447,6 +1443,7 @@ function SpotlightPageImpl({
   onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
   onNotInterested: (id: string) => void;
+  onVideoWatched: (id: string) => void;
   /** Whether the app-wide feed sound preference is on. */
   soundOn: boolean;
   onToggleSound: () => void;
@@ -1658,6 +1655,7 @@ function SpotlightPageImpl({
                 isActive={isActive}
                 preload={preload}
                 paused={paused || holdPaused}
+                onWatched={() => onVideoWatched(item.id)}
                 rate={speedActive ? 2 : 1}
                 muted={!soundOn}
                 posterUri={item.videoPosterUri}
@@ -1864,6 +1862,7 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   && prev.onShopTag === next.onShopTag
   && prev.onOpenCreator === next.onOpenCreator
   && prev.onNotInterested === next.onNotInterested
+  && prev.onVideoWatched === next.onVideoWatched
   && prev.onToggleSound === next.onToggleSound
   && prev.reduceMotion === next.reduceMotion
 ));
@@ -2029,6 +2028,7 @@ export default function FeedScreen({
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
   const creatorStartPostId = creatorFeed?.startPostId;
+  const creatorExactPost = creatorFeed?.exactPost;
   // Search collapsed from its own bar row into a plain icon inside
   // buyerTopRow (TikTok-style), so the floating top overlay is now just
   // topBar's own paddingTop plus that one row's height — single source of
@@ -2193,9 +2193,13 @@ export default function FeedScreen({
       else setFeedRefreshing(true);
       setFeedError(false);
       try {
-        const result = await loadVideoFeedThrough(creatorSource, creatorId, initial ? creatorStartPostId : null);
+        const result = creatorExactPost && creatorSource === 'creator' && creatorStartPostId
+          ? await loadExactCreatorVideoReplay(creatorId, creatorStartPostId)
+          : await loadVideoFeedThrough(creatorSource, creatorId, initial ? creatorStartPostId : null);
         if (feedGenerationRef.current !== generation) return;
-        setSellerFeedPosts(result.posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null));
+        const playablePosts = result.posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+        if (creatorExactPost && playablePosts[0]?.id !== creatorStartPostId) throw new Error('Video unavailable');
+        setSellerFeedPosts(playablePosts);
         creatorOffsetRef.current = result.nextOffset;
         feedHasMoreRef.current = result.hasMore;
         setFeedHasMore(result.hasMore);
@@ -2262,7 +2266,7 @@ export default function FeedScreen({
         else setFeedRefreshing(false);
       }
     }
-  }, [feedTab, creatorSource, creatorId, creatorStartPostId]);
+  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
@@ -2615,6 +2619,11 @@ export default function FeedScreen({
     viewedPostIdsRef.current.add(id);
     api.posts.interact(id, { type: 'view' }).catch(() => {});
   }, [activeIndex, api, displayItems, userId]);
+
+  const handleVideoWatched = useCallback((id: string) => {
+    if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    void api.posts.recordWatchedVideo(id).catch(() => {});
+  }, [api, userId]);
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
@@ -3111,6 +3120,7 @@ export default function FeedScreen({
               onOpenComments={handleOpenComments}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
+              onVideoWatched={handleVideoWatched}
               soundOn={soundOn}
               onToggleSound={toggleSound}
               onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}

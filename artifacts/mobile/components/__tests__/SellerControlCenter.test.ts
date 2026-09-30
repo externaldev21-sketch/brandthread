@@ -5,7 +5,7 @@
  * tree needed) against @/lib/sellerControlCenter directly.
  *
  * Covers:
- * 1.  Default pinned shortcuts: Add product, Orders, Post video, Payouts
+ * 1.  Default pinned shortcuts: Add product, Orders, Create post, Payouts
  * 2.  Pin / unpin / reorder are pure and immutable
  * 3.  Persistence key is scoped to the authenticated Clerk user ID
  * 4.  Account switch: loads correct pins per user, does not mix users
@@ -57,7 +57,7 @@ function clearStore() {
 // ─── 1. Default pinned shortcuts ───────────────────────────────────────────────
 
 describe('Default pinned shortcuts', () => {
-  it('defaults to Add product, Orders, Post video, Payouts in that order', () => {
+  it('defaults to Add product, Orders, Create post, Payouts in that order', () => {
     expect(DEFAULT_PINNED_IDS).toEqual(['add-product', 'orders', 'post-video', 'payouts']);
   });
 
@@ -70,7 +70,7 @@ describe('Default pinned shortcuts', () => {
   it('labels match the spec', () => {
     expect(findItem('add-product')?.label).toBe('Add product');
     expect(findItem('orders')?.label).toBe('Orders');
-    expect(findItem('post-video')?.label).toBe('Post video');
+    expect(findItem('post-video')?.label).toBe('Create post');
     expect(findItem('payouts')?.label).toBe('Payouts');
   });
 });

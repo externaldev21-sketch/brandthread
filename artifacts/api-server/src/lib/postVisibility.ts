@@ -1,5 +1,5 @@
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
-import { db, postComments, posts } from "@workspace/db";
+import { db, interactions, postComments, posts } from "@workspace/db";
 import { authorInGoodStanding } from "./safety";
 
 /**
@@ -17,6 +17,20 @@ export function publicPostCondition(now = new Date()) {
     eq(posts.moderationStatus, "visible"),
     authorInGoodStanding(posts.userId),
   );
+}
+
+/** Total likes received on posts eligible for a public profile, independent of pagination. */
+export async function publicProfileLikes(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(interactions)
+    .innerJoin(posts, eq(posts.id, interactions.postId))
+    .where(and(
+      eq(posts.userId, userId),
+      eq(interactions.type, "like"),
+      publicPostCondition(),
+    ));
+  return Number(row?.total ?? 0);
 }
 
 /**

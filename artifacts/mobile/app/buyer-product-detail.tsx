@@ -54,6 +54,9 @@ import {
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
   shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
@@ -507,6 +510,7 @@ export default function BuyerProductDetailScreen() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  const { ref: actionBarRef, rect: actionBarRect, onLayout: actionBarOnLayout } = useMeasuredTarget();
   // Deliberate-choice confirmation sheet (View bag / Keep shopping) —
   // separate from `addedToCart` above, which only drives the transient
   // checkmark on the sticky action bar's icon button.
@@ -1357,6 +1361,9 @@ export default function BuyerProductDetailScreen() {
           floating tab bar — no tabBarInset is passed. */}
       <StickyFooter style={s.actionBar}>
       <View
+        ref={actionBarRef}
+        onLayout={actionBarOnLayout}
+        collapsable={false}
         style={s.actionBarRow}
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
@@ -1413,6 +1420,12 @@ export default function BuyerProductDetailScreen() {
         )}
       </View>
       </StickyFooter>
+      <FirstRunTip
+        id="buyer-product-detail"
+        variant="spotlight"
+        contentReady={!loading}
+        spotlight={{ target: actionBarRect, ...BUYER_PRODUCT_DETAIL_SPOTLIGHT }}
+      />
     </View>
   );
 }

@@ -52,8 +52,6 @@ export function ThreadCashSection({ state }: { state: CheckoutThreadCash }) {
             value={on}
             onValueChange={state.setOn}
             disabled={switchDisabled}
-            trackColor={{ false: ck.fieldBorder, true: ck.text }}
-            thumbColor={on ? ck.bg : ck.text}
             accessibilityLabel="Use Thread Cash"
             accessibilityHint={on ? 'Returns it to your balance' : `Takes ${formatCents(state.targetCents)} off what your card is charged`}
             testID="checkout-thread-cash-switch"

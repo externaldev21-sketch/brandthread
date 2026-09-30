@@ -11,6 +11,7 @@ vi.mock('@/lib/devPreview', () => ({ isBuyerDevPreview: () => false, isPreviewDe
 import {
   getCreatorVideosPage,
   getSellerShopPage,
+  loadExactCreatorVideoReplay,
   loadVideoFeedThrough,
   posterForPost,
   toShopProduct,
@@ -111,6 +112,38 @@ describe('loadVideoFeedThrough — the player opens at the tapped video', () => 
     const result = await loadVideoFeedThrough('creator', 'user_seller', 'missing', 3);
     expect(serviceRequestMock).toHaveBeenCalledTimes(3);
     expect(result.startIndex).toBe(0);
+  });
+});
+
+describe('loadExactCreatorVideoReplay — history opens the exact video', () => {
+  it('opens a video absent from the first creator page instead of the newest video', async () => {
+    serviceRequestMock.mockImplementation(async (path: string) =>
+      path.startsWith('/api/posts/')
+        ? row('old')
+        : { total: 200, hasMore: true, videos: [row('new'), row('second')] });
+    const result = await loadExactCreatorVideoReplay('user_seller', 'old');
+    expect(result.posts.map(post => post.id)).toEqual(['old', 'new', 'second']);
+    expect(result.startIndex).toBe(0);
+    expect(result.nextOffset).toBe(2);
+    expect(result.hasMore).toBe(true);
+    expect(serviceRequestMock).toHaveBeenCalledWith('/api/posts/old', { cache: 'no-store' });
+  });
+
+  it('keeps an authorized video omitted by feed filters, without duplicating one already present', async () => {
+    serviceRequestMock.mockImplementation(async (path: string) =>
+      path.startsWith('/api/posts/') ? row('muted') : { hasMore: false, videos: [] });
+    const muted = await loadExactCreatorVideoReplay('user_seller', 'muted');
+    expect(muted.posts.map(post => post.id)).toEqual(['muted']);
+    serviceRequestMock.mockImplementation(async (path: string) =>
+      path.startsWith('/api/posts/') ? row('new') : { hasMore: false, videos: [row('new'), row('other')] });
+    const present = await loadExactCreatorVideoReplay('user_seller', 'new');
+    expect(present.posts.map(post => post.id)).toEqual(['new', 'other']);
+  });
+
+  it('does not fall back to a different video when the target is unavailable', async () => {
+    serviceRequestMock.mockImplementation(async (path: string) =>
+      path.startsWith('/api/posts/') ? row('old', { userId: 'another_author' }) : { videos: [row('new')] });
+    await expect(loadExactCreatorVideoReplay('user_seller', 'old')).rejects.toThrow('Video unavailable');
   });
 });
 

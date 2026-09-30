@@ -73,6 +73,10 @@ vi.mock('@/hooks/useApi', () => ({
   useApi: () => api,
 }));
 
+vi.mock('@clerk/expo', () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'user_test' }),
+}));
+
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {

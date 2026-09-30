@@ -41,6 +41,42 @@ describe('Orders and Products share one SellerListHeader', () => {
   });
 });
 
+describe('Title dropdown replaces the Alert.alert title menu', () => {
+  it('neither screen opens the title menu via Alert.alert anymore (a no-op on web, an ugly system alert on native)', () => {
+    for (const source of [ordersSource, productsSource]) {
+      expect(source).not.toMatch(/onTitlePress=\{[\s\S]{0,80}Alert\.alert/);
+    }
+  });
+
+  it('both screens pass SellerListHeader a titleMenu of real, working options', () => {
+    expect(productsSource).toMatch(/titleMenu=\{\[/);
+    expect(productsSource).toContain('All products');
+    expect(productsSource).toContain('Collections');
+    expect(ordersSource).toMatch(/titleMenu=\{\[/);
+    expect(ordersSource).toContain('All orders');
+    expect(ordersSource).toContain('Returns');
+  });
+
+  it('the shared header only renders the chevron/dropdown when a titleMenu is actually passed', () => {
+    expect(headerSource).toMatch(/hasMenu\s*=\s*!!titleMenu/);
+    expect(headerSource).toContain("Feather name=\"chevron-down\"");
+    // The chevron branch must be conditional on hasMenu, not unconditional.
+    const chevronIndex = headerSource.indexOf('chevron-down');
+    const beforeChevron = headerSource.slice(0, chevronIndex);
+    expect(beforeChevron).toMatch(/hasMenu\s*\?/);
+  });
+});
+
+describe('Count row is hidden on an empty list', () => {
+  it('Products only renders the count row when sortedProducts is non-empty', () => {
+    expect(productsSource).toMatch(/sortedProducts\.length === 0 \? null/);
+  });
+
+  it('Orders only renders the count row when filtered is non-empty', () => {
+    expect(ordersSource).toMatch(/filtered\.length > 0 && \(/);
+  });
+});
+
 describe('Products empty state has no preview wording', () => {
   it('never mentions "preview" anywhere near the empty-state copy', () => {
     const emptyCopySection = productsSource.slice(

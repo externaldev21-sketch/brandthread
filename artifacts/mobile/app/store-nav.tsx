@@ -483,8 +483,6 @@ export default function StoreNavScreen() {
                 <HapticSwitch
                   value={itemForm.visible}
                   onValueChange={(v) => setItemForm((p) => ({ ...p, visible: v }))}
-                  trackColor={{ false: BORDER, true: PURPLE }}
-                  thumbColor={FG}
                 />
               </View>
 

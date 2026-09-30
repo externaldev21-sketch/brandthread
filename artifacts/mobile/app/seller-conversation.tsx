@@ -15,15 +15,21 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { PressableScale, StatusBadge } from '@/components/BrandthreadUI';
+import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import {
+  acceptSellerConversationRequest, scheduleDeleteSellerConversationRequest,
+  undoDeleteSellerConversationRequest, blockSellerConversationRequestUser,
+} from '@/lib/sellerRequestActions';
+import { DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import {
   useAudioPlayer,
   useAudioPlayerStatus,
@@ -34,7 +40,7 @@ import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceM
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
-import { confirmUnblock } from '@/lib/safety';
+import { confirmUnblock, apiErrorMessage, apiErrorCode, BLOCK_EXPLAINER } from '@/lib/safety';
 import {
   BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
@@ -89,6 +95,14 @@ interface ConvView {
    *  GET /api/conversations/:id (see PATCH .../typing). Undefined for a
    *  seeded preview thread (no real backend to poll). */
   otherTyping?: boolean;
+  /** New every-role-pair DM/message-request routing — true while this
+   *  thread is a pending request (see app/(buyer)/inbox.tsx's identical
+   *  field and artifacts/api-server/src/routes/conversations.ts). */
+  isRequest?: boolean;
+  /** Who started the request — same value for both participants (it's a
+   *  conversation-level column); the CURRENT viewer is the sender iff this
+   *  equals their own id (effectiveMyId). */
+  requestedBy?: string;
 }
 interface MsgAttachment {
   type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system' | 'thread_cash';
@@ -255,6 +269,10 @@ export default function SellerConversationScreen() {
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  // Request mode (Accept/Delete/Block panel) — see isRequestMode below.
+  const [requestActionLoading, setRequestActionLoading] = useState(false);
+  const textInputRef = useRef<TextInput>(null);
+  const { showUndo } = useUndoToast();
   // Item 68 (chat reactions glass) — long-pressed message + its measured
   // on-screen position, feeding the shared ReactionOverlay (see
   // app/buyer-conversation.tsx's identical pattern).
@@ -358,9 +376,22 @@ export default function SellerConversationScreen() {
         loadMessages(generation),
       ]);
       if (generationRef.current !== generation) return;
-      setConv(c as ConvView);
+      const convView = c as ConvView;
+      setConv(convView);
       const safety = (c as { messaging?: DmMessagingState }).messaging;
       setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
+      // Mark the thread as read once we know it isn't a pending request —
+      // per the Instagram-style request flow (same rule
+      // app/buyer-conversation.tsx already follows), the sender of a
+      // pending request must not see a read receipt until the RECIPIENT
+      // actually accepts it. A seller who is the recipient here still gets
+      // this the moment the thread loads, same as before; only the
+      // isRequest case is now deferred to handleAcceptRequest below.
+      if (!convView.isRequest) {
+        api.conversations.markRead(id).catch(() => {
+          notifyConversationReadFailure(id);
+        });
+      }
     } catch (e) {
       console.error('Failed to load conversation', e);
     } finally {
@@ -371,14 +402,6 @@ export default function SellerConversationScreen() {
   useFocusEffect(useCallback(() => {
     const generation = ++generationRef.current;
     consecutiveFailuresRef.current = 0;
-    // Mark the thread as read as soon as it opens. This is intentionally
-    // independent of loading the conversation/messages so a slow or failed
-    // read request cannot leave the seller's inbox badge stale.
-    if (id && !isSellerPreviewConversationId(id)) {
-      api.conversations.markRead(id).catch(() => {
-        notifyConversationReadFailure(id);
-      });
-    }
     loadAll(generation);
     pollRef.current = setInterval(() => loadMessages(generation), 15_000);
     return () => {
@@ -491,7 +514,21 @@ export default function SellerConversationScreen() {
   const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
-  const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
+  // New every-role-pair DM/message-request routing: `conv.isRequest` and
+  // `requestedBy` are the same for every viewer (conversation-level, not
+  // per-viewer) — the current seller is the one who SENT it iff
+  // `requestedBy` equals their own id, same test
+  // app/buyer-conversation.tsx's isRequestMode should also make (see this
+  // screen's isRequestMode/isRequestSender comment below for why only the
+  // recipient sees the Accept/Delete/Block panel).
+  const isRequestMode = conv?.isRequest === true;
+  const isRequestSender = isRequestMode && conv?.requestedBy === effectiveMyId;
+  // The server only blocks the RECIPIENT of a pending request from replying
+  // (POST /api/conversations/:id/messages → 403 REQUEST_NOT_ACCEPTED) — the
+  // sender can keep messaging freely while it's pending, so composer send
+  // is only disabled for the recipient side of isRequestMode.
+  const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id
+    && !(isRequestMode && !isRequestSender);
   // Whether the composer actually has something to send — drives whether
   // the send button shows at all (see the input row below), independent of
   // `canSend`'s isSending/id gating so the button doesn't flicker away
@@ -613,6 +650,68 @@ export default function SellerConversationScreen() {
     hapticPrimaryAction();
     setShowBuyerContext(true);
     if (buyerOrders === null && !loadingBuyerOrders) void loadBuyerOrders();
+  }
+
+  // ── Request mode: accept / delete / block ───────────────────────────────
+  // Only reachable by the RECIPIENT of a pending request (isRequestMode &&
+  // !isRequestSender) — see app/buyer-conversation.tsx's identical trio,
+  // through lib/sellerRequestActions.ts's preview-aware wrappers instead of
+  // lib/requestActions.ts's buyer ones.
+
+  async function handleAcceptRequest() {
+    if (!id || !conv || requestActionLoading) return;
+    hapticPrimaryAction();
+    setRequestActionLoading(true);
+    const previousConv = conv;
+    try {
+      await acceptSellerConversationRequest(id, api);
+      hapticSuccessAction();
+      setConv({ ...previousConv, isRequest: false });
+      // Composer takes the bottom panel's place the instant isRequestMode
+      // flips false — hand it the keyboard right away, matching
+      // app/buyer-conversation.tsx's identical accept flow.
+      setTimeout(() => textInputRef.current?.focus(), 50);
+    } catch (e) {
+      // Roll back: the panel stays up and Accept is tappable again.
+      setConv(previousConv);
+      Alert.alert('Couldn’t accept request', apiErrorMessage(e, 'Please check your connection and try again.'));
+    } finally {
+      setRequestActionLoading(false);
+    }
+  }
+
+  function handleDeleteRequest() {
+    if (!id) return;
+    hapticDestructiveConfirm();
+    const conversationId = id;
+    const name = displayName;
+    scheduleDeleteSellerConversationRequest(conversationId, api);
+    showUndo({
+      message: `Deleted request from ${name}`,
+      undo: () => undoDeleteSellerConversationRequest(conversationId),
+      // Match the toast's own visible window to the real undo grace period
+      // — see the same fix (and its doc comment) in
+      // app/(buyer)/inbox.tsx's deleteRequestConversation.
+      durationMs: DELETE_GRACE_MS,
+    });
+    goBackOr(router);
+  }
+
+  async function handleBlockRequest() {
+    if (!id || !other) return;
+    const confirmed = await confirmDestructiveActionSheet({
+      title: `Block ${other.name}?`,
+      message: BLOCK_EXPLAINER,
+      confirmLabel: 'Block',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockSellerConversationRequestUser(id, other);
+      goBackOr(router);
+    } catch (e) {
+      Alert.alert('Couldn’t block', apiErrorMessage(e, 'Please check your connection and try again.'));
+    }
   }
 
   // Theme system line's "Change" — reopens the picker directly.
@@ -978,14 +1077,22 @@ export default function SellerConversationScreen() {
       });
       setMessages((prev) => [...prev, msg as Msg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-    } catch (e: any) {
-      const raw = String(e?.message ?? '');
-      const friendly = raw.includes('MODERATED')
-        ? 'This message was flagged by safety filters and was not sent.'
-        : raw.includes('BLOCKED')
-          ? "You can't message this buyer."
-          : 'Message not sent. Tap to retry.';
-      Alert.alert('Not sent', friendly);
+    } catch (e) {
+      // REQUEST_NOT_ACCEPTED (403): the buyer's request was actually still
+      // pending server-side even though this screen's own `conv.isRequest`
+      // said otherwise — e.g. accepted from another device mid-race, or a
+      // stale load right after the request landed. Same structured-error
+      // presentation every other guard on this screen uses (BLOCKED,
+      // BLOCKED_BY_ME, SELLER_ON_VACATION, …): the server's own message is
+      // already a short, honest sentence, so it's surfaced as-is via
+      // apiErrorMessage rather than a raw/ugly fallback — and the local
+      // isRequest flag is corrected so the composer swaps to the real
+      // Accept/Delete/Block panel instead of staying live to 403 again on
+      // retry.
+      if (apiErrorCode(e) === 'REQUEST_NOT_ACCEPTED') {
+        setConv((prev) => (prev ? { ...prev, isRequest: true } : prev));
+      }
+      Alert.alert('Not sent', apiErrorMessage(e, 'Message not sent. Tap to retry.'));
       setText(t);
       setPendingAttachment(att);
       setReplyTo(replyingTo);
@@ -1480,6 +1587,42 @@ export default function SellerConversationScreen() {
         </View>
       </View>
 
+      {/* Request-mode profile header — RECIPIENT view only (a seller who
+          sent the request keeps the ordinary composer plus the "Sent as a
+          request" indicator below; only whoever is reviewing an incoming
+          request gets this bigger lead-in). Mirrors
+          app/buyer-conversation.tsx's identical requestProfileHeader. */}
+      {isRequestMode && !isRequestSender && other && (
+        <View style={s.requestProfileHeader} testID="seller-conversation-request-profile-header">
+          <View style={[s.requestProfileAvatar, { backgroundColor: other.color || PURPLE }]}>
+            <Text style={s.requestProfileAvatarInitials}>
+              {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+            </Text>
+          </View>
+          <Text style={s.requestProfileName} numberOfLines={1}>{other.name}</Text>
+          {!!other.handle && (
+            <Text style={s.requestProfileHandle} numberOfLines={1}>{other.handle}</Text>
+          )}
+          <PressableScale
+            style={s.requestProfilePill}
+            onPress={() => {
+              hapticPrimaryAction();
+              const qs = new URLSearchParams({
+                userId: other.userId, name: other.name,
+                handle: other.handle ?? '', initials: other.initials ?? '',
+                color: other.color ?? PURPLE,
+              });
+              router.push(('/buyer-other-profile?' + qs.toString()) as never);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${other.name}'s profile`}
+            testID="seller-conversation-request-view-profile"
+          >
+            <Text style={s.requestProfilePillText}>View profile</Text>
+          </PressableScale>
+        </View>
+      )}
+
       {/* Order context card */}
       {conv?.contextOrderNumber ? (
         <View style={s.orderCard}>
@@ -1574,7 +1717,7 @@ export default function SellerConversationScreen() {
       {/* Reply preview — mirrors app/buyer-conversation.tsx's own
           ReplyBanner (Mobbin: Instagram "Replying to a message",
           mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). */}
-      {replyTo && !messagingBlocked && (
+      {replyTo && !messagingBlocked && !(isRequestMode && !isRequestSender) && (
         <ReplyBanner
           testID="seller-conversation-reply-banner"
           theme={theme}
@@ -1584,8 +1727,34 @@ export default function SellerConversationScreen() {
         />
       )}
 
-      {/* Input row */}
-      {messagingBlocked && other ? (
+      {/* "Sent as a request" — the SENDER's own view of a pending request
+          thread (Dev's rule 3): the seller keeps the ordinary composer (the
+          server only blocks the recipient from replying), but sees this
+          short indicator instead of the Accept/Delete/Block panel below,
+          which only the recipient gets. */}
+      {isRequestSender && !messagingBlocked && (
+        <View style={s.sentRequestBanner} testID="seller-conversation-sent-request-banner">
+          <Feather name="clock" size={ICON.sm} color={MUTED} />
+          <Text style={s.sentRequestBannerText}>
+            Sent as a message request — {displayName} hasn't accepted it yet
+          </Text>
+        </View>
+      )}
+
+      {/* Input row — request mode replaces the composer entirely with the
+          accept/block/delete bottom panel for the RECIPIENT only (see
+          SellerRequestActionPanel below); the sender keeps the ordinary
+          composer plus the "Sent as a request" banner above. */}
+      {isRequestMode && !isRequestSender && other ? (
+        <SellerRequestActionPanel
+          name={other.name}
+          bottomInset={insets.bottom}
+          loading={requestActionLoading}
+          onAccept={handleAcceptRequest}
+          onDelete={handleDeleteRequest}
+          onBlock={handleBlockRequest}
+        />
+      ) : messagingBlocked && other ? (
         <BlockedComposer
           counterpartName={other.name}
           messaging={messaging}
@@ -1741,6 +1910,7 @@ export default function SellerConversationScreen() {
         ) : null}
 
         <TextInput
+          ref={textInputRef}
           style={[s.textInput, WEB_INPUT_RESET]}
           value={text}
           onChangeText={handleChangeText}
@@ -2105,6 +2275,91 @@ export default function SellerConversationScreen() {
   );
 }
 
+// ─── Request-mode bottom panel ─────────────────────────────────────────────────
+// Seller-side mirror of app/buyer-conversation.tsx's RequestActionPanel —
+// same three-way row (Block / Delete / Accept, Accept the sole filled/
+// primary action), only reachable by the RECIPIENT of a pending request.
+function SellerRequestActionPanel({
+  name, bottomInset, loading, onAccept, onDelete, onBlock,
+}: {
+  name: string;
+  bottomInset: number;
+  loading: boolean;
+  onAccept: () => void;
+  onDelete: () => void;
+  onBlock: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const rs = requestPanelStyles;
+  return (
+    <View
+      style={[rs.wrap, { borderTopColor: theme.border, backgroundColor: theme.surface, paddingBottom: Math.max(bottomInset, SP.md) }]}
+      testID="seller-conversation-request-panel"
+    >
+      <Text style={[rs.title, { color: theme.text }]}>{name} wants to send you a message</Text>
+      <Text style={[rs.subline, { color: theme.muted }]}>
+        Accepting lets them see when you’ve read their messages and message you freely.
+      </Text>
+      <View style={rs.actionsRow}>
+        <PressableScale
+          style={rs.actionBtn}
+          onPress={onBlock}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Block ${name}`}
+          testID="seller-conversation-request-block"
+        >
+          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+        </PressableScale>
+        <PressableScale
+          style={rs.actionBtn}
+          onPress={onDelete}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete request from ${name}`}
+          testID="seller-conversation-request-delete"
+        >
+          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+        </PressableScale>
+        <PressableScale
+          style={[rs.actionBtn, { backgroundColor: theme.accent }]}
+          onPress={onAccept}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept message request from ${name}`}
+          testID="seller-conversation-request-accept"
+        >
+          {loading ? (
+            <ActivityIndicator color={theme.onAccent} size="small" />
+          ) : (
+            <Text style={[rs.actionText, { color: theme.onAccent }]}>Accept</Text>
+          )}
+        </PressableScale>
+      </View>
+    </View>
+  );
+}
+
+const requestPanelStyles = StyleSheet.create({
+  wrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    gap: SP.xs,
+  },
+  title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
+  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  actionsRow: { flexDirection: 'row', gap: SP.sm },
+  actionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+});
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
@@ -2161,6 +2416,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerCenter: { flex: 1, minWidth: 0 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flexShrink: 1, minWidth: 0 },
   headerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
+
+  // Request-mode profile header (avatar / name / @handle / "View profile") —
+  // same shape as app/buyer-conversation.tsx's identical styles, RECIPIENT
+  // view only (see the JSX's own comment).
+  requestProfileHeader: { alignItems: 'center', paddingVertical: SP.lg, paddingHorizontal: SP.lg, gap: 4 },
+  requestProfileAvatar: {
+    width: 88, height: 88, borderRadius: 44,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: SP.sm,
+  },
+  requestProfileAvatarInitials: { fontSize: FS.xl, fontFamily: FONT.bold, color: '#FFFFFF' },
+  requestProfileName: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  requestProfileHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
+  requestProfilePill: {
+    height: 34, paddingHorizontal: SP.md, borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  requestProfilePillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+
+  // "Sent as a request" indicator — the SENDER's own view of a pending
+  // request thread (see the JSX's own comment).
+  sentRequestBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+    marginHorizontal: SP.md, marginBottom: SP.xs, paddingVertical: SP.sm, paddingHorizontal: SP.md,
+    backgroundColor: CARD, borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  },
+  sentRequestBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
 
   orderCard: {
     flexDirection: 'row', alignItems: 'center',

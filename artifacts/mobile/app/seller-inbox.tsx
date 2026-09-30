@@ -4,14 +4,15 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl, Alert, Image } from 'react-native';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
+import { PressableScale, SearchBar, useUndoToast } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -31,10 +32,19 @@ import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRo
 import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
 import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
 import { useInboxCommunities } from '@/lib/communities/useCommunityInbox';
+import {
+  scheduleDeleteSellerConversationRequest, undoDeleteSellerConversationRequest, blockSellerConversationRequestUser,
+} from '@/lib/sellerRequestActions';
+import { subscribePendingConversationDeletes, DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
+import { BLOCK_EXPLAINER } from '@/lib/safety';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 
 interface Participant {
   userId: string; name: string; handle: string;
   initials: string; color: string; accountType: string;
+  avatarUri?: string;
 }
 interface ConvView {
   id: string; type: string;
@@ -45,7 +55,80 @@ interface ConvView {
   updatedAt: string;
   isPinned?: boolean;
   isArchived?: boolean;
+  // New every-role-pair DM/message-request routing: a buyer with no
+  // follow-back and no real paid order now lands in the seller's Requests
+  // tab too, same isRequest/requestedBy shape buyer<->buyer already used —
+  // see app/(buyer)/inbox.tsx's identical fields and
+  // artifacts/api-server/src/routes/conversations.ts's buildConversationView.
+  isRequest?: boolean;
+  requestedBy?: string;
 }
+
+type InboxTab = 'inbox' | 'requests';
+
+// ─── Inbox / Requests pill row ─────────────────────────────────────────────
+// Same Inbox/Requests pattern as app/(buyer)/inbox.tsx's InboxPillRow
+// (pills with a live unread-count badge on Requests), restyled to this
+// screen's own theming (AppThemePreset, not the buyer screen's useAppTheme
+// return shape) rather than pasted verbatim — no filter icon here, this
+// screen has no equivalent affordance.
+function InboxPillRow({
+  value, onChange, requestsCount, theme,
+}: {
+  value: InboxTab;
+  onChange: (tab: InboxTab) => void;
+  requestsCount: number;
+  theme: AppThemePreset;
+}) {
+  const pills: { key: InboxTab; label: string; count?: number }[] = [
+    { key: 'inbox', label: 'Inbox' },
+    { key: 'requests', label: 'Requests', count: requestsCount },
+  ];
+  return (
+    <View style={[pillS.row, { paddingHorizontal: SP.md }]}>
+      {pills.map(pill => {
+        const active = value === pill.key;
+        return (
+          <PressableScale
+            key={pill.key}
+            style={[
+              pillS.pill,
+              active
+                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
+                : { backgroundColor: 'transparent', borderColor: theme.border },
+            ]}
+            onPress={() => onChange(pill.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            testID={`seller-inbox-tab-${pill.key}`}
+          >
+            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
+              {pill.label}
+            </Text>
+            {!!pill.count && pill.count > 0 && (
+              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+                <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
+                  {pill.count > 99 ? '99+' : pill.count}
+                </Text>
+              </View>
+            )}
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}
+
+const pillS = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+  },
+  pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
+  pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+});
 
 function timeAgo(ts?: number): string {
   if (!ts) return '';
@@ -77,6 +160,16 @@ export default function SellerInboxScreen() {
   // forever instead of ever reaching the `!myId` preview branch below.
   const { userId } = useAuth();
   const myId = userId ?? '';
+  const { showUndo } = useUndoToast();
+
+  const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
+  // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
+  // window (lib/pendingRequestDeletes.ts) before the real delete actually
+  // fires — see app/(buyer)/inbox.tsx's identical pendingDeleteIds state for
+  // why this is tracked here (force a re-render + filter) rather than read
+  // directly off the module, which is the real source of truth.
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => subscribePendingConversationDeletes(setPendingDeleteIds), []);
 
   // Joined community group chats sit beside buyer DMs, merged by recency.
   const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
@@ -256,6 +349,16 @@ export default function SellerInboxScreen() {
     router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
   }
 
+  // Requests-tab row tap — deliberately does NOT optimistically clear
+  // unreadCount/mark read (unlike openConversation above): per the
+  // Instagram-style request flow (app/(buyer)/inbox.tsx's identical
+  // openRequestConversation), the buyer who sent a pending request shouldn't
+  // see a read receipt until the seller actually accepts it.
+  function openRequestConversation(conversationId: string) {
+    hapticPrimaryAction();
+    router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
+  }
+
   function longPressConversation(c: ConvView) {
     hapticDestructiveConfirm();
     showActionSheet('Options', undefined, [
@@ -334,10 +437,62 @@ export default function SellerInboxScreen() {
         />
       );
     }
-    return renderItem(row.dm);
+    return renderItem({ item: row.dm } as ListRenderItemInfo<ConvView>);
   }
 
-  function renderItem(item: ConvView) {
+  // ── Requests-tab actions (Block / Delete) ───────────────────────────────
+  // Same shape as app/(buyer)/inbox.tsx's identical handlers, through
+  // lib/sellerRequestActions.ts's preview-aware wrappers instead of
+  // lib/requestActions.ts's buyer ones. Accept lives only in
+  // app/seller-conversation.tsx's request-mode panel — not on this list, per
+  // the same Instagram-reference design the buyer Requests tab already uses
+  // (a row tap opens the thread; Block/Delete are the only per-row actions).
+  function deleteRequestConversation(c: ConvView) {
+    const other = otherParticipant(c);
+    hapticDestructiveConfirm();
+    scheduleDeleteSellerConversationRequest(c.id, api, () => {
+      setConvs((current) => current.filter((row) => row.id !== c.id));
+    });
+    showUndo({
+      message: `Deleted request from ${other?.name ?? 'this buyer'}`,
+      undo: () => undoDeleteSellerConversationRequest(c.id),
+      durationMs: DELETE_GRACE_MS,
+    });
+  }
+
+  function deleteAllRequests() {
+    if (requestConvs.length === 0) return;
+    hapticDestructiveConfirm();
+    const ids = requestConvs.map((c) => c.id);
+    ids.forEach((id) => scheduleDeleteSellerConversationRequest(id, api, () => {
+      setConvs((current) => current.filter((row) => row.id !== id));
+    }));
+    showUndo({
+      message: ids.length === 1 ? 'Deleted 1 request' : `Deleted ${ids.length} requests`,
+      undo: () => ids.forEach((id) => undoDeleteSellerConversationRequest(id)),
+      durationMs: DELETE_GRACE_MS,
+    });
+  }
+
+  async function blockRequestConversation(c: ConvView) {
+    const other = otherParticipant(c);
+    if (!other) return;
+    const confirmed = await confirmDestructiveActionSheet({
+      title: `Block ${other.name}?`,
+      message: BLOCK_EXPLAINER,
+      confirmLabel: 'Block',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockSellerConversationRequestUser(c.id, other);
+      setConvs((current) => current.filter((row) => row.id !== c.id));
+    } catch {
+      Alert.alert('Couldn’t block', 'Please try again.');
+    }
+  }
+
+  function renderItem({ item }: ListRenderItemInfo<ConvView>) {
     const other = otherParticipant(item);
     if (!other) return null;
     const hasUnread = item.unreadCount > 0;
@@ -426,10 +581,81 @@ export default function SellerInboxScreen() {
     );
   }
 
+  // Requests-tab row — same row visuals/interactions as an ordinary Inbox
+  // row above (renderItem), just filtered to isRequest and with Block/Delete
+  // as its only swipe actions (Accept lives in the conversation screen's own
+  // request panel, matching app/(buyer)/inbox.tsx's identical row).
+  function renderRequestRow({ item }: ListRenderItemInfo<ConvView>) {
+    const other = otherParticipant(item);
+    if (!other) return null;
+    const hasUnread = item.unreadCount > 0;
+
+    const swipeActions: InboxSwipeAction[] = [
+      {
+        key: 'block',
+        label: 'Block',
+        icon: 'slash',
+        color: theme.cardElevated,
+        textColor: theme.error,
+        onPress: () => blockRequestConversation(item),
+        accessibilityLabel: `Block ${other.name || other.handle || 'this buyer'}`,
+      },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        color: theme.cardElevated,
+        textColor: theme.error,
+        onPress: () => deleteRequestConversation(item),
+        accessibilityLabel: `Delete request from ${other.name || other.handle || 'this buyer'}`,
+      },
+    ];
+
+    return (
+      <InboxSwipeRow rowId={item.id} actions={swipeActions}>
+        <PressableScale
+          testID={`seller-inbox-request-${item.id}`}
+          style={[s.row, { backgroundColor: theme.background }]}
+          activeOpacity={0.7}
+          onPress={() => openRequestConversation(item.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open message request from ${other.name || other.handle || 'this buyer'}`}
+        >
+          <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
+            {other.avatarUri ? (
+              <Image source={{ uri: other.avatarUri }} style={s.avatarImage} />
+            ) : (
+              <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+            )}
+          </View>
+          <View style={s.rowCenter}>
+            <View style={s.rowTop}>
+              <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
+                {other.name || other.handle || 'Buyer'}
+              </Text>
+              <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
+            </View>
+            <View style={s.rowBottom}>
+              <Text
+                style={[s.preview, hasUnread && { color: theme.text, fontFamily: FONT.bold }]}
+                numberOfLines={1}
+              >
+                {previewText(item.lastMessage)}
+              </Text>
+              {hasUnread && (
+                <View testID={`seller-inbox-request-unread-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
+              )}
+            </View>
+          </View>
+        </PressableScale>
+      </InboxSwipeRow>
+    );
+  }
+
   const queryLower = query.trim().toLowerCase();
   const visibleConvs = useMemo(() => convs
     .filter((c) => {
-      if (c.isArchived) return false;
+      if (c.isArchived || c.isRequest || pendingDeleteIds.has(c.id)) return false;
       if (!queryLower) return true;
       const other = otherParticipant(c);
       const haystack = [other?.name, other?.handle, c.lastMessage, c.contextOrderNumber, c.contextProductName]
@@ -437,7 +663,16 @@ export default function SellerInboxScreen() {
       return haystack.includes(queryLower);
     })
     .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
-  [convs, queryLower]);
+  [convs, queryLower, pendingDeleteIds]);
+
+  const requestConvs = useMemo(() => convs.filter((c) =>
+    c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id)
+  ), [convs, pendingDeleteIds]);
+
+  // Header subtitle reflects the Inbox tab's own unread total now that
+  // Requests has its own badge on the pill row below — a pending request's
+  // unreadCount would otherwise double up in both places.
+  const totalUnread = visibleConvs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
   const inboxRows = useMemo(() => mergeInboxRows(
     visibleConvs,
@@ -469,10 +704,54 @@ export default function SellerInboxScreen() {
         </View>
       )}
 
+      {!isLoading && (
+        <InboxPillRow value={activeTab} onChange={setActiveTab} requestsCount={requestConvs.length} theme={theme} />
+      )}
+
       {isLoading ? (
         <View style={[s.listPad, { paddingTop: SP.md }]}>
           <ListSkeleton rows={6} />
         </View>
+      ) : activeTab === 'requests' ? (
+        requestConvs.length === 0 ? (
+          <View style={s.centerFill}>
+            <EmptyState
+              icon="mail"
+              title="No message requests"
+              // Every role pair can land here now, not just buyers you don't
+              // follow — a buyer with no real paid order can also message you
+              // first, per the new DM routing rules.
+              message="Requests from buyers who don't follow you, or haven't ordered from you, appear here."
+            />
+          </View>
+        ) : (
+          <FlashList
+            data={requestConvs}
+            keyExtractor={(c) => c.id}
+            renderItem={renderRequestRow}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} />
+            }
+            contentContainerStyle={{ paddingBottom: insets.bottom + SP.lg, paddingTop: SP.xs }}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={s.requestsHeaderRow}>
+                <Text style={s.requestsHeaderText}>
+                  Open a chat to get info about who's messaging you. They won't know you've seen it until you accept.
+                </Text>
+                <PressableScale
+                  onPress={deleteAllRequests}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete all requests"
+                  testID="seller-inbox-requests-delete-all"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={s.requestsDeleteAll}>Delete all</Text>
+                </PressableScale>
+              </View>
+            }
+          />
+        )
       ) : loadError && convs.length === 0 ? (
         <View style={s.centerFill}>
           <ErrorState
@@ -508,6 +787,12 @@ export default function SellerInboxScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <FirstRunTip
+        id="seller-inbox"
+        variant="gesture"
+        contentReady={!isLoading}
+        gesture={SELLER_INBOX_GESTURE}
+      />
     </View>
   );
 }
@@ -528,7 +813,9 @@ const createStyles = (theme: AppThemePreset) => {
   avatar: {
     width: 56, height: 56, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center', marginRight: SP.md,
+    overflow: 'hidden',
   },
+  avatarImage: { width: 56, height: 56 },
   avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   rowCenter: { flex: 1 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
@@ -543,5 +830,13 @@ const createStyles = (theme: AppThemePreset) => {
   unreadDot: {
     width: 8, height: 8, borderRadius: 4, marginLeft: SP.sm,
   },
+
+  // Requests tab — explainer line + "Delete all", above the request rows.
+  requestsHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm,
+  },
+  requestsHeaderText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16 },
+  requestsDeleteAll: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted },
   });
 };

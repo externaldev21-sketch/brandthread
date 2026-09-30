@@ -40,7 +40,7 @@ test('Add Product — header alignment, photo row, one-page scroll, Save flow @ 
 
   // Add a photo — cropper opens automatically (existing 3:4 cropper, reused).
   const chooserPromise = page.waitForEvent('filechooser');
-  await page.getByTestId('add-product-add-photos').click();
+  await page.getByTestId('add-product-add-photos').first().click();
   const chooser = await chooserPromise;
   await chooser.setFiles(['/tmp/test-size-chart-upload.png']);
   await page.getByTestId('media-cropper').waitFor({ timeout: 10_000 });

@@ -132,6 +132,17 @@ describe('notification response navigation', () => {
     ]);
   });
 
+  it('opens a story mention push in the mention viewer and a reshare push in the story viewer', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('sm-1', { targetType: 'story', targetId: 's7', type: 'story_mention' }));
+    handler(targetResponse('sr-1', { targetType: 'story', targetId: 's8', type: 'story_reshare' }));
+    expect(router.push.mock.calls.map((call) => call[0])).toEqual([
+      '/story-mention-viewer?storyId=s7',
+      '/buyer-story-viewer?storyId=s8&allStoryIds=s8',
+    ]);
+  });
+
   it('routes a payout notification to the payouts screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
