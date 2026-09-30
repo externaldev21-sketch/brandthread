@@ -26,9 +26,8 @@ import Svg, {
   G, Path, Rect, Circle, Defs, Mask as SvgMask, Text as SvgText,
   Image as SvgImage, Filter, FeColorMatrix,
 } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
 import {
-  BG, CARD, FG, RADIUS,
+  CARD, FG, RADIUS,
 } from '@/lib/theme';
 import type {
   DesignProject, DesignLayer,
@@ -280,8 +279,11 @@ interface DesignLayerCompositorProps {
  * all layer coordinates (which are in canvas space) map correctly regardless
  * of the display size requested.
  *
- * Falls back to a type-icon placeholder only when the project has no layers
- * at all (e.g. a brand-new blank canvas).
+ * A project with no visible layers yet (a brand-new blank canvas) renders a
+ * plain white artboard at the canvas's own aspect ratio — never a generic
+ * grey type-icon. That's what an actually-blank canvas looks like; a
+ * placeholder icon reads as "this thumbnail is broken", not "this canvas is
+ * empty".
  */
 export default function DesignLayerCompositor({
   project,
@@ -321,16 +323,12 @@ export default function DesignLayerCompositor({
         </Svg>
       ) : (
         <View style={cs.placeholder}>
-          <Feather
-            name={
-              project.type === 'garment'  ? 'layers'       :
-              project.type === 'campaign' ? 'trending-up'  :
-              project.type === 'mockup'   ? 'box'          :
-              project.type === 'social'   ? 'instagram'    : 'edit-2'
-            }
-            size={displaySize * 0.35}
-            color={FG}
-            style={{ opacity: 0.2 }}
+          <View
+            style={{
+              width: cw * Math.min(displaySize / cw, displaySize / ch),
+              height: ch * Math.min(displaySize / cw, displaySize / ch),
+              backgroundColor: '#FFFFFF',
+            }}
           />
         </View>
       )}
