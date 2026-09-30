@@ -7,7 +7,6 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { getSetupState, type SetupState } from '@/lib/setupStore';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { SP, RADIUS, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
