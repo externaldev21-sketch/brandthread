@@ -51,6 +51,7 @@ import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
 import socialRouter from "./social";
+import storyMentionsRouter from "./story-mentions";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
 import shippingZonesRouter from "./shipping-zones";
@@ -194,6 +195,7 @@ router.use("/reports",                   reportsRouter);
 router.use("/moderation",                moderationRouter);
 router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
+router.use("/social",                    storyMentionsRouter);
 router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
