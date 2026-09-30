@@ -299,6 +299,8 @@ export default function SellerStudioRadialMenu({
       setSetupDone(completedRequiredTaskCount(state));
       setSetupTotal(requiredTaskCount(state));
     });
+    if (!userId) return () => { cancelled = true; };
+
     api.auth.me().then((profile: any) => {
       if (cancelled) return;
       setBrandName(profile?.brandName ?? profile?.displayName ?? profile?.name ?? null);

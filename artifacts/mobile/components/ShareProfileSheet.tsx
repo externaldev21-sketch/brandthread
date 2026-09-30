@@ -38,6 +38,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 
 import { FONT, FS, SP, RADIUS, ICON, SUCCESS, RED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -93,6 +94,7 @@ type BusyAction = 'share' | 'copy' | 'download' | null;
 
 export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileSheetProps) {
   const { theme } = useAppTheme();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
@@ -112,8 +114,15 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
+    if (!authLoaded) return;
     setError(false);
     setLoading(true);
+    // Signed-out previews must never call the protected profile API.
+    if (!isSignedIn) {
+      setIdentity(null);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await api.auth.me();
       setIdentity({
@@ -127,7 +136,7 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, authLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!visible) return;
@@ -198,7 +207,8 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
     void runAction('copy', async () => {
       hapticSuccess();
       if (Platform.OS === 'web') {
-        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(canonicalUrl);
+        if (!navigator?.clipboard?.writeText) throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(canonicalUrl);
       } else {
         const Clipboard = await import('expo-clipboard');
         await Clipboard.setStringAsync(canonicalUrl);
@@ -278,6 +288,11 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
             {loading ? (
               <View style={[styles.card, { alignItems: 'center', justifyContent: 'center' }]}>
                 <Feather name="loader" size={24} color="#0A0A0B" />
+              </View>
+            ) : !isSignedIn ? (
+              <View style={[styles.card, styles.stateCard]}>
+                <Feather name="link-2" size={28} color="#0A0A0B" />
+                <Text style={styles.stateText}>Sign in to share your profile</Text>
               </View>
             ) : error ? (
               <View style={[styles.card, styles.stateCard]}>
