@@ -987,7 +987,6 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/referrals/stats') return { referralCode: null, totalReferred: 0, totalRewardCents: 0, pending: [] };
   if (p === '/design-studio/projects') return [];
   if (p === '/moderation/me') return { flags: [], strikes: 0, restricted: false };
-  if (p === '/safety/muted-words') return { words: [], limit: 50 };
   if (p === '/social/blocks') return [];
   if (p === '/social/suggested') return [];
   if (p === '/social/friends/activity') return [];

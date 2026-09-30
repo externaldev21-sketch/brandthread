@@ -12,8 +12,9 @@ const read = (relativePath: string) =>
  * 'length')" in every session (real or preview): the audit's demo API mock
  * seeded /safety/muted-words as a bare array, but api.safety.mutedWords()
  * always reads `.words.length` off the response, expecting `{ words, limit }`
- * — a seed-shape bug in the mock, not the screen. Fixed the seed to match the
- * real endpoint's shape.
+ * — a seed-shape bug in the mock, not the screen. (Fixed independently
+ * upstream by the time this branch merged `dev` in; this test just locks
+ * in the shape either fix leaves in place.)
  *
  * buyer-problem-report 404'd fetching a single order (getBuyerOrder) because
  * it always tries the real API first regardless of preview mode, and the
