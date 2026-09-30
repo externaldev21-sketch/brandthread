@@ -13,6 +13,10 @@ import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { useAuth } from '@clerk/expo';
+import { DisputeTimeline } from '@/components/disputes/DisputeTimeline';
+import { DisputeEvidenceFiles } from '@/components/disputes/DisputeEvidenceFiles';
+import type { DisputeEvidenceFile } from '@/lib/disputeTypes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +87,8 @@ export default function DisputeDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { userId: authUserId } = useAuth();
+  const isSignedOutPreview = isSellerDevPreview() && !authUserId;
 
   // order shape compatible with render code
   const [order, setOrder] = useState<any | null>(null);
@@ -98,6 +104,9 @@ export default function DisputeDetailScreen() {
   const [addingNote, setAddingNote] = useState(false);
   const [conceding, setConceding] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
+  const [evidenceFiles, setEvidenceFiles] = useState<DisputeEvidenceFile[]>([]);
+  const [evidenceSubmittedAt, setEvidenceSubmittedAt] = useState<string | null>(null);
+  const [timelineKey, setTimelineKey] = useState(0);
 
   const load = useCallback(async () => {
     // No id at all (e.g. a bad/incomplete deep link) — show "not found"
@@ -133,6 +142,9 @@ export default function DisputeDetailScreen() {
           updatedAt:        data.updatedAt,
         };
         setDispute(mapped);
+        setEvidenceFiles(data.evidenceFiles ?? []);
+        setEvidenceSubmittedAt(data.evidenceSubmittedAt ?? null);
+        setTimelineKey(k => k + 1);
 
         // Build order-compatible shape from the order context the API includes
         const o = data.order;
@@ -355,6 +367,15 @@ export default function DisputeDetailScreen() {
           )}
         </GradientCard>
 
+        {/* STATUS TIMELINE */}
+        <DisputeTimeline
+          disputeId={dispute.id}
+          refreshKey={timelineKey}
+          demo={isSignedOutPreview
+            ? { status: dispute.status, createdAt: dispute.createdAt, evidenceDeadline: dispute.evidenceDeadline ?? null }
+            : undefined}
+        />
+
         {/* 3. CUSTOMER CLAIM */}
         <View>
           <Text style={styles.sectionHeader}>Customer Claim</Text>
@@ -408,6 +429,17 @@ export default function DisputeDetailScreen() {
               <Text style={styles.evidenceDesc}>{ev.description}</Text>
             </BrandthreadCard>
           ))}
+
+          {/* Uploaded evidence files */}
+          <View style={{ marginBottom: SP.sm }}>
+            <DisputeEvidenceFiles
+              disputeId={dispute.id}
+              files={evidenceFiles}
+              locked={isFinal || status === 'under_review' || !!evidenceSubmittedAt}
+              readOnly={isSignedOutPreview}
+              onAdded={(file) => setEvidenceFiles(prev => [...prev.filter(f => f.evidenceType !== file.evidenceType), file])}
+            />
+          </View>
 
           {/* Add evidence form */}
           {!isFinal && (
@@ -470,7 +502,7 @@ export default function DisputeDetailScreen() {
             </View>
           )}
 
-          {(status === 'evidence_needed' || status === 'evidence_submitted') && dispute.evidence.filter(e => !e.description.startsWith('[INTERNAL NOTE]')).length > 0 && (
+          {(status === 'evidence_needed' || status === 'evidence_submitted') && !evidenceSubmittedAt && (dispute.evidence.filter(e => !e.description.startsWith('[INTERNAL NOTE]')).length > 0 || evidenceFiles.length > 0) && (
             <View style={{ marginTop: SP.sm }}>
               <PrimaryButton
                 label="Submit All Evidence"

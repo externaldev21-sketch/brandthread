@@ -137,6 +137,7 @@ export default function FinanceScreen() {
   const documents = [
     ...(!isReadOnly && !isSignedOutSellerPreview ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
     ...(!isSignedOutSellerPreview ? [{ label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) }] : []),
+    { label: 'Chargebacks', icon: 'shield' as const, trailing: 'chevron-right' as const, onPress: () => router.push('/disputes' as any) },
   ];
 
   if (isLoadingRole && !isSignedOutSellerPreview) {
@@ -309,7 +310,7 @@ export default function FinanceScreen() {
                   <Feather name={item.icon} size={15} color={colors.mutedForeground} />
                 </View>
                 <Text style={[styles.docLabel, { color: colors.foreground }]}>{item.label}</Text>
-                <Feather name="download" size={15} color={colors.mutedForeground} />
+                <Feather name={'trailing' in item ? item.trailing : 'download'} size={15} color={colors.mutedForeground} />
               </TouchableOpacity>
             ))}
           </View>

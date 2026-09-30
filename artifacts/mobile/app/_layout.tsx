@@ -1257,6 +1257,7 @@ function RootLayoutNav() {
         <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="disputes"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />

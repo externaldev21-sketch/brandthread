@@ -106,6 +106,10 @@ export function createNotificationResponseHandler(
       router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
       return;
     }
+    if (data?.targetType === 'dispute' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/dispute-detail?disputeId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'payout') {
       router.push('/payouts');
       return;

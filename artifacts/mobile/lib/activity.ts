@@ -623,6 +623,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       // the low-stock filter is the closest equivalent destination without
       // a product id to deep-link straight to one variant's stock editor.
       return '/(tabs)/products?filter=low-stock';
+    case 'dispute':
+      return id ? `/dispute-detail?disputeId=${q(id)}` : '/disputes';
     case 'payout':
       return '/payouts';
     case 'subscription_invoice':

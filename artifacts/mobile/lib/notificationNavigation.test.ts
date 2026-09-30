@@ -150,6 +150,13 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/payouts');
   });
 
+  it('routes a dispute notification to the dispute detail screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('dispute-1', { targetType: 'dispute', targetId: 'd-1' }));
+    expect(router.push).toHaveBeenCalledWith('/dispute-detail?disputeId=d-1');
+  });
+
   it('opens a community message push in the community chat, never a DM', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
