@@ -28,6 +28,9 @@ import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { useQueryClient } from '@tanstack/react-query';
 import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
+import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
+import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
+import { getPreviewSellerOrder } from '@/lib/previewOrders';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -127,7 +130,12 @@ export function adaptApiOrder(raw: any): Order {
     taxAmountCents:   0,
     totalCents:       (item.priceCents ?? 0) * item.quantity,
     fulfillmentSource: 'seller' as FulfillmentType,
-    isPreOrder:       false,
+    isPreOrder:       raw.isPreorder === true,
+    deliverBy:        item.deliverBy ?? null,
+    deliveredAt:      item.deliveredAt ?? null,
+    trackingNumber:   item.trackingNumber ?? null,
+    carrier:          item.carrier ?? null,
+    refundedAt:       item.refundedAt ?? null,
   }));
 
   const totalCents    = raw.totalCents ?? 0;
@@ -296,7 +304,12 @@ export function adaptApiOrder(raw: any): Order {
         }]
       : [],
     hasUnreadMessage:       false,
-    isPreOrder:             false,
+    isPreOrder:             raw.isPreorder === true,
+    deliverBy:              raw.deliverBy ?? null,
+    promisedShipDate:       raw.promisedShipDate ?? null,
+    deliveredAt:            raw.deliveredAt ?? null,
+    autoRefundedAt:         raw.autoRefundedAt ?? null,
+    disputePausedAt:        raw.disputePausedAt ?? null,
     isManufacturerFulfilled: false,
     currency: 'USD',
     tags:     [],
@@ -391,7 +404,6 @@ const TRACKING_STATUS_OPTIONS: { key: TrackingStatus; label: string }[] = [
   { key: 'accepted', label: 'Accepted' },
   { key: 'in_transit', label: 'In Transit' },
   { key: 'out_for_delivery', label: 'Out for Delivery' },
-  { key: 'delivered', label: 'Delivered' },
   { key: 'exception', label: 'Exception' },
   { key: 'returned_to_sender', label: 'Returned to Sender' },
 ];
@@ -511,7 +523,13 @@ export default function OrderDetailScreen() {
         setOrderReturns(prev => prev ?? []);
       });
     try {
-      const raw = await api.orders.get(id);
+      // Demo preview has no account; a fixture id falls back to its fixture
+      // (lib/previewOrders.ts, demo=1 only) instead of a failed request.
+      const raw = await api.orders.get(id).catch((err: unknown) => {
+        const preview = getPreviewSellerOrder(id);
+        if (preview) return preview;
+        throw err;
+      });
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
       queryClient.setQueryData(queryKeys.order(id), raw);
@@ -573,26 +591,43 @@ export default function OrderDetailScreen() {
 
   async function handleMarkProcessing() {
     hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
+    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
     load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
     hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
+    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
     load(generationRef.current);
   }
 
   async function handleMarkShipped() {
     hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
+    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { writeFailed('Couldn’t update this order', e); return; }
     load(generationRef.current);
   }
 
-  async function handleMarkDelivered() {
-    hapticSuccessAction();
-    try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
-    load(generationRef.current);
+  // 409 AUTO_REFUNDED / DELIVERY_NOT_SELLER_CONFIRMED get their own copy.
+  function writeFailed(title: string, e: any) {
+    Alert.alert(title, sellerOrderConflictMessage(e?.code) ?? 'Check your connection and try again.');
+    if (e?.code === 'AUTO_REFUNDED') load(generationRef.current);
+  }
+
+  const [showShipItems, setShowShipItems] = useState(false);
+  const [shippingItems, setShippingItems] = useState(false);
+
+  async function handleShipItems(itemIds: string[], trackingNumber: string, carrier: string) {
+    setShippingItems(true);
+    try {
+      await api.orders.addItemsTracking(id, { itemIds, trackingNumber, ...(carrier ? { carrier } : {}) });
+      hapticSuccessAction();
+      setShowShipItems(false);
+      load(generationRef.current);
+    } catch (e: any) {
+      writeFailed('Couldn’t add tracking', e);
+    } finally {
+      setShippingItems(false);
+    }
   }
 
   // Opens (or creates) the real DM thread with this order's buyer — reuses
@@ -703,7 +738,7 @@ export default function OrderDetailScreen() {
         carrier:        form.carrier.trim(),
       });
     } catch (e: any) {
-      Alert.alert('Couldn’t add tracking', 'Check your connection and try again.');
+      writeFailed('Couldn’t add tracking', e);
       return;
     }
     setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
@@ -715,7 +750,7 @@ export default function OrderDetailScreen() {
       await api.orders.addTracking(id, { trackingNumber, carrier });
       load(generationRef.current);
     } catch (e: any) {
-      Alert.alert('Couldn’t add tracking', 'Check your connection and try again.');
+      writeFailed('Couldn’t add tracking', e);
     }
   }
 
@@ -728,7 +763,7 @@ export default function OrderDetailScreen() {
       });
       await load(generationRef.current);
     } catch (e: any) {
-      Alert.alert('Couldn’t update tracking', 'Check your connection and try again.');
+      writeFailed('Couldn’t update tracking', e);
       throw e;
     } finally {
       setUpdatingTracking(false);
@@ -850,7 +885,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
@@ -911,6 +946,14 @@ export default function OrderDetailScreen() {
         </View>
       </Modal>
 
+      <ShipItemsSheet
+        visible={showShipItems}
+        busy={shippingItems}
+        items={unshippedItems(order.lineItems).map(li => ({ id: li.id, productName: li.productName, variant: li.variant, quantity: li.quantity }))}
+        onClose={() => setShowShipItems(false)}
+        onSubmit={handleShipItems}
+      />
+
       {/* Tracking Events Modal */}
       <Modal visible={!!trackingModalShipmentId} transparent animationType="slide" onRequestClose={() => setTrackingModalShipmentId(null)}>
         <View style={s.modalOverlay}>
@@ -943,12 +986,12 @@ export default function OrderDetailScreen() {
 // TAB: OVERVIEW
 // ═══════════════════════════════════════════════════════
 
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onMarkDelivered, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
+function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
   order: Order;
   onMarkProcessing: () => void;
   onMarkReadyToShip: () => void;
   onMarkShipped: () => void;
-  onMarkDelivered: () => void;
+  onShipSome: () => void;
   onCancelPress: () => void;
   onMessageBuyer: () => void;
   messagingBuyer: boolean;
@@ -1009,6 +1052,8 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         <OrderStatusTimeline status={order.status} />
       </BrandthreadCard>
 
+      <SellerDeliveryBanner order={order} shipped={order.status === 'shipped' || order.status === 'delivered'} />
+
       {/* Fulfillment via Shopify — only shown for orders containing a Shopify-linked product */}
       {order.shopifyFulfillment && (
         <View style={s.section}>
@@ -1037,7 +1082,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       )}
 
       {/* Cancellation reason card */}
-      {order.status === 'cancelled' && order.cancellation && (
+      {order.status === 'cancelled' && order.cancellation && !order.autoRefundedAt && (
         <View style={s.section}>
           <BrandthreadCard style={s.cancellationCard}>
             <View style={s.cancellationHeader}>
@@ -1073,19 +1118,22 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             />
           )}
         </View>
-        {order.status === 'new' && (
+        {order.autoRefundedAt ? (
+          <Text style={s.readOnlyNote}>Auto-refunded orders are read-only. Mark shipped and Add tracking are turned off.</Text>
+        ) : null}
+        {!order.autoRefundedAt && order.status === 'new' && (
           <View style={s.actionRow}>
             <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ flex: 1 }} />
             <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={{ flex: 1 }} accent={RED} />
           </View>
         )}
-        {order.status === 'processing' && (
+        {!order.autoRefundedAt && order.status === 'processing' && (
           <View style={s.actionRow}>
             <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
             <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
           </View>
         )}
-        {order.status === 'ready_to_ship' && (
+        {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
             <View style={s.actionRow}>
               <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
@@ -1101,13 +1149,17 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" />
           </View>
         )}
-        {order.status === 'shipped' && (
-          <View style={s.actionRow}>
-            <PrimaryButton label="Mark Delivered" onPress={onMarkDelivered} icon="check-circle" style={{ flex: 1 }} />
+        {!order.autoRefundedAt && order.status === 'shipped' && (
+          <View style={s.actionCol}>
             {order.shipments[0]?.trackingNumber && (
-              <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" style={{ flex: 1 }} />
+              <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" />
             )}
+            <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
           </View>
+        )}
+        {!order.autoRefundedAt && order.lineItems.length > 1 && unshippedItems(order.lineItems).length > 0
+          && (order.status === 'processing' || order.status === 'ready_to_ship' || order.status === 'shipped') && (
+          <SecondaryButton label="Ship some items" onPress={onShipSome} icon="package" />
         )}
         {order.status === 'delivered' && (
           <BrandthreadCard style={s.deliveredCard}>
@@ -1115,7 +1167,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <Text style={s.deliveredText}>Order delivered · Read-only</Text>
           </BrandthreadCard>
         )}
-        {(order.status === 'new' || order.status === 'processing' || order.status === 'ready_to_ship') && order.status !== 'new' && (
+        {!order.autoRefundedAt && (order.status === 'processing' || order.status === 'ready_to_ship') && (
           <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
         )}
       </View>
@@ -1162,6 +1214,15 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
                 <Text style={s.lineItemName}>{li.productName}</Text>
                 <Text style={s.lineItemVariant}>{li.variant}</Text>
                 {li.sku && <Text style={s.lineItemSku}>SKU: {li.sku}</Text>}
+                {(order.deliverBy || li.trackingNumber || li.refundedAt) ? (
+                  <Text style={s.lineItemVariant}>
+                    {li.refundedAt
+                      ? `Refunded ${formatLocalDate(li.refundedAt)}`
+                      : li.trackingNumber
+                        ? `${li.deliveredAt ? 'Delivered' : 'Shipped'} · ${[li.carrier, li.trackingNumber].filter(Boolean).join(' ')}`
+                        : `Not shipped${li.deliverBy ? ` · ship by ${formatLocalDate(li.deliverBy)}` : ''}`}
+                  </Text>
+                ) : null}
               </View>
               <View style={s.lineItemRight}>
                 <Text style={s.lineItemQty}>×{li.quantity}</Text>
@@ -1373,6 +1434,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const { fulfillment, shipments } = order;
+  const readOnly = !!order.autoRefundedAt;
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>(
     order.trackingStatus ?? shipments[0]?.trackingStatus ?? 'label_created',
   );
@@ -1402,7 +1464,8 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
 
   return (
     <View style={s.tabContent}>
-      <View style={s.section}>
+      {readOnly ? <SellerDeliveryBanner order={order} shipped={false} /> : null}
+      {!readOnly && <View style={s.section}>
         <SectionHeader title="Tracking Status" />
         <BrandthreadCard style={s.trackingStatusCard}>
           <Text style={s.trackingStatusHint}>
@@ -1456,7 +1519,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             onPress={saveTrackingUpdate}
           />
         </BrandthreadCard>
-      </View>
+      </View>}
 
       {fulfillment.groups.map((group, idx) => {
         const groupItems = order.lineItems.filter(li => group.lineItemIds.includes(li.id));
@@ -1484,7 +1547,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 <Text style={s.manufacturerName}>{group.manufacturerName ?? 'Manufacturer'}</Text>
                 <Text style={s.manufacturerStatus}>Status: {group.status.replace(/_/g, ' ')}</Text>
                 <Text style={s.manufacturerNotice}>Fulfillment request sent to manufacturer</Text>
-                <SecondaryButton label="Add Tracking from Manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} />
+                <SecondaryButton label="Add Tracking from Manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} disabled={readOnly} />
               </BrandthreadCard>
             ) : (
               <BrandthreadCard style={s.sellerFulfillCard}>
@@ -1507,10 +1570,10 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   </View>
                 )}
 
-                <View style={s.actionRow}>
+                {!readOnly && <View style={s.actionRow}>
                   <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small style={{ flex: 1 }} />
                   <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
-                </View>
+                </View>}
               </BrandthreadCard>
             )}
 
@@ -1904,6 +1967,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   actionSection:    { gap: SP.sm },
   actionRow:        { flexDirection: 'row', gap: SP.sm },
   actionCol:        { gap: SP.sm },
+  readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   deliveredText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
 
