@@ -1099,15 +1099,10 @@ const FULL_PAGE_COVER_CROP_THRESHOLD = 0.3;
  * Height of the sharp video frame. Full-bleed: the video always fills the
  * WHOLE page, all the way to the bottom edge — there is no shorter "stops at
  * the line" frame any more (that was PR #196's approach, rejected for
- * reading as an instant dead-stop). The floating tab-bar zone is instead a
- * frosted-glass overlay drawn on TOP of this same full-bleed frame, sampling
- * the live video/list actually behind it, rather than a separate shorter
- * frame plus a blurred copy of a poster image. That overlay (TabBarGlassZone)
- * is now rendered once, centrally, by BuyerTabBar itself (the one shared tab-
- * bar container mounted for the whole buyer navigator) rather than per video
- * page here — a fixed strip at the bottom of the viewport blurs whichever
- * page is currently in view exactly the same way a per-page copy would,
- * since only one page is ever visible at a time.
+ * reading as an instant dead-stop). There is no overlay of any kind behind
+ * the floating tab bar either (a later frosted-glass strip there was itself
+ * deleted — it read as a flickering dark band); clearance from the tab bar
+ * is handled purely by bottom padding on the scrollable content.
  *
  * `bottomStripHeight` is accepted purely so existing callers don't need to
  * change, but it no longer shrinks the frame itself or renders anything.
@@ -1280,15 +1275,10 @@ function LiveVideoVisual({
   }, [player, rate]);
 
   // Full-bleed: the sharp video plays all the way to the bottom of the page
-  // again (frameHeight === pageHeight, see immersiveFrameHeight above). The
-  // frosted glass over the tab-bar zone is a real backdrop blur (CSS
-  // `backdrop-filter` on web, a native blur material on iOS/Android) of the
-  // live video actually behind it, not a separate shorter frame plus a
-  // blurred copy of a poster image — but it's rendered once by BuyerTabBar
-  // (see the shared TabBarGlassZone usage there), not per page here, since a
-  // fixed strip at the bottom of the viewport already blurs whichever page
-  // is currently visible. As the video plays, the blur updates in real time
-  // because it's sampling the live layer, not a frozen mirror.
+  // again (frameHeight === pageHeight, see immersiveFrameHeight above). There
+  // is no overlay behind the floating tab bar at all any more — clearance
+  // from it is handled by bottom padding on the scrollable content, not a
+  // blurred strip.
   //
   // Explicit size on the sharp-clip wrapper itself rather than trusting it
   // to inherit height from an ancestor: on web, absoluteFill inside a

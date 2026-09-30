@@ -303,7 +303,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/buyer-feed/LongPressMenu.tsx',
   'components/buyer-feed/RightActionRail.tsx',
   'components/buyer-feed/ShopSideTab.tsx',
-  'components/buyer-nav/TabBarGlassZone.tsx',
   'components/calls/CallAvatarCircle.tsx',
   'components/calls/InCallView.tsx',
   'components/chat/MediaUploadThumb.tsx',
