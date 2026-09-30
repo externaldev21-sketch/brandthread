@@ -507,6 +507,7 @@ export default function StoryMentionViewerScreen() {
             </View>
           ) : null}
           <Composer
+          overMedia
             value={text}
             onChangeText={setText}
             onSend={() => { void sendReply(); }}

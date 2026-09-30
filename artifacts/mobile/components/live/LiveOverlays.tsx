@@ -368,6 +368,7 @@ export function LiveCommentBar({
   const hasQuick = !!(onGift || onShare || onMore);
   return (
     <Composer
+          overMedia
       value={text}
       onChangeText={setText}
       onSend={submit}

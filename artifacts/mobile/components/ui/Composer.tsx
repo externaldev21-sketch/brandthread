@@ -14,7 +14,7 @@
  * the safe-area bottom with nothing overlapping it, and its bottom padding
  * follows the keyboard frame-by-frame so it never gaps or jumps.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Platform, Pressable, StyleSheet, TextInput, View,
   type NativeSyntheticEvent, type StyleProp, type TextInputKeyPressEventData, type ViewStyle,
@@ -66,6 +66,8 @@ export interface ComposerProps {
   topSlot?: React.ReactNode;
   /** Set false on a composer inside a sheet that must leave the tab bar alone. */
   hideTabBar?: boolean;
+  /** Composer floats over full-bleed media (live, stories): the wrapper is clear, only the pill is solid. */
+  overMedia?: boolean;
   /** Extra bottom padding when the composer is not at the screen edge (e.g. in a sheet that already insets). */
   bottomInset?: number;
   style?: StyleProp<ViewStyle>;
@@ -81,7 +83,7 @@ function TabBarHider() {
 export default function Composer({
   value, onChangeText, onSend, placeholder = 'Message…', leftAccessory, rightAccessory,
   canSend, busy = false, onStop, editable = true, maxLength, autoFocus, inputRef, nativeID,
-  onFocus, onBlur, onKeyPress, enterToSend = true, topSlot, hideTabBar = true, bottomInset,
+  onFocus, onBlur, onKeyPress, enterToSend = true, topSlot, hideTabBar = true, overMedia = false, bottomInset,
   style, testID = 'composer', accessibilityLabel,
 }: ComposerProps) {
   const { theme } = useAppTheme();
@@ -89,6 +91,13 @@ export default function Composer({
   const reduceMotion = useReducedMotion();
   const restingBottom = bottomInset ?? Math.max(insets.bottom, 8);
   const { progress } = useReanimatedKeyboardAnimation();
+
+  // Explicit content-driven height: native multiline inputs autosize, but a
+  // web <textarea> defaults to 2 rows, so drive the height ourselves (1 → 5 lines).
+  const [contentH, setContentH] = useState(LINE_HEIGHT);
+  const inputH = value.length === 0
+    ? COMPOSER_PILL_MIN_HEIGHT
+    : Math.min(MAX_INPUT_HEIGHT, Math.max(COMPOSER_PILL_MIN_HEIGHT, contentH + INPUT_V_PAD * 2));
 
   const sendable = canSend ?? value.trim().length > 0;
   const showAction = sendable || busy;
@@ -118,7 +127,7 @@ export default function Composer({
 
   return (
     <Animated.View
-      style={[styles.wrap, { backgroundColor: theme.background }, wrapStyle, style]}
+      style={[styles.wrap, { backgroundColor: overMedia ? 'transparent' : theme.background }, wrapStyle, style]}
       testID={testID}
     >
       {hideTabBar ? <TabBarHider /> : null}
@@ -131,6 +140,7 @@ export default function Composer({
             nativeID={nativeID}
             style={[
               styles.input,
+              { height: inputH },
               { color: theme.text },
               Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
             ]}
@@ -139,6 +149,8 @@ export default function Composer({
             placeholder={placeholder}
             placeholderTextColor={theme.muted}
             multiline
+            numberOfLines={1}
+            onContentSizeChange={(e) => setContentH(e.nativeEvent.contentSize.height - (Platform.OS === 'web' ? INPUT_V_PAD * 2 : 0))}
             editable={editable}
             maxLength={maxLength}
             autoFocus={autoFocus}

@@ -553,6 +553,7 @@ function BuyerLiveNativeScreen() {
           ))}
         </ScrollView>
         <Composer
+          overMedia
           value={commentText}
           onChangeText={setCommentText}
           onSend={() => { hapticLight(); sendComment(); }}

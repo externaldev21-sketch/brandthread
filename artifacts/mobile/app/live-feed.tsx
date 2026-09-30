@@ -704,6 +704,7 @@ function LiveRoomPage({
         </View>
 
         <Composer
+          overMedia
           value={message}
           onChangeText={setMessage}
           onSend={sendMessage}

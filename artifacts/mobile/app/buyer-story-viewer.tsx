@@ -874,6 +874,7 @@ export default function BuyerStoryViewer() {
             </View>
           ) : (
             <Composer
+          overMedia
               value={inputText}
               onChangeText={setInputText}
               onSend={() => handleSendReply()}

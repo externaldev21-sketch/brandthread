@@ -384,6 +384,7 @@ function SellerLiveNativeScreen() {
 
         {/* Comment input */}
         <Composer
+          overMedia
           value={commentText}
           onChangeText={setCommentText}
           onSend={sendComment}
