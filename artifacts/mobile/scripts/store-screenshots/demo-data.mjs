@@ -608,6 +608,15 @@ export function respond({ method, path, query, role, options = {} }) {
   let match;
 
   if (p === '/config/features') return { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null };
+  // app/boost.tsx (Promote a post) fetches all three of these on load;
+  // unseeded, they 404 on every single load of that screen. The demo seller
+  // has no video/slideshow posts (only photo posts in the feed fixture, and
+  // boost only accepts video/2+-image slideshows), so an honest empty state
+  // — no eligible posts yet, no active boosts — is the real answer here,
+  // not fabricated boost data.
+  if (p === '/boosts/targets') return [];
+  if (p === '/boosts/summary') return { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
+  if (p === '/boosts') return [];
   if (p === '/auth/me') return profileFor(role);
   if (p === '/seller/subscription/status') return { plan: 'growth', status: 'active', trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: 'Oct 14, 2026', amountCents: 2900, paymentMethodLabel: 'Visa ···4242', effectiveProvider: 'stripe' };
   if (p === '/team/context') return { role: 'owner', storeOwnerId: SELLER_USER.id, teamMembershipId: null };
@@ -679,6 +688,12 @@ export function respond({ method, path, query, role, options = {} }) {
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p.startsWith('/reviews/product/')) return REVIEWS;
   if (p === '/public/posts' || p === '/posts/feed') return role === 'buyer' ? feedPosts() : [];
+  // lib/appStartPrefetch.ts calls this on EVERY app boot, not just the
+  // screens that render a post grid — unseeded, it 404s on every single
+  // seller page load, `/boost` included. The demo feed already has two
+  // Northline Studio (the seller persona) posts; these are exactly those,
+  // as "mine".
+  if (p === '/posts/mine') return role === 'seller' ? feedPosts().filter((post) => post.userId === SELLER_USER.id) : [];
   if (p === '/posts/repost-context') return {};
   if (p === '/live/active') return { streams: [] };
   if (p.startsWith('/social/status/')) return { isFollowing: false, followersCount: 24800 };
@@ -779,6 +794,9 @@ export function respond({ method, path, query, role, options = {} }) {
 
   // Seller
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
+  // lib/appStartPrefetch.ts calls this on every app boot too — unseeded, it
+  // 404s on every single seller page load, `/boost` included.
+  if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
   if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
   if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.fresh ? 0 : options.orderCount ?? 9);

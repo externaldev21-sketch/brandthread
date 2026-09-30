@@ -38,8 +38,6 @@ import { useApi } from '@/hooks/useApi';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS, SP, RADIUS, ICON, SHADOW_SM,
 } from '@/lib/theme';
 import { divideCents, formatCents } from '@/lib/money';
@@ -100,22 +98,25 @@ function daysRemaining(endsAt: string): number {
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
+// Monochrome only: status is told apart by weight/opacity and its own
+// label text, never by hue (this screen has none of the app's 3 allowed
+// color accents — LIVE-red, end-call-red, Thread Cash green).
 function statusColor(s: string): string {
-  if (s === 'active')           return SUCCESS;
-  if (s === 'paused')           return ORANGE;
+  if (s === 'active')           return FG;
+  if (s === 'paused')           return MUTED;
   if (s === 'completed')        return MUTED;
-  if (s === 'cancelled')        return RED;
-  if (s === 'failed')           return RED;
-  if (s === 'pending_payment')  return ORANGE;
+  if (s === 'cancelled')        return SUBTLE;
+  if (s === 'failed')           return SUBTLE;
+  if (s === 'pending_payment')  return MUTED;
   return MUTED;
 }
 
 function statusBg(s: string): string {
-  if (s === 'active')           return SUCCESS_DIM;
-  if (s === 'paused')           return ORANGE_DIM;
-  if (s === 'cancelled')        return RED_DIM;
-  if (s === 'failed')           return RED_DIM;
-  if (s === 'pending_payment')  return ORANGE_DIM;
+  if (s === 'active')           return 'rgba(255,255,255,0.12)';
+  if (s === 'paused')           return 'rgba(255,255,255,0.06)';
+  if (s === 'cancelled')        return 'rgba(255,255,255,0.04)';
+  if (s === 'failed')           return 'rgba(255,255,255,0.04)';
+  if (s === 'pending_payment')  return 'rgba(255,255,255,0.06)';
   return 'rgba(255,255,255,0.05)';
 }
 
@@ -252,11 +253,11 @@ function BudgetStepSlider({
 const ss = StyleSheet.create({
   sliderTouch: { height: 44, justifyContent: 'center', position: 'relative' },
   sliderTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
-  sliderFill:  { height: 5, borderRadius: 3, backgroundColor: PURPLE_LIGHT },
+  sliderFill:  { height: 5, borderRadius: 3, backgroundColor: FG },
   sliderThumb: {
     position: 'absolute', top: 10, width: 24, height: 24, borderRadius: 12,
     marginLeft: -12, backgroundColor: '#fff',
-    borderWidth: 3, borderColor: PURPLE_LIGHT,
+    borderWidth: 3, borderColor: FG,
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
@@ -274,7 +275,7 @@ function StepDots({ total, current }: { total: number; current: number }) {
             width: i === current ? 18 : 6,
             height: 6,
             borderRadius: 3,
-            backgroundColor: i <= current ? PURPLE_LIGHT : SUBTLE,
+            backgroundColor: i <= current ? FG : SUBTLE,
           }}
         />
       ))}
@@ -787,7 +788,7 @@ export default function BoostScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityLabel="Change post"
         >
-          <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm }}>Change</Text>
+          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' }}>Change</Text>
         </TouchableOpacity>
       </View>
     );
@@ -823,7 +824,7 @@ export default function BoostScreen() {
     if (loadingExisting) {
       return (
         <View style={s.centeredState}>
-          <ActivityIndicator color={PURPLE_LIGHT} />
+          <ActivityIndicator color={FG} />
         </View>
       );
     }
@@ -907,7 +908,7 @@ export default function BoostScreen() {
 
           {loadingTargets ? (
             <View style={s.centeredState}>
-              <ActivityIndicator color={PURPLE_LIGHT} size="large" />
+              <ActivityIndicator color={FG} size="large" />
             </View>
           ) : targetsError ? (
             <View style={s.emptyState}>
@@ -949,7 +950,7 @@ export default function BoostScreen() {
                   </Text>
                   {selectedTarget?.id === t.id && (
                     <View style={s.gridCheck}>
-                      <Feather name="check" size={12} color="#fff" />
+                      <Feather name="check" size={12} color={BG} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1015,7 +1016,7 @@ export default function BoostScreen() {
           {/* Estimated reach */}
           <View style={s.reachCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-              <Feather name="users" size={ICON.xs} color={PURPLE_LIGHT} />
+              <Feather name="users" size={ICON.xs} color={MUTED} />
               <Text style={s.reachLabel}>Estimated reach</Text>
             </View>
             <Text style={s.reachValue}>
@@ -1071,7 +1072,7 @@ export default function BoostScreen() {
           contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad, alignItems: 'center' }}
         >
           <View style={s.successIcon}>
-            <Feather name="zap" size={32} color={GOLD} />
+            <Feather name="zap" size={32} color={FG} />
           </View>
           <Text style={s.successTitle}>Boost active!</Text>
           <Text style={s.successSub}>
@@ -1108,7 +1109,7 @@ export default function BoostScreen() {
   if (verifying) {
     return (
       <View style={[s.screen, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={PURPLE_LIGHT} size="large" />
+        <ActivityIndicator color={FG} size="large" />
         <Text style={[s.stepSub, { marginTop: SP.md, textAlign: 'center' }]}>
           Confirming payment…
         </Text>
@@ -1163,7 +1164,7 @@ const s = StyleSheet.create({
     borderColor: 'transparent',
     position: 'relative',
   },
-  gridTileSelected: { borderColor: PURPLE_LIGHT },
+  gridTileSelected: { borderColor: FG },
   gridScrim: {
     position: 'absolute',
     top: 0,
@@ -1189,7 +1190,7 @@ const s = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: PURPLE_LIGHT,
+    backgroundColor: FG,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1240,14 +1241,14 @@ const s = StyleSheet.create({
 
   // Reach estimate card
   reachCard: {
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: PURPLE_LIGHT + '30',
+    borderColor: 'rgba(255,255,255,0.14)',
     padding: SP.md,
     marginTop: SP.md,
   },
-  reachLabel:       { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT },
+  reachLabel:       { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   reachValue:       { fontFamily: FONT.bold, fontSize: FS.xl, color: FG, marginBottom: 2 },
   reachDailyBudget: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.sm },
   reachDisclaimer:  { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 16 },
@@ -1265,7 +1266,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.sm,
-    backgroundColor: PURPLE_LIGHT,
+    backgroundColor: FG,
     borderRadius: RADIUS.pill,
     paddingVertical: SP.md,
     paddingHorizontal: SP.xl,
@@ -1289,7 +1290,7 @@ const s = StyleSheet.create({
   statusBadge:      { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2 },
   statusBadgeText:  { fontFamily: FONT.semibold, fontSize: FS.xs },
   progressTrack:    { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  progressFill:     { height: 4, borderRadius: 2, backgroundColor: PURPLE_LIGHT },
+  progressFill:     { height: 4, borderRadius: 2, backgroundColor: FG },
   pauseBtn:         { marginTop: SP.sm, paddingVertical: SP.xs, alignItems: 'center' },
   pauseBtnText:     { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
 
@@ -1298,7 +1299,7 @@ const s = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: ORANGE_DIM,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: SP.xl,
