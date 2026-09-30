@@ -16,9 +16,9 @@ import {
   TouchableOpacity,
   View, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import {
@@ -105,7 +105,6 @@ export default function DraftsScreen() {
   const styles = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const [drafts, setDrafts] = useState<ProductDraft[]>([]);
   const [sort, setSort] = useState<DraftSort>('lastSaved');
   const [filterQuery, setFilterQuery] = useState('');
@@ -171,26 +170,13 @@ export default function DraftsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => goBackOr(router)}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel="Back to products"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>In-progress drafts</Text>
-          <Text style={styles.headerSubtitle}>
-            {filterQuery.trim()
-              ? `${visibleDrafts.length} of ${drafts.length} drafts`
-              : `${drafts.length} draft${drafts.length === 1 ? '' : 's'}`}
-          </Text>
-        </View>
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenHeader
+        title="In-progress drafts"
+        subtitle={filterQuery.trim()
+          ? `${visibleDrafts.length} of ${drafts.length} drafts`
+          : `${drafts.length} draft${drafts.length === 1 ? '' : 's'}`}
+        onBack={() => goBackOr(router)}
+      />
 
       <View style={styles.controlsSection}>
         <Text style={styles.controlLabel}>Filter drafts</Text>
@@ -275,43 +261,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   root: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    minHeight: 76,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitleWrap: {
-    flex: 1,
-    marginLeft: SP.sm,
-  },
-  headerTitle: {
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  headerSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
-    marginTop: 2,
-  },
-  headerSpacer: {
-    width: 38,
   },
   controlsSection: {
     paddingHorizontal: SP.md,

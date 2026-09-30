@@ -31,6 +31,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -157,6 +158,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
       onRequestClose={onClose}
       testID="recovery-modal"
     >
+      <ModalSafeArea>
       <View style={[rm.screen, { paddingTop: topPad, paddingBottom: bottomPad }]}>
 
         {/* Cancel — top-right, muted (matches iOS style in ref screenshots) */}
@@ -285,6 +287,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
           </View>
         )}
       </View>
+      </ModalSafeArea>
     </Modal>
   );
 }
@@ -926,6 +929,7 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="preview-modal">
+      <ModalSafeArea>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: BG }]}>
         <TouchableOpacity
           style={[pv.closeBtn, { top: topInset + SP.sm }]}
@@ -974,6 +978,7 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
           </TouchableOpacity>
         </View>
       </View>
+      </ModalSafeArea>
     </Modal>
   );
 }

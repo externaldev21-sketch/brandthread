@@ -21,7 +21,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { FONT, FS, SP, RADIUS, ICON, MUTED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
 import { formatCents } from '@/lib/money';
@@ -392,7 +392,7 @@ export default function FulfillOrderScreen() {
   if (!order) {
     return (
       <View style={s.root}>
-        <Header title="Fulfill Order" />
+        <ScreenHeader title="Fulfill Order" />
         <View style={s.centered}>
           <Text style={s.errorText}>Couldn't load this order.</Text>
         </View>
@@ -439,7 +439,7 @@ export default function FulfillOrderScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Fulfill Order" />
+      <ScreenHeader title="Fulfill Order" />
 
       {/* Stepper */}
       <View style={s.stepperRow}>
