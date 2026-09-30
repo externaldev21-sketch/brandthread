@@ -761,6 +761,16 @@ export interface ShopifyImportJob {
   createdAt: string;
   updatedAt: string;
 }
+export interface WatchedVideo {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorAccountType: 'buyer' | 'seller';
+  caption: string;
+  thumbnailUrl: string | null;
+  watchedAt: string;
+}
+
 export interface PostAnalyticsResponse {
   post: {
     id: string;
@@ -2060,6 +2070,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList: (ownerId?: string) =>
         get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),
+      watchedVideos: (cursor?: string) =>
+        freshGet<{ items: WatchedVideo[]; nextCursor: string | null }>(
+          `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+        ),
+      recordWatchedVideo: (id: string) =>
+        post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}),
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
