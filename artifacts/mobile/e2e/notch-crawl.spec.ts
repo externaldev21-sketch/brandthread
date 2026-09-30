@@ -102,6 +102,11 @@ function discoverRoutes(mobileRoot: string): string[] {
       }
       if (!/\.tsx$/.test(entry)) continue;
       if (entry === '_layout.tsx' || entry.startsWith('+') || entry.endsWith('.test.tsx')) continue;
+      // Out of scope — a separate effort owns the checkout/address flow
+      // (see screen-fit-safe-area.test.tsx's own exclusion). Also
+      // legitimately unreachable by a seller account, so crawling it under
+      // both roles produces role-mismatch noise rather than real findings.
+      if (entry === 'buyer-checkout.tsx') continue;
       const name = entry.replace(/\.tsx$/, '');
       const segment = name === 'index' ? '' : `/${name}`;
       // Route groups like (tabs)/(buyer) don't appear in the URL.
@@ -211,7 +216,21 @@ const VIOLATION_SCRIPT = `(() => {
  * screen without a header, or a modal/sheet with no title of its own) —
  * absence is not a failure, only a mismatched *presence* is. */
 const HEADER_GEOMETRY_SCRIPT = `(() => {
-  const el = document.querySelector('[data-testid="screen-header-title"]');
+  // querySelector alone can pick up a leftover, unmounting node from a
+  // screen transition still in the DOM for one frame (react-navigation
+  // renders the outgoing screen underneath the incoming one during a
+  // transition) — filter to genuinely visible, laid-out nodes the same way
+  // VIOLATION_SCRIPT does, and prefer the LAST one in document order (the
+  // incoming/current screen mounts after the outgoing one it's replacing).
+  const candidates = [...document.querySelectorAll('[data-testid="screen-header-title"]')];
+  let el = null;
+  for (const candidate of candidates) {
+    const style = window.getComputedStyle(candidate);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+    const rect = candidate.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    el = candidate;
+  }
   if (!el) return null;
   const rect = el.getBoundingClientRect();
   const style = window.getComputedStyle(el);
