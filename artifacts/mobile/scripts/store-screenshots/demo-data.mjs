@@ -679,6 +679,12 @@ export function respond({ method, path, query, role, options = {} }) {
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p.startsWith('/reviews/product/')) return REVIEWS;
   if (p === '/public/posts' || p === '/posts/feed') return role === 'buyer' ? feedPosts() : [];
+  // The seller's own post grid (app/(tabs)/profile.tsx, app/content.tsx) and
+  // lib/appStartPrefetch.ts's app-boot prefetch both call this on every
+  // seller screen, not just the ones that render it — unseeded, it 404s on
+  // every single seller page load. The demo feed already has two Northline
+  // Studio (the seller persona) posts; these are exactly those, as "mine".
+  if (p === '/posts/mine') return role === 'seller' ? feedPosts().filter((post) => post.userId === SELLER_USER.id) : [];
   if (p === '/posts/repost-context') return {};
   if (p === '/live/active') return { streams: [] };
   if (p.startsWith('/social/status/')) return { isFollowing: false, followersCount: 24800 };
@@ -779,7 +785,24 @@ export function respond({ method, path, query, role, options = {} }) {
 
   // Seller
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
+  // Seller dashboard's secondary (range-independent) fetch group — without
+  // these seeded, api.products.list()/api.inventory.list()/api.analytics
+  // .products() all 404 ("NOT_SEEDED") every time the seller dashboard loads,
+  // which both spams a hard console-error finding on every audit run of
+  // `/(tabs)` and (for a role/account this fixture wasn't written for) can
+  // leave SellerDashboardTrafficSources-adjacent state undefined. Real seller
+  // products/inventory/top-sellers, not fabricated for this response alone.
+  if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
+  if (p === '/inventory') return role === 'seller' ? SELLER_PRODUCTS.map((product) => product.inventory) : [];
+  if (p === '/analytics/products') return role === 'seller'
+    ? SELLER_PRODUCTS.filter((product) => product.totalRevenueCents > 0).map((product) => ({
+      productId: product.id, name: product.name, unitsSold: product.totalSales, revenueCents: product.totalRevenueCents,
+    }))
+    : [];
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  // Rendered on every seller screen (StripeConnectWarning); unseeded, it
+  // 404s on every single dashboard load, not just this route's own fetches.
+  if (p === '/seller/connect/status') return { connected: true, stripeAccountId: 'acct_demo', chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242', providerConfigured: true };
   if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
   if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.fresh ? 0 : options.orderCount ?? 9);
   if (p === '/conversations') return role === 'seller' ? sellerConversations(options.fresh ? 0 : options.conversationCount ?? 5) : [];

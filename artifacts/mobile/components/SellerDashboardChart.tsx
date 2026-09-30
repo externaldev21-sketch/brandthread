@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   },
   tooltipLabel: {
     fontFamily: FONT.regular,
-    fontSize: 9,
+    fontSize: FS.xs,
   },
   tooltipText: {
     fontFamily: FONT.semibold,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   rangePill: {
     flex: 1,
-    minHeight: 36,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 999,
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
   },
   axisRow: {
-    height: 14,
+    height: 16,
     marginTop: SP.xs,
   },
   // Shared base — deliberately has no `width`. RN's style-array flattening
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     fontFamily: FONT.regular,
-    fontSize: 9,
+    fontSize: FS.xs,
   },
   // Middle labels: fixed-width box, centered on their evenly-spaced x.
   axisLabel: {
