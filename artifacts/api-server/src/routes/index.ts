@@ -25,6 +25,7 @@ import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
 import aiRouter from "./ai";
 import aiCreditsRouter from "./ai-credits";
+import aiHelpersRouter from "./ai-helpers";
 import { aiCreditsGate } from "../lib/aiCredits/gate";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
@@ -137,6 +138,7 @@ router.use("/seller/export",   sellerExportRouter);
 // (and refunds on error). Must stay ahead of the AI routers below.
 router.use(aiCreditsGate);
 router.use("/ai/credits",      aiCreditsRouter);
+router.use("/ai-helpers",      tc, aiHelpersRouter); // caption, product description, size chart, save (priced in AI_TOOL_RULES)
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
