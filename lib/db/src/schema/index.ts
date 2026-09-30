@@ -448,6 +448,12 @@ export const orders = pgTable('orders', {
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
   stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
+  // Stripe Radar / review signals, seller-only (see api-server lib/risk/orderRisk.ts).
+  // Null until the paid-order webhook has normalised the charge outcome.
+  riskLevel: text('risk_level'), // 'normal' | 'elevated' | 'highest'
+  riskScore: integer('risk_score'),
+  riskFlags: jsonb('risk_flags').$type<Array<{ code: string; label: string; severity: 'info' | 'medium' | 'high' }>>().default([]),
+  riskReviewed: boolean('risk_reviewed'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

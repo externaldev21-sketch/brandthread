@@ -26,6 +26,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { useQueryClient } from '@tanstack/react-query';
+import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
 
 function useThemeAliases() {
@@ -302,6 +303,7 @@ export function adaptApiOrder(raw: any): Order {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? raw.createdAt,
     shopifyFulfillment: raw.shopifyFulfillment ?? null,
+    sellerRisk: raw.risk ?? null,
   };
 }
 
@@ -994,6 +996,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <Text style={s.riskBadgeText}>⚠ High Risk</Text>
           </View>
         )}
+        <OrderRiskBadge risk={order.sellerRisk} />
         {order.isPreOrder && (
           <View style={s.preOrderBadge}>
             <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>

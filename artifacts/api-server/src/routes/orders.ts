@@ -15,6 +15,7 @@ import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/or
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { withRiskView } from "../lib/risk/orderRisk";
 
 const router = Router();
 router.use(requireAuth);
@@ -106,6 +107,10 @@ router.get("/", async (req, res) => {
       dropName: drops.name,
       dropType: drops.type,
       itemCount: sql<number>`count(${orderItems.id})::int`,
+      riskLevel: orders.riskLevel,
+      riskScore: orders.riskScore,
+      riskFlags: orders.riskFlags,
+      riskReviewed: orders.riskReviewed,
     })
     .from(orders)
     .leftJoin(customers, eq(orders.customerId, customers.id))
@@ -115,7 +120,8 @@ router.get("/", async (req, res) => {
     .where(buyerId ? and(eq(orders.ownerId, ownerId), eq(orders.buyerId, buyerId)) : eq(orders.ownerId, ownerId))
     .groupBy(orders.id, customers.name, customers.email, drops.name, drops.type, users.displayName, users.name, users.email)
     .orderBy(desc(orders.createdAt));
-  res.json(rows);
+  // Seller-only Radar summary: one `risk` object instead of the raw columns.
+  res.json(rows.map(withRiskView));
 });
 
 // POST /api/orders — transactional, server-side prices, stock validation (manager+)
@@ -352,7 +358,7 @@ router.get("/:id", async (req, res) => {
     fulfilledByPartner: shopifyLink.status === "sent" && Boolean(order.trackingNumber),
   } : null;
 
-  res.json({ ...order, items, customer, shopifyFulfillment });
+  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts

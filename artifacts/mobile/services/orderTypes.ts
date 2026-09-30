@@ -414,6 +414,8 @@ export interface Order {
   fulfillmentType: FulfillmentType;
   riskLevel: RiskLevel;
   riskFlags: RiskFlag[];
+  /** Seller-only Stripe Radar summary from GET /api/orders/:id (`risk`). */
+  sellerRisk?: { level: 'normal' | 'elevated' | 'highest'; score?: number | null; reviewed?: boolean; flags: { code: string; label: string; severity: 'info' | 'medium' | 'high' }[] } | null;
   customer: OrderCustomer;
   lineItems: OrderLineItem[];
   fulfillment: Fulfillment;

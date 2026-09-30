@@ -241,6 +241,7 @@ and `reserved` = amounts in flight. The tests check this after every scenario.
 | `charge.refunded` | Manufacturer card reversal as before. For buyer orders, records refunds made **outside** Brandthread (Stripe dashboard) so the books match Stripe. |
 | `charge.refund.updated` (status `failed`) | A refund Stripe accepted then failed: reverse its ledger entry and restore the order's refunded total. |
 | `transfer.created/updated/reversed` | Manufacturer bulk payment from held funds (+ ledger). |
+| `review.opened` / `review.closed` | No money movement. Sets the seller-only risk flags on the order (`orders.risk_*`, see `radar-rules.md`). |
 
 ## 7. Scheduled jobs
 

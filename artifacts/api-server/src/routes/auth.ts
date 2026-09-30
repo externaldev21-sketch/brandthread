@@ -270,7 +270,7 @@ router.post("/data-export", requireAuth, async (req, res) => {
         group.push(item);
         itemsByOrder.set(item.orderId, group);
       }
-      result.orders = ownedOrders.map((order) => ({
+      result.orders = ownedOrders.map(({ riskLevel, riskScore, riskFlags, riskReviewed, ...order }) => ({
         ...order,
         items: itemsByOrder.get(order.id) ?? [],
         relationship: order.buyerId === clerkUserId ? "buyer" : "seller",
