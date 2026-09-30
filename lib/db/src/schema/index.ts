@@ -465,6 +465,7 @@ export const orders = pgTable('orders', {
   autoRefundLastError: text('auto_refund_last_error'),
   // 0 none, 1 = 5 days, 2 = 2 days, 3 = 12 hours warning already sent.
   deadlineWarningLevel: integer('deadline_warning_level').notNull().default(0),
+  trackingPolledAt: timestamp('tracking_polled_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

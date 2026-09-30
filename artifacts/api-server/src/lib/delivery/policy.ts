@@ -192,3 +192,37 @@ export function undeliveredRefundCents(input: {
   if (total <= 0) return 0;
   return Math.min(remaining, Math.floor((input.chargedCents * value(subset)) / total));
 }
+
+// ─── Listing a pre-order ──────────────────────────────────────────────────────
+
+export type PreorderListingError = { status: 400; code: "PREORDER_SHIP_DATE_REQUIRED" | "PREORDER_SHIP_DATE_INVALID"; error: string };
+
+/**
+ * A pre-order product must carry the seller's promised ship date, and a newly
+ * supplied date must be in the future. `effective*` are the values the
+ * product will have after the write (the request's, else the stored ones).
+ */
+export function validatePreorderListing(input: {
+  effectiveIsPreorder: boolean;
+  suppliedShipDate: unknown;
+  effectiveShipDate: Date | null;
+  now?: Date;
+}): PreorderListingError | null {
+  if (!input.effectiveIsPreorder) return null;
+  if (input.suppliedShipDate !== undefined && input.suppliedShipDate !== null && input.suppliedShipDate !== "") {
+    const supplied = new Date(input.suppliedShipDate as string);
+    if (Number.isNaN(supplied.valueOf())) {
+      return { status: 400, code: "PREORDER_SHIP_DATE_INVALID", error: "preOrderEstShipDate must be a valid date" };
+    }
+    if (supplied.valueOf() < (input.now ?? new Date()).valueOf() - DAY_MS) {
+      return { status: 400, code: "PREORDER_SHIP_DATE_INVALID", error: "preOrderEstShipDate must be in the future" };
+    }
+  }
+  if (!input.effectiveShipDate) {
+    return {
+      status: 400, code: "PREORDER_SHIP_DATE_REQUIRED",
+      error: "A pre-order needs a ship date. Buyers are promised it, and the order is refunded automatically if it isn't delivered within 60 days.",
+    };
+  }
+  return null;
+}

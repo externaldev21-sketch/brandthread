@@ -15,6 +15,7 @@ import { reversePurchasePointsOnce } from "../../routes/loyalty";
 import { advanceDropEscrow, recoverLabelCost, sweepOrderReleases } from "./escrow";
 import { expireStockReservations, sweepTransferOrders } from "./cartTransfers";
 import { refundOrder, RefundError } from "./refunds";
+import { payoutHoldApplies } from "../delivery/payoutGate";
 import { DROP_OPEN_STATES, orderStatusMachine, type OrderStatus } from "./stateMachines";
 
 /**
@@ -79,16 +80,22 @@ export async function failDrop(
   const summary: DropFailureSummary = { dropId, state: drop?.escrowState ?? null, refunded: 0, pending: 0, errors: 0 };
   if (drop?.escrowState !== "failing") return summary;
 
-  const unshipped = await db.select({
+  const heldOrders = await db.select({
     id: orders.id,
     status: orders.status,
     buyerId: orders.buyerId,
     orderNumber: orders.orderNumber,
+    deliverBy: orders.deliverBy,
   }).from(orders).where(and(
     eq(orders.dropId, dropId),
     eq(orders.chargeModel, "held"),
     eq(orders.fundsState, "held"),
   ));
+  // Hold-until-delivered: a shipped order stays held until it is delivered
+  // (then released) or its own delivery deadline refunds it, so a drop's
+  // deadline no longer refunds parcels already on their way.
+  const unshipped = heldOrders.filter((order) =>
+    !(payoutHoldApplies({ deliverBy: order.deliverBy }) && order.status === "shipped"));
 
   for (const order of unshipped) {
     const status = order.status as OrderStatus;

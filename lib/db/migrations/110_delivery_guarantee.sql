@@ -17,7 +17,8 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS auto_refund_attempts         INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS auto_refund_next_attempt_at  TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS auto_refund_last_error       TEXT,
-  ADD COLUMN IF NOT EXISTS deadline_warning_level       SMALLINT NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS deadline_warning_level       SMALLINT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tracking_polled_at           TIMESTAMPTZ;
 
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_delivery_confirmed_by_valid;
 ALTER TABLE orders ADD CONSTRAINT orders_delivery_confirmed_by_valid CHECK (

@@ -29,6 +29,7 @@ import {
   type DropEscrowState, type OrderFundsState,
 } from "./stateMachines";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode, type ChargeDetails } from "./stripeMoney";
+import { payoutHoldApplies, payoutReleasableSql, payoutTimeReached, hasOpenReturn } from "../delivery/payoutGate";
 import type Stripe from "stripe";
 
 type StripeLike = Pick<Stripe, "transfers">;
@@ -296,7 +297,7 @@ export async function recordOrderPaid(executor: DbExecutor, input: PaidOrderInpu
 
 export type ReleaseRequestResult =
   | { status: "requested" | "exists"; releaseId: string }
-  | { status: "not_held" | "no_tracking" | "not_found" | "drop_closed" | "funds_not_held"; releaseId?: undefined };
+  | { status: "not_held" | "no_tracking" | "not_found" | "drop_closed" | "funds_not_held" | "awaiting_delivery"; releaseId?: undefined };
 
 /**
  * Step 1 of a release, all inside one database transaction: checks the
@@ -308,13 +309,16 @@ export type ReleaseRequestResult =
 export async function requestOrderRelease(
   orderId: string,
   trigger: "tracking" | "label" | "manual" | "sweeper",
+  now: Date = new Date(),
 ): Promise<ReleaseRequestResult> {
   return db.transaction(async (tx) => {
     const [order] = rows<{
       id: string; owner_id: string; drop_id: string | null; charge_model: string | null;
       funds_state: string | null; tracking_number: string | null;
+      deliver_by: Date | null; delivered_at: Date | null; payout_release_at: Date | null; dispute_paused_at: Date | null;
     }>(await tx.execute(sql`
-      SELECT id, owner_id, drop_id, charge_model, funds_state, tracking_number
+      SELECT id, owner_id, drop_id, charge_model, funds_state, tracking_number,
+             deliver_by, delivered_at, payout_release_at, dispute_paused_at
       FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
     `));
     if (!order) return { status: "not_found" } as const;
@@ -330,14 +334,29 @@ export async function requestOrderRelease(
       WHERE order_id = ${orderId}::uuid AND status = 'active' AND tracking_number IS NOT NULL
       LIMIT 1
     `)).length > 0;
-    if (!hasTracking) return { status: "no_tracking" } as const;
+    if (!hasTracking && !order.delivered_at) return { status: "no_tracking" } as const;
+
+    // Hold-until-delivered (lib/delivery/payoutGate.ts): a guaranteed order's
+    // funds stay held until it is delivered + the buffer, even though it has
+    // tracking. Drop orders without a deadline keep the old tracking release.
+    if (payoutHoldApplies({ deliverBy: order.deliver_by })) {
+      const reached = payoutTimeReached({
+        deliverBy: order.deliver_by, deliveredAt: order.delivered_at,
+        payoutReleaseAt: order.payout_release_at, disputePausedAt: order.dispute_paused_at,
+      }, now);
+      if (!reached || await hasOpenReturn(tx, orderId)) return { status: "awaiting_delivery" } as const;
+    }
 
     // Lock the drop: releases in one drop are serialized, so the running
     // pro-rata share below sees a consistent set of remaining orders.
     const [drop] = rows<{ escrow_state: string | null }>(await tx.execute(sql`
       SELECT escrow_state FROM drops WHERE id = ${order.drop_id}::uuid FOR UPDATE
     `));
-    if (!drop?.escrow_state || !(DROP_OPEN_STATES as string[]).includes(drop.escrow_state)) {
+    // A drop that failed its production deadline still pays the orders that
+    // shipped and were then delivered (hold-until-delivered keeps those
+    // held past the deadline instead of refunding them).
+    const heldDelivered = drop?.escrow_state === "failing" && payoutHoldApplies({ deliverBy: order.deliver_by });
+    if (!drop?.escrow_state || !((DROP_OPEN_STATES as string[]).includes(drop.escrow_state) || heldDelivered)) {
       return { status: "drop_closed" } as const;
     }
 
@@ -578,9 +597,9 @@ export async function executeOrderRelease(
 export async function releaseOrderFunds(
   orderId: string,
   trigger: "tracking" | "label" | "manual" | "sweeper",
-  options: { stripe?: StripeLike | null } = {},
+  options: { stripe?: StripeLike | null; now?: Date } = {},
 ): Promise<ReleaseRequestResult & { execution?: ReleaseExecution }> {
-  const requested = await requestOrderRelease(orderId, trigger);
+  const requested = await requestOrderRelease(orderId, trigger, options.now);
   if (!requested.releaseId) return requested;
   const execution = await executeOrderRelease(requested.releaseId, { stripe: options.stripe, reclaimStale: true });
   return { ...requested, execution };
@@ -612,16 +631,18 @@ export async function sweepOrderReleases(options: { stripe?: StripeLike | null; 
     WHERE o.charge_model = 'held' AND o.funds_state = 'held'
       AND (
         (o.tracking_number IS NOT NULL AND btrim(o.tracking_number) <> '')
+        OR o.delivered_at IS NOT NULL
         OR EXISTS (
           SELECT 1 FROM shipping_labels l
           WHERE l.order_id = o.id AND l.status = 'active' AND l.tracking_number IS NOT NULL
         )
       )
+      AND ${payoutReleasableSql(now)}
     LIMIT 200
   `));
   for (const row of trackedButHeld) {
     try {
-      const result = await releaseOrderFunds(row.id, "sweeper", { stripe: options.stripe });
+      const result = await releaseOrderFunds(row.id, "sweeper", { stripe: options.stripe, now });
       if (result.execution?.state === "paid") settled++;
     } catch (err) {
       logger.error({ err, orderId: row.id }, "Release sweep failed for one tracked order");
