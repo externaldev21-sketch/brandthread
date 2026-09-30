@@ -13,12 +13,17 @@
  */
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { assertNoTextOrBoxOverflow } from './lib/textFitCheck.mjs';
 
 // The harness/demo-images modules are real ESM (.mjs); Playwright transpiles
 // this spec through CJS, which cannot `import` an ESM file statically —
 // loaded lazily via dynamic import() instead, which Node's interop handles.
 let harness: typeof import('../scripts/store-screenshots/harness.mjs');
 let demoImages: typeof import('../scripts/store-screenshots/demo-images.mjs');
+
+const SCREENSHOT_DIR = path.resolve(__dirname, '../../../docs/pr-assets/layers-panel');
+mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
 let browser: any;
 let closeServer: () => void;
@@ -95,6 +100,41 @@ test('layers panel renders as a full-height sheet with Procreate structure', asy
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThan(300); // old popover was a fixed 280px card
   expect(box!.height).toBeGreaterThan(300); // old popover was only as tall as its ~3 rows
+
+  await context.close();
+});
+
+test('layers panel has no truncated/overflowing text or boxes, at 393×852', async () => {
+  const { context, page } = await openCanvasWithLayers({ width: 393, height: 852 });
+
+  const panel = page.locator('[data-testid="layers-panel"]');
+  await expect(panel).toBeVisible();
+  await page.waitForTimeout(200);
+
+  // Full panel + zoomed row-group screenshots for PR review — not just a
+  // full-screen shot, per the text-fit review standard.
+  await panel.screenshot({ path: path.join(SCREENSHOT_DIR, '01-panel-full.png') });
+  const firstRow = page.locator('[data-testid^="layer-row-"]').first();
+  await firstRow.screenshot({ path: path.join(SCREENSHOT_DIR, '02-row-zoomed.png') });
+  const bgRow = page.locator('[data-testid="layer-row-background"]');
+  await bgRow.screenshot({ path: path.join(SCREENSHOT_DIR, '03-background-row-zoomed.png') });
+
+  // Open the context menu on a layer and screenshot it zoomed too.
+  const rows = page.locator('[data-testid^="layer-row-"]:not([data-testid="layer-row-background"])');
+  const target = rows.first();
+  await target.click();
+  await page.waitForTimeout(150);
+  await target.click();
+  await page.waitForTimeout(200);
+  const menu = page.locator('[data-testid^="layer-context-menu-"]').first();
+  if (await menu.count() > 0) {
+    await menu.screenshot({ path: path.join(SCREENSHOT_DIR, '04-context-menu-zoomed.png') });
+  }
+
+  // Permanent regression guard: no label/name/button text may overflow its
+  // own box, and no chip/row/button may spill past its parent's bounds,
+  // anywhere inside the panel.
+  await assertNoTextOrBoxOverflow(page, '[data-testid="layers-panel"]');
 
   await context.close();
 });
