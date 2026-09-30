@@ -14,7 +14,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, ScrollView, TouchableOpacity, Pressable, StyleSheet, Image,
-  ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions,
+  ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions, Dimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
@@ -66,6 +66,7 @@ const PLACEMENTS: { key: PlacementType; label: string }[] = [
 ];
 
 const GRID_GAP = 12;
+const SCREEN_W_FOR_GRID = Dimensions.get('window').width;
 const SCREEN_PAD = SP.md;
 
 let seq = 0;
@@ -260,7 +261,7 @@ export default function AiDesignChatScreen() {
   };
 
   const optionRow = openChip ? (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.optionRow} keyboardShouldPersistTaps="handled">
+    <View style={s.optionRow}>
       {(openChip === 'garment'
         ? GARMENT_TILES.map(g => ({ id: g.key as string, label: g.label, selected: garment === g.key, onPress: () => { setGarment(g.key); setOpenChip(null); } }))
         : openChip === 'colour'
@@ -271,13 +272,13 @@ export default function AiDesignChatScreen() {
           <Text style={[s.optionText, o.selected && s.optionTextSelected]}>{o.label}</Text>
         </Pressable>
       ))}
-    </ScrollView>
+    </View>
   ) : null;
 
   const topSlot = (
     <View style={s.topSlot}>
       {optionRow}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow} keyboardShouldPersistTaps="handled">
+      <View style={s.chipRow}>
         {current ? (
           <Pressable
             onPress={() => setCurrentId(null)}
@@ -310,7 +311,7 @@ export default function AiDesignChatScreen() {
             {chip('placement', 'Placement', placementLabel, () => setPlacement(null))}
           </>
         )}
-      </ScrollView>
+      </View>
     </View>
   );
 
@@ -355,13 +356,14 @@ export default function AiDesignChatScreen() {
             resizeMode="cover"
           />
         </TouchableOpacity>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.actionRow} keyboardShouldPersistTaps="handled">
+        <View style={s.actionGrid}>
           <ActionPill icon="edit-3" label="Refine" primary onPress={() => handleRefine(version)} s={s} colors={colors} testID="ai-design-refine" />
           <ActionPill icon="shuffle" label="Variation" onPress={() => handleVariation(version)} s={s} colors={colors} testID="ai-design-variation" disabled={isGenerating} />
           <ActionPill icon="bookmark" label="Save" onPress={() => handleSave(version)} s={s} colors={colors} testID="ai-design-save" />
-          <ActionPill icon="layers" label="Studio" onPress={() => handleSendToDesignStudio(version)} s={s} colors={colors} />
-          <ActionPill icon="user" label="Model" onPress={() => handleSendToMockupToModel(version)} s={s} colors={colors} />
-        </ScrollView>
+          <ActionPill icon="layers" label="Studio" onPress={() => handleSendToDesignStudio(version)} s={s} colors={colors} testID="ai-design-studio" />
+          <ActionPill icon="user" label="Model" onPress={() => handleSendToMockupToModel(version)} s={s} colors={colors} testID="ai-design-model" />
+          <ActionPill icon="clock" label="History" onPress={() => setShowHistory(true)} s={s} colors={colors} testID="ai-design-history" />
+        </View>
       </View>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -369,13 +371,7 @@ export default function AiDesignChatScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader
-        title="AI Design"
-        onBack={() => goBackOr(router)}
-        actions={versions.length > 1
-          ? [{ icon: 'clock', onPress: () => setShowHistory(true), accessibilityLabel: `Version history (${versions.length})` }]
-          : undefined}
-      />
+      <ScreenHeader title="AI Design" onBack={() => goBackOr(router)} divider={false} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {turns.length === 0 ? (
           <ScrollView
@@ -534,8 +530,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     marginTop: 4,
   },
   topSlot: { gap: SP.sm, paddingBottom: SP.sm },
-  chipRow: { gap: SP.sm, paddingRight: SP.md, alignItems: 'center' },
-  optionRow: { gap: SP.sm, paddingRight: SP.md },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, alignItems: 'center' },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -593,14 +589,17 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  actionRow: { gap: SP.sm, paddingRight: SP.md },
+  // 3×2 grid: six equal-size buttons, icon + label centred together.
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
+    height: 40,
+    width: (SCREEN_W_FOR_GRID - SCREEN_PAD * 2 - SP.sm * 2) / 3,
+    paddingHorizontal: 12,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     backgroundColor: colors.background,
