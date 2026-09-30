@@ -69,6 +69,10 @@ vi.mock('react-native', () => {
   };
 });
 
+vi.mock('@clerk/expo', () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'user_test' }),
+}));
+
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light' },

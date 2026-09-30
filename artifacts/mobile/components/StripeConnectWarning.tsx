@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -52,6 +53,7 @@ export default function StripeConnectWarning({
   isConnecting = false,
 }: StripeConnectWarningProps) {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   const { theme } = useAppTheme();
   const { width, fontScale } = useWindowDimensions();
   const useLargeTextLayout = width < 402 || fontScale >= 1.3;
@@ -62,7 +64,7 @@ export default function StripeConnectWarning({
   const connectStatus = providedStatus === undefined ? localStatus : providedStatus;
 
   const refreshConnectStatus = useCallback(async () => {
-    if (providedStatus !== undefined || isRefreshing.current) return;
+    if (!isSignedIn || providedStatus !== undefined || isRefreshing.current) return;
     isRefreshing.current = true;
 
     try {
@@ -73,7 +75,7 @@ export default function StripeConnectWarning({
     } finally {
       isRefreshing.current = false;
     }
-  }, [api, providedStatus]);
+  }, [api, isSignedIn, providedStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -89,7 +91,7 @@ export default function StripeConnectWarning({
   }, [refreshConnectStatus]);
 
   const handleFixStripeConnect = async () => {
-    if (loading || isConnecting) return;
+    if (!isSignedIn || loading || isConnecting) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (onConnect) {
       await onConnect();

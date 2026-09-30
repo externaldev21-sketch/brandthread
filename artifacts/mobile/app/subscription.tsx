@@ -15,6 +15,7 @@ import {
   Alert, ActivityIndicator, Linking, AppState, AppStateStatus, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +30,7 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import { formatCents } from '@/lib/money';
 import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
@@ -56,13 +58,15 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const isSellerPreview = isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId);
   const { available: revenueCatAvailable, packages: revenueCatPackages, purchase, restore, managementURL } = useRevenueCat();
   const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
 
   const [activeTab,   setActiveTab]   = useState<'plan' | 'billing'>('plan');
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
-  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(!isSellerPreview);
   const [currentPlan, setCurrentPlan] = useState({
     name:               'Starter',
     price:              '$29',
@@ -101,6 +105,10 @@ export default function SubscriptionScreen() {
   }, []);
 
   const fetchStatus = useCallback(async () => {
+    if (isSellerPreview) {
+      setStatusLoading(false);
+      return;
+    }
     setStatusLoading(true);
     try {
       const data = await api.seller.subscription.status();
@@ -110,16 +118,18 @@ export default function SubscriptionScreen() {
     } finally {
       setStatusLoading(false);
     }
-  }, [api, applyStatus]);
+  }, [api, applyStatus, isSellerPreview]);
 
   useFocusEffect(
     useCallback(() => {
+      if (isSellerPreview) return;
       invalidatePlanCache();
       fetchStatus();
-    }, [fetchStatus]),
+    }, [fetchStatus, isSellerPreview]),
   );
 
   useEffect(() => {
+    if (isSellerPreview) return;
     const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
       const externalSession = externalSessionOpenedRef.current;
       if (nextState !== 'active' || !externalSession) return;
@@ -146,11 +156,12 @@ export default function SubscriptionScreen() {
       setStatusLoading(false);
     });
     return () => subscription.remove();
-  }, [api, applyStatus]);
+  }, [api, applyStatus, isSellerPreview]);
 
   function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
 
   async function handleChangePlan(planId: string) {
+    if (isSellerPreview) return;
     haptic();
     // Only treat the current plan as "already selected" when there's an active subscription.
     // status:'none' means no paid plan yet — Starter must remain selectable.
@@ -195,6 +206,7 @@ export default function SubscriptionScreen() {
   }
 
   async function handleOpenPortal() {
+    if (isSellerPreview) return;
     haptic();
     try {
       const target = getBillingRecoveryTarget(currentPlan.effectiveProvider, managementURL);
@@ -219,6 +231,7 @@ export default function SubscriptionScreen() {
   }
 
   async function handleRestore() {
+    if (isSellerPreview) return;
     haptic();
     try {
       await restore();
@@ -245,7 +258,7 @@ export default function SubscriptionScreen() {
     : currentPlan.status === 'canceled' ? 'Cancelled'
     : 'Free';
 
-  if (isLoadingRole) {
+  if (isLoadingRole && !isSellerPreview) {
     return (
       <View style={styles.root}>
         <ScreenHeader title="Subscription" />
@@ -256,7 +269,7 @@ export default function SubscriptionScreen() {
     );
   }
 
-  if (currentRole !== 'owner' && !isReadOnly) {
+  if (!isSellerPreview && currentRole !== 'owner' && !isReadOnly) {
     return (
       <View style={styles.root}>
         <ScreenHeader title="Subscription" />
@@ -377,7 +390,7 @@ export default function SubscriptionScreen() {
                       </View>
                     ))}
                   </View>
-                   {!isReadOnly && !isCurrent && (
+                    {!isReadOnly && !isSellerPreview && !isCurrent && (
                     <TouchableOpacity
                       testID={`seller-subscription-change-${plan.id}`}
                       style={[styles.changePlanBtn, plan.id === 'starter' && styles.changePlanBtnOutline]}
@@ -461,12 +474,12 @@ export default function SubscriptionScreen() {
               ))}
             </View>
 
-             {!isReadOnly && (
+              {!isReadOnly && !isSellerPreview && (
                 <TouchableOpacity testID="seller-subscription-cancel" style={styles.cancelBtn} onPress={handleOpenPortal}>
                   <Text style={styles.cancelText}>{Platform.OS === 'web' ? 'Manage or cancel subscription' : 'Manage subscription'}</Text>
                </TouchableOpacity>
              )}
-              {!isReadOnly && Platform.OS !== 'web' && (
+              {!isReadOnly && !isSellerPreview && Platform.OS !== 'web' && (
                 <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore} testID="seller-revenuecat-restore">
                   <Text style={styles.restoreText}>Restore purchases</Text>
                 </TouchableOpacity>
@@ -544,7 +557,7 @@ export default function SubscriptionScreen() {
                   </View>
                 </View>
 
-                 {!isReadOnly && (
+                  {!isReadOnly && !isSellerPreview && (
                     <TouchableOpacity testID="seller-subscription-manage-billing" style={styles.manageBillingBtn} onPress={handleOpenPortal}>
                      <Feather name="external-link" size={16} color={PURPLE} />
                       <Text style={styles.manageBillingText}>{Platform.OS === 'web' ? 'Manage billing & invoices' : 'Manage subscription'}</Text>
