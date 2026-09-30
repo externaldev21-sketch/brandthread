@@ -18,8 +18,8 @@ import { formatCents } from '@/lib/money';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 
-const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────

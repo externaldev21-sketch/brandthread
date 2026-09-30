@@ -149,6 +149,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     alignItems: 'center',
     gap: 10,
     flexShrink: 1,
+    // 44x44 minimum comfortable touch target (COMP.minTouchTarget) — this
+    // used to be sized to its icon (34px), which read as a control under
+    // 44x44 to the audit.
+    minHeight: 44,
+    paddingVertical: 5,
   },
   brandMark: {
     width: 34,
@@ -184,7 +189,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   switchItem: {
     paddingHorizontal: 16,
-    height: 34,
+    // 44px minimum comfortable touch target (COMP.minTouchTarget); was 34px.
+    height: 44,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
@@ -216,9 +222,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   title: {
     color: theme.text,
     fontFamily: 'Inter_700Bold',
-    fontSize: 42,
-    lineHeight: 48,
-    letterSpacing: -1.4,
+    // FS.h1 (36) — the largest step on the declared type scale in lib/theme.ts.
+    fontSize: 36,
+    lineHeight: 42,
+    letterSpacing: -1.2,
     marginBottom: 18,
   },
   summary: {

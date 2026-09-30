@@ -37,6 +37,7 @@ import {
   setPreviewConversationTheme, setPreviewConversationDisappearing, appendPreviewMessage,
 } from '@/lib/previewInbox';
 import { muteConversation, setConversationTheme, setConversationDisappearing } from '@/services/socialService';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { pickAvatarColor } from '@/lib/avatarColors';
 
@@ -72,7 +73,15 @@ export default function ConversationDetailsScreen() {
   const [isBlocked, setIsBlocked] = useState(params.isBlocked === '1');
   const [busy, setBusy] = useState(false);
 
-  const isPreview = isPreviewConversationId(params.id);
+  // isSellerDevPreview()/isBuyerDevPreview() (not just a seeded conversation
+  // id): this screen is opened by query params rather than a file-based
+  // dynamic segment, so a direct/audited load can land here with no id at
+  // all, or (as the audit's own generic `id` param synthesis does) one that
+  // collides with an unrelated entity's id. Either way, in a dev-preview
+  // session there is never a real conversation to fetch, so treat ANY
+  // preview session as preview here too rather than relying on the id
+  // string happening to look like a seeded one.
+  const isPreview = isPreviewConversationId(params.id) || isSellerDevPreview() || isBuyerDevPreview();
   const displayName = params.participantName ?? 'Conversation';
 
   useEffect(() => {
