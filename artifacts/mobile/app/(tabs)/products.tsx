@@ -621,7 +621,9 @@ export default function ProductsScreen() {
   ];
 
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
-  const hasActiveFilter = filter !== 'all';
+  // The selected status chip already shows Active/Draft/etc. as selected.
+  // Highlight the separate filter control only for choices outside that row.
+  const hasActiveFilter = filter !== 'all' && !filterPills.some(pill => pill.value === filter);
 
   const openProduct = useCallback((product: Product) => {
     if (previewOnly) {
@@ -754,7 +756,7 @@ export default function ProductsScreen() {
         searchPlaceholder="Search products…"
         onFilterPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
         hasActiveFilter={hasActiveFilter}
-        filterAccessibilityLabel={hasActiveFilter ? `Filter: ${filter}` : 'Filter products'}
+        filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}
         onSortPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
         sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
         chips={filterPills.map(pill => ({

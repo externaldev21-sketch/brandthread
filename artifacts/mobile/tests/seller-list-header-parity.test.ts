@@ -39,6 +39,11 @@ describe('Orders and Products share one SellerListHeader', () => {
     expect(headerSource).toContain('minHeight: 44');
     expect(headerSource).toMatch(/height:\s*36/);
   });
+
+  it('does not highlight the Products filter button when a visible status chip is selected', () => {
+    expect(productsSource).toContain("filter !== 'all' && !filterPills.some(pill => pill.value === filter)");
+    expect(productsSource).toContain("filterAccessibilityLabel={filter !== 'all' ? `Filter: ${filter}` : 'Filter products'}");
+  });
 });
 
 describe('Products empty state has no preview wording', () => {
