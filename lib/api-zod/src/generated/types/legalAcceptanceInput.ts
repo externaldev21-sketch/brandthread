@@ -5,8 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { LegalAcceptanceInputSource } from './legalAcceptanceInputSource';
 
 export interface LegalAcceptanceInput {
   /** @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$ */
   version: string;
+  source?: LegalAcceptanceInputSource;
 }

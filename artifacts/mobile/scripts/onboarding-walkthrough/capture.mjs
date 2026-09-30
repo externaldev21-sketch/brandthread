@@ -142,7 +142,7 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByLabel('Password', { exact: true }).fill(id.password);
       await page.getByLabel('Confirm password', { exact: true }).fill(id.password);
       await page.getByTestId('onboarding-username-input').fill(id.username);
-      await page.getByTestId('legal-consent-checkbox').click();
+      await page.getByTestId('legal-consent-line').waitFor({ timeout: 5_000 });
       await shot('sign-up-form');
       await page.getByRole('button', { name: 'Create account', exact: true }).click();
     });
@@ -259,7 +259,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByLabel('Password', { exact: true }).fill(id.password);
       await page.getByLabel('Confirm password', { exact: true }).fill(id.password);
       await page.getByTestId('onboarding-username-input').fill(id.username);
-      await page.getByTestId('legal-consent-checkbox').click();
+      await page.getByTestId('legal-consent-line').waitFor({ timeout: 5_000 });
       await shot('sign-up-form');
       await page.getByRole('button', { name: 'Create account', exact: true }).click();
     });

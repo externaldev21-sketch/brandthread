@@ -149,6 +149,8 @@
     { "match": "/help", "owner": "storeAccount" },
     { "match": "/terms", "owner": "storeAccount" },
     { "match": "/community-guidelines", "owner": "storeAccount" },
+    { "match": "/seller-agreement", "owner": "storeAccount" },
+    { "match": "/refund-policy", "owner": "storeAccount" },
     { "match": "/onboarding", "owner": "storeAccount" },
     { "match": "/setup", "owner": "storeAccount" },
     { "match": "/sign-in", "owner": "storeAccount" },
