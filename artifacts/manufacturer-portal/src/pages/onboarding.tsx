@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, ArrowRight, Check, CheckCircle2, Eye, Handshake, ImagePlus, Loader2, Lock, MessageSquare, Trash2, Wallet,
+  ArrowLeft, ArrowRight, Check, CheckCircle2, ExternalLink, Eye, Handshake, ImagePlus, Loader2, Lock, MessageSquare, Trash2, Wallet,
 } from "lucide-react";
 import {
   getGetMyManufacturerProfileQueryKey, getResolveManufacturerInviteQueryKey, useGetMyManufacturerProfile,
@@ -19,6 +19,7 @@ import { TimeZoneSelect, browserTimeZone } from "@/components/time-zone-select";
 import { cn } from "@/lib/utils";
 import { errorMessage, useApiRequest } from "@/lib/api";
 import { clearInvite, pendingInvite } from "@/lib/invite";
+import { useConnectStatus } from "@/hooks/use-connect-status";
 
 const SPECIALTIES = ["Cut & Sew", "Knitwear", "Denim", "Activewear", "Outerwear", "Swimwear", "Leather Goods", "Wovens", "Accessories", "Screen Printing", "Embroidery"];
 const MAX_PHOTOS = 8;
@@ -31,7 +32,7 @@ type Form = {
 };
 type Errors = Partial<Record<keyof Form, string>>;
 
-const STEPS = ["Business", "Capabilities", "Contact", "Review", "Photos", "Done"] as const;
+const STEPS = ["Company info", "Capabilities", "Contact", "Review", "Factory photos", "Payout setup", "Done"] as const;
 
 function validate(step: number, form: Form): Errors {
   const errors: Errors = {};
@@ -80,8 +81,10 @@ export default function Onboarding() {
   });
   const register = useRegisterManufacturer();
   const registerViaInvite = useRegisterManufacturerViaInvite();
+  const connectStatus = useConnectStatus();
 
   const [step, setStep] = useState(0);
+  const [resumed, setResumed] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -109,17 +112,28 @@ export default function Onboarding() {
     if (invited?.companyName) setForm((current) => current.businessName ? current : { ...current, businessName: invited.companyName ?? "" });
   }, [inviteInfo.data]);
 
-  // Already registered: accept a pending invite for the existing profile, or go to the hub.
+  // Already registered: accept a pending invite for the existing profile, resume exactly
+  // where they left off (photos, then payout setup), or — once both are done — go to the
+  // hub. Runs once per profile load so it doesn't fight the wizard's own step state.
   const existing = me.data;
   useEffect(() => {
-    if (!existing || step >= 4) return;
-    if (!invite) { setLocation("/dashboard"); return; }
-    if (accepting) return;
-    setAccepting(true);
-    request<{ threadId?: string }>(`/api/manufacturers/register-via-invite/${encodeURIComponent(invite)}`, { method: "POST", body: "{}" })
-      .then((result) => { clearInvite(); setLocation(result.threadId ? `/messages/${result.threadId}` : "/dashboard"); })
-      .catch(() => { clearInvite(); setLocation("/dashboard"); });
-  }, [existing, invite, step, accepting, request, setLocation]);
+    if (!existing || resumed) return;
+    if (invite) {
+      if (accepting) return;
+      setAccepting(true);
+      request<{ threadId?: string }>(`/api/manufacturers/register-via-invite/${encodeURIComponent(invite)}`, { method: "POST", body: "{}" })
+        .then((result) => { clearInvite(); setLocation(result.threadId ? `/messages/${result.threadId}` : "/dashboard"); })
+        .catch(() => { clearInvite(); setLocation("/dashboard"); });
+      return;
+    }
+    if (connectStatus.isLoading) return; // wait for payout readiness before deciding where to resume
+    setResumed(true);
+    setPhotos(existing.photos ?? []);
+    if ((existing.photos?.length ?? 0) === 0) { setStep(4); return; }
+    const payoutsUsable = connectStatus.error?.status !== 503;
+    if (payoutsUsable && !connectStatus.data?.ready) { setStep(5); return; }
+    setLocation("/dashboard");
+  }, [existing, invite, accepting, request, setLocation, resumed, connectStatus.isLoading, connectStatus.data, connectStatus.error]);
 
   const next = () => {
     const found = validate(step, form);
@@ -190,10 +204,30 @@ export default function Onboarding() {
     }
   };
 
+  const [payoutStarting, setPayoutStarting] = useState(false);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const startPayoutOnboarding = async () => {
+    setPayoutStarting(true);
+    setPayoutError(null);
+    try {
+      const returnUrl = `${window.location.origin}${import.meta.env.BASE_URL}onboard`;
+      const result = await request<{ url: string }>("/api/manufacturers/connect/onboard", {
+        method: "POST",
+        body: JSON.stringify({ returnUrl, refreshUrl: returnUrl }),
+      });
+      window.location.assign(result.url);
+    } catch (error) {
+      setPayoutError(errorMessage(error, "Stripe onboarding could not be opened."));
+      setPayoutStarting(false);
+    }
+  };
+  const payoutsDisabled = connectStatus.error?.status === 503;
+  const connectReady = connectStatus.data?.ready === true;
+
   const isInvited = !!invite && !!inviteInfo.data;
   const pending = register.isPending || registerViaInvite.isPending;
 
-  if (me.isLoading || (existing && step < 4) || (invite && inviteInfo.isLoading)) {
+  if (me.isLoading || (existing && !resumed) || (invite && inviteInfo.isLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground" data-testid="status-onboarding-loading">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {existing && invite ? "Connecting you with the seller…" : "Loading…"}
@@ -375,6 +409,34 @@ export default function Onboarding() {
             )}
 
             {step === 5 && (
+              <section className="space-y-6">
+                <div><h1 className="text-2xl font-bold tracking-tight">Payout setup</h1><p className="mt-1 text-muted-foreground">Sellers pay your order cards through Stripe. Verify your business and bank account once — it takes about 10 minutes.</p></div>
+                {payoutsDisabled ? (
+                  <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground" data-testid="status-onboarding-payouts-not-configured">
+                    <Wallet className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>Payments aren't switched on for this workspace yet. You can skip this for now — we'll remind you on your hub as soon as it's ready.</p>
+                  </div>
+                ) : connectReady ? (
+                  <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4 text-sm" data-testid="status-onboarding-payouts-ready">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <p>Stripe has verified your business. Sellers can pay your order cards and the money goes to your bank.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+                      <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <p>Stripe verifies your business and bank account{country && country.code !== "US" ? ` · you'll be paid out in ${country.currency}` : ""}. You'll need your business registration and bank details.</p>
+                    </div>
+                    <Button onClick={() => void startPayoutOnboarding()} disabled={payoutStarting} className="h-12 gap-2 px-6 font-semibold" data-testid="button-onboarding-start-connect">
+                      <ExternalLink className="h-4 w-4" /> {payoutStarting ? "Opening Stripe…" : "Set up with Stripe"}
+                    </Button>
+                    {payoutError && <p className="text-sm text-destructive" role="alert">{payoutError}</p>}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {step === 6 && (
               <section className="space-y-8 text-center">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary"><CheckCircle2 className="h-8 w-8" /></div>
                 <div>
@@ -382,7 +444,9 @@ export default function Onboarding() {
                   <p className="mx-auto mt-2 max-w-lg text-muted-foreground">
                     {threadId
                       ? "Your private conversation is ready. Say hello, ask for the tech pack, and send a sample card when you've priced it."
-                      : "Brands can find you right now. One last thing: verify your payout account so sellers can pay your order cards."}
+                      : connectReady
+                        ? "Brands can find you right now, and your payouts are ready to receive money."
+                        : "Brands can find you right now. Finish payout setup from your hub whenever you're ready."}
                   </p>
                 </div>
                 <div className="mx-auto grid max-w-lg gap-3 text-left">
@@ -391,9 +455,11 @@ export default function Onboarding() {
                       <MessageSquare className="h-5 w-5 text-primary" /><div className="flex-1"><p className="font-medium">Open the conversation</p><p className="text-sm text-muted-foreground">Chat, share photos and send order cards</p></div><ArrowRight className="h-4 w-4" />
                     </Link>
                   )}
-                  <Link href="/payment" className="flex items-center gap-3 rounded-lg border border-border bg-card p-4" data-testid="link-onboarding-payouts">
-                    <Wallet className="h-5 w-5 text-primary" /><div className="flex-1"><p className="font-medium">Set up payouts</p><p className="text-sm text-muted-foreground">About 10 minutes with Stripe{country && country.code !== "US" ? ` · paid out in ${country.currency}` : ""}</p></div><ArrowRight className="h-4 w-4" />
-                  </Link>
+                  {!connectReady && !payoutsDisabled && (
+                    <Link href="/payment" className="flex items-center gap-3 rounded-lg border border-border bg-card p-4" data-testid="link-onboarding-payouts">
+                      <Wallet className="h-5 w-5 text-primary" /><div className="flex-1"><p className="font-medium">Finish payout setup</p><p className="text-sm text-muted-foreground">About 10 minutes with Stripe{country && country.code !== "US" ? ` · paid out in ${country.currency}` : ""}</p></div><ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
                   <Link href="/dashboard" className="flex items-center justify-center rounded-lg p-3 text-sm text-muted-foreground hover:text-foreground">Go to my hub</Link>
                 </div>
               </section>
@@ -402,9 +468,9 @@ export default function Onboarding() {
         </main>
       </div>
 
-      {step < 5 && (
+      {step < 6 && (
         <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between border-t border-border bg-background/80 p-4 backdrop-blur-md md:left-64 md:p-6">
-          <Button variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || step === 4 || pending} className="h-12 gap-2 px-6">
+          <Button variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || step === 4 || step === 5 || pending} className="h-12 gap-2 px-6">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
           {step < 3 && <Button onClick={next} className="h-12 gap-2 px-8 font-semibold" data-testid="button-onboarding-next">Continue <ArrowRight className="h-4 w-4" /></Button>}
@@ -416,7 +482,12 @@ export default function Onboarding() {
           )}
           {step === 4 && (
             <Button onClick={() => setStep(5)} disabled={uploading > 0} className="h-12 gap-2 px-8 font-semibold" data-testid="button-onboarding-photos-done">
-              {photos.length ? "Finish" : "Skip for now"} <ArrowRight className="h-4 w-4" />
+              {photos.length ? "Continue" : "Skip for now"} <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {step === 5 && (
+            <Button onClick={() => setStep(6)} disabled={payoutStarting} variant={connectReady || payoutsDisabled ? "default" : "outline"} className="h-12 gap-2 px-8 font-semibold" data-testid="button-onboarding-payout-done">
+              {connectReady || payoutsDisabled ? "Finish" : "Skip for now"} <ArrowRight className="h-4 w-4" />
             </Button>
           )}
         </footer>

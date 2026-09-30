@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, Redirect, useLocation } from "wouter";
+import { UserButton } from "@clerk/react";
 import {
   LayoutDashboard,
   Package,
@@ -30,24 +31,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; mobile?: string }> = [
     { href: "/dashboard", label: "Hub", icon: LayoutDashboard, mobile: "Hub" },
     { href: "/messages", label: "Inbox", icon: MessageSquare, mobile: "Inbox" },
-    { href: "/orders", label: "Active Orders", icon: Package, exact: true, mobile: "Orders" },
+    { href: "/orders", label: "Active orders", icon: Package, exact: true, mobile: "Orders" },
     { href: "/orders/history", label: "Completed", icon: History },
     { href: "/payment", label: "Payouts", icon: Wallet, mobile: "Payouts" },
     { href: "/sellers", label: "Sellers", icon: Store },
-    { href: "/quote-requests", label: "Quote Requests", icon: FileText },
+    { href: "/quote-requests", label: "Quote requests", icon: FileText },
     { href: "/products", label: "Products", icon: Boxes },
     { href: "/profile", label: "Profile", icon: Settings, mobile: "Profile" },
   ];
 
   if (isModerator) {
-    navItems.push({ href: "/moderation/ip-cases", label: "Safety Queue", icon: ShieldAlert });
+    navItems.push({ href: "/moderation/ip-cases", label: "Safety queue", icon: ShieldAlert });
   }
 
   // Signed in but no manufacturer profile yet: finish onboarding first.
   if ((profileError as { status?: number } | null)?.status === 404) return <Redirect to="/onboard" />;
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden text-foreground selection:bg-primary selection:text-primary-foreground">
+    <div className="flex h-dvh w-full bg-background overflow-hidden text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Sidebar */}
       <aside className="w-64 border-r border-border bg-card flex flex-col hidden md:flex shrink-0 z-10">
         <div className="h-16 flex items-center px-6 border-b border-border">
@@ -59,7 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         
         <div className="p-4 flex-1 overflow-y-auto space-y-1">
           <div className="mb-6 px-2">
-            <h3 className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground mb-3">Menu</h3>
+            <h3 className="sr-only">Menu</h3>
             <nav className="space-y-1">
               {navItems.map((item) => {
                 const isActive = item.exact ? location === item.href : location.startsWith(item.href);
@@ -84,15 +85,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center text-muted-foreground shrink-0 border border-border">
-              <Factory className="w-4 h-4" />
-            </div>
+            <UserButton />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
                 {profile?.businessName || "Manufacturer"}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                {profile?.specialty || "Loading..."}
+                {profile?.specialty || (profile === undefined ? <span className="inline-block h-3 w-16 animate-pulse rounded bg-secondary" /> : "")}
               </p>
             </div>
           </div>
@@ -104,8 +103,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
         
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center gap-2 md:hidden">
             <img src={`${import.meta.env.BASE_URL}brandthread-logo.png`} className="w-8 h-8 rounded-sm object-cover" alt="Brandthread" />
+            <UserButton />
           </div>
           
           <div className="flex-1"></div>
@@ -127,7 +127,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </div>
-        <nav className="grid grid-cols-5 border-t border-border bg-card md:hidden">
+        <nav className="grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
           {navItems.filter((item) => item.mobile).map((item) => {
             const isActive = item.exact ? location === item.href : location.startsWith(item.href);
             return (
