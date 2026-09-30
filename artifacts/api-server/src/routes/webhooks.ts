@@ -6,7 +6,7 @@ import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import type Stripe from "stripe";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
   revenueCatWebhookEvents, manufacturers, sampleOrders, manufacturerActivityEvents,
   stripeTrialWarningEvents,
@@ -44,6 +44,8 @@ import {
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
+import { processDisputeEvent } from "../lib/disputes/webhook";
+import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
@@ -397,24 +399,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
           cumulativeReversedCents: event.data.object.amount,
           providerEventId: event.id,
           source: "dispute",
-        })) await handleDisputeCreated(event.data.object);
+        })) await handleDisputeEvent(event);
         break;
 
+      // Updated / closed / funds_withdrawn / funds_reinstated all run through
+      // the same idempotent processor (lib/disputes/webhook.ts), which writes
+      // the dispute_events timeline, the ledger effect and the seller alert.
       case "charge.dispute.updated":
-        if (!await isManufacturerCardPayment(
-          stripeReferenceId(event.data.object.payment_intent),
-          stripeReferenceId(event.data.object.charge),
-        )) {
-          await handleDisputeUpdated(event.data.object);
-        }
-        break;
-
       case "charge.dispute.closed":
+      case "charge.dispute.funds_withdrawn":
+      case "charge.dispute.funds_reinstated":
         if (!await isManufacturerCardPayment(
           stripeReferenceId(event.data.object.payment_intent),
           stripeReferenceId(event.data.object.charge),
         )) {
-          await handleDisputeClosed(event.data.object);
+          await handleDisputeEvent(event);
         }
         break;
 
@@ -1597,112 +1596,11 @@ async function handleIdentityFailed(session: any) {
 }
 
 // ─── Dispute handlers ─────────────────────────────────────────────────────────
+// The logic lives in lib/disputes/webhook.ts so it can be tested without a
+// database; this wires in the real store, ledger and notification publisher.
 
-function mapDisputeStatus(s: string): string {
-  switch (s) {
-    case "needs_response":           return "needs_response";
-    case "under_review":             return "under_review";
-    case "warning_needs_response":   return "needs_response";
-    case "warning_under_review":     return "under_review";
-    case "warning_closed":           return "closed";
-    case "charge_refunded":          return "closed";
-    case "won":                      return "won";
-    case "lost":                     return "lost";
-    default:                         return s;
-  }
-}
-
-/** Resolve the seller's clerkId from a Stripe paymentIntentId or chargeId. */
-async function resolveSellerAndOrder(
-  paymentIntentId: string | null,
-  chargeId: string | null,
-): Promise<{ sellerId: string; orderId: string | null }> {
-  // Try to find matching order by payment intent ID
-  if (paymentIntentId) {
-    const [ord] = await db
-      .select({ id: orders.id, ownerId: orders.ownerId })
-      .from(orders)
-      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
-      .limit(1);
-    if (ord) return { sellerId: ord.ownerId, orderId: ord.id };
-  }
-  return { sellerId: "unknown", orderId: null };
-}
-
-async function handleDisputeCreated(dispute: any) {
-  const dueBy = dispute.evidence_details?.due_by
-    ? new Date(dispute.evidence_details.due_by * 1000)
-    : null;
-
-  const { sellerId, orderId } = await resolveSellerAndOrder(
-    dispute.payment_intent ?? null,
-    dispute.charge ?? null,
-  );
-
-  // Build human-readable claim from reason
-  const reasonLabels: Record<string, string> = {
-    credit_not_processed:    "Customer claims they did not receive a refund.",
-    duplicate:               "Customer claims this is a duplicate charge.",
-    fraudulent:              "Customer reports this as an unauthorized charge.",
-    general:                 "Customer filed a general dispute.",
-    product_not_received:    "Customer claims the product was not received.",
-    product_unacceptable:    "Customer claims the product was defective or not as described.",
-    subscription_canceled:   "Customer claims they canceled their subscription.",
-    unrecognized:            "Customer does not recognize this charge.",
-  };
-  const customerClaim = reasonLabels[dispute.reason] ?? `Dispute filed: ${dispute.reason}`;
-
-  await db
-    .insert(disputes)
-    .values({
-      stripeDisputeId:       dispute.id,
-      stripeChargeId:        dispute.charge ?? null,
-      stripePaymentIntentId: dispute.payment_intent ?? null,
-      orderId,
-      sellerId,
-      amountCents:           dispute.amount,
-      currency:              dispute.currency,
-      reason:                dispute.reason,
-      status:                mapDisputeStatus(dispute.status),
-      evidenceDueBy:         dueBy,
-      stripeEvidenceDetails: dispute.evidence_details ?? {},
-      isChargeRefundable:    dispute.is_charge_refundable ?? true,
-      networkReasonCode:     dispute.network_reason_code ?? null,
-      customerClaim,
-    })
-    .onConflictDoNothing();
-
-  logger.info({ disputeId: dispute.id, sellerId, orderId, reason: dispute.reason }, "Dispute created");
-}
-
-async function handleDisputeUpdated(stripeDispute: any) {
-  const dueBy = stripeDispute.evidence_details?.due_by
-    ? new Date(stripeDispute.evidence_details.due_by * 1000)
-    : null;
-
-  await db
-    .update(disputes)
-    .set({
-      status:                mapDisputeStatus(stripeDispute.status),
-      evidenceDueBy:         dueBy,
-      stripeEvidenceDetails: stripeDispute.evidence_details ?? {},
-      updatedAt:             new Date(),
-    })
-    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
-
-  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute updated");
-}
-
-async function handleDisputeClosed(stripeDispute: any) {
-  await db
-    .update(disputes)
-    .set({
-      status:    mapDisputeStatus(stripeDispute.status),
-      updatedAt: new Date(),
-    })
-    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
-
-  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
+async function handleDisputeEvent(event: { id: string; type: string; created?: number; data: { object: any } }) {
+  await processDisputeEvent(event, buildDisputeDeps(publishNotification));
 }
 
 /**

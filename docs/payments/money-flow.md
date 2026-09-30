@@ -85,6 +85,22 @@ Buyer cancellation, seller cancellation, approved return, failed drop and overso
   and restocked; if Stripe refuses, it goes back to its previous status.
 - Repeating a refund with the same key returns the first refund and never pays twice.
 
+### 2.5 Disputes (chargebacks)
+
+Stripe takes the disputed amount back when a dispute **opens** (`charge.dispute.funds_withdrawn`) and returns
+it only if the dispute is **won** (`charge.dispute.funds_reinstated`). So a lost dispute needs no second
+movement; the money already left. `lib/money/disputes.ts` records it like a clawback with no refund row:
+
+- Withdrawal: `buyer_payments` +amount. Held order: the seller's share comes out of that order's held money
+  (and the drop wallet). Already released, or an in-stock order: `platform_funds_advanced` (seller) -amount,
+  meaning the seller owes it to Brandthread. Posted once per Stripe event (`dispute-withdrawn/<dispute>/<event>`).
+- Reinstatement (won): the exact opposite of each withdrawal it reverses (`dispute-reinstated/<tx id>`).
+- **Not modelled:** Stripe's dispute fee. The amount is stored on the `dispute_events` row (`feeCents`) but
+  no ledger posting is made, because who bears it (seller, platform, or split) is an owner decision.
+- The seller is notified (push + in-app, deep link to `/dispute-detail`) when a dispute opens, 48 hours before
+  the evidence deadline (`jobs/disputeEvidenceReminder.ts`), and when it is won or lost. Every step is
+  idempotent; replays change nothing. The timeline lives in `dispute_events` (migration 114).
+
 ## 3. Fees and rounding
 
 All in `fees.ts`, integer arithmetic only (basis points, `BigInt` for safety):
@@ -239,6 +255,7 @@ and `reserved` = amounts in flight. The tests check this after every scenario.
 |---|---|
 | `checkout.session.completed` / `async_payment_succeeded` | Create the order + fee split + ledger + held deposit, atomically. Oversold → automatic refund. |
 | `charge.refunded` | Manufacturer card reversal as before. For buyer orders, records refunds made **outside** Brandthread (Stripe dashboard) so the books match Stripe. |
+| `charge.dispute.*` (created, updated, closed, funds_withdrawn, funds_reinstated) | Timeline row + seller alert for each; ledger withdrawal / reversal on funds_withdrawn / funds_reinstated (§2.5). |
 | `charge.refund.updated` (status `failed`) | A refund Stripe accepted then failed: reverse its ledger entry and restore the order's refunded total. |
 | `transfer.created/updated/reversed` | Manufacturer bulk payment from held funds (+ ledger). |
 
@@ -303,7 +320,7 @@ from Stripe documentation excerpts, search results, and card-network rules; each
    Confirm the platform's liability when a seller's balance is insufficient, and whether account debits
    are enabled.
 8. **Disputes on held orders** land on the platform charge. Decide whether the disputed amount is deducted
-   from the drop or the order's release (today: recorded by the existing disputes flow, not deducted).
+   from the drop or the order's release (today: the withdrawal is taken from the order's held money in the ledger, §2.5; the dispute fee is not posted).
 9. **Collecting what sellers owe** (a failed drop's shortfall, unrecovered labels). It is recorded and shown
    to the seller, but not collected automatically. Decide the policy: deduct from future releases, account
    debits, or invoices.
@@ -360,7 +377,7 @@ stranded; *Medium* = incorrect balances or missing safety; *Low* = hygiene.
 |---|---|
 | A cart with one seller's preorder **and** in-stock items | The app groups checkout by seller. The server now refuses these with a clear `MIXED_PREORDER_CART` message. The app should split checkout groups by (seller, preorder drop). |
 | Collecting money sellers owe (drop shortfalls, unrecovered labels) | Recorded in the ledger and shown on the finance screen; collection policy is an owner decision (§8, item 9). |
-| Disputes on held preorders | Not deducted from the order's release (§8, item 8). |
+| Dispute fee | Stored on the dispute timeline, not posted to the ledger (§2.5, §8 item 8). |
 | A label voided **after** its order was released | The refund goes back into that order's held balance and needs a manual payout. Rare. |
 | Manual transfer reversals made in the Stripe dashboard on release transfers | Not reconciled automatically. |
 | Sample/bulk cards paid by the seller's card | Brandthread's 5% applies (existing); Stripe's fee on those charges is paid by Brandthread and not tracked in the ledger. Bulk payments from held funds carry no platform fee. Owner decision. |

@@ -1792,10 +1792,54 @@ export const disputes = pgTable('disputes', {
   isChargeRefundable:     boolean('is_charge_refundable').notNull().default(true),
   networkReasonCode:      text('network_reason_code'),
   customerClaim:          text('customer_claim').notNull().default(''),
+  /** Set once evidence is sent to Stripe for review (migration 114); Stripe allows one submission. */
+  evidenceSubmittedAt:    timestamp('evidence_submitted_at'),
   createdAt:              timestamp('created_at').defaultNow().notNull(),
   updatedAt:              timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   orderIdx: index('disputes_order_idx').on(table.orderId),
+}));
+
+export const DISPUTE_EVENT_KINDS = [
+  'created', 'evidence_due_soon', 'updated', 'funds_withdrawn', 'funds_reinstated',
+  'evidence_submitted', 'accepted', 'won', 'lost', 'warning_closed',
+] as const;
+export type DisputeEventKind = (typeof DISPUTE_EVENT_KINDS)[number];
+
+// Status timeline for a dispute (migration 114). stripe_event_id is unique so a
+// replayed webhook never writes twice; events raised by our own API use a
+// deterministic synthetic id.
+export const disputeEvents = pgTable('dispute_events', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  disputeId:     uuid('dispute_id').notNull().references(() => disputes.id, { onDelete: 'cascade' }),
+  stripeEventId: text('stripe_event_id').notNull(),
+  kind:          text('kind').$type<DisputeEventKind>().notNull(),
+  /** Safe summary only (status, amounts, fee) — never the raw Stripe payload. */
+  payload:       jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+  occurredAt:    timestamp('occurred_at').defaultNow().notNull(),
+  notifiedAt:    timestamp('notified_at'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  stripeEventUnique: uniqueIndex('dispute_events_stripe_event_unique').on(table.stripeEventId),
+  disputeIdx: index('dispute_events_dispute_idx').on(table.disputeId, table.occurredAt),
+}));
+
+// Files a seller uploaded as dispute evidence (migration 114). evidence_type is
+// the Stripe evidence field the file is sent under, so one live file per type.
+export const disputeEvidenceFiles = pgTable('dispute_evidence_files', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  disputeId:    uuid('dispute_id').notNull().references(() => disputes.id, { onDelete: 'cascade' }),
+  sellerId:     text('seller_id').notNull(),
+  evidenceType: text('evidence_type').notNull(),
+  fileName:     text('file_name').notNull().default(''),
+  objectKey:    text('object_key').notNull(),
+  contentType:  text('content_type').notNull(),
+  sizeBytes:    integer('size_bytes').notNull(),
+  stripeFileId: text('stripe_file_id'),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  disputeIdx: index('dispute_evidence_files_dispute_idx').on(table.disputeId),
+  typeUnique: uniqueIndex('dispute_evidence_files_type_unique').on(table.disputeId, table.evidenceType),
 }));
 
 // ─── Paid Promotion Boosts ────────────────────────────────────────────────────
