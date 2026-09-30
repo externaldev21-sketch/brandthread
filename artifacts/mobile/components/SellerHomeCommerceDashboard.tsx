@@ -87,6 +87,12 @@ import {
 
 type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 
+// Stable reference for "no data yet" — `data?.buckets ?? []` would otherwise
+// hand a brand-new array to two useMemo dependencies on every render,
+// defeating their memoization (same bug class as app/boost.tsx's infinite
+// render loop, though here it doesn't set state so it isn't infinite).
+const EMPTY_BUCKETS: SellerHomeAnalyticsSnapshot['data']['buckets'] = [];
+
 interface FinanceBalance {
   available: { amount: number; currency: string; formatted: string };
   pending: { amount: number; currency: string; formatted: string };
@@ -535,7 +541,7 @@ export default function SellerHomeCommerceDashboard({
   } : null;
 
   // ── Metric aggregate + chart series for the currently focused metric ─────
-  const buckets = data?.buckets ?? [];
+  const buckets = data?.buckets ?? EMPTY_BUCKETS;
   const series = useMemo(() => metricSeries(metric, buckets), [metric, buckets]);
   const labels = useMemo(() => buckets.map((b) => bucketLabel(b.bucket, range as SellerHomeTimeRange)), [buckets, range]);
 
