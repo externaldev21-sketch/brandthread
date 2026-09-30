@@ -455,9 +455,12 @@ function sellerOrders(count = 9) {
 // the rest are guest checkouts (buyerId: null), same as production data
 // where not every order has a linked Brandthread account.
 function sellerOrderDetail(id, count = 9) {
-  const rows = sellerOrders(count);
-  const row = rows.find((r) => r.id === id);
-  if (!row) return undefined;
+  const rows = sellerOrders(Math.max(count, 1));
+  // Falls back to the first row for an id this fixture doesn't know about
+  // (e.g. a caller navigating with a real-looking id like "so-1") instead
+  // of 404ing — every other field below is keyed off the matched row, so
+  // the response stays internally consistent either way.
+  const row = rows.find((r) => r.id === id) ?? rows[0];
   const index = rows.indexOf(row);
   return {
     id: row.id,
@@ -1021,6 +1024,14 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/package-presets') return { presets: [] };
   if (p === '/shipping-rates') return [];
   if (p === '/returns') return [];
+  // A single return/dispute/product this fixture doesn't have a real row
+  // for still answers 200 with `null` ("not found", the screens' own
+  // honest empty state) rather than a bare 404 — same reasoning as
+  // sellerOrderDetail's fallback below, just without fabricating content
+  // for surfaces this fixture doesn't model yet.
+  if ((match = p.match(/^\/returns\/([^/]+)$/))) return null;
+  if ((match = p.match(/^\/disputes\/([^/]+)$/))) return null;
+  if ((match = p.match(/^\/products\/([^/]+)$/))) return byId(SELLER_PRODUCTS)(match[1]) ?? null;
   if (p === '/taxes/status') return {
     stripeTaxEnabled: false, provider: 'stripe', providerConfigured: true, providerStatus: 'not_enabled',
     automaticTaxAtCheckout: false, complianceNote: '', chargeShippingTax: false, chargeVat: false,
