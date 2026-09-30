@@ -316,7 +316,6 @@ export default function PayoutsScreen() {
               message={balance?.connected === false
                 ? 'Add a bank account under Bank account to start receiving payouts.'
                 : 'Payouts show up here once your available balance clears.'}
-              compact
             />
           ) : (
             payouts.map((p) => {
@@ -471,15 +470,13 @@ export default function PayoutsScreen() {
 }
 
 const createStyles = (theme: AppThemePreset) => {
-  const { accent, text, muted, subtle, card, border, warning } = theme;
+  const { accent, text, muted, subtle, card, border } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
-  devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${warning}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
-  devBannerText:{ color: warning, fontSize: FS.xs, fontFamily: FONT.medium },
   balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
   balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
   balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
