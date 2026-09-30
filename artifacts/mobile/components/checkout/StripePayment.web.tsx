@@ -25,6 +25,7 @@ import { loadStripe } from '@stripe/stripe-js/pure';
 import type { Stripe, StripeElements, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { MIN_CARD_CHARGE_CENTS_CLIENT, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
+import { useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import {
   stripePublishableKey,
   type BillingDetails, type ConfirmOutcome, type ExpressPayProps, type GetClientSecret, type PaymentControllerApi,
@@ -48,31 +49,33 @@ export function stripePaymentAvailable(): boolean {
   return !!stripePublishableKey() && !stripeLoadFailed;
 }
 
-/** Monochrome, Inter, dark fields with a hairline border (the page's own field style). */
-const APPEARANCE: StripeElementsOptions['appearance'] = {
-  theme: 'night',
-  variables: {
-    colorPrimary: '#FFFFFF',
-    colorBackground: '#000000',
-    colorText: '#FFFFFF',
-    colorTextSecondary: '#8A8A8A',
-    colorTextPlaceholder: '#6B6B6B',
-    colorDanger: '#FFFFFF',
-    colorIcon: '#8A8A8A',
-    fontFamily: 'Inter, system-ui, sans-serif',
-    fontSizeBase: '16px',
-    borderRadius: '12px',
-    spacingUnit: '4px',
-  },
-  rules: {
-    '.Input': { border: '1px solid rgba(255,255,255,0.14)', boxShadow: 'none', backgroundColor: '#000000' },
-    '.Input:focus': { border: '1px solid rgba(255,255,255,0.6)', boxShadow: 'none' },
-    '.Input--invalid': { border: '1px solid #FFFFFF', boxShadow: 'none' },
-    '.Label': { color: '#8A8A8A', fontWeight: '500', fontSize: '13px' },
-    '.Error': { color: '#FFFFFF' },
-    '.Tab': { border: '1px solid rgba(255,255,255,0.14)', backgroundColor: '#000000', boxShadow: 'none' },
-  },
-};
+/** Follows the app theme: fields with a hairline border (the page's own field style). */
+function makeAppearance(ck: CheckoutColors): StripeElementsOptions['appearance'] {
+  return {
+    theme: 'night',
+    variables: {
+      colorPrimary: ck.text,
+      colorBackground: ck.bg,
+      colorText: ck.text,
+      colorTextSecondary: ck.muted,
+      colorTextPlaceholder: ck.subtle,
+      colorDanger: ck.text,
+      colorIcon: ck.muted,
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSizeBase: '16px',
+      borderRadius: '12px',
+      spacingUnit: '4px',
+    },
+    rules: {
+      '.Input': { border: `1px solid ${ck.fieldBorder}`, boxShadow: 'none', backgroundColor: ck.bg },
+      '.Input:focus': { border: `1px solid ${ck.fieldFocus}`, boxShadow: 'none' },
+      '.Input--invalid': { border: `1px solid ${ck.text}`, boxShadow: 'none' },
+      '.Label': { color: ck.muted, fontWeight: '500', fontSize: '13px' },
+      '.Error': { color: ck.text },
+      '.Tab': { border: `1px solid ${ck.fieldBorder}`, backgroundColor: ck.bg, boxShadow: 'none' },
+    },
+  };
+}
 
 export function StripePaymentProvider({ amountCents, children, onUnavailable }: {
   amountCents: number;
@@ -80,6 +83,7 @@ export function StripePaymentProvider({ amountCents, children, onUnavailable }: 
   /** Stripe.js failed to load: the screen falls back to hosted Checkout. */
   onUnavailable?: () => void;
 }) {
+  const ck = useCheckoutColors();
   const loader = stripeLoader();
   useEffect(() => {
     let active = true;
@@ -97,9 +101,9 @@ export function StripePaymentProvider({ amountCents, children, onUnavailable }: 
     // Matches the server (cards are kept on the buyer's Stripe customer for
     // next time, as the hosted flow always did).
     setupFutureUsage: 'off_session',
-    appearance: APPEARANCE,
+    appearance: makeAppearance(ck),
     fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap' }],
-  }), [amountCents]);
+  }), [amountCents, ck]);
   if (!loader) return <>{children}</>;
   return <Elements stripe={loader} options={options}>{children}</Elements>;
 }

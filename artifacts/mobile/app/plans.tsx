@@ -594,7 +594,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 6,
   },
-  phoneChartBar: { flex: 1, backgroundColor: theme.text, borderRadius: 2, opacity: 0.85 },
+  phoneChartBar: { flex: 1, backgroundColor: theme.accent, borderRadius: 2, opacity: 0.85 },
   phoneRow: { height: 8, borderRadius: 4, backgroundColor: theme.border, width: '100%' },
 
   commissionNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },

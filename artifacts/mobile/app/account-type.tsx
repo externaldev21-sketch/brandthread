@@ -115,7 +115,7 @@ export function AccountTypeStep({
                     <Text style={styles.cardTitle}>{c.title}</Text>
                   </View>
                   <View style={[styles.radio, isSelected && { borderColor: theme.text }]}>
-                    {isSelected ? <View style={[styles.radioDot, { backgroundColor: theme.text }]} /> : null}
+                    {isSelected ? <View style={[styles.radioDot, { backgroundColor: theme.accent }]} /> : null}
                   </View>
                 </View>
                 <Text style={styles.cardDesc}>{c.description}</Text>

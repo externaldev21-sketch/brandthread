@@ -432,7 +432,7 @@ function makeListStyles(colors: ReturnType<typeof useColors>) {
     rowIcon: { width: 22, flexShrink: 0 },
     rowLabel: { flex: 1, minWidth: 0, fontSize: 16, fontFamily: FONT.regular },
     rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
-    rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
+    rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: colors.text },
     rowSoonBadge: { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
     rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
   });

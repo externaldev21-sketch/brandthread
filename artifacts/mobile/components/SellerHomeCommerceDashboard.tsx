@@ -766,15 +766,15 @@ export default function SellerHomeCommerceDashboard({
                   </View>
                   <TouchableOpacity
                     testID="seller-dashboard-cash-out"
-                    style={[styles.withdrawButton, { backgroundColor: theme.text }, (financeLoading || cashingOut) && styles.withdrawButtonDisabled]}
+                    style={[styles.withdrawButton, { backgroundColor: theme.accent }, (financeLoading || cashingOut) && styles.withdrawButtonDisabled]}
                     activeOpacity={0.82}
                     disabled={financeLoading || cashingOut}
                     onPress={requestCashOut}
                     accessibilityRole="button"
                     accessibilityLabel="Withdraw available balance"
                   >
-                    {cashingOut ? <ActivityIndicator size="small" color={theme.background} /> : (
-                      <Text style={[styles.withdrawButtonText, { color: theme.background }]}>Withdraw</Text>
+                    {cashingOut ? <ActivityIndicator size="small" color={theme.onAccent} /> : (
+                      <Text style={[styles.withdrawButtonText, { color: theme.onAccent }]}>Withdraw</Text>
                     )}
                   </TouchableOpacity>
                 </View>

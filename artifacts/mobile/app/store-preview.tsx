@@ -274,6 +274,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   webviewClip: { overflow: 'hidden', width: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.xl },
   errorText: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted, textAlign: 'center' },
-  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.text },
-  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.background },
+  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.accent },
+  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
 });

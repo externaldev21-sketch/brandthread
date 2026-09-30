@@ -84,7 +84,7 @@ export function SellerThreadCashCard({
           styles.cashOutBtn,
           (loading || error || !balanceCents)
             ? [styles.cashOutBtnDisabled, { borderColor: theme.border }]
-            : { backgroundColor: theme.text },
+            : { backgroundColor: theme.accent },
         ]}
         accessibilityRole="button"
         accessibilityLabel="Cash out Thread Cash"
@@ -93,12 +93,12 @@ export function SellerThreadCashCard({
         <Feather
           name="arrow-down-circle"
           size={16}
-          color={(loading || error || !balanceCents) ? theme.muted : theme.background}
+          color={(loading || error || !balanceCents) ? theme.muted : theme.onAccent}
         />
         <Text
           style={[
             styles.cashOutBtnText,
-            { color: (loading || error || !balanceCents) ? theme.muted : theme.background },
+            { color: (loading || error || !balanceCents) ? theme.muted : theme.onAccent },
           ]}
         >
           Cash out

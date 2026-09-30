@@ -13,6 +13,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import type { LiveProduct } from '@/lib/live/types';
+import { LIVE_RED } from './LiveAvatarRing';
 
 export function LiveProductsSheet({
   visible, hostName, products, pinnedProductId, onBuy, onClose,
@@ -51,8 +52,8 @@ export function LiveProductsSheet({
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   {live && (
-                    <View style={[styles.liveChip, { backgroundColor: theme.text }]}>
-                      <Text style={[styles.liveChipText, { color: theme.background }]}>LIVE NOW</Text>
+                    <View style={[styles.liveChip, { backgroundColor: LIVE_RED }]}>
+                      <Text style={[styles.liveChipText, { color: '#fff' }]}>LIVE NOW</Text>
                     </View>
                   )}
                   <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{p.name}</Text>
@@ -60,11 +61,11 @@ export function LiveProductsSheet({
                 </View>
                 <Pressable
                   onPress={() => onBuy(p.productId)}
-                  style={[styles.buy, { backgroundColor: theme.text }]}
+                  style={[styles.buy, { backgroundColor: theme.accent }]}
                   accessibilityRole="button"
                   accessibilityLabel={`Buy ${p.name}`}
                 >
-                  <Text style={[styles.buyText, { color: theme.background }]}>Buy</Text>
+                  <Text style={[styles.buyText, { color: theme.onAccent }]}>Buy</Text>
                 </Pressable>
               </View>
             );

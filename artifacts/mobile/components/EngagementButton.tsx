@@ -32,14 +32,12 @@ import Reanimated, {
 import type { FeatherNames } from '@/lib/featherNames';
 import { TickingCount } from '@/components/ui/TickingCount';
 import { IconFillTransition } from '@/components/ui/IconFillTransition';
+import { useColors } from '@/hooks/useColors';
 import {
   FONT,
   FS,
   SP,
   RADIUS,
-  FG,
-  CARD,
-  BORDER,
   RED,
   SUCCESS,
   ANIM,
@@ -89,6 +87,7 @@ export function FeedToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function FeedToastBanner({ entry }: { entry: ToastEntry }) {
+  const colors = useColors();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
 
@@ -114,7 +113,7 @@ function FeedToastBanner({ entry }: { entry: ToastEntry }) {
       accessibilityRole="alert"
       style={[
         toastStyles.banner,
-        isError ? toastStyles.errorBanner : toastStyles.infoBanner,
+        isError ? toastStyles.errorBanner : [toastStyles.infoBanner, { backgroundColor: colors.card, borderColor: colors.border }],
         { opacity, transform: [{ translateY }] },
       ]}
       pointerEvents="none"
@@ -125,7 +124,7 @@ function FeedToastBanner({ entry }: { entry: ToastEntry }) {
         color={isError ? RED : SUCCESS}
         style={{ marginRight: 6 }}
       />
-      <Text style={toastStyles.text} numberOfLines={2}>{entry.message}</Text>
+      <Text style={[toastStyles.text, { color: colors.foreground }]} numberOfLines={2}>{entry.message}</Text>
     </Animated.View>
   );
 }
@@ -149,13 +148,9 @@ const toastStyles = StyleSheet.create({
     backgroundColor: '#1a0d0d',
     borderColor: RED,
   },
-  infoBanner: {
-    backgroundColor: CARD,
-    borderColor: BORDER,
-  },
+  infoBanner: {},
   text: {
     flex: 1,
-    color: FG,
     fontFamily: FONT.medium,
     fontSize: FS.xs,
     lineHeight: 17,
