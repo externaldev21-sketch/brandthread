@@ -28,6 +28,7 @@ import { captureRef } from 'react-native-view-shot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import Checkerboard from '@/components/design/Checkerboard';
 import BgRefineCanvas, { type BgRefineHandle, type RefineStroke, type RefineTool } from '@/components/design/BgRefineCanvas';
 import BgRemovalGlowSweep from '@/components/ai-tools/BgRemovalGlowSweep';
@@ -120,6 +121,7 @@ export default function DesignBgRemovalScreen() {
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
+  useHideTabBar();
 
   const [phase, setPhase] = useState<Phase>('empty');
   const [source, setSource] = useState<SourcePhoto | null>(null);
@@ -370,7 +372,7 @@ export default function DesignBgRemovalScreen() {
     } else setHIndex(i => Math.min(history.length - 1, i + 1));
   }
 
-  const bottomPad = COMP.tabBarH + insets.bottom + SP.md;
+  const bottomPad = insets.bottom + SP.md;
   const showStrip = true;
   const stripLocked = phase === 'processing' || refining;
   const editing = phase === 'done';
@@ -484,29 +486,32 @@ export default function DesignBgRemovalScreen() {
           />
         )}
         {editing && !refining && (
-          <View style={s.row}>
+          <View style={s.group}>
             <View style={s.swatches}>
               {BACKDROPS.map(b => (
                 <Swatch key={b.key} kind={b.key} label={b.label} active={backdrop === b.key} onPress={() => { Haptics.selectionAsync().catch(() => {}); setBackdrop(b.key); }} />
               ))}
             </View>
-            <PressableScale onPress={() => setRefining(true)} style={s.ghostPill} accessibilityRole="button" accessibilityLabel="Refine" testID="bg-removal-refine">
-              <Feather name="edit-3" size={ICON.sm} color={FG} />
-              <Text style={s.ghostText}>Refine</Text>
-            </PressableScale>
-            <PressableScale onPress={handleSave} style={[s.savePill, saving && s.dim]} accessibilityRole="button" accessibilityLabel="Save" testID="bg-removal-save">
-              {saved ? <Feather name="check" size={ICON.sm} color={BG} /> : null}
-              <Text style={s.saveText}>{saved ? 'Saved' : 'Save'}</Text>
-            </PressableScale>
+            <View style={s.grid}>
+              <Pressable onPress={() => setRefining(true)} style={({ pressed }) => [s.cell, s.cellOutline, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Refine" testID="bg-removal-refine">
+                <Feather name="edit-3" size={ICON.sm} color={FG} />
+                <Text style={s.cellText}>Refine</Text>
+              </Pressable>
+              <Pressable onPress={handleSave} style={({ pressed }) => [s.cell, s.cellSolid, saving && s.dim, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Save" testID="bg-removal-save">
+                <Feather name={saved ? 'check' : 'download'} size={ICON.sm} color={BG} />
+                <Text style={[s.cellText, { color: BG }]}>{saved ? 'Saved' : 'Save'}</Text>
+              </Pressable>
+            </View>
           </View>
         )}
         {editing && refining && (
-          <View style={s.row}>
-            <ToolBtn icon="minus-circle" label="Erase" active={tool === 'erase'} onPress={() => setTool('erase')} />
-            <ToolBtn icon="plus-circle" label="Restore" active={tool === 'restore'} onPress={() => setTool('restore')} />
-            <View style={{ flex: 1 }} />
-            <PressableScale onPress={handleApplyRefine} disabled={applying} style={[s.savePill, applying && s.dim]} accessibilityRole="button" accessibilityLabel="Done" testID="bg-removal-refine-done">
-              <Text style={s.saveText}>Done</Text>
+          <View style={s.group}>
+            <View style={s.grid}>
+              <ToolBtn icon="minus-circle" label="Erase" active={tool === 'erase'} onPress={() => setTool('erase')} />
+              <ToolBtn icon="plus-circle" label="Restore" active={tool === 'restore'} onPress={() => setTool('restore')} />
+            </View>
+            <PressableScale onPress={handleApplyRefine} disabled={applying} style={[s.pill, applying && s.dim]} accessibilityRole="button" accessibilityLabel="Done" testID="bg-removal-refine-done">
+              <Text style={s.pillText}>Done</Text>
             </PressableScale>
           </View>
         )}
@@ -542,10 +547,10 @@ function CornerBtn({ icon, label, disabled, onPress }: { icon: keyof typeof Feat
 
 function ToolBtn({ icon, label, active, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; active: boolean; onPress: () => void }) {
   return (
-    <PressableScale onPress={onPress} style={[s.toolBtn, active && s.toolBtnActive]} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }}>
+    <Pressable onPress={onPress} style={({ pressed }) => [s.cell, active ? s.cellSolid : s.cellOutline, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }}>
       <Feather name={icon} size={ICON.sm} color={active ? BG : FG} />
-      <Text style={[s.toolText, active && { color: BG }]}>{label}</Text>
-    </PressableScale>
+      <Text style={[s.cellText, active && { color: BG }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -611,27 +616,20 @@ const s = StyleSheet.create({
   tileImg: { width: '100%', height: '100%' },
 
   dock: { paddingHorizontal: SP.md, paddingTop: SP.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: COMP.buttonH },
+  group: { gap: SP.sm },
+  grid: { flexDirection: 'row', gap: SP.sm },
+  cell: { flex: 1, height: COMP.buttonH, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  cellOutline: { borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
+  cellSolid: { backgroundColor: FG, borderWidth: 1, borderColor: FG },
+  cellText: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   pill: { height: COMP.buttonH, borderRadius: RADIUS.pill, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
   pillDisabled: { opacity: 0.4 },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.md, color: BG },
-  swatches: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
-  swatchRing: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  swatches: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.xs, height: 44 },
+  swatchRing: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   swatchRingActive: { borderColor: FG },
-  swatch: { width: 22, height: 22, borderRadius: 11, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  swatch: { width: 30, height: 30, borderRadius: 15, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   swatchIcon: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  ghostPill: {
-    height: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1, borderColor: BORDER, backgroundColor: BG,
-  },
-  ghostText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-  savePill: { height: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: FG },
-  saveText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: BG },
   dim: { opacity: 0.6 },
-  toolBtn: {
-    height: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderColor: BORDER, backgroundColor: BG,
-  },
-  toolBtnActive: { backgroundColor: FG, borderColor: FG },
-  toolText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  pressed: { opacity: 0.85 },
 });

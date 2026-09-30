@@ -104,7 +104,7 @@ const HIDE_SCROLLBARS_CSS = `
  * Opens a fresh browser context for one device and role. Returns the context,
  * the page, and `activity.lastApiAt` (when the fake API last answered).
  */
-export async function openContext(browser, { device, role, origin, images, seedOptions = {}, apiOptions = {}, onUnseeded }) {
+export async function openContext(browser, { device, role, origin, images, seedOptions = {}, apiOptions = {}, onUnseeded, contextOptions = {} }) {
   const context = await browser.newContext({
     viewport: device.viewport,
     deviceScaleFactor: device.scale,
@@ -115,6 +115,7 @@ export async function openContext(browser, { device, role, origin, images, seedO
     timezoneId: DEMO_TIME_ZONE,
     colorScheme: 'dark',
     reducedMotion: 'reduce',
+    ...contextOptions,
   });
   // The demo data is written for one fixed moment (see DEMO_NOW); the clock
   // keeps ticking from there so animations and timers behave normally.
