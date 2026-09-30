@@ -4,7 +4,7 @@
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
-  Animated, Easing, Platform, Pressable, StyleSheet, Text, TextInput, View,
+  Animated, Easing, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
@@ -17,6 +17,8 @@ import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { Glass } from '@/components/ui/Glass';
+import Composer from '@/components/ui/Composer';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LIVE_RED } from './LiveAvatarRing';
 
 const ND = Platform.OS !== 'web';
@@ -353,6 +355,7 @@ export function LiveCommentBar({
   onShare?: () => void;
   onMore?: () => void;
 }) {
+  const { theme } = useAppTheme();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async () => {
@@ -362,47 +365,41 @@ export function LiveCommentBar({
     setText('');
     try { await onSend(t); } catch { setText(t); } finally { setBusy(false); }
   };
+  const hasQuick = !!(onGift || onShare || onMore);
   return (
-    <View style={styles.commentRow}>
-      {/* Plain translucent fill, no BlurView: on web an absolutely-positioned
-          blur layer paints above the (unpositioned) <input> and its
-          backdrop-filter blurred the typed text and placeholder. */}
-      <View style={styles.commentPill}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          onSubmitEditing={submit}
-          editable={!disabled}
-          placeholder="Add comment..."
-          placeholderTextColor="rgba(255,255,255,0.62)"
-          returnKeyType="send"
-          maxLength={300}
-          style={styles.commentInput}
-          accessibilityLabel="Add a comment to the live chat"
-          testID="live-comment-input"
-        />
-        {text.trim().length > 0 && (
-          <Pressable onPress={submit} style={styles.sendBtn} accessibilityRole="button" accessibilityLabel="Send comment" hitSlop={6}>
-            <Feather name="arrow-up" size={16} color="#000" />
-          </Pressable>
-        )}
-      </View>
-      {onGift && (
-        <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={4} testID="live-gift">
-          <ThreadCashBill width={26} />
-        </Pressable>
-      )}
-      {onShare && (
-        <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
-          <Feather name="share" size={22} color="#fff" />
-        </Pressable>
-      )}
-      {onMore && (
-        <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
-          <Feather name="more-horizontal" size={22} color="#fff" />
-        </Pressable>
-      )}
-    </View>
+    <Composer
+      value={text}
+      onChangeText={setText}
+      onSend={submit}
+      canSend={text.trim().length > 0 && !busy}
+      editable={!disabled}
+      placeholder="Add comment..."
+      accessibilityLabel="Add a comment to the live chat"
+      maxLength={300}
+      hideTabBar={false}
+      bottomInset={0}
+      testID="live-comment"
+      style={styles.composerFlush}
+      rightAccessory={hasQuick ? (
+        <>
+          {onGift && (
+            <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={4} testID="live-gift">
+              <ThreadCashBill width={24} />
+            </Pressable>
+          )}
+          {onShare && (
+            <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
+              <Feather name="share" size={20} color={theme.text} />
+            </Pressable>
+          )}
+          {onMore && (
+            <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
+              <Feather name="more-horizontal" size={20} color={theme.text} />
+            </Pressable>
+          )}
+        </>
+      ) : undefined}
+    />
   );
 }
 
@@ -504,15 +501,6 @@ const styles = StyleSheet.create({
   },
   railBadgeText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.xs },
 
-  commentRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  commentPill: {
-    flex: 1, height: 44, borderRadius: RADIUS.pill, overflow: 'hidden', flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.42)',
-  },
-  commentInput: {
-    flex: 1, height: 44, paddingHorizontal: 16, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm,
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
-  },
-  sendBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 6 },
-  quickIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  composerFlush: { paddingHorizontal: 0, paddingTop: 0 },
+  quickIconBtn: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
 });

@@ -33,6 +33,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -551,26 +552,15 @@ function BuyerLiveNativeScreen() {
             </PressableScale>
           ))}
         </ScrollView>
-        <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>
-          <TextInput
-            value={commentText}
-            onChangeText={setCommentText}
-            onSubmitEditing={sendComment}
-            placeholder="Add a comment…"
-            placeholderTextColor="rgba(255,255,255,0.45)"
-            returnKeyType="send"
-            style={s.textInput}
-          />
-          <PressableScale
-            onPress={() => { hapticLight(); sendComment(); }}
-            activeOpacity={0.7}
-            style={s.sendBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Send comment"
-          >
-            <Feather name="send" size={18} color="#fff" />
-          </PressableScale>
-        </View>
+        <Composer
+          value={commentText}
+          onChangeText={setCommentText}
+          onSend={() => { hapticLight(); sendComment(); }}
+          placeholder="Add a comment…"
+          accessibilityLabel="Add a comment"
+          hideTabBar={false}
+          testID="buyer-live-composer"
+        />
       </KeyboardAvoidingView>
 
       {purchaseTag && (
@@ -701,9 +691,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentRow:       { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingVertical: 3 },
   commentName:      { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
   commentMsg:       { color: 'rgba(255,255,255,0.88)', fontFamily: FONT.regular, fontSize: 12 },
-  inputRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 6 },
-  textInput:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: RADIUS.pill, paddingHorizontal: 15, paddingVertical: 9, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm },
-  sendBtn:          { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   purchaseSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
     maxHeight: H * 0.78, backgroundColor: BG, borderTopLeftRadius: RADIUS.xl,

@@ -101,7 +101,7 @@ describe('BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS + BuyerTabBar: same helper, same mo
     const bar = src('../components/buyer-nav/BuyerTabBar.tsx');
     expect(bar).toContain("import { useSegments, type Tabs } from 'expo-router';");
     expect(bar).toMatch(/const segments = useSegments\(\);/);
-    expect(bar).toMatch(/const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS\.has\(firstSegment\);/);
+    expect(bar).toMatch(/const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS\.has\(firstSegment\) \|\| hiddenByScreen;/);
   });
 
   it('drives translateY via the SAME TAB_BAR_SLIDE_MS/EASING/tabBarSlideTargetY helper as the seller bar, never a spring', () => {

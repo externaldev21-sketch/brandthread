@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, Pressable, TextInput, Animated, Easing,
+  View, Text, Pressable, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
   Linking, Platform, Share,
 } from 'react-native';
@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import Composer from '@/components/ui/Composer';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
@@ -867,99 +868,81 @@ export default function BuyerStoryViewer() {
           style={styles.bottomBarWrap}
           keyboardVerticalOffset={0}
         >
-          {!currentStory.repliesDisabled && replyFocused && (
-            <View style={styles.quickReactionRow}>
-              {QUICK_REACTIONS.map(emoji => (
-                <PressableScale
-                  key={emoji}
-                  onPress={() => sendQuickReaction(emoji)}
-                  disabled={sendingReply}
-                  accessibilityRole="button"
-                  accessibilityLabel={`React with ${emoji}`}
-                >
-                  <AppleEmoji emoji={emoji} size={26} />
-                </PressableScale>
-              ))}
-            </View>
-          )}
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-            {!currentStory.repliesDisabled ? (
-              <>
-                <View style={styles.replyInputPill}>
-                  <TextInput
-                    style={styles.replyInput}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder={`Reply to ${currentStory.authorName}…`}
-                    placeholderTextColor="rgba(255,255,255,0.8)"
-                    onFocus={() => {
-                      if (replyBlurTimer.current) { clearTimeout(replyBlurTimer.current); replyBlurTimer.current = null; }
-                      setIsPaused(true);
-                      setReplyFocused(true);
-                    }}
-                    onBlur={() => {
-                      replyBlurTimer.current = setTimeout(() => { setIsPaused(false); setReplyFocused(false); }, 200);
-                    }}
-                    onSubmitEditing={() => handleSendReply()}
-                    returnKeyType="send"
-                    editable={!sendingReply}
-                  />
-                </View>
-                {inputText.trim().length > 0 ? (
-                  // Instagram shows a text "Send" button in place of
-                  // heart+share once there's text to send — not an extra
-                  // icon alongside them.
-                  <PressableScale
-                    onPress={() => handleSendReply()}
-                    style={styles.sendTextBtn}
-                    disabled={sendingReply}
-                    accessibilityRole="button"
-                    accessibilityLabel="Send reply"
-                  >
-                    <Text style={styles.sendTextBtnLabel}>{sendingReply ? 'Sending…' : 'Send'}</Text>
-                  </PressableScale>
-                ) : (
-                  <>
-                    <PressableScale
-                      onPress={() => { hapticLight(); handleLike(); }}
-                      style={styles.likeBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
-                    >
-                      <Animated.View style={{ transform: [{ scale: heartPop }] }}>
-                        {likedSet.has(currentStory.id) ? (
-                          <FontAwesome name="heart" size={ICON.lg} color={ON_DARK} />
-                        ) : (
-                          <Feather name="heart" size={ICON.lg} color={ON_DARK} />
-                        )}
-                      </Animated.View>
-                      {(likesCounts[currentStory.id] ?? 0) > 0 && (
-                        <Text style={styles.likesCountText}>
-                          {likesCounts[currentStory.id]}
-                        </Text>
-                      )}
-                    </PressableScale>
-                    <PressableScale
-                      onPress={() => {
-                        hapticLight();
-                        setIsPaused(true);
-                        Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
-                          .catch(() => {})
-                          .finally(() => setIsPaused(false));
-                      }}
-                      style={styles.likeBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel="Share this story"
-                    >
-                      <Feather name="send" size={ICON.lg} color={ON_DARK} />
-                    </PressableScale>
-                  </>
-                )}
-              </>
-            ) : (
+          {currentStory.repliesDisabled ? (
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
               <Text style={styles.repliesDisabled}>Replies disabled</Text>
-            )}
-          </View>
+            </View>
+          ) : (
+            <Composer
+              value={inputText}
+              onChangeText={setInputText}
+              onSend={() => handleSendReply()}
+              canSend={inputText.trim().length > 0 && !sendingReply}
+              editable={!sendingReply}
+              placeholder={`Reply to ${currentStory.authorName}…`}
+              hideTabBar={false}
+              onFocus={() => {
+                if (replyBlurTimer.current) { clearTimeout(replyBlurTimer.current); replyBlurTimer.current = null; }
+                setIsPaused(true);
+                setReplyFocused(true);
+              }}
+              onBlur={() => {
+                replyBlurTimer.current = setTimeout(() => { setIsPaused(false); setReplyFocused(false); }, 200);
+              }}
+              topSlot={replyFocused ? (
+                <View style={styles.quickReactionRow}>
+                  {QUICK_REACTIONS.map(emoji => (
+                    <PressableScale
+                      key={emoji}
+                      onPress={() => sendQuickReaction(emoji)}
+                      disabled={sendingReply}
+                      accessibilityRole="button"
+                      accessibilityLabel={`React with ${emoji}`}
+                    >
+                      <AppleEmoji emoji={emoji} size={26} />
+                    </PressableScale>
+                  ))}
+                </View>
+              ) : null}
+              rightAccessory={(
+                <>
+                  <PressableScale
+                    onPress={() => { hapticLight(); handleLike(); }}
+                    style={styles.likeBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
+                  >
+                    <Animated.View style={{ transform: [{ scale: heartPop }] }}>
+                      {likedSet.has(currentStory.id) ? (
+                        <FontAwesome name="heart" size={ICON.lg} color={theme.text} />
+                      ) : (
+                        <Feather name="heart" size={ICON.lg} color={theme.text} />
+                      )}
+                    </Animated.View>
+                    {(likesCounts[currentStory.id] ?? 0) > 0 && (
+                      <Text style={[styles.likesCountText, { color: theme.text }]}>
+                        {likesCounts[currentStory.id]}
+                      </Text>
+                    )}
+                  </PressableScale>
+                  <PressableScale
+                    onPress={() => {
+                      hapticLight();
+                      setIsPaused(true);
+                      Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
+                        .catch(() => {})
+                        .finally(() => setIsPaused(false));
+                    }}
+                    style={styles.likeBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share this story"
+                  >
+                    <Feather name="send" size={ICON.lg} color={theme.text} />
+                  </PressableScale>
+                </>
+              )}
+            />
+          )}
         </KeyboardAvoidingView>
       )}
       </Animated.View>
@@ -1183,35 +1166,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     justifyContent: 'center',
     gap: SP.md,
     paddingBottom: SP.sm,
-  },
-  // A plain transparent pill, not the shared frosted <Glass> — Dev's exact
-  // ask after the glass material's blur/specular layers were reading as an
-  // opaque grey blob that hid the typed text underneath it.
-  replyInputPill: {
-    flex: 1,
-    height: 44,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-  },
-  replyInput: {
-    height: 44,
-    paddingHorizontal: SP.md,
-    fontSize: 15,
-    fontFamily: FONT.regular,
-    color: ON_DARK,
-  },
-  sendTextBtn: {
-    paddingHorizontal: SP.sm,
-    height: 44,
-    justifyContent: 'center',
-  },
-  sendTextBtnLabel: {
-    color: ON_DARK,
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
   },
   ownStoryBar: {
     paddingHorizontal: SP.md,
