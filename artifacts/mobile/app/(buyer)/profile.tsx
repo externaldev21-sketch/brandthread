@@ -72,6 +72,7 @@ import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRo
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -374,7 +375,12 @@ export default function ProfileScreen() {
 
   const loadCounts = useCallback(async () => {
     const id = user?.id;
-    if (!id) return;
+    // isBuyerDevPreview() (not just !id): a stubbed/fake-signed-in Clerk
+    // session (this app's own audit/e2e harnesses fake a signed-in user so
+    // protected screens render at all) still reports a truthy id, which
+    // would otherwise fall through to the real backend-less endpoint below
+    // and log a console 404 — see the identical fix in app/seller-inbox.tsx.
+    if (!id || isBuyerDevPreview()) return;
     try {
       const data = await api.social.profile(id);
       if (accountRef.current !== id || !data) return;
@@ -393,14 +399,24 @@ export default function ProfileScreen() {
     }
     setLoadError(false);
     void loadCounts();
+    // getSavedItems() and getBuyerOrdersWithStatus() are real, backend-less-
+    // in-preview network calls with no preview branch of their own (unlike
+    // getMyProfile/getPrivacySettings/loadBuyerProfile, which only ever read
+    // local storage, and getMyPosts, which already checks isBuyerDevPreview()
+    // internally) — skip them here in dev-preview (including a Clerk-
+    // stubbed audit/e2e session, which still reports a truthy user.id) so
+    // they never log a console 404, same as app/seller-inbox.tsx's fix.
+    const devPreview = isBuyerDevPreview();
     try {
       const [p, po, sv, pr, bp, ordersResult] = await Promise.all([
         getMyProfile(),
         getMyPosts(),
-        getSavedItems(),
+        devPreview ? Promise.resolve([]) : getSavedItems(),
         getPrivacySettings(),
         loadBuyerProfile(),
-        getBuyerOrdersWithStatus(user.id).catch(() => ({ orders: [] as BuyerOrderView[], fromCache: true })),
+        devPreview
+          ? Promise.resolve({ orders: [] as BuyerOrderView[], fromCache: true })
+          : getBuyerOrdersWithStatus(user.id).catch(() => ({ orders: [] as BuyerOrderView[], fromCache: true })),
       ]);
       if (accountRef.current !== user?.id) return;
       setProfile(p);
@@ -436,7 +452,7 @@ export default function ProfileScreen() {
   // uses (api.social.myStories() filtered by expiresAt > now).
   useFocusEffect(useCallback(() => {
     let alive = true;
-    if (user?.id) {
+    if (user?.id && !isBuyerDevPreview()) {
       api.social.myStories()
         .then((rows) => { if (alive) setMyStoryIds(activeStoryIds(rows)); })
         .catch(() => { /* no ring rather than a wrong one */ });
@@ -483,7 +499,12 @@ export default function ProfileScreen() {
       setThreadCashStreak(status.streak);
     };
 
-    if (!user?.id) {
+    // isBuyerDevPreview() (not just !user?.id): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // user.id, which would otherwise fall through to the real backend-less
+    // endpoint below and log a console 404.
+    if (!user?.id || isBuyerDevPreview()) {
       applyPreviewFallback();
       return () => { active = false; };
     }
