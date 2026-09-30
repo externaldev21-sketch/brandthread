@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -103,17 +103,37 @@ export default function StorePreview() {
   //
   // This screen is seller-only, but the dev/web preview bypass can still
   // land here under `?bt_preview=buyer` (e.g. a route crawl testing every
-  // screen under both roles) with no real session either — checking only
-  // isSellerDevPreview() missed that case and let the real endpoint 404
-  // every time. Only a real signed-in account outside preview mode calls
-  // the network.
-  const inDevPreview = useMemo(() => isSellerDevPreview() || isBuyerDevPreview(), []);
-  const freshPreview = useMemo(() => inDevPreview && !isPreviewDemoMode(), [inDevPreview]);
-  const demoPreview  = useMemo(() => inDevPreview && isPreviewDemoMode(), [inDevPreview]);
+  // screen under both roles, or a persisted 'buyer' role from earlier
+  // testing in the same browser) with no real session either — checking
+  // only isSellerDevPreview() missed that case and let the real endpoint
+  // fire every time. Only a real signed-in account outside preview mode
+  // calls the network.
+  //
+  // Computed fresh on every render (not memoized with a frozen `[]` dep
+  // array) and, critically, re-checked again with its own direct calls
+  // inside load() itself below rather than trusted from a closure — a
+  // real, live-observed failure mode was the real network branch firing
+  // despite the URL genuinely carrying `?bt_preview=seller`. A captured
+  // closure value computed once at mount can go stale; a fresh,
+  // synchronous check made right before the fetch decision cannot — it
+  // always reflects the actual current window.location/localStorage state
+  // at the exact moment that decision is made, so there is no window in
+  // which a cached/real response can reach the render before this check
+  // has run.
+  const inDevPreview  = isSellerDevPreview() || isBuyerDevPreview();
+  const freshPreview  = inDevPreview && !isPreviewDemoMode();
+  const demoPreview   = inDevPreview && isPreviewDemoMode();
 
   const load = useCallback(async () => {
-    if (freshPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return; }
-    if (demoPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return; }
+    // Re-derive at call time — see the comment above these consts for why
+    // this isn't just "freshPreview"/"demoPreview" from the render closure.
+    const devPreviewNow = isSellerDevPreview() || isBuyerDevPreview();
+    if (devPreviewNow && !isPreviewDemoMode()) {
+      setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return;
+    }
+    if (devPreviewNow && isPreviewDemoMode()) {
+      setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return;
+    }
     if (inFlight.current) return;
     inFlight.current = true;
     setLoading(true);
@@ -132,7 +152,7 @@ export default function StorePreview() {
       if (mountedRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, freshPreview, demoPreview]);
+  }, [api]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
