@@ -316,6 +316,7 @@ export default function PayoutsScreen() {
               message={balance?.connected === false
                 ? 'Add a bank account under Bank account to start receiving payouts.'
                 : 'Payouts show up here once your available balance clears.'}
+              compact
             />
           ) : (
             payouts.map((p) => {
