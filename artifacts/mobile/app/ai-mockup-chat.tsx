@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   FlatList,
   StyleSheet,
@@ -11,10 +10,9 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
-import { Feather } from '@expo/vector-icons';
+import Composer from '@/components/ui/Composer';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS } from '@/lib/theme';
@@ -41,14 +39,11 @@ const INITIAL_MSG: Message = {
 
 export default function AIMockupChatScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const flatRef = useRef<FlatList>(null);
-
-  const bottomPad = insets.bottom;
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return;
@@ -148,52 +143,39 @@ export default function AIMockupChatScreen() {
         )}
       />
 
-      {/* Suggestions */}
-      {messages.length <= 1 && (
-        <FlatList
-          horizontal
-          data={SUGGESTED}
-          keyExtractor={(s) => s}
-          showsHorizontalScrollIndicator={false}
-          style={styles.suggestionList}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 8, alignItems: 'center' }}
-          renderItem={({ item: s }) => (
-            <TouchableOpacity
-              onPress={() => sendMessage(s)}
-              activeOpacity={0.75}
-              style={[styles.suggestion, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <Text style={[styles.suggestionText, { color: colors.foreground }]} numberOfLines={2}>{s}</Text>
-            </TouchableOpacity>
-          )}
-        />
-      )}
-
       {/* Input */}
-      <View style={[styles.inputBar, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: bottomPad + 12 }]}>
-        <View style={[styles.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TextInput
-            style={[styles.input, { color: colors.foreground }]}
-            placeholder="Describe your design in your own words..."
-            placeholderTextColor={colors.mutedForeground}
-            value={input}
-            onChangeText={setInput}
-            multiline
-            maxLength={500}
-            editable={!loading}
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage(input)}
-          />
-          <TouchableOpacity
-            onPress={() => sendMessage(input)}
-            activeOpacity={0.8}
-            disabled={!input.trim() || loading}
-            style={[styles.sendBtn, { backgroundColor: input.trim() && !loading ? colors.primary : colors.secondary }]}
-          >
-            <Feather name="send" size={16} color={input.trim() && !loading ? colors.primaryForeground : colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <Composer
+        testID="ai-mockup"
+        value={input}
+        onChangeText={setInput}
+        onSend={() => sendMessage(input)}
+        canSend={!!input.trim() && !loading}
+        editable={!loading}
+        maxLength={500}
+        enterToSend={false}
+        placeholder="Describe your design in your own words..."
+        topSlot={
+          messages.length <= 1 ? (
+            <FlatList
+              horizontal
+              data={SUGGESTED}
+              keyExtractor={(s) => s}
+              showsHorizontalScrollIndicator={false}
+              style={styles.suggestionList}
+              contentContainerStyle={{ gap: 8, paddingBottom: 8, alignItems: 'center' }}
+              renderItem={({ item: s }) => (
+                <TouchableOpacity
+                  onPress={() => sendMessage(s)}
+                  activeOpacity={0.75}
+                  style={[styles.suggestion, { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <Text style={[styles.suggestionText, { color: colors.foreground }]} numberOfLines={2}>{s}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          ) : null
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -214,8 +196,4 @@ const styles = StyleSheet.create({
   suggestionList: { flexGrow: 0, maxHeight: 40 },
   suggestion: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 220, alignSelf: 'center' },
   suggestionText: { fontSize: 12, fontFamily: FONT.regular },
-  inputBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
-  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, gap: 8 },
-  input: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, maxHeight: 100, paddingTop: 6, paddingBottom: 6 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, // 44x44 minimum touch target (COMP.minTouchTarget); was 36x36.
 });
