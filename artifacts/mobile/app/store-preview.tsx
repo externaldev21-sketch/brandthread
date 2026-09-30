@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -102,12 +102,30 @@ export default function StorePreview() {
   // uses (lib/previewSellerProducts.ts) — see lib/previewStorefrontHtml.ts.
   //
   // Only a real signed-in account outside preview mode calls the network.
-  const freshPreview = useMemo(() => isSellerDevPreview() && !isPreviewDemoMode(), []);
-  const demoPreview  = useMemo(() => isSellerDevPreview() && isPreviewDemoMode(), []);
+  //
+  // Computed fresh on every render (not memoized with a frozen `[]` dep
+  // array) and, critically, re-checked again with its own direct calls
+  // inside load() itself below rather than trusted from a closure — a
+  // real, live-observed failure mode was the real network branch firing
+  // despite the URL genuinely carrying `?bt_preview=seller`, which a
+  // captured/stale read of these gates could explain but a fresh,
+  // synchronous check right before the fetch cannot: it always reflects
+  // the actual current window.location/localStorage state at the exact
+  // moment the decision to call the network (or not) is made, so there is
+  // no window in which a cached/real response can reach the render before
+  // this check has run.
+  const freshPreview = isSellerDevPreview() && !isPreviewDemoMode();
+  const demoPreview  = isSellerDevPreview() && isPreviewDemoMode();
 
   const load = useCallback(async () => {
-    if (freshPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return; }
-    if (demoPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return; }
+    // Re-derive at call time — see the comment above these consts for why
+    // this isn't just "freshPreview"/"demoPreview" from the render closure.
+    if (isSellerDevPreview() && !isPreviewDemoMode()) {
+      setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return;
+    }
+    if (isSellerDevPreview() && isPreviewDemoMode()) {
+      setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return;
+    }
     if (inFlight.current) return;
     inFlight.current = true;
     setLoading(true);
@@ -126,7 +144,7 @@ export default function StorePreview() {
       if (mountedRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, freshPreview, demoPreview]);
+  }, [api]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
