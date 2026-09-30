@@ -11,7 +11,8 @@ import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
-import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
@@ -293,7 +294,7 @@ export default function PayoutsScreen() {
             <EmptyState
               icon="inbox"
               title={isPreview ? 'No payout history in this preview' : balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-              description={isPreview
+              message={isPreview
                 ? 'This read-only preview does not load live payouts.'
                 : balance?.connected === false
                   ? 'Add a bank account under Bank account to start receiving payouts.'
