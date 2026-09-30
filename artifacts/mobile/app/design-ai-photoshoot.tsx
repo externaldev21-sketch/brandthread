@@ -13,10 +13,11 @@
  */
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, Image, FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -28,6 +29,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiToolProgressBar } from '@/components/ai-tools/AiToolProgressBar';
 import { AiPrimaryButton, AiButtonDock, AiSecondaryButton } from '@/components/ai-tools/AiToolButtons';
 import { ReferencePhotoTiles } from '@/components/ai-tools/ReferencePhotoTiles';
+import { AiSlimComposer } from '@/components/ai-tools/AiSlimComposer';
 import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
@@ -50,10 +52,40 @@ const RATIOS: { value: ImageRatioKind; label: string }[] = [
   { value: '4:5', label: '4:5' },
   { value: '9:16', label: '9:16' },
 ];
+const PRODUCT_TILE = 84;
+
+// Scene-preset image tiles (item 3 of Dev's follow-up: convert the old text
+// chips to photo+label tiles). No real preset photography exists in this
+// repo — using a consistent dark gradient + icon per scene, at the same
+// tile size/weight as the product and reference-photo tile rows, rather
+// than inventing per-scene stock photography.
+const SCENE_ICONS: Record<SceneStyleKind, keyof typeof Feather.glyphMap> = {
+  studio: 'aperture', street: 'map', luxury_interior: 'home', outdoor: 'sun',
+  industrial: 'tool', minimal: 'minus-circle', runway: 'flag', night: 'moon', custom: 'edit-3',
+};
+
+// Isolates the pinned dock's bottom offset in one place. This screen must
+// keep the floating seller tab bar visible (tests/seller-bottom-navigation-
+// layout.test.ts's mustShowBar list), so today the dock reserves the tab
+// bar's own height on top of the safe-area inset.
+// TODO(useHideTabBar): once components/.../useHideTabBar lands and this
+// screen adopts it (tracked in a sibling session), replace the body with
+// `insets.bottom` alone — the tab bar will be hidden entirely on this
+// screen instead of needing its height reserved here. Isolated here so
+// that swap is a one-line change instead of touching every call site.
+function getAiToolDockBottomInset(insets: { bottom: number }): number {
+  return COMP.tabBarH + insets.bottom;
+}
+// The dock's own rendered height above that bottom inset (primary button +
+// its top padding + a small buffer) — used to size the ScrollView's own
+// bottom padding so scroll content always ends fully above the pinned
+// button, with no magic-number guess.
+const DOCK_CONTENT_HEIGHT = 52 + SP.lg + SP.lg;
 
 export default function AIPhotoshootScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const dockBottomInset = getAiToolDockBottomInset(insets);
 
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -342,93 +374,115 @@ export default function AIPhotoshootScreen() {
       <AiToolProgressBar step={1} />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + 260 }]}
+        contentContainerStyle={[s.content, { paddingBottom: dockBottomInset + DOCK_CONTENT_HEIGHT }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={s.sectionLabel}>Product photos</Text>
         {products === null ? (
           <ActivityIndicator style={{ marginTop: SP.lg }} color={FG} />
-        ) : products.length === 0 && uploadedProductUris.length === 0 ? (
-          <View style={s.emptyCatalog}>
-            <Feather name="package" size={ICON.lg} color={MUTED} />
-            <Text style={s.emptyCatalogTitle}>No products yet</Text>
-            <Text style={s.emptyCatalogSub}>Add a product first, or upload photos directly for this shoot.</Text>
-            <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm }}>
-              <AiSecondaryButton label="Add a product" icon="plus" variant="outline" onPress={() => router.push('/add-product' as never)} />
-              <AiSecondaryButton label="Upload photos instead" icon="upload" variant="outline" onPress={pickUploadInsteadOfProduct} />
-            </View>
-          </View>
         ) : (
-          <>
-            <View style={s.productGrid}>
-              {(products ?? []).slice(0, 12).map((p) => {
-                const selected = selectedProductIds.has(p.id);
-                const thumb = p.media?.[0]?.uri;
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={[s.productTile, selected && s.productTileSelected]}
-                    onPress={() => toggleProduct(p.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${p.name}`}
-                  >
-                    {thumb ? (
-                      <Image source={{ uri: thumb }} style={s.productTileImg} resizeMode="cover" />
-                    ) : (
-                      <View style={[s.productTileImg, s.productTileImgEmpty]}>
-                        <Feather name="package" size={ICON.md} color={SUBTLE} />
-                      </View>
-                    )}
-                    {selected && (
-                      <View style={s.productTileCheck}>
-                        <Feather name="check" size={12} color={BG} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <TouchableOpacity style={s.uploadInsteadRow} onPress={pickUploadInsteadOfProduct} accessibilityRole="button">
-              <Feather name="upload" size={ICON.sm} color={MUTED} />
-              <Text style={s.uploadInsteadText}>Upload photos instead</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tileRow}>
+            <TouchableOpacity
+              style={s.actionTile}
+              onPress={pickUploadInsteadOfProduct}
+              accessibilityRole="button"
+              accessibilityLabel="Upload photos"
+            >
+              <Feather name="upload" size={20} color={MUTED} />
+              <Text style={s.actionTileLabel}>Upload</Text>
             </TouchableOpacity>
-            {uploadedProductUris.length > 0 && (
-              <ReferencePhotoTiles
-                uris={uploadedProductUris}
-                max={4}
-                onAdd={pickUploadInsteadOfProduct}
-                onRemove={(i) => setUploadedProductUris(prev => prev.filter((_, idx) => idx !== i))}
-                label="uploaded photo"
-              />
+            {products.length === 0 && (
+              <TouchableOpacity
+                style={s.actionTile}
+                onPress={() => router.push('/add-product' as never)}
+                accessibilityRole="button"
+                accessibilityLabel="Add a product"
+              >
+                <Feather name="plus-circle" size={20} color={MUTED} />
+                <Text style={s.actionTileLabel}>Add product</Text>
+              </TouchableOpacity>
             )}
-          </>
+            {products.slice(0, 20).map((p) => {
+              const selected = selectedProductIds.has(p.id);
+              const thumb = p.media?.[0]?.uri;
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[s.productTile, selected && s.productTileSelected]}
+                  onPress={() => toggleProduct(p.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${p.name}`}
+                >
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={s.productTileImg} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.productTileImg, s.productTileImgEmpty]}>
+                      <Feather name="package" size={ICON.md} color={SUBTLE} />
+                    </View>
+                  )}
+                  {selected && (
+                    <View style={s.productTileCheck}>
+                      <Feather name="check" size={12} color={BG} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+        {uploadedProductUris.length > 0 && (
+          <View style={{ marginTop: SP.sm }}>
+            <ReferencePhotoTiles
+              uris={uploadedProductUris}
+              max={4}
+              onAdd={pickUploadInsteadOfProduct}
+              onRemove={(i) => setUploadedProductUris(prev => prev.filter((_, idx) => idx !== i))}
+              label="uploaded photo"
+            />
+          </View>
         )}
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Creative reference photos</Text>
-        <Text style={s.sectionSub}>Any scene, model, pose, or lighting you want to match. Optional.</Text>
         <ReferencePhotoTiles uris={refUris} max={MAX_REFS} onAdd={pickReferences} onRemove={removeRef} label="reference" />
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Describe the shoot</Text>
-        <TextInput
-          style={s.promptInput}
+        <AiSlimComposer
           value={prompt}
           onChangeText={setPrompt}
-          placeholder="e.g. Golden-hour rooftop, editorial mood, film grain"
-          placeholderTextColor={SUBTLE}
-          multiline
+          placeholder="e.g. Golden-hour rooftop, editorial mood"
+          icon="edit-3"
+          accessibilityLabel="Describe the shoot"
         />
 
-        <View style={s.chipRow}>
-          {SCENE_STYLES.slice(0, 6).map((opt) => (
-            <TouchableOpacity key={opt.value} style={[s.chip, sceneStyle === opt.value && s.chipActive]} onPress={() => setSceneStyle(opt.value)}>
-              <Text style={[s.chipText, sceneStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={s.chipRow}>
+        <View style={s.sectionDivider} />
+        <Text style={s.sectionLabel}>Scene</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tileRow}>
+          {SCENE_STYLES.slice(0, 8).map((opt) => {
+            const active = sceneStyle === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={s.presetTile}
+                onPress={() => setSceneStyle(opt.value)}
+                accessibilityRole="button"
+                accessibilityLabel={`Scene: ${opt.label}`}
+              >
+                <LinearGradient
+                  colors={active ? ['#4a4a4a', '#1c1c1c'] : ['#2e2e2e', '#101010']}
+                  style={[s.presetTileImg, active && s.presetTileImgActive]}
+                >
+                  <Feather name={SCENE_ICONS[opt.value]} size={20} color="#fff" />
+                </LinearGradient>
+                <Text style={[s.presetTileLabel, active && s.presetTileLabelActive]}>{opt.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <View style={[s.chipRow, { marginTop: SP.md }]}>
           {MODEL_STYLES.slice(0, 5).map((opt) => (
             <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} onPress={() => setModelStyle(opt.value)}>
               <Text style={[s.chipText, modelStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
@@ -462,7 +516,7 @@ export default function AIPhotoshootScreen() {
         </View>
       </ScrollView>
 
-      <AiButtonDock bottomInset={COMP.tabBarH + insets.bottom}>
+      <AiButtonDock bottomInset={dockBottomInset}>
         <AiPrimaryButton
           label="Generate"
           icon="zap"
@@ -516,24 +570,24 @@ function ProductPickerModal({ visible, loading, products, onClose, onSelect }: {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   content: { padding: SP.lg },
-  sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.xs },
-  sectionSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, lineHeight: 18 },
+  sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.sm },
   sectionDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.lg },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SP.sm },
-  productTile: { width: 88, height: 88, borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, position: 'relative' },
+  tileRow: { flexDirection: 'row', gap: 10, paddingRight: SP.lg },
+  actionTile: {
+    width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  actionTileLabel: { fontFamily: FONT.medium, fontSize: 11, color: MUTED, textAlign: 'center' },
+  productTile: { width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, position: 'relative' },
   productTileSelected: { borderColor: FG, borderWidth: 2 },
   productTileImg: { width: '100%', height: '100%' },
   productTileImgEmpty: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
   productTileCheck: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
-  uploadInsteadRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
-  uploadInsteadText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
-  emptyCatalog: { alignItems: 'center', gap: SP.xs, paddingVertical: SP.xl, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
-  emptyCatalogTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG, marginTop: SP.xs },
-  emptyCatalogSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.lg },
-  promptInput: {
-    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.lg, backgroundColor: CARD, color: FG,
-    fontFamily: FONT.regular, fontSize: FS.sm, padding: SP.md, minHeight: 64, textAlignVertical: 'top', marginBottom: SP.md,
-  },
+  presetTile: { width: PRODUCT_TILE, alignItems: 'center', gap: 6 },
+  presetTileImg: { width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  presetTileImgActive: { borderWidth: 2, borderColor: FG },
+  presetTileLabel: { fontFamily: FONT.medium, fontSize: 11, color: MUTED, textAlign: 'center' },
+  presetTileLabelActive: { color: FG, fontFamily: FONT.semibold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.md },
   chip: { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
   chipActive: { backgroundColor: FG, borderColor: FG },
