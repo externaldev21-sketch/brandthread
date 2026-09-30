@@ -9,7 +9,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 
 export {
   FEED_GESTURES_TIP_VERSION,
@@ -163,12 +163,12 @@ const styles = StyleSheet.create({
   dim: { backgroundColor: 'rgba(0,0,0,0.38)' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
-  subtitle: { color: 'rgba(255,255,255,0.72)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },
+  subtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },
   rows: { width: '100%', gap: 28 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   glyphSlot: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1 },
   rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
-  rowSubtitle: { color: 'rgba(255,255,255,0.65)', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  dismissHint: { color: 'rgba(255,255,255,0.55)', fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48, letterSpacing: 0.3 },
+  rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48, letterSpacing: 0.3 },
 });

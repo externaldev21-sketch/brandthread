@@ -10,6 +10,17 @@ import path from 'node:path';
  * (however small) ever renders blurry again. See lib/animationUtils.ts and
  * components/ui/AppText.tsx for the actual fixes this spec guards.
  *
+ * Extended for the "words are blurry, make them all clear" follow-up sweep
+ * (Replit iPhone-frame preview report, 393x852 @ DPR2) with three more
+ * checks: no `filter`/`backdrop-filter` ANCESTOR of a text node (checks
+ * 1-2 above already covered transforms/translucent color; see check 3),
+ * no lingering `will-change` once animations have settled (check 4), and no
+ * synthetic/faux-bold font-weight on this app's per-weight static Inter
+ * faces (check 5). That sweep's real fixes: components/BrandthreadUI.tsx's
+ * `PressableScale` and components/EngagementButton.tsx's pulse wrapper both
+ * used to carry an identity `transform`/`opacity` permanently, even fully at
+ * rest — see their own comments for detail.
+ *
  * Same manual-run model as e2e/brandthread-agent.spec.ts (its header comment
  * has the exact commands): this is a REAL, runnable spec, but it isn't
  * wired into CI here because that requires a live Postgres + api-server +
@@ -244,7 +255,108 @@ for (const screen of SCREENS) {
         // Known/accepted exemptions: none yet. Surface everything else.
         expect(translucentText, JSON.stringify(translucentText, null, 2)).toEqual([]);
 
-        // ── 3. Screenshot crops for manual review (attached to the PR). ───
+        // ── 3. No text node has a `filter`/`backdrop-filter` ANCESTOR. ────
+        // A `filter`/`backdrop-filter` on a node the text sits *behind* (a
+        // sibling background layer, e.g. Glass's own backdrop div, or
+        // whatever content a frosted strip like TabBarGlassZone floats over)
+        // is fine and intentional — that's the whole point of a frosted
+        // surface. What's never fine is a `filter`/`backdrop-filter` on an
+        // element that the text node is INSIDE (an ancestor in the DOM
+        // tree): that forces the browser to rasterize the text into that
+        // filtered layer's offscreen bitmap, which can resample it at a
+        // fractional/scaled resolution and soften it. See components/ui/
+        // Glass.tsx for the correct pattern this guards (blur backdrop as an
+        // absolutely-positioned sibling, never a wrapper, of its `children`).
+        const filterAncestors = await page.evaluate(() => {
+          const bad: Array<{ text: string; filter: string }> = [];
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+              return (node.textContent ?? '').trim().length > 0
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_REJECT;
+            },
+          });
+          let node: Node | null;
+          // eslint-disable-next-line no-cond-assign
+          while ((node = walker.nextNode())) {
+            let el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+            while (el && el !== document.body) {
+              const cs = getComputedStyle(el);
+              const backdrop = cs.backdropFilter || (cs as any).webkitBackdropFilter || 'none';
+              const filter = cs.filter || 'none';
+              if (filter !== 'none' || (backdrop && backdrop !== 'none')) {
+                bad.push({
+                  text: (node.textContent ?? '').trim().slice(0, 60),
+                  filter: filter !== 'none' ? `filter: ${filter}` : `backdrop-filter: ${backdrop}`,
+                });
+                break;
+              }
+              el = el.parentElement;
+            }
+          }
+          return bad;
+        });
+        expect(filterAncestors, JSON.stringify(filterAncestors, null, 2)).toEqual([]);
+
+        // ── 4. No element still carries `will-change` once every animation
+        //      on the page has settled. `will-change` hints the browser to
+        //      keep a layer permanently promoted/rasterized — fine while
+        //      something is actually animating, a lingering hint at rest is
+        //      pure downside. ──────────────────────────────────────────────
+        const staleWillChange = await page.evaluate(() => {
+          const bad: Array<{ tag: string; willChange: string }> = [];
+          const all = document.body.querySelectorAll('*');
+          for (const el of Array.from(all)) {
+            const wc = getComputedStyle(el).willChange;
+            if (wc && wc !== 'auto') {
+              bad.push({ tag: el.tagName + (el.id ? `#${el.id}` : '') + (el.className ? `.${String(el.className).split(' ').join('.')}` : ''), willChange: wc });
+            }
+          }
+          return bad;
+        });
+        expect(staleWillChange, JSON.stringify(staleWillChange, null, 2)).toEqual([]);
+
+        // ── 5. No synthetic ("faux") bold: a computed `font-weight` that
+        //      doesn't match a real loaded font file for that family. This
+        //      app loads Inter as separate per-weight static families
+        //      (Inter_400Regular, Inter_500Medium, Inter_600SemiBold,
+        //      Inter_700Bold — see app/_layout.tsx's useFonts), each a
+        //      single real weight registered at the browser's default
+        //      (normal/400) weight. A text node using one of those families
+        //      but a computed `font-weight` other than 400 has no matching
+        //      weight file for that exact face, so the browser synthesizes
+        //      ("faux-bolds") it by algorithmically thickening the glyph
+        //      outlines — this looks blurry/mushy rather than genuinely
+        //      bold. The fix is always to switch `fontFamily` to the
+        //      correctly-weighted Inter family (via the FONT theme token),
+        //      never to layer a numeric `fontWeight` on top of one. ───────
+        const syntheticBold = await page.evaluate(() => {
+          const bad: Array<{ text: string; fontFamily: string; fontWeight: string }> = [];
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+              return (node.textContent ?? '').trim().length > 0
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_REJECT;
+            },
+          });
+          let node: Node | null;
+          // eslint-disable-next-line no-cond-assign
+          while ((node = walker.nextNode())) {
+            const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+            if (!el) continue;
+            const cs = getComputedStyle(el);
+            const family = cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '');
+            if (!/^Inter_\d+/.test(family)) continue; // only this app's per-weight static Inter faces
+            const weight = parseInt(cs.fontWeight, 10) || 400;
+            if (weight !== 400) {
+              bad.push({ text: (node.textContent ?? '').trim().slice(0, 60), fontFamily: family, fontWeight: cs.fontWeight });
+            }
+          }
+          return bad;
+        });
+        expect(syntheticBold, JSON.stringify(syntheticBold, null, 2)).toEqual([]);
+
+        // ── 6. Screenshot crops for manual review (attached to the PR). ───
         await page.screenshot({
           path: path.join(SCREENSHOT_DIR, `${screen.name}-x${dpr}.png`),
           fullPage: false,
