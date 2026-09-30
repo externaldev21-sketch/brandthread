@@ -223,7 +223,7 @@ export default function SalesScreen() {
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       accessibilityRole="button" accessibilityState={{ selected: on }}
     >
-      <Text style={[s.segText, on && { color: theme.onAccent }]} numberOfLines={1}>{label}</Text>
+      <Text style={[s.segText, on && { color: theme.onAccent }]}>{label}</Text>
     </TouchableOpacity>
   );
 
@@ -251,7 +251,7 @@ export default function SalesScreen() {
             <BrandthreadCard key={x.id} style={s.card}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1, paddingRight: SP.sm }}>
-                  <Text style={s.cardName} numberOfLines={1}>{x.name}</Text>
+                  <Text style={s.cardName}>{x.name}</Text>
                   <Text style={s.cardValue}>{fmtValue(x)}</Text>
                   <Text style={s.metaText}>{scopeLabel(x)}</Text>
                   <Text style={s.metaText}>
@@ -357,7 +357,7 @@ export default function SalesScreen() {
               const on = selectedProductIds.includes(p.id);
               return (
                 <TouchableOpacity key={p.id} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedProductIds(prev => on ? prev.filter(id => id !== p.id) : [...prev, p.id]); }}>
-                  <Text style={s.pickName} numberOfLines={1}>{p.name}</Text>
+                  <Text style={s.pickName}>{p.name}</Text>
                   <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );
@@ -376,7 +376,7 @@ export default function SalesScreen() {
               const on = collection === c;
               return (
                 <TouchableOpacity key={c} style={[s.pickRow, on && { borderColor: theme.accent }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCollection(c); setShowCollectionPicker(false); }}>
-                  <Text style={s.pickName} numberOfLines={1}>{c}</Text>
+                  <Text style={s.pickName}>{c}</Text>
                   <Feather name={on ? 'check-circle' : 'circle'} size={18} color={on ? theme.accent : MUTED} />
                 </TouchableOpacity>
               );

@@ -1,0 +1,27 @@
+[more] clipped: "Bank account and payout history · $42.60" (292>239)
+[more] clipped: "2" (32>25)
+[sales-empty] clipped: "2" (32>25)
+[form] clipped: "2" (32>25)
+[form-filled] clipped: "2" (32>25)
+[list] clipped: "2" (32>25)
+[buyer-detail] clipped: "SALE
+Heavyweight Hoodie — Ember
+$78.40
+$" (377>361)
+[buyer-detail] off-screen: "Field Shell Jacket — Rust
+Northline Stud" (0..640)
+[buyer-detail] clipped: "Field Shell Jacket — Rust" (156>140)
+[buyer-detail] clipped: "Boxy Fleece Hoodie — Graphite" (199>140)
+[buyer-detail] off-screen: "Trail Runner 02 — Clay
+Field Office
+$165" (328..468)
+[buyer-detail] off-screen: "Trail Runner 02 — Clay" (328..468)
+[buyer-detail] off-screen: "Field Office" (328..468)
+[buyer-detail] off-screen: "$165.00" (328..468)
+[buyer-detail] off-screen: "Garment-Dyed Hoodie — Moss
+Quiet Hours
+$" (484..624)
+[buyer-detail] clipped: "Garment-Dyed Hoodie — Moss" (195>140)
+[buyer-detail] off-screen: "Garment-Dyed Hoodie — Moss" (484..624)
+[buyer-detail] off-screen: "Quiet Hours" (484..624)
+[buyer-detail] off-screen: "$92.00" (484..624)

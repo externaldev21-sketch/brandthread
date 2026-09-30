@@ -7,7 +7,7 @@
  * The fake API (harness) has no /api/sales, so this script answers it with an
  * in-memory list; nothing here is shipped data.
  */
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ensureDemoImages } from './store-screenshots/demo-images.mjs';
 import {
@@ -28,6 +28,42 @@ function cors(origin) {
     'access-control-allow-headers': 'authorization,content-type,x-store-context',
     'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
   };
+}
+
+
+const fitIssues = [];
+/** Flags text clipped by its box (scrollWidth > clientWidth), text/boxes past the viewport edge, and boxes wider than their parent. */
+async function checkFit(page, label) {
+  const found = await page.evaluate(() => {
+    const out = [];
+    const vw = window.innerWidth;
+    for (const el of document.querySelectorAll('div, span, input')) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const text = (el.innerText || el.value || el.placeholder || '').trim().slice(0, 40);
+      const style = getComputedStyle(el);
+      if (el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'auto' && style.overflowX !== 'scroll' && text) out.push(`clipped: "${text}" (${el.scrollWidth}>${el.clientWidth})`);
+      if (text && (r.right > vw + 1 || r.left < -1) && style.position !== 'fixed') out.push(`off-screen: "${text}" (${Math.round(r.left)}..${Math.round(r.right)})`);
+      if (text && /…$/.test(text)) out.push(`ellipsis: "${text}"`);
+      const ps = el.parentElement && getComputedStyle(el.parentElement);
+      if (text && el.parentElement && ps.overflowX === 'visible') {
+        const pr = el.parentElement.getBoundingClientRect();
+        if (pr.width > 0 && r.width > pr.width + 1 && el.children.length === 0) out.push(`wider than parent: "${text}"`);
+      }
+    }
+    return out;
+  });
+  for (const f of new Set(found)) fitIssues.push(`[${label}] ${f}`);
+}
+
+/** Zoomed crop around the union of the named texts' boxes. */
+async function zoom(page, file, names, pad = 16) {
+  const boxes = [];
+  for (const n of names) boxes.push(await page.getByText(n, { exact: true }).first().boundingBox());
+  const b = boxes.filter(Boolean);
+  const x = Math.max(0, Math.min(...b.map((q) => q.x)) - pad), y = Math.max(0, Math.min(...b.map((q) => q.y)) - pad);
+  const w = Math.min(393 - x, Math.max(...b.map((q) => q.x + q.width)) - x + pad), h = Math.max(...b.map((q) => q.y + q.height)) - y + pad;
+  await page.screenshot({ path: path.join(OUT, file), clip: { x, y, width: w, height: h } });
 }
 
 async function run() {
@@ -59,28 +95,36 @@ async function run() {
       await openScreen(seller.page, seller.activity, server.origin, 'seller', '/(tabs)/more');
       try { await seller.page.getByText('Automatic sale prices').first().waitFor({ timeout: 15_000 }); break; } catch (e) { if (attempt >= 3) throw e; }
     }
+    await checkFit(seller.page, 'more');
     await seller.page.screenshot({ path: path.join(OUT, '01-more-tab-sales-row.png') });
+    await zoom(seller.page, '01z-more-discounts-and-sales-rows.png', ['Discounts', 'Automatic sale prices']);
 
     await seller.page.getByText('Automatic sale prices').first().click();
     await seller.page.getByText('No sales yet').waitFor({ timeout: 15_000 });
     await waitForQuietNetwork(seller.activity);
+    await checkFit(seller.page, 'sales-empty');
     await seller.page.screenshot({ path: path.join(OUT, '02-sales-empty.png') });
 
     await seller.page.getByText('Create sale').first().click();
     await seller.page.getByPlaceholder('Summer sale').waitFor();
     await seller.page.getByPlaceholder('Summer sale').fill('Summer sale');
     await seller.page.getByText('Collection', { exact: true }).click();
+    await checkFit(seller.page, 'form');
     await seller.page.screenshot({ path: path.join(OUT, '03-create-sale-form.png') });
+    await zoom(seller.page, '03z-value-and-scope-buttons.png', ['Percentage', 'Fixed amount', 'Entire store', 'Products', 'Collection']);
     await seller.page.getByText('Choose a collection').click();
     await seller.page.getByText('Hoodies', { exact: true }).click();
     await seller.page.getByPlaceholder('Start date (YYYY-MM-DD)').fill('2026-09-01');
     await seller.page.getByRole('switch').first().click();
     await seller.page.getByPlaceholder('End date (YYYY-MM-DD)').fill('2026-10-31');
+    await checkFit(seller.page, 'form-filled');
     await seller.page.screenshot({ path: path.join(OUT, '04-create-sale-filled.png') });
     await seller.page.getByText('Create sale', { exact: true }).last().click();
     await seller.page.getByText('20% off').first().waitFor({ timeout: 10_000 });
     await seller.page.waitForTimeout(1500);
+    await checkFit(seller.page, 'list');
     await seller.page.screenshot({ path: path.join(OUT, '05-sales-list.png') });
+    await zoom(seller.page, '05z-sale-card.png', ['Summer sale', 'Live', 'Collection: Hoodies']);
     await seller.context.close();
 
     // ── Buyer: sale price + strike-through ──
@@ -101,8 +145,12 @@ async function run() {
     await buyer.page.getByText('$78.40').first().waitFor({ timeout: 20_000 });
     await waitForQuietNetwork(buyer.activity);
     await waitForImages(buyer.page);
+    await checkFit(buyer.page, 'buyer-detail');
     await buyer.page.screenshot({ path: path.join(OUT, '06-buyer-product-sale-price.png') });
     await buyer.context.close();
+    const report = fitIssues.length ? fitIssues.join('\n') : 'No text-fit issues found on the screens above.';
+    writeFileSync(path.join(OUT, 'text-fit-report.txt'), report + '\n');
+    console.log(report);
   } finally {
     await browser.close();
     server.close();
