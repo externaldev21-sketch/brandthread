@@ -353,7 +353,6 @@ export interface Refund {
   reason?: string;
   restockInventory: boolean;
   notifyCustomer: boolean;
-  isDemo: boolean;
   processedAt?: string;
   failedReason?: string;
   createdAt: string;
