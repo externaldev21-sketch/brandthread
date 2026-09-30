@@ -588,12 +588,12 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     pointerEvents: 'none',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   activeFill: {
     position: 'absolute',
     pointerEvents: 'none',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   circleContent: {
     pointerEvents: 'none',

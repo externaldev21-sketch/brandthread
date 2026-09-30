@@ -29,15 +29,19 @@ export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(0, 0, 0, 0.68)'; // black e
 
 
 // ─── Borders ─────────────────────────────────────────────────────────────────
-// Surfaces are black fill + thin silver border, never a grey fill. Borders
-// stay translucent on purpose (they sit on top of varying card/image content).
-export const BORDER          = 'rgba(192,192,192,0.28)';
-export const BORDER_SUBTLE   = 'rgba(192,192,192,0.14)';
+// Surfaces are black fill + thin silver border, never a grey fill. A
+// translucent border anti-aliases into a soft/fuzzy edge (the alpha blends
+// differently against every surface it sits on), so every outline — chip,
+// card, stat tile, input, list row, sheet, outline button — uses an OPAQUE
+// 1px line instead. Keep BORDER/BORDER_SUBTLE opaque; never reintroduce an
+// rgba() alpha here (tests/no-translucent-border-lint.test.ts enforces it).
+export const BORDER          = '#4A4A4A';
+export const BORDER_SUBTLE   = '#333333';
 export const BORDER_ACTIVE   = '#FFFFFF';
 export const BORDER_FOCUS    = '#FFFFFF';
-// Translucent washes for the handful of non-text call sites (dot/timeline
-// backgrounds, a hairline border) that legitimately want the old
-// see-through look. Never use these for `color:` — see MUTED/SUBTLE below.
+// Translucent washes for the handful of non-border, non-text call sites
+// (dot/timeline backgrounds) that legitimately want a see-through look.
+// Never use these for a border or for `color:` — see MUTED/SUBTLE below.
 export const MUTED_WASH  = 'rgba(192,192,192,0.35)';
 export const SUBTLE_WASH = 'rgba(192,192,192,0.28)';
 

@@ -1305,7 +1305,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 118,
     borderRadius: 59,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: '#8C8C8C',
   },
   // The "landed" ring — sized/positioned to sit just outside the 84pt icon.
   // Purely decorative (pointerEvents "none"); its opacity/scale are driven

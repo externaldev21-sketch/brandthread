@@ -5417,33 +5417,37 @@ const styles = StyleSheet.create({
   // there's nothing guaranteed behind these handles yet (that's the
   // "artboard on a dark workspace" structural change, a later phase). A
   // fully transparent track read as literally invisible white-on-white.
-  // Opaque black + a thin white edge (never translucent — see the
-  // monochrome rule elsewhere in this file) keeps them visible on any
-  // canvas colour while staying slim and inset, not a wide glued-on pill.
-  sizeSlider:    { width: 20, height: 130, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', paddingVertical: 6 },
-  opacitySlider: { width: 20, height: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', paddingVertical: 6 },
-  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', position: 'relative' },
+  // Opaque black + a thin, OPAQUE white-ish edge (never translucent — a
+  // translucent border blends differently against whatever's behind it and
+  // anti-aliases into a soft/fuzzy edge; see the app-wide border-crispness
+  // fix) keeps them visible on any canvas colour while staying slim and
+  // inset, not a wide glued-on pill.
+  sizeSlider:    { width: 20, height: 130, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#999999', paddingVertical: 6 },
+  opacitySlider: { width: 20, height: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#999999', paddingVertical: 6 },
+  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#999999', position: 'relative' },
   sizeThumb: { position: 'absolute', left: '50%', width: 10, height: 10, marginLeft: -5, borderRadius: 5, backgroundColor: FG },
   // Undo/redo sit beneath both handles in the same sidebar column, matching
   // Procreate's own placement — never in the top bar (see the top-bar
   // comment for why).
   sidebarUndoGroup: { alignItems: 'center', gap: SP.xs },
-  sidebarIconBtn:   { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  sidebarIconBtn:   { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000', borderWidth: 1, borderColor: '#999999' },
 
   // The large drag-time preview card — Procreate's own "Size 99%" card,
   // top-left of the canvas, only while a handle is actively being dragged.
-  // Opaque black + a white outline (never translucent — a translucent pill
-  // read as solid grey once the canvas became a real white artboard).
+  // Opaque black + an opaque white-ish outline (never translucent — see
+  // the border-crispness fix note above).
   dragPreviewCard: {
     position: 'absolute', top: SP.md, left: SP.md, zIndex: 6,
     width: 128, minHeight: 128,
     backgroundColor: '#000000', borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1, borderColor: '#999999',
     padding: SP.sm, alignItems: 'flex-start', justifyContent: 'flex-start',
   },
   dragPreviewLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
   dragPreviewDotWrap: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   dragPreviewDot: { borderRadius: 999 },
+  sizeBubble:{ position: 'absolute', right: 50, top: '50%', backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER },
+  sizeBubbleText: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
 
   canvas:         { flex: 1, backgroundColor: BG, position: 'relative' },
   inlineTextInput:{ position: 'absolute', backgroundColor: 'transparent', fontFamily: FONT.regular, padding: 4, minHeight: 40 },

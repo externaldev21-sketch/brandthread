@@ -65,6 +65,11 @@ function hasHardcodedGrey(source: string): boolean {
 // `@/lib/theme` (or the runtime `useAppTheme()`/`useColors()` equivalents),
 // then delete its line here in the same change.
 const HARDCODED_GREY_ALLOWLIST = new Set([
+  // Permanent exception, not a migration TODO: Dev's explicit spec for the
+  // Studio carousel's 16 album covers is "monochrome black/white/silver
+  // only" regardless of the active Appearance theme — see the file's own
+  // header comment. Never remove this line; there is nothing to fix here.
+  'components/StudioCardCover.tsx',
   'app/(tabs)/feed.tsx',
   'app/buyer-live.tsx',
   'app/buyer-post-comments.tsx',

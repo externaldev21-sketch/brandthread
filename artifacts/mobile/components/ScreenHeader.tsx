@@ -18,7 +18,6 @@ export interface ScreenHeaderAction {
 
 interface ScreenHeaderProps {
   title: string;
-  subtitle?: string;
   rightElement?: React.ReactNode;
   /** Extra icon-button actions rendered right of `rightElement` (back/action slots). */
   actions?: ScreenHeaderAction[];
@@ -59,7 +58,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
+  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -144,31 +143,10 @@ export function ScreenHeader({
         </View>
       </View>
 
-      {subtitle && !scrollY && (
-        <Text
-          style={[
-            styles.subtitle,
-            {
-              color: colors.mutedForeground,
-              // Sibling row below `container`, so it needs its own horizontal
-              // offset to line up under the title: the container's own gutter
-              // (SP.md) plus, for push, the back button's width + gap (44 +
-              // SP.sm) that the title itself is indented by in that variant.
-              paddingHorizontal: SP.md,
-              marginLeft: variant === 'push' ? 44 + SP.sm : 0,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {subtitle}
-        </Text>
-      )}
-
       {scrollY && (
         <Animated.View style={{ opacity: largeTitleOpacity!, transform: [{ scale: largeTitleScale! }], height: largeTitleHeight!, overflow: 'hidden' }}>
           <View style={styles.largeTitleWrap}>
             <Text style={[TYPE_SCALE.title1, { color: colors.foreground, fontFamily: FONT.bold }]} numberOfLines={1}>{title}</Text>
-            {subtitle && <Text style={[styles.subtitle, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={1}>{subtitle}</Text>}
           </View>
         </Animated.View>
       )}
@@ -182,11 +160,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    // Center the title with the back/close button on the same row. The
-    // subtitle no longer lives inside this row (it's a sibling Text below
-    // `container`), so it can never affect this row's height or nudge the
-    // title's vertical position — that's what keeps title Y identical with
-    // or without a subtitle (the #389 invariant), even under center-align.
+    // Center the title with the back/close button on the same row.
     alignItems: 'center',
     minHeight: COMP.headerH,
     paddingHorizontal: SP.md,
@@ -227,11 +201,6 @@ const styles = StyleSheet.create({
     fontSize: TITLE_SIZE,
     fontFamily: FONT.bold,
     letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    marginTop: SP.xs,
   },
   rightSlot: {
     minWidth: COMP.iconBtn,

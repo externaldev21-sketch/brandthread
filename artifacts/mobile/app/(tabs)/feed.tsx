@@ -3565,7 +3565,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     borderRadius: RADII.pill, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1, borderColor: '#808080',
   },
   progressFill: {
     height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.9)',
@@ -3574,7 +3574,7 @@ const styles = StyleSheet.create({
   scrubBubble: {
     position: 'absolute', minWidth: 40, alignItems: 'center',
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: '#595959',
   },
   scrubBubbleText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
   scrubThumb: {
@@ -3587,7 +3587,7 @@ const styles = StyleSheet.create({
     position: 'absolute', top: '42%', alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: '#7A7A7A',
   },
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
@@ -3615,7 +3615,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
     paddingHorizontal: 7, paddingVertical: 5,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1, borderColor: '#525252',
   },
   repostAvatarStack: { minWidth: 22, height: 22, flexDirection: 'row', alignItems: 'center' },
   repostAvatar: {
@@ -3639,7 +3639,7 @@ const styles = StyleSheet.create({
   soundRow: {
     height: 20, flexDirection: 'row', alignItems: 'center', gap: 5,
     alignSelf: 'flex-start', paddingHorizontal: 7, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: '#525252',
   },
   soundText: { fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
@@ -3712,7 +3712,7 @@ const styles = StyleSheet.create({
   findFriendsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
     paddingHorizontal: 18, paddingVertical: 10, borderRadius: RADII.pill,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    borderWidth: 1, borderColor: '#7A7A7A',
   },
   findFriendsBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },

@@ -2277,7 +2277,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // as a minor affordance rather than competing with the real action rows.
   photoMoreSlot: {
     width: 40, height: 84, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: theme.borderSubtle,
     alignItems: 'center', justifyContent: 'center',
   },
   mediaDeleteBtn: {

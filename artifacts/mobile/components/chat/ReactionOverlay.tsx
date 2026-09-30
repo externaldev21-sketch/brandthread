@@ -183,7 +183,7 @@ const s = StyleSheet.create({
   menuWrap: { position: 'absolute', minWidth: 190, maxWidth: 260 },
   menuGlass: { paddingVertical: 4 },
   menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
-  menuItemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)' },
+  menuItemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#666666' },
   menuLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: '#fff' },
   elevatedShadow: {
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,

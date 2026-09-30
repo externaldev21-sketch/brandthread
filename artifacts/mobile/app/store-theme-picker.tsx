@@ -342,7 +342,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     height: 10,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#8C8C8C',
   },
   currentBadge: {
     position: 'absolute',
@@ -567,7 +567,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     height: 10,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: '#666666',
   },
   presetLabel: {
     fontSize: FS.xs,

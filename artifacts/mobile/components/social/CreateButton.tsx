@@ -59,7 +59,7 @@ const makeStyles = (theme: AppThemePreset, compact?: boolean) => StyleSheet.crea
     gap: 6,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: '#666666',
   },
   tint: { backgroundColor: `${theme.surface}66` },
   pressed: { opacity: 0.85, transform: [{ scale: 0.96 }] },

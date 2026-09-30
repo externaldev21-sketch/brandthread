@@ -162,7 +162,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   input: {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG,
     backgroundColor: SURFACE, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: theme.borderSubtle,
     paddingHorizontal: SP.md, paddingVertical: 10,
   },
   actionRow: { flexDirection: 'row', gap: SP.sm },

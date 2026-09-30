@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: 22,
     // Solid fill (bumped from 0.32 now that there's no BlurView underneath
     // adding its own contrast) instead of a blur-over-video background.
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: '#7A7A7A',
   },
   searchInput: {
     flex: 1, height: 44, paddingHorizontal: 10, fontSize: 14, color: ON_DARK,

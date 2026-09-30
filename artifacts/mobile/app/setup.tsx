@@ -111,7 +111,7 @@ function TaskCard({
 
 const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD,
-                borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+                borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER,
                 paddingHorizontal: SP.md, paddingVertical: 16, marginBottom: SP.sm },
   cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
   cardDone:   { opacity: 0.6 },

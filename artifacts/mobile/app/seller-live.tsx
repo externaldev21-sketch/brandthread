@@ -458,7 +458,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   liveDot:          { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
   livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: 12, letterSpacing: 1.5 },
   durationText:     { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 13 },
-  endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: '#666666' },
   endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13 },
   viewerRow:        { position: 'absolute', top: 0, left: 16, zIndex: 9 },
   viewerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },

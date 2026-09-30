@@ -1183,7 +1183,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: 11,
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: '#999999',
     alignItems: 'center',
     justifyContent: 'center',
   },

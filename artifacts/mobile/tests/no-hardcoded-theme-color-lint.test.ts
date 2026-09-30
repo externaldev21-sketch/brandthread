@@ -133,6 +133,9 @@ function hasHardcodedThemeColor(source: string, file: string): boolean {
 // `useAppTheme()`/`useColors()` tokens, then delete its line here in the
 // same change.
 const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
+  // Permanent exception, not a migration TODO — see
+  // tests/no-hardcoded-grey-lint.test.ts's entry for the same file.
+  'components/StudioCardCover.tsx',
   'app/(buyer)/cart.tsx',
   'app/(buyer)/edit-profile.tsx',
   'app/(buyer)/friends.tsx',
@@ -290,7 +293,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/StyleTagsPicker.tsx',
   'components/SupportChatBubble.tsx',
   'components/TextOverlayEditor.tsx',
-  'components/ai/AiComposer.tsx',
   'components/ai/AuroraGlow.tsx',
   'components/ai/MarkdownLite.tsx',
   'components/analytics/AnalyticsKit.tsx',
@@ -362,7 +364,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/search/VideoTile.tsx',
   'components/settings/SettingsKit.tsx',
   'components/share-cards/ShareCardFrame.tsx',
-  'components/social/CreateButton.tsx',
   'components/social/PostGrid.tsx',
   'components/social/RemoveFollowerSheet.tsx',
   'components/social/StoryGestureGuide.tsx',

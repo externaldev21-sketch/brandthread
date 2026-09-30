@@ -454,7 +454,7 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   colorSwatch: {
     width: 44, height: 44, borderRadius: RADII.chip,
-    borderWidth: 2, borderColor: BORDER,
+    borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
   colorSwatchSelected: { borderColor: PURPLE },

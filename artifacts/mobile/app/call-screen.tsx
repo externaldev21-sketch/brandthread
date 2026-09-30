@@ -717,7 +717,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: '#4D4D4D',
   },
   ctrlBtnActive: {
     backgroundColor: 'rgba(255,59,48,0.15)',

@@ -167,7 +167,7 @@ const pillStyles = StyleSheet.create({
   // the active theme, same intentional pattern as the search field's fixed
   // #1f1f1f fill.
   notFollowing: { backgroundColor: '#FFFFFF' },
-  following: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  following: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#8C8C8C' },
   label: { fontSize: 14, fontFamily: FONT.semibold },
   notFollowingLabel: { color: '#000000' },
   followingLabel: { color: '#FFFFFF' },

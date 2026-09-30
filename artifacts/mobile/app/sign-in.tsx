@@ -826,7 +826,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingVertical: 15, marginBottom: SPACING.xs,
   },
   // Apple button: solid black per Apple Human Interface Guidelines
-  appleBtn: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
+  appleBtn: { backgroundColor: '#000000', borderColor: '#595959' },
   oauthText: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text },
 
   divider: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginVertical: SPACING.lg },

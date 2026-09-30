@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
     paddingHorizontal: 7, paddingVertical: 5,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1, borderColor: '#525252',
   },
   repostAvatarStack: { minWidth: 22, height: 22, flexDirection: 'row', alignItems: 'center' },
   repostAvatar: {
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   soundRow: {
     height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: '#525252',
   },
   soundText: {
     fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}E6`, flexShrink: 1,

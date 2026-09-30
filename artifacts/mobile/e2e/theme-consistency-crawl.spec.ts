@@ -174,3 +174,123 @@ test('key screens follow the active Appearance theme instead of staying hardcode
   }
   expect(failures, `hardcoded black/white fills found under a non-black theme — see ${path.join(outDir, 'theme-consistency-report.json')}`).toEqual([]);
 });
+
+// ── Border crispness ────────────────────────────────────────────────────
+// Dev's report: filter chips (Community, and every outlined chip/card/input
+// app-wide) looked blurry/fuzzy-edged, because the shared border token was
+// translucent — a translucent 1px line anti-aliases into a soft edge since
+// its alpha blends differently against whatever's behind it. Fixed by
+// making lib/theme.ts's BORDER/BORDER_SUBTLE and
+// contexts/AppThemeContext.tsx's palette() border/borderSubtle opaque. This
+// crawl reads every bordered element's *computed* style and flags one whose
+// border is still translucent (alpha < 1) at a visible width (>= 1px).
+const BORDER_SCREENS: Array<{ name: string; role: 'buyer' | 'seller'; route: string }> = [
+  { name: 'community', role: 'buyer', route: '/community' },
+  { name: 'dashboard', role: 'seller', route: '/(tabs)' },
+  { name: 'settings', role: 'seller', route: '/seller-settings' },
+];
+
+// components/ui/Glass.tsx is a real frosted-glass primitive — genuine
+// backdrop blur + a specular-highlight gradient + a translucent edge, the
+// standard way to render actual "glass" chrome (its own border deliberately
+// isn't opaque, unlike the flat-card/chip bug this crawl otherwise guards
+// against). Its BORDER_DARK/BORDER_LIGHT constants are exempted by their
+// known values; components/tab-bar/TabBarParts.tsx's TabBarGlass hairline
+// edge (already allowlisted in tests/no-translucent-border-lint.test.ts as
+// a deliberate "frosted glass" hairline) is exempted the same way.
+const EXEMPT_BORDER_VALUES = new Set([
+  'rgba(255, 255, 255, 0.22)', 'rgba(255, 255, 255, 0.55)', // Glass.tsx
+  'rgba(255, 255, 255, 0.18)', // TabBarParts.tsx's TabBarGlass
+]);
+
+const BORDER_SCAN_SCRIPT = `(() => {
+  const EXEMPT = ${JSON.stringify([...EXEMPT_BORDER_VALUES])};
+  const results = [];
+  const all = document.querySelectorAll('body *');
+  for (const el of all) {
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    if (rect.bottom <= 0 || rect.top >= window.innerHeight || rect.right <= 0 || rect.left >= window.innerWidth) continue;
+    const widths = [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth].map(parseFloat);
+    const colors = [style.borderTopColor, style.borderRightColor, style.borderBottomColor, style.borderLeftColor];
+    for (let i = 0; i < 4; i++) {
+      if (widths[i] < 1) continue; // no visible border on this edge
+      if (EXEMPT.includes(colors[i])) continue;
+      const m = colors[i].match(/^rgba\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\d.]+)\\s*\\)$/);
+      if (!m) continue; // rgb(...) with no alpha channel is already opaque
+      const alpha = parseFloat(m[4]);
+      if (alpha < 0.999) {
+        results.push({ el: el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : ''), edge: ['top', 'right', 'bottom', 'left'][i], color: colors[i], width: widths[i], label: el.getAttribute('aria-label') || el.textContent?.slice(0, 40) || '' });
+        break;
+      }
+    }
+  }
+  return results;
+})()`;
+
+interface BorderFailure {
+  screen: string;
+  role: string;
+  element: string;
+  edge: string;
+  color: string;
+  width: number;
+  label: string;
+}
+
+test('outlined elements (chips, cards, inputs, list rows) use an opaque border, not a blurry translucent one', async () => {
+  const { DEFAULT_BUILD_DIR, launchBrowser, openContext, serveBuild, waitForQuietNetwork } = await loadHarness();
+  const { ensureDemoImages } = await loadDemoImages();
+
+  const outDir = path.join(process.cwd(), 'e2e', '.theme-consistency-crawl-out');
+  mkdirSync(outDir, { recursive: true });
+
+  const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
+  const browser = await launchBrowser();
+  const failures: BorderFailure[] = [];
+
+  try {
+    const images = await ensureDemoImages(browser, path.join(outDir, 'images'));
+    const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: IPHONE_USER_AGENT };
+
+    for (const screen of BORDER_SCREENS) {
+      const { page, activity } = await openContext(browser, { device, role: screen.role, origin, images, seedOptions: { fresh: false } });
+      try {
+        let landed = '';
+        const targetPath = screen.route.split('?')[0];
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await page.goto(`${origin}/?bt_preview=${screen.role}&demo=1`);
+          await page.waitForFunction(() => (window as any).Clerk?.loaded === true, undefined, { timeout: 20_000 }).catch(() => {});
+          await waitForQuietNetwork(activity, 800, 8000).catch(() => {});
+          await page.evaluate((url: string) => {
+            history.pushState(history.state, '', url);
+            window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+          }, `${screen.route}${screen.route.includes('?') ? '&' : '?'}bt_preview=${screen.role}`);
+          await waitForQuietNetwork(activity, 800, 8000).catch(() => {});
+          await page.waitForTimeout(1200);
+          landed = await page.evaluate(() => location.pathname);
+          if (landed.startsWith(targetPath)) break;
+        }
+
+        const results = await page.evaluate(BORDER_SCAN_SCRIPT);
+        for (const r of results as any[]) {
+          failures.push({ screen: screen.name, role: screen.role, element: r.el, edge: r.edge, color: r.color, width: r.width, label: r.label });
+        }
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    close();
+  }
+
+  writeFileSync(path.join(outDir, 'border-crispness-report.json'), JSON.stringify(failures, null, 2));
+
+  if (failures.length > 0) {
+    console.log('Translucent border hits:', failures.slice(0, 10));
+  }
+  expect(failures, `translucent (blurry-edged) borders found — see ${path.join(outDir, 'border-crispness-report.json')}`).toEqual([]);
+});

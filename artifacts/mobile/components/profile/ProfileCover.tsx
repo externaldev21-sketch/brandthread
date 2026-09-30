@@ -386,7 +386,7 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     coachArt: { height: 132, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     coachThread: { position: 'absolute', left: -SP.lg, right: -SP.lg, top: 6 },
-    coachIcon: { width: 64, height: 64, borderRadius: 32, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+    coachIcon: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
     coachTitle: { ...TYPE_SCALE.title1, color: theme.text, textAlign: 'center', letterSpacing: -0.6 },
     coachBody: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, color: theme.muted, textAlign: 'center', marginBottom: SP.sm },
     coachActions: { flexDirection: 'row' },

@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
   },
   avatarCircle: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: '#3D2B56', overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#B3B3B3',
   },
   avatarLetter: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
   hostText: { flexShrink: 1 },
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
     height: 30, minWidth: 60, backgroundColor: '#fff', borderRadius: RADIUS.pill,
     paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center',
   },
-  followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
+  followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: '#B3B3B3' },
   followBtnText: { color: '#000', fontFamily: FONT.semibold, fontSize: 13 },
   followBtnTextActive: { color: '#fff' },
   closeBtn: {
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
     // productCardTint layer above it are what actually reads as "subtle
     // dark blur" on iOS/web; on Android (no blur) this alone stands in.
     backgroundColor: '#17171A', borderRadius: RADIUS.md, overflow: 'hidden',
-    paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 10, borderWidth: 1, borderColor: '#4D4D4D',
   },
   productCardTint: { backgroundColor: 'rgba(20,20,22,0.45)' },
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },

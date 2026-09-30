@@ -1118,7 +1118,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     height: 44,
     borderRadius: RADII.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: '#999999',
     backgroundColor: 'transparent',
     justifyContent: 'center',
   },

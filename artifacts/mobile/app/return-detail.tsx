@@ -362,7 +362,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
 
   reason: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
-  photo: { width: 84, height: 84, borderRadius: RADIUS.sm, marginRight: SP.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  photo: { width: 84, height: 84, borderRadius: RADIUS.sm, marginRight: SP.sm, borderWidth: 1, borderColor: theme.border },
   noPhotos: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, marginTop: SP.sm },
   response: { marginTop: SP.md, gap: 4 },
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, marginTop: SP.md },

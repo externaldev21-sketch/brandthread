@@ -846,7 +846,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: SP.sm,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: BORDER,
   },
   heroCardButtonText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
   // Options grid

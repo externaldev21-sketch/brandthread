@@ -47,7 +47,6 @@ const ROOT_ROW_HEIGHT = 44;
  */
 export function Header({
   title,
-  subtitle,
   largeTitle,
   onBack,
   showBack = true,
@@ -59,7 +58,6 @@ export function Header({
   dividerVariant = 'default',
 }: {
   title: string;
-  subtitle?: string;
   largeTitle?: boolean;
   onBack?: () => void;
   showBack?: boolean;
@@ -120,8 +118,6 @@ export function Header({
             </View>
           )}
         </View>
-        {/* No subtitle unless the page genuinely has one (Discover doesn't) — kept optional for the rare page that needs it. */}
-        {subtitle && <Text numberOfLines={2} style={[rootStyles.subtitle, { color: theme.muted }]}>{subtitle}</Text>}
         {belowTitle && <View style={rootStyles.belowTitle}>{belowTitle}</View>}
       </View>
     );
@@ -195,7 +191,6 @@ export function Header({
       {largeTitle && (
         <Animated.View style={[styles.largeTitleWrap, { opacity: largeOpacity }]}>
           <Text numberOfLines={1} style={[styles.largeTitle, { color: theme.text }]}>{title}</Text>
-          {subtitle && <Text numberOfLines={2} style={[styles.subtitle, { color: theme.muted }]}>{subtitle}</Text>}
         </Animated.View>
       )}
 
@@ -252,12 +247,6 @@ const rootStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  subtitle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    marginTop: 2,
-    paddingHorizontal: GUTTER,
-  },
   belowTitle: {
     paddingHorizontal: GUTTER,
     paddingTop: SP.sm,
@@ -301,11 +290,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT.bold,
     fontSize: FS.h2,
     letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    marginTop: SP.xs,
   },
   belowTitle: {
     paddingHorizontal: GUTTER,

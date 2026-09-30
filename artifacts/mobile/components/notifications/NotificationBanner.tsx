@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   card: {
     width: '94%',
     borderRadius: RADIUS.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.28,
     shadowRadius: 16,
