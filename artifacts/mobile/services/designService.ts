@@ -16,6 +16,7 @@ import {
   retainDesignUploadAsset,
 } from '@/lib/designCloudImageCache';
 import { ApiError } from '@/lib/networkNotice';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -506,6 +507,29 @@ async function loadAssets(key = K().assets): Promise<BrandAsset[]> {
 }
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
+/**
+ * A single full-canvas fill layer so a demo seed project's gallery thumbnail
+ * renders as a real (if plain) canvas preview instead of
+ * DesignLayerCompositor's grey type-icon placeholder, which is meant only
+ * for a genuinely blank, layer-less canvas.
+ */
+function fillLayer(fillHex: string): DesignLayer {
+  const now = new Date().toISOString();
+  return {
+    id: uid('layer'),
+    name: 'Background',
+    type: 'shape',
+    visible: true,
+    locked: false,
+    order: 0,
+    opacity: 1,
+    transform: { x: 0, y: 0, width: 1080, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
+    data: { kind: 'shape', shape: 'rect', fillColor: fillHex, fill: fillHex },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function makeSeedProject(
   name: string,
   type: DesignProjectType,
@@ -526,16 +550,30 @@ function makeSeedProject(
   };
 }
 
+/**
+ * A genuinely new seller (or a fresh dev/web preview, `?bt_preview=seller`
+ * with no `&demo=1`) must see Design Studio's real empty state — zero
+ * projects, not three fake ones. Sample projects only ever appear under the
+ * explicit `&demo=1` preview flag (see lib/devPreview.ts's isPreviewDemoMode
+ * doc comment); every other case, including real production accounts,
+ * returns the actually-empty list from AsyncStorage untouched.
+ */
 async function seedIfEmpty(projectsKey = K().projects): Promise<DesignProject[]> {
   const existing = await loadProjects(projectsKey);
   if (existing.length > 0) return existing;
+  if (!isPreviewDemoMode()) return existing;
   const seeds: DesignProject[] = [
     makeSeedProject('Spring Drop Hoodie', 'garment', 'saved', {
       garmentType: 'hoodie',
       garmentColor: '#1A1A2E',
+      layers: [fillLayer('#2A2A2E')],
     }),
-    makeSeedProject('Product Launch Mockup', 'mockup', 'draft'),
-    makeSeedProject('Campaign Assets', 'campaign', 'exported'),
+    makeSeedProject('Product Launch Mockup', 'mockup', 'draft', {
+      layers: [fillLayer('#3F3F46')],
+    }),
+    makeSeedProject('Campaign Assets', 'campaign', 'exported', {
+      layers: [fillLayer('#E4E4E7')],
+    }),
   ];
   await saveProjects(seeds, projectsKey);
   return seeds;

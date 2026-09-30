@@ -59,8 +59,11 @@ import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { validateJsonByteLength } from '@/lib/fileValidator';
-import { SheetRise } from '@/components/motion/SheetRise';
 import { GridSkeleton } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
+import ReanimatedAnimated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -417,10 +420,10 @@ type NewCanvasTab = 'presets' | 'custom' | 'clipboard';
 type ColorProfile = 'sRGB' | 'P3';
 type SizeUnit = 'px' | 'in';
 
-const SCREEN_QUICK_CHOICES = [
-  { label: 'Screen',  width: 1170, height: 2532, desc: 'iPhone 14 Pro' },
-  { label: 'Tablet',  width: 2048, height: 2732, desc: 'iPad Pro 12.9"' },
-  { label: 'Desktop', width: 2560, height: 1600, desc: '13" MacBook' },
+const SCREEN_QUICK_CHOICES: { label: string; width: number; height: number; desc: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { label: 'Screen',  width: 1170, height: 2532, desc: 'iPhone 14 Pro',   icon: 'smartphone' },
+  { label: 'Tablet',  width: 2048, height: 2732, desc: 'iPad Pro 12.9"',  icon: 'tablet' },
+  { label: 'Desktop', width: 2560, height: 1600, desc: '13" MacBook',    icon: 'monitor' },
 ];
 const DPI_OPTIONS = [72, 150, 300];
 
@@ -559,10 +562,19 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
 
   const sheetBottom = insets.bottom;
 
+  // Shared sheet motion engine (components/ui/BottomSheet.tsx) — the exact
+  // same fast swipe-down-to-dismiss / tap-outside-to-dismiss every other
+  // bespoke sheet in the app uses, instead of a bare fade + no gesture.
+  const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
+  if (!modalVisible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="new-canvas-sheet">
-      <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close new canvas sheet" />
-      <SheetRise style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
+    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID="new-canvas-sheet">
+      <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+        <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close new canvas sheet" accessibilityRole="button" />
+      </ReanimatedAnimated.View>
+      <GestureDetector gesture={panGesture}>
+      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }, sheetStyle]}>
         <View style={sh.handle} />
         <View style={sh.header}>
           <TouchableOpacity
@@ -611,10 +623,10 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                       accessibilityRole="button"
                       testID={`preset-${qc.label.toLowerCase()}`}
                     >
-                      <View style={sh.presetIcon}><Feather name="monitor" size={ICON.md} color={MUTED} /></View>
+                      <View style={sh.presetIcon}><Feather name={qc.icon} size={ICON.md} color={MUTED} /></View>
                       <View style={sh.presetInfo}>
                         <Text style={sh.presetLbl}>{qc.label}</Text>
-                        <Text style={sh.presetDim}>{qc.width} \u00D7 {qc.height} — {qc.desc}</Text>
+                        <Text style={sh.presetDim}>{qc.width} × {qc.height} — {qc.desc}</Text>
                       </View>
                       {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
@@ -670,7 +682,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                       <TextInput style={sh.dimInput} keyboardType="numeric" value={customW} onChangeText={setCustomW} selectTextOnFocus
                         accessibilityLabel="Canvas width" testID="custom-width-input" />
                     </View>
-                    <Text style={sh.dimX}>\u00D7</Text>
+                    <Text style={sh.dimX}>×</Text>
                     <View style={sh.dimField}>
                       <Text style={sh.dimLbl}>Height</Text>
                       <TextInput style={sh.dimInput} keyboardType="numeric" value={customH} onChangeText={setCustomH} selectTextOnFocus
@@ -701,7 +713,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                   </View>
                   <View style={sh.dimPreview}>
                     <Text style={sh.dimPreviewTxt}>
-                      {toPx(customW)} \u00D7 {toPx(customH)} px{unit === 'in' ? `  (${customW || 0} \u00D7 ${customH || 0} in @ ${dpi} dpi)` : ''}
+                      {toPx(customW)} × {toPx(customH)} px{unit === 'in' ? `  (${customW || 0} × ${customH || 0} in @ ${dpi} dpi)` : ''}
                     </Text>
                   </View>
                   <TouchableOpacity style={[sh.createBtn, creating && { opacity: 0.5 }]} onPress={createCustom} activeOpacity={0.8} disabled={creating}
@@ -779,7 +791,8 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
             </View>
           )}
         />
-      </SheetRise>
+      </ReanimatedAnimated.View>
+      </GestureDetector>
     </Modal>
   );
 }
@@ -799,7 +812,9 @@ const sh = StyleSheet.create({
   tabLbl:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabLblActive: { color: FG },
   tabContent: { paddingHorizontal: SP.lg, paddingTop: SP.md, paddingBottom: SP.xxl },
-  sectionHd: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
+  // Sentence case, matching Settings' SectionHeader (components/BrandthreadUI.tsx)
+  // exactly — no uppercase/letterSpacing treatment.
+  sectionHd: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.sm },
   presetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, minHeight: COMP.buttonHSm },
   presetIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
   presetInfo: { flex: 1 },
@@ -1123,32 +1138,38 @@ interface GridItemProps {
 
 function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNamePress }: GridItemProps) {
   return (
-    <TouchableOpacity
-      style={[g.cell, selected && g.cellSelected]}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={400}
-      activeOpacity={0.80}
-      accessibilityLabel={`${project.name}, ${dimsLabel(project)}`}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      testID={`grid-item-${project.id}`}
-    >
-      {/* Selection checkbox — top-right over the thumbnail */}
-      {selectionMode && (
-        <View style={[g.checkbox, selected && g.checkboxOn]}>
-          {selected && <Feather name="check" size={10} color={BG} />}
-        </View>
-      )}
+    <View style={[g.cell, selected && g.cellSelected]}>
+      {/* Thumbnail — its own touch target (tap opens preview/toggles select,
+          long-press enters select mode). A sibling of the name/dims touch
+          target below, never a parent — two nested pressables render as a
+          <button> inside a <button> on web, which React (and the DOM) both
+          reject. */}
+      <TouchableOpacity
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        activeOpacity={0.80}
+        accessibilityLabel={`${project.name}, ${dimsLabel(project)}`}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        testID={`grid-item-${project.id}`}
+      >
+        {/* Selection checkbox — top-right over the thumbnail */}
+        {selectionMode && (
+          <View style={[g.checkbox, selected && g.checkboxOn]}>
+            {selected && <Feather name="check" size={10} color={BG} />}
+          </View>
+        )}
 
-      {/* Thumbnail — fills cell width, portrait-ratio height, rounded corners */}
-      <View style={g.thumb}>
-        <DesignLayerCompositor
-          project={project}
-          displaySize={CELL_SIZE}
-          borderRadius={RADIUS.sm}
-        />
-      </View>
+        {/* Thumbnail — fills cell width, portrait-ratio height, rounded corners */}
+        <View style={g.thumb}>
+          <DesignLayerCompositor
+            project={project}
+            displaySize={CELL_SIZE}
+            borderRadius={RADIUS.sm}
+          />
+        </View>
+      </TouchableOpacity>
 
       {/* Name + dims — tapping opens rename sheet when not in selection mode */}
       <TouchableOpacity
@@ -1162,7 +1183,7 @@ function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNa
         <Text style={g.name} numberOfLines={1}>{project.name}</Text>
         <Text style={g.dims}>{dimsLabel(project)}</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -1544,10 +1565,12 @@ export default function DesignGalleryScreen() {
           showsVerticalScrollIndicator={false}
           testID="gallery-grid"
           ListEmptyComponent={
-            <View style={s.emptyBox} testID="gallery-empty">
-              <Feather name="edit-3" size={ICON.xxl} color={SUBTLE} />
-              <Text style={s.emptyTitle}>No artworks yet</Text>
-              <Text style={s.emptyDesc}>Tap + to create your first design.</Text>
+            <View testID="gallery-empty">
+              <EmptyState
+                icon="edit-3"
+                title="No designs yet"
+                description="Tap + to start a design."
+              />
             </View>
           }
           ListFooterComponent={
@@ -1711,7 +1734,4 @@ const s = StyleSheet.create({
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Empty state
-  emptyBox:   { alignItems: 'center', paddingTop: 80, gap: SP.sm },
-  emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  emptyDesc:  { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', maxWidth: 240 },
 });
