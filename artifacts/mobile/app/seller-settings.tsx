@@ -41,6 +41,8 @@ export default function SellerSettingsScreen() {
   const [accountScope, setAccountScope] = useState<'global' | 'us'>('global');
   const [scopeLoading, setScopeLoading] = useState(false);
   const [scopeSaving, setScopeSaving] = useState<'global' | 'us' | null>(null);
+  const [scopeLoadError, setScopeLoadError] = useState<string | null>(null);
+  const [scopeSaveError, setScopeSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -76,9 +78,13 @@ export default function SellerSettingsScreen() {
   async function openAccountScope() {
     setScopeVisible(true);
     setScopeLoading(true);
+    setScopeLoadError(null);
+    setScopeSaveError(null);
     try {
       const data = await api.seller.getSettings();
       setAccountScope(data.settings?.accountScope === 'us' ? 'us' : 'global');
+    } catch {
+      setScopeLoadError('Could not load account reach. Check your connection and try again.');
     } finally {
       setScopeLoading(false);
     }
@@ -88,10 +94,13 @@ export default function SellerSettingsScreen() {
     if (scopeSaving || nextScope === accountScope) { setScopeVisible(false); return; }
     hapticLight();
     setScopeSaving(nextScope);
+    setScopeSaveError(null);
     try {
       await api.seller.updateSettings({ accountScope: nextScope });
       setAccountScope(nextScope);
       setScopeVisible(false);
+    } catch {
+      setScopeSaveError('Could not save account reach. Choose an option to try again.');
     } finally {
       setScopeSaving(null);
     }
@@ -196,8 +205,11 @@ export default function SellerSettingsScreen() {
         visible={scopeVisible}
         loading={scopeLoading}
         saving={scopeSaving}
+        loadError={scopeLoadError}
+        saveError={scopeSaveError}
         value={accountScope}
         onChoose={chooseAccountScope}
+        onRetry={() => { void openAccountScope(); }}
         onClose={() => { if (!scopeSaving) setScopeVisible(false); }}
       />
     </View>
@@ -205,13 +217,16 @@ export default function SellerSettingsScreen() {
 }
 
 function AccountScopeSheet({
-  visible, loading, saving, value, onChoose, onClose,
+  visible, loading, saving, loadError, saveError, value, onChoose, onRetry, onClose,
 }: {
   visible: boolean;
   loading: boolean;
   saving: 'global' | 'us' | null;
+  loadError: string | null;
+  saveError: string | null;
   value: 'global' | 'us';
   onChoose: (v: 'global' | 'us') => void;
+  onRetry: () => void;
   onClose: () => void;
 }) {
   const colors = useColors();
@@ -235,39 +250,49 @@ function AccountScopeSheet({
             <View style={{ minHeight: 150, alignItems: 'center', justifyContent: 'center' }}>
               <ActivityIndicator color={colors.primary} />
             </View>
+          ) : loadError ? (
+            <View style={s.loadError}>
+              <Text accessibilityRole="alert" style={s.errorText}>{loadError}</Text>
+              <TouchableOpacity style={s.retryButton} onPress={onRetry} accessibilityRole="button">
+                <Text style={s.retryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <View style={{ gap: 10 }} accessibilityRole="radiogroup">
-              {([
-                { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
-                { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
-              ]).map((option) => {
-                const selected = value === option.value;
-                const isSaving = saving === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    activeOpacity={0.75}
-                    disabled={!!saving}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected, disabled: !!saving }}
-                    onPress={() => onChoose(option.value)}
-                    style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
-                  >
-                    <View style={s.optionIcon}>
-                      <Feather name={option.icon} size={18} color={colors.foreground} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.optionTitle}>{option.label}</Text>
-                      <Text style={s.optionDescription}>{option.description}</Text>
-                    </View>
-                    {isSaving ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={{ gap: 10 }}>
+              <View style={{ gap: 10 }} accessibilityRole="radiogroup">
+                {([
+                  { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
+                  { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
+                ]).map((option) => {
+                  const selected = value === option.value;
+                  const isSaving = saving === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      activeOpacity={0.75}
+                      disabled={!!saving}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected, disabled: !!saving }}
+                      onPress={() => onChoose(option.value)}
+                      style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
+                    >
+                      <View style={s.optionIcon}>
+                        <Feather name={option.icon} size={18} color={colors.foreground} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.optionTitle}>{option.label}</Text>
+                        <Text style={s.optionDescription}>{option.description}</Text>
+                      </View>
+                      {isSaving ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {saveError && <Text accessibilityRole="alert" style={s.errorText}>{saveError}</Text>}
             </View>
           )}
         </View>
@@ -290,6 +315,10 @@ function makeScopeStyles(colors: ReturnType<typeof useColors>) {
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
     title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
     subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },
+    loadError: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 16 },
+    errorText: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.destructive, textAlign: 'center' },
+    retryButton: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 10 },
+    retryText: { fontSize: 14, fontFamily: FONT.semibold, color: colors.foreground },
     close: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
     option: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
     optionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondary },
