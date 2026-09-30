@@ -51,11 +51,12 @@ function localBucketIso(y: number, m: number, d: number, h = 0): string {
   return new Date(y, m, d, h, 0, 0, 0).toISOString();
 }
 
-/** The Monday (local calendar) on/before `from`. */
-function mostRecentMonday(from: Date): Date {
+/** The Sunday (local calendar) on/before `from` — the app's week starts
+ *  Sunday (not ISO Monday-first), matching the real API's floorToLocalWeek. */
+function mostRecentSunday(from: Date): Date {
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const day = d.getDay(); // 0 Sun .. 6 Sat
-  d.setDate(d.getDate() - ((day + 6) % 7));
+  d.setDate(d.getDate() - day);
   return d;
 }
 
@@ -68,12 +69,15 @@ const SEED_BY_RANGE: Record<PreviewSellerChartRange, number> = {
 };
 
 function makeBucket(iso: string, mode: PreviewSellerChartMode, baseCents: number, shape: number, rand: () => number): Bucket {
-  if (mode === 'fresh') return { bucket: iso, totalCents: 0, orderCount: 0, visitorCount: 0 };
+  if (mode === 'fresh') return { bucket: iso, totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 };
   const wobble = 0.55 + rand() * 0.9;
   const totalCents = Math.max(0, Math.round(baseCents * Math.max(0.05, shape) * wobble));
   const orderCount = totalCents > 0 ? Math.max(1, Math.round((totalCents / 4200) * (0.8 + rand() * 0.4))) : 0;
   const visitorCount = Math.max(orderCount, Math.round(orderCount * (6 + rand() * 6)));
-  return { bucket: iso, totalCents, orderCount, visitorCount };
+  // A small, deterministic refund rate (~4%) so netCents is a real distinct
+  // number from totalCents in demo mode too — never silently equal to gross.
+  const netCents = Math.round(totalCents * 0.96);
+  return { bucket: iso, totalCents, netCents, orderCount, visitorCount };
 }
 
 function buildBuckets(range: PreviewSellerChartRange, mode: PreviewSellerChartMode, now: Date): Bucket[] {
@@ -91,10 +95,10 @@ function buildBuckets(range: PreviewSellerChartRange, mode: PreviewSellerChartMo
       });
     }
     case 'week': {
-      const monday = mostRecentMonday(now);
+      const sunday = mostRecentSunday(now);
       return Array.from({ length: 7 }, (_, i) => {
-        const day = new Date(monday);
-        day.setDate(monday.getDate() + i);
+        const day = new Date(sunday);
+        day.setDate(sunday.getDate() + i);
         const dow = day.getDay();
         const weekendBump = dow === 0 || dow === 6 ? 1.35 : 0.85 + i * 0.03;
         return makeBucket(localBucketIso(day.getFullYear(), day.getMonth(), day.getDate()), mode, 18000, weekendBump, rand);
@@ -110,15 +114,15 @@ function buildBuckets(range: PreviewSellerChartRange, mode: PreviewSellerChartMo
       });
     }
     case 'year': {
-      // Trailing 12 months ending THIS month, in order (e.g. Oct … Sep) —
-      // never the same month repeated (that was the reported bug).
+      // Calendar Jan–Dec of THIS year (not a trailing 12-month window — see
+      // the real API's floorToLocalYear), future months not drawn. Every
+      // bucket's own month is distinct — never the same one repeated (the
+      // original reported bug).
       const y = now.getFullYear();
-      const m = now.getMonth();
-      return Array.from({ length: 12 }, (_, i) => {
-        const offset = i - 11; // -11 .. 0
-        const bucketDate = new Date(y, m + offset, 1);
-        const shape = 0.45 + (i / 11) * 0.85 + Math.sin((i / 11) * Math.PI * 1.5) * 0.2;
-        return makeBucket(localBucketIso(bucketDate.getFullYear(), bucketDate.getMonth(), 1), mode, 480_000, shape, rand);
+      const currentMonth = now.getMonth();
+      return Array.from({ length: currentMonth + 1 }, (_, m) => {
+        const shape = 0.45 + (m / 11) * 0.85 + Math.sin((m / 11) * Math.PI * 1.5) * 0.2;
+        return makeBucket(localBucketIso(y, m, 1), mode, 480_000, shape, rand);
       });
     }
     case 'all':
@@ -142,16 +146,21 @@ export function buildPreviewSellerAnalytics(
 ): SellerHomeAnalytics {
   const buckets = buildBuckets(range, mode, now);
   const totalCents = buckets.reduce((sum, b) => sum + b.totalCents, 0);
+  const netCents = buckets.reduce((sum, b) => sum + b.netCents, 0);
   const orderCount = buckets.reduce((sum, b) => sum + b.orderCount, 0);
   const visitorCount = buckets.reduce((sum, b) => sum + b.visitorCount, 0);
 
   const previous = mode === 'fresh'
-    ? { totalCents: 0, orderCount: 0, visitorCount: 0 }
-    : {
-      totalCents: Math.round(totalCents * (0.72 + mulberry32(SEED_BY_RANGE[range] + 1)() * 0.35)),
-      orderCount: Math.max(0, Math.round(orderCount * 0.85)),
-      visitorCount: Math.max(0, Math.round(visitorCount * 0.88)),
-    };
+    ? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 }
+    : (() => {
+      const previousTotalCents = Math.round(totalCents * (0.72 + mulberry32(SEED_BY_RANGE[range] + 1)() * 0.35));
+      return {
+        totalCents: previousTotalCents,
+        netCents: Math.round(previousTotalCents * 0.96),
+        orderCount: Math.max(0, Math.round(orderCount * 0.85)),
+        visitorCount: Math.max(0, Math.round(visitorCount * 0.88)),
+      };
+    })();
 
   // A deterministic (seeded, not Math.random) split of the same visitorCount
   // above into the four real source categories — a plausible-looking demo
@@ -163,8 +172,14 @@ export function buildPreviewSellerAnalytics(
   return {
     range,
     totalCents,
+    netCents,
     orderCount,
     visitorCount,
+    conversionRate: visitorCount > 0 ? Math.round((orderCount / visitorCount) * 1000) / 10 : 0,
+    averageOrderCents: orderCount > 0 ? Math.round(totalCents / orderCount) : 0,
+    // Deterministic, small — Live gifting is a real but occasional revenue
+    // stream, never the dominant number on the chart.
+    threadCashReceivedCents: mode === 'fresh' ? 0 : Math.round(totalCents * 0.015),
     toFulfill: mode === 'fresh' ? 0 : Math.max(0, Math.round(orderCount * 0.08)),
     toCapture: 0,
     previous,
