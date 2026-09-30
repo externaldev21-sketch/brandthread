@@ -45,6 +45,6 @@ export function useTabBarHiddenByScreen(): boolean {
 }
 
 /** Call from a screen with a bottom composer: hides the tab bar while focused. */
-export function useHideTabBar(): void {
-  useFocusEffect(useCallback(() => acquireTabBarHide(), []));
+export function useHideTabBar(enabled = true): void {
+  useFocusEffect(useCallback(() => (enabled ? acquireTabBarHide() : undefined), [enabled]));
 }
