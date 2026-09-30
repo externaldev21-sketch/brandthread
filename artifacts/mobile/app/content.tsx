@@ -15,6 +15,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 type FilterTab = 'all' | ContentStatus;
@@ -60,7 +61,10 @@ export default function ContentScreen() {
   const router  = useRouter();
 
   // Read optional tab query param (e.g. from /content?tab=draft)
-  const params  = useLocalSearchParams<{ tab?: string }>();
+  const params  = useLocalSearchParams<{ tab?: string; from?: string }>();
+  const onBack = params.from === STUDIO_MENU_ORIGIN
+    ? () => returnToStudioMenu(router)
+    : undefined;
   const initialTab: FilterTab = (
     params.tab && VALID_TABS.includes(params.tab as FilterTab)
       ? params.tab as FilterTab
@@ -210,6 +214,7 @@ export default function ContentScreen() {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Content"
+        onBack={onBack}
         actions={[
           { icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
           {

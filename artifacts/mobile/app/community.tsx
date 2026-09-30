@@ -7,7 +7,7 @@ import {
   ScrollView, View, Text, StyleSheet,
   ActivityIndicator, Image, RefreshControl,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +18,7 @@ import { useApi, type Freelancer } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, serviceLabel, formatHourlyRate, ratingLabel } from '@/lib/freelancer';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 
 export default function CommunityScreen() {
   const colors = useColors();
@@ -25,6 +26,10 @@ export default function CommunityScreen() {
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ from?: string }>();
+  const onBack = params.from === STUDIO_MENU_ORIGIN
+    ? () => returnToStudioMenu(router)
+    : undefined;
   const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
   const [me, setMe] = useState<Freelancer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +83,7 @@ export default function CommunityScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Community"
+        onBack={onBack}
         subtitle="Hire vetted creatives for your brand"
         rightElement={
           <PressableScale

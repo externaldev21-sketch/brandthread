@@ -117,3 +117,17 @@ mtime_ms = 1790632787065
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/12cb8517-09b6-46b7-a5b6-cc8cd4d04e6a/7e5a0400-f48d-4c57-a75a-dd42950ed90c"
 storage_version_token = "1790632794643556"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "0y7rnlVb5CFOOYZZi5IBh"
+uri = "file://.local/reports/replit-local-work-diff.txt"
+type = "text"
+title = "Backup verification and full changed-file list"
+description = "All 208 files differing from the merged upstream commit, commit/tree verification, and the two attachments received after snapshot capture."
+logical_id = "d88b9a03-97bf-45bd-812e-7f86d4a9d5bc"
+content_hash = "sha256:ea615c663d189a6f6bb17f6508ceefb360a9d79ef36965068fce54fb3e70d993"
+size = 10960
+mtime_ms = 1790804919685
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/d88b9a03-97bf-45bd-812e-7f86d4a9d5bc/eb7fe2a1-77a5-46b5-b735-74714430ce23"
+storage_version_token = "1790804920286611"
+content_type = "text/plain"

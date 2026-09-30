@@ -518,6 +518,10 @@ export default function SellerStudioRadialMenu({
       router.push({ pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN } });
     } else if (item.id === 'analytics') {
       router.push({ pathname: '/(tabs)/analytics', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'content') {
+      router.push({ pathname: '/content', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'community') {
+      router.push({ pathname: '/community', params: { from: STUDIO_MENU_ORIGIN } });
     } else {
       router.push(item.route as never);
     }

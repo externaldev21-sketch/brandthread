@@ -11,6 +11,6 @@ The seller tab bar belongs to the signed-in seller app shell and remains visible
 
 For a Studio-launched tool, “the previous screen” can mean the Studio selection overlay rather than its underlying dashboard route.
 
-**Why:** The user clarified this for Payouts and repeated the same request for Analytics: leaving a Studio tool should restore the selection menu so they can choose another item, not expose the dashboard.
+**Why:** The user repeatedly asks to return to the menu to choose another item when leaving Studio-launched screens, rather than expose the dashboard. “Previous screen” refers to that selection surface, not just navigation history.
 
 **How to apply:** Preserve the launch origin when restoring a selection overlay. Returning should allow a new choice without restarting auto-entry; do not change back behavior for launches from unrelated screens.

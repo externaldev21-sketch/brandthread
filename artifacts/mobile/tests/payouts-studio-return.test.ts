@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { returnToStudioMenu, subscribeStudioMenuReturn } from '../lib/navigation/studioMenuReturn';
 
-describe('Payouts return to Studio', () => {
+describe('Studio tool return navigation', () => {
   it('pops the previous route before reopening the menu', () => {
     const events: string[] = [];
     const router = {
@@ -68,5 +68,30 @@ describe('Payouts return to Studio', () => {
     expect(analytics).toContain('router.setParams({ from: undefined })');
     expect(analytics.match(/<ScreenHeader title="Analytics" subtitle="Last 7 days" onBack=\{onBack\}/g)).toHaveLength(2);
     expect(analytics).toContain('} : undefined');
+  });
+
+  it('returns Content to Studio only for Studio launches, preserving tab links and other entry paths', () => {
+    const root = path.resolve(__dirname, '..');
+    const menu = fs.readFileSync(path.join(root, 'components/SellerStudioRadialMenu.tsx'), 'utf8');
+    const content = fs.readFileSync(path.join(root, 'app/content.tsx'), 'utf8');
+    expect(menu).toContain("item.id === 'content'");
+    expect(menu).toContain("pathname: '/content', params: { from: STUDIO_MENU_ORIGIN }");
+    expect(content).toContain('params.from === STUDIO_MENU_ORIGIN');
+    expect(content).toContain('? () => returnToStudioMenu(router)');
+    expect(content).toContain(': undefined');
+    expect(content).toContain('onBack={onBack}');
+    expect(content).toContain('params.tab && VALID_TABS.includes(params.tab as FilterTab)');
+  });
+
+  it('returns the Community freelancer directory to Studio without changing other entry paths', () => {
+    const root = path.resolve(__dirname, '..');
+    const menu = fs.readFileSync(path.join(root, 'components/SellerStudioRadialMenu.tsx'), 'utf8');
+    const community = fs.readFileSync(path.join(root, 'app/community.tsx'), 'utf8');
+    expect(menu).toContain("item.id === 'community'");
+    expect(menu).toContain("pathname: '/community', params: { from: STUDIO_MENU_ORIGIN }");
+    expect(community).toContain('params.from === STUDIO_MENU_ORIGIN');
+    expect(community).toContain('? () => returnToStudioMenu(router)');
+    expect(community).toContain(': undefined');
+    expect(community).toContain('onBack={onBack}');
   });
 });
