@@ -264,6 +264,9 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // literally overlapped it (audit: "Launch · $25" overlapping the tab
   // bar's cart badge).
   'design-campaign',
+  // Mockup-to-Model — its own sticky "Create N photos" bottom CTA (audit:
+  // "Create photos" overlapping the tab bar's cart badge), same category.
+  'design-mockup-to-model',
   // Storefront-from-AI wizard and its full-screen generating/progress screen.
   'store-generate',
   'store-generating',

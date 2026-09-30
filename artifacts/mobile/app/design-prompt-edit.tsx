@@ -10,12 +10,13 @@ import {
   Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import {
-  FONT, FS, SP, RADIUS, ICON, OVERLAY,
+  FONT, FS, SP, RADIUS, ICON, OVERLAY, COMP,
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
@@ -44,6 +45,13 @@ export default function DesignPromptEditScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   const s = createStyles(theme);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  // This screen keeps the persistent seller tab bar (it's a normal
+  // scrollable screen, not a full-screen flow) — its own ScrollView, not
+  // BrandthreadScreen's built-in `scrollable` mode, so it needs the same
+  // clearance formula that mode uses or the last content sits underneath
+  // the bar (audit: "Preserve logo" overlapping the tab bar's cart badge).
+  const tabBarClearance = Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md;
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [preserveProduct, setPreserveProduct] = useState(true);
@@ -207,7 +215,7 @@ export default function DesignPromptEditScreen() {
           </View>
         )}
 
-        <View style={s.bottomPad} />
+        <View style={{ height: tabBarClearance }} />
       </ScrollView>
 
       {isGenerating && (
@@ -302,6 +310,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   overlayGrad:            { alignItems: 'center', gap: SP.md, padding: SP.xl, borderRadius: RADIUS.lg },
   overlayTitle:           { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
   overlaySub:             { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
-  bottomPad:              { height: 40 },
   });
 };
