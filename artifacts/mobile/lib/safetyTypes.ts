@@ -65,6 +65,8 @@ export interface ModerationQueueItem {
   reason: string;
   note: string | null;
   createdAt: string;
+  /** createdAt + 24h — the review promise made in the Community Guidelines. */
+  dueBy?: string;
   resolution: { action: string | null; note: string | null; resolvedAt: string | null } | null;
   owner: ProfileSummary | null;
   reporter: ProfileSummary | null;
@@ -75,7 +77,7 @@ export interface ModerationQueueItem {
 export interface ModerationQueue {
   items: ModerationQueueItem[];
   hasMore: boolean;
-  summary: { open: number; heldByFilter: number; resolvedToday: number };
+  summary: { open: number; heldByFilter: number; resolvedToday: number; overdue?: number };
 }
 
 export type ModerationAction = 'dismiss' | 'remove_content' | 'suspend_user';

@@ -9,6 +9,8 @@ import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
+import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
@@ -1522,6 +1524,11 @@ export async function isBlocked(userId: string): Promise<boolean> {
  */
 export async function blockUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
   await serviceRequest('/api/social/block', { method: 'POST', body: JSON.stringify({ userId: params.userId }) });
+  // The server now hides this person everywhere; drop what this device already
+  // holds (warm-start feed pages, cached query results) so nothing of theirs
+  // paints again before the next refetch.
+  await purgeAuthorFromFeedPostsCache(params.userId).catch(() => {});
+  queryClient.invalidateQueries().catch(() => {});
   const k = K();
   const blocks = await getBlockedUsers(k);
   if (blocks.some(b => b.blockedUserId === params.userId)) { notify(); return; }

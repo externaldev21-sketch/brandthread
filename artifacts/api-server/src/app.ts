@@ -22,6 +22,7 @@ import { validateMutationEnvelope } from "./middlewares/validateRequest";
 import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
 import { requireAuth } from "./middlewares/requireAuth";
 import { profileLanding } from "./routes/profileLanding";
+import { IP_NOTICE_PATHS, ipNoticePage } from "./routes/ipNoticePage";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -162,6 +163,8 @@ app.use(
 
 app.use(appRateLimiter);
 app.get("/u/:username", rateLimit("public-read"), profileLanding);
+// Public IP / DMCA notice form (creates an ip_case via POST /api/ip-cases).
+app.get([...IP_NOTICE_PATHS], rateLimit("public-read"), ipNoticePage);
 app.use("/api/v1", (_req, res, next) => {
   res.setHeader("X-Brandthread-API-Version", "1");
   next();

@@ -451,4 +451,63 @@ export async function sendIpCaseInformationRequestEmail(options: {
   });
 }
 
+/**
+ * Seller notice that a listing was taken down after an intellectual-property
+ * report. Includes the case reference and how to file a counter-notice.
+ */
+export async function sendIpTakedownSellerEmail(options: {
+  to: string;
+  caseReference: string;
+  listingName: string | null;
+  rightsType: string;
+  strikeCount: number;
+  flaggedRepeatInfringer: boolean;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const listing = options.listingName ? `“${escapeHtml(options.listingName)}”` : "One of your listings";
+  const warning = options.flaggedRepeatInfringer
+    ? "<p><strong>Your account has been flagged under our repeat-infringer policy.</strong> Further reports may lead to suspension.</p>"
+    : `<p>This takedown counts as strike ${options.strikeCount} under our repeat-infringer policy. Repeated infringement leads to account suspension.</p>`;
+  const html = renderBrandthreadEmail({
+    preheader: `A listing was removed after an IP report (${options.caseReference}).`,
+    eyebrow: "Intellectual property",
+    title: "A listing was taken down",
+    subtitle: `Case ${options.caseReference}`,
+    bodyHtml: `<p>${listing} was removed from Brandthread after a ${escapeHtml(options.rightsType)} report from a rights holder.</p>
+      ${warning}
+      <p>If you believe this was a mistake, reply to this email within 10 business days with a counter-notice that includes your full name and contact details, a description of the removed listing, a statement under penalty of perjury that you have a good-faith belief it was removed by mistake or misidentification, and your consent to resolve any dispute in the courts of your location. Keep the case reference in the subject line.</p>
+      <p style="margin-bottom:0;color:#666666;">Questions: legal@brandthread.app</p>`,
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Brandthread listing taken down - case ${options.caseReference}`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
+export async function sendIpCounterNoticeOutcomeEmail(options: {
+  to: string;
+  caseReference: string;
+  outcome: "reinstated" | "upheld";
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const reinstated = options.outcome === "reinstated";
+  const html = renderBrandthreadEmail({
+    preheader: `Counter-notice decision for case ${options.caseReference}.`,
+    eyebrow: "Intellectual property",
+    title: reinstated ? "Your listing was reinstated" : "The takedown stands",
+    subtitle: `Case ${options.caseReference}`,
+    bodyHtml: reinstated
+      ? "<p>We reviewed your counter-notice and restored the listing. The strike for this case was removed from your account.</p>"
+      : "<p>We reviewed your counter-notice and the takedown stands. The rights holder may pursue the matter further; the listing will stay removed.</p>",
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Brandthread counter-notice decision - case ${options.caseReference}`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export { escapeHtml, formatCents, formatDate };

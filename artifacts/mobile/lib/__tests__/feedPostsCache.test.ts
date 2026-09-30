@@ -8,7 +8,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-import { getCachedFeedPosts, initFeedPostsCache, setCachedFeedPosts } from '../feedPostsCache';
+import { getCachedFeedPosts, hydrateFeedPostsCache, initFeedPostsCache, purgeAuthorFromFeedPostsCache, setCachedFeedPosts } from '../feedPostsCache';
 
 describe('feedPostsCache: per-account scoping', () => {
   beforeEach(() => {
@@ -51,5 +51,28 @@ describe('feedPostsCache: per-account scoping', () => {
     initFeedPostsCache('user-empty-write-check');
     setCachedFeedPosts('for-you', []);
     expect(getCachedFeedPosts('for-you')).toBeUndefined();
+  });
+});
+
+describe('feedPostsCache: blocking purges the blocked author', () => {
+  beforeEach(() => {
+    store.clear();
+    initFeedPostsCache('user-a');
+  });
+
+  it('removes their posts from every tab in memory and on disk, and keeps everyone else', async () => {
+    setCachedFeedPosts('for-you', [{ id: '1', sellerId: 'blocked' }, { id: '2', sellerId: 'ok' }]);
+    setCachedFeedPosts('following', [{ id: '3', sellerId: 'blocked' }]);
+    await purgeAuthorFromFeedPostsCache('blocked');
+    expect(getCachedFeedPosts('for-you')).toEqual([{ id: '2', sellerId: 'ok' }]);
+    expect(getCachedFeedPosts('following')).toEqual([]);
+    const onDisk = JSON.parse(store.get('bt_feed_posts_cache_v1_user-a:for-you') ?? '[]');
+    expect(onDisk).toEqual([{ id: '2', sellerId: 'ok' }]);
+  });
+
+  it('cleans a disk-only cache that has not been hydrated this session', async () => {
+    store.set('bt_feed_posts_cache_v1_user-a:for-you', JSON.stringify([{ id: '1', sellerId: 'blocked' }, { id: '2', sellerId: 'ok' }]));
+    await purgeAuthorFromFeedPostsCache('blocked');
+    expect(await hydrateFeedPostsCache('for-you')).toEqual([{ id: '2', sellerId: 'ok' }]);
   });
 });
