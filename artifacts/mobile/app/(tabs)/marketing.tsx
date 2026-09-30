@@ -15,6 +15,7 @@ import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -89,12 +90,16 @@ export default function MarketingScreen() {
         .catch(() => { if (!cancelled) setKlaviyo({ connected: false }); });
       api.adCampaigns.list()
         .then((res) => { if (!cancelled) { setCampaigns(Array.isArray(res?.campaigns) ? res.campaigns : []); setCampaignsError(false); } })
-        // A failed fetch must never collapse into "No campaigns yet" — that
-        // reads as a real, permanent empty state instead of a retryable outage.
-        .catch(() => { if (!cancelled) { setCampaigns([]); setCampaignsError(true); } });
+        // A failed fetch on a real, authenticated account must never
+        // collapse into "No campaigns yet" — that reads as a real,
+        // permanent empty state instead of a retryable outage. But a dev
+        // web preview has no real signed-in account behind it at all, so a
+        // 401/404 there is expected and benign, not a genuine failure —
+        // show the normal empty state instead of an error banner.
+        .catch(() => { if (!cancelled) { setCampaigns([]); setCampaignsError(!isSellerDevPreview()); } });
       api.discountCodes.list()
         .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
-        .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(true); } });
+        .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
       api.referrals.stats()
         .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0 }); })
         .catch(() => { if (!cancelled) setReferrals(null); });

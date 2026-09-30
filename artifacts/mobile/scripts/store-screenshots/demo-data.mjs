@@ -941,10 +941,25 @@ export function respond({ method, path, query, role, options = {} }) {
     };
   }
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
-  // lib/appStartPrefetch.ts's warmSellerTabs() calls this on every seller
-  // app boot too — unseeded, it 404s on every single seller page load.
+  // Seller dashboard's secondary (range-independent) fetch group, plus
+  // lib/appStartPrefetch.ts's warmSellerTabs() app-boot prefetch — without
+  // these seeded, api.products.list()/api.inventory.list()/api.analytics
+  // .products() all 404 ("NOT_SEEDED") on every seller page load, which
+  // spams a hard console-error finding on every audit run and (for a
+  // role/account this fixture wasn't written for) can leave
+  // SellerDashboardTrafficSources-adjacent state undefined. Real seller
+  // products/inventory/top-sellers, not fabricated for this response alone.
   if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
+  if (p === '/inventory') return role === 'seller' ? SELLER_PRODUCTS.map((product) => product.inventory) : [];
+  if (p === '/analytics/products') return role === 'seller'
+    ? SELLER_PRODUCTS.filter((product) => product.totalRevenueCents > 0).map((product) => ({
+      productId: product.id, name: product.name, unitsSold: product.totalSales, revenueCents: product.totalRevenueCents,
+    }))
+    : [];
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  // Rendered on every seller screen (StripeConnectWarning); unseeded, it
+  // 404s on every single dashboard load, not just this route's own fetches.
+  if (p === '/seller/connect/status') return { connected: true, stripeAccountId: 'acct_demo', chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242', providerConfigured: true };
   if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
   if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.fresh ? 0 : options.orderCount ?? 9);
   if (p === '/conversations') return role === 'seller' ? sellerConversations(options.fresh ? 0 : options.conversationCount ?? 5) : [];
@@ -978,9 +993,8 @@ export function respond({ method, path, query, role, options = {} }) {
   // surface the original screenshot script needed. Zero-state ("fresh
   // preview") shapes throughout, matching this file's existing convention
   // and every consumer's own defensive `?? []`/`Array.isArray` handling.
-  if (p === '/products') return [];
-  if (p === '/posts/mine') return [];
-  if (p === '/inventory') return [];
+  // (/products, /posts/mine and /inventory are seeded once, above, with
+  // real per-role data rather than a blanket [] here.)
   if (p === '/ad-campaigns') return [];
   if (p === '/discount-codes') return [];
   if (p === '/loyalty') return { enrolled: false, pointsBalance: 0, tiers: [] };
@@ -1005,11 +1019,15 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/auth/sessions') return { sessions: [] };
   if (p === '/freelancers') return { freelancers: [] };
   if (p === '/freelancers/me') return { freelancer: null };
-  if (p === '/seller/connect/status') return { connected: false, stripeAccountId: null, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, status: 'not_connected', verified: false, bankLast4: null, providerConfigured: false };
+  // (/seller/connect/status is seeded once, above, as connected: true — this
+  // demo seller's setup checklist already marks "connect_payments" done and
+  // /finance/balance already reports connected: true, so a second,
+  // contradicting "not_connected" answer here would disagree with the rest
+  // of this same demo persona.)
   if (p === '/seller/subscription/invoices') return [];
   if (p === '/integrations/klaviyo') return { connected: false };
   if (p === '/analytics/revenue') return { totalCents: 0, orderCount: 0, daily: [] };
-  if (p === '/analytics/products') return [];
+  // (/analytics/products is seeded once, above, with real per-role data.)
   if (p === '/analytics/customers') return { stats: {} };
   if (p === '/public/discover/feed') return { items: [], computedAt: iso(0), source: 'empty', nextOffset: null };
   // 'col_nl_ember' is the audit's fixed dynamic-route param value for

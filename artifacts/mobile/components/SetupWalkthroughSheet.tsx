@@ -160,8 +160,11 @@ export default function SetupWalkthroughSheet({
                 >
                   <View style={[
                     s.iconWrap,
-                    task.completed && { backgroundColor: theme.success },
-                    isActive && !task.completed && { backgroundColor: theme.accent },
+                    // Monochrome only: a completed step is told apart by the
+                    // solid accent fill + checkmark glyph, never a green tint
+                    // (this screen has none of the app's 3 allowed color
+                    // accents — LIVE-red, end-call-red, Thread Cash green).
+                    (task.completed || isActive) && { backgroundColor: theme.accent },
                   ]}>
                     <Feather
                       name={task.completed ? 'check' : (task.icon as keyof typeof Feather.glyphMap)}
