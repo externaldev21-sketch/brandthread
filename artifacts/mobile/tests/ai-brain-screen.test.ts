@@ -48,21 +48,27 @@ describe('ai-brain input is never behind the seller tab bar', () => {
   });
 });
 
-// ─── Redesign: aurora idle state ──────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────────────────────
+// Dev's explicit rule for this screen: no translucent overlays, no grey
+// fills — solid black background. The aurora glow background (and the
+// empty-state logo's own glow halo) were removed for exactly this reason;
+// AuroraGlow.tsx still exists and is still reduced-motion-safe (see below),
+// it's simply no longer used on this screen.
 
-describe('aurora idle/empty state', () => {
-  it('the screen renders the aurora background behind all content', () => {
-    expect(screen).toContain('<AuroraGlow');
-    expect(screen).toContain("from '@/components/ai/AuroraGlow'");
+describe('empty state', () => {
+  it('the screen has a solid black background, not the aurora glow or a themed color', () => {
+    expect(screen).not.toContain('<AuroraGlow');
+    expect(screen).not.toContain("from '@/components/ai/AuroraGlow'");
+    expect(screen).toContain("backgroundColor: '#000000'");
   });
 
-  it('aurora brightens while the AI is generating and calms down when idle', () => {
-    expect(screen).toContain('thinking={isGenerating}');
+  it('the empty state does not give the logo a glow halo', () => {
+    expect(screen).not.toMatch(/<BrandthreadLogo[^>]*showGlow/);
   });
 
-  it('the empty state centers the Brandthread logo with a glow and the required prompt copy', () => {
+  it('the empty state centers the Brandthread logo with the required prompt copy', () => {
     expect(screen).toContain('What are we building today?');
-    expect(screen).toContain('showGlow');
+    expect(screen).toContain('<BrandthreadLogo');
   });
 
   it('the empty state offers 3–4 real AI suggestion chips sourced from SCREEN_PROMPTS', () => {

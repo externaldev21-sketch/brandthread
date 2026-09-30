@@ -48,7 +48,12 @@ describe('seller home dashboard data contract', () => {
     // stat tiles all derive from the same `data`/`buckets`, which is itself
     // gated to the currently selected `range` by selectSellerHomeAnalytics
     // — there is no second, independently-fetched period anywhere here.
-    expect(source).toContain('const buckets = data?.buckets ?? []');
+    // EMPTY_BUCKETS is a stable module-level `[]` reused here instead of an
+    // inline `?? []` literal — a fresh array every render was feeding a
+    // useMemo dependency below and defeating its memoization (same bug
+    // class, though not itself infinite, as app/boost.tsx's "Maximum
+    // update depth exceeded" crash — see that fix's own comments).
+    expect(source).toContain('const buckets = data?.buckets ?? EMPTY_BUCKETS');
     expect(source).toContain('metricSeries(metric, buckets)');
     expect(source).toContain('bucketLabel(b.bucket, range as SellerHomeTimeRange)');
     expect(source).toMatch(/case 'sales': return \{ current: data\.totalCents, previous: previous\.totalCents \}/);

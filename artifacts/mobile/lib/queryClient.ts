@@ -42,13 +42,25 @@ export const queryPersister = createAsyncStoragePersister({
   throttleTime: 1_000,
 });
 
+// The signed-in Clerk userId every queryKeys.* entry below is scoped under
+// (except `profile`, which already takes an explicit userId — left as-is).
+// Set from app/_layout.tsx's ServiceConfigurer on sign-in/out/account switch,
+// same moment as services/productService.ts's/cartService.ts's own per-user
+// scoping. Namespacing (rather than queryClient.clear()ing on every switch)
+// is what makes switching back to an already-visited account instant: its
+// entries were never evicted, just filed under a key account B can't read.
+let _queryScopeUserId = 'anon';
+export function setQueryKeyScope(userId: string | null): void {
+  _queryScopeUserId = userId ?? 'anon';
+}
+
 /** Query key helpers so prefetch (press-in) and the owning screen's useQuery
  *  always agree on the same cache entry. */
 export const queryKeys = {
-  product: (id: string) => ['product', id] as const,
-  productList: (scope: string) => ['products', scope] as const,
+  product: (id: string) => ['product', _queryScopeUserId, id] as const,
+  productList: (scope: string) => ['products', _queryScopeUserId, scope] as const,
   profile: (userId: string) => ['profile', userId] as const,
-  order: (id: string) => ['order', id] as const,
-  orderList: (scope: string) => ['orders', scope] as const,
-  tabData: (tab: string) => ['tab-data', tab] as const,
+  order: (id: string) => ['order', _queryScopeUserId, id] as const,
+  orderList: (scope: string) => ['orders', _queryScopeUserId, scope] as const,
+  tabData: (tab: string) => ['tab-data', _queryScopeUserId, tab] as const,
 };

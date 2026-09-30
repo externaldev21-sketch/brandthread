@@ -483,6 +483,14 @@ export default function OrderDetailScreen() {
   const hasLoadedRef = useRef(!!cachedOrder);
 
   const load = useCallback(async (generation: number) => {
+    // No order id at all (e.g. a bad/incomplete deep link) — nothing to
+    // fetch. Show the "not found" state below instead of firing requests
+    // that can only ever 404.
+    if (!id) {
+      setLoading(false);
+      hasLoadedRef.current = true;
+      return;
+    }
     // Keep one request in flight per focus cycle. Without this guard, a slow
     // poll can overlap the next tick and an older success can clear the
     // paused state after a later failure has already stopped the timer.
@@ -765,7 +773,7 @@ export default function OrderDetailScreen() {
           icon="alert-circle"
           title="Order not found"
           description="This order may have been deleted or the ID is invalid."
-          action={{ label: 'Go Back', onPress: () => goBackOr(router), icon: 'arrow-left' }}
+          action={{ label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
         />
       </View>
     );
@@ -780,7 +788,7 @@ export default function OrderDetailScreen() {
         title={order.orderNumber}
         subtitle={order.customer.name}
         variant="push"
-        onBack={() => goBackOr(router)}
+        onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
       />
 

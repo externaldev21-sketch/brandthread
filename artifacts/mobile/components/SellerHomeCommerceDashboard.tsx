@@ -10,11 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ApiError } from '@/lib/networkNotice';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -87,6 +88,12 @@ import {
 
 type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 
+// Stable reference for "no data yet" — `data?.buckets ?? []` would otherwise
+// hand a brand-new array to two useMemo dependencies on every render,
+// defeating their memoization (same bug class as app/boost.tsx's infinite
+// render loop, though here it doesn't set state so it isn't infinite).
+const EMPTY_BUCKETS: SellerHomeAnalyticsSnapshot['data']['buckets'] = [];
+
 interface FinanceBalance {
   available: { amount: number; currency: string; formatted: string };
   pending: { amount: number; currency: string; formatted: string };
@@ -118,6 +125,27 @@ const PERIOD_LABEL: Record<SellerDashboardRange, string> = {
   year: 'last year',
   all: '',
 };
+
+// Range-aware empty-chart copy — "No sales yet" alone reads the same for
+// every range; naming the range itself (Shopify's own zero-state pattern)
+// makes it clear which window is empty rather than implying the WHOLE store
+// has never sold anything.
+const EMPTY_CHART_MESSAGE: Record<SellerDashboardRange, string> = {
+  today: 'No sales yet today',
+  week: 'No sales yet this week',
+  month: 'No sales yet this month',
+  year: 'No sales yet this year',
+  all: 'No sales yet',
+};
+
+// Live updates while the Dashboard is visible: there's no push/socket
+// channel for new orders or Thread Cash events (see lib/live/* — that's Live
+// -stream viewer presence, a different concern), so this polls at a short
+// interval instead, matching the app's own established focus-poll pattern
+// (see app/seller-inbox.tsx's 30s conversation poll). useFocusEffect's
+// cleanup stops the interval the moment the screen loses focus — including
+// when the user switches tabs or backgrounds the app onto another tab.
+const LIVE_POLL_INTERVAL_MS = 30_000;
 
 function metricSeries(
   metric: MetricKey,
@@ -163,6 +191,7 @@ export default function SellerHomeCommerceDashboard({
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
+  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
 
   const [range, setRange] = useState<SellerDashboardRange>('week');
@@ -388,6 +417,27 @@ export default function SellerHomeCommerceDashboard({
 
   useEffect(() => { payoutAttemptKeyRef.current = null; }, [userId]);
 
+  // ── Live updates: refresh on regaining focus, then poll while visible ────
+  // `retryTick` already drives both the range-scoped analytics fetch and
+  // loadSecondaryData (orders/inventory/hub/products) below — bumping it is
+  // the same real refetch pull-to-refresh already triggers, just on a timer
+  // instead of a gesture.
+  const hasFocusedOnceRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFocusedOnceRef.current) {
+        // Not the very first mount — the seller is RETURNING to this screen
+        // (tab switch back, popped from another screen), so refresh
+        // immediately rather than waiting for the next poll tick.
+        setRetryTick((n) => n + 1);
+      }
+      hasFocusedOnceRef.current = true;
+
+      const interval = setInterval(() => setRetryTick((n) => n + 1), LIVE_POLL_INTERVAL_MS);
+      return () => clearInterval(interval);
+    }, []),
+  );
+
   const nav = useCallback((route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push(route as never);
@@ -535,7 +585,7 @@ export default function SellerHomeCommerceDashboard({
   } : null;
 
   // ── Metric aggregate + chart series for the currently focused metric ─────
-  const buckets = data?.buckets ?? [];
+  const buckets = data?.buckets ?? EMPTY_BUCKETS;
   const series = useMemo(() => metricSeries(metric, buckets), [metric, buckets]);
   const labels = useMemo(() => buckets.map((b) => bucketLabel(b.bucket, range as SellerHomeTimeRange)), [buckets, range]);
 
@@ -543,7 +593,7 @@ export default function SellerHomeCommerceDashboard({
     if (!data) return { current: 0, previous: 0 };
     // A response with no `previous` bucket (a brand-new store, or a partial
     // payload) must not crash the dashboard — treat it as a zeroed prior period.
-    const previous = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
+    const previous = data.previous ?? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 };
     switch (metric) {
       case 'sales': return { current: data.totalCents, previous: previous.totalCents };
       case 'orders': return { current: data.orderCount, previous: previous.orderCount };
@@ -584,7 +634,7 @@ export default function SellerHomeCommerceDashboard({
   };
 
   const tiles: SellerDashboardStatTileData[] = data ? (['orders', 'visitors', 'conversion', 'aov'] as MetricKey[]).map((key) => {
-    const tilesPrevious = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
+    const tilesPrevious = data.previous ?? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 };
     const agg = key === 'orders' ? { current: data.orderCount, previous: tilesPrevious.orderCount }
       : key === 'visitors' ? { current: data.visitorCount, previous: tilesPrevious.visitorCount }
       : key === 'conversion' ? {
@@ -612,7 +662,7 @@ export default function SellerHomeCommerceDashboard({
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarMetrics.occupiedHeight + SP.md }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
@@ -667,7 +717,7 @@ export default function SellerHomeCommerceDashboard({
                   // Never a fabricated "+31.1%"-style comparison for a
                   // brand-new/zero-sales account — matches Shopify's own
                   // zero-state chart ("$0.00 —", no percent).
-                  <Text style={[styles.heroDelta, { color: theme.muted }]}>No sales yet</Text>
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{EMPTY_CHART_MESSAGE[range]}</Text>
                 ) : deltaLine && scrubIndex === null && heroSettled ? (
                   <Text
                     style={[
@@ -694,6 +744,8 @@ export default function SellerHomeCommerceDashboard({
                 onScrub={setScrubIndex}
                 isEmpty={isEmptyChart}
                 formatValue={(v) => formatMetricValue(metric, v)}
+                emptyMessage={EMPTY_CHART_MESSAGE[range]}
+                showNowMarker={range === 'today'}
               />
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
@@ -714,15 +766,15 @@ export default function SellerHomeCommerceDashboard({
                   </View>
                   <TouchableOpacity
                     testID="seller-dashboard-cash-out"
-                    style={[styles.withdrawButton, { backgroundColor: theme.text }, (financeLoading || cashingOut) && styles.withdrawButtonDisabled]}
+                    style={[styles.withdrawButton, { backgroundColor: theme.accent }, (financeLoading || cashingOut) && styles.withdrawButtonDisabled]}
                     activeOpacity={0.82}
                     disabled={financeLoading || cashingOut}
                     onPress={requestCashOut}
                     accessibilityRole="button"
                     accessibilityLabel="Withdraw available balance"
                   >
-                    {cashingOut ? <ActivityIndicator size="small" color={theme.background} /> : (
-                      <Text style={[styles.withdrawButtonText, { color: theme.background }]}>Withdraw</Text>
+                    {cashingOut ? <ActivityIndicator size="small" color={theme.onAccent} /> : (
+                      <Text style={[styles.withdrawButtonText, { color: theme.onAccent }]}>Withdraw</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -795,8 +847,13 @@ export default function SellerHomeCommerceDashboard({
                 <View style={styles.section}>
                   <SellerDashboardTrafficSources
                     totalVisits={data.visitorCount}
+                    previousVisits={data.previous?.visitorCount ?? 0}
+                    periodLabel={range !== 'all' ? PERIOD_LABEL[range] : null}
                     trafficSources={data.trafficSources}
                     theme={theme}
+                    onSeeAll={() => nav('/analytics-store')}
+                    onOpenSource={() => nav('/analytics-store')}
+                    onShareStore={() => nav('/share-store')}
                   />
                 </View>
               )}
@@ -853,7 +910,7 @@ const styles = StyleSheet.create({
   // flex: 1 on the ScrollView itself is required on iOS so the layout engine
   // gives it a bounded height and allows inner content to scroll correctly.
   scrollView: { flex: 1 },
-  scroll: { flexGrow: 1, paddingBottom: 160 },
+  scroll: { flexGrow: 1 },
   scrollEndMarker: { height: 1 },
 
   // Matches the shared root-page Header's exact title/row treatment (Discover

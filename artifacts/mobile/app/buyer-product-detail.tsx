@@ -494,7 +494,7 @@ export default function BuyerProductDetailScreen() {
   const pathname = usePathname();
   const { push, back } = useThreadPull();
   const usesThreadPull = pathname === '/thread-product-detail';
-  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router);
+  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
@@ -1516,7 +1516,7 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
         <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
         <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
       </View>
-      <View style={sgs.imageWrap} {...responder.panHandlers}>
+      <View style={[sgs.imageWrap, { backgroundColor: theme.surface }]} {...responder.panHandlers}>
         <Animated.Image
           source={{ uri: imageUri }}
           resizeMode="contain"
@@ -1532,7 +1532,7 @@ function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imag
 const sgs = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, marginBottom: SP.sm },
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
-  imageWrap: { width: '100%', aspectRatio: 4 / 3, backgroundColor: '#000', overflow: 'hidden' },
+  imageWrap: { width: '100%', aspectRatio: 4 / 3, overflow: 'hidden' },
   hint: { textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm, marginBottom: SP.xs },
 });
 
@@ -1803,10 +1803,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // edge instead of just past the icon.
   cartBadge: {
     position: 'absolute', top: -4, right: 0, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
-    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center',
   },
-  cartBadgeText: { color: '#000000', fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
-  cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: '#000000' },
+  cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
+  cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: CARD },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },

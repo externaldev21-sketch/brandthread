@@ -1,38 +1,67 @@
 /**
  * SellerStudioRadialMenu — Seller Control Center
  *
- * The sheet opened from the tab bar's Studio button (accessibilityLabel
- * "Open Studio tools"). Despite the file's historical name (kept so the tab
- * bar's import and the native device-interaction contract test don't need to
- * change), this is the seller's condensed "control center": a store header
- * followed by a plain 4-column grid of every seller destination — reskinned
- * from Binance's own Features bottom sheet
- * (https://mobbin.com/screens/b2cccef3-bc9c-4320-b7c0-e495dd4c3627) in this
- * app's black/white/silver palette. Unlike Binance's boxed icons, each grid
- * item here is just a white line icon and a label — no tile or border behind
- * it — per Dev's call. There is no search field and no editable pinned-
- * shortcuts row anymore: every destination is always visible in the grid, so
- * there is nothing to search for or curate.
+ * Opened from the tab bar's Studio button (accessibilityLabel "Open Studio
+ * tools"). Despite the file's historical name (kept so the tab bar's import
+ * and the native device-interaction contract test don't need to change),
+ * this is now its own FULL-SCREEN PAGE — not a partial sheet — that slides
+ * up to cover the whole screen (fast, no bounce) and shows one destination
+ * at a time as a full-bleed "cover", edge to edge, with its name and a
+ * one-shot signature animation over it. Dev's words: "every icon is its own
+ * screen, swipe across and feel boom boom boom."
  *
- * Presented as a fast slide-up/down sheet (Reanimated + react-native-gesture-
- * handler, UI thread only): swipe DOWN anywhere on the sheet dismisses it —
- * the sheet tracks the finger 1:1, rubber-bands if dragged up past its
- * resting position, and either snaps back or slides fully offscreen once
- * released past ~25% of its height or on a fast downward flick. Inner
- * content (the ScrollView) still scrolls normally; the drag only takes over
- * once that content is scrolled to the top, exactly like an iOS page sheet.
- * Tapping the dimmed area above the sheet triggers the identical fast
- * slide-down. There is no separate close (X) button — Dev's own call: once
- * swipe/tap-to-dismiss exist, a dedicated close button is redundant chrome,
- * and it used to float over the "View store" pill. Android back and Escape
- * (web) still close it via the Modal's own onRequestClose.
+ * Consolidated down from the prior 4-column grid's ~28 destinations to the
+ * ones that have NO other way into them — see MENU_EXCLUDED_IDS below for
+ * the removed items and where each one's real entry point now lives.
+ *
+ * Layout, top to bottom:
+ *  - Header (below the notch): the seller's real profile photo + store name
+ *    on the left (an initials circle, matching the store name's own first
+ *    letter, only when there's no photo yet; a neutral store icon — never a
+ *    random letter — when there's no store name either), a compact
+ *    unfilled "View store" button, and a close (X) button.
+ *  - The card area: the current card's full-bleed cover fills the entire
+ *    remaining width/height, edge to edge — a neighbor is visible ONLY
+ *    mid-transition (the ~90ms slide between cards), never at rest, per
+ *    Dev's own screenshot ("no slivers, no half-words").
+ *  - The "Entering page" auto-enter fill button, pinned above the home
+ *    indicator.
+ *  - A row of small position dots.
+ *
+ * Interaction:
+ *  - A horizontal drag anywhere on the card area SCRUBS through the list —
+ *    every SCRUB_PX_PER_CARD (lib/studioCardCarousel.ts) of finger movement
+ *    advances exactly one card, either direction, freely reversible. Each
+ *    step is a quick ~90ms slide (never a bounce/spring). One strong haptic
+ *    tick fires per card change, rate-limited so a very fast scrub still
+ *    reads as a clean buzz rather than mush. Each card also plays its own
+ *    one-shot signature micro-animation the moment it becomes current — a
+ *    tiny 100ms scale-pop while the finger is flying past cards quickly, or
+ *    the full ~350-450ms signature motion once the finger slows/dwells (and
+ *    again on lock) — see MICRO_KIND below.
+ *  - Lifting the finger after a horizontal scrub does NOT navigate
+ *    (Dev's own live-testing feedback on the first cut: "too fast /
+ *    accident-prone"). It LOCKS on whatever card is currently centered — a
+ *    quick snap-to-center, a single firmer "landed" haptic, a subtle white
+ *    ring + scale-up, and the "Entering page" button appears and fills
+ *    left-to-right over EXACTLY AUTO_ENTER_MS (1s), opening the card the
+ *    instant it completes. A plain "Cancel" text link shows just above the
+ *    pill while it counts down; tapping it stops the fill and swaps the
+ *    pill to a static "Continue" (tap it any time to still open). Touching/
+ *    scrubbing again cancels either state immediately and continues from
+ *    the locked card, arming a fresh countdown once it re-locks; a tap on
+ *    the pill or a quick upward flick skips the wait and opens right away.
+ *  - A downward drag (anywhere on the card area or the header) or the close
+ *    (X) button dismisses the whole page without navigating, sliding it
+ *    back down to reveal the screen underneath — the same rubber-band/
+ *    velocity-flick feel either way.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -41,30 +70,39 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
+  Extrapolation,
+  interpolate,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
+  ReduceMotion,
+  useReducedMotion,
   useSharedValue,
+  withSequence,
   withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import { SHEET_EASING, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
+import { StudioCoverBackdrop, StudioCoverGrain } from '@/components/StudioCardCover';
 
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
-import { FONT, FS, RADIUS, SP, BREAKPOINT } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { getSetupState, completionPercent } from '@/lib/setupStore';
-import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
-import { initFromStorage, subscribe as subscribeOrderBadge } from '@/lib/orderBadgeStore';
-import { PressableScale, SheetHandle } from '@/components/BrandthreadUI';
+import { getSetupState, completionPercent, completedRequiredTaskCount, requiredTaskCount } from '@/lib/setupStore';
+import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';
+import { SCRUB_PX_PER_CARD, indexForDrag } from '@/lib/studioCardCarousel';
+import { PressableScale } from '@/components/BrandthreadUI';
 import {
   ALL_ITEMS,
   type ControlCenterItem,
@@ -72,35 +110,97 @@ import {
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
 
-// ─── Grid ordering ────────────────────────────────────────────────────────────
-// Dev's named order for the first 3 rows (the destinations a seller reaches
-// for most), then every other previously-reachable route afterward in its
-// existing catalog order — so nothing that used to be reachable from this
-// menu is dropped, it just falls after the priority row.
-const PRIORITY_IDS = [
-  'add-product', 'orders', 'go-live', 'post-video',
-  'products', 'discounts', 'analytics', 'payouts',
-  'content', 'messages', 'boost', 'settings',
+// ─── Menu contents ────────────────────────────────────────────────────────────
+// Dev's consolidation pass: the menu should only hold destinations with NO
+// other way in. Everything below is EXCLUDED from the carousel because it
+// already has a real, generally-visible entry point elsewhere — it stays
+// fully reachable, just not from here (same treatment 'brand-memory' and
+// 'help' already had):
+//   orders          -> tab bar's own Orders tab
+//   discounts       -> seller-settings' Discounts row (services/settingsCatalog.ts)
+//   products        -> tab bar's own Products tab
+//   post-video      -> the seller create FAB's "New post" entry
+//   messages        -> the seller Profile tab's own Messages button
+//   boost           -> the seller create FAB's "Start a boost" entry
+//   store-preview   -> this page's OWN header "View store" button
+//   subscription    -> seller-settings' Subscription row
+//   store-builder   -> seller-settings' Store Builder row
+//   shipping        -> seller-settings' Shipping row (and edit-profile.tsx)
+//   team            -> seller-settings' Team and permissions row
+//   settings        -> the seller Profile tab's gear icon (and this page's
+//                      own header setup-progress bar)
+//   help            -> Settings > Help & support (services/settingsCatalog.ts)
+//                      — this page's own "?" icon was removed entirely
+// Kept regardless (Dev-named, no matter what else is true): go-live,
+// analytics, payouts, community, taxes. Kept because nothing else reaches
+// them: add-product (the dashboard's own "Add product" CTA is itself part
+// of the seller-setup checklist flow, not a standing always-there button —
+// Dev's own call to keep this one anyway), content, finance, manufacturer,
+// customers, and the six Growth/Design Studio tools (app/(tabs)/studio.tsx
+// links to the same six routes but is itself unreachable — href: null in
+// the tab bar, and nothing anywhere pushes to it, so it doesn't count as a
+// real duplicate entry point).
+const MENU_EXCLUDED_IDS = [
+  'orders', 'discounts', 'products', 'post-video', 'messages', 'boost',
+  'store-preview', 'subscription', 'store-builder', 'shipping', 'team',
+  'settings', 'help',
 ];
-// 'help' is unlinked from the grid itself (same "kept reachable, just not
-// from here" treatment this file already gives 'brand-memory' — see
-// lib/sellerControlCenter.ts) and moved to a "?" icon in the header instead,
-// next to "View store". Dev's own bug report: with it in the grid, Help &
-// Support was the sole item in the final row, leaving a large empty area
-// under it — 28 remaining items divides evenly into exactly 7 full rows of
-// 4, so removing it (rather than reordering around it) is what actually
-// closes that gap instead of just moving it elsewhere.
-const GRID_EXCLUDED_IDS = ['help'];
-const GRID_ITEMS: ControlCenterItem[] = [
-  ...PRIORITY_IDS.map((id) => ALL_ITEMS.find((item) => item.id === id)).filter((i): i is ControlCenterItem => !!i),
-  ...ALL_ITEMS.filter((item) => !PRIORITY_IDS.includes(item.id) && !GRID_EXCLUDED_IDS.includes(item.id)),
+// Most-used first, per Dev — the rest of the catalog order doesn't matter
+// once everything reachable elsewhere has already been excluded above.
+const CARD_ORDER = [
+  'add-product', 'go-live', 'analytics', 'payouts', 'community', 'taxes',
+  'content', 'finance', 'manufacturer', 'customers',
+  'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
 ];
-const GRID_COLUMNS = 4;
-// Reserves a fixed 2-line-tall box for every grid label — see gridLabel's
-// own style comment for why.
-const GRID_LABEL_LINE_HEIGHT = 15;
+const CARD_ITEMS: ControlCenterItem[] = CARD_ORDER
+  .map((id) => ALL_ITEMS.find((item) => item.id === id))
+  .filter((i): i is ControlCenterItem => !!i);
+if (__DEV__) {
+  // Catch a rename/typo in CARD_ORDER or MENU_EXCLUDED_IDS immediately in
+  // development rather than silently dropping (or double-counting) an item.
+  const accounted = new Set([...CARD_ORDER, ...MENU_EXCLUDED_IDS]);
+  const missing = ALL_ITEMS.filter((item) => !accounted.has(item.id));
+  if (missing.length > 0) {
+    console.warn(
+      '[SellerStudioRadialMenu] Item(s) not in CARD_ORDER or MENU_EXCLUDED_IDS — ' +
+      'unreachable from anywhere until sorted into one of the two: ' +
+      missing.map((i) => i.id).join(', '),
+    );
+  }
+}
 
-/** Rubber-band resistance for dragging the sheet up past its resting
+/** Spread into every FUNCTIONAL timing's withTiming config (the sheet's own
+ *  open/close/dismiss slide, the scrub step, the lock snap, the auto-enter
+ *  fill) — these govern real interaction feedback and, for the fill
+ *  especially, a deliberate real-time "you can still cancel" window, not
+ *  pure decoration, so they must keep their actual duration even with
+ *  Reduce Motion on (otherwise a reduced-motion user gets the fill
+ *  instant-completing on every release — literally the "too fast /
+ *  accident-prone" bug this feature exists to fix). Per-card SIGNATURE
+ *  micro-animations are the opposite case and do respect Reduce Motion
+ *  (see CarouselCard's own reaction, which checks it manually) — Dev's own
+ *  spec: "respects Reduce Motion (fade only)". */
+const NO_REDUCE_MOTION = { reduceMotion: ReduceMotion.Never } as const;
+/** Quick, no-bounce slide between cards on each scrub step or programmatic
+ *  settle — matches the "quick 80-100ms slide, no bounce" spec. */
+const CARD_STEP_MS = 90;
+const CARD_STEP_EASING = Easing.out(Easing.cubic);
+/** Minimum real time between two haptic calls, however many card-index
+ *  crossings happen in between — keeps a very fast scrub a clean buzz
+ *  instead of a mushy blur of overlapping vibrations. */
+const MIN_HAPTIC_INTERVAL_MS = 45;
+/** How many cards on each side of the current one stay mounted — not for a
+ *  peek effect anymore (there is none at rest — see the card/cardSpacing
+ *  sizing below), just so a neighbor is already mounted and ready the
+ *  instant a fast scrub reaches it, rather than popping in mid-slide. */
+const CARD_WINDOW_RADIUS = 2;
+/** A scrub step slower than this many ms counts as a "dwell" — its card
+ *  plays the FULL signature micro-animation. Faster than this (the finger
+ *  flying past several cards) only gets the tiny scale-pop, so a fast scrub
+ *  never feels noisy. */
+const MICRO_DWELL_MS = 120;
+
+/** Rubber-band resistance for dragging the page up past its resting
  *  position — a diminishing-returns curve (never a hard clamp) that
  *  asymptotically approaches -(dim*c) however far past rest the finger
  *  travels. `value` is always <= 0 here (translateY dragged negative). */
@@ -109,6 +209,35 @@ function rubberBandUp(value: number, dim = 100, c = 0.55) {
   const x = -value;
   return -((x * dim * c) / (dim + c * x));
 }
+
+// ─── Per-card signature micro-animations ───────────────────────────────────────
+// One short (~350-450ms), one-shot, ease-out motion per cover subject —
+// built entirely from transforms/opacity on the existing icon (plus, for
+// go-live only, a small extra dot + sweep), never a bespoke illustration or
+// a looping/bouncy animation. See CarouselCard's own micro-animation
+// reaction for how fast-vs-dwell and Reduce Motion are handled.
+type MicroKind =
+  | 'swing' | 'pulse-dot' | 'rise' | 'flip' | 'pop-in' | 'rotate-notch'
+  | 'slide-click' | 'pie-pop' | 'turn-60' | 'nudge' | 'draw-stroke'
+  | 'fade-outline' | 'snip' | 'twinkle' | 'blink' | 'target-pulse';
+const MICRO_KIND: Record<string, MicroKind> = {
+  'add-product': 'swing',        // hanger swings once and settles
+  'go-live': 'pulse-dot',        // LIVE dot pulses once + lens-flare sweep
+  'analytics': 'rise',           // rises from 0 into place
+  'payouts': 'flip',             // coin flips once
+  'community': 'pop-in',         // pops in
+  'taxes': 'rotate-notch',       // globe rotates a notch
+  'content': 'slide-click',      // film frame slides/clicks into place
+  'finance': 'pie-pop',          // pie slice pops out and back
+  'manufacturer': 'turn-60',     // gear turns 60 degrees
+  'customers': 'nudge',          // people nudge together
+  'design-studio': 'draw-stroke',// pen draws one stroke
+  'mockup-to-model': 'fade-outline', // silhouette fades in from outline
+  'remove-bg': 'snip',           // scissors snip
+  'ai-design': 'twinkle',        // sparkle twinkle
+  'campaign-gen': 'target-pulse',// target rings pulse inward once
+  'ai-photoshoot': 'blink',      // shutter blink
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -124,22 +253,28 @@ export default function SellerStudioRadialMenu({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const isTablet = screenWidth >= BREAKPOINT.tablet;
+  const { height: screenHeight } = useWindowDimensions();
   const { theme } = useAppTheme();
-  const styles = useMemo(() => makeStyles(theme, isTablet), [theme, isTablet]);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const api = useApi();
+  const reduceMotion = useReducedMotion();
 
-  const { userId, isSignedIn } = useAuth();
+  const { userId } = useAuth();
 
-  const sheetHeight = Math.min(screenHeight * 0.9, screenHeight - insets.top - 24);
+  // Full-screen now, not a partial sheet — Dev's final layout call.
+  const pageHeight = screenHeight;
 
-  // Sheet transform + backdrop opacity, both UI-thread shared values —
-  // translateY doubles as the "distance below resting position" the sheet
-  // sits at, so 0 = fully open and `sheetHeight` = fully offscreen.
-  const translateY = useSharedValue(sheetHeight);
-  const backdropOpacity = useSharedValue(0);
+  // Measured once the card area actually lays out, so cards can be sized to
+  // it exactly (pixel-perfect edge-to-edge tiling — see cardSpacing below)
+  // rather than approximated off the window's own width/height.
+  const [cardAreaSize, setCardAreaSize] = useState({ width: 0, height: 0 });
+  const cardSpacing = cardAreaSize.width;
+
+  // translateY doubles as "distance below resting position" the whole page
+  // sits at — 0 = fully open (covering the screen), pageHeight = fully
+  // offscreen below.
+  const translateY = useSharedValue(pageHeight);
   // Captured at the start of each drag so onUpdate computes an absolute
   // position from the gesture's cumulative translation, not a running delta.
   const dragStartY = useSharedValue(0);
@@ -148,61 +283,156 @@ export default function SellerStudioRadialMenu({
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   const [brandName, setBrandName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [setupPercent, setSetupPercent] = useState(0);
-  const [orderCount, setOrderCount] = useState(() => getSellerOrderBadgeCount(userId));
-  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [setupDone, setSetupDone] = useState(0);
+  const [setupTotal, setSetupTotal] = useState(0);
 
-  // ── Store header data + live badges — refreshed each time the sheet opens ──
+  // ── Store header data — refreshed each time the page opens ────────────────
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-
     getSetupState().then((state) => {
       if (cancelled) return;
       setSetupPercent(completionPercent(state));
+      setSetupDone(completedRequiredTaskCount(state));
+      setSetupTotal(requiredTaskCount(state));
     });
-
     api.auth.me().then((profile: any) => {
       if (cancelled) return;
       setBrandName(profile?.brandName ?? profile?.displayName ?? profile?.name ?? null);
+      setAvatarUrl(profile?.profileImageUrl ?? null);
     }).catch(() => {});
-
-    api.conversations.list().then((list: any) => {
-      if (cancelled) return;
-      const total = (list as Array<{ unreadCount?: number; type?: string }>)
-        .filter((c) => c.type !== 'buyer_to_buyer')
-        .reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
-      setUnreadMessages(total);
-    }).catch(() => {});
-
-    if (userId) {
-      initFromStorage(userId).then(() => {
-        if (!cancelled) setOrderCount(getSellerOrderBadgeCount(userId));
-      });
-    }
-
     return () => { cancelled = true; };
   }, [open, api, userId]);
 
-  useEffect(() => {
-    const unsub = subscribeOrderBadge(() => setOrderCount(getSellerOrderBadgeCount(userId)));
-    return unsub;
-  }, [userId]);
-
   useEffect(() => () => {
     cancelAnimation(translateY);
-    cancelAnimation(backdropOpacity);
-  }, [translateY, backdropOpacity]);
+  }, [translateY]);
+
+  // ── Card carousel state ─────────────────────────────────────────────────────
+  // `cardIndex` is the UI-thread source of truth — a float that animates
+  // (via withTiming) toward whatever integer index the current drag/tap
+  // resolves to. `cardIndexJS` mirrors its ROUNDED value on the JS side,
+  // updated only when it actually changes (see the reaction below), driving
+  // the position dots and which cards are mounted at all — that can't be
+  // driven from a worklet, unlike the per-card transform/opacity styles,
+  // which read `cardIndex` directly.
+  const cardIndex = useSharedValue(0);
+  const gestureStartIndex = useSharedValue(0);
+  const [cardIndexJS, setCardIndexJS] = useState(0);
+  // 0 = no card currently "landed" (still scrubbing, or fresh open); ramps
+  // to 1 the moment a horizontal release locks a card, driving that card's
+  // white ring + scale-up in CarouselCard below. Reset to 0 the instant a
+  // new gesture begins on the card area (see cardAreaPan.onBegin), whether
+  // that's a fresh scrub or the tap/flick that opens the locked card.
+  const landedPulse = useSharedValue(0);
+  // ── Auto-enter fill (replaces tap-to-open as the main path) ─────────────────
+  // 0→1 over AUTO_ENTER_MS the moment a card locks; its completion callback
+  // opens the card exactly like a tap would.
+  //   'hidden'    — no card locked, the pill/Cancel are gone.
+  //   'counting'  — the fill is running; the pill reads "Entering page" and
+  //                 a plain "Cancel" text link shows just above it.
+  //   'cancelled' — the user tapped Cancel: the fill is stopped and reset to
+  //                 empty, the pill reads "Continue" (a static tap target,
+  //                 no more auto-navigate), and Cancel itself is gone (there
+  //                 is nothing left to cancel).
+  // Any new touch on the card area/header — a fresh scrub, or the very tap
+  // that's about to open the locked card — resets this straight to
+  // 'hidden', so a cancelled state never carries over to a different card;
+  // landing and releasing on any card (even the same one again) always
+  // starts a fresh 'counting'.
+  const fillProgress = useSharedValue(0);
+  const [enterState, setEnterState] = useState<'hidden' | 'counting' | 'cancelled'>('hidden');
+  const [enterButtonWidth, setEnterButtonWidth] = useState(0);
+  // A brief fade whenever the pill's own label text changes (counting ->
+  // cancelled reads "Entering page" -> "Continue") — a lightweight
+  // crossfade rather than an abrupt text swap.
+  const pillContentOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (enterState === 'hidden') return;
+    pillContentOpacity.value = 0;
+    pillContentOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enterState]);
+
+  // ── Per-card micro-animation trigger (see MICRO_KIND above) ─────────────────
+  // A global "play token": microTriggerIndex names which card should play,
+  // microTriggerSeq increments so that card's own reaction (in CarouselCard)
+  // fires exactly once, and microFast decides tiny-pop vs full-signature.
+  const microTriggerIndex = useSharedValue(-1);
+  const microTriggerSeq = useSharedValue(0);
+  const microFast = useSharedValue(false);
+  const lastStepAtRef = useRef(0);
+
+  useEffect(() => {
+    // Reset to the first card every time the page opens fresh, so it never
+    // reopens wherever a previous session happened to leave off.
+    if (open) {
+      cardIndex.value = 0;
+      gestureStartIndex.value = 0;
+      landedPulse.value = 0;
+      cancelAnimation(fillProgress);
+      fillProgress.value = 0;
+      microTriggerIndex.value = -1;
+      microTriggerSeq.value = 0;
+      setEnterState('hidden');
+      setCardIndexJS(0);
+      lastStepAtRef.current = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const fireHapticTick = useCallback(() => {
+    const now = Date.now();
+    if (now - lastStepAtRef.current < MIN_HAPTIC_INTERVAL_MS) {
+      // Still rate-limit the physical buzz even though we always classify
+      // the step's speed below — a very fast scrub should read as one
+      // continuous buzz, not overlapping vibrations.
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+  }, []);
+
+  /** The firmer, distinct-from-scrub-ticks haptic that fires once when a
+   *  card locks on release — Dev's "landed" feel. */
+  const fireLandedHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+  }, []);
+
+  /** Classifies how long the finger dwelled on the PREVIOUS card before
+   *  advancing to `rounded`, and arms that card's micro-animation trigger
+   *  accordingly (see MICRO_DWELL_MS). JS-side because it needs a real wall-
+   *  clock timestamp, same as the haptic rate-limiting above. */
+  const armMicroTrigger = useCallback((rounded: number) => {
+    const now = Date.now();
+    const elapsed = now - lastStepAtRef.current;
+    lastStepAtRef.current = now;
+    microFast.value = elapsed < MICRO_DWELL_MS;
+    microTriggerIndex.value = rounded;
+    microTriggerSeq.value = microTriggerSeq.value + 1;
+  }, [microFast, microTriggerIndex, microTriggerSeq]);
+
+  useAnimatedReaction(
+    () => Math.round(cardIndex.value),
+    (rounded, previous) => {
+      if (rounded === previous) return;
+      runOnJS(setCardIndexJS)(rounded);
+      if (previous !== null) {
+        runOnJS(fireHapticTick)();
+        runOnJS(armMicroTrigger)(rounded);
+      }
+    },
+  );
 
   // ── Open / close ────────────────────────────────────────────────────────────
   // A single fast timeline (never a spring — a spring's overshoot/settle
   // reads as a bounce, not the "swift and fast" slide Dev asked for) shared
-  // by every way the sheet opens or closes: the initial expand, choosing an
-  // item, tapping the backdrop, and the swipe gesture below. `pendingAfterRef`
-  // carries a one-shot callback (e.g. "navigate after the sheet finishes
-  // closing") through to `finishClose`, which only ever runs once the close
-  // animation has actually completed.
+  // by every way the page opens or closes: the initial expand and the
+  // dismiss-swipe/close-button below. Release-to-select is deliberately NOT
+  // part of this timeline — see commitAndOpen below, which closes with no
+  // animation at all, per spec ("sheet gone in the same frame").
 
   const pendingAfterRef = useRef<(() => void) | null>(null);
 
@@ -219,12 +449,10 @@ export default function SellerStudioRadialMenu({
 
   const expand = useCallback(() => {
     setOpen(true);
-    translateY.value = sheetHeight;
-    backdropOpacity.value = 0;
+    translateY.value = pageHeight;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING });
-    backdropOpacity.value = withTiming(1, { duration: SHEET_OPEN_MS, easing: SHEET_EASING });
-  }, [translateY, backdropOpacity, sheetHeight]);
+    translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING, ...NO_REDUCE_MOTION });
+  }, [translateY, pageHeight]);
 
   useEffect(() => {
     if (openRequestKey > 0 && !open) expand();
@@ -233,125 +461,512 @@ export default function SellerStudioRadialMenu({
 
   const collapse = useCallback((after?: () => void) => {
     pendingAfterRef.current = after ?? null;
-    backdropOpacity.value = withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING });
-    translateY.value = withTiming(sheetHeight, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, (finished) => {
+    translateY.value = withTiming(pageHeight, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING, ...NO_REDUCE_MOTION }, (finished) => {
       if (finished) runOnJS(finishClose)();
     });
-  }, [backdropOpacity, translateY, sheetHeight, finishClose]);
+  }, [translateY, pageHeight, finishClose]);
 
-  // ── Swipe-to-dismiss (anywhere on the sheet) ───────────────────────────────
-  // Wraps the ENTIRE sheet (header + search + the ScrollView), not just the
-  // handle — react-native-gesture-handler's Pan gesture only takes over from
-  // a nested native ScrollView once that ScrollView can't scroll further in
-  // the gesture's direction (i.e. already at the top), so inner content
-  // keeps scrolling normally and the drag only starts a dismiss once scrolled
-  // to the top — the same composition every other sheet in this app
-  // (ShopProductSheet, useSheetTransition) already relies on.
+  /** Cancels the enter-fill and hides the button — used by every path that
+   *  closes the page WITHOUT opening a card (close button, Android back/
+   *  Escape). The gesture-driven paths (a new touch on the card area or
+   *  header) do the UI-thread equivalent directly in their own onBegin/
+   *  onStart instead, for zero-latency cancellation. */
+  const cancelEnterFill = useCallback(() => {
+    cancelAnimation(fillProgress);
+    fillProgress.value = 0;
+    setEnterState('hidden');
+  }, [fillProgress]);
 
-  const panGesture = useMemo(() => Gesture.Pan()
-    .onStart(() => {
-      dragStartY.value = translateY.value;
-    })
-    .onUpdate((e) => {
-      const next = dragStartY.value + e.translationY;
-      // Dragging down (next > 0) tracks the finger 1:1. Dragging up past the
-      // sheet's resting position (next < 0) rubber-bands instead of hard
-      // clamping to 0 — a diminishing-returns curve that asymptotically
-      // approaches -55pt no matter how far past rest the finger travels.
-      translateY.value = next >= 0 ? next : rubberBandUp(next);
-    })
-    .onEnd((e) => {
-      const shouldClose = e.translationY > sheetHeight * 0.25 || e.velocityY > 800;
-      if (!shouldClose) {
-        translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING });
-        return;
-      }
-      runOnJS(hapticDismiss)();
-      // A flick carries its release velocity into the slide so a hard swipe
-      // feels instant rather than waiting out the standard close duration —
-      // never slower than SHEET_CLOSE_MS, never faster than a floor short
-      // enough to still read as a slide rather than a jump-cut.
-      const remaining = sheetHeight - translateY.value;
-      const velocityMs = e.velocityY > 0 ? (remaining / e.velocityY) * 1000 : SHEET_CLOSE_MS;
-      const duration = Math.min(SHEET_CLOSE_MS, Math.max(90, velocityMs));
-      backdropOpacity.value = withTiming(0, { duration, easing: SHEET_EASING });
-      translateY.value = withTiming(sheetHeight, { duration, easing: SHEET_EASING }, (finished) => {
-        if (finished) runOnJS(finishClose)();
-      });
-    }), [sheetHeight, translateY, dragStartY, backdropOpacity, hapticDismiss, finishClose]);
-
-  const sheetAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-  const backdropAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
-  // ── Navigation / gating ────────────────────────────────────────────────────
-
-  const choose = useCallback((action: ControlCenterItem) => {
+  /** Release-to-select / tap-to-select: no closing animation at all — the
+   *  page is just gone, in the same frame the navigation fires, per spec
+   *  ("no slide, fade or delay"). */
+  const commitAndOpen = useCallback((item: ControlCenterItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    cancelAnimation(translateY);
+    // Every way of opening a card — a tap, an upward flick, tapping the
+    // enter button, or the button's own fill completing on its own — routes
+    // through here, so cancelling the fill unconditionally means it can
+    // never double-fire (e.g. a tap landing right as the fill was about to
+    // complete on its own).
+    cancelAnimation(fillProgress);
+    fillProgress.value = 0;
+    setEnterState('hidden');
+    setOpen(false);
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
-      action.growthOnly &&
+      item.growthOnly &&
       (planLoading || !!planError || !hasPlan('growth'))
     ) {
       if (planError) retryPlan();
-      collapse(() => setUpsellFeature(action.label));
+      setUpsellFeature(item.label);
       return;
     }
-    collapse(() => router.push(action.route as never));
-  }, [planLoading, planError, hasPlan, retryPlan, collapse, router]);
+    setNextPushAnimationNone();
+    router.push(item.route as never);
+  }, [translateY, fillProgress, planLoading, planError, hasPlan, retryPlan, router]);
+
+  // ── Gestures ─────────────────────────────────────────────────────────────────
+  // Horizontal = scrub through cards, vertical = dismiss, near-zero movement
+  // = tap-to-open. Two hard-won constraints from live web testing shaped
+  // this:
+  //  1. react-native-gesture-handler's web implementation (2.32.0) cannot
+  //     resolve a Gesture.Race between two Gesture.Pan instances — attaching
+  //     a second Pan alongside another (whether as a Race sibling, or
+  //     nested in a separate GestureDetector one level up) made BOTH
+  //     gestures cancel immediately on any real drag, regardless of their
+  //     activeOffset/failOffset config. So scrub and dismiss are combined
+  //     into ONE Gesture.Pan per detector that locks its own axis manually
+  //     on the first ~10px of movement, rather than two Pans raced against
+  //     each other.
+  //  2. A genuine tap (zero movement) never activates a Gesture.Pan at all
+  //     — it goes straight from BEGAN to FAILED without ever calling
+  //     onStart/onEnd, on web or native, however its offsets are
+  //     configured. So "a tap opens it" needs an actual Gesture.Tap, Raced
+  //     against the combined Pan above — and that particular combination
+  //     (exactly one Pan + one Tap) DOES resolve correctly on web, unlike
+  //     two Pans.
+
+  const commitAndOpenRef = useRef(commitAndOpen);
+  commitAndOpenRef.current = commitAndOpen;
+  const currentItemRef = useRef(CARD_ITEMS[0]);
+  currentItemRef.current = CARD_ITEMS[cardIndexJS] ?? CARD_ITEMS[0];
+  const openCurrentItem = useCallback(() => {
+    commitAndOpenRef.current(currentItemRef.current);
+  }, []);
+
+  /** How far (in either single-axis direction) a drag must travel before its
+   *  axis locks in — matches the "decide within the first ~10px" spec. */
+  const AXIS_LOCK_PX = 10;
+  const cardGestureAxis = useSharedValue<'none' | 'horizontal' | 'vertical'>('none');
+  /** How quick/far an upward flick on the card area must be to count as the
+   *  "power move" that opens instantly, rather than an ordinary slow drag up
+   *  (which just rubber-bands and snaps back, same as before). Symmetric
+   *  with the downward dismiss-flick threshold below. */
+  const OPEN_FLICK_VELOCITY = 800;
+  /** How fast the locked card snaps to dead-center on release, and how long
+   *  its ring/scale "landed" pulse takes to ramp in. */
+  const CARD_LOCK_MS = 100;
+  /** Exactly how long the "Entering page" button takes to fill left-to-right
+   *  and auto-open the locked card — a plain linear fill (no easing curve to
+   *  imply acceleration/deceleration, no countdown number). Lowered from
+   *  1.5s per Dev's live-testing feedback ("the timer is like half a second
+   *  too long") — one named constant drives both the fill animation and the
+   *  auto-navigate timing, so they can never drift apart. */
+  const AUTO_ENTER_MS = 1000;
+
+  const runDismissEnd = useCallback((e: { translationY: number; velocityY: number }) => {
+    'worklet';
+    const shouldClose = e.translationY > pageHeight * 0.2 || e.velocityY > 800;
+    if (!shouldClose) {
+      translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING, ...NO_REDUCE_MOTION });
+      return;
+    }
+    runOnJS(hapticDismiss)();
+    const remaining = pageHeight - translateY.value;
+    const velocityMs = e.velocityY > 0 ? (remaining / e.velocityY) * 1000 : SHEET_CLOSE_MS;
+    const duration = Math.min(SHEET_CLOSE_MS, Math.max(90, velocityMs));
+    translateY.value = withTiming(pageHeight, { duration, easing: SHEET_EASING, ...NO_REDUCE_MOTION }, (finished) => {
+      if (finished) runOnJS(finishClose)();
+    });
+  }, [pageHeight, translateY, hapticDismiss, finishClose]);
+
+  // Header: dismiss-only (vertical), or a plain tap on empty header space
+  // also dismisses without navigating — this detector never scrubs.
+  const dismissGesture = useMemo(() => Gesture.Pan()
+    .onStart(() => {
+      dragStartY.value = translateY.value;
+      // A swipe starting on the header should cancel any in-flight
+      // enter-fill on the card area below, same as touching the card area
+      // itself would (spec: "cancel and close, never navigates").
+      cancelAnimation(fillProgress);
+      fillProgress.value = 0;
+      runOnJS(setEnterState)('hidden');
+    })
+    .onUpdate((e) => {
+      const next = dragStartY.value + e.translationY;
+      translateY.value = next >= 0 ? next : rubberBandUp(next);
+    })
+    .onEnd((e) => {
+      runDismissEnd(e);
+    }), [translateY, dragStartY, fillProgress, runDismissEnd]);
+
+  // Card area: scrub (horizontal) or dismiss (vertical) — a single combined
+  // Pan that locks its own axis, per constraint 1 above.
+  const cardAreaPan = useMemo(() => Gesture.Pan()
+    .onBegin(() => {
+      cardGestureAxis.value = 'none';
+      gestureStartIndex.value = Math.round(cardIndex.value);
+      dragStartY.value = translateY.value;
+      // Any new touch on the card area — a fresh scrub, or the tap/flick
+      // that's about to open the locked card — clears the "landed" ring so
+      // it never lingers on a card that's no longer the settled one, and
+      // cancels any in-flight enter-fill immediately (spec: "if the user
+      // touches/scrubs again during the fill, the fill cancels and resets
+      // immediately and the carousel continues from that card").
+      landedPulse.value = 0;
+      cancelAnimation(fillProgress);
+      fillProgress.value = 0;
+      runOnJS(setEnterState)('hidden');
+    })
+    .onUpdate((e) => {
+      if (cardGestureAxis.value === 'none') {
+        if (Math.abs(e.translationX) > AXIS_LOCK_PX || Math.abs(e.translationY) > AXIS_LOCK_PX) {
+          cardGestureAxis.value = Math.abs(e.translationX) >= Math.abs(e.translationY) ? 'horizontal' : 'vertical';
+        }
+      }
+      if (cardGestureAxis.value === 'horizontal') {
+        const next = indexForDrag(gestureStartIndex.value, e.translationX, CARD_ITEMS.length);
+        cardIndex.value = withTiming(next, { duration: CARD_STEP_MS, easing: CARD_STEP_EASING, ...NO_REDUCE_MOTION });
+      } else if (cardGestureAxis.value === 'vertical') {
+        const next = dragStartY.value + e.translationY;
+        translateY.value = next >= 0 ? next : rubberBandUp(next);
+      }
+    })
+    .onEnd((e) => {
+      if (cardGestureAxis.value === 'vertical') {
+        // A quick, primarily-upward flick is the "power move" that opens
+        // the current card instantly — same as a tap, just from a flick
+        // instead. Anything else vertical (a slow drag up, or a real
+        // downward swipe/flick) goes through the normal dismiss logic,
+        // which itself decides close-vs-snap-back.
+        const isUpwardFlick = e.velocityY < -OPEN_FLICK_VELOCITY;
+        if (isUpwardFlick) {
+          runOnJS(openCurrentItem)();
+          return;
+        }
+        runDismissEnd(e);
+      } else if (cardGestureAxis.value === 'horizontal') {
+        // Release no longer opens the card (Dev's live-testing feedback:
+        // too fast/accident-prone) — it LOCKS on whichever card is nearest
+        // to center: a firm snap to dead-center plus a single "landed"
+        // haptic distinct from the per-card scrub ticks, and landedPulse
+        // drives that card's ring/scale-up in CarouselCard below. Opening
+        // it now takes a separate tap or upward flick.
+        const target = Math.round(cardIndex.value);
+        cardIndex.value = withTiming(target, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING, ...NO_REDUCE_MOTION });
+        landedPulse.value = withTiming(1, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING, ...NO_REDUCE_MOTION });
+        runOnJS(fireLandedHaptic)();
+        // A lock always plays the FULL signature animation (never the tiny
+        // fast-pop), same as a genuine dwell.
+        microFast.value = false;
+        microTriggerIndex.value = target;
+        microTriggerSeq.value = microTriggerSeq.value + 1;
+        // Auto-enter: the "Entering page" button appears and fills over
+        // EXACTLY AUTO_ENTER_MS; when it completes, open the card exactly
+        // like a tap would. onBegin above cancels this the instant any new
+        // touch starts, and commitAndOpen cancels it unconditionally on
+        // every path that actually opens a card (tap, flick, or this fill
+        // completing), so it can never double-fire.
+        runOnJS(setEnterState)('counting');
+        fillProgress.value = 0;
+        fillProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
+          if (finished) runOnJS(openCurrentItem)();
+        });
+      }
+      // axis === 'none' here means the Pan never crossed AXIS_LOCK_PX at
+      // all before release — too small a movement for this Pan to have
+      // even activated (see constraint 2), so it never reaches onEnd for
+      // that case; the Race'd tapGesture below handles it instead.
+    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, fillProgress, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, fireLandedHaptic]);
+
+  // A genuine tap (near-zero movement) — see constraint 2 above for why
+  // this can't just be "the Pan's onEnd when its axis never locked".
+  const tapGesture = useMemo(() => Gesture.Tap()
+    .maxDistance(AXIS_LOCK_PX)
+    .onEnd(() => {
+      runOnJS(openCurrentItem)();
+    }), [openCurrentItem]);
+
+  const cardAreaGesture = useMemo(
+    () => Gesture.Race(cardAreaPan, tapGesture),
+    [cardAreaPan, tapGesture],
+  );
+
+  const pageAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  // The reveal itself — see the enterButton JSX below for how this width,
+  // animating against a FIXED-width inner label of the same total button
+  // width, produces the left-to-right white-fill/black-text-reveal effect.
+  const enterFillStyle = useAnimatedStyle(() => ({
+    width: fillProgress.value * enterButtonWidth,
+  }));
+  // Crossfades the pill's own label text on "Entering page" <-> "Continue".
+  const pillContentStyle = useAnimatedStyle(() => ({
+    opacity: pillContentOpacity.value,
+  }));
 
   // ── Derived data ────────────────────────────────────────────────────────────
-
-  const badgeCountFor = (item: ControlCenterItem): number | undefined => {
-    if (item.badgeKey === 'orders') return orderCount > 0 ? orderCount : undefined;
-    if (item.badgeKey === 'messages') return unreadMessages > 0 ? unreadMessages : undefined;
-    return undefined;
-  };
 
   const isLocked = (item: ControlCenterItem) =>
     GROWTH_PLAN_ENFORCEMENT_ENABLED && !!item.growthOnly && !planLoading && !planError && !hasPlan('growth');
 
   const storeIsLive = setupPercent >= 100;
+  const hasStoreName = !!brandName?.trim();
 
-  // ── Grid item renderer ──────────────────────────────────────────────────────
-  // Plain icon + label, no tile or border behind either — per Dev's reskin of
-  // Binance's Features sheet. Press feedback is opacity/scale only
-  // (PressableScale), never a background-color change, since there's no
-  // background to change.
+  // ── Card renderer ────────────────────────────────────────────────────────────
+  // Every mounted card (the current one plus CARD_WINDOW_RADIUS neighbors on
+  // each side) renders the same full-bleed cover + icon + name; only its
+  // animated position/opacity (driven by `cardIndex`, on the UI thread)
+  // differ, which is what makes the transition on each scrub step a smooth
+  // slide+crossfade rather than a hard content swap. Sized to `cardSpacing`
+  // exactly (== the measured card-area width) so cards tile edge to edge
+  // with zero gap and zero overlap at rest — a neighbor is only ever
+  // visible mid-transition, never at an integer (resting) index.
 
-  const renderGridItem = (item: ControlCenterItem) => {
-    const badge = badgeCountFor(item);
+  function CarouselCard({ item, itemIndex }: { item: ControlCenterItem; itemIndex: number }) {
     const locked = isLocked(item);
-    return (
-      <View key={item.id} style={styles.gridCell}>
-        <PressableScale
-          onPress={() => choose(item)}
-          accessibilityRole="button"
-          accessibilityLabel={item.label}
-          testID={`seller-control-center-item-${item.id}`}
-          style={styles.gridItem}
-        >
-          <View style={styles.gridIconWrap}>
-            <Feather name={item.icon as any} size={26} color={theme.text} />
-            {badge !== undefined && (
-              <View style={styles.gridBadge}>
-                <Text style={styles.gridBadgeText}>{badge > 99 ? '99+' : badge}</Text>
-              </View>
-            )}
-            {locked && (
-              <View style={styles.gridLock}>
-                <Feather name="lock" size={10} color={theme.text} />
-              </View>
-            )}
-          </View>
-          <Text style={styles.gridLabel} numberOfLines={2}>{item.shortLabel ?? item.label}</Text>
-        </PressableScale>
-      </View>
+    const microKind = MICRO_KIND[item.id] ?? 'pop-in';
+    const isGoLive = item.id === 'go-live';
+
+    const cardStyle = useAnimatedStyle(() => {
+      const distance = itemIndex - cardIndex.value;
+      const absDistance = Math.abs(distance);
+      // landedPulse only ever applies to whichever card is actually
+      // dead-center (absDistance ~0) — a neighbor mid-scrub never gets the
+      // scale-up, even while landedPulse is still ramping in from the
+      // previous card's release.
+      const landedBoost = absDistance < 0.01 ? landedPulse.value * 0.05 : 0;
+      return {
+        transform: [
+          { translateX: distance * cardSpacing },
+          { scale: 1 + landedBoost },
+        ],
+        // Fully opaque right up to the moment it stops being adjacent —
+        // zero peek at rest (Dev, firm): at any integer distance >= 1 the
+        // card already sits fully outside the card area (translateX ==
+        // distance * cardSpacing, and cardSpacing == the card area's own
+        // width), so this opacity fade only ever plays out DURING the
+        // ~90ms slide between two adjacent integer positions.
+        opacity: interpolate(absDistance, [0, 1], [1, 0], Extrapolation.CLAMP),
+      };
+    });
+    // Icon + name only ever show on the card that's actually centered (or
+    // very nearly there mid-scrub) — a peeking neighbor showing a clipped
+    // fragment of its name read as broken in an earlier pass. Now moot at
+    // rest (see cardStyle above — a neighbor isn't visible at all once
+    // settled), but this still keeps text from ever appearing on a
+    // partially-slid-in neighbor mid-transition.
+    const contentStyle = useAnimatedStyle(() => {
+      const distance = itemIndex - cardIndex.value;
+      return { opacity: interpolate(Math.abs(distance), [0.32, 0.48], [1, 0], Extrapolation.CLAMP) };
+    });
+    // The "landed" ring — a plain white outline that fades/scales in around
+    // the icon only for the currently-centered card, once landedPulse ramps
+    // up on release.
+    const ringStyle = useAnimatedStyle(() => {
+      const distance = itemIndex - cardIndex.value;
+      const isCentered = Math.abs(distance) < 0.01;
+      const pulse = isCentered ? landedPulse.value : 0;
+      return {
+        opacity: pulse,
+        transform: [{ scale: interpolate(pulse, [0, 1], [0.9, 1], Extrapolation.CLAMP) }],
+      };
+    });
+
+    // ── Signature micro-animation (see MICRO_KIND) ────────────────────────────
+    const microScale = useSharedValue(1);
+    const microScaleX = useSharedValue(1);
+    const microScaleY = useSharedValue(1);
+    const microRotate = useSharedValue(0);
+    const microTranslateX = useSharedValue(0);
+    const microTranslateY = useSharedValue(0);
+    const microOpacity = useSharedValue(1);
+    // go-live only:
+    const liveDotScale = useSharedValue(0);
+    const liveSweepProgress = useSharedValue(0);
+
+    useAnimatedReaction(
+      () => (microTriggerIndex.value === itemIndex ? microTriggerSeq.value : -1),
+      (seq, prevSeq) => {
+        if (seq === -1 || seq === prevSeq) return;
+        if (reduceMotion) {
+          // Reduce Motion: fade only, never a transform.
+          microOpacity.value = 0.5;
+          microOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) });
+          return;
+        }
+        if (microFast.value) {
+          // Finger flying past several cards quickly — a tiny 100ms
+          // scale-pop synced with the haptic tick, never the full motion.
+          microScale.value = withSequence(
+            withTiming(1.06, { duration: 50, easing: Easing.out(Easing.quad) }),
+            withTiming(1, { duration: 50, easing: Easing.out(Easing.quad) }),
+          );
+          return;
+        }
+        switch (microKind) {
+          case 'swing':
+            microRotate.value = withSequence(
+              withTiming(-10, { duration: 120, easing: Easing.out(Easing.quad) }),
+              withTiming(6, { duration: 140, easing: Easing.out(Easing.quad) }),
+              withTiming(0, { duration: 140, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'pulse-dot':
+            liveDotScale.value = withSequence(
+              withTiming(1.3, { duration: 150, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) }),
+            );
+            liveSweepProgress.value = 0;
+            liveSweepProgress.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
+            break;
+          case 'rise':
+            microScaleY.value = 0;
+            microScaleY.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.cubic) });
+            break;
+          case 'flip':
+            microScaleX.value = withSequence(
+              withTiming(0, { duration: 180, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'pop-in':
+            microScale.value = 0.7;
+            microScale.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.cubic) });
+            break;
+          case 'rotate-notch':
+            microRotate.value = withSequence(
+              withTiming(20, { duration: 200, easing: Easing.out(Easing.quad) }),
+              withTiming(0, { duration: 200, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'slide-click':
+            microTranslateX.value = -10;
+            microTranslateX.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.quad) });
+            break;
+          case 'pie-pop':
+            microScale.value = withSequence(
+              withTiming(1.15, { duration: 180, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'turn-60':
+            microRotate.value = withSequence(
+              withTiming(60, { duration: 220, easing: Easing.out(Easing.quad) }),
+              withTiming(0, { duration: 220, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'nudge':
+            microTranslateX.value = -5;
+            microTranslateX.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.quad) });
+            break;
+          case 'draw-stroke':
+            microTranslateX.value = -6;
+            microTranslateY.value = -6;
+            microTranslateX.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.quad) });
+            microTranslateY.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.quad) });
+            break;
+          case 'fade-outline':
+            microOpacity.value = 0.15;
+            microScale.value = 0.92;
+            microOpacity.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
+            microScale.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
+            break;
+          case 'snip':
+            microRotate.value = withSequence(
+              withTiming(-14, { duration: 100, easing: Easing.out(Easing.quad) }),
+              withTiming(14, { duration: 100, easing: Easing.out(Easing.quad) }),
+              withTiming(0, { duration: 140, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'twinkle':
+            microScale.value = withSequence(
+              withTiming(1.18, { duration: 160, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'blink':
+            microScaleY.value = withSequence(
+              withTiming(0.1, { duration: 90, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+          case 'target-pulse':
+            microScale.value = withSequence(
+              withTiming(1.18, { duration: 160, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) }),
+            );
+            break;
+        }
+      },
     );
-  };
+
+    const microIconStyle = useAnimatedStyle(() => ({
+      opacity: microOpacity.value,
+      transform: [
+        { translateX: microTranslateX.value },
+        { translateY: microTranslateY.value },
+        { rotate: `${microRotate.value}deg` },
+        { scale: microScale.value },
+        { scaleX: microScaleX.value },
+        { scaleY: microScaleY.value },
+      ],
+    }));
+    const liveDotStyle = useAnimatedStyle(() => ({ transform: [{ scale: liveDotScale.value }] }));
+    const liveSweepStyle = useAnimatedStyle(() => ({
+      opacity: interpolate(liveSweepProgress.value, [0, 0.15, 0.85, 1], [0, 0.5, 0.5, 0], Extrapolation.CLAMP),
+      transform: [
+        { translateX: interpolate(liveSweepProgress.value, [0, 1], [-70, 70]) },
+        { rotate: '20deg' },
+      ],
+    }));
+
+    // pointerEvents="none": the whole card area's gesture (scrub/dismiss/
+    // tap, composed in cardAreaGesture) handles all real touch input — an
+    // individual card never receives its own touches, since which card is
+    // "current" comes purely from cardIndex, not from which card a finger
+    // happens to be over. accessibilityLabel/testID still identify it (for
+    // a screen reader's swipe-navigation and this file's own tests / the
+    // native device-interaction contract), even though a direct tap on a
+    // non-center card doesn't select it the way the old grid's individual
+    // pressable tiles did.
+    return (
+      <Animated.View
+        key={item.id}
+        style={[styles.card, { width: cardAreaSize.width, height: cardAreaSize.height }, cardStyle]}
+        pointerEvents="none"
+        accessibilityLabel={item.label}
+        testID={`seller-control-center-item-${item.id}`}
+      >
+        <StudioCoverBackdrop />
+        <Animated.View style={[styles.cardContent, contentStyle]}>
+          <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
+            <View style={styles.cardMedallionRing} pointerEvents="none" />
+            <Animated.View
+              style={[styles.cardLandedRing, ringStyle]}
+              pointerEvents="none"
+              testID={`seller-studio-card-landed-ring-${item.id}`}
+            />
+            <Feather name={item.icon as any} size={84} color="rgba(0,0,0,0.5)" style={styles.cardIconShadow} />
+            <Feather name={item.icon as any} size={84} color={theme.text} />
+            {locked && (
+              <View style={styles.cardLock}>
+                <Feather name="lock" size={14} color={theme.text} />
+              </View>
+            )}
+            {isGoLive && (
+              <>
+                <Animated.View style={[styles.liveDot, liveDotStyle]} pointerEvents="none" />
+                <Animated.View style={[styles.liveSweep, liveSweepStyle]} pointerEvents="none" />
+              </>
+            )}
+          </Animated.View>
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.85)']}
+            style={styles.cardBottomVignette}
+            pointerEvents="none"
+          />
+          <Text style={styles.cardLabel} numberOfLines={2}>{item.label}</Text>
+        </Animated.View>
+      </Animated.View>
+    );
+  }
+
+  const windowStart = Math.max(0, cardIndexJS - CARD_WINDOW_RADIUS);
+  const windowEnd = Math.min(CARD_ITEMS.length - 1, cardIndexJS + CARD_WINDOW_RADIUS);
+  const windowedItems: Array<{ item: ControlCenterItem; itemIndex: number }> = [];
+  for (let i = windowStart; i <= windowEnd; i++) windowedItems.push({ item: CARD_ITEMS[i], itemIndex: i });
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -378,93 +993,165 @@ export default function SellerStudioRadialMenu({
         transparent
         animationType="none"
         statusBarTranslucent
-        onRequestClose={() => collapse()}
+        onRequestClose={() => { cancelEnterFill(); collapse(); }}
       >
-        {/* Backdrop */}
+        {/* The full-screen page itself — no separate backdrop layer: it
+            fully covers whatever screen was behind it (Dashboard, Products,
+            whichever), sliding up from/down to offscreen. Header and card
+            area are SIBLING GestureDetectors, each with its own single
+            Gesture.Pan (dismissGesture, cardAreaGesture) — see the block
+            comment above cardAreaGesture's definition for why neither is
+            ever combined with another Pan via Gesture.Race. */}
         <Animated.View
-          testID="seller-studio-menu-backdrop"
-          accessibilityLabel="Studio tools dark backdrop"
-          style={[StyleSheet.absoluteFill, styles.backdrop, backdropAnimatedStyle]}
-          pointerEvents="none"
-        />
-        <Pressable
-          testID="seller-studio-menu-dismiss"
-          accessibilityLabel="Dismiss Studio tools backdrop"
-          onPress={() => { hapticDismiss(); collapse(); }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Sheet — the whole thing (not just the handle) carries the
-            swipe-down-to-dismiss gesture; see panGesture's comment above for
-            why this composes correctly with the ScrollView inside it. */}
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                height: sheetHeight,
-                paddingBottom: Math.max(insets.bottom, 16),
-              },
-              sheetAnimatedStyle,
-            ]}
-          >
-            <SheetHandle />
-
-            {/* ── Store header ── */}
+          style={[
+            styles.page,
+            {
+              height: pageHeight,
+              paddingTop: headerTopInset,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+            pageAnimatedStyle,
+          ]}
+        >
+          <GestureDetector gesture={dismissGesture}>
+            {/* ── Store header ──
+                Always the seller's real profile photo + real store name; an
+                initials circle (matching the store name's own first letter)
+                only when there's no photo yet, and a neutral store icon —
+                never a random letter — when there's no store name either.
+                No "?" help icon (Settings > Help & support covers it — see
+                services/settingsCatalog.ts). "View store" is a compact,
+                unfilled text+icon button. A close (X) replaces the old
+                swipe-only dismissal now that this is a full page, not a
+                sheet with a visible "outside" to tap. */}
             <View style={styles.header}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarLetter}>{(brandName?.[0] ?? 'S').toUpperCase()}</Text>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : hasStoreName ? (
+                  <Text style={styles.avatarLetter}>{brandName!.trim()[0].toUpperCase()}</Text>
+                ) : (
+                  <Feather name="shopping-bag" size={18} color={theme.text} />
+                )}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.storeName} numberOfLines={1}>{brandName ?? 'Your store'}</Text>
-                <Pressable
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/settings' as never)); }}
-                  hitSlop={{ top: 4, bottom: 4, left: 0, right: 4 }}
-                >
-                  <Text style={[styles.statusPill, storeIsLive ? styles.statusLive : styles.statusSetup]}>
-                    {storeIsLive ? 'Store live' : `${setupPercent}% set up`}
-                  </Text>
-                </Pressable>
+              <View style={styles.headerTextBlock}>
+                {hasStoreName ? (
+                  <Text style={styles.storeName} numberOfLines={1}>{brandName!.trim()}</Text>
+                ) : (
+                  <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/settings' as never)); }}>
+                    <Text style={[styles.storeName, styles.storeNamePrompt]} numberOfLines={1}>Name your store</Text>
+                  </Pressable>
+                )}
+                {!storeIsLive && setupPercent > 0 && (
+                  <Pressable
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/settings' as never)); }}
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`Store setup, ${setupDone} of ${setupTotal} steps complete`}
+                    hitSlop={{ top: 6, bottom: 6, left: 0, right: 6 }}
+                    style={styles.setupBarTrack}
+                  >
+                    <View style={[styles.setupBarFill, { width: `${setupPercent}%` }]} />
+                  </Pressable>
+                )}
               </View>
-              {/* Help & Support: unlinked from the feature grid itself (see
-                  GRID_EXCLUDED_IDS's own comment — it was the lone item in
-                  an otherwise-full final row) and moved here instead, per
-                  Dev's own suggestion, as a plain "?" next to View store. */}
-              <PressableScale
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/help' as never)); }}
-                accessibilityRole="button"
-                accessibilityLabel="Help & Support"
-                testID="seller-control-center-item-help"
-                style={styles.helpBtn}
-              >
-                <Feather name="help-circle" size={20} color={theme.text} />
-              </PressableScale>
               <PressableScale
                 onPress={() => collapse(() => router.push('/store-preview' as never))}
                 accessibilityRole="button"
                 accessibilityLabel="View store"
                 style={styles.viewStoreBtn}
               >
-                <Feather name="external-link" size={13} color={theme.onAccent} />
                 <Text style={styles.viewStoreLabel}>View store</Text>
+                <Feather name="arrow-up-right" size={13} color={theme.text} />
+              </PressableScale>
+              <PressableScale
+                onPress={() => { cancelEnterFill(); hapticDismiss(); collapse(); }}
+                accessibilityRole="button"
+                accessibilityLabel="Close Studio tools"
+                testID="seller-studio-menu-close"
+                style={styles.closeBtn}
+              >
+                <Feather name="x" size={20} color={theme.text} />
               </PressableScale>
             </View>
+          </GestureDetector>
 
-            {/* ── Feature grid — 4 columns, plain white line icons with a
-                label under each, no tile or border. Everything previously
-                reachable from this menu is always visible here; there is no
-                search or pin-editing anymore, so nothing to filter. ── */}
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
+          {/* ── Card carousel ── */}
+          <GestureDetector gesture={cardAreaGesture}>
+            <View
+              style={styles.cardArea}
+              testID="seller-studio-card-area"
+              onLayout={(e) => setCardAreaSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
             >
-              <View style={styles.grid}>
-                {GRID_ITEMS.map((item) => renderGridItem(item))}
-              </View>
-            </ScrollView>
-          </Animated.View>
-        </GestureDetector>
+              {windowedItems.map(({ item, itemIndex }) => (
+                <CarouselCard key={item.id} item={item} itemIndex={itemIndex} />
+              ))}
+              <StudioCoverGrain />
+            </View>
+          </GestureDetector>
+
+          {/* ── Cancel link + auto-enter fill button ──
+              Appears the instant a card locks. While 'counting', the pill
+              reads "Entering page" and fills left-to-right over EXACTLY
+              AUTO_ENTER_MS, opening the card when it completes; a plain
+              "Cancel" text link (no background/border) sits just above it.
+              Tapping Cancel stops the fill, resets it to empty, and swaps
+              the pill to a static "Continue" (still tappable to open) with
+              a brief crossfade — see the block comment above cardAreaPan's
+              onEnd for the full cancel/skip rules. The fill "reveal" itself
+              is two identical labels: a plain white-on-dark one underneath,
+              and a black-on-white copy inside a width-animated, overflow-
+              hidden container on top, both using the SAME fixed
+              enterButtonWidth so the revealed black text lines up exactly
+              with the white text it's covering rather than re-centering as
+              the fill container shrinks/grows. */}
+          {enterState !== 'hidden' && (
+            <>
+              {enterState === 'counting' && (
+                <Pressable
+                  testID="seller-studio-enter-cancel"
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel entering page"
+                  onPress={() => {
+                    cancelAnimation(fillProgress);
+                    fillProgress.value = 0;
+                    setEnterState('cancelled');
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  }}
+                  hitSlop={{ top: 14, bottom: 14, left: 20, right: 20 }}
+                  style={styles.cancelLink}
+                >
+                  <Text style={styles.cancelLinkLabel}>Cancel</Text>
+                </Pressable>
+              )}
+              <Pressable
+                testID="seller-studio-enter-button"
+                accessibilityRole="button"
+                accessibilityLabel={enterState === 'cancelled' ? 'Continue to page' : 'Entering page. Tap to open now.'}
+                onPress={openCurrentItem}
+                onLayout={(e) => setEnterButtonWidth(e.nativeEvent.layout.width)}
+                style={styles.enterButton}
+              >
+                <Animated.Text style={[styles.enterButtonLabelBase, pillContentStyle]}>
+                  {enterState === 'cancelled' ? 'Continue' : 'Entering page'}
+                </Animated.Text>
+                <Animated.View style={[styles.enterButtonFill, enterFillStyle]} pointerEvents="none">
+                  <View style={[styles.enterButtonFillInner, { width: enterButtonWidth }]}>
+                    <Animated.Text style={[styles.enterButtonLabelFilled, pillContentStyle]} numberOfLines={1}>
+                      {enterState === 'cancelled' ? 'Continue' : 'Entering page'}
+                    </Animated.Text>
+                  </View>
+                </Animated.View>
+              </Pressable>
+            </>
+          )}
+
+          {/* Small position dots — replaces the old "X / 16" text. */}
+          <View style={styles.dotsRow} testID="seller-studio-position-dots">
+            {CARD_ITEMS.map((item, i) => (
+              <View key={item.id} style={[styles.dot, i === cardIndexJS && styles.dotActive]} />
+            ))}
+          </View>
+        </Animated.View>
       </Modal>
 
       <PlanUpsellModal
@@ -483,7 +1170,7 @@ export default function SellerStudioRadialMenu({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.create({
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   toggle: {
     position: 'absolute',
     right: SP.md,
@@ -498,29 +1185,17 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 7 },
   },
-  toggleInner: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   pressed: { transform: [{ scale: 0.94 }], opacity: 0.9 },
 
-  backdrop: { backgroundColor: theme.background },
-
-  sheet: {
+  // The whole page — no separate backdrop layer. It fully covers whatever
+  // screen was behind it (Dev's final layout call: a full-screen takeover,
+  // not a partial sheet with a dimmed "outside" to show through).
+  page: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: theme.card,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
-    borderTopWidth: 1,
-    borderColor: theme.border,
-    overflow: 'hidden',
-    maxWidth: isTablet ? 620 : undefined,
-    alignSelf: isTablet ? 'center' : undefined,
-    width: isTablet ? 620 : undefined,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -8 },
+    top: 0,
+    backgroundColor: theme.background,
   },
 
   header: {
@@ -528,103 +1203,231 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
     alignItems: 'center',
     gap: SP.sm,
     paddingHorizontal: SP.md,
+    paddingTop: SP.xs,
     paddingBottom: SP.sm,
   },
+  // Fixed: previously a solid grey (theme.accentDim) circle — Dev's own
+  // report. Black fill + a thin silver ring reads as this app's own
+  // black/white/silver identity instead of a generic filled avatar. Now
+  // also the frame for the seller's real profile photo when one exists
+  // (avatarImage below) — the initial/neutral-icon fallbacks only ever
+  // show without a photo.
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.accentDim,
+    backgroundColor: theme.background,
+    borderWidth: 1.5,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  avatarLetter: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.accentLight },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarLetter: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  // Vertically centered against the 44pt avatar and the header's other
+  // 32pt buttons — justifyContent: 'center' rather than the default
+  // flex-start, since this block's own content (one or two lines) is
+  // shorter than its row siblings.
+  headerTextBlock: { flex: 1, justifyContent: 'center', gap: 4 },
   storeName: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  statusPill: {
-    marginTop: 2,
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    alignSelf: 'flex-start',
+  // "Name your store" — a tappable prompt (not a static "Your store"
+  // placeholder) shown only when the seller hasn't set a store name yet.
+  storeNamePrompt: { color: theme.muted },
+  // A thin silver progress bar replaces the old tiny "X% set up" text —
+  // Dev: clean, no clutter. Tappable (opens the setup checklist), and
+  // hidden entirely once setup reaches 100% (see storeIsLive in the
+  // component) or before any progress has been made at all.
+  setupBarTrack: {
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: theme.border,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
   },
-  statusLive: { color: theme.success },
-  statusSetup: { color: theme.accentLight },
-  helpBtn: {
+  setupBarFill: { height: '100%', backgroundColor: theme.text, borderRadius: 1.5 },
+  // Compact, unfilled text+icon button — Dev's own call: the old solid
+  // white pill was "too big and eye-catching". No background, a hairline
+  // border only, ~32pt tall, matching the avatar's own vertical center.
+  viewStoreBtn: {
+    height: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  viewStoreLabel: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
+  closeBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
   },
-  viewStoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: RADIUS.pill,
-    backgroundColor: theme.accent,
-  },
-  viewStoreLabel: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.onAccent },
 
-  scrollContent: { paddingHorizontal: SP.sm, paddingBottom: SP.xxl },
-
-  // ── Feature grid — 4 columns, no tile/border behind an item, just an icon
-  // and a label. Each cell is a flat 25%-width slot so the grid re-flows
-  // correctly at any sheet width (including the centered tablet width).
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  gridCell: { width: '25%', paddingVertical: SP.sm },
-  gridItem: { alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingHorizontal: 4 },
-  gridIconWrap: { alignItems: 'center', justifyContent: 'center' },
-  // GRID_LABEL_LINE_HEIGHT * 2 reserves a fixed 2-line-tall box for every
-  // label regardless of whether its own text is 1 or 2 lines — Dev's own bug
-  // report: a 1-line label ("Boost") next to a 2-line one ("Add product")
-  // used to leave the icon above it sitting at a different height than its
-  // row neighbors, and the row itself a different height than the next row
-  // down, like the Binance Features sheet reference this grid is modeled on
-  // never has. `wordWrap`/`overflowWrap: 'normal'` (web only — React Native
-  // Web's own default Text style hard-codes `wordWrap: 'break-word'` on any
-  // multi-line Text, including this one, which is what let "Manufacturer
-  // Hub" break mid-word as "Manufacture/r Hub" instead of wrapping only at
-  // the space; native ignores this key entirely, so it's always safe to
-  // include unconditionally rather than gating it behind Platform.OS).
-  gridLabel: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-    color: theme.text,
-    textAlign: 'center',
-    lineHeight: GRID_LABEL_LINE_HEIGHT,
-    height: GRID_LABEL_LINE_HEIGHT * 2,
-    // `wordWrap` is the exact key react-native-web's own Text component
-    // reads to decide overflow-wrap behavior (see its textOneLine/
-    // textMultiLine internal styles) — already part of RN's TextStyle type,
-    // just normally left at its default. No effect on native.
-    wordWrap: 'normal',
-  },
-  gridBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -10,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
-    backgroundColor: theme.accent,
+  // ── Card carousel — one destination at a time, its own full-bleed cover
+  // (StudioCoverBackdrop) filling the ENTIRE card area edge to edge, behind
+  // a huge icon + name. Absolutely-positioned cards, offset purely via the
+  // animated translateX/opacity in CarouselCard's own style — this View
+  // itself never scrolls.
+  cardArea: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  gridBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: theme.onAccent },
-  gridLock: {
+  // Sized to the measured card area exactly (width/height set inline from
+  // cardAreaSize in CarouselCard) so consecutive cards tile with zero gap
+  // and zero overlap at rest — no rounded corners now that this is the
+  // card area's own full-bleed content, not a floating "poster" within a
+  // partial sheet.
+  card: {
     position: 'absolute',
-    bottom: -4,
-    right: -8,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  // Only cardContent (icon/name/vignette) fades out per-card via
+  // CarouselCard's contentStyle — StudioCoverBackdrop itself is a sibling
+  // and unaffected, so a card mid-transition still shows its own cover art
+  // the whole time, just without any text on it until it's centered.
+  cardContent: { flex: 1, alignItems: 'center', paddingTop: SP.xxl, paddingBottom: SP.xl },
+  cardIconWrap: { flex: 1, width: 132, alignItems: 'center', justifyContent: 'center' },
+  // A subtle, always-on silver "medallion" ring behind the icon — reads as
+  // a coin/badge frame, distinct from (and concentric with) the brighter
+  // interactive landed ring, which only appears once a card locks.
+  cardMedallionRing: {
+    position: 'absolute',
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  // The "landed" ring — sized/positioned to sit just outside the 84pt icon.
+  // Purely decorative (pointerEvents "none"); its opacity/scale are driven
+  // entirely by CarouselCard's ringStyle (landedPulse), never toggled via
+  // conditional JSX, so it can fade/scale in smoothly instead of popping.
+  cardLandedRing: {
+    position: 'absolute',
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  // A faint dark double of the icon, offset slightly down-right beneath the
+  // main white glyph — a cheap "emboss"/chrome pop that doesn't require a
+  // gradient-filled icon mask.
+  cardIconShadow: { position: 'absolute', transform: [{ translateX: 2 }, { translateY: 3 }] },
+  // go-live's own extras — a small red "LIVE" dot and a soft diagonal
+  // highlight sweep, both purely decorative (pointerEvents "none").
+  liveDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#ff3b30',
+    borderWidth: 1.5,
+    borderColor: '#000',
+  },
+  liveSweep: {
+    position: 'absolute',
+    width: 24,
+    height: 140,
+    backgroundColor: '#ffffff',
+  },
+  cardLabel: {
+    // Dropped from 24/bold — Dev: with the fill pill now the only visible
+    // action, the big bottom title was reading like a second button.
+    // Semibold at 20 still reads clearly as a title, not a control.
+    fontSize: 20,
+    fontFamily: FONT.semibold,
+    color: theme.text,
+    textAlign: 'center',
+    letterSpacing: 0.2,
+    wordWrap: 'normal',
+  },
+  // Sits directly behind cardLabel (painted first, in the same paddingBottom
+  // footprint) so the poster-style caption stays legible over busy cover art.
+  cardBottomVignette: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 96,
+  },
+  cardLock: {
+    position: 'absolute',
+    bottom: -6,
+    right: -10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: theme.card,
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // Position dots — replaces the old "X / 16" text indicator.
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: SP.xs,
+    paddingBottom: SP.sm,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: theme.border,
+  },
+  dotActive: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.text },
+
+  // Plain text link, no background/border — sits just above the pill while
+  // it's counting down. theme.muted is this app's own silver token (never
+  // hardcoded), so it matches across every preset.
+  cancelLink: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  cancelLinkLabel: { fontSize: 14, fontFamily: FONT.medium, color: theme.muted },
+
+  // ── Auto-enter fill button ──
+  // Dev, after #525 shipped: "less bold and smaller." A compact pill sized
+  // to its own label (not full width), a thin 1px hairline instead of a
+  // heavy solid block, and a Medium-weight label instead of Bold — the fill
+  // itself still runs the full AUTO_ENTER_MS, just reads as a subtle
+  // white/silver wash behind lighter text rather than a loud CTA.
+  enterButton: {
+    height: 42,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    marginTop: SP.xs,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enterButtonLabelBase: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text, letterSpacing: 0.2 },
+  enterButtonFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+  },
+  enterButtonFillInner: { height: '100%', alignItems: 'center', justifyContent: 'center' },
+  enterButtonLabelFilled: { fontSize: FS.base, fontFamily: FONT.medium, color: '#000000', letterSpacing: 0.2 },
 });

@@ -3,15 +3,21 @@ export type TrafficSource = 'feed' | 'search' | 'profile' | 'external';
 export type SellerHomeAnalytics = {
   range: string;
   totalCents: number;
+  /** Net of anything actually refunded/cancelled back out. Always <= totalCents. */
+  netCents: number;
   orderCount: number;
   visitorCount: number;
+  conversionRate: number;
+  averageOrderCents: number;
+  /** Thread Cash received via Live gifting in this range (cashable). */
+  threadCashReceivedCents: number;
   toFulfill: number;
   toCapture: number;
   /** The immediately preceding period of the same length (e.g. yesterday for "today"). */
-  previous: { totalCents: number; orderCount: number; visitorCount: number };
+  previous: { totalCents: number; netCents: number; orderCount: number; visitorCount: number };
   /** Real per-source breakdown (Discover feed / Search / Your profile / External links), same range. */
   trafficSources: Array<{ source: TrafficSource; count: number; sharePercent: number }>;
-  buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
+  buckets: Array<{ bucket: string; totalCents: number; netCents: number; orderCount: number; visitorCount: number }>;
 };
 
 export const EMPTY_TRAFFIC_SOURCES: SellerHomeAnalytics['trafficSources'] = [
@@ -30,11 +36,15 @@ export function zeroSellerHomeAnalytics(range: string): SellerHomeAnalytics {
   return {
     range,
     totalCents: 0,
+    netCents: 0,
     orderCount: 0,
     visitorCount: 0,
+    conversionRate: 0,
+    averageOrderCents: 0,
+    threadCashReceivedCents: 0,
     toFulfill: 0,
     toCapture: 0,
-    previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
+    previous: { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 },
     trafficSources: EMPTY_TRAFFIC_SOURCES,
     buckets: [],
   };

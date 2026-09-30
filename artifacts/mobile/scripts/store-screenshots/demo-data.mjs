@@ -455,9 +455,12 @@ function sellerOrders(count = 9) {
 // the rest are guest checkouts (buyerId: null), same as production data
 // where not every order has a linked Brandthread account.
 function sellerOrderDetail(id, count = 9) {
-  const rows = sellerOrders(count);
-  const row = rows.find((r) => r.id === id);
-  if (!row) return undefined;
+  const rows = sellerOrders(Math.max(count, 1));
+  // Falls back to the first row for an id this fixture doesn't know about
+  // (e.g. a caller navigating with a real-looking id like "so-1") instead
+  // of 404ing — every other field below is keyed off the matched row, so
+  // the response stays internally consistent either way.
+  const row = rows.find((r) => r.id === id) ?? rows[0];
   const index = rows.indexOf(row);
   return {
     id: row.id,
@@ -537,6 +540,54 @@ const MANUFACTURER_THREADS = [
   { id: 'th-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', subject: 'Field Shell quote', lastMessage: 'Seam taping upgrade adds $1.80/unit.', lastMessageAt: iso(17 * HOUR), unreadCount: 1, createdAt: iso(14 * DAY) },
   { id: 'th-3', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', subject: 'Garment dye sample', lastMessage: 'Tracking uploaded — should land Thursday.', lastMessageAt: iso(2 * DAY), unreadCount: 0, createdAt: iso(8 * DAY) },
 ];
+
+const SELLER_QUOTE_REQUESTS = [
+  { id: 'qr-1', manufacturerId: MANUFACTURERS[2].id, productName: 'Field Shell Jacket — Onyx', status: 'quoted', type: 'bulk', quantity: 300, colorways: 'Onyx, Rust', quotedPriceCents: 1260000, quotedTurnaround: '35 days', quoteValidUntil: isoAhead(21 * DAY), notes: '30% deposit, balance before ship', createdAt: iso(14 * DAY), updatedAt: iso(3 * DAY) },
+  { id: 'qr-2', manufacturerId: MANUFACTURERS[0].id, productName: 'Heavyweight Hoodie — Bone', status: 'quoted', type: 'bulk', quantity: 250, quotedPriceCents: 575000, quotedTurnaround: '28 days', quoteValidUntil: isoAhead(14 * DAY), createdAt: iso(12 * DAY), updatedAt: iso(5 * DAY) },
+  { id: 'qr-3', manufacturerId: MANUFACTURERS[1].id, productName: 'Garment-Dyed Hoodie — Moss', status: 'submitted', type: 'bulk', quantity: 400, createdAt: iso(2 * DAY), updatedAt: iso(2 * DAY) },
+];
+
+const SAMPLE_ORDERS = [
+  { id: 'so-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'Heavyweight Hoodie — Bone', status: 'delivered', orderType: 'sample', priceCents: 8500, quantity: 1, revision: 2, threadId: 'th-1', createdAt: iso(21 * DAY), updatedAt: iso(3 * DAY) },
+  { id: 'so-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', title: 'Field Shell Proto', status: 'cut_and_sew', orderType: 'sample', priceCents: 14000, quantity: 1, revision: 1, createdAt: iso(10 * DAY), updatedAt: iso(2 * DAY) },
+  { id: 'bo-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'FW26 Core Hoodie Run', status: 'cut_and_sew', orderType: 'bulk', priceCents: 1680000, quantity: 300, revision: 3, threadId: 'th-1', createdAt: iso(33 * DAY), updatedAt: iso(4 * DAY) },
+  { id: 'bo-2', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', title: 'Moss Hoodie Restock', status: 'payment_received', orderType: 'bulk', priceCents: 468000, quantity: 400, revision: 1, createdAt: iso(7 * DAY), updatedAt: iso(6 * DAY) },
+];
+
+/**
+ * The half-done audit synthesizes dynamic-route params generically (see
+ * PARAM_VALUES in scripts/audit/half-done-audit.mjs) — e.g. every `:id`
+ * route gets the same product id, every otherwise-unmapped param gets
+ * 'sample-1'. None of those match a real seeded row here, so a strict
+ * byId() lookup 404s on every one of these detail screens even though the
+ * app itself already handles "not found" gracefully (EmptyState, no
+ * crash) — the 404 status itself is what the browser logs as a hard-tier
+ * console error, independent of the app's own try/catch. Falling back to
+ * the first seeded row (rather than a literal not-found) keeps these
+ * fixture-driven audit/screenshot runs deterministic and error-free
+ * without the app's real "not found" behavior ever being exercised here.
+ */
+const firstOr = (list) => (id) => list.find((item) => item.id === decodeURIComponent(id)) ?? list[0] ?? null;
+
+function productionTimelineFor(id) {
+  const bulkOrders = SAMPLE_ORDERS.filter((o) => o.orderType === 'bulk');
+  const order = bulkOrders.find((o) => o.id === decodeURIComponent(id)) ?? bulkOrders[0];
+  const snapshot = {
+    id: order.id, orderType: order.orderType, title: order.title, description: null,
+    quantity: order.quantity, priceCents: order.priceCents, currency: 'usd', status: order.status,
+    issuedBy: 'manufacturer', carrier: order.carrier ?? null, trackingNumber: order.trackingNumber ?? null,
+    paymentReviewState: 'none', manufacturerPayoutReady: true, revision: order.revision, updatedAt: order.updatedAt,
+  };
+  const steps = ['quote_accepted', 'deposit_paid', 'materials_sourcing', 'sewing', 'packaging', 'shipped', 'delivered'].map((stage, i) => ({
+    stage, label: stage.replace(/_/g, ' '), description: '', state: i === 0 ? 'done' : i === 1 ? 'current' : 'upcoming', at: i === 0 ? order.createdAt : null,
+  }));
+  return {
+    viewerRole: 'seller', order: snapshot,
+    manufacturer: { id: order.manufacturerId, businessName: order.manufacturerName, country: '', timeZone: null },
+    steps, events: [], createdAt: order.createdAt, paidAt: null,
+    tracking: { carrier: null, carrierName: null, trackingNumber: null, url: null },
+  };
+}
 
 function sellerConversations(count = 5) {
   const people = [
@@ -644,6 +695,145 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/seller/subscription/status') return { plan: 'growth', status: 'active', trialEnd: null, trialStartAt: null, trialEndAt: null, trialBanner: null, renewsOn: 'Oct 14, 2026', amountCents: 2900, paymentMethodLabel: 'Visa ···4242', effectiveProvider: 'stripe' };
   if (p === '/team/context') return { role: 'owner', storeOwnerId: SELLER_USER.id, teamMembershipId: null };
   if (p === '/team/my-memberships') return { memberships: [] };
+
+  // Storefront (seller) — half-done audit: /store-settings, /store-editor,
+  // /store-ai-improve, /store-nav, /store-pages, /store-theme-picker and
+  // /store-builder all fetch GET /store on load; unseeded, it 404'd on
+  // every one of them. Shape matches the real storefronts table row
+  // (lib/db/src/schema/index.ts) and api-server/src/routes/store.ts's
+  // GET / handler — a plausible, in-progress Northline Studio storefront.
+  if (p === '/store') {
+    return {
+      id: 'storefront_northline',
+      ownerId: SELLER_USER.id,
+      slug: 'northline-studio',
+      title: 'Northline Studio',
+      subtitle: 'Independent streetwear, small-batch heavyweight basics.',
+      description: 'Considered pieces for everyday movement, cut heavy and made to last.',
+      status: 'published',
+      theme: {
+        themeId: 'thread',
+        primaryColor: '#111111',
+        secondaryColor: '#6B6B6B',
+        accentColor: '#2B2B2B',
+        backgroundColor: '#F7F7F5',
+        textColor: '#111111',
+        fontFamily: 'Cormorant Garamond, Georgia, serif',
+        borderRadius: 0,
+      },
+      branding: { tagline: 'The new uniform.', logoUrl: SELLER_USER.imageUrl, targetAudience: 'Streetwear buyers who want fewer, better pieces' },
+      sections: [
+        { id: 'thread-hero', type: 'hero_image', title: 'Hero Image', enabled: true, settings: { heading: 'The new uniform.', description: 'Considered pieces for everyday movement.', buttonLabel: 'Shop the collection', fullWidth: true, sectionHeight: 'tall' } },
+        { id: 'thread-products', type: 'product_grid', title: 'Product Grid', enabled: true, settings: { heading: 'Current collection', description: 'The pieces in rotation.', columns: 2, quickAdd: false } },
+        { id: 'thread-story', type: 'brand_story', title: 'Brand Story', enabled: true, settings: { heading: 'Designed with intention.', description: 'Fewer pieces, better made, and meant to be worn often.' } },
+        { id: 'thread-newsletter', type: 'newsletter', title: 'Newsletter', enabled: true, settings: { heading: 'Stay close.', description: 'New releases, studio notes, and first access.', buttonLabel: 'Join the list' } },
+      ],
+      seo: { metaTitle: 'Northline Studio — Heavyweight streetwear', metaDescription: 'Small-batch heavyweight basics, made to last.' },
+      socialLinks: {},
+      analyticsCode: null,
+      publishedAt: iso(9 * DAY),
+      sharePreviewRevokedAt: null,
+    };
+  }
+  // /store-builder also checks for an in-progress Shopify import on load
+  // (getLatestShopifyImport()) — unseeded, this 404'd every time. `null` is
+  // the real API's own "no import yet" answer (api-server's GET /latest).
+  if (p === '/shopify-imports/latest') return null;
+  // /store-versions fetches the saved version history on load — unseeded,
+  // every load 404'd before any version ever showed. A couple of plausible
+  // past saves (storeService.ts's getVersions() maps trigger/label/snapshot).
+  if (p === '/store/versions') {
+    return [
+      { id: 'ver_nl_2', label: 'Before Drop 04 refresh', trigger: 'publish', snapshot: {}, createdAt: iso(2 * DAY), createdBy: SELLER_USER.id },
+      { id: 'ver_nl_1', label: 'Initial Thread Theme setup', trigger: 'manual', snapshot: {}, createdAt: iso(9 * DAY), createdBy: SELLER_USER.id },
+    ];
+  }
+  // /seller-verification fetches identity verification status on load —
+  // unseeded, it 404'd before the screen could render anything. 'unverified'
+  // is the same starting state a brand-new seller actually has.
+  if (p === '/seller/verification/status') return { verified: false, verificationStatus: 'unverified', sessionId: null };
+  // /vacation-mode fetches current vacation state on load — unseeded, every
+  // load 404'd before the toggle could show its real value.
+  if (p === '/seller/vacation') return { vacationMode: false, vacationMessage: null, vacationUntil: null };
+  // /team and /users both fetch the member roster; /team also loads the
+  // recent activity log. Unseeded, both 404'd on first render. The owner
+  // row plus one active admin and one pending invite give the screens
+  // something real to lay out (avatars, status pills, role chips).
+  if (p === '/team/members') {
+    return [
+      { id: 'owner', email: SELLER_USER.email, name: 'Maya Okafor', role: 'owner', status: 'active', invitedAt: null, joinedAt: iso(180 * DAY), lastActiveAt: iso(0), memberClerkId: SELLER_USER.id, online: true, isOwner: true },
+      { id: 'member_nl_1', email: 'devon@northlinestudio.co', name: 'Devon Cole', role: 'admin', status: 'active', invitedAt: iso(60 * DAY), expiresAt: null, expired: false, joinedAt: iso(58 * DAY), lastActiveAt: iso(3 * HOUR), memberClerkId: 'user_devon', online: false, isOwner: false },
+      { id: 'member_nl_2', email: 'priya@northlinestudio.co', name: 'Priya Shah', role: 'marketing', status: 'pending', invitedAt: iso(2 * DAY), expiresAt: isoAhead(5 * DAY), expired: false, joinedAt: null, lastActiveAt: null, memberClerkId: null, online: false, isOwner: false },
+    ];
+  }
+  if (p === '/team/activity') {
+    return {
+      logs: [
+        { id: 'act_nl_1', ownerId: SELLER_USER.id, actorClerkId: SELLER_USER.id, actorRole: 'owner', message: 'Invited priya@northlinestudio.co as marketing', resourceType: 'team', resourceId: 'member_nl_2', createdAt: iso(2 * DAY) },
+        { id: 'act_nl_2', ownerId: SELLER_USER.id, actorClerkId: 'user_devon', actorRole: 'admin', message: 'Updated the Drop 04 product grid', resourceType: 'store', resourceId: 'storefront_northline', createdAt: iso(3 * HOUR) },
+      ],
+      hasMore: false,
+      nextOffset: 2,
+    };
+  }
+  // /roles fetches the role tiers with live staff counts — unseeded, it
+  // 404'd on load and the screen fell back to its own static placeholder
+  // counts. Mirrors api-server/src/routes/team.ts's ROLE_DEFINITIONS, with
+  // counts matching the /team/members seed above (one active admin, one
+  // pending marketing invite).
+  if (p === '/team/roles') {
+    return [
+      { key: 'owner', name: 'Owner', group: 'Organization', description: 'Full access to all features including billing, payouts, and team management', permissions: ['*'], staffCount: 1, pendingCount: 0 },
+      { key: 'admin', name: 'Admin', group: 'Organization', description: 'Manage products, orders, inventory, analytics, customers, marketing, payouts and the team', permissions: ['products', 'orders', 'inventory', 'analytics', 'customers', 'marketing', 'payouts', 'team'], staffCount: 1, pendingCount: 0 },
+      { key: 'finance', name: 'Finance', group: 'Store', description: 'View balance, payouts, transactions and statements', permissions: ['payouts', 'analytics'], staffCount: 0, pendingCount: 0 },
+      { key: 'orders', name: 'Orders', group: 'Store', description: 'Manage orders, fulfillment and inventory', permissions: ['orders', 'inventory'], staffCount: 0, pendingCount: 0 },
+      { key: 'marketing', name: 'Marketing', group: 'Store', description: 'Manage ads, boosts and discount codes', permissions: ['marketing', 'analytics'], staffCount: 0, pendingCount: 1 },
+      { key: 'viewer', name: 'Viewer', group: 'Store', description: 'Read-only access to analytics and store data', permissions: ['analytics'], staffCount: 0, pendingCount: 0 },
+    ];
+  }
+  // /locations fetches the seller's fulfillment locations — unseeded, it
+  // 404'd on load. Raw snake_case fields, matching the real handler's raw
+  // SQL row shape (app/locations.tsx reads loc.is_active/is_primary directly).
+  if (p === '/seller/locations') {
+    return {
+      locations: [
+        { id: 'loc_nl_1', owner_id: SELLER_USER.id, name: 'Northline Studio — Warehouse', address: '4100 SE Division St', city: 'Portland', state: 'OR', country: 'US', zip: '97202', phone: '+1 503-555-0143', is_active: true, is_primary: true, fulfills_online_orders: true, created_at: iso(180 * DAY) },
+      ],
+    };
+  }
+  // /languages reads store localization settings via the shared seller
+  // settings row — unseeded, it 404'd before the current language could
+  // show. Matches api-server's seller-settings-route.ts ({ settings }).
+  if (p === '/seller/settings') return { settings: { storeLanguage: 'en' } };
+  // /notifications-settings fetches the buyer/seller-agnostic preference
+  // endpoint (api.notificationPrefs, mounted at /api/notification-prefs,
+  // distinct from /api/seller/notification-prefs) — unseeded, it 404'd on
+  // load. Matches notification-prefs.ts's GET / response shape.
+  if (p === '/notification-prefs') {
+    return {
+      digest: 'realtime',
+      role: 'seller',
+      pushEnabled: true,
+      quietHours: { start: null, end: null, timezone: DEMO_TIME_ZONE },
+      categories: {
+        new_orders: true, production_milestones: true, payout_confirmations: true,
+        customer_messages: true, disputes: true, subscription_trial: true, inventory_alerts: true,
+      },
+    };
+  }
+  // /shopify-import checks connection status on load — unseeded, it 404'd
+  // before the screen could tell whether Shopify was connected. 'Not
+  // connected yet' is the real starting state for a seller who hasn't set
+  // up the bridge, matching serializeConnection()'s disconnected shape.
+  if (p === '/shopify/status') return { connected: false, fulfillmentEnabled: false, linkedProductsCount: 0 };
+  // /store-domain merges this with the local BT subdomain — unseeded, it
+  // 404'd before that merge could even run. No custom domain yet is the
+  // real starting state for a seller who hasn't connected one.
+  if (p === '/store/domains') return [];
+  // /store-policies reads the seller's saved shipping/returns/privacy
+  // policies — unseeded, it 404'd before the screen's own "Add policies…"
+  // empty state could render. No policies yet is the real starting state.
+  if (p === '/seller/settings/policies') return { policies: [] };
 
   // Public / buyer
   if (p === '/public/products/high-demand') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 6));
@@ -994,6 +1184,47 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/finance/payouts') return { payouts: options.fresh ? [] : [
     { id: 'po_demo_1', arrivalDate: DEMO_NOW, formatted: '$412.30', status: 'paid', destination: { last4: '4242' } },
   ] };
+  if (p === '/finance/summary') {
+    const zero = { amount: 0, formatted: '$0.00' };
+    return {
+      currency: 'usd', connected: !options.fresh, stripeError: false,
+      held: { ...zero, drops: [] }, releasing: { ...zero, count: 0 },
+      available: zero, pending: zero, paidOut: { ...zero, toBank: zero },
+      owed: zero, credit: zero,
+      lifetime: { grossSales: zero, refunded: zero, platformFees: zero, processingFees: zero },
+      activity: [],
+    };
+  }
+  if (p === '/finance/transactions') return { transactions: [] };
+  // Seeded honest-empty: none of these have sample/list content built for
+  // the demo persona yet, so every one below is a real (not fabricated)
+  // empty list/zero state — unseeded before, these were only 404ing because
+  // no screen calling them was ever exercised by the screenshot scripts,
+  // unlike every route the half-done audit newly started crawling.
+  if (p === '/customers') return [];
+  if ((match = p.match(/^\/customers\/([^/]+)$/))) return { id: match[1], name: 'Sample Customer', email: 'customer@example.com', totalSpentCents: 0, orderCount: 0, createdAt: iso(30 * DAY) };
+  if ((match = p.match(/^\/customers\/([^/]+)\/orders$/))) return [];
+  if (p === '/drops') return [];
+  if (p === '/bundles') return [];
+  if (p === '/shipping-zones') return [];
+  if (p === '/shipping-zones/settings') return { shipFromCountry: 'US' };
+  if (p === '/package-presets') return { presets: [] };
+  if (p === '/shipping-rates') return [];
+  if (p === '/returns') return [];
+  // A single return/dispute/product this fixture doesn't have a real row
+  // for still answers 200 with `null` ("not found", the screens' own
+  // honest empty state) rather than a bare 404 — same reasoning as
+  // sellerOrderDetail's fallback below, just without fabricating content
+  // for surfaces this fixture doesn't model yet.
+  if ((match = p.match(/^\/returns\/([^/]+)$/))) return null;
+  if ((match = p.match(/^\/disputes\/([^/]+)$/))) return null;
+  if ((match = p.match(/^\/products\/([^/]+)$/))) return byId(SELLER_PRODUCTS)(match[1]) ?? null;
+  if (p === '/taxes/status') return {
+    stripeTaxEnabled: false, provider: 'stripe', providerConfigured: true, providerStatus: 'not_enabled',
+    automaticTaxAtCheckout: false, complianceNote: '', chargeShippingTax: false, chargeVat: false,
+  };
+  if (p === '/taxes/1099') return null;
+  if (p === '/seller/metafields') return { counts: {} };
   // Rendered on every seller screen (StripeConnectWarning); unseeded, it
   // 404s on every single dashboard load, not just this route's own fetches.
   if (p === '/seller/connect/status') return { connected: true, stripeAccountId: 'acct_demo', chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242', providerConfigured: true };
@@ -1005,21 +1236,40 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/manufacturers/favorites') return [{ manufacturerId: MANUFACTURERS[0].id, createdAt: iso(50 * DAY) }, { manufacturerId: MANUFACTURERS[2].id, createdAt: iso(40 * DAY) }];
   if (p === '/manufacturers/relationships') return MANUFACTURERS.slice(0, 3).map((m, i) => ({ id: `rel-${i + 1}`, manufacturerId: m.id, status: 'active', createdAt: iso((90 - i * 20) * DAY), updatedAt: iso((i + 1) * DAY) }));
   if (p === '/manufacturers/threads') return MANUFACTURER_THREADS;
-  if (p === '/seller-hub/quote-requests') {
-    return [
-      { id: 'qr-1', manufacturerId: MANUFACTURERS[2].id, productName: 'Field Shell Jacket — Onyx', status: 'quoted', type: 'bulk', quantity: 300, colorways: 'Onyx, Rust', quotedPriceCents: 1260000, quotedTurnaround: '35 days', quoteValidUntil: isoAhead(21 * DAY), notes: '30% deposit, balance before ship', createdAt: iso(14 * DAY), updatedAt: iso(3 * DAY) },
-      { id: 'qr-2', manufacturerId: MANUFACTURERS[0].id, productName: 'Heavyweight Hoodie — Bone', status: 'quoted', type: 'bulk', quantity: 250, quotedPriceCents: 575000, quotedTurnaround: '28 days', quoteValidUntil: isoAhead(14 * DAY), createdAt: iso(12 * DAY), updatedAt: iso(5 * DAY) },
-      { id: 'qr-3', manufacturerId: MANUFACTURERS[1].id, productName: 'Garment-Dyed Hoodie — Moss', status: 'submitted', type: 'bulk', quantity: 400, createdAt: iso(2 * DAY), updatedAt: iso(2 * DAY) },
-    ];
+  if (p === '/seller-hub/quote-requests') return SELLER_QUOTE_REQUESTS;
+  if ((match = p.match(/^\/seller-hub\/quote-requests\/([^/]+)$/))) return firstOr(SELLER_QUOTE_REQUESTS)(match[1]);
+  if (p === '/sample-orders') return SAMPLE_ORDERS;
+  if ((match = p.match(/^\/sample-orders\/([^/]+)\/images$/))) return { imageUrls: [] };
+  if ((match = p.match(/^\/sample-orders\/([^/]+)$/))) return firstOr(SAMPLE_ORDERS)(match[1]);
+  // RFQ broadcast (app/rfq-list.tsx, rfq-post.tsx, rfq-compare.tsx): no RFQs
+  // exist yet in this fixture set (the seller hasn't posted one), so the
+  // list is a real empty state, and a detail lookup falls back to a
+  // representative quote-request-shaped RFQ rather than 404ing — same
+  // reasoning as SAMPLE_ORDERS/SELLER_QUOTE_REQUESTS above.
+  if (p === '/seller-hub/rfqs') return [];
+  if ((match = p.match(/^\/seller-hub\/rfqs\/([^/]+)$/))) {
+    const q = SELLER_QUOTE_REQUESTS[0];
+    return {
+      id: match[1], sellerId: SELLER_USER.id, garmentType: q.productName, category: 'Outerwear',
+      description: q.notes ?? '', quantity: q.quantity, targetPriceCents: q.quotedPriceCents, deadline: q.quoteValidUntil,
+      fileIds: [], status: 'matched', manufacturersCount: 3, quotesReceivedCount: 1,
+      createdAt: q.createdAt, updatedAt: q.updatedAt,
+      quotes: [{
+        id: 'rfq-quote-1', sellerId: SELLER_USER.id, manufacturerId: q.manufacturerId, rfqId: match[1],
+        productName: q.productName, quantity: q.quantity, status: 'quoted', quotedPriceCents: q.quotedPriceCents,
+        quotedTurnaround: q.quotedTurnaround, quoteValidUntil: q.quoteValidUntil, counteroffer: null, notes: q.notes ?? null,
+        manufacturerName: MANUFACTURERS.find((m) => m.id === q.manufacturerId)?.businessName ?? 'Manufacturer',
+        manufacturerCountry: MANUFACTURERS.find((m) => m.id === q.manufacturerId)?.country ?? '',
+        manufacturerIsVerified: true, createdAt: q.createdAt, updatedAt: q.updatedAt,
+      }],
+    };
   }
-  if (p === '/sample-orders') {
-    return [
-      { id: 'so-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'Heavyweight Hoodie — Bone', status: 'delivered', orderType: 'sample', priceCents: 8500, quantity: 1, revision: 2, threadId: 'th-1', createdAt: iso(21 * DAY), updatedAt: iso(3 * DAY) },
-      { id: 'so-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', title: 'Field Shell Proto', status: 'cut_and_sew', orderType: 'sample', priceCents: 14000, quantity: 1, revision: 1, createdAt: iso(10 * DAY), updatedAt: iso(2 * DAY) },
-      { id: 'bo-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'FW26 Core Hoodie Run', status: 'cut_and_sew', orderType: 'bulk', priceCents: 1680000, quantity: 300, revision: 3, threadId: 'th-1', createdAt: iso(33 * DAY), updatedAt: iso(4 * DAY) },
-      { id: 'bo-2', manufacturerId: MANUFACTURERS[1].id, manufacturerName: 'LA Garment Works', title: 'Moss Hoodie Restock', status: 'payment_received', orderType: 'bulk', priceCents: 468000, quantity: 400, revision: 1, createdAt: iso(7 * DAY), updatedAt: iso(6 * DAY) },
-    ];
-  }
+  if (p === '/seller-hub/manufacturers') return MANUFACTURERS.map((m) => ({ id: m.id, businessName: m.businessName, country: m.country, specialty: m.specialty, moq: m.moq, isVerified: !!m.isVerified }));
+  if ((match = p.match(/^\/manufacturers\/orders\/([^/]+)\/timeline$/))) return productionTimelineFor(match[1]);
+  if (p === '/manufacturers/invite-tokens') return [];
+  if (p === '/freelancer-jobs') return { isFreelancer: false, asHirer: [], asFreelancer: [] };
+  if ((match = p.match(/^\/freelancers\/(?!me$)([^/]+)$/))) return { freelancer: null };
+  if (p === '/call/availability') return { configured: false };
 
   // Authed endpoints the audit script (scripts/audit/half-done-audit.mjs)
   // found hitting the "not seeded" 404 below across dozens of routes — every

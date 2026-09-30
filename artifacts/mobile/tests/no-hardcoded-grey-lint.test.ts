@@ -76,7 +76,6 @@ const HARDCODED_GREY_ALLOWLIST = new Set([
   'app/seller-live.tsx',
   'app/store-editor.tsx',
   'components/buyer-feed/ShopSideTab.tsx',
-  'components/checkout/OrderSummarySection.tsx',
   'components/live/LiveOverlays.tsx',
   'components/profile/ProfileStoryAvatar.tsx',
   'components/search/PersonRow.tsx',

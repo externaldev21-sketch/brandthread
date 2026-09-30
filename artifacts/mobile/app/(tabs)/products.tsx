@@ -364,7 +364,7 @@ function SortModal({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
-  const scrollResetRef = useScrollReset<any>();
+  const scrollResetRef = useScrollReset<any>(true, false);
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, string>;
   const s = React.useMemo(() => createStyles(theme), [theme]);

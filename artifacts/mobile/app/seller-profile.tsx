@@ -449,7 +449,10 @@ export default function SellerProfileScreen() {
         title="Professional dashboard"
         subtitle="Views, followers and content stats"
         chevron
-        onPress={() => router.push('/(tabs)' as never)}
+        // navigate (not push): this switches to the existing Dashboard tab
+        // rather than stacking a duplicate instance of the whole tab
+        // navigator on top of itself.
+        onPress={() => router.navigate('/(tabs)' as never)}
         style={styles.dashboardRow}
         testID="seller-profile-dashboard"
       />

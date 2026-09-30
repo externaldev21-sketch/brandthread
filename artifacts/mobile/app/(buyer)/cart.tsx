@@ -34,7 +34,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 // Same flat-black language as the one-page checkout: sections on pure black,
 // uppercase labels, 1px hairlines. No card containers.
-import { CK, CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
+import { CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
@@ -308,7 +308,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   // edge; the row pads itself back in, so at rest nothing moves. Opaque black
   // (the page color) so the actions never show through at rest (web).
   swipeBleed: { marginHorizontal: -SP.md },
-  swipeFront: { paddingHorizontal: SP.md, backgroundColor: CK.bg },
+  swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.background },
   checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
@@ -517,9 +517,9 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   sellerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
-  // The checkout's hairline (CK.divider), between lines and above the footer.
-  divider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.xs },
-  footer: { borderTopWidth: 1, borderTopColor: CK.divider, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
+  // The checkout's hairline (theme.borderSubtle), between lines and above the footer.
+  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
+  footer: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
@@ -622,7 +622,7 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
   labelSm: { fontSize: FS.sm },
   value: { ...TYPE.bodyMedium, ...TABULAR_NUMS, fontFamily: FONT.semibold, color: theme.text },
   valueSm: { fontSize: FS.sm },
-  divider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.sm },
+  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
   totalLabel: { ...TYPE.subheading, color: theme.text },
   totalValue: { ...TYPE.subheading, ...TABULAR_NUMS, color: theme.text },
@@ -1001,7 +1001,7 @@ export default function CartScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: CK.bg }}>
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
         <BrandedLoader label="Gathering your picks…" />
       </View>
     );
@@ -1011,7 +1011,7 @@ export default function CartScreen() {
   const hasSaved = cart.savedItems.length > 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: CK.bg }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Pushed-screen header: back chevron + "Cart (N)" + Edit, matching
           every other stack screen (not the tab-root large-title header) —
           this is a screen reached from the feed's cart icon or Shop the
@@ -1051,7 +1051,7 @@ export default function CartScreen() {
           <Button
             label="Continue shopping"
             icon="compass"
-            onPress={() => router.push('/(buyer)/discover' as never)}
+            onPress={() => router.navigate('/(buyer)/discover' as never)}
             style={s.emptyCta}
             accessibilityHint="Opens Discover to browse products"
           />
@@ -1142,15 +1142,15 @@ export default function CartScreen() {
               <>
               {groups.length > 1 && (
                 <View style={s.multiSellerNotice}>
-                  <Feather name="layers" size={15} color={CK.muted} style={{ marginTop: 2 }} />
-                  <Text style={[s.multiSellerText, { color: CK.muted }]}>Items from {groups.length} sellers ship separately, each with its own delivery estimate.</Text>
+                  <Feather name="layers" size={15} color={theme.muted} style={{ marginTop: 2 }} />
+                  <Text style={[s.multiSellerText, { color: theme.muted }]}>Items from {groups.length} sellers ship separately, each with its own delivery estimate.</Text>
                 </View>
               )}
               {isSignedIn && (
               <View style={s.loyaltyCard}>
                 <View style={s.loyaltyHeading}>
                   <View style={s.loyaltyIcon}>
-                    <Feather name="gift" size={15} color={CK.text} />
+                    <Feather name="gift" size={15} color={theme.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.loyaltyTitle}>Use points</Text>
@@ -1259,7 +1259,7 @@ export default function CartScreen() {
               BUYER_TAB_BAR_HIDDEN_ROUTES), so it pads by insets.bottom + 8,
               not the tab bar's occupied height. */}
           {hasItems && (
-            <StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: CK.bg, borderTopColor: CK.divider }}>
+            <StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: theme.background, borderTopColor: theme.borderSubtle }}>
               <View style={s.checkoutBarRow}>
                 <View>
                   <Text style={s.checkoutSummaryLabel}>
@@ -1307,7 +1307,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   editBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    backgroundColor: CK.bg, borderBottomWidth: 1, borderBottomColor: CK.divider,
+    backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle,
   },
   editBarText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   selectAllRow: {
@@ -1317,19 +1317,19 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   // Same label + hairline as a checkout section (CheckoutPrimitives).
-  savedSection: { borderTopWidth: 1, borderTopColor: CK.divider, paddingTop: 14, marginBottom: SP.md },
-  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: CK.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: SP.sm + 4 },
-  divider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.xs },
-  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderTopWidth: 1, borderTopColor: CK.divider, paddingVertical: 14 },
+  savedSection: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 14, marginBottom: SP.md },
+  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: SP.sm + 4 },
+  divider: { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
+  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { borderTopWidth: 1, borderTopColor: CK.divider, paddingVertical: 14 },
+  loyaltyCard: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingVertical: 14 },
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: CK.fieldBorder, alignItems: 'center', justifyContent: 'center' },
+  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   loyaltySub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   // The checkout's dark field with a hairline border.
-  pointsInput: { flex: 1, height: 48, borderRadius: 12, backgroundColor: CK.bg, borderWidth: 1, borderColor: CK.fieldBorder, color: CK.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
+  pointsInput: { flex: 1, height: 48, borderRadius: 12, backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
   pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
   appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },

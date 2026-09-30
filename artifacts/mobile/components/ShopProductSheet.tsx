@@ -1388,16 +1388,16 @@ export function ShopProductSheet({
       {showAddedConfirmation && (
         <View style={ss.addedToastWrap} pointerEvents="box-none" accessibilityLiveRegion="polite">
           <TouchableOpacity
-            style={[ss.addedToast, { backgroundColor: theme.text }]}
+            style={[ss.addedToast, { backgroundColor: theme.accent }]}
             onPress={() => { setShowAddedConfirmation(false); handleViewCart(); }}
             activeOpacity={0.9}
             accessibilityRole="button"
             accessibilityLabel="Added to cart. View cart"
           >
-            <Feather name="check" size={15} color={theme.background} />
-            <Text style={[ss.addedToastText, { color: theme.background }]}>Added to cart</Text>
-            <Text style={[ss.addedToastDivider, { color: theme.background }]}>·</Text>
-            <Text style={[ss.addedToastView, { color: theme.background }]}>View</Text>
+            <Feather name="check" size={15} color={theme.onAccent} />
+            <Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to cart</Text>
+            <Text style={[ss.addedToastDivider, { color: theme.onAccent }]}>·</Text>
+            <Text style={[ss.addedToastView, { color: theme.onAccent }]}>View</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1625,7 +1625,7 @@ function ProductListRow({
         {adding ? (
           <ActivityIndicator size="small" color={theme.text} />
         ) : added ? (
-          <Feather name="check" size={16} color={theme.background} />
+          <Feather name="check" size={16} color={theme.onAccent} />
         ) : (
           <Feather name="shopping-cart" size={16} color={theme.text} />
         )}
@@ -1980,7 +1980,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     justifyContent: 'center',
     alignSelf: 'center',
   },
-  listRowCartBtnAdded: { backgroundColor: theme.text, borderColor: theme.text },
+  listRowCartBtnAdded: { backgroundColor: theme.accent, borderColor: theme.accent },
   listRowCartBtnDisabled: { opacity: 0.5 },
 
   // Loading / error

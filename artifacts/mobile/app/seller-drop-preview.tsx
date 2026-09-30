@@ -118,7 +118,7 @@ export default function SellerDropPreview() {
             </TouchableOpacity>
             <View style={styles.previewBadge}>
               <Feather name="eye" size={12} color={ON_DARK} />
-              <Text style={styles.previewBadgeText}>PREVIEW</Text>
+              <Text style={styles.previewBadgeText}>BUYER VIEW</Text>
             </View>
           </View>
 
@@ -151,7 +151,7 @@ export default function SellerDropPreview() {
                     <Feather name="image" size={22} color={theme.muted} />
                   </View>
                 )}
-                <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, padding: 8 }} numberOfLines={1}>{p.name}</Text>
+                <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, padding: 8 }} numberOfLines={2}>{p.name}</Text>
               </View>
             ))}
           </View>

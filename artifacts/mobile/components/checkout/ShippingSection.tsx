@@ -10,7 +10,7 @@
  *      state (picker), ZIP, country (picker).
  *  - "Save to my addresses" for signed-in buyers entering a new one.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
@@ -19,7 +19,7 @@ import { recipientName } from '@/lib/checkoutPayment';
 import { COUNTRIES, US_STATES, normalizeUsState } from '@/lib/addressRegions';
 import type { CheckoutAddress } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
-import { CK, CheckoutField, CheckoutSection, OptionRow, PickerField } from './CheckoutPrimitives';
+import { CheckoutField, CheckoutSection, OptionRow, PickerField, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 
 export type CheckoutAddressDraft = Partial<CheckoutAddress> & { saveAddress?: boolean; label?: string };
 
@@ -63,6 +63,8 @@ export function ShippingSection({
   canSaveAddresses: boolean;
   showErrors: boolean;
 }) {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
   const hasSaved = savedAddresses.length > 0;
   const usingNew = !address.id;
   const errors = getCheckoutAddressErrors(address);
@@ -180,8 +182,8 @@ export function ShippingSection({
           <HapticSwitch
             value={address.saveAddress !== false}
             onValueChange={saveAddress => set({ saveAddress })}
-            trackColor={{ false: CK.fieldBorder, true: CK.text }}
-            thumbColor={address.saveAddress !== false ? CK.bg : CK.text}
+            trackColor={{ false: ck.fieldBorder, true: ck.text }}
+            thumbColor={address.saveAddress !== false ? ck.bg : ck.text}
             accessibilityLabel="Save to my addresses"
           />
         </View>
@@ -217,15 +219,17 @@ export function ShippingSection({
   );
 }
 
-const styles = StyleSheet.create({
-  formUnderRows: { paddingTop: SP.md },
-  twoCol: { flexDirection: 'row', gap: SP.sm + 4 },
-  col: { flex: 1 },
-  inlineError: { fontFamily: FONT.medium, fontSize: FS.meta, color: CK.text, marginTop: -2 },
-  saveRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    borderTopWidth: 1, borderTopColor: CK.divider, paddingTop: SP.md, marginTop: SP.xs,
-  },
-  saveTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: CK.text },
-  saveHint: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: CK.muted },
-});
+function makeStyles(ck: CheckoutColors) {
+  return StyleSheet.create({
+    formUnderRows: { paddingTop: SP.md },
+    twoCol: { flexDirection: 'row', gap: SP.sm + 4 },
+    col: { flex: 1 },
+    inlineError: { fontFamily: FONT.medium, fontSize: FS.meta, color: ck.text, marginTop: -2 },
+    saveRow: {
+      flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+      borderTopWidth: 1, borderTopColor: ck.divider, paddingTop: SP.md, marginTop: SP.xs,
+    },
+    saveTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
+    saveHint: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: ck.muted },
+  });
+}

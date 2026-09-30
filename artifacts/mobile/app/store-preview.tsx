@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -11,7 +11,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { isAuthError } from '@/lib/networkNotice';
+import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -68,27 +70,89 @@ export default function StorePreview() {
   const [html, setHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // GET /api/store/preview requires a real signed-in session server-side
+  // (see artifacts/api-server/src/routes/store.ts: router.use(requireAuth)
+  // runs before the /preview route is registered). A dev/web preview
+  // session that bypasses real Clerk sign-in has no such session, so this
+  // call 401s there even when freshPreview's own gate (below) doesn't
+  // catch it — e.g. isSellerDevPreview() can't detect every host this app
+  // gets tested from. Track that distinctly from a generic load failure so
+  // it reads as "nothing to preview yet", not as a broken screen.
+  const [authRequired, setAuthRequired] = useState(false);
   const [device, setDevice] = useState<DeviceMode>('mobile');
+  // Guards against overlapping calls: useFocusEffect can re-fire in quick
+  // succession (focus/blur churn, StrictMode's double-invoke in dev), and
+  // without this a second in-flight call's state updates could land after
+  // the first's, or after the screen has lost focus/unmounted.
+  const inFlight = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Fresh preview never has a real store to fetch — see the file doc
-  // comment. Demo preview (&demo=1) and real signed-in accounts both load
-  // the real endpoint, same as production.
-  const freshPreview = isSellerDevPreview() && !isPreviewDemoMode();
+  // Fresh preview (no &demo=1) never has a real store to fetch — see the
+  // file doc comment.
+  //
+  // Demo preview (&demo=1) ALSO never calls the real endpoint: GET
+  // /api/store/preview requires a real signed-in session server-side (see
+  // artifacts/api-server/src/routes/store.ts's router.use(requireAuth)),
+  // which a dev/web preview session never has by construction — that call
+  // cannot structurally succeed here, so routing demo mode through it was
+  // always going to fail one way or another (a 401, or nothing visible).
+  // Demo mode instead renders a local, self-contained storefront built
+  // from the same seeded catalog every other demo-gated seller screen
+  // uses (lib/previewSellerProducts.ts) — see lib/previewStorefrontHtml.ts.
+  //
+  // This screen is seller-only, but the dev/web preview bypass can still
+  // land here under `?bt_preview=buyer` (e.g. a route crawl testing every
+  // screen under both roles, or a persisted 'buyer' role from earlier
+  // testing in the same browser) with no real session either — checking
+  // only isSellerDevPreview() missed that case and let the real endpoint
+  // fire every time. Only a real signed-in account outside preview mode
+  // calls the network.
+  //
+  // Computed fresh on every render (not memoized with a frozen `[]` dep
+  // array) and, critically, re-checked again with its own direct calls
+  // inside load() itself below rather than trusted from a closure — a
+  // real, live-observed failure mode was the real network branch firing
+  // despite the URL genuinely carrying `?bt_preview=seller`. A captured
+  // closure value computed once at mount can go stale; a fresh,
+  // synchronous check made right before the fetch decision cannot — it
+  // always reflects the actual current window.location/localStorage state
+  // at the exact moment that decision is made, so there is no window in
+  // which a cached/real response can reach the render before this check
+  // has run.
+  const inDevPreview  = isSellerDevPreview() || isBuyerDevPreview();
+  const freshPreview  = inDevPreview && !isPreviewDemoMode();
+  const demoPreview   = inDevPreview && isPreviewDemoMode();
 
   const load = useCallback(async () => {
-    if (freshPreview) { setLoading(false); setError(false); setHtml(null); return; }
+    // Re-derive at call time — see the comment above these consts for why
+    // this isn't just "freshPreview"/"demoPreview" from the render closure.
+    const devPreviewNow = isSellerDevPreview() || isBuyerDevPreview();
+    if (devPreviewNow && !isPreviewDemoMode()) {
+      setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return;
+    }
+    if (devPreviewNow && isPreviewDemoMode()) {
+      setLoading(false); setError(false); setAuthRequired(false); setHtml(buildPreviewStorefrontHtml()); return;
+    }
+    if (inFlight.current) return;
+    inFlight.current = true;
     setLoading(true);
     setError(false);
+    setAuthRequired(false);
     try {
       const raw = await (api as any).store.previewHtml() as string;
+      if (!mountedRef.current) return;
       setHtml(raw);
-    } catch {
-      setError(true);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      if (isAuthError(err)) setAuthRequired(true);
+      else setError(true);
     } finally {
-      setLoading(false);
+      inFlight.current = false;
+      if (mountedRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, freshPreview]);
+  }, [api]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -140,6 +204,15 @@ export default function StorePreview() {
       ) : loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text} size="large" />
+        </View>
+      ) : authRequired ? (
+        <View style={styles.center}>
+          <EmptyState
+            icon="shopping-bag"
+            title="Your store is empty"
+            description="Add a product to see your store come to life here."
+            action={{ label: 'Add product', onPress: () => router.push('/add-product' as never), icon: 'plus' }}
+          />
         </View>
       ) : error || !html ? (
         <View style={styles.center}>
@@ -201,6 +274,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   webviewClip: { overflow: 'hidden', width: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.xl },
   errorText: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted, textAlign: 'center' },
-  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.text },
-  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.background },
+  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.accent },
+  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
 });

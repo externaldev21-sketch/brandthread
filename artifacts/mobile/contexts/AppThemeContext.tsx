@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { Platform, type TextStyle } from 'react-native';
 import { useApi } from '@/lib/api';
+import { isProductionPreviewHost } from '@/lib/devPreview';
 
 export type AppThemeId =
   | 'monochrome' | 'purple' | 'olive' | 'navy' | 'champagne' | 'black' | 'silver'
@@ -110,8 +111,19 @@ export async function peekPersistedTheme(storage: ThemePeekStorage): Promise<App
   return DEFAULT_THEME;
 }
 
+// Mirrors lib/devPreview.ts's own __DEV__ || NAVIGATION_ISOLATION_TEST gate:
+// an exported (non-__DEV__) preview build — e.g. scripts/store-screenshots'
+// own harness, which sets EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST=1 so a
+// production-like export can still be screenshotted with ?bt_preview= —
+// needs ?bt_theme= to work too, or every theme-dependent screenshot/crawl
+// check silently falls back to the default theme regardless of what's
+// requested. Still never active in a real production build (neither flag
+// set there).
+const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 const getPreviewThemeId = (): AppThemeId | null => {
-  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return null;
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  if (isProductionPreviewHost()) return null;
   const requested = new URLSearchParams(window.location.search).get('bt_theme');
   return isThemeId(requested) ? requested : null;
 };
@@ -176,6 +188,14 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [api, storageKey]);
   const value = useMemo(() => ({ theme: getTheme(themeId), isHydrated, selectTheme }), [isHydrated, selectTheme, themeId]);
+  useEffect(() => {
+    // Exposes the live theme for the theme-consistency crawl (e2e/theme-consistency-crawl.spec.ts)
+    // to compare computed element styles against, in the same preview-only build the crawl runs
+    // against — never present in a real production build.
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    if (!__DEV__ && process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST !== '1') return;
+    (window as unknown as { __btActiveTheme?: AppThemePreset }).__btActiveTheme = value.theme;
+  }, [value.theme]);
   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
 }
 export function useAppTheme() { return useContext(AppThemeContext); }

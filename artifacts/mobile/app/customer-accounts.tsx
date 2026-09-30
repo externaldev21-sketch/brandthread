@@ -1,27 +1,30 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { Feather } from '@expo/vector-icons';
 
 /**
  * This screen used to be a static Shopify-admin clone: fake sign-in-link
  * toggles, a fake account URL, and half a dozen "Customize"/"Manage" buttons
  * that only fired a haptic. None of it was backed by a real API, so per the
- * honesty rules it's collapsed to an honest "not available yet" state
+ * honesty rules it's collapsed to an honest "not configurable" state
  * instead of shipping fabricated settings. Bring the real UI back once
  * customer-account configuration has a real endpoint.
  */
 export default function CustomerAccountsScreen() {
+  const router = useRouter();
   const colors = useColors();
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Customer accounts" />
+      <ScreenHeader title="Customer accounts" onBack={() => goBackOr(router, "/seller-settings")} />
       <View style={styles.empty}>
         <Feather name="user" size={28} color={colors.mutedForeground} />
-        <Text style={[styles.title, { color: colors.foreground }]}>Not available yet</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Not configurable from the app</Text>
         <Text style={[styles.body, { color: colors.mutedForeground }]}>
-          Customer account settings aren{'’'}t configurable from the app yet.
+          Customer account settings aren{'’'}t editable here.
         </Text>
       </View>
     </View>

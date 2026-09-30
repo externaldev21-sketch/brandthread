@@ -101,7 +101,7 @@ function makeRadioStyles(theme: AppThemePreset) {
     rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
     radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
     radioSelected: { borderColor: theme.text },
-    radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: theme.text },
+    radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: theme.accent },
     label: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, flex: 1 },
     labelSelected: { color: theme.text, fontFamily: FONT.semibold },
   });

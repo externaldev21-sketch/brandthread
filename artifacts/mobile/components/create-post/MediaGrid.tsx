@@ -226,11 +226,11 @@ export function MediaGrid({
             <View style={styles.selectedDim} pointerEvents="none" />
           )}
           {selected && (
-            <View style={[styles.selectionBadge, { backgroundColor: FG }]}>
+            <View style={[styles.selectionBadge, { backgroundColor: theme.accent }]}>
               {photoIndex >= 0 ? (
-                <Text style={[styles.selectionBadgeText, { color: theme.background }]}>{photoIndex + 1}</Text>
+                <Text style={[styles.selectionBadgeText, { color: theme.onAccent }]}>{photoIndex + 1}</Text>
               ) : (
-                <Feather name="check" size={12} color={theme.background} />
+                <Feather name="check" size={12} color={theme.onAccent} />
               )}
             </View>
           )}

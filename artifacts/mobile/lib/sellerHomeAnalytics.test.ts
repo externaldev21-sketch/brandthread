@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  EMPTY_TRAFFIC_SOURCES,
   selectSellerHomeAnalytics,
   sellerHomeAnalyticsKey,
   zeroSellerHomeAnalytics,
@@ -12,11 +13,16 @@ describe('seller home analytics zero state', () => {
     expect(zeroSellerHomeAnalytics('today')).toEqual({
       range: 'today',
       totalCents: 0,
+      netCents: 0,
       orderCount: 0,
       visitorCount: 0,
+      conversionRate: 0,
+      averageOrderCents: 0,
+      threadCashReceivedCents: 0,
       toFulfill: 0,
       toCapture: 0,
-      previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
+      previous: { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 },
+      trafficSources: EMPTY_TRAFFIC_SOURCES,
       buckets: [],
     });
   });
