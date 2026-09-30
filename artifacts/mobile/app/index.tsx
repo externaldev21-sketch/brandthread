@@ -63,12 +63,28 @@ export default function Index() {
       effectivePreviewRole = DEV_BYPASS_ROLE;
     }
     if (!effectivePreviewRole) return;
+    // 150ms, not the original 50ms: still imperceptible for the common case
+    // (a bare "/" load with no deep link to resolve), but gives a heavier
+    // destination route more real time to finish resolving before this even
+    // fires — reduces how often the checks inside actually need to catch a
+    // still in-flight resolution.
     const redirect = setTimeout(() => {
       // Re-check the LIVE ref at fire time, not the atRoot this effect
       // closed over — see atRootRef's own comment above for why.
       if (!atRootRef.current) return;
+      // Belt-and-suspenders, web only: Expo Router updates the browser's
+      // actual URL via the History API as part of resolving a deep link,
+      // which is a real DOM mutation, not something that waits on this
+      // component's own re-render — it can commit before `segments` (and
+      // therefore `atRoot`/atRootRef) has caught up here. Live-verified
+      // still redirecting a direct "/seller-inbox?…&demo=1" load to the
+      // dashboard even with atRootRef in place, meaning that ref can still
+      // read stale in a window this narrow. window.location.pathname has no
+      // such dependency on React's render/commit timing at all, so trust it
+      // over atRootRef whenever the two disagree.
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') return;
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
-    }, 50);
+    }, 150);
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router, atRoot]);
 
