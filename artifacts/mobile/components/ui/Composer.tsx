@@ -167,7 +167,7 @@ export default function Composer({
           {!showAction && rightAccessory ? <View style={styles.right}>{rightAccessory}</View> : null}
           <Animated.View
             pointerEvents={showAction ? 'auto' : 'none'}
-            style={[styles.actionSlot, !showAction && styles.actionSlotHidden, actionStyle]}
+            style={[styles.actionSlot, actionStyle]}
           >
             <Pressable
               onPress={busy ? onStop : onSend}
@@ -220,7 +220,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 6,
   },
-  actionSlotHidden: { width: 0, marginLeft: 0, overflow: 'hidden' },
   send: {
     width: COMPOSER_SEND_SIZE,
     height: COMPOSER_SEND_SIZE,
