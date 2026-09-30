@@ -297,6 +297,17 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/ai/AiComposer.tsx',
   'components/ai/AuroraGlow.tsx',
   'components/ai/MarkdownLite.tsx',
+  // components/ai-tools/* — the Mockup to Model / Remove Background / AI
+  // Photoshoot shared components (PRs #555/#556/#559), built against the
+  // pure-monochrome lib/theme.ts tokens before this Appearance-theme
+  // migration reached them — same as most of the app per this file's own
+  // ~2,000-hit note above. Not re-themed here; a follow-up can migrate
+  // them onto useAppTheme() like the rest of the ratchet.
+  'components/ai-tools/AiResultViewer.tsx',
+  'components/ai-tools/AiResultsGrid.tsx',
+  'components/ai-tools/AiToolButtons.tsx',
+  'components/ai-tools/BgRemovalGlowSweep.tsx',
+  'components/ai-tools/ReferencePhotoTiles.tsx',
   'components/analytics/AnalyticsKit.tsx',
   'components/buy-now/BuyNowFlow.tsx',
   'components/buy-now/OrderSuccessSheet.tsx',
