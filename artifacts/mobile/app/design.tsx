@@ -486,7 +486,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
     try {
       const proj = await createProject('canvas', preset.label, {
         width: preset.width, height: preset.height,
-        backgroundHex: preset.transparentBg ? 'transparent' : '#000000',
+        backgroundHex: preset.transparentBg ? 'transparent' : '#FFFFFF',
       });
       onClose(); onCreated(proj.id);
     } catch { Alert.alert('Error', 'Could not create canvas.'); }
@@ -502,7 +502,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
     if (creating) return;
     setCreating(true);
     try {
-      const proj = await createProject('canvas', customTitle.trim() || `${w} \u00D7 ${h}`, { width: w, height: h, backgroundHex: '#000000' });
+      const proj = await createProject('canvas', customTitle.trim() || `${w} \u00D7 ${h}`, { width: w, height: h, backgroundHex: '#FFFFFF' });
       onClose(); onCreated(proj.id);
     } catch { Alert.alert('Error', 'Could not create canvas.'); }
     finally { setCreating(false); }
@@ -516,7 +516,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
       if (!img?.data) { Alert.alert('No image', 'Could not read image from clipboard.'); return; }
       const dataUri = `data:image/png;base64,${img.data}`;
       const w = img.size?.width || 1080, h = img.size?.height || 1080;
-      const proj = await createProject('canvas', 'From Clipboard', { width: w, height: h, backgroundHex: '#000000' });
+      const proj = await createProject('canvas', 'From Clipboard', { width: w, height: h, backgroundHex: '#FFFFFF' });
       const now = new Date().toISOString();
       await updateProject(proj.id, {
         layers: [{
@@ -550,7 +550,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
       const now = new Date().toISOString();
       const proj = await createProject('canvas', `${parsed.name || 'Imported'} (imported)`, {
         width, height,
-        backgroundHex: typeof parsed.canvas.backgroundHex === 'string' ? parsed.canvas.backgroundHex : '#000000',
+        backgroundHex: typeof parsed.canvas.backgroundHex === 'string' ? parsed.canvas.backgroundHex : '#FFFFFF',
       });
       await updateProject(proj.id, { layers: validation.layers, createdAt: now, updatedAt: now });
       onClose(); onCreated(proj.id);
@@ -1684,7 +1684,7 @@ export default function DesignGalleryScreen() {
       try { durable = await makeDurableUri(asset.uri); }
       catch (e: unknown) { Alert.alert('Import failed', e instanceof Error ? e.message : String(e)); return; }
       const w = asset.width || 1080, h = asset.height || 1080;
-      const proj = await createProject('canvas', 'Photo Canvas', { width: w, height: h, backgroundHex: '#000000' });
+      const proj = await createProject('canvas', 'Photo Canvas', { width: w, height: h, backgroundHex: '#FFFFFF' });
       const now = new Date().toISOString();
       await updateProject(proj.id, {
         layers: [{
@@ -1748,7 +1748,7 @@ export default function DesignGalleryScreen() {
         const now = new Date().toISOString();
         const proj = await createProject('canvas', `${parsed.name || asset.name.replace(/\.json$/i, '')} (imported)`, {
           width, height,
-          backgroundHex: typeof parsed.canvas.backgroundHex === 'string' ? parsed.canvas.backgroundHex : '#000000',
+          backgroundHex: typeof parsed.canvas.backgroundHex === 'string' ? parsed.canvas.backgroundHex : '#FFFFFF',
         });
         await updateProject(proj.id, { layers: jsonResult.layers, createdAt: now, updatedAt: now });
         router.push(`/design-canvas?id=${proj.id}`);
@@ -1771,7 +1771,7 @@ export default function DesignGalleryScreen() {
       // does; the image layer's `fit: 'contain'` scales it to whatever
       // square canvas it lands on, same as the Photo import path's fallback.
       const size = 1080;
-      const proj = await createProject('canvas', asset.name.replace(/\.[^.]+$/, '') || 'Imported Image', { width: size, height: size, backgroundHex: '#000000' });
+      const proj = await createProject('canvas', asset.name.replace(/\.[^.]+$/, '') || 'Imported Image', { width: size, height: size, backgroundHex: '#FFFFFF' });
       const now = new Date().toISOString();
       await updateProject(proj.id, {
         layers: [{

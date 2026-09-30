@@ -310,14 +310,19 @@ export default function PayoutsScreen() {
           ) : loadError ? (
             <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
           ) : payouts.length === 0 ? (
-            <EmptyState
-              icon="inbox"
-              title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-              message={balance?.connected === false
-                ? 'Add a bank account under Bank account to start receiving payouts.'
-                : 'Payouts show up here once your available balance clears.'}
-              compact
-            />
+            <View style={{ alignItems: 'center' }}>
+              <EmptyState
+                icon="inbox"
+                title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
+                message=""
+                compact
+              />
+              <Text style={styles.payoutsEmptyMessage}>
+                {balance?.connected === false
+                  ? 'Add a bank account under Bank account to start receiving payouts.'
+                  : 'Payouts show up here once your available balance clears.'}
+              </Text>
+            </View>
           ) : (
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
@@ -471,15 +476,13 @@ export default function PayoutsScreen() {
 }
 
 const createStyles = (theme: AppThemePreset) => {
-  const { accent, text, muted, subtle, card, border, warning } = theme;
+  const { accent, text, muted, subtle, card, border } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
-  devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${warning}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
-  devBannerText:{ color: warning, fontSize: FS.xs, fontFamily: FONT.medium },
   balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
   balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
   balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
@@ -497,6 +500,10 @@ const createStyles = (theme: AppThemePreset) => {
   tabText:      { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
    tabTextActive:{ color: accent },
   list:         { padding: SP.md },
+  payoutsEmptyMessage: {
+    color: muted, fontSize: FS.sm, fontFamily: FONT.medium, textAlign: 'center',
+    maxWidth: 280, marginTop: -4,
+  },
   payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: border },
   payoutLeft:   {},
   payoutRight:  { alignItems: 'flex-end', gap: 4 },
