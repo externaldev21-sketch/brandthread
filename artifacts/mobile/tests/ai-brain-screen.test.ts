@@ -19,7 +19,7 @@ const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
 const screen = read('app/ai-brain.tsx');
 const rootLayout = read('app/_layout.tsx');
 const aurora = read('components/ai/AuroraGlow.tsx');
-const composer = read('components/ai/AiComposer.tsx');
+const composer = read('components/ui/Composer.tsx');
 const sharedComposer = read('components/ui/Composer.tsx');
 
 // ─── Bug fix: composer/content must clear the tab bar + home indicator ───────

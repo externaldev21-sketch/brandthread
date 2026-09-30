@@ -294,7 +294,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/StyleTagsPicker.tsx',
   'components/SupportChatBubble.tsx',
   'components/TextOverlayEditor.tsx',
-  'components/ai/AiComposer.tsx',
   'components/ai/AuroraGlow.tsx',
   'components/ai/MarkdownLite.tsx',
   // components/ai-tools/* — the Mockup to Model / Remove Background / AI
