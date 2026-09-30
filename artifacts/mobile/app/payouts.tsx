@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -295,7 +295,7 @@ export default function PayoutsScreen() {
       </View>
 
       {activeTab === 'payouts' ? (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + COMP.tabBarH + SP.md }]}>
           {loading ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
@@ -331,7 +331,7 @@ export default function PayoutsScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + COMP.tabBarH + SP.md }]}>
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
