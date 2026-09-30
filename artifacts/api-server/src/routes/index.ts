@@ -99,6 +99,7 @@ import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
+import productImportRouter, { etsyCallbackRouter as etsyImportCallbackRouter } from "./product-import";
 import designStudioRouter from "./design-studio";
 import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
@@ -220,6 +221,9 @@ router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
+// Etsy redirects the browser to the callback with no session; it is mounted before the authenticated group.
+router.use("/product-import/etsy/callback", etsyImportCallbackRouter);
+router.use("/product-import",             tc, productImportRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────
 // Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't
