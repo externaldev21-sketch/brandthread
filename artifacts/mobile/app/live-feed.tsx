@@ -17,7 +17,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Platform, Pressable, Share, ActivityIndicator,
+  View, Text, StyleSheet, FlatList, Platform, Pressable, Share, ActivityIndicator,
   AccessibilityInfo, useWindowDimensions,
 } from 'react-native';
 import { Asset } from 'expo-asset';
@@ -49,6 +49,7 @@ import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import Composer from '@/components/ui/Composer';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -702,17 +703,15 @@ function LiveRoomPage({
           </View>
         </View>
 
-        <View style={styles.inputRow}>
-          <TextInput
-            value={message}
-            onChangeText={setMessage}
-            onSubmitEditing={sendMessage}
-            placeholder="Say something…"
-            placeholderTextColor="rgba(255,255,255,0.7)"
-            returnKeyType="send"
-            style={styles.input}
-          />
-        </View>
+        <Composer
+          overMedia
+          value={message}
+          onChangeText={setMessage}
+          onSend={sendMessage}
+          placeholder="Say something…"
+          hideTabBar={false}
+          testID="live-feed-composer"
+        />
       </KeyboardAvoidingView>
     </View>
   );
@@ -832,10 +831,4 @@ const styles = StyleSheet.create({
   },
 
   // 16pt insets (the shared `bottom` container already gives 12pt; +4pt here).
-  inputRow: { height: 44, marginHorizontal: 4 },
-  input: {
-    flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff',
-    fontFamily: FONT.regular, fontSize: FS.sm,
-  },
 });
