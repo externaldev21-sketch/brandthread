@@ -36,7 +36,7 @@ async function call(method: string, path: string, userId?: string, body?: unknow
     headers: { "content-type": "application/json", ...(userId ? { "x-test-user": userId } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { status: res.status, body: await res.json() };
+  return { status: res.status, body: (await res.json()) as any };
 }
 
 async function placeOrder(buyerId: string, totalCents: number, extra: Partial<typeof orders.$inferInsert> = {}) {
