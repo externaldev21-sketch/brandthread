@@ -107,7 +107,7 @@ export default function AnalyticsStoreScreen() {
       {!data ? (
         <EmptyState
           icon="bar-chart-2"
-          title="Store insights are on the way"
+          title="No store visits yet"
           description="We'll show traffic and conversion once visitors start browsing your store."
           style={{ marginTop: SP.lg }}
         />
