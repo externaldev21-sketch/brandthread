@@ -153,6 +153,11 @@ function isRouteFile(full: string, entry: string): boolean {
   if (!full.includes(`${path.sep}app${path.sep}`) && !full.startsWith(path.join(ROOT, 'app') + path.sep)) return false;
   if (!/\.tsx$/.test(entry)) return false;
   if (entry === '_layout.tsx' || entry.startsWith('+') || entry.endsWith('.test.tsx')) return false;
+  // Out of scope — a separate effort owns the checkout/address flow (see
+  // screen-fit-safe-area.test.tsx's own exclusion, and e2e/notch-crawl.spec.ts's
+  // matching one). Its own doc comment happens to mention "ScreenHeader" in
+  // prose, which would otherwise false-positive this file as migrated.
+  if (entry === 'buyer-checkout.tsx') return false;
   return true;
 }
 
