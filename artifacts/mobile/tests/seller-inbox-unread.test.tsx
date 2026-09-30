@@ -34,6 +34,8 @@ vi.mock('react-native', () => {
 
   return {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
+    Alert: { alert: vi.fn() },
+    PanResponder: { create: (config: Record<string, unknown>) => ({ panHandlers: config }) },
     Animated: {
       Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } interpolate() { return this._value; } },
       View: nativeComponent('Animated.View'),
@@ -113,6 +115,20 @@ vi.mock('@/lib/previewInbox', () => ({
   getSellerPreviewConversations: () => [
     conversation('preview-seller-conversation-01', 1),
   ],
+  isSellerPreviewConversationId: (id: string | null | undefined) =>
+    !!id && id.startsWith('preview-seller-conversation-'),
+  setPreviewConversationPinned: vi.fn(),
+}));
+
+vi.mock('@/services/socialService', () => ({
+  markConversationRead: vi.fn().mockResolvedValue(undefined),
+  archiveConversation: vi.fn().mockResolvedValue(undefined),
+  muteUser: vi.fn().mockResolvedValue(undefined),
+  setConversationPinned: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('@/components/ui/ActionSheet', () => ({
+  showActionSheet: vi.fn(),
 }));
 
 vi.mock('@expo/vector-icons', () => ({
