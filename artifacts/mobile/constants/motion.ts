@@ -81,7 +81,7 @@ export const FADE_MS = 180;
  *  with no spring/bounce/overshoot — the bar must always land in the exact
  *  same resting position it started from. See lib/tabBarSlide.ts for the
  *  guaranteed-end-state helper that uses these. */
-export const TAB_BAR_SLIDE_MS = 150;
+export const TAB_BAR_SLIDE_MS = 200;
 export const TAB_BAR_SLIDE_EASING_BEZIER = [0, 0, 0.2, 1] as const;
 export const TAB_BAR_SLIDE_EASING = Easing.bezier(...TAB_BAR_SLIDE_EASING_BEZIER);
 

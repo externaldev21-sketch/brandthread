@@ -36,13 +36,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import AiComposer from '@/components/ai/AiComposer';
+import Composer from '@/components/ui/Composer';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -407,7 +406,6 @@ export default function AiBrainScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -737,10 +735,6 @@ export default function AiBrainScreen() {
 
   const label = contextLabel(parsedContext);
   const canSend = inputText.trim().length > 0 && !isGenerating;
-  // Home-indicator-safe bottom padding. The tab bar never renders on this
-  // screen (see the full-screen deny-list in app/_layout.tsx), so this is
-  // the only bottom inset the composer needs to clear.
-  const composerBottomInset = Math.max(insets.bottom, 8);
 
   return (
     <View style={styles.root}>
@@ -833,20 +827,21 @@ export default function AiBrainScreen() {
             />
 
             {/* ── Input row ───────────────────────────────────────────────── */}
-            <AiComposer
+            <Composer
+              testID="ai-composer"
               value={inputText}
               onChangeText={setInputText}
               onSend={() => handleSend()}
+              busy={isGenerating}
               onStop={handleStop}
-              isGenerating={isGenerating}
               canSend={canSend}
+              enterToSend={false}
+              accessibilityLabel="Message Brandthread AI"
               placeholder={
                 isAuthLoaded || isSellerDevPreview() || isBuyerDevPreview()
                   ? 'Ask anything about your brand…'
                   : 'Preparing your session…'
               }
-              accentColor={colors.primary}
-              bottomInset={composerBottomInset}
             />
         </>
       </KeyboardAvoidingView>

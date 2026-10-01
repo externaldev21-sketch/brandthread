@@ -48,7 +48,8 @@
     "verify:ios-build": "node scripts/verify-ios-build.js",
     "verify:privacy-manifest": "node scripts/verify-ios-privacy-manifest.js",
     "verify:privacy-manifest:config": "node scripts/verify-ios-privacy-manifest.js --config-only",
-    "verify:submit-config": "node scripts/verify-submit-config.js"
+    "verify:submit-config": "node scripts/verify-submit-config.js",
+    "check:landing-fit": "node scripts/landing-fit-check.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
