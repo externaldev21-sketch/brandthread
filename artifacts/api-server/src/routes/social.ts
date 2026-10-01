@@ -1035,6 +1035,10 @@ async function loadActiveStory(storyId: string) {
   return row;
 }
 
+/** Upper bound on media items in one story and rows returned by story list endpoints. */
+const MAX_STORY_MEDIA_ITEMS = 20;
+const STORY_LIST_CAP = 100;
+
 // ─── POST /api/social/stories — create a story ───────────────────────────────
 router.post("/stories", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
@@ -1047,6 +1051,9 @@ router.post("/stories", async (req, res) => {
 
   if (!Array.isArray(rawMedia) || rawMedia.length === 0) {
     res.status(400).json({ error: "media[] required" }); return;
+  }
+  if (rawMedia.length > MAX_STORY_MEDIA_ITEMS) {
+    res.status(400).json({ error: `A story can have up to ${MAX_STORY_MEDIA_ITEMS} items`, code: "VALIDATION_ERROR" }); return;
   }
 
   const restriction = await publishingRestriction(myId);
@@ -1139,7 +1146,8 @@ router.get("/stories/me", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const now  = new Date();
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")));
+    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
+    .orderBy(asc(stories.createdAt)).limit(STORY_LIST_CAP);
 
   const likedSet = rows.length
     ? new Set(
@@ -1168,7 +1176,8 @@ router.get("/stories/user/:userId", async (req, res) => {
   }
 
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")));
+    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
+    .orderBy(asc(stories.createdAt)).limit(STORY_LIST_CAP);
 
   if (!rows.length) { res.json([]); return; }
 
@@ -1206,7 +1215,8 @@ router.get("/stories/following", async (req, res) => {
 
   const rows = await db.select().from(stories)
     .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
-    .orderBy(desc(stories.createdAt));
+    .orderBy(desc(stories.createdAt))
+    .limit(STORY_LIST_CAP * 10);
   if (!rows.length) { res.json([]); return; }
 
   const blockedIds = new Set(
@@ -1288,7 +1298,8 @@ router.get("/stories/:id/viewers", async (req, res) => {
 
   const viewRows = await db.select({ userId: storyViews.userId, viewedAt: storyViews.viewedAt })
     .from(storyViews).where(eq(storyViews.storyId, storyId))
-    .orderBy(desc(storyViews.viewedAt));
+    .orderBy(desc(storyViews.viewedAt))
+    .limit(500);
   if (!viewRows.length) { res.json([]); return; }
 
   const profiles = await profilesById(viewRows.map((r) => r.userId));
@@ -1327,28 +1338,31 @@ router.post("/stories/:id/like", async (req, res) => {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
-  const [existing] = await db.select({ storyId: storyLikes.storyId })
-    .from(storyLikes)
-    .where(and(eq(storyLikes.storyId, storyId), eq(storyLikes.userId, myId)))
-    .limit(1);
-
+  // Counter changes are driven only by rows actually inserted/deleted, so
+  // concurrent taps and retries cannot make likes_count drift from story_likes.
+  const removing = (req.body as { liked?: unknown } | undefined)?.liked === false;
   let liked: boolean;
-  if (existing) {
-    await db.delete(storyLikes)
-      .where(and(eq(storyLikes.storyId, storyId), eq(storyLikes.userId, myId)));
+  const deleted = await db.delete(storyLikes)
+    .where(and(eq(storyLikes.storyId, storyId), eq(storyLikes.userId, myId)))
+    .returning({ storyId: storyLikes.storyId });
+  if (deleted.length > 0) {
     await db.update(stories)
-      .set({ likesCount: sql`GREATEST(likes_count - 1, 0)` })
+      .set({ likesCount: sql`GREATEST(likes_count - ${deleted.length}, 0)` })
       .where(eq(stories.id, storyId));
+    liked = false;
+  } else if (removing) {
     liked = false;
   } else {
     const inserted = await db.insert(storyLikes).values({ storyId, userId: myId })
       .onConflictDoNothing()
       .returning({ storyId: storyLikes.storyId });
-    await db.update(stories)
-      .set({ likesCount: sql`likes_count + 1` })
-      .where(eq(stories.id, storyId));
+    if (inserted.length > 0) {
+      await db.update(stories)
+        .set({ likesCount: sql`likes_count + 1` })
+        .where(eq(stories.id, storyId));
+      void notifyStoryLike({ storyId, likerId: myId });
+    }
     liked = true;
-    if (inserted.length > 0) void notifyStoryLike({ storyId, likerId: myId });
   }
 
   const [row] = await db.select({ likesCount: stories.likesCount })
@@ -1367,18 +1381,14 @@ router.post("/stories/:id/view", async (req, res) => {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
-  const [existing] = await db.select({ storyId: storyViews.storyId })
-    .from(storyViews)
-    .where(and(eq(storyViews.storyId, storyId), eq(storyViews.userId, myId)))
-    .limit(1);
-
-  if (!existing) {
-    await db.insert(storyViews).values({ storyId, userId: myId }).onConflictDoNothing();
+  const inserted = await db.insert(storyViews).values({ storyId, userId: myId })
+    .onConflictDoNothing()
+    .returning({ storyId: storyViews.storyId });
+  if (inserted.length > 0) {
     await db.update(stories)
       .set({ viewsCount: sql`views_count + 1` })
       .where(eq(stories.id, storyId));
   } else {
-    // Update viewedAt
     await db.update(storyViews)
       .set({ viewedAt: new Date() })
       .where(and(eq(storyViews.storyId, storyId), eq(storyViews.userId, myId)));
