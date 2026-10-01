@@ -72,6 +72,7 @@ const TABS: {
       'products', 'add-product', 'product-detail', 'product-editor',
       'product-store', 'product-import', 'product-size-chart',
       'product-bundles', 'product-bundle-edit', 'drafts',
+      'size-chart-templates', 'size-chart-template-edit', 'size-chart-template-apply',
     ],
     destination: '/(tabs)/products',
   },
@@ -118,6 +119,9 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'product-size-chart': 'products',
   'product-bundles': 'products',
   'product-bundle-edit': 'products',
+  'size-chart-templates': 'products',
+  'size-chart-template-edit': 'products',
+  'size-chart-template-apply': 'products',
   'drafts': 'products',
   // Orders
   'orders': 'orders',
