@@ -3,6 +3,7 @@
  * Mounted at /api/freelancers/connect — pattern-identical to seller connect
  * (routes/connect.ts) but operates on the freelancers table.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import { db, freelancers, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -42,6 +43,7 @@ router.post("/onboard", async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
+    if (await denyIfAgeRestricted(clerkUserId, res)) return;
 
     // Dev proxy forwards /api/* verbatim to this server (previewPath /api);
     // the domain root is the correct public base for building /api/... URLs.

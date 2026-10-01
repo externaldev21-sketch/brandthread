@@ -11,6 +11,7 @@
  * Requires Stripe Identity to be enabled in the Stripe Dashboard:
  *   Dashboard → More → Identity → Get started
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -46,6 +47,7 @@ router.get("/status", async (req, res) => {
 // ─── POST /api/seller/verification/start ─────────────────────────────────────
 router.post("/start", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
+  if (await denyIfAgeRestricted(clerkId, res)) return;
 
   // Fetch current state
   const [user] = await db

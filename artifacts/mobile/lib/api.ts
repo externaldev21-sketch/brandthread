@@ -793,6 +793,8 @@ export interface LocalUserProfile {
   suspendedAt?: string | null;
   /** True when this sync cancelled a pending deletion (signing back in cancels it). */
   deletionCancelled?: boolean;
+  /** Derived age band (the date of birth is never stored). null = not asked yet. */
+  ageBand?: 'under_13' | '13_17' | '18_plus' | null;
 }
 
 export interface ShopifyImportJob {
@@ -3322,6 +3324,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
+    },
+    /** Age gate: the DOB is sent once, reduced to a band server-side, and never stored. */
+    ageGate: {
+      submit: (dateOfBirth: string) => post<{ ageBand: 'under_13' | '13_17' | '18_plus' }>('/api/auth/age', { dateOfBirth }),
     },
   };
 }

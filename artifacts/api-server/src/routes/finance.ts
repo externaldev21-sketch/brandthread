@@ -9,6 +9,7 @@
  * POST /payout                  manually trigger a payout (if manual schedule)
  * GET  /summary                 held vs releasing vs available vs paid out
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
@@ -492,6 +493,7 @@ router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
 
 router.post("/payout", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
+  if (await denyIfAgeRestricted(sellerId, res)) return;
   const { amount, currency, idempotencyKey } = req.body;
 
   try {

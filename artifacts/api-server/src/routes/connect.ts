@@ -3,6 +3,7 @@
  * Mounted at /api/seller/connect — all routes require Clerk auth, except the
  * Stripe redirect targets exported as `connectRedirectRouter`.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import type Stripe from "stripe";
 import { db, users } from "@workspace/db";
@@ -153,6 +154,7 @@ router.post("/onboard", async (req, res) => {
   try {
     const client = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
+    if (await denyIfAgeRestricted(clerkUserId, res)) return;
     const urls = defaultUrls(clerkUserId);
     const body = (req.body ?? {}) as { refreshUrl?: unknown; returnUrl?: unknown };
     for (const key of ["refreshUrl", "returnUrl"] as const) {
@@ -184,6 +186,7 @@ async function resumeHandler(req: any, res: any) {
   try {
     const client = requireStripe();
     const clerkUserId = req.clerkUserId as string;
+    if (await denyIfAgeRestricted(clerkUserId, res)) return;
     const link = await mintHostedLink(client, clerkUserId, defaultUrls(clerkUserId));
     if (!link) {
       res.status(404).json({ error: "User not found — call /api/auth/sync first" });
