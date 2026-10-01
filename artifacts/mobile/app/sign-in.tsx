@@ -10,6 +10,7 @@
  * Forgot password is untouched — it's its own screen (app/forgot-password.tsx)
  * with its own custom email-code-based reset, not part of this flow.
  */
+import { track } from '@/lib/analytics';
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -282,6 +283,7 @@ export default function SignInScreen() {
         if (isAddAccount) { checkMultiSessionDrop(); router.replace('/' as never); }
       } else if (ssoSignUp) {
         // Brand-new user with no account yet — send them through onboarding
+        track('signup_completed', { method: provider });
         router.replace('/onboarding' as never);
       }
       // If user cancelled (result with no session) we fall through silently

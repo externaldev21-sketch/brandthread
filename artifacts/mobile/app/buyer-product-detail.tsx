@@ -2,6 +2,7 @@
  * Brandthread Buyer Product Detail
  * Variant selection, add to cart, buy now.
  */
+import { track } from '@/lib/analytics';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -624,6 +625,7 @@ export default function BuyerProductDetailScreen() {
           // Best-effort — a failed view record should never affect the
           // product page itself, so no error handling beyond swallowing it.
           if (prod?.id && isSignedIn) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
+          if (prod?.id) track('product_viewed', { surface: 'detail' });
         }
       } catch {}
       if (!cancelled) setLoading(false);

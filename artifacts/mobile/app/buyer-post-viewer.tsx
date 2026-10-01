@@ -3,6 +3,7 @@
  * Receives lightweight params from the profile grid; loads real engagement
  * from socialService. Owner-only: edit caption (inline modal) and delete.
  */
+import { track } from '@/lib/analytics';
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -156,6 +157,7 @@ export default function BuyerPostViewer() {
     }
     found = found ?? previewPost(params.postId);
     if (found) {
+      track('post_viewed', { post_type: found.type });
       setPost(found);
       setLiked(found.likedByMe ?? false);
       setLikeCount(found.likesCount ?? 0);

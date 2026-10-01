@@ -3,6 +3,7 @@ import app from "./app";
 import { validateEnv } from "./lib/env";
 import { logger } from "./lib/logger";
 import { flushMonitoring } from "./lib/monitoring";
+import { flushAnalytics } from "./lib/analytics";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
 import { startSellerRankingJob }  from "./jobs/computeSellerRanking";
@@ -121,6 +122,7 @@ function shutdown(signal: NodeJS.Signals): void {
     }
 
     clearTimeout(forceExitTimer);
+    await flushAnalytics();
     await flushMonitoring();
     process.exit(closeErr ? 1 : 0);
   });
