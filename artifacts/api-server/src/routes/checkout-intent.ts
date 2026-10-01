@@ -77,6 +77,7 @@ const addressSchema = z.object({
 const groupsSchema = z.array(z.object({
   items: z.array(itemSchema).min(1).max(100),
   discountCode: z.string().trim().min(1).max(64).optional(),
+  liveStreamId: z.string().uuid().nullable().optional(),
 })).min(1).max(MAX_CART_GROUPS);
 /** A quote only needs where the order goes (a wallet sheet shares no street until the buyer pays). */
 const quoteSchema = z.object({
@@ -139,7 +140,7 @@ async function priceCart(
   const priced: PricedCartGroup[] = [];
   const sellers = new Set<string>();
   for (const group of groups) {
-    const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, shipping });
+    const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, liveStreamId: group.liveStreamId ?? null, shipping });
     if (sellers.has(pricedGroup.sellerId)) {
       throw new CartCheckoutError(400, "DUPLICATE_SELLER_GROUP", "Each seller's items must be in one group.");
     }

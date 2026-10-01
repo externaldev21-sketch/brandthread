@@ -1400,6 +1400,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             threadCashToken?: string;
             /** Seller discount code, validated fresh server-side and applied to this charge. */
             discountCode?: string;
+            /** Live the buyer is shopping from (required for live-only codes). */
+            liveStreamId?: string;
           },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1413,6 +1415,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
             ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
             ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
+            ...(opts.liveStreamId          ? { liveStreamId:          opts.liveStreamId          } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -2448,6 +2451,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         oneUsePerCustomer?: boolean;
         startsAt?: string | null;
         expiresAt?: string | null;
+        /** Live-only code: valid only for this stream, while it is live. */
+        liveStreamId?: string;
       }) => post<any>('/api/discount-codes', data),
       update: (id: string, data: {
         active?: boolean;
@@ -2462,8 +2467,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }) => patch<any>(`/api/discount-codes/${id}`, data),
       delete: (id: string) => del<any>(`/api/discount-codes/${id}`),
       uses:   (id: string) => get<any[]>(`/api/discount-codes/${id}/uses`),
-      validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
-        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
+      validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[], liveStreamId?: string) =>
+        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}${liveStreamId ? `&liveStreamId=${encodeURIComponent(liveStreamId)}` : ''}`),
     },
     /** Returns — buyer-initiated return requests */
     returns: {
@@ -2695,7 +2700,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Live Shopping — Agora-powered live streams */
     live: {
-      start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string }) =>
+      start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string; scheduledLiveId?: string }) =>
         post<any>('/api/live/start', data),
       active:         () => get<{ streams: any[] }>('/api/live/active'),
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
@@ -2708,6 +2713,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         patch<any>(`/api/live/${encodeURIComponent(id)}/products`, { productTags }),
       comment:        (id: string, data: { message: string; displayName?: string; avatarUrl?: string }) =>
         post<any>(`/api/live/${encodeURIComponent(id)}/comment`, data),
+      // ── Live commerce (pin) ── routes/live-commerce.ts
+      /** Pin a tagged product (productId) or unpin (null); broadcast to viewers over the live socket. */
+      pin:            (id: string, productId: string | null) =>
+        post<{ pinnedProductId: string | null; productTags: any[] }>(`/api/live/${encodeURIComponent(id)}/pin`, { productId }),
+      // ── end live commerce ──
       comments:       (id: string, since?: string) =>
         get<{ comments: any[] }>(`/api/live/${encodeURIComponent(id)}/comments${since ? `?since=${encodeURIComponent(since)}` : ''}`),
     },

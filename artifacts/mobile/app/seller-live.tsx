@@ -19,6 +19,7 @@ import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+import { LiveCodesHostSheet } from '@/components/live/LiveCodesHostSheet';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -69,6 +70,7 @@ function SellerLiveNativeScreen() {
   const [duration, setDuration]           = useState(0);
   const [productTags, setProductTags]     = useState<any[]>([]);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showLiveCodes, setShowLiveCodes]   = useState(false);
   const [allProducts, setAllProducts]     = useState<any[]>([]);
   const [ending, setEnding]               = useState(false);
   const [agoraReady, setAgoraReady]       = useState(false);
@@ -242,13 +244,17 @@ function SellerLiveNativeScreen() {
 
   async function highlightProduct(productId: string) {
     Haptics.selectionAsync();
+    // Tapping the featured product again unpins it. The pin is stored and
+    // broadcast by the server (POST /api/live/:id/pin), which also keeps the
+    // legacy `highlighted` flag in step.
+    const alreadyPinned = productTags.find(tag => tag.productId === productId)?.highlighted === true;
     const updated = productTags.map(tag => ({
       ...tag,
-      highlighted: tag.productId === productId,
+      highlighted: !alreadyPinned && tag.productId === productId,
     }));
     setProductTags(updated);
     try {
-      await (api as any).live.updateProducts(params.streamId, updated);
+      await (api as any).live.pin(params.streamId, alreadyPinned ? null : productId);
     } catch {
       Alert.alert('Could not feature product', 'The product highlight did not reach viewers. Please try again.');
     }
@@ -326,6 +332,10 @@ function SellerLiveNativeScreen() {
             </View>
           )}
         </TouchableOpacity>
+        {/* Live-only discount codes */}
+        <TouchableOpacity onPress={() => setShowLiveCodes(true)} style={s.railBtn} activeOpacity={0.7} accessibilityLabel="Live codes">
+          <Feather name="tag" size={21} color="#fff" />
+        </TouchableOpacity>
         {/* Switch camera */}
         <TouchableOpacity
           style={s.railBtn}
@@ -397,6 +407,8 @@ function SellerLiveNativeScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {showLiveCodes && <LiveCodesHostSheet streamId={params.streamId} onClose={() => setShowLiveCodes(false)} />}
 
       {/* Product picker modal */}
       {showProductPicker && (

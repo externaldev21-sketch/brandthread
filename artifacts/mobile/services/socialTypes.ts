@@ -485,7 +485,7 @@ export type NotificationType =
   | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
   | 'order_out_for_delivery' | 'order_exception' | 'order_returned_to_sender'
   | 'return_update' | 'refund_update' | 'dispute_update'
-  | 'product_restocked' | 'drop_live' | 'preorder_closing'
+  | 'product_restocked' | 'drop_live' | 'live_reminder' | 'live_started' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'
   | 'system' | 'marketing';

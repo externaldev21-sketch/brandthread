@@ -40,6 +40,8 @@ import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPa
 import { getLiveStreamProvider } from '@/lib/live/liveProvider';
 import { useLivePager, LIVE_END_ANIMATION_MS, type LiveRuntime } from '@/lib/live/useLivePager';
 import { liveShopSelection } from '@/lib/live/liveShop';
+import { fetchLiveCodes, describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
+import { clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import type { LiveStream } from '@/lib/live/types';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
@@ -261,6 +263,23 @@ export default function LiveScreen() {
   const [optionsFor, setOptionsFor] = useState<LiveStream | null>(null);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
+  const [liveCodes, setLiveCodes] = useState<LiveCode[]>([]);
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+
+  // Live-only codes for the stream whose bag is open (real streams only —
+  // the preview provider has no backend).
+  const bagStreamId = bagFor?.id ?? null;
+  useEffect(() => {
+    setLiveCodes([]);
+    if (!bagStreamId || provider.id === 'preview') return undefined;
+    let alive = true;
+    setAppliedCode(getLiveCheckoutContext()?.streamId === bagStreamId ? getLiveCheckoutContext()?.code ?? null : null);
+    fetchLiveCodes(bagStreamId).then(codes => { if (alive) setLiveCodes(codes); }).catch(() => {});
+    return () => { alive = false; };
+  }, [bagStreamId, provider]);
+
+  // Leaving the live ends "shopping from this live" for discount purposes.
+  useEffect(() => () => clearLiveCheckoutContext(), []);
 
   useEffect(() => {
     AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setMuted(false); }).catch(() => {});
@@ -350,6 +369,7 @@ export default function LiveScreen() {
   const buy = useCallback((stream: LiveStream, productId: string) => {
     const sel = liveShopSelection(stream, productId, provider.id === 'preview');
     if (!sel) return;
+    if (provider.id !== 'preview') setLiveCheckoutContext({ streamId: stream.id, sellerId: stream.host.id });
     setBagFor(null);
     setShopSelection(sel);
   }, [provider.id]);
@@ -463,6 +483,14 @@ export default function LiveScreen() {
           pinnedProductId={pager.runtime[bagFor.id]?.pinnedProductId ?? bagFor.pinnedProductId}
           onBuy={pid => buy(bagFor, pid)}
           onClose={() => setBagFor(null)}
+          codes={liveCodes}
+          appliedCode={appliedCode}
+          onApplyCode={code => {
+            setLiveCheckoutContext({ streamId: bagFor.id, sellerId: bagFor.host.id, code });
+            setAppliedCode(code);
+            const c = liveCodes.find(x => x.code === code);
+            setNotice(c ? `${code} applied: ${describeLiveCode(c)} at checkout` : `${code} applied at checkout`);
+          }}
         />
       )}
       {shopSelection && (

@@ -8,6 +8,7 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './liveCommerce';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -1380,6 +1381,8 @@ export const discountCodes = pgTable('discount_codes', {
   oneUsePerCustomer: boolean('one_use_per_customer').notNull().default(false),
   startsAt:       timestamp('starts_at'),
   active:         boolean('active').notNull().default(true),
+  /** Live-only code (migration 122): valid only for this stream, only while it is live. */
+  liveStreamId:   uuid('live_stream_id'),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('discount_codes_seller_idx').on(t.sellerId),
@@ -1940,6 +1943,9 @@ export const liveStreams = pgTable('live_streams', {
   recordingStartedAt:   timestamp('recording_started_at', { withTimezone: true }),
   recordingStoppedAt:   timestamp('recording_stopped_at', { withTimezone: true }),
   recordingError:       text('recording_error'),
+  // Pinned product (migration 120): the on-screen Buy card.
+  pinnedProductId:      text('pinned_product_id'),
+  pinUpdatedAt:         timestamp('pin_updated_at', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   statusViewerIdx: index('live_streams_status_viewer_idx')

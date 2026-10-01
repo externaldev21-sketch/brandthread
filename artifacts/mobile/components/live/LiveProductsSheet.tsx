@@ -14,9 +14,11 @@ import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import type { LiveProduct } from '@/lib/live/types';
 import { LIVE_RED } from './LiveAvatarRing';
+import { Button } from '@/components/ui/Button';
+import { describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
 
 export function LiveProductsSheet({
-  visible, hostName, products, pinnedProductId, onBuy, onClose,
+  visible, hostName, products, pinnedProductId, onBuy, onClose, codes = [], appliedCode = null, onApplyCode,
 }: {
   visible: boolean;
   hostName: string;
@@ -24,6 +26,10 @@ export function LiveProductsSheet({
   pinnedProductId: string | null;
   onBuy: (productId: string) => void;
   onClose: () => void;
+  /** Live-only codes the host shared in this live; tap to apply at checkout. */
+  codes?: LiveCode[];
+  appliedCode?: string | null;
+  onApplyCode?: (code: string) => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -42,6 +48,33 @@ export function LiveProductsSheet({
           </Pressable>
         </View>
         <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: SP.sm }}>
+          {codes.length > 0 && onApplyCode && (
+            <View style={{ gap: SP.sm }} testID="live-codes">
+              {codes.map(c => {
+                const applied = appliedCode?.toUpperCase() === c.code.toUpperCase();
+                return (
+                  <View key={c.id} style={[styles.row, { borderColor: theme.border }]}>
+                    <Feather name="tag" size={18} color={theme.text} style={{ marginHorizontal: 8 }} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.name, { color: theme.text }]}>{c.code}</Text>
+                      <Text style={[styles.sub, { color: theme.muted }]}>
+                        {describeLiveCode(c)}{c.minOrderCents > 0 ? ` over ${formatCents(c.minOrderCents)}` : ''}
+                      </Text>
+                    </View>
+                    <Button
+                      label={applied ? 'Applied' : 'Apply'}
+                      variant={applied ? 'secondary' : 'primary'}
+                      size="compact"
+                      icon={applied ? 'check' : undefined}
+                      disabled={applied}
+                      onPress={() => onApplyCode(c.code)}
+                      accessibilityLabel={applied ? `${c.code} applied` : `Apply code ${c.code}`}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          )}
           {products.map((p, i) => {
             const live = p.productId === pinnedProductId;
             return (

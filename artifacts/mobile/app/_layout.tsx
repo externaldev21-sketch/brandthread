@@ -282,6 +282,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'quote-request',
   // Seller livestream — real full-screen camera/broadcast controls.
   'seller-go-live',
+  // Opened from Go Live setup (no tab bar there); keep it consistent.
+  'seller-schedule-live',
   'seller-live',
   // LIVE viewer pager — full-bleed video with its own comment bar.
   'live',

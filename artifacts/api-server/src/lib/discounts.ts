@@ -6,7 +6,7 @@
  * actual checkout charge (buyer.ts POST /checkout/session) can never disagree.
  */
 import { and, eq, sql } from "drizzle-orm";
-import { db, discountCodes, discountCodeUses } from "@workspace/db";
+import { db, discountCodes, discountCodeUses, liveStreams } from "@workspace/db";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type DiscountCodeRow = InferSelectModel<typeof discountCodes>;
@@ -19,7 +19,9 @@ export type DiscountRejectionCode =
   | "MAX_USES_REACHED"
   | "ALREADY_USED_BY_CUSTOMER"
   | "MIN_ORDER_NOT_MET"
-  | "NO_ELIGIBLE_ITEMS";
+  | "NO_ELIGIBLE_ITEMS"
+  | "LIVE_ONLY"
+  | "LIVE_ENDED";
 
 export class DiscountValidationError extends Error {
   constructor(readonly code: DiscountRejectionCode, message: string, readonly details?: Record<string, unknown>) {
@@ -44,6 +46,26 @@ export interface DiscountApplication {
   freeShipping: boolean;
 }
 
+/**
+ * Live-only codes (discount_codes.live_stream_id): valid solely for that
+ * stream and solely while it is live. Pure so the rule is unit-testable.
+ * Returns null when the code may be used.
+ */
+export function liveScopeRejection(
+  discountLiveStreamId: string | null | undefined,
+  requestLiveStreamId: string | null | undefined,
+  streamStatus: string | null | undefined,
+): { code: "LIVE_ONLY" | "LIVE_ENDED"; message: string } | null {
+  if (!discountLiveStreamId) return null;
+  if (!requestLiveStreamId || requestLiveStreamId.toLowerCase() !== discountLiveStreamId.toLowerCase()) {
+    return { code: "LIVE_ONLY", message: "This code only works during the live it was shared in." };
+  }
+  if (streamStatus !== "live") {
+    return { code: "LIVE_ENDED", message: "This code was only valid during the live, which has ended." };
+  }
+  return null;
+}
+
 /** Sum of cart lines the code is allowed to discount (all of them for entire_store). */
 function eligibleSubtotalCents(discount: DiscountCodeRow, lines: CartLine[]): number {
   const productIds = Array.isArray(discount.productIds) ? new Set(discount.productIds as string[]) : new Set<string>();
@@ -65,6 +87,8 @@ export async function validateDiscountCode(input: {
   cartSubtotalCents: number;
   lines: CartLine[];
   now?: Date;
+  /** The live stream the buyer is shopping from, if any (required for live-only codes). */
+  liveStreamId?: string | null;
 }): Promise<DiscountApplication> {
   const now = input.now ?? new Date();
   const normalizedCode = input.code.trim().toUpperCase();
@@ -80,6 +104,20 @@ export async function validateDiscountCode(input: {
   }
   if (!discount.active) {
     throw new DiscountValidationError("INACTIVE", "This discount code is paused.");
+  }
+  if (discount.liveStreamId) {
+    const requested = input.liveStreamId ?? null;
+    let streamStatus: string | null = null;
+    if (requested && requested.toLowerCase() === discount.liveStreamId.toLowerCase()) {
+      const [stream] = await db
+        .select({ status: liveStreams.status })
+        .from(liveStreams)
+        .where(eq(liveStreams.id, discount.liveStreamId))
+        .limit(1);
+      streamStatus = stream?.status ?? null;
+    }
+    const rejection = liveScopeRejection(discount.liveStreamId, requested, streamStatus);
+    if (rejection) throw new DiscountValidationError(rejection.code, rejection.message);
   }
   if (discount.startsAt && discount.startsAt.getTime() > now.getTime()) {
     throw new DiscountValidationError("NOT_STARTED", "This discount code isn't active yet.");
