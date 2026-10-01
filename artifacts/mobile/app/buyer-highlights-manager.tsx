@@ -305,6 +305,8 @@ export default function BuyerHighlightsManager() {
         actions={[{ icon: 'plus', onPress: openCreate, accessibilityLabel: 'New highlight' }]}
       />
 
+      {/* Card chrome lives on a wrapper: on web, RN's RefreshControl wrapper would otherwise apply the list `style` twice (double border). */}
+      <View style={{ flexGrow: 1, flexShrink: 1, backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
       <FlatList
         data={highlights}
         keyExtractor={h => h.id}
@@ -320,8 +322,8 @@ export default function BuyerHighlightsManager() {
         }
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
-        style={{ backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}
       />
+      </View>
 
       <HLFormModal
         visible={creating}
