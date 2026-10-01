@@ -71,6 +71,7 @@ import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
@@ -1169,6 +1170,11 @@ export async function handleCheckoutPaid(
         shippingCountry: shippingAddress?.country ?? null,
         radar: chargeDetails.radar ?? null,
       });
+    }
+
+    // For You: a purchase is the strongest taste signal (seller + style of the content that sold it).
+    if (buyerId) {
+      void recordPurchaseSignals({ buyerId, sellerId: ownerId, variantIds: rawItems.map((i) => i.variantId) });
     }
 
     if (createdOrderId) {
