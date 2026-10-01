@@ -50,7 +50,7 @@ const MAX_GARMENTS = 4;
 const INITIAL_MSG: Message = {
   id: '0',
   role: 'assistant',
-  content: "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.",
+  content: "Add photos of your piece and any references, then tell me the vibe.",
 };
 
 export default function AIPhotographyChatScreen() {
@@ -331,15 +331,7 @@ export default function AIPhotographyChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <ScreenHeader
-        title="AI Product Photography"
-        subtitle="AI-generated photos"
-        rightElement={
-          <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.statusText, { color: colors.foreground }]}>Online</Text>
-          </View>
-        }
-      />
+      <ScreenHeader title="AI Product Photography" divider={false} />
 
       {/* Chat mode switch — both modes share the same thread and composer.
           Only shown when Outfit Swap is enabled; otherwise Product Photography is the only mode. */}
@@ -349,18 +341,18 @@ export default function AIPhotographyChatScreen() {
             activeOpacity={0.82}
             onPress={() => setMode('free')}
             testID="ai-photography-mode-free"
-            style={[styles.modeChip, mode === 'free' && { backgroundColor: colors.primary }]}
+            style={[styles.modeChip, { borderColor: colors.border }, mode === 'free' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
             <Feather name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
             <Text style={[styles.modeChipText, { color: mode === 'free' ? colors.primaryForeground : colors.mutedForeground }]}>
-              Product Photography
+              Photography
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.82}
             onPress={() => setMode('outfitSwap')}
             testID="ai-photography-mode-outfit-swap"
-            style={[styles.modeChip, mode === 'outfitSwap' && { backgroundColor: colors.primary }]}
+            style={[styles.modeChip, { borderColor: colors.border }, mode === 'outfitSwap' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
             <Feather name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
             <Text style={[styles.modeChipText, { color: mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground }]}>
@@ -538,16 +530,14 @@ export default function AIPhotographyChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  modeSwitch: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
-  modeChip: { flex: 1, minHeight: 34, borderRadius: 17, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  modeChipText: { fontSize: 12, fontFamily: FONT.semibold },
+  modeSwitch: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  modeChip: { flex: 1, flexBasis: 0, minWidth: 0, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  modeChipText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   outfitNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
   outfitNoticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
   // Narrow enough that the badge never eats into the title's available
   // width — a wider badge here previously clipped "AI Product Photography"
   // (251px of text in a 246px box) once the header row split the space.
-  statusBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   bubble: { maxWidth: '85%', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
