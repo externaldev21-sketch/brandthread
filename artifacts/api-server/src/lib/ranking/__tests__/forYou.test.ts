@@ -9,8 +9,11 @@ import {
   scoreCandidate,
   diversifyFeed,
   isCacheFresh,
+  engagementQuality,
   type RankingCandidate,
+  type PostEngagementStats,
 } from "../forYou";
+import { DEFAULT_RANKING_CONFIG, sanitizeRankingConfig, parseEnvOverride } from "../config";
 
 describe("updateAffinity", () => {
   it("adds weight to a new key", () => {
@@ -199,5 +202,120 @@ describe("isCacheFresh", () => {
 
   it("is stale after the TTL has elapsed", () => {
     expect(isCacheFresh(new Date(Date.now() - 120_000), 60_000)).toBe(false);
+  });
+});
+
+const stats = (over: Partial<PostEngagementStats> = {}): PostEngagementStats => ({
+  views: 100, avgCompletion: 0.5, likes: 0, shares: 0, saves: 0, purchases: 0, comments: 0, reposts: 0, ...over,
+});
+
+describe("engagementQuality", () => {
+  it("is 0 without stats and always bounded to 0..1", () => {
+    expect(engagementQuality(undefined)).toBe(0);
+    const huge = engagementQuality(stats({ views: 1, likes: 1e6, shares: 1e6, saves: 1e6, purchases: 1e6, avgCompletion: 5 }));
+    expect(huge).toBeLessThanOrEqual(1);
+    expect(huge).toBeGreaterThan(0.6);
+    expect(engagementQuality(stats({ views: 0, avgCompletion: -3 }))).toBeGreaterThanOrEqual(0);
+  });
+
+  it("rewards likes, shares, saves and purchases, purchases most", () => {
+    const base = engagementQuality(stats());
+    expect(engagementQuality(stats({ likes: 10 }))).toBeGreaterThan(base);
+    expect(engagementQuality(stats({ shares: 10 }))).toBeGreaterThan(engagementQuality(stats({ likes: 10 })));
+    expect(engagementQuality(stats({ purchases: 10 }))).toBeGreaterThan(engagementQuality(stats({ saves: 10 })));
+  });
+
+  it("rewards higher completion only when views back it up", () => {
+    const high = engagementQuality(stats({ views: 100, avgCompletion: 0.95 }));
+    const low = engagementQuality(stats({ views: 100, avgCompletion: 0.1 }));
+    expect(high).toBeGreaterThan(low);
+    const fewViewsHigh = engagementQuality(stats({ views: 1, avgCompletion: 0.95 }));
+    expect(fewViewsHigh).toBeLessThan(high);
+  });
+
+  it("smooths tiny samples: 1 view + 1 like does not beat a proven post", () => {
+    const tiny = engagementQuality(stats({ views: 1, likes: 1, avgCompletion: null }));
+    const proven = engagementQuality(stats({ views: 500, likes: 150, shares: 30, saves: 40, avgCompletion: 0.8 }));
+    expect(proven).toBeGreaterThan(tiny);
+  });
+});
+
+describe("scoreCandidate with tunable config", () => {
+  const now = Date.now();
+  const cand = (over: Partial<RankingCandidate> = {}): RankingCandidate => ({
+    id: "p", sellerId: "s", createdAt: new Date(now), styleTags: [], isFollowed: false, isBoosted: false,
+    isLive: false, sellerScore: 0, ...over,
+  });
+
+  it("engagement term lifts a proven post and is scaled by its own weight", () => {
+    const proven = cand({ engagement: stats({ likes: 50, shares: 20, saves: 20, purchases: 5, avgCompletion: 0.9 }) });
+    const plain = cand();
+    expect(scoreCandidate(proven, {}, {}, {}, now)).toBeGreaterThan(scoreCandidate(plain, {}, {}, {}, now));
+    const off = sanitizeRankingConfig({ scoreWeights: { engagement: 0 } });
+    expect(scoreCandidate(proven, {}, {}, {}, now, off)).toBeCloseTo(scoreCandidate(plain, {}, {}, {}, now, off), 10);
+    const boosted = sanitizeRankingConfig({ scoreWeights: { engagement: 10 } });
+    expect(scoreCandidate(proven, {}, {}, {}, now, boosted)).toBeGreaterThan(scoreCandidate(proven, {}, {}, {}, now));
+  });
+
+  it("honours a custom followed weight and half-life", () => {
+    const cfg = sanitizeRankingConfig({ scoreWeights: { followed: 7 } });
+    const diff = scoreCandidate(cand({ isFollowed: true }), {}, {}, {}, now, cfg) - scoreCandidate(cand(), {}, {}, {}, now, cfg);
+    expect(diff).toBeCloseTo(7, 10);
+    const slow = sanitizeRankingConfig({ recencyHalfLifeHours: 240 });
+    const old = cand({ createdAt: new Date(now - 48 * 3600_000) });
+    expect(scoreCandidate(old, {}, {}, {}, now, slow)).toBeGreaterThan(scoreCandidate(old, {}, {}, {}, now));
+  });
+
+  it("eventWeight uses overridden weights", () => {
+    expect(eventWeight("like", null, { like: 9 })).toBe(9);
+    expect(eventWeight("purchase", null, { like: 9 })).toBe(0);
+  });
+});
+
+describe("sanitizeRankingConfig", () => {
+  it("returns defaults for garbage input and never throws", () => {
+    for (const bad of [null, undefined, 5, "x", [], [1, 2], { eventWeights: "no" }, { scoreWeights: [] }]) {
+      expect(sanitizeRankingConfig(bad)).toEqual(DEFAULT_RANKING_CONFIG);
+    }
+  });
+
+  it("clamps out-of-range values and ignores unknown keys", () => {
+    const cfg = sanitizeRankingConfig({
+      eventWeights: { like: 9999, purchase: -9999, bogus: 5, share: "3.5", view: "abc" },
+      scoreWeights: { affinity: -4, freshness: 1e9, nope: 1 },
+      recencyHalfLifeHours: 0,
+      liveInterleaveEvery: 1,
+      explorationEvery: 1000.4,
+      engagementWindowDays: 9999,
+      unknownTop: true,
+    }) as any;
+    expect(cfg.eventWeights.like).toBe(10);
+    expect(cfg.eventWeights.purchase).toBe(-10);
+    expect(cfg.eventWeights.share).toBe(3.5);
+    expect(cfg.eventWeights.view).toBe(DEFAULT_RANKING_CONFIG.eventWeights.view);
+    expect(cfg.eventWeights.bogus).toBeUndefined();
+    expect(cfg.scoreWeights.affinity).toBe(0);
+    expect(cfg.scoreWeights.freshness).toBe(20);
+    expect(cfg.scoreWeights.nope).toBeUndefined();
+    expect(cfg.recencyHalfLifeHours).toBe(1);
+    expect(cfg.liveInterleaveEvery).toBe(2);
+    expect(cfg.explorationEvery).toBe(50);
+    expect(cfg.engagementWindowDays).toBe(90);
+    expect(cfg.unknownTop).toBeUndefined();
+  });
+
+  it("does not mutate defaults and layers onto a base", () => {
+    const before = JSON.stringify(DEFAULT_RANKING_CONFIG);
+    const a = sanitizeRankingConfig({ scoreWeights: { affinity: 5 } });
+    const b = sanitizeRankingConfig({ scoreWeights: { followed: 2 } }, a);
+    expect(b.scoreWeights.affinity).toBe(5);
+    expect(b.scoreWeights.followed).toBe(2);
+    expect(JSON.stringify(DEFAULT_RANKING_CONFIG)).toBe(before);
+  });
+
+  it("parseEnvOverride tolerates invalid JSON", () => {
+    expect(parseEnvOverride("{oops")).toBeNull();
+    expect(parseEnvOverride(undefined)).toBeNull();
+    expect(parseEnvOverride('{"scoreWeights":{"affinity":4}}')).toEqual({ scoreWeights: { affinity: 4 } });
   });
 });
