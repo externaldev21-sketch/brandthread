@@ -17,6 +17,8 @@ import { debitCredits, refundDebit } from "./ledger";
 export async function aiCreditsGate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const rule = findToolRule(req.method, req.path);
   if (!rule) return next();
+  // Text tools are never debited; their routes carry their own rate limit.
+  if (rule.kind === "text") return next();
   const { userId } = getAuth(req);
   if (!userId) return next();
 

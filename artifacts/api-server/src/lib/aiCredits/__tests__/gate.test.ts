@@ -14,7 +14,15 @@ describe("AI tool rules", () => {
     expect(findToolRule("POST", "/onboarding-sample/generate")).toBeNull();
     expect(findToolRule("GET", "/photography/generate")).toBeNull();
   });
-  it("only has positive integer costs", () => {
-    for (const r of AI_TOOL_RULES) expect(Number.isInteger(r.cost) && r.cost > 0).toBe(true);
+  it("only has positive integer costs, except free text tools", () => {
+    for (const r of AI_TOOL_RULES) {
+      if (r.kind === "text") expect(r.cost).toBe(0);
+      else expect(Number.isInteger(r.cost) && r.cost > 0).toBe(true);
+    }
+  });
+  it("marks the AI helpers as unlimited text", () => {
+    for (const p of ["/ai-helpers/caption", "/ai-helpers/product-description", "/ai-helpers/size-chart"]) {
+      expect(findToolRule("POST", p)).toMatchObject({ cost: 0, kind: "text" });
+    }
   });
 });

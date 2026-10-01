@@ -21,6 +21,8 @@ export type AiToolRule = {
   tool: string;
   label: string;
   cost: number;
+  /** 'text' tools are unlimited on paid plans: never debited (cost 0), only the route rate limit applies. */
+  kind?: "text";
 };
 
 /**
@@ -33,9 +35,9 @@ export const AI_TOOL_RULES: AiToolRule[] = [
   { method: "POST", path: /^\/ai\/brand-memory\/rebuild$/,        tool: "brand_memory",     label: "Brand memory",          cost: 1 },
   { method: "POST", path: /^\/brandthread-agent\/(chat|message)s?$/, tool: "agent_chat",    label: "Brandthread agent",     cost: 1 },
   { method: "POST", path: /^\/store\/ai\//,                       tool: "store_ai",         label: "Store AI",              cost: 2 },
-  { method: "POST", path: /^\/ai-helpers\/caption$/,            tool: "ai_caption",       label: "Caption and hashtags",  cost: 1 },
-  { method: "POST", path: /^\/ai-helpers\/product-description$/, tool: "ai_product_description", label: "Product description", cost: 2 },
-  { method: "POST", path: /^\/ai-helpers\/size-chart$/,          tool: "ai_size_chart",    label: "Size chart",            cost: 2 },
+  { method: "POST", path: /^\/ai-helpers\/caption$/,            tool: "ai_caption",       label: "Caption and hashtags",  cost: 0, kind: "text" },
+  { method: "POST", path: /^\/ai-helpers\/product-description$/, tool: "ai_product_description", label: "Product description", cost: 0, kind: "text" },
+  { method: "POST", path: /^\/ai-helpers\/size-chart$/,          tool: "ai_size_chart",    label: "Size chart",            cost: 0, kind: "text" },
   { method: "POST", path: /^\/logo\/(generate|logo)$/,            tool: "logo",             label: "Logo",                  cost: 5 },
   { method: "POST", path: /^\/mockup\/generate$/,                 tool: "mockup",           label: "Mockup",                cost: 5 },
   { method: "POST", path: /^\/photography\/generate$/,            tool: "photoshoot",       label: "AI photoshoot",         cost: 8 },

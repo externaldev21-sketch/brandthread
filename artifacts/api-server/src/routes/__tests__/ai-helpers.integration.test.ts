@@ -130,80 +130,51 @@ afterAll(async () => {
   await new Promise<void>((r) => server?.close(() => r()));
 });
 
-describe("credits through the real gate", () => {
-  it("debits 1 credit for a caption on success", async () => {
+describe("text helpers are never debited (real gate mounted)", () => {
+  it("does not touch the credit ledger on success", async () => {
     const before = await balance();
     state.aiReply = captionReply;
     const r = await call("/caption", { draft: "new hoodie out now", tone: "bold" });
     expect(r.status).toBe(200);
-    expect(r.headers.get("x-ai-credits-charged")).toBe("1");
+    expect(r.headers.get("x-ai-credits-charged")).toBeNull();
     expect(r.json.captions).toHaveLength(3);
-    expect(r.json.hashtags).toEqual(["#streetwear", "#newdrop", "#ootd"].filter((t) => r.json.hashtags.includes(t)));
     expect(r.json.hashtags.every((t: string) => /^#[A-Za-z0-9_]+$/.test(t))).toBe(true);
-    expect(await balance()).toBe(before - 1);
+    expect(await balance()).toBe(before);
+    const { listHistory } = await import("../../lib/aiCredits/ledger");
+    expect((await listHistory(ME)).entries.map((e) => e.kind)).not.toContain("debit");
   });
 
-  it("refunds when the provider fails", async () => {
-    const before = await balance();
+  it("still works with zero credits", async () => {
+    const { debitCredits } = await import("../../lib/aiCredits/ledger");
+    await debitCredits({ clerkUserId: ME, cost: await balance(), toolKey: "test" });
+    state.aiReply = captionReply;
+    expect((await call("/caption", { draft: "hello" })).status).toBe(200);
+    state.aiReply = () => ({ note: "Relaxed fit." });
+    expect((await call("/size-chart", { garmentType: "tee", unit: "cm", base: { chest: 100 }, grading: { chest: 4 } })).status).toBe(200);
+  });
+
+  it("returns 502 ai_failed when the provider fails", async () => {
     state.aiReply = () => new Error("upstream 500");
     const r = await call("/caption", { draft: "new hoodie out now" });
     expect(r.status).toBe(502);
     expect(r.json.code).toBe("ai_failed");
-    await vi.waitFor(async () => expect(await balance()).toBe(before));
   });
 
-  it("refunds an unusable model answer", async () => {
-    const before = await balance();
+  it("returns 502 for an unusable model answer", async () => {
     state.aiReply = () => ({ captions: ["only one"], hashtags: [] });
-    const r = await call("/caption", { draft: "hello" });
-    expect(r.status).toBe(502);
-    await vi.waitFor(async () => expect(await balance()).toBe(before));
+    expect((await call("/caption", { draft: "hello" })).status).toBe(502);
   });
 
-  it("returns 503 ai_unavailable without calling the provider, and refunds", async () => {
+  it("returns 503 ai_unavailable without calling the provider", async () => {
     delete process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    const before = await balance();
     const r = await call("/caption", { draft: "hello" });
     expect(r.status).toBe(503);
     expect(r.json.code).toBe("ai_unavailable");
     expect(state.aiCalls).toHaveLength(0);
-    await vi.waitFor(async () => expect(await balance()).toBe(before));
   });
 
-  it("refunds invalid input (400)", async () => {
-    const before = await balance();
-    const r = await call("/caption", { tone: "bold" });
-    expect(r.status).toBe(400);
-    await vi.waitFor(async () => expect(await balance()).toBe(before));
-  });
-
-  it("answers 402 when the user has no credits left", async () => {
-    const { debitCredits } = await import("../../lib/aiCredits/ledger");
-    const bal = await balance();
-    await debitCredits({ clerkUserId: ME, cost: bal, toolKey: "test" });
-    const r = await call("/caption", { draft: "hello" });
-    expect(r.status).toBe(402);
-    expect(r.json.code).toBe("insufficient_credits");
-    expect(state.aiCalls).toHaveLength(0);
-  });
-
-  it("charges 2 credits for size charts and product descriptions", async () => {
-    const before = await balance();
-    state.aiReply = () => ({ note: "Runs true to size with a relaxed chest." });
-    const r = await call("/size-chart", {
-      garmentType: "tee", unit: "cm", base: { chest: 100, length: 70 }, grading: { chest: 4, length: 1.5 },
-    });
-    expect(r.status).toBe(200);
-    expect(r.headers.get("x-ai-credits-charged")).toBe("2");
-    expect(await balance()).toBe(before - 2);
-  });
-
-  it("does not gate or bill /save", async () => {
-    const before = await balance();
-    const r = await call("/save", { target: "post", postId: crypto.randomUUID(), caption: "x" });
-    expect(r.status).toBe(404);
-    expect(r.headers.get("x-ai-credits-charged")).toBeNull();
-    expect(await balance()).toBe(before);
+  it("rejects invalid input (400)", async () => {
+    expect((await call("/caption", { tone: "bold" })).status).toBe(400);
   });
 });
 
