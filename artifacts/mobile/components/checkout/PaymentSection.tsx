@@ -39,6 +39,8 @@ export interface SavedCard {
 }
 
 export const NEW_CARD = 'new';
+/** Buy now, pay later (Klarna / Afterpay): shows Stripe's Payment Element on its Klarna / Afterpay tabs. */
+export const BNPL = 'bnpl';
 
 function brandLabel(brand: string) {
   if (!brand) return 'Card';
@@ -163,7 +165,7 @@ export function ExpressSection({ children, visible }: { children: React.ReactNod
 // ─── PAYMENT ─────────────────────────────────────────────────────────────────
 
 export function PaymentSection({
-  path, savedCards, selectedCard, onSelectCard, onCardComplete, sellerCount,
+  path, savedCards, selectedCard, onSelectCard, onCardComplete, sellerCount, bnplAvailable,
 }: {
   path: PaymentPath;
   savedCards: SavedCard[];
@@ -172,6 +174,8 @@ export function PaymentSection({
   onSelectCard: (id: string) => void;
   onCardComplete: (complete: boolean) => void;
   sellerCount: number;
+  /** Web, every seller opted in, amount eligible: offer Klarna / Afterpay next to saved cards. */
+  bnplAvailable?: boolean;
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
@@ -205,7 +209,8 @@ export function PaymentSection({
     );
   }
 
-  const showNewCard = savedCards.length === 0 || selectedCard === NEW_CARD;
+  const showBnplRow = !!bnplAvailable && savedCards.length > 0;
+  const showNewCard = savedCards.length === 0 || selectedCard === NEW_CARD || (showBnplRow && selectedCard === BNPL);
   return (
     <CheckoutSection title="Payment" testID="checkout-payment">
       {savedCards.length > 0 ? (
@@ -224,9 +229,19 @@ export function PaymentSection({
             selected={selectedCard === NEW_CARD}
             onPress={() => onSelectCard(NEW_CARD)}
             title="Use a new card"
-            last={selectedCard !== NEW_CARD}
+            last={selectedCard !== NEW_CARD && !showBnplRow}
             testID="checkout-new-card"
           />
+          {showBnplRow ? (
+            <OptionRow
+              selected={selectedCard === BNPL}
+              onPress={() => onSelectCard(BNPL)}
+              title="Klarna or Afterpay"
+              lines={['Pay over time']}
+              last={selectedCard !== BNPL}
+              testID="checkout-bnpl"
+            />
+          ) : null}
         </View>
       ) : null}
       {showNewCard ? (

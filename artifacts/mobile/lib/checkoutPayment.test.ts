@@ -126,3 +126,15 @@ describe('quote responses', () => {
     expect(isCartQuote({ amountCents: 100, groups: [{}] })).toBe(false);
   });
 });
+
+describe('quoteOffersBnpl', () => {
+  it('is true only when the server offered klarna or afterpay', async () => {
+    const { quoteOffersBnpl } = await import('./checkoutPayment');
+    const base = { amountCents: 100, groups: [] };
+    expect(quoteOffersBnpl(undefined)).toBe(false);
+    expect(quoteOffersBnpl(base)).toBe(false);
+    expect(quoteOffersBnpl({ ...base, paymentMethodTypes: ['card'] })).toBe(false);
+    expect(quoteOffersBnpl({ ...base, paymentMethodTypes: ['card', 'klarna'] })).toBe(true);
+    expect(quoteOffersBnpl({ ...base, paymentMethodTypes: ['card', 'afterpay_clearpay'] })).toBe(true);
+  });
+});

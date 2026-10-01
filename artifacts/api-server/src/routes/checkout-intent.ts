@@ -38,6 +38,8 @@ import {
   CART_CHECKOUT_KIND, CartCheckoutError, MAX_CART_GROUPS, MIN_CARD_CHARGE_CENTS,
   calculateGroupTax, findCardDataInRequest, priceCartGroup, type CartShipping, type PricedGroup,
 } from "../lib/money/cartCheckout";
+import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
+import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
 
 const router = Router();
@@ -207,9 +209,12 @@ router.post("/quote", validateRequest({ body: quoteSchema }), async (req, res) =
   };
   try {
     const priced = await priceCart(stripe, buyerId, body.groups, shipping);
+    const amountCents = priced.reduce((sum, group) => sum + group.totalCents, 0);
+    const bnpl = await bnplMethodsForCart({ sellerIds: priced.map((g) => g.sellerId), amountCents, shipToCountry: shipping.country });
     res.json({
-      amountCents: priced.reduce((sum, group) => sum + group.totalCents, 0),
+      amountCents,
       groups: breakdown(priced),
+      paymentMethodTypes: paymentMethodTypesFor(bnpl),
     });
   } catch (error) {
     if (sendError(res, error)) return;
@@ -328,14 +333,16 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   // ── One PaymentIntent for the cart ────────────────────────────────────────
   let intent;
   try {
+    // Card always; Klarna / Afterpay only when the platform flag, every seller and the amount allow it.
+    const bnpl = await bnplMethodsForCart({ sellerIds: priced.map((g) => g.sellerId), amountCents, shipToCountry: shipping.country });
     const customer = await ensureStripeCustomer(stripe, buyerId, body.contactEmail, shipping, body.contactPhone);
     intent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "usd",
       customer,
-      // Card covers Apple Pay and Google Pay (both are card wallets).
-      payment_method_types: ["card"],
-      ...(body.saveCard === false ? {} : { setup_future_usage: "off_session" as const }),
+      // Card covers Apple Pay and Google Pay (both are card wallets). BNPL
+      // can't be combined with a top-level setup_future_usage, see lib/payments/bnpl.ts.
+      ...paymentIntentMethodParams(bnpl, body.saveCard !== false),
       receipt_email: body.contactEmail,
       shipping: {
         name: shipping.name,
@@ -378,6 +385,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
     status: intent.status,
     amountCents,
     groups: breakdown(priced, rows),
+    paymentMethodTypes: intent.payment_method_types ?? ["card"],
   });
 });
 
