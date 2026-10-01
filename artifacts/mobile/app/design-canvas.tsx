@@ -25,7 +25,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable,
   Alert, ScrollView, TextInput, Modal, Dimensions, Share,
   Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent,
-  LayoutAnimation, UIManager,
+  LayoutAnimation, UIManager, Linking,
 } from 'react-native';
 
 // Android needs this opt-in for LayoutAnimation (iOS/web animate by default).
@@ -204,8 +204,11 @@ type ActiveSheet =
   | 'brushLib' | 'color' | 'layers' | 'wrench' | 'text' | 'export' | 'canvasInfo'
   | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | null;
 
-// Wrench tab type — now includes 'prefs' as sixth tab
-type WrenchTab = 'add' | 'canvas' | 'guides' | 'share' | 'prefs';
+// Wrench tab type — Procreate's own Actions tabs are Add / Canvas / Guides /
+// Share / Video / Preferences / Help. 'video' is deliberately absent: its
+// Replay / Time-lapse / Export actions need real recording infrastructure
+// this app doesn't have, and a tab of non-working buttons would be a stub.
+type WrenchTab = 'add' | 'canvas' | 'guides' | 'share' | 'prefs' | 'help';
 
 // Transform handle kind (legacy 4-corner system, kept for compat)
 type HandleKind =
@@ -3919,6 +3922,9 @@ export default function DesignCanvasScreen() {
         }}
         onInsertFile={() => { closeSheet(); setTimeout(() => handleInsertFile(), 100); }}
         onAddText={() => { closeSheet(); openSheet('text'); }}
+        // HELP tab
+        onOpenHelpCenter={() => { closeSheet(); router.push('/help' as never); }}
+        onOpenSettings={() => { closeSheet(); router.push('/settings' as never); }}
         onCut={handleCut}
         onCopy={handleCopyLayer}
         onCopyCanvas={handleCopyCanvas}
@@ -4746,6 +4752,10 @@ interface WrenchActionsSheetProps {
   timerDisplay: { session: string; total: string };
   quickMenuEditSlot: number | null;
   onQuickMenuEditSlot: (slot: number | null) => void;
+  // HELP — in-app destinations are navigated by the host screen (it owns
+  // the router + closes the sheet first); external ones use Linking here.
+  onOpenHelpCenter: () => void;
+  onOpenSettings: () => void;
 }
 
 const WRENCH_TABS: { key: WrenchTab; label: string }[] = [
@@ -4754,11 +4764,12 @@ const WRENCH_TABS: { key: WrenchTab; label: string }[] = [
   { key: 'guides', label: 'Guides' },
   { key: 'share',  label: 'Share' },
   { key: 'prefs',  label: 'Prefs' },
+  { key: 'help',   label: 'Help' },
 ];
 
 function WrenchActionsSheet({
   visible, onClose, wrenchTab, setWrenchTab, selectedLayerId,
-  onInsertPhoto, onInsertFile, onTakePhoto, onAddText,
+  onInsertPhoto, onInsertFile, onTakePhoto, onAddText, onOpenHelpCenter, onOpenSettings,
   onCut, onCopy, onCopyCanvas, onPaste, hasClipboard,
   onCropResize, animEnabled, onToggleAnimAssist,
   onFlipHorizontal, onFlipVertical, onCanvasInfo,
@@ -4774,7 +4785,7 @@ function WrenchActionsSheet({
   const hasSelection = !!selectedLayerId;
 
   function ActionCell({
-    icon, label, sub, onPress, disabled = false, active = false,
+    icon, label, sub, onPress, disabled = false, active = false, testID,
   }: {
     icon: React.ComponentProps<typeof Feather>['name'];
     label: string;
@@ -4782,6 +4793,7 @@ function WrenchActionsSheet({
     onPress: () => void;
     disabled?: boolean;
     active?: boolean;
+    testID?: string;
   }) {
     return (
       <TouchableOpacity
@@ -4791,6 +4803,7 @@ function WrenchActionsSheet({
         disabled={disabled}
         accessibilityLabel={label}
         accessibilityRole="button"
+        testID={testID}
       >
         <Feather name={icon} size={ICON.md} color={active ? FG : disabled ? SUBTLE : MUTED} />
         <Text style={styles.actionCellLabel}>{label}</Text>
@@ -4847,12 +4860,13 @@ function WrenchActionsSheet({
         <SheetHandle />
 
         {/* Tab row */}
-        <View style={styles.wrenchTabsRow}>
+        <View style={styles.wrenchTabsRow} testID="wrench-tabs-row">
           {WRENCH_TABS.map(t => (
             <TouchableOpacity
               key={t.key}
               style={[styles.wrenchTabBtn, wrenchTab === t.key && styles.wrenchTabBtnActive]}
               onPress={() => { setWrenchTab(t.key); Haptics.selectionAsync(); }}
+              testID={`wrench-tab-${t.key}`}
               accessibilityRole="tab"
               accessibilityState={{ selected: wrenchTab === t.key }}
             >
@@ -5242,6 +5256,36 @@ function WrenchActionsSheet({
                 </View>
               )}
 
+            </View>
+          )}
+
+          {/* ── HELP TAB — Procreate's Help tab is Advanced settings / Support /
+              Procreate Folio / Leave a review / Handbook. Every cell here
+              opens a REAL destination: the in-app Help Center screen, the
+              support mailbox, live chat, and in-app Settings. Deliberately
+              absent, not faked: "Leave a review" (no store listing URL or
+              review API exists in this app yet) and a Folio equivalent
+              (no Brandthread gallery to link to). ── */}
+          {wrenchTab === 'help' && (
+            <View style={styles.actionGrid} testID="wrench-help-grid">
+              <ActionCell
+                icon="help-circle" label="Help Center" sub="Guides & FAQs"
+                onPress={onOpenHelpCenter} testID="help-center"
+              />
+              <ActionCell
+                icon="mail" label="Contact Support" sub="support@brandthread.app"
+                onPress={() => { Linking.openURL('mailto:support@brandthread.app').catch(() => {}); }}
+                testID="help-support"
+              />
+              <ActionCell
+                icon="message-circle" label="Live Chat" sub="brandthread.app/chat"
+                onPress={() => { Linking.openURL('https://brandthread.app/chat').catch(() => {}); }}
+                testID="help-chat"
+              />
+              <ActionCell
+                icon="settings" label="Settings" sub="Account & app settings"
+                onPress={onOpenSettings} testID="help-settings"
+              />
             </View>
           )}
 
@@ -5671,7 +5715,13 @@ const styles = StyleSheet.create({
   // 2-column action grid
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: SP.md, gap: SP.sm },
   actionCell: {
-    width: (SW - SP.md * 2 - SP.sm) / 2,
+    // Percent, not (SW - padding - gap) / 2: that absolute formula is 2px
+    // too wide once the sheet's own 1px side borders come off its inner
+    // width, so the second cell on every row wrapped and the whole grid
+    // rendered single-column with the right half empty (caught by the Help
+    // tab's zoomed screenshot). Procreate's Actions grid is 2-up; 48% plus
+    // the row gap always fits two regardless of surrounding chrome.
+    width: '48%',
     backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
     paddingVertical: SP.md, gap: SP.xs, minHeight: 80,
