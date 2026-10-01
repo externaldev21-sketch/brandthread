@@ -5,14 +5,13 @@
  * this screen only edits them. `&demo=1` renders sample data with no API calls.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
-import { Chip } from '@/components/ui/Chip';
 import { ListRow } from '@/components/ui/ListRow';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -117,7 +116,7 @@ export default function LiveModerationScreen() {
         avatar={{ name: u.displayName }}
         title={u.displayName}
         subtitle={u.username ? `@${u.username}` : undefined}
-        right={<Button label={kind === 'muted' ? 'Unmute' : 'Unban'} variant="secondary" size="compact" onPress={() => void lift(kind, u)} />}
+        right={<View style={s.rowBtn}><Button label={kind === 'muted' ? 'Unmute' : 'Unban'} variant="secondary" size="compact" fullWidth onPress={() => void lift(kind, u)} /></View>}
       />
     ));
 
@@ -138,10 +137,22 @@ export default function LiveModerationScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.sectionLabel}>Slow mode</Text>
-          <View style={s.chipRow}>
-            {SLOW_MODE_OPTIONS.map((sec) => (
-              <Chip key={sec} label={slowLabel(sec)} selected={slow === sec} onPress={() => patch({ slowModeSeconds: sec })} />
-            ))}
+          <View style={s.segmentRow}>
+            {SLOW_MODE_OPTIONS.map((sec) => {
+              const on = slow === sec;
+              return (
+                <Pressable
+                  key={sec}
+                  onPress={() => patch({ slowModeSeconds: sec })}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={sec === 0 ? 'Slow mode off' : `Slow mode ${slowLabel(sec)}`}
+                  style={[s.segment, { backgroundColor: on ? theme.accent : theme.card, borderColor: on ? theme.accent : theme.border }]}
+                >
+                  <Text style={[s.segmentText, { color: on ? theme.onAccent : theme.text }]}>{slowLabel(sec)}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <Text style={s.sectionLabel}>Blocked words</Text>
@@ -159,22 +170,15 @@ export default function LiveModerationScreen() {
               style={s.input}
               accessibilityLabel="Blocked word"
             />
-            <Button label="Add" variant="secondary" size="small" onPress={commitWord} disabled={!wordDraft.trim()} />
+            <View style={s.rowBtn}><Button label="Add" variant="secondary" size="small" fullWidth onPress={commitWord} disabled={!wordDraft.trim()} /></View>
           </View>
-          {words.length > 0 && (
-            <View style={s.chipRow}>
-              {words.map((w) => (
-                <Chip
-                  key={w}
-                  label={w}
-                  selected={false}
-                  onPress={() => patch({ bannedWords: words.filter((x) => x !== w) })}
-                  onRemove={() => patch({ bannedWords: words.filter((x) => x !== w) })}
-                  removeAccessibilityLabel={`Remove ${w}`}
-                />
-              ))}
-            </View>
-          )}
+          {words.map((w) => (
+            <ListRow
+              key={w}
+              title={w}
+              right={<View style={s.rowBtn}><Button label="Remove" variant="secondary" size="compact" fullWidth onPress={() => patch({ bannedWords: words.filter((x) => x !== w) })} /></View>}
+            />
+          ))}
           <ListRow
             title="Use for all my lives"
             toggle={{ value: saveAsDefault, onChange: setSaveAsDefault }}
@@ -194,7 +198,9 @@ export default function LiveModerationScreen() {
             </>
           )}
 
-          <Button label="Save" onPress={() => void save()} loading={saving} fullWidth style={s.saveBtn} />
+          <View style={s.saveWrap}>
+            <Button label="Save" onPress={() => void save()} loading={saving} fullWidth />
+          </View>
         </ScrollView>
       )}
     </View>
@@ -210,12 +216,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, letterSpacing: 0.6,
     textTransform: 'uppercase', marginTop: SP.lg, marginBottom: SP.sm,
   },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  segmentRow: { flexDirection: 'row', gap: SP.sm },
+  segment: { flex: 1, height: 44, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  segmentText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  rowBtn: { width: 112 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   input: {
-    flex: 1, height: 44, borderRadius: RADIUS.md, paddingHorizontal: SP.md,
+    flex: 1, minWidth: 0, height: 44, borderRadius: RADIUS.md, paddingHorizontal: SP.md,
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base,
   },
   defaultRow: { marginTop: SP.md },
-  saveBtn: { marginTop: SP.xl },
+  saveWrap: { marginTop: SP.xl },
 });

@@ -119,7 +119,7 @@ export default function LiveCohostScreen() {
               avatar={{ uri: c.avatarUrl, name: c.displayName }}
               title={c.displayName}
               subtitle={c.username ? `@${c.username}` : undefined}
-              right={<Button label="Remove" variant="secondary" size="compact" onPress={() => void removeCohost(c)} />}
+              right={<View style={s.rowBtn}><Button label="Remove" variant="secondary" size="compact" fullWidth onPress={() => void removeCohost(c)} /></View>}
             />
           ))}
         </>
@@ -150,13 +150,16 @@ export default function LiveCohostScreen() {
               title={item.displayName}
               subtitle={item.username ? `@${item.username}` : undefined}
               right={
-                <Button
-                  label={invited.has(item.userId) ? 'Invited' : 'Invite'}
-                  variant={invited.has(item.userId) ? 'secondary' : 'primary'}
-                  size="compact"
-                  disabled={invited.has(item.userId)}
-                  onPress={() => void invite(item)}
-                />
+                <View style={s.rowBtn}>
+                  <Button
+                    label={invited.has(item.userId) ? 'Invited' : 'Invite'}
+                    variant={invited.has(item.userId) ? 'secondary' : 'primary'}
+                    size="compact"
+                    fullWidth
+                    disabled={invited.has(item.userId)}
+                    onPress={() => void invite(item)}
+                  />
+                </View>
               }
             />
           )}
@@ -174,10 +177,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 44, borderRadius: RADIUS.md,
     paddingHorizontal: SP.md, backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
-  searchInput: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, height: 44 },
+  searchInput: { flex: 1, minWidth: 0, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, height: 44 },
   sectionLabel: {
     color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, letterSpacing: 0.6,
     textTransform: 'uppercase', marginTop: SP.lg, marginBottom: SP.sm,
   },
+  rowBtn: { width: 112 },
   emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.lg },
 });

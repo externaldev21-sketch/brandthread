@@ -45,7 +45,7 @@ export function LiveCommentActionsSheet({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close comment actions" />
-      <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-comment-actions">
+      <SheetRise style={[styles.sheet, { backgroundColor: theme.background, borderTopWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingBottom: insets.bottom + SP.md }]} testID="live-comment-actions">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <Text style={[styles.preview, { color: theme.muted }]} numberOfLines={2}>
           <Text style={{ fontFamily: FONT.bold, color: theme.text }}>{comment.display_name} </Text>
@@ -73,7 +73,8 @@ export function LiveCommentActionsSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)' },
+  // Transparent tap-away layer — no translucent scrim over the broadcast.
+  backdrop: { ...StyleSheet.absoluteFill },
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
