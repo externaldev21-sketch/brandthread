@@ -23,7 +23,7 @@ describe('Seller Studio page has a real close (X) button — Dev\'s final layout
   it('a close button exists, with its own testID/accessibilityLabel and haptic', () => {
     expect(studio).toContain('testID="seller-studio-menu-close"');
     expect(studio).toContain('accessibilityLabel="Close Studio tools"');
-    expect(studio).toContain('cancelEnterFill(); hapticDismiss(); collapse();');
+    expect(studio).toContain('cancelEnter(); hapticDismiss(); collapse();');
   });
 
   it('there is no separate backdrop layer anymore — the page itself fully covers the screen behind it', () => {
@@ -33,7 +33,7 @@ describe('Seller Studio page has a real close (X) button — Dev\'s final layout
   });
 
   it('Android back and web Escape still close it via the Modal\'s own onRequestClose', () => {
-    expect(studio).toContain('onRequestClose={() => { cancelEnterFill(); collapse(); }}');
+    expect(studio).toContain('onRequestClose={() => { cancelEnter(); collapse(); }}');
   });
 });
 
@@ -74,7 +74,7 @@ describe('Seller Studio page swipe-to-dismiss is UI-thread Reanimated + gesture-
   it('close-button dismiss and swipe-past-threshold dismiss both fire a light haptic', () => {
     expect(studio).toContain('hapticDismiss');
     expect(studio).toContain('ImpactFeedbackStyle.Light');
-    expect(studio).toContain('cancelEnterFill(); hapticDismiss(); collapse();');
+    expect(studio).toContain('cancelEnter(); hapticDismiss(); collapse();');
     expect(studio).toContain('runOnJS(hapticDismiss)()');
   });
 });
