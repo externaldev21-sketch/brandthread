@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, real, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
@@ -8,6 +8,7 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -160,6 +161,9 @@ export const users = pgTable('users', {
   // verification for sellers. A system account is excluded from seller
   // search/ranking and cannot be reported (see reports.ts).
   isSystemAccount: boolean('is_system_account').notNull().default(false),
+  // Internal App Review demo account (migration 240). Never purged by the
+  // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
+  isReviewAccount: boolean('is_review_account').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -2283,4 +2287,34 @@ export const adCampaigns = pgTable('ad_campaigns', {
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
+
+// ─── Automatic media screening results (migration 115) ───────────────────────
+// Held / rejected uploads only. No raw images are stored.
+export const mediaModerationResults = pgTable('media_moderation_results', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  /** 'post' | 'story' | 'comment' | 'upload' */
+  targetType:    text('target_type').notNull(),
+  targetId:      text('target_id').notNull(),
+  ownerId:       text('owner_id'),
+  provider:      text('provider').notNull(),
+  /** 'hold' | 'reject' */
+  verdict:       text('verdict').notNull(),
+  categories:    jsonb('categories').$type<string[]>().notNull().default([]),
+  scores:        jsonb('scores').$type<Record<string, number>>().notNull().default({}),
+  maxScore:      real('max_score').notNull().default(0),
+  framesChecked: integer('frames_checked').notNull().default(0),
+  /** 'normal' | 'high' */
+  priority:      text('priority').notNull().default('normal'),
+  mediaRefs:     jsonb('media_refs').$type<string[]>().notNull().default([]),
+  surface:       text('surface'),
+  reviewedBy:    text('reviewed_by'),
+  reviewedAt:    timestamp('reviewed_at', { withTimezone: true }),
+  /** 'approve' | 'remove' */
+  reviewAction:  text('review_action'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  targetIdx: index('media_moderation_results_target_idx').on(table.targetType, table.targetId),
+  reviewIdx: index('media_moderation_results_review_idx').on(table.verdict, table.reviewedAt, table.createdAt),
+}));
+
 export * from './ranking';

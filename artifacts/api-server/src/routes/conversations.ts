@@ -1262,7 +1262,24 @@ router.post("/upload-media", async (req, res) => {
   try {
     const { objectStorageClient } = await import("../lib/objectStorage");
     const raw = Buffer.from(base64, "base64");
-    // Images are downscaled and stripped of EXIF/GPS; video and audio are stored as sent.
+    const buffer = raw;
+
+    // Automatic screening (off when the AI integration env is missing). A DM
+    // has no held state, so flagged media is refused; an outage of the
+    // screening provider never blocks messaging.
+    if (normalizedMimeType.startsWith("image/") || normalizedMimeType.startsWith("video/")) {
+      const { screenImageBuffer, screenVideo, MEDIA_REJECTED_MESSAGE } = await import("../lib/mediaModeration");
+      const verdict = normalizedMimeType.startsWith("image/")
+        ? await screenImageBuffer(buffer, normalizedMimeType)
+        : await screenVideo({ buffer });
+      if ((verdict.verdict === "hold" && !verdict.unverified) || verdict.verdict === "reject") {
+        const { recordRejectedUpload } = await import("../lib/mediaModerationStore");
+        void recordRejectedUpload({ ownerId: userId, surface: "dm", verdict: { ...verdict, verdict: "reject" } });
+        return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+      }
+    }
+    // Images are downscaled and stripped of EXIF/GPS (after screening, which sees the original bytes);
+    // video and audio are stored as sent.
     const isImage = normalizedMimeType.startsWith("image/");
     const stored = isImage ? await normalizeUploadedImage(raw, normalizedMimeType) : { buffer: raw, contentType: normalizedMimeType };
     const bucket = objectStorageClient.bucket(BUCKET_ID);

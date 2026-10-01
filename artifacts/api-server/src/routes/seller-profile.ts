@@ -10,6 +10,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
 (async () => {
@@ -178,6 +179,15 @@ function createProfileImageUploadHandler(
       }
       if (!hasValidImageSignature(bytes, contentType)) {
         res.status(400).json({ error: "The uploaded file does not match its declared image type." });
+        return;
+      }
+
+      // Automatic screening (off when the AI integration env is missing).
+      // Identity images have no held state, so flagged images are refused.
+      const screened = await screenImageBuffer(bytes, contentType);
+      if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+        void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: label, verdict: { ...screened, verdict: "reject" } }));
+        res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
         return;
       }
 
