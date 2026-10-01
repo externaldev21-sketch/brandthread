@@ -10,6 +10,7 @@ import type {
 } from './safetyTypes';
 import { useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { uploadChunked, type ChunkedTransport, type ResumeStore } from '@/lib/createPost/chunkedUpload';
 import {
   ApiError,
   dismissNetworkNotice,
@@ -524,6 +525,66 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+/** Remembers in-flight chunked upload sessions so a retry/restart resumes instead of restarting. */
+const chunkedResumeStore: ResumeStore = {
+  get: async (key) => { try { return await AsyncStorage.getItem(`bt_chunked_upload:${key}`); } catch { return null; } },
+  set: async (key, id) => {
+    try {
+      if (id) await AsyncStorage.setItem(`bt_chunked_upload:${key}`, id);
+      else await AsyncStorage.removeItem(`bt_chunked_upload:${key}`);
+    } catch { /* resume is best-effort */ }
+  },
+};
+
+/** Chunked, resumable video upload (see lib/createPost/chunkedUpload.ts). */
+async function uploadVideoChunked(
+  video: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+  opts: { onProgress?: (fraction: number) => void; signal?: { aborted: boolean } } = {},
+): Promise<{ objectPath: string; contentType: string; size: number }> {
+  const source = await fetch(video.uri);
+  if (!source.ok) throw new Error("Could not read the selected video.");
+  const blob = await source.blob();
+  const contentType = (video.mimeType || blob.type || "video/mp4").split(";")[0];
+  const authHeaders = async () => {
+    const token = await getCachedToken(getToken);
+    return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() };
+  };
+  const json = async <T,>(path: string, init: RequestInit): Promise<T> => {
+    const res = await fetch(`${BASE}${versionApiPath(path)}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(await authHeaders()), ...(init.headers ?? {}) },
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return (res.status === 204 ? undefined : await res.json()) as T;
+  };
+  const transport: ChunkedTransport = {
+    start: (meta) => json("/api/posts/uploads", { method: "POST", body: JSON.stringify(meta) }),
+    status: (id) => json(`/api/posts/uploads/${id}`, { method: "GET" }),
+    complete: (id) => json(`/api/posts/uploads/${id}/complete`, { method: "POST", body: "{}" }),
+    putChunk: async (id, index, chunk, onBytes) => {
+      const headers = await authHeaders();
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", `${BASE}${versionApiPath(`/api/posts/uploads/${id}/chunks/${index}`)}`);
+        xhr.setRequestHeader("Content-Type", "application/octet-stream");
+        for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, String(v));
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) onBytes(e.loaded); };
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, xhr.responseText)));
+        xhr.onerror = () => reject(new Error("Network error while uploading"));
+        xhr.send(chunk);
+      });
+    },
+  };
+  return uploadChunked({
+    transport, blob, contentType,
+    resumeKey: `${video.uri}|${blob.size}`,
+    resumeStore: chunkedResumeStore,
+    onProgress: opts.onProgress,
+    signal: opts.signal,
+  });
+}
+
 // ─── Ad Campaign Types ────────────────────────────────────────────────────────
 
 export type AdCtaKind =
@@ -2022,6 +2083,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           contentType: string;
           size: number;
         }>('/api/posts/video-clips', { uri, mimeType }, getToken, getCacheScope),
+      /** Long videos (up to 10 min): chunked + resumable, real progress. */
+      uploadVideoChunked: (
+        video: { uri: string; mimeType?: string | null },
+        opts?: { onProgress?: (fraction: number) => void; signal?: { aborted: boolean } },
+      ) => uploadVideoChunked(video, getToken, opts),
       /** Upload a single raw photo slide (JPEG/PNG/WEBP) for slideshow composition */
       uploadPhotoSlide: (uri: string, mimeType?: string | null) =>
         uploadImage<{
@@ -2046,6 +2112,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         duration: number;
         clipCount: number;
       }>('/api/posts/compose-video', body),
+      /** POST carousel: crop + adjust + trim every slide (photos and videos) into the fixed 3:4 canvas. */
+      composeCarousel: (body: {
+        items: Array<{
+          kind: 'photo' | 'video'; objectPath: string;
+          crop?: { x: number; y: number; width: number; height: number };
+          adjust?: Record<string, number>;
+          trimStart?: number; trimEnd?: number;
+        }>;
+      }) => post<{
+        items: Array<{
+          kind: 'photo' | 'video'; mediaPath: string; mediaUrl: string;
+          thumbnailPath: string; thumbnailUrl: string; duration?: number;
+        }>;
+      }>('/api/posts/compose-carousel', body),
       /** Re-extract the cover frame from an already-composed video at a chosen offset, without re-encoding. */
       composeVideoThumbnail: (mediaPath: string, offset: number) => post<{
         thumbnailUrl: string;
@@ -2054,6 +2134,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }>('/api/posts/compose-video/thumbnail', { mediaPath, offset }),
       /** Compose ordered photo slides with per-slide text overlays into portrait rendered images */
       composeSlideshow: (body: {
+        aspectRatio?: '1:1' | '3:4' | '9:16';
+        surface?: 'thread' | 'profile';
+        coverIndex?: number;
         slides: Array<{
           objectPath: string;
           overlays?: Array<{

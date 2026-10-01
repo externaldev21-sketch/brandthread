@@ -64,7 +64,7 @@ describe('seller setup destination navigation', () => {
     // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
     // still returns to the seller-setup origin via leaveProductFlow.
     expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
-    expect(createPost).toContain("(isSellerSetup ? SELLER_HOME_ROUTE : '/(tabs)/profile') as never");
+    expect(createPost).toContain('if (isSetup) { router.replace(SELLER_HOME_ROUTE as never); return; }');
   });
 
   it('routes all nine completion signals through the behavioral completion boundary', () => {
@@ -76,7 +76,7 @@ describe('seller setup destination navigation', () => {
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],
-      ['app/create-post.tsx', "() => persistSellerPost(false)", "'first_post'"],
+      ['app/create-post.tsx', "completeSetupTaskAfter('first_post', run)", "'first_post'"],
       ['app/manufacturer-hub.tsx', '() => saveManufacturer(mfg.id)', "'connect_manufacturer'"],
     ] as const;
 

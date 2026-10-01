@@ -29,7 +29,9 @@ import {
   getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
-import type { BuyerPost, Comment } from '@/services/socialTypes';
+import type { BuyerPost, Comment, PostSlide } from '@/services/socialTypes';
+import { mapSlides } from '@/services/socialService';
+import { PostCarousel } from '@/components/social/PostCarousel';
 import { getPreviewActivityPost } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
@@ -104,6 +106,25 @@ function previewPost(postId: string | undefined): BuyerPost | null {
   };
 }
 
+/** Seller POSTs (and any post the buyer-social route doesn't cover) via the public post route. */
+async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promise<BuyerPost | null> {
+  try {
+    const p: any = await api.posts.get(id);
+    if (!p?.id) return null;
+    const name = p.seller?.brandName ?? p.seller?.displayName ?? 'Post';
+    const urls: string[] = Array.isArray(p.mediaUrls) ? p.mediaUrls : [];
+    return {
+      id: p.id, authorId: p.userId, authorName: name, authorHandle: '', authorInitials: String(name).slice(0, 2).toUpperCase(),
+      authorColor: '#1C1C1E', authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'public' as any,
+      type: p.mediaType ?? 'photo', caption: p.caption ?? '', hashtags: p.hashtags ?? [], mediaColors: [],
+      mediaUrl: p.mediaUrl, mediaUrls: urls, slides: mapSlides(p.slides), aspectRatio: p.aspectRatio,
+      likesCount: p.likeCount ?? 0, commentsCount: 0, repostsCount: p.repostCount ?? 0,
+      likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+      createdAt: p.createdAt, updatedAt: p.updatedAt ?? p.createdAt,
+    };
+  } catch { return null; }
+}
+
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
   const api = useApi();
@@ -149,7 +170,7 @@ export default function BuyerPostViewer() {
     let found: BuyerPost | null = null;
     try {
       const all = await getMyPosts();
-      found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId);
+      found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId) ?? await loadPublicPost(api, params.postId);
     } catch {
       // A failed lookup leaves the placeholder, as before — or, in the
       // preview, falls through to the seeded post below.
@@ -212,6 +233,13 @@ export default function BuyerPostViewer() {
   const mediaColor2 = params.postMediaColor2 ?? BG;
   const postType = (post?.type ?? params.postType ?? 'photo') as BuyerPost['type'];
 
+  // POST carousels (and any multi-photo post) render as a 3:4 swipeable carousel.
+  const viewerSlides: PostSlide[] | null = post?.slides && post.slides.length > 0
+    ? post.slides
+    : post && post.mediaUrls && post.mediaUrls.length > 1 && post.type !== 'video'
+      ? post.mediaUrls.map((url) => ({ kind: 'photo' as const, url }))
+      : null;
+
   const typeIcon: keyof typeof Feather.glyphMap =
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
 
@@ -240,6 +268,11 @@ export default function BuyerPostViewer() {
         style={contentOpacity ? { opacity: contentOpacity } : undefined}
       >
         {/* Media display */}
+        {viewerSlides ? (
+          <View style={{ backgroundColor: BG }} testID="viewer-carousel">
+            <PostCarousel slides={viewerSlides} width={windowWidth} dotColor={FG} dotDim={MUTED} />
+          </View>
+        ) : (
         <View style={s.media}>
           <PostMedia
             mediaUrl={post?.mediaUrl}
@@ -250,6 +283,7 @@ export default function BuyerPostViewer() {
             onWatched={post?.type === 'video' ? handleVideoWatched : undefined}
           />
         </View>
+        )}
 
         {/* Author row */}
         <View style={s.authorRow}>

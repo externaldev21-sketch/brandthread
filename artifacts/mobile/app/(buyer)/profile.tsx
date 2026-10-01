@@ -67,7 +67,7 @@ import {
   CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
 } from '@/components/profile/ProfileCover';
 import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
-import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
@@ -303,7 +303,7 @@ export default function ProfileScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
-  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   const heroPosterOnly = useHeroPosterOnly();
   const threadCashEnabled = useFeatureFlag('threadCash');
   const celebrateThreadCash = useCelebrateThreadCash();

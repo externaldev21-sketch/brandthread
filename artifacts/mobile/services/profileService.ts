@@ -96,7 +96,8 @@ export async function loadVideoFeedThrough(
   for (let page = 0; page < maxPages && hasMore; page += 1) {
     const result = await getVideoFeedPage(source, id, offset);
     const seen = new Set(posts.map((post) => post.id));
-    posts.push(...result.posts.filter((post) => !seen.has(post.id)));
+    // POSTs (profile surface) open in their own 3:4 viewer — the Threads video player only swipes Thread posts.
+    posts.push(...result.posts.filter((post) => !seen.has(post.id) && post.surface !== 'profile'));
     offset = result.nextOffset;
     hasMore = result.hasMore;
     if (!postId || posts.some((post) => post.id === postId)) break;

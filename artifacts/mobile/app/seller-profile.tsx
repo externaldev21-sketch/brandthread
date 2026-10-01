@@ -42,7 +42,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import {
@@ -111,7 +111,7 @@ export default function SellerProfileScreen() {
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const layout = useProfileLayout();
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   // Clears the floating buyer tab bar when this screen is reached from the
   // buyer shell (viewing a brand's public profile); a no-op elsewhere.
   const barInset = useBuyerTabBarInset();
@@ -351,6 +351,11 @@ export default function SellerProfileScreen() {
 
   const openVideo = useCallback((item: ProfileGridItem) => {
     if (!seller) return;
+    if (item.surface === 'profile') {
+      // POST (3:4 carousel): its own viewer, not the Threads video player.
+      router.push(('/buyer-post-viewer?postId=' + encodeURIComponent(item.id)) as never);
+      return;
+    }
     router.push(profileVideosHref({ source: 'creator', id: seller.sellerId, startPostId: item.id, title: seller.brandName }) as never);
   }, [router, seller]);
 

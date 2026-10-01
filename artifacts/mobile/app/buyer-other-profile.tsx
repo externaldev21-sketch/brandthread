@@ -35,7 +35,7 @@ import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
@@ -58,7 +58,7 @@ export default function BuyerOtherProfileScreen() {
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
-  const layout  = useProfileLayout();
+  const layout  = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   const barInset = useBuyerTabBarInset();
   const { userId: currentUserId } = useAuth();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
