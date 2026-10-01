@@ -160,6 +160,9 @@ export const users = pgTable('users', {
   // verification for sellers. A system account is excluded from seller
   // search/ranking and cannot be reported (see reports.ts).
   isSystemAccount: boolean('is_system_account').notNull().default(false),
+  // Internal App Review demo account (migration 240). Never purged by the
+  // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
+  isReviewAccount: boolean('is_review_account').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
