@@ -22,6 +22,7 @@
 import type { PreviewCatalogProduct } from './previewCatalog';
 import { isPreviewDemoMode } from './devPreview';
 import { buildDemoBuyerOrders, buildDemoSellerOrders, isPreviewSellerOrderId } from './previewDeliveryOrders';
+import { buildDemoReorderOrders } from './previewReorderOrder';
 
 // previewCatalog pulls in bundled image assets (expo-asset). It's required
 // lazily, only once a preview order is actually requested in a dev build, so
@@ -83,7 +84,7 @@ export function getPreviewBuyerOrder(id: string | null | undefined): Record<stri
 }
 
 function demoBuyerOrders(): Record<string, unknown>[] {
-  return buildDemoBuyerOrders(previewCatalogProduct);
+  return [...buildDemoBuyerOrders(previewCatalogProduct), ...buildDemoReorderOrders(previewCatalogProduct)];
 }
 
 /** The buyer's Orders list in the preview (GET /api/buyer/orders shape). Empty unless demo=1. */
