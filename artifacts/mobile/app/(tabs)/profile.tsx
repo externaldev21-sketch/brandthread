@@ -55,6 +55,7 @@ import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { PREVIEW_SELLER_IDENTITY, previewSellerBrandName } from '@/lib/previewIdentity';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -460,7 +461,8 @@ export default function ProfileScreen() {
     }
   }
 
-  const brandTitle = profile?.brandName || profile?.displayName || 'My Brand';
+  // In the dev preview there is no account, so the one shared preview identity is shown here and in Settings / Edit profile.
+  const brandTitle = previewSellerBrandName() ?? (profile?.brandName || profile?.displayName || 'My Brand');
   const avatarInitials = brandTitle
     .split(/\s+/)
     .map((part) => part[0])
@@ -605,7 +607,9 @@ export default function ProfileScreen() {
         tabsVariant="iconOnly"
         identity={{
           name: brandTitle,
-          handle: profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
+          handle: previewSellerBrandName()
+            ? PREVIEW_SELLER_IDENTITY.handle
+            : profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
             ? `@${profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`
             : null,
           initials: avatarInitials,

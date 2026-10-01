@@ -365,8 +365,9 @@ function SellerBarGate() {
   const [isStudioOpen, setIsStudioOpen] = useState(false);
 
   // Preview navigation must not depend on Clerk or completed onboarding.
-  // PREVIEW_ROLE is web-only; native seller chrome requires an active session.
-  const isPreviewSeller = PREVIEW_ROLE === 'seller';
+  // The session fallback covers reloads after the URL query has been dropped;
+  // PREVIEW_SESSION_ROLE is web-only, so native seller chrome requires a session.
+  const isPreviewSeller = PREVIEW_SESSION_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
 
@@ -520,6 +521,13 @@ const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
 })();
 const DEV_WEB_ONBOARDING_PREVIEW =
   __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;
+
+// The preview role for THIS page: the one the URL asked for, or - after a reload of a plain tab URL
+// such as /orders, where in-app navigation had already dropped `?bt_preview=` - the role the first
+// load persisted (lib/devPreview.ts). Without the fallback a reloaded preview lost its seller tab
+// bar and waited on a Clerk session that preview never has.
+const PREVIEW_SESSION_ROLE: 'buyer' | 'seller' | null = PREVIEW_ROLE
+  ?? (Platform.OS === 'web' ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null) : null);
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
@@ -1576,8 +1584,8 @@ export default function RootLayout() {
     <AppIntroSplash ready={appReady}>
       <ClerkLoadErrorBoundary>
         <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-          {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
-            // Development previews render without waiting for Clerk.
+          {PREVIEW_SESSION_ROLE || DEV_BYPASS_ROLE ? (
+            // Explicit / persisted dev previews and the local dev bypass render without waiting for Clerk.
             appTree
           ) : (
             <>

@@ -43,6 +43,7 @@ import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
 import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
@@ -117,6 +118,8 @@ interface PersistedCashoutAttempt {
   amount: number;
   currency: string;
 }
+
+const PREVIEW_ANALYTICS_USER = 'preview-seller';
 
 function cashoutAttemptStorageKey(userId: string): string {
   return `bt:seller-cashout-attempt:${userId}`;
@@ -197,7 +200,7 @@ export default function SellerHomeCommerceDashboard({
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
   const sellerPreview = isSellerDevPreview();
-  const analyticsUserId = sellerPreview ? userId ?? 'demo-seller' : userId;
+  const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId;
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
   const [range, setRange] = useState<SellerDashboardRange>('week');
@@ -348,11 +351,23 @@ export default function SellerHomeCommerceDashboard({
   // once per seller/refresh, not re-fetched on every chart range switch. ────
   const loadSecondaryData = useCallback(async () => {
     if (sellerPreview) {
-      setTopProducts([]);
-      setRecentOrders([]);
-      setEverSoldCount(12);
-      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: 0 });
+      // Dev preview: derive everything locally from the same demo order set the
+      // Orders tab lists (lib/previewSellerOrders.ts) - never call the API.
+      const previewOrders = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
+      const byProduct = new Map<string, TopProductSummary>();
+      for (const order of previewOrders) {
+        for (const item of order.items) {
+          const row = byProduct.get(item.productId) ?? { productId: item.productId, name: item.productName, imageUrl: null, unitsSold: 0, revenueCents: 0 };
+          row.unitsSold += item.quantity;
+          row.revenueCents += item.priceCents * item.quantity;
+          byProduct.set(item.productId, row);
+        }
+      }
       setSecondaryError(false);
+      setEverSoldCount(previewOrders.length);
+      setRecentOrders(previewOrders.slice(0, 5).map(normalizeRecentOrder));
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: filterOrders(previewOrders.map(apiRowToOrder), 'unfulfilled').length });
+      setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), []));
       return;
     }
     if (!userId) {

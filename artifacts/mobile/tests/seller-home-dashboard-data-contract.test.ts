@@ -9,10 +9,12 @@ const source = fs.readFileSync(
 
 describe('seller home dashboard data contract', () => {
   it('waits for the authenticated seller and reloads analytics when the range changes', () => {
-    expect(source).toContain('if (!analyticsUserId)');
+    expect(source).toContain('if (sellerPreview)');
     expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
+    // analyticsUserId = the signed-in user, or a fixed id in the dev preview (which has no account).
     expect(source).toContain('sellerHomeAnalyticsKey(analyticsUserId, range)');
-    expect(source).toContain("const analyticsUserId = sellerPreview ? userId ?? 'demo-seller' : userId");
+    expect(source).toContain('const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId');
+    expect(source).toContain('allPreviewSellerOrders()');
     expect(source).toContain('setSnapshot({ key: requestKey');
   });
 

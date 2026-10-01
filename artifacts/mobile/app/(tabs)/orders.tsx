@@ -31,7 +31,7 @@ import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
-import { getPreviewSellerOrders } from '@/lib/previewOrders';
+import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
 import { sellerCountdown } from '@/lib/deliveryGuarantee';
 import { DeadlineChip } from '@/components/orders/SellerDelivery';
 import { useQueryClient } from '@tanstack/react-query';
@@ -779,14 +779,17 @@ export default function OrdersScreen() {
     // not a connectivity failure, so it resolves straight to the honest
     // empty state rather than the "couldn't load" retry banner a real
     // fetch failure shows.
-    if (isPreviewMode && !userId) {
+    if (isPreviewMode) {
+      // Preview never calls the orders API (a stubbed session would only get
+      // a 401). Demo mode lists the same order set the dashboard's numbers
+      // are summed from (lib/previewSellerOrders.ts); fresh mode is empty.
+      const rows = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
+      const preview = rows.map(apiRowToOrder);
+      rows.forEach((raw) => queryClient.setQueryData(queryKeys.order(raw.id), raw));
       if (generationRef.current === generation) {
-        // ?demo=1 only: the seeded delivery-guarantee fixtures.
-        const demo = isPreviewDemoMode() ? getPreviewSellerOrders().map(apiRowToOrder) : [];
-        setOrders(demo);
-        // Owner = the (absent) account, so the owner guard below lets the rows through.
-        setOrdersOwnerId(userId as string | null);
-        setStats(computeStats(demo));
+        setOrders(preview);
+        setOrdersOwnerId(userId ?? null);
+        setStats(computeStats(preview));
         setLoadError(false);
         setLoading(false);
         setRefreshing(false);
@@ -873,9 +876,9 @@ export default function OrdersScreen() {
       setUpdatesPaused(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
-      // Preview mode with no account resolves once, synchronously, in
-      // loadData above — no real backend to poll every 30s.
-      if (userId || !isPreviewMode) {
+      // Preview mode resolves once, synchronously, in loadData above — no
+      // real backend to poll every 30s (even with a stubbed signed-in user).
+      if (!isPreviewMode) {
         timerRef.current = setInterval(() => loadData(generation), 30_000);
       }
       return () => {

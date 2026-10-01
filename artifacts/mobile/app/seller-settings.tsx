@@ -12,6 +12,7 @@
  * buyer settings screen is unaffected.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -62,7 +63,7 @@ export default function SellerSettingsScreen() {
     return () => { active = false; };
   }, [api]);
 
-  const profileName = user?.fullName || user?.username || 'Your Brandthread store';
+  const profileName = previewSellerBrandName() ?? (user?.fullName || user?.username || 'Your Brandthread store');
   // Initials are derived from the exact same `profileName` string shown next
   // to the avatar (not a separate first/last-name pair that may be blank),
   // so the avatar and the name text can never disagree.

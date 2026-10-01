@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDevWebPreviewRole } from '@/lib/devPreview';
+import { getDevWebPreviewRole, isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { useAuth } from '@clerk/expo';
 
 export type UserRole = 'buyer' | 'seller' | null;
@@ -25,7 +25,8 @@ const RoleContext = createContext<RoleContextValue>({
 });
 
 function getDevPreviewRole(): UserRole {
-  return getDevWebPreviewRole();
+  return getDevWebPreviewRole()
+    ?? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null);
 }
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
