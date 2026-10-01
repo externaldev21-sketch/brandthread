@@ -41,6 +41,7 @@ import {
   ProfileChip, ProfileEditMessagesRow, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
+import { useSellerActivityUnread } from '@/hooks/useSellerActivityUnread';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
@@ -133,6 +134,7 @@ function DraftsFolderTile({
 export default function ProfileScreen() {
   const router  = useRouter();
   const api = useApi();
+  const hasUnreadActivity = useSellerActivityUnread();
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
   const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
   // The seller tab bar floats over content (same metrics as the global bar).
@@ -636,7 +638,12 @@ export default function ProfileScreen() {
         topLeft={accountSwitcher}
         topRight={(
           <ProfileTopBarIconRow>
-            <ProfileTopBarIcon name="bell" onPress={() => nav('/notifications-settings')} accessibilityLabel="Notification settings" />
+            <ProfileTopBarIcon name="bell"
+              onPress={() => nav('/seller-activity')}
+              accessibilityLabel={hasUnreadActivity ? 'Activity, new activity' : 'Activity'}
+              badge={hasUnreadActivity}
+              testID="seller-activity-bell"
+            />
             <ProfileTopBarIcon
               name="share-2"
               onPress={() => {

@@ -205,6 +205,72 @@ export async function notifyRepost(input: { postId: string; reposterId: string }
   }
 }
 
+// ─── Saves, shares and tags ───────────────────────────────────────────────────
+
+/**
+ * One alert per (owner, person, post) for lower-urgency post engagement —
+ * saves, shares, and being tagged. Idempotent, skips self-actions and blocks.
+ */
+async function notifyPostEngagement(input: {
+  postId: string;
+  actorId: string;
+  /** Recipient override (tags notify the tagged person, not the post owner). */
+  recipientId?: string;
+  type: "post_save" | "post_share" | "post_tag";
+  verb: string;
+}): Promise<void> {
+  try {
+    const post = await loadPost(input.postId);
+    if (!post) return;
+    const recipientId = input.recipientId ?? post.userId;
+    if (recipientId === input.actorId) return;
+    if ((await blockedUserIds(recipientId)).has(input.actorId)) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, recipientId),
+        eq(notificationsFeed.type, input.type),
+        eq(notificationsFeed.targetId, post.id),
+        eq(notificationsFeed.actorId, input.actorId),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.actorId);
+    if (!actor) return;
+
+    await publishNotification({
+      userId: recipientId,
+      category: "social",
+      type: input.type,
+      title: `${actor.actorName} ${input.verb}`,
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+    });
+  } catch (err) {
+    logger.warn({ err, postId: input.postId, type: input.type }, "Post engagement notification failed");
+  }
+}
+
+/** Tell a post's owner someone saved it. */
+export const notifyPostSave = (input: { postId: string; saverId: string }) =>
+  notifyPostEngagement({ postId: input.postId, actorId: input.saverId, type: "post_save", verb: "saved your post" });
+
+/** Tell a post's owner someone shared it out of the app. */
+export const notifyPostShare = (input: { postId: string; sharerId: string }) =>
+  notifyPostEngagement({ postId: input.postId, actorId: input.sharerId, type: "post_share", verb: "shared your post" });
+
+/** Tell a person they were tagged in a post (call from wherever post_user_tags rows are written). */
+export const notifyPostTag = (input: { postId: string; taggerId: string; taggedUserId: string }) =>
+  notifyPostEngagement({
+    postId: input.postId, actorId: input.taggerId, recipientId: input.taggedUserId,
+    type: "post_tag", verb: "tagged you in a post",
+  });
+
 // ─── Story / highlight likes ──────────────────────────────────────────────────
 
 /**

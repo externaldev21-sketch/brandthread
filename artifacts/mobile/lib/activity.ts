@@ -163,7 +163,7 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
 
 /** Types where repeat events read better as one row. Orders/payments never merge. */
 export const AGGREGATED_TYPES: ReadonlySet<string> = new Set([
-  'post_like', 'post_comment', 'new_follower', 'story_like', 'repost',
+  'post_like', 'post_comment', 'new_follower', 'story_like', 'repost', 'post_save', 'post_share',
 ]);
 
 /**
@@ -308,7 +308,8 @@ export function activityDetail(row: ActivityRow): string | null {
   // Merged comment rows would show only the newest excerpt; keep them tidy.
   if (row.type === 'post_comment' && row.ids.length > 1) return null;
   if (row.type === 'post_like' || row.type === 'new_follower' || row.type === 'story_like' || row.type === 'repost'
-    || row.type === 'story_mention' || row.type === 'story_reshare') return null;
+    || row.type === 'story_mention' || row.type === 'story_reshare' || row.type === 'post_save'
+    || row.type === 'post_share' || row.type === 'post_tag') return null;
   const body = row.body?.trim();
   if (!body) return null;
   if (row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention' || row.type === 'comment_like') {
@@ -453,6 +454,9 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'mention':
     case 'story_mention': return 'at-sign';
     case 'new_follower': return 'user-plus';
+    case 'post_save': return 'bookmark';
+    case 'post_share': return 'send';
+    case 'post_tag': return 'tag';
     case 'repost':
     case 'story_reshare': return 'repeat';
     case 'thread_cash_received': return 'dollar-sign';
