@@ -58,12 +58,18 @@ export interface MediaCropperProps {
   /** Pass the previously-saved rect to reopen "Edit crop" framed where the creator left it. */
   initialRect?: NormalizedCropRect | null;
   title?: string;
+  /** Extra top padding for the header, e.g. the safe-area top inset on a notched device. */
+  topInset?: number;
+  /** Outlines the crop frame — for source photos that are dark at the edges. */
+  showFrame?: boolean;
+  /** Vertically centres Cancel / Done on the title line (their 44pt hit areas otherwise sit text-top). */
+  centerHeaderActions?: boolean;
   onCancel: () => void;
   onSave: (result: MediaCropperResult) => void;
 }
 
 export function MediaCropper({
-  visible, uri, targetRatio, initialRect, title = 'Crop photo', onCancel, onSave,
+  visible, uri, targetRatio, initialRect, title = 'Crop photo', topInset = 0, showFrame = false, centerHeaderActions = false, onCancel, onSave,
 }: MediaCropperProps) {
   const { theme } = useAppTheme();
   const [sourceSize, setSourceSize] = useState<{ width: number; height: number } | null>(null);
@@ -206,19 +212,19 @@ export function MediaCropper({
 
   return (
     <View style={[s.root, { backgroundColor: theme.background }]} testID="media-cropper">
-      <View style={s.header}>
-        <PressableScale onPress={onCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Cancel crop" testID="media-cropper-cancel">
+      <View style={[s.header, topInset > 0 && { paddingTop: topInset + SP.sm }]}>
+        <PressableScale style={centerHeaderActions ? s.headerActionCentered : undefined} onPress={onCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Cancel crop" testID="media-cropper-cancel">
           <Text style={[s.headerAction, { color: theme.text }]}>Cancel</Text>
         </PressableScale>
         <Text style={[s.headerTitle, { color: theme.text }]}>{title}</Text>
-        <PressableScale onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Save crop" testID="media-cropper-save" disabled={!sourceSize}>
+        <PressableScale style={centerHeaderActions ? s.headerActionCentered : undefined} onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Save crop" testID="media-cropper-save" disabled={!sourceSize}>
           <Text style={[s.headerAction, s.headerActionPrimary, { color: theme.text, opacity: sourceSize ? 1 : 0.4 }]}>Done</Text>
         </PressableScale>
       </View>
 
       <View style={s.stage}>
         <View
-          style={[s.frame, { width: frameWidth, height: frameHeight }]}
+          style={[s.frame, { width: frameWidth, height: frameHeight }, showFrame && { borderWidth: 1, borderColor: theme.border }]}
           {...webWheelProps}
         >
           <GestureDetector gesture={composed}>
@@ -294,6 +300,7 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md, paddingTop: SP.xl, paddingBottom: SP.md,
   },
   headerAction: { fontSize: FS.base, fontFamily: FONT.medium },
+  headerActionCentered: { justifyContent: 'center' },
   headerActionPrimary: { fontFamily: FONT.bold },
   headerTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },

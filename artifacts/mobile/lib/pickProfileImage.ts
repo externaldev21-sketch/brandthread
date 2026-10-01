@@ -7,25 +7,25 @@ import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 /** Opens the camera and returns the captured asset, or null if cancelled/denied. */
-export async function pickFromCamera(aspect: [number, number]): Promise<ImagePicker.ImagePickerAsset | null> {
+export async function pickFromCamera(aspect: [number, number], allowsEditing = true): Promise<ImagePicker.ImagePickerAsset | null> {
   const perm = await ImagePicker.requestCameraPermissionsAsync();
   if (!perm.granted) {
     Alert.alert('Permission needed', 'Allow camera access to take a photo.');
     return null;
   }
-  const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect, quality: 0.9 });
+  const res = await ImagePicker.launchCameraAsync({ allowsEditing, aspect, quality: 0.9 });
   return res.canceled || !res.assets[0] ? null : res.assets[0];
 }
 
 /** Opens the photo library and returns the chosen asset, or null if cancelled/denied. */
-export async function pickFromLibrary(aspect: [number, number]): Promise<ImagePicker.ImagePickerAsset | null> {
+export async function pickFromLibrary(aspect: [number, number], allowsEditing = true): Promise<ImagePicker.ImagePickerAsset | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) {
     Alert.alert('Permission needed', 'Allow photo library access to choose a photo.');
     return null;
   }
   const res = await ImagePicker.launchImageLibraryAsync({
-    allowsEditing: true, aspect, quality: 0.9, mediaTypes: ['images'],
+    allowsEditing, aspect, quality: 0.9, mediaTypes: ['images'],
   });
   return res.canceled || !res.assets[0] ? null : res.assets[0];
 }
