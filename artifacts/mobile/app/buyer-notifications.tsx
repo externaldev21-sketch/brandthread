@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, ScrollView,
   Alert, StyleSheet,
 } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -496,6 +497,7 @@ export default function BuyerNotifications() {
         />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={listData}
           keyExtractor={(item) =>
             item.type === 'header' ? `header-${item.title}` : item.notif.id

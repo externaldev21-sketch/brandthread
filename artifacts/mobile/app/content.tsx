@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, FlatList, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 
 type FilterTab = 'all' | ContentStatus;
 
@@ -220,7 +221,71 @@ export default function ContentScreen() {
         ]}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+      <FlatList
+        {...LONG_LIST_TUNING}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scrollContent}
+        data={loading || loadError ? [] : posts}
+        keyExtractor={(post) => post.id}
+        ItemSeparatorComponent={PostSeparator}
+        renderItem={({ item: post }) => (
+          <View style={s.postRowPad}>
+            <TouchableOpacity
+              key={post.id}
+              style={[s.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.82}
+              onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
+              accessibilityRole="button"
+              accessibilityLabel={post.caption || 'Untitled post'}
+            >
+              <View style={[s.postThumb, { backgroundColor: colors.elevated }]}>
+                <Feather name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
+              </View>
+              <View style={s.postBody}>
+                <View style={s.postTopRow}>
+                  <View style={[
+                    s.statusBadge,
+                    { backgroundColor: statusColor(post.status, colors) + '22', borderColor: statusColor(post.status, colors) + '44' },
+                  ]}>
+                    <Text style={[s.statusText, { color: statusColor(post.status, colors) }]}>
+                      {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                    </Text>
+                  </View>
+                  <Text style={[s.postType, { color: colors.mutedForeground }]}>{post.type.replace('_', ' ')}</Text>
+                </View>
+                <Text style={[s.postCaption, { color: colors.foreground }]} numberOfLines={2}>{post.caption}</Text>
+                {post.status === 'published' && (
+                  <View style={s.postMetrics}>
+                    <View style={s.metric}>
+                      <Feather name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
+                      <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.likes.toLocaleString()}</Text>
+                    </View>
+                    <View style={s.metric}>
+                      <Feather name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
+                      <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.comments}</Text>
+                    </View>
+                  </View>
+                )}
+                {post.status === 'scheduled' && post.scheduledFor && (
+                  <Text style={[s.scheduledText, { color: colors.mutedForeground }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={s.moreBtn}
+                onPress={() => openPostActions(post)}
+                disabled={deletingPostId === post.id}
+                accessibilityRole="button"
+                accessibilityLabel="Manage post"
+              >
+                {deletingPostId === post.id
+                  ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  : <Feather name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+        )}
+        ListHeaderComponent={(
+      <>
         {/* Overview stats */}
         <View style={s.statsRow}>
           {[
@@ -303,6 +368,11 @@ export default function ContentScreen() {
             ))}
           </ScrollView>
 
+        </View>
+      </>
+        )}
+        ListEmptyComponent={(
+          <View style={s.listPad}>
           {loading ? (
             <View style={s.loading}>
               <ActivityIndicator color={colors.primary} />
@@ -320,69 +390,17 @@ export default function ContentScreen() {
               <Text style={[s.emptyTitle, { color: colors.foreground }]}>No {tabLabel}posts yet</Text>
               <Text style={[s.emptyDesc, { color: colors.mutedForeground }]}>Create content to engage your audience.</Text>
             </View>
-          ) : (
-            <View style={s.postList}>
-              {posts.map(post => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={[s.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  activeOpacity={0.82}
-                  onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
-                  accessibilityRole="button"
-                  accessibilityLabel={post.caption || 'Untitled post'}
-                >
-                  <View style={[s.postThumb, { backgroundColor: colors.elevated }]}>
-                    <Feather name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
-                  </View>
-                  <View style={s.postBody}>
-                    <View style={s.postTopRow}>
-                      <View style={[
-                        s.statusBadge,
-                        { backgroundColor: statusColor(post.status, colors) + '22', borderColor: statusColor(post.status, colors) + '44' },
-                      ]}>
-                        <Text style={[s.statusText, { color: statusColor(post.status, colors) }]}>
-                          {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                        </Text>
-                      </View>
-                      <Text style={[s.postType, { color: colors.mutedForeground }]}>{post.type.replace('_', ' ')}</Text>
-                    </View>
-                    <Text style={[s.postCaption, { color: colors.foreground }]} numberOfLines={2}>{post.caption}</Text>
-                    {post.status === 'published' && (
-                      <View style={s.postMetrics}>
-                        <View style={s.metric}>
-                          <Feather name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
-                          <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.likes.toLocaleString()}</Text>
-                        </View>
-                        <View style={s.metric}>
-                          <Feather name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
-                          <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.comments}</Text>
-                        </View>
-                      </View>
-                    )}
-                    {post.status === 'scheduled' && post.scheduledFor && (
-                      <Text style={[s.scheduledText, { color: colors.mutedForeground }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    style={s.moreBtn}
-                    onPress={() => openPostActions(post)}
-                    disabled={deletingPostId === post.id}
-                    accessibilityRole="button"
-                    accessibilityLabel="Manage post"
-                  >
-                    {deletingPostId === post.id
-                      ? <ActivityIndicator size="small" color={colors.mutedForeground} />
-                      : <Feather name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+          ) : null}
+          </View>
+        )}
+      />
       <AIBrainFAB context={{ screen: 'content' as const }} bottomOffset={0} />
     </View>
   );
+}
+
+function PostSeparator() {
+  return <View style={{ height: SP.sm }} />;
 }
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
@@ -422,6 +440,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
 
   // Post cards
   postList: { gap: SP.sm },
+  listPad: { paddingHorizontal: SP.md },
+  postRowPad: { paddingHorizontal: SP.md },
   postCard: { flexDirection: 'row', gap: SP.sm + 4, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.sm + 2 },
   postThumb: { width: 56, height: 56, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   postBody: { flex: 1, gap: 4 },

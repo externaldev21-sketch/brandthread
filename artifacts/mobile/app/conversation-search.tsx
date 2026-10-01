@@ -5,6 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,6 +87,7 @@ export default function ConversationSearchScreen() {
         <ActivityIndicator style={{ marginTop: SP.xl }} color={theme.text} />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={results}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}

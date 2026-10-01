@@ -2,11 +2,12 @@
  * Seller Reviews — view received reviews and post public replies.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -240,26 +241,25 @@ export default function SellerReviewsScreen() {
         </View>
       )}
 
-      <ScrollView
+      <FlatList
+        {...LONG_LIST_TUNING}
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
-      >
-        {loading && (
+        data={loading ? [] : reviews}
+        keyExtractor={(r) => r.id}
+        renderItem={({ item: r }) => <ReviewCard review={r} onReplySubmitted={load} />}
+        ListEmptyComponent={loading ? (
           <View style={s.center}>
             <ActivityIndicator size="large" color={PURPLE} />
           </View>
-        )}
-        {!loading && reviews.length === 0 && (
+        ) : (
           <View style={s.center}>
             <Feather name="star" size={40} color={MUTED} />
             <Text style={s.emptyTitle}>No reviews yet</Text>
             <Text style={s.emptyBody}>Reviews from buyers will appear here. Complete orders to start collecting feedback.</Text>
           </View>
         )}
-        {!loading && reviews.map((r) => (
-          <ReviewCard key={r.id} review={r} onReplySubmitted={load} />
-        ))}
-      </ScrollView>
+      />
     </View>
   );
 }

@@ -211,6 +211,17 @@ if (fs.existsSync(outputDir)) {
 // are never served publicly.
 const uploadSourceMaps = ['SENTRY_AUTH_TOKEN', 'SENTRY_ORG', 'SENTRY_PROJECT'].every((name) => process.env[name]?.trim());
 
+// One chunk per route: the first load ships the shell and the landing route
+// instead of every screen. app.config.js turns on Expo Router async routes for
+// web only while this marker exists; it is always removed again, so native and
+// EAS configs (and the OTA fingerprint) never see it. Set
+// BRANDTHREAD_WEB_ASYNC_ROUTES=0 to export a single-bundle web build instead.
+const asyncRoutesMarker = path.join(projectRoot, '.web-async-routes');
+if (process.env.BRANDTHREAD_WEB_ASYNC_ROUTES !== '0') {
+  fs.writeFileSync(asyncRoutesMarker, 'web export only; see app.config.js\n');
+  process.on('exit', () => fs.rmSync(asyncRoutesMarker, { force: true }));
+}
+
 console.log(`Exporting Brandthread web build for ${env.EXPO_PUBLIC_DOMAIN}…`);
 const result = spawnSync(
   'pnpm',

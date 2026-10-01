@@ -25,6 +25,7 @@
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -398,6 +399,7 @@ export default function ConnectionsScreen() {
         />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={renderItem}

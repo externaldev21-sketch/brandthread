@@ -60,3 +60,6 @@ Thumbs.db
 # Notch-crawl scratch output (screenshots + JSON report from e2e/notch-crawl.spec.ts)
 artifacts/mobile/.notch-crawl/
 artifacts/mobile/.audit/
+
+# web export marker written by artifacts/mobile/scripts/build-web.js
+artifacts/mobile/.web-async-routes

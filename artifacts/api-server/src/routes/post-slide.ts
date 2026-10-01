@@ -26,6 +26,7 @@ import {
   validateOverlaysArray, MAX_SLIDES,
   type ValidatedOverlay,
 } from "../lib/slideValidation";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -163,9 +164,10 @@ router.post(
 
     let objectPath: string | null = null;
     try {
-      objectPath = await storage.createObjectEntityFromBuffer(bytes, contentType);
+      const stored = await normalizeUploadedImage(bytes, contentType);
+      objectPath = await storage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
       await storage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkId, visibility: "private" });
-      return res.status(201).json({ objectPath, contentType, size: bytes.length });
+      return res.status(201).json({ objectPath, contentType: stored.contentType, size: stored.buffer.length });
     } catch (err) {
       if (objectPath) await storage.deleteObjectEntity(objectPath).catch(() => {});
       req.log.error({ err, clerkId }, "Could not upload photo slide");

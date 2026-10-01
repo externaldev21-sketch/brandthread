@@ -3,6 +3,7 @@
  * Base URL is resolved from EXPO_PUBLIC_API_BASE_URL (set in the dev script).
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
+import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
@@ -468,6 +469,7 @@ async function uploadImage<T = any>(
   getToken: GetToken,
   getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
+  image = await prepareImageForUpload(image);
   const source = await fetch(image.uri);
   if (!source.ok) {
     throw new Error("Could not read the selected image.");

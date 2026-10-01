@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -85,6 +86,7 @@ export default function ProductReviewsScreen() {
           </ScrollView>
 
           <FlatList
+            {...LONG_LIST_TUNING}
             data={filtered}
             keyExtractor={item => item.id}
             contentContainerStyle={{ padding: SP.md }}

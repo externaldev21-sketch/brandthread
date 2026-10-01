@@ -34,6 +34,7 @@ import {
 } from '@/lib/engagementRetryQueue';
 import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
 import type { ViewToken } from 'react-native';
+import { Platform } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
 import { useSettled } from '@/lib/animationUtils';
@@ -51,6 +52,8 @@ import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+import { remoteVideoUri, withVideoCaching } from '@/lib/videoPreload';
+import { useFeedVideoPreload } from '@/hooks/useFeedVideoPreload';
 import { mark as perfMark } from '@/lib/perf';
 import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
@@ -1651,7 +1654,7 @@ function SpotlightPageImpl({
           {item.contentType === 'video'
             ? (
               <VideoVisual
-                source={item.videoSource ?? item.mediaUris[0]}
+                source={withVideoCaching(item.videoSource ?? item.mediaUris[0], Platform.OS !== 'web')}
                 isActive={isActive}
                 preload={preload}
                 paused={paused || holdPaused}
@@ -2888,6 +2891,19 @@ export default function FeedScreen({
       if (uri) ExpoImage.prefetch(uri).catch(() => {});
     }
   }, [activeIndex, displayItems]);
+
+  // Keep the videos after the mounted neighbour buffering + disk-cached
+  // (current, +1 mounted by the list, +2 by this hook). Native, signed-in only.
+  const preloadCandidates = useMemo(
+    () => displayItems.map((entry) => {
+      const post = entry as { contentType?: string; videoSource?: VideoSource; mediaUris?: string[] };
+      return post.contentType === 'video'
+        ? { kind: 'video' as const, uri: remoteVideoUri(post.videoSource ?? post.mediaUris?.[0]) }
+        : { kind: 'other' as const, uri: null };
+    }),
+    [displayItems],
+  );
+  useFeedVideoPreload(preloadCandidates, activeIndex, Boolean(userId));
 
   const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
   // Buyer Home: chrome clearance for the rail/caption/scrub-bar, padded with
