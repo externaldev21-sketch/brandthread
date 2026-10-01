@@ -78,6 +78,7 @@ export function CommunityInboxRow({ community, onPress, onToggleMute, horizontal
           <Text
             style={[styles.preview, { color: p.loud ? theme.text : theme.muted, fontFamily: p.loud ? FONT.bold : FONT.regular }]}
             numberOfLines={1}
+            {...({ dataSet: { fit: 'preview' } } as object)}
           >
             {communityPreviewText(community)}
           </Text>

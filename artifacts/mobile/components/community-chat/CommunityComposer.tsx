@@ -1,25 +1,24 @@
 /**
- * Composer for the community group chat — the DM composer look (camera circle
- * + text pill + send) minus voice / products / orders / Thread Cash, with
- * photo staging on top: each picked photo uploads through the moderated
+ * Composer for the community group chat — the shared slim <Composer/> (which
+ * also hides the floating tab bar) with an image button on the left, minus
+ * voice / products / orders / Thread Cash, and photo staging in its top slot: each picked photo uploads through the moderated
  * endpoint BEFORE the message is sent, and a rejected photo shows a calm
  * inline note on its own thumbnail with a remove button.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { PressableScale } from '@/components/BrandthreadUI';
+import Composer from '@/components/ui/Composer';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
-import UploadRing from '@/components/chat/UploadRing';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { messagePreviewText } from '@/lib/chatGrouping';
 import { hapticPrimaryAction } from '@/lib/haptics';
-import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ApiError } from '@/lib/networkNotice';
 import { apiErrorMessage } from '@/lib/safety';
-import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import type { CommunityAttachment } from '@/lib/communities/types';
 import type { DisplayMessage } from '@/lib/communities/chatMerge';
 import type { SendOutcome } from './useCommunityChat';
@@ -30,10 +29,7 @@ export const COMMUNITY_CHAT_INPUT_ID = 'community-chat-composer-input';
 const MAX_PHOTOS = 5;
 const MAX_TEXT = 4000;
 const THUMB = 64;
-const COMPOSER_CONTROL = 36;
-const COMPOSER_LINE_HEIGHT = 20;
-const COMPOSER_MAX_LINES = 5;
-const COMPOSER_TEXT_V_PADDING = SP.sm;
+const ATTACH_SIZE = 36;
 
 const REJECTED_FALLBACK = 'This photo can’t be shared in Brandthread communities. Try a different one.';
 const UNAVAILABLE_FALLBACK = 'We couldn’t check that photo right now. Please try again in a moment.';
@@ -58,11 +54,9 @@ export interface CommunityComposerProps {
   onCancelReply: () => void;
   /** Quiet, transient messages (e.g. photo permission) — shown by the screen's snackbar. */
   onNotice: (text: string) => void;
-  /** Safe-area bottom inset — the composer clears the home indicator itself. */
-  bottomInset: number;
 }
 
-export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply, onNotice, bottomInset }: CommunityComposerProps) {
+export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply, onNotice }: CommunityComposerProps) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const [text, setText] = useState('');
@@ -164,12 +158,8 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
     setInlineNote((n) => (n ? null : n));
   }, []);
 
-  const lines = Math.min(Math.max(text.split('\n').length, 1), COMPOSER_MAX_LINES);
-  const inputHeight = lines * COMPOSER_LINE_HEIGHT + COMPOSER_TEXT_V_PADDING * 2;
-  const bottomPad = Platform.OS === 'web' ? 16 : bottomInset + SP.sm;
-
-  return (
-    <View style={s.wrap}>
+  const topSlot = (
+    <>
       {replyTo && (
         <ReplyBanner
           testID="community-reply-banner"
@@ -229,12 +219,32 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
         </View>
       )}
 
-      <View style={s.inputRow}>
+      {inlineNote && (
+        <View style={s.inlineNote} testID="community-inline-note">
+          <Feather name="info" size={14} color={theme.muted} style={{ marginTop: 1 }} />
+          <Text style={[s.noteText, { color: theme.muted, flex: 1 }]}>{inlineNote}</Text>
+        </View>
+      )}
+    </>
+  );
+
+  return (
+    <Composer
+      testID="community"
+      value={text}
+      onChangeText={handleChangeText}
+      onSend={() => { void handleSend(); }}
+      canSend={canSend}
+      placeholder="Message the group…"
+      nativeID={COMMUNITY_CHAT_INPUT_ID}
+      maxLength={MAX_TEXT}
+      topSlot={topSlot}
+      leftAccessory={
         <PressableScale
           rippleEnabled={false}
           bounce={false}
           onPress={() => { hapticPrimaryAction(); void handlePickPhoto(); }}
-          style={s.cameraBtn}
+          style={s.attachBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="community-attach"
           accessibilityRole="button"
@@ -242,61 +252,12 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
         >
           <Feather name="image" size={18} color={theme.onAccent} />
         </PressableScale>
-
-        <View style={s.pill}>
-          <TextInput
-            nativeID={COMMUNITY_CHAT_INPUT_ID}
-            style={[s.textInput, WEB_INPUT_RESET, { height: inputHeight }]}
-            value={text}
-            onChangeText={handleChangeText}
-            placeholder="Message the group…"
-            placeholderTextColor={theme.muted}
-            multiline
-            maxLength={MAX_TEXT}
-            autoCapitalize="sentences"
-            testID="community-input"
-            accessibilityLabel="Message"
-            onKeyPress={Platform.OS === 'web' ? (e: any) => {
-              // Web hardware-keyboard Enter sends; Shift+Enter still inserts a newline.
-              if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            } : undefined}
-          />
-          <PressableScale
-            rippleEnabled={false}
-            bounce={false}
-            noMinHeight
-            disabled={!canSend}
-            onPress={() => { void handleSend(); }}
-            style={[s.sendBtn, { backgroundColor: canSend ? theme.accent : theme.cardElevated }]}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            testID="community-send"
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            accessibilityState={{ disabled: !canSend }}
-          >
-            {uploading
-              ? <UploadRing size={ICON.md - 4} color={theme.muted} />
-              : <Feather name="arrow-up" size={COMPOSER_CONTROL * 0.55} color={canSend ? theme.onAccent : theme.muted} />}
-          </PressableScale>
-        </View>
-      </View>
-
-      {inlineNote && (
-        <View style={s.inlineNote} testID="community-inline-note">
-          <Feather name="info" size={14} color={theme.muted} style={{ marginTop: 1 }} />
-          <Text style={[s.noteText, { color: theme.muted, flex: 1 }]}>{inlineNote}</Text>
-        </View>
-      )}
-      <View style={{ height: bottomPad }} />
-    </View>
+      }
+    />
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  wrap: { backgroundColor: theme.background },
   stage: {
     flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, alignItems: 'flex-start',
     paddingHorizontal: SP.md, paddingTop: SP.sm,
@@ -310,34 +271,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   photoNote: { marginTop: 4, gap: 4 },
   noteText: { fontSize: FS.xs, lineHeight: 15, fontFamily: FONT.regular },
   noteAction: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingTop: SP.sm,
-  },
-  cameraBtn: {
-    width: COMPOSER_CONTROL, height: COMPOSER_CONTROL, borderRadius: COMPOSER_CONTROL / 2,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 2, backgroundColor: theme.accent,
-  },
-  pill: {
-    flex: 1, flexDirection: 'row', alignItems: 'flex-end',
-    backgroundColor: theme.cardElevated, borderRadius: RADIUS.xxl,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-    paddingLeft: SP.md, paddingRight: SP.xs, gap: SP.sm,
-    minHeight: COMPOSER_CONTROL + SP.sm,
-  },
-  textInput: {
-    flex: 1,
-    paddingVertical: COMPOSER_TEXT_V_PADDING,
-    fontSize: FS.base, lineHeight: COMPOSER_LINE_HEIGHT, fontFamily: FONT.regular, color: theme.text,
-    textAlignVertical: 'center',
-    maxHeight: COMPOSER_LINE_HEIGHT * COMPOSER_MAX_LINES + COMPOSER_TEXT_V_PADDING * 2,
-    minHeight: COMPOSER_CONTROL,
-    marginBottom: SP.xs,
-    ...(Platform.OS === 'web' ? { paddingTop: COMPOSER_TEXT_V_PADDING, paddingBottom: COMPOSER_TEXT_V_PADDING } : null),
-  },
-  sendBtn: {
-    width: COMPOSER_CONTROL, height: COMPOSER_CONTROL, borderRadius: COMPOSER_CONTROL / 2,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SP.xs,
+  attachBtn: {
+    width: ATTACH_SIZE, height: ATTACH_SIZE, borderRadius: ATTACH_SIZE / 2,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent,
   },
   inlineNote: { flexDirection: 'row', gap: 6, paddingHorizontal: SP.md + SP.xs, paddingTop: SP.xs },
 });

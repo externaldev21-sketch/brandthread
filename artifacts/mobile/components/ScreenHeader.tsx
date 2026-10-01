@@ -34,6 +34,8 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
+  /** Draw the hairline under the header (default true). Pass false for a bare back arrow + title. */
+  divider?: boolean;
   /** Override the spoken back label when the route changes between a list and an inline form. */
   backAccessibilityLabel?: string;
   /** Optional testID forwarded to the back/close button, for screens whose tests target it directly. */
@@ -67,7 +69,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, divider = true, hideDivider = false,
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = true, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);

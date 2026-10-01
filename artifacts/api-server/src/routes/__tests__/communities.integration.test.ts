@@ -172,6 +172,8 @@ describe("official communities", () => {
       "Creative Direction", "Streetwear Founders", "Sourcing & Manufacturing",
     ]));
     expect(body.communities.slice(0, 6).every((c) => c.verified)).toBe(true);
+    // Migration 112 tightened the copy so every description fits a card on one line.
+    for (const c of body.communities.filter((x) => x.kind === "official")) expect(c.description.length).toBeLessThanOrEqual(48);
     expect(body.communities.find((c) => c.name === "Graphic Design Community")).toMatchObject({ joined: false, memberCount: expect.any(Number) });
   });
 

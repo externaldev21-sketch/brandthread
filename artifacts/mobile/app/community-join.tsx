@@ -155,7 +155,7 @@ export default function CommunityJoinScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Group invite" />
+      <ScreenHeader divider={false} title="Group invite" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: barInset + SP.xl }]}
         showsVerticalScrollIndicator={false}
