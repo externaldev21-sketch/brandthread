@@ -85,6 +85,9 @@ function notifIcon(type: Notification['type']): string {
     case 'order_cancelled': return 'x-circle';
     case 'order_delay': return 'alert-triangle';
     case 'order_out_for_delivery': return 'truck';
+    case 'order_preparing': return 'box';
+    case 'order_auto_refunded': return 'rotate-ccw';
+    case 'order_refund_warning': return 'clock';
     case 'order_exception': return 'alert-triangle';
     case 'order_returned_to_sender': return 'corner-up-left';
     case 'drop_live': return 'zap';
@@ -160,6 +163,9 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     case 'order_cancelled':
     case 'order_delay':
     case 'order_out_for_delivery':
+    case 'order_preparing':
+    case 'order_auto_refunded':
+    case 'order_refund_warning':
     case 'order_exception':
     case 'order_returned_to_sender':
     case 'return_update':
