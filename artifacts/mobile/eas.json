@@ -23,6 +23,14 @@
         "buildType": "apk"
       }
     },
+    "staging": {
+      "extends": "preview",
+      "channel": "staging",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_SENTRY_ENVIRONMENT": "staging"
+      }
+    },
     "production": {
       "distribution": "store",
       "environment": "production",
