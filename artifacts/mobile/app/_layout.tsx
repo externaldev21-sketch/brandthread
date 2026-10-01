@@ -70,6 +70,7 @@ import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
+import { SaveHeartHost } from '@/components/SaveHeartHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
@@ -1509,6 +1510,7 @@ export default function RootLayout() {
                                   <FirstRunTipsProvider>
                                     <RootLayoutNav />
                                     <GlobalCallOverlay />
+                                    <SaveHeartHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>

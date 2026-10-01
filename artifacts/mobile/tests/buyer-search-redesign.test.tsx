@@ -82,6 +82,9 @@ vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
 }));
 
+
+// The save heart has its own coverage (saved-products-store.test.ts); this suite only exercises search flow.
+vi.mock('@/components/SaveHeart', () => ({ SaveHeart: () => null }));
 vi.mock('expo-linear-gradient', () => ({
   LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
