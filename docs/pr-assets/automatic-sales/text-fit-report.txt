@@ -1,4 +1,3 @@
-[more] clipped: "Bank account and payout history · $42.60" (292>239)
 [more] clipped: "2" (32>25)
 [sales-empty] clipped: "2" (32>25)
 [form] clipped: "2" (32>25)
