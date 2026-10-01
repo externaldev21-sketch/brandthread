@@ -101,6 +101,7 @@ export default function BuyerSettingsMenuScreen() {
       title: 'Work',
       rows: [
         { key: 'freelancer-jobs', icon: 'briefcase', label: 'Freelancer jobs', onPress: () => router.push('/freelancer-jobs' as any) },
+        { key: 'creator-program', icon: 'link', label: 'Creator program', onPress: () => router.push('/creator-program' as any) },
       ],
     },
     {

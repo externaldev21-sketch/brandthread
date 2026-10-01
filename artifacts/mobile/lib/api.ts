@@ -2377,6 +2377,37 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           ...(expectedClerkId ? { expectedClerkId } : {}),
         }),
     },
+    /** Affiliate / creator program — creator side (/api/affiliate) and seller side (/api/seller/affiliate) */
+    affiliate: {
+      overview: () => get<import('./affiliateTypes').CreatorOverview>('/api/affiliate/overview'),
+      brand: (ref: string) => get<import('./affiliateTypes').BrandProgramInfo>(`/api/affiliate/brands/${encodeURIComponent(ref)}`),
+      apply: (sellerId: string) =>
+        post<{ id: string; status: string; code: string }>(`/api/affiliate/brands/${encodeURIComponent(sellerId)}/apply`, {}),
+      respondToInvite: (id: string, accept: boolean) =>
+        post<{ id: string; status: string }>(`/api/affiliate/invites/${encodeURIComponent(id)}/${accept ? 'accept' : 'decline'}`, {}),
+      payouts: () =>
+        get<{ payouts: import('./affiliateTypes').CreatorPayout[]; payout: import('./affiliateTypes').CreatorPayoutStatus }>('/api/affiliate/payouts'),
+      onboardPayouts: () => post<{ url: string }>('/api/affiliate/payout-account/onboard', {}),
+      /** Public, unauthenticated: records a click on a creator link. */
+      click: (code: string, visitorId?: string) =>
+        post<{ valid: boolean; code: string; sellerId: string }>('/api/public/affiliate/click', { code, visitorId }),
+      attach: (code: string) =>
+        post<{ attributed: boolean; reason?: string }>('/api/affiliate/attach', { code }),
+      seller: {
+        overview: () => get<import('./affiliateTypes').SellerAffiliateOverview>('/api/seller/affiliate'),
+        saveProgram: (body: Partial<{
+          enabled: boolean; commissionPercent: number; buyerDiscountPercent: number; windowDays: number;
+          holdDays: number; minPayoutCents: number; autoApprove: boolean;
+        }>) => put<{ program: import('./affiliateTypes').SellerProgram }>('/api/seller/affiliate/program', body),
+        invite: (username: string, commissionPercent?: number) =>
+          post<{ id: string; status: string }>('/api/seller/affiliate/creators/invite', { username, ...(commissionPercent != null ? { commissionPercent } : {}) }),
+        approve: (id: string) => post<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}/approve`, {}),
+        update: (id: string, body: { status?: 'active' | 'paused'; commissionPercent?: number | null }) =>
+          patch<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}`, body),
+        remove: (id: string) => del<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}`),
+        payouts: () => get<{ payouts: Array<{ id: string; creatorName: string; amountCents: number; state: string; paidAt: string | null; createdAt: string }>; payoutsAvailable: boolean }>('/api/seller/affiliate/payouts'),
+      },
+    },
     /** Server-side privacy settings */
     privacy: {
       /** Get current server-side privacy preferences */

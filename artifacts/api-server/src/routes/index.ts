@@ -109,11 +109,15 @@ import webhooksShippoRouter from "./webhooks-shippo";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
+import affiliatePublicRouter from "./affiliate-public";
+import affiliateCreatorRouter from "./affiliate-creator";
+import sellerAffiliateRouter from "./seller-affiliate";
 
 const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
@@ -206,6 +210,7 @@ router.use("/conversations",             conversationsRouter);
 // declared inside before the router applies requireAuth.
 router.use("/communities",               communitiesRouter);
 router.use("/brandthread-agent",         brandthreadAgentRouter);
+router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
@@ -223,6 +228,7 @@ router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
 router.use("/referrals",                 referralsRouter);
+router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
