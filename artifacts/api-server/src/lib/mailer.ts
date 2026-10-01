@@ -97,3 +97,19 @@ export async function sendVerifyEmailEmail(options: { to: string; code: string }
   });
   return send({ to: options.to, subject: "Verify your email for Brandthread", html });
 }
+
+/** Single-use link that lets the account owner confirm a web deletion request. */
+export async function sendAccountDeletionEmail(options: { to: string; link: string }): Promise<boolean> {
+  const html = renderBrandthreadEmail({
+    preheader: "Confirm your Brandthread account deletion request",
+    eyebrow: "Account deletion",
+    title: "Confirm account deletion",
+    subtitle: "Use this link to confirm the request. It expires in 60 minutes and works once.",
+    bodyHtml: `
+      <p style="margin:0 0 18px;">We received a request to permanently delete the Brandthread account for this email address. Nothing is deleted until you open the link and confirm.</p>
+      <p style="margin:0;color:#666666;">If you didn't request this, ignore this email. Your account stays as it is.</p>
+    `,
+    cta: { label: "Confirm deletion", url: options.link },
+  });
+  return send({ to: options.to, subject: "Confirm your Brandthread account deletion", html });
+}
