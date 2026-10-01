@@ -81,15 +81,11 @@ async function openAdjustmentsHsb(page: import('@playwright/test').Page) {
   await page.locator('[data-testid="btn-adjustments"]').first().click();
   await page.waitForTimeout(300);
 
-  // btn-adjustments both selects the tool AND immediately opens the
-  // Adjustments sheet (defaulting to Curves) — its own full-screen overlay
-  // Pressable then sits on top of the sub-mode bar (adj-mode-hsb lives
-  // there, not inside the sheet), blocking any click on it. The real flow
-  // is: close the sheet first, THEN tap the HSB chip, which re-opens the
-  // sheet already on HSB.
-  await page.locator('[data-testid="adjustments-sheet-done"]').click();
-  await page.waitForTimeout(300);
-  await page.locator('[data-testid="adj-mode-hsb"]').click();
+  // The sheet opens on Procreate's category grid; HSB lives under
+  // Colour Adjustment.
+  await page.locator('[data-testid="adj-cat-colour"]').click();
+  await page.waitForTimeout(250);
+  await page.locator('[data-testid="adj-tool-hsb"]').click();
   await page.waitForTimeout(300);
 }
 
@@ -112,9 +108,9 @@ test('HSB sub-tool renders real sliders for a selected layer, no overflow', asyn
 
   const panel = page.locator('[data-testid="adjustments-hsb-panel"]');
   await expect(panel).toBeVisible();
-  // Two "HSB" texts exist at once (the sheet title and the now-active
-  // sub-mode chip's own label) — scope to the sheet's dialog role.
-  await expect(page.getByRole('dialog').getByText('HSB', { exact: true })).toBeVisible();
+  // The sheet title is the tool's full Procreate label now that the sheet
+  // is category → list → tool.
+  await expect(page.locator('[data-testid="adjustments-sheet-title"]')).toHaveText('Hue, Saturation, Brightness');
   for (const key of ['hue', 'saturation', 'brightness']) {
     await expect(page.locator(`[data-testid="hsb-${key}-value"]`)).toBeVisible();
     await expect(page.locator(`[data-testid="hsb-${key}-dec"]`)).toBeVisible();
