@@ -57,6 +57,8 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** A store gift card from the buyer's wallet, spent on this seller's group only. */
+  giftCard?: { cardId: string };
 };
 
 export type PaymentIntentAddress = {
@@ -83,7 +85,7 @@ export type QuoteBody = {
   shippingAddress: { street?: string; line2?: string | null; city?: string; state?: string; postalCode: string; country: string };
 };
 
-type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
+type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'> & Partial<Pick<CheckoutSession, 'giftCards'>>;
 
 /** One group per seller. A promo code applies to single-seller orders, as before. */
 export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
@@ -95,6 +97,7 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
       quantity: Number(item.quantity),
     })),
     ...(code ? { discountCode: String(code) } : {}),
+    ...(session.giftCards?.[group.sellerId] ? { giftCard: { cardId: session.giftCards[group.sellerId].cardId } } : {}),
   }));
 }
 
@@ -161,6 +164,8 @@ export type QuoteGroup = {
   shippingCents: number;
   discountCents: number;
   taxCents: number;
+  /** Covered by a store gift card; totalCents is what the card payment still covers. */
+  giftCardCents?: number;
   totalCents: number;
   processingDays: number | null;
 };
@@ -190,14 +195,23 @@ export function isCartQuote(value: unknown): value is CartQuote {
 }
 
 /** Totals for the page and the Pay button once the server has priced the cart. */
-export function quoteTotals(quote: CartQuote) {
-  return quote.groups.reduce((sum, group) => ({
+export type QuoteTotals = {
+  subtotalCents: number; shippingCents: number; discountCents: number; taxCents: number; totalCents: number;
+  /** Present only when a store gift card is applied. */
+  giftCardCents?: number;
+};
+
+export function quoteTotals(quote: CartQuote): QuoteTotals {
+  const base = quote.groups.reduce((sum, group) => ({
     subtotalCents: sum.subtotalCents + group.subtotalCents,
     shippingCents: sum.shippingCents + group.shippingCents,
     discountCents: sum.discountCents + group.discountCents,
     taxCents: sum.taxCents + group.taxCents,
     totalCents: sum.totalCents + group.totalCents,
   }), { subtotalCents: 0, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 0 });
+  const giftCardCents = quote.groups.reduce((sum, group) => sum + (group.giftCardCents ?? 0), 0);
+  // Only present when a store gift card is applied, so other orders keep their exact shape.
+  return giftCardCents > 0 ? { ...base, giftCardCents } : base;
 }
 
 // ─── Delivery window ─────────────────────────────────────────────────────────

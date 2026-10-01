@@ -39,6 +39,8 @@ import {
   calculateGroupTax, findCardDataInRequest, priceCartGroup, type CartShipping, type PricedGroup,
 } from "../lib/money/cartCheckout";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
+import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
+import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
 
 const router = Router();
 
@@ -77,6 +79,11 @@ const addressSchema = z.object({
 const groupsSchema = z.array(z.object({
   items: z.array(itemSchema).min(1).max(100),
   discountCode: z.string().trim().min(1).max(64).optional(),
+  /** A store gift card for this seller's group: a code, or the id of a card in the buyer's wallet. */
+  giftCard: z.object({
+    code: z.string().trim().min(4).max(64).optional(),
+    cardId: z.string().uuid().optional(),
+  }).refine((ref) => Boolean(ref.code) !== Boolean(ref.cardId)).optional(),
 })).min(1).max(MAX_CART_GROUPS);
 /** A quote only needs where the order goes (a wallet sheet shares no street until the buyer pays). */
 const quoteSchema = z.object({
@@ -107,11 +114,13 @@ type GroupBreakdown = {
   shippingCents: number;
   discountCents: number;
   taxCents: number;
+  /** Covered by a store gift card; totalCents is what is left for the card payment. */
+  giftCardCents: number;
   totalCents: number;
   processingDays: number | null;
 };
 
-function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>): GroupBreakdown[] {
+function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gift: Map<string, number> = new Map()): GroupBreakdown[] {
   return rows.map((row) => {
     const subtotal = (row.items ?? []).reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
     return {
@@ -121,13 +130,17 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>): G
       shippingCents: row.shippingCents ?? 0,
       discountCents: row.discountCodeAmountCents ?? 0,
       taxCents: row.taxCents ?? 0,
+      giftCardCents: gift.get(row.id) ?? 0,
       totalCents: row.amountTotalCents ?? 0,
       processingDays: null,
     };
   });
 }
 
-type PricedCartGroup = PricedGroup & { taxCents: number; calculationId: string | null; totalCents: number };
+type PricedCartGroup = PricedGroup & {
+  taxCents: number; calculationId: string | null; totalCents: number;
+  giftCardId: string | null; giftCardCents: number;
+};
 
 /** Prices every seller group, then its Stripe Tax. Throws CartCheckoutError. */
 async function priceCart(
@@ -145,13 +158,24 @@ async function priceCart(
     }
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
+    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents;
+    // A store gift card covers part of THIS seller's group only.
+    const gift = group.giftCard
+      ? await applyGiftCardToGroup({
+        buyerId, sellerId: pricedGroup.sellerId, ref: group.giftCard, groupTotalCents: fullTotalCents,
+        feeFloorCents: pricedGroup.platformFeeCents + pricedGroup.processingFeeEstimateCents,
+      })
+      : null;
     priced.push({
       ...pricedGroup,
       taxCents: tax.taxCents,
       calculationId: tax.calculationId,
-      totalCents: pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents,
+      giftCardId: gift?.cardId ?? null,
+      giftCardCents: gift?.cents ?? 0,
+      totalCents: fullTotalCents - (gift?.cents ?? 0),
     });
   }
+  trimGiftCardsForMinimumCharge(priced, MIN_CARD_CHARGE_CENTS);
   return priced;
 }
 
@@ -163,6 +187,7 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     shippingCents: group.shippingCents,
     discountCents: group.discountCents,
     taxCents: group.taxCents,
+    giftCardCents: group.giftCardCents,
     totalCents: group.totalCents,
     processingDays: group.processingDays,
   }));
@@ -178,6 +203,10 @@ function stripeFor(res: Response): ReturnType<typeof requireStripe> | null {
 }
 
 function sendError(res: Response, error: unknown): boolean {
+  if (error instanceof GiftCardError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return true;
+  }
   if (error instanceof CartCheckoutError) {
     res.status(error.status).json({ error: error.message, code: error.code, ...error.details });
     return true;
@@ -244,7 +273,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
       clientSecret: intent.client_secret,
       status: intent.status,
       amountCents: intent.amount,
-      groups: breakdownFromRows(prior),
+      groups: breakdownFromRows(prior, await giftCentsForCheckouts(db, prior.map((row) => row.id))),
     });
     return;
   }
@@ -303,6 +332,14 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,
         })));
+        if (group.giftCardId && group.giftCardCents > 0) {
+          // Claims an unclaimed card for this buyer, then atomically takes the amount off it.
+          await claimCard(tx, group.giftCardId, buyerId);
+          await reserveForCheckout(tx, {
+            cardId: group.giftCardId, checkoutSessionId: row.id, amountCents: group.giftCardCents,
+            actorId: buyerId, sellerId: group.sellerId,
+          });
+        }
         inserted.push(row);
       }
       return inserted;

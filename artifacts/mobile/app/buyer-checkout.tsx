@@ -86,6 +86,7 @@ import {
   ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
 } from '@/components/checkout/PaymentSection';
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
+import { GiftCardSection } from '@/components/checkout/GiftCardSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
@@ -1060,6 +1061,23 @@ export default function BuyerCheckoutScreen() {
             }
           />
 
+          {/* Store gift cards: in-app, signed-in orders. Each card pays only its own store's items. */}
+          {inApp && isSignedIn && !previewOnly ? (
+            <GiftCardSection
+              groups={current.deliveryGroups.map(group => ({ sellerId: group.sellerId, sellerName: group.sellerName }))}
+              applied={current.giftCards ?? {}}
+              coveredCents={Object.fromEntries((activeQuote?.groups ?? []).map(group => [group.sellerId, group.giftCardCents ?? 0]))}
+              onApply={(sellerId, card) => void persist({
+                ...current, giftCards: { ...(current.giftCards ?? {}), [sellerId]: card }, idempotencyKey: `ck_${randomUUID()}`,
+              })}
+              onRemove={sellerId => {
+                const next = { ...(current.giftCards ?? {}) };
+                delete next[sellerId];
+                void persist({ ...current, giftCards: next, idempotencyKey: `ck_${randomUUID()}` });
+              }}
+            />
+          ) : null}
+
           {/* Thread Cash (item 109): hidden while the flag is off, for guests
               and for multi-seller orders. */}
           {threadCashEligible && <ThreadCashSection state={threadCash} />}
@@ -1100,6 +1118,7 @@ export default function BuyerCheckoutScreen() {
             itemCount={itemCount}
             taxNote={taxNote}
             quotedGroups={inApp ? activeQuote?.groups : undefined}
+            giftCardCents={quoted?.giftCardCents ?? 0}
           />
 
           {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
