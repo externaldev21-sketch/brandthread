@@ -281,6 +281,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/SellerDashboardSections.tsx',
   'components/SellerHomeCommerceDashboard.tsx',
   'components/SellerStudioRadialMenu.tsx',
+  'components/StudioMenuHints.tsx',
   'components/SellerTutorialOverlay.tsx',
   'components/SetupCelebration.tsx',
   'components/SetupWalkthroughSheet.tsx',

@@ -48,6 +48,46 @@ describe('Studio edge-trace entry: lock -> trace -> zoom-through, replacing the 
     expect(studio).toContain('traceProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }');
   });
 
+  it('the title never fades or slides during the zoom-through burst — rendered outside the scaled card layer, with its own punch/flash in sync with the burst', () => {
+    // Dev (superseding an earlier fade-out fix): the title must stay fully
+    // visible and readable through the whole burst, all the way to
+    // navigation. No fade-related style survives on the label.
+    expect(studio).not.toContain('cardLabelFadeStyle');
+    // The label is a sibling of the scaled `card` View, not a child of it —
+    // its own wrapper only ever translates (never scales) with the carousel.
+    const carouselCardBody = studio.slice(studio.indexOf('function CarouselCard('), studio.indexOf('const windowStart ='));
+    expect(carouselCardBody).toContain('const labelAnchorStyle = useAnimatedStyle');
+    expect(carouselCardBody).toContain('const labelPunchStyle = useAnimatedStyle');
+    // The label's JSX sits in its own Animated.View (cardLabelLayer), after
+    // and separate from the `card` Animated.View that carries cardStyle's scale.
+    const renderBlock = carouselCardBody.slice(carouselCardBody.indexOf('return ('));
+    expect(renderBlock).toContain('styles.cardLabelLayer');
+    expect(renderBlock).toContain('<Animated.Text style={[styles.cardLabel, labelPunchStyle]}');
+    // labelAnchorStyle only ever applies translateX (the carousel's own
+    // horizontal offset) — no scale, so cardStyle's zoom-through burst can
+    // never move or resize it.
+    const anchorStyleStart = carouselCardBody.indexOf('const labelAnchorStyle = useAnimatedStyle');
+    const anchorStyleBody = carouselCardBody.slice(anchorStyleStart, carouselCardBody.indexOf('});', anchorStyleStart) + 3);
+    expect(anchorStyleBody).toContain('transform: [{ translateX: distance * cardSpacing }]');
+    expect(anchorStyleBody).not.toContain('scale');
+  });
+
+  it('the title snap (scale punch + letter-spacing/brightness flash) fires in the same instant as the zoom-through burst, and resets on cancel', () => {
+    const fnBody = studio.slice(studio.indexOf('const triggerZoomEnter = useCallback'), studio.indexOf('}, [reduceMotion, fireEnterHaptic'));
+    const burstIdx = fnBody.indexOf('zoomScale.value = withTiming(ZOOM_THROUGH_SCALE');
+    const punchIdx = fnBody.indexOf('labelPunchScale.value = withSequence(');
+    const flashIdx = fnBody.indexOf('labelFlash.value = withSequence(');
+    expect(burstIdx).toBeGreaterThan(-1);
+    expect(punchIdx).toBeGreaterThan(burstIdx);
+    expect(flashIdx).toBeGreaterThan(punchIdx);
+    expect(fnBody).toContain('withTiming(1.12, { duration: 70, easing: Easing.out(Easing.quad) })');
+    expect(fnBody).toContain('withSpring(1, { damping: 10, stiffness: 180, mass: 0.4 })');
+    // retractEnter (shared by both cancel paths) resets both back to rest.
+    const retractBody = studio.slice(studio.indexOf('function retractEnter('), studio.indexOf('// ─── Per-card signature micro-animations'));
+    expect(retractBody).toContain('labelPunchScale.value = 1;');
+    expect(retractBody).toContain('labelFlash.value = 0;');
+  });
+
   it('locking a card starts entering=true and the trace, and only pushes/brightens the cover when NOT Reduce Motion', () => {
     const endBlock = studio.slice(studio.indexOf('.onEnd((e) => {', studio.indexOf('const cardAreaPan =')), studio.indexOf('}), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse,'));
     const horizontalBranch = endBlock.slice(endBlock.indexOf("cardGestureAxis.value === 'horizontal'"));
@@ -87,9 +127,9 @@ describe('Studio edge-trace entry: lock -> trace -> zoom-through, replacing the 
     expect(retractBody).toContain('enterFade.value = 0;');
     // Both gesture entry points call it.
     const beginBlock = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('.onUpdate(', studio.indexOf('const cardAreaPan =')));
-    expect(beginBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade);');
+    expect(beginBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);');
     const dismissStartBlock = studio.slice(studio.indexOf('const dismissGesture ='), studio.indexOf('.onUpdate(', studio.indexOf('const dismissGesture =')));
-    expect(dismissStartBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade);');
+    expect(dismissStartBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);');
   });
 
   it('a tap or upward flick still opens instantly, unaffected by the trace mechanism (they call openCurrentItem directly, no skipHaptic)', () => {

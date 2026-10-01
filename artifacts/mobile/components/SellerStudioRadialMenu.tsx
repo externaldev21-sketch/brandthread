@@ -16,7 +16,7 @@
  *
  * Layout: the current card's full-bleed cover fills the ENTIRE screen, edge
  * to edge, top to bottom — no bars, no letterboxing above/below it. The
- * header and the row of position dots FLOAT on top of that cover as two
+ * header and the edge-chevron swipe hint FLOAT on top of that cover as two
  * absolutely-positioned overlays (no background of their own — legibility
  * comes from the cover's own dark vignette, same as the icon/name already
  * relied on). Header: the seller's real profile photo + store name on the
@@ -27,7 +27,7 @@
  * between cards), never at rest, per Dev's own screenshot ("no slivers, no
  * half-words"). A thin white edge-trace draws clockwise around the WHOLE
  * SCREEN on lock (see AUTO_ENTER_MS) — inset from the physical screen edges
- * on every side, header and dots included, not just the area between them.
+ * on every side, header and chevrons included, not just the area between them.
  *
  * Interaction:
  *  - A horizontal drag anywhere on the card area SCRUBS through the list —
@@ -66,6 +66,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Image,
   Modal,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -85,7 +86,9 @@ import Animated, {
   ReduceMotion,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withSequence,
+  withSpring,
   withTiming,
   Easing,
   type SharedValue,
@@ -111,8 +114,10 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';
 import { SCRUB_PX_PER_CARD, indexForDrag } from '@/lib/studioCardCarousel';
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { STUDIO_MENU_SCRUB_ROWS } from '@/lib/firstRunTips/content';
+import { useFirstRunTip } from '@/hooks/useFirstRunTip';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { getDisplayCornerRadius, insetOutlineCornerRadius } from '@/lib/displayCornerRadius';
+import { StudioEdgeChevrons, StudioSwipeCoach } from '@/components/StudioMenuHints';
 import {
   ALL_ITEMS,
   type ControlCenterItem,
@@ -231,9 +236,30 @@ const PUSH_IN_SCALE = 1.14;
  *  triggerZoomEnter), so the extra distance reads as a snappier burst, not
  *  a slower one. */
 const ZOOM_THROUGH_SCALE = 2.6;
-/** Corner radius of the edge-trace rectangle — a "rounded screen-edge"
- *  look rather than a hard-cornered box. */
-const TRACE_CORNER_RADIUS = 28;
+/** Duration of that zoom-through burst (and its destination fade). */
+const ZOOM_BURST_MS = 220;
+/** Under Reduce Motion the burst is replaced by a plain fade of this length. */
+const REDUCED_MOTION_FADE_MS = 180;
+/** The title's exit motion (Dev): over the LAST ~400ms of the push-in/zoom-
+ *  through — i.e. starting TITLE_EXIT_MS before the destination fade
+ *  completes and ending in the same frame the page disappears — the title
+ *  slides up TITLE_EXIT_LIFT_PX and tremors, ramping slow→fast (amplitude
+ *  TITLE_TREMOR_AMP_MIN→MAX px, frequency TITLE_TREMOR_HZ_MIN→MAX). Driven
+ *  by one UI-thread shared value (labelExit, 0→1, see cardAreaPan's lock
+ *  onEnd) and mapped to transforms in CarouselCard's labelPunchStyle.
+ *  Reduce Motion keeps the slide, skips the tremor. */
+const TITLE_EXIT_MS = 400;
+const TITLE_EXIT_LIFT_PX = 12;
+const TITLE_TREMOR_AMP_MIN = 1;
+const TITLE_TREMOR_AMP_MAX = 2.5;
+const TITLE_TREMOR_HZ_MIN = 5;
+const TITLE_TREMOR_HZ_MAX = 24;
+/** The edge-trace's corner radius is no longer a fixed number: it is the
+ *  DEVICE's own display corner radius minus TRACE_INSET (concentric with
+ *  the glass — see lib/displayCornerRadius.ts), recomputed from the window
+ *  size + safe-area insets on every size change (rotation, iPad split
+ *  view). Dev's bug: a fixed 28pt radius drawn 8pt inside a ~55pt iPhone
+ *  corner sat outside the visible glass, so all four corners were cut off. */
 /** How far the trace rectangle sits inside the card's measured bounds.
  *  Dev: live-inspected at 393x852 and found the path drawn exactly ON the
  *  card edges (x=0 and x=w), so half the stroke fell outside the Svg's own
@@ -242,6 +268,11 @@ const TRACE_CORNER_RADIUS = 28;
  *  (mid-screen) ever showed. Must clear strokeWidth/2 plus a margin so the
  *  full stroke paints on-screen on every edge. */
 const TRACE_INSET = 8;
+/** The trace stroke has no blur/glow filter — its "glow" is the plain 3px
+ *  white stroke itself — so the inset only needs to clear strokeWidth/2
+ *  (1.5px) with margin. If a blur is ever added, TRACE_INSET must stay
+ *  >= strokeWidth/2 + the blur radius or the glow clips at the edges. */
+const TRACE_STROKE_WIDTH = 3;
 
 /** Rubber-band resistance for dragging the page up past its resting
  *  position — a diminishing-returns curve (never a hard clamp) that
@@ -262,14 +293,25 @@ function retractEnter(
   traceProgress: SharedValue<number>,
   zoomScale: SharedValue<number>,
   enterFade: SharedValue<number>,
+  labelPunchScale: SharedValue<number>,
+  labelFlash: SharedValue<number>,
+  labelExit: SharedValue<number>,
 ) {
   'worklet';
   cancelAnimation(traceProgress);
   cancelAnimation(zoomScale);
   cancelAnimation(enterFade);
+  cancelAnimation(labelPunchScale);
+  cancelAnimation(labelFlash);
+  cancelAnimation(labelExit);
   traceProgress.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
   zoomScale.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) });
   enterFade.value = 0;
+  labelPunchScale.value = 1;
+  labelFlash.value = 0;
+  // The title eases back down from wherever its exit slide had got to
+  // (it only ever starts in the last TITLE_EXIT_MS, so usually from 0).
+  labelExit.value = withTiming(0, { duration: 120, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
 }
 
 // ─── Per-card signature micro-animations ───────────────────────────────────────
@@ -347,7 +389,7 @@ export default function SellerStudioRadialMenu({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
-  const { height: screenHeight } = useWindowDimensions();
+  const { width: windowWidth, height: screenHeight } = useWindowDimensions();
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
@@ -426,7 +468,7 @@ export default function SellerStudioRadialMenu({
   // (via withTiming) toward whatever integer index the current drag/tap
   // resolves to. `cardIndexJS` mirrors its ROUNDED value on the JS side,
   // updated only when it actually changes (see the reaction below), driving
-  // the position dots and which cards are mounted at all — that can't be
+  // which cards are mounted at all (and the current-item ref) — that can't be
   // driven from a worklet, unlike the per-card transform/opacity styles,
   // which read `cardIndex` directly.
   const cardIndex = useSharedValue(0);
@@ -464,7 +506,49 @@ export default function SellerStudioRadialMenu({
   const traceProgress = useSharedValue(0);
   const zoomScale = useSharedValue(1);
   const enterFade = useSharedValue(0);
+  // The title's own "snap" the instant the zoom-through burst fires (see
+  // triggerZoomEnter) — Dev: a quick scale punch plus a brief letter-
+  // spacing tighten/brightness flash, in sync with the burst, now that the
+  // label itself is rendered outside the card's scaled layer (see
+  // CarouselCard below) and no longer needs to fade to avoid clipping.
+  const labelPunchScale = useSharedValue(1);
+  const labelFlash = useSharedValue(0);
+  // The title's exit slide + tremor (see TITLE_EXIT_MS) — 0 at rest, 1 in
+  // the frame the page disappears. Armed with a delay the moment a card
+  // locks (cardAreaPan's onEnd) so it ends exactly with the destination
+  // fade; any cancel eases it back to 0 (retractEnter).
+  const labelExit = useSharedValue(0);
+  // Live horizontal drag translation while scrubbing (0 when the finger is
+  // up) — drives the edge chevrons' brighten/stretch (StudioEdgeChevrons).
+  const scrubDragX = useSharedValue(0);
   const [entering, setEntering] = useState(false);
+
+  // ── First-time swipe coach (StudioSwipeCoach) ──────────────────────────────
+  // Shown the very first time this ACCOUNT opens the menu, through the
+  // app's own first-run tips system (hooks/useFirstRunTip: seen-state is
+  // user-scoped — AsyncStorage key `first_run_tips_seen:<userId>`, mirrored
+  // to the server so it stays seen across devices/reinstalls — and it
+  // never stacks with another tip). Replaces the earlier fullscreen
+  // "Scrub through your tools" guide this component rendered OUTSIDE its
+  // own Modal, where a native Modal covered it. Dismissed by a tap or the
+  // user's first swipe (which still scrubs through — see tapGesture and
+  // cardAreaPan below), never by a control of its own.
+  // `&demo=1` preview: shows on EVERY open so Dev can see it on demand
+  // (`&tips=1` also still forces it, like every other tip).
+  const coachTip = useFirstRunTip('studio-menu-swipe-coach', { contentReady: open });
+  const coachTipRef = useRef(coachTip);
+  coachTipRef.current = coachTip;
+  const coachDemoEveryOpen = isPreviewDemoMode();
+  const [coachDemoDismissed, setCoachDemoDismissed] = useState(false);
+  const coachVisible = open && (coachTip.visible || (coachDemoEveryOpen && !coachDemoDismissed));
+  // UI-thread mirror so the gestures can decide "dismiss the coach instead
+  // of opening a card" without a JS round-trip.
+  const coachActive = useSharedValue(false);
+  useEffect(() => { coachActive.value = coachVisible; }, [coachVisible, coachActive]);
+  const dismissCoach = useCallback(() => {
+    if (coachTipRef.current.visible) coachTipRef.current.dismiss();
+    setCoachDemoDismissed(true);
+  }, []);
 
   // ── Per-card micro-animation trigger (see MICRO_KIND above) ─────────────────
   // A global "play token": microTriggerIndex names which card should play,
@@ -486,10 +570,15 @@ export default function SellerStudioRadialMenu({
       traceProgress.value = 0;
       zoomScale.value = 1;
       enterFade.value = 0;
+      labelPunchScale.value = 1;
+      labelFlash.value = 0;
+      labelExit.value = 0;
+      scrubDragX.value = 0;
       microTriggerIndex.value = -1;
       microTriggerSeq.value = 0;
       setEntering(false);
       setCardIndexJS(0);
+      setCoachDemoDismissed(false);
       lastStepAtRef.current = 0;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -586,11 +675,13 @@ export default function SellerStudioRadialMenu({
     cancelAnimation(traceProgress);
     cancelAnimation(zoomScale);
     cancelAnimation(enterFade);
+    cancelAnimation(labelExit);
     traceProgress.value = 0;
     zoomScale.value = 1;
     enterFade.value = 0;
+    labelExit.value = 0;
     setEntering(false);
-  }, [traceProgress, zoomScale, enterFade]);
+  }, [traceProgress, zoomScale, enterFade, labelExit]);
 
   // Lets the Studio tab button toggle: it bumps openRequestKey when the
   // caller thinks the page is closed and closeRequestKey when it thinks the
@@ -625,9 +716,11 @@ export default function SellerStudioRadialMenu({
     cancelAnimation(traceProgress);
     cancelAnimation(zoomScale);
     cancelAnimation(enterFade);
+    cancelAnimation(labelExit);
     traceProgress.value = 0;
     zoomScale.value = 1;
     enterFade.value = 0;
+    labelExit.value = 0;
     setEntering(false);
     setOpen(false);
     if (
@@ -641,7 +734,7 @@ export default function SellerStudioRadialMenu({
     }
     setNextPushAnimationNone();
     router.push(item.route as never);
-  }, [translateY, traceProgress, zoomScale, enterFade, planLoading, planError, hasPlan, retryPlan, router]);
+  }, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading, planError, hasPlan, retryPlan, router]);
 
   // ── Gestures ─────────────────────────────────────────────────────────────────
   // Horizontal = scrub through cards, vertical = dismiss, near-zero movement
@@ -686,16 +779,28 @@ export default function SellerStudioRadialMenu({
   const triggerZoomEnter = useCallback(() => {
     fireEnterHaptic();
     if (reduceMotion) {
-      enterFade.value = withTiming(1, { duration: 180, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
+      enterFade.value = withTiming(1, { duration: REDUCED_MOTION_FADE_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
         if (finished) runOnJS(openCurrentItem)({ skipHaptic: true });
       });
       return;
     }
-    zoomScale.value = withTiming(ZOOM_THROUGH_SCALE, { duration: 220, easing: Easing.in(Easing.cubic) });
-    enterFade.value = withTiming(1, { duration: 220, easing: Easing.linear }, (finished) => {
+    zoomScale.value = withTiming(ZOOM_THROUGH_SCALE, { duration: ZOOM_BURST_MS, easing: Easing.in(Easing.cubic) });
+    enterFade.value = withTiming(1, { duration: ZOOM_BURST_MS, easing: Easing.linear }, (finished) => {
       if (finished) runOnJS(openCurrentItem)({ skipHaptic: true });
     });
-  }, [reduceMotion, fireEnterHaptic, zoomScale, enterFade, openCurrentItem]);
+    // The title's own snap, fired in the same instant as the burst above —
+    // a quick punch up then a spring settle (~180ms total), plus a brief
+    // letter-spacing tighten/brightness flash (labelFlash 0→1→0) that the
+    // label's own animated style below maps to letterSpacing/textShadow.
+    labelPunchScale.value = withSequence(
+      withTiming(1.12, { duration: 70, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 10, stiffness: 180, mass: 0.4 }),
+    );
+    labelFlash.value = withSequence(
+      withTiming(1, { duration: 70, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 110, easing: Easing.in(Easing.quad) }),
+    );
+  }, [reduceMotion, fireEnterHaptic, zoomScale, enterFade, labelPunchScale, labelFlash, openCurrentItem]);
 
   /** How far (in either single-axis direction) a drag must travel before its
    *  axis locks in — matches the "decide within the first ~10px" spec. */
@@ -731,10 +836,16 @@ export default function SellerStudioRadialMenu({
   const dismissGesture = useMemo(() => Gesture.Pan()
     .onStart(() => {
       dragStartY.value = translateY.value;
+      // A swipe starting on the header counts as the first-time coach's
+      // "first swipe" too.
+      if (coachActive.value) {
+        coachActive.value = false;
+        runOnJS(dismissCoach)();
+      }
       // A swipe starting on the header should cancel any in-flight
       // edge-trace on the card area below, same as touching the card area
       // itself would (spec: "cancel and close, never navigates").
-      retractEnter(traceProgress, zoomScale, enterFade);
+      retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);
       runOnJS(setEntering)(false);
     })
     .onUpdate((e) => {
@@ -743,7 +854,7 @@ export default function SellerStudioRadialMenu({
     })
     .onEnd((e) => {
       runDismissEnd(e);
-    }), [translateY, dragStartY, traceProgress, zoomScale, enterFade, runDismissEnd]);
+    }), [translateY, dragStartY, coachActive, dismissCoach, traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit, runDismissEnd]);
 
   // Card area: scrub (horizontal) or dismiss (vertical) — a single combined
   // Pan that locks its own axis, per constraint 1 above.
@@ -759,16 +870,24 @@ export default function SellerStudioRadialMenu({
       // screen anywhere... cancels" — the trace retracts and the carousel
       // continues from that card).
       landedPulse.value = 0;
-      retractEnter(traceProgress, zoomScale, enterFade);
+      scrubDragX.value = 0;
+      retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);
       runOnJS(setEntering)(false);
     })
     .onUpdate((e) => {
       if (cardGestureAxis.value === 'none') {
         if (Math.abs(e.translationX) > AXIS_LOCK_PX || Math.abs(e.translationY) > AXIS_LOCK_PX) {
           cardGestureAxis.value = Math.abs(e.translationX) >= Math.abs(e.translationY) ? 'horizontal' : 'vertical';
+          // The user's first real swipe is what dismisses the first-time
+          // coach — and it still goes through as a normal scrub/dismiss.
+          if (coachActive.value) {
+            coachActive.value = false;
+            runOnJS(dismissCoach)();
+          }
         }
       }
       if (cardGestureAxis.value === 'horizontal') {
+        scrubDragX.value = e.translationX;
         const next = indexForDrag(gestureStartIndex.value, e.translationX, CARD_ITEMS.length);
         cardIndex.value = withTiming(next, { duration: CARD_STEP_MS, easing: CARD_STEP_EASING, ...NO_REDUCE_MOTION });
       } else if (cardGestureAxis.value === 'vertical') {
@@ -777,6 +896,8 @@ export default function SellerStudioRadialMenu({
       }
     })
     .onEnd((e) => {
+      // Finger up: the edge chevrons ease back to their resting state.
+      scrubDragX.value = withTiming(0, { duration: 160, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
       if (cardGestureAxis.value === 'vertical') {
         // A quick, primarily-upward flick is the "power move" that opens
         // the current card instantly — same as a tap, just from a flick
@@ -823,20 +944,41 @@ export default function SellerStudioRadialMenu({
         if (!reduceMotion) {
           zoomScale.value = withTiming(PUSH_IN_SCALE, { duration: AUTO_ENTER_MS, easing: Easing.out(Easing.quad) });
         }
+        // The title's exit (slide up + slow→fast tremor): armed now, on the
+        // UI thread, to run over exactly the LAST TITLE_EXIT_MS of the whole
+        // trace + burst (or trace + reduced-motion fade) — so it ends in
+        // the same frame the destination fade completes and the page goes.
+        // Always a real-time timing (NO_REDUCE_MOTION): under Reduce Motion
+        // the slide still plays; only the tremor is dropped, in
+        // labelPunchStyle. Cancelled (eased back) by retractEnter.
+        const exitDelayMs = AUTO_ENTER_MS + (reduceMotion ? REDUCED_MOTION_FADE_MS : ZOOM_BURST_MS) - TITLE_EXIT_MS;
+        labelExit.value = 0;
+        labelExit.value = withDelay(
+          exitDelayMs,
+          withTiming(1, { duration: TITLE_EXIT_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }),
+          ReduceMotion.Never,
+        );
       }
       // axis === 'none' here means the Pan never crossed AXIS_LOCK_PX at
       // all before release — too small a movement for this Pan to have
       // even activated (see constraint 2), so it never reaches onEnd for
       // that case; the Race'd tapGesture below handles it instead.
-    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, traceProgress, zoomScale, enterFade, reduceMotion, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, triggerZoomEnter, fireLandedHaptic]);
+    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, scrubDragX, coachActive, dismissCoach, traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit, reduceMotion, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, triggerZoomEnter, fireLandedHaptic]);
 
   // A genuine tap (near-zero movement) — see constraint 2 above for why
   // this can't just be "the Pan's onEnd when its axis never locked".
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(AXIS_LOCK_PX)
     .onEnd(() => {
+      // While the first-time coach is up, a tap dismisses IT — never opens
+      // the card underneath by surprise.
+      if (coachActive.value) {
+        coachActive.value = false;
+        runOnJS(dismissCoach)();
+        return;
+      }
       runOnJS(openCurrentItem)();
-    }), [openCurrentItem]);
+    }), [openCurrentItem, coachActive, dismissCoach]);
 
   const cardAreaGesture = useMemo(
     () => Gesture.Race(cardAreaPan, tapGesture),
@@ -853,6 +995,14 @@ export default function SellerStudioRadialMenu({
   // <Rect>'s own implicit path always starts at its top-LEFT corner, which
   // is why this is a hand-built <Path> instead. Recomputed only when the
   // measured card area actually changes (see cardAreaSize/onLayout above).
+  // The device's own display corner radius (lib/displayCornerRadius.ts) —
+  // recomputed on every window-size / inset change (rotation, iPad split
+  // view / Stage Manager) so the trace's corners stay concentric with the
+  // glass and are never clipped by it, on any device or the web preview.
+  const displayCornerRadius = useMemo(
+    () => getDisplayCornerRadius({ width: windowWidth, height: screenHeight, insets, platform: Platform.OS }),
+    [windowWidth, screenHeight, insets],
+  );
   const tracePath = useMemo(() => {
     const { width: w, height: h } = cardAreaSize;
     if (w === 0 || h === 0) return { d: '', length: 0 };
@@ -860,7 +1010,7 @@ export default function SellerStudioRadialMenu({
     const top = TRACE_INSET;
     const right = w - TRACE_INSET;
     const bottom = h - TRACE_INSET;
-    const r = Math.min(TRACE_CORNER_RADIUS, (right - left) / 2, (bottom - top) / 2);
+    const r = insetOutlineCornerRadius(displayCornerRadius, TRACE_INSET, right - left, bottom - top);
     const cx = (left + right) / 2;
     const d = [
       `M ${cx} ${top}`,
@@ -876,7 +1026,7 @@ export default function SellerStudioRadialMenu({
     ].join(' ');
     const length = 2 * (right - left - 2 * r) + 2 * (bottom - top - 2 * r) + 2 * Math.PI * r;
     return { d, length };
-  }, [cardAreaSize]);
+  }, [cardAreaSize, displayCornerRadius]);
   // strokeDasharray is the full path length (one dash spanning it exactly);
   // dashoffset shrinks from that full length to 0 as traceProgress goes
   // 0→1, revealing the stroke from its start point (top-center) clockwise.
@@ -951,19 +1101,64 @@ export default function SellerStudioRadialMenu({
         opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.22], Extrapolation.CLAMP) : 0,
       };
     });
-    // Dev: during the zoom-through burst the title text slid down and got
-    // clipped at the bottom edge — `cardStyle`'s scale transform is centered
-    // on the whole card, so content far from center (the label, pinned near
-    // the bottom) moves the most. Rather than fight transform-origin
-    // (inconsistent between web and native), the label just fades out as
-    // the burst starts, well before it would visibly travel out of bounds —
-    // it's gone from view by ZOOM_THROUGH_SCALE, long before navigation.
-    // Unaffected by (and keeps playing through) the slow push-in — only the
-    // fast final burst past PUSH_IN_SCALE triggers it.
-    const cardLabelFadeStyle = useAnimatedStyle(() => {
-      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+    // Dev (superseding #675's fade-out): the title must stay fully visible
+    // and readable through the whole zoom-through burst, all the way to
+    // navigation — never fade, never slide. `cardStyle`'s scale transform
+    // is centered on the whole card, so content far from center (the label,
+    // pinned near the bottom) would otherwise move the most as the burst
+    // scales up. Fighting that with an inverse scale on a child of the
+    // scaled view only cancels the SIZE change, not the position shift the
+    // parent's scale imposes on an off-center child — so instead the label
+    // is rendered as its own sibling layer entirely outside the scaled
+    // `card` View (see the render below), tracking only the carousel's own
+    // horizontal translateX, never cardStyle's scale. It is anchored to a
+    // fixed spot above the bottom and genuinely never moves during the
+    // burst. labelAnchorStyle below reuses `contentStyle`'s own
+    // distance-based fade so a neighboring card's label still disappears
+    // the same way during an ordinary scrub.
+    const labelAnchorStyle = useAnimatedStyle(() => {
+      const distance = itemIndex - cardIndex.value;
       return {
-        opacity: isCurrent ? interpolate(zoomScale.value, [PUSH_IN_SCALE, ZOOM_THROUGH_SCALE], [1, 0], Extrapolation.CLAMP) : 1,
+        transform: [{ translateX: distance * cardSpacing }],
+        opacity: interpolate(Math.abs(distance), [0.32, 0.48], [1, 0], Extrapolation.CLAMP),
+      };
+    });
+    // The title's own "snap" in sync with the zoom-through burst (see
+    // triggerZoomEnter): a quick scale punch (1 → 1.12 → spring back to 1)
+    // plus a brief letter-spacing tighten + brightness (glow) flash. Only
+    // the entering card's own label ever plays it.
+    const labelPunchStyle = useAnimatedStyle(() => {
+      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+      const punch = isCurrent ? labelPunchScale.value : 1;
+      const flash = isCurrent ? labelFlash.value : 0;
+      // The exit motion (see TITLE_EXIT_MS): `exit` runs 0→1 over the last
+      // TITLE_EXIT_MS. Slide: an ease-out lift of TITLE_EXIT_LIFT_PX. Tremor:
+      // amplitude ramps linearly 1→2.5px while the frequency chirps
+      // 5→24Hz — the phase is the integral of that rising frequency, so
+      // the oscillation itself genuinely accelerates rather than jumping
+      // between two fixed speeds. Skipped (slide only) under Reduce Motion.
+      const exit = isCurrent ? labelExit.value : 0;
+      const lift = -TITLE_EXIT_LIFT_PX * (1 - (1 - exit) * (1 - exit));
+      let tremorX = 0;
+      let tremorY = 0;
+      if (!reduceMotion && exit > 0) {
+        const amp = TITLE_TREMOR_AMP_MIN + (TITLE_TREMOR_AMP_MAX - TITLE_TREMOR_AMP_MIN) * exit;
+        const seconds = TITLE_EXIT_MS / 1000;
+        const phase = 2 * Math.PI * (
+          TITLE_TREMOR_HZ_MIN * seconds * exit
+          + 0.5 * (TITLE_TREMOR_HZ_MAX - TITLE_TREMOR_HZ_MIN) * seconds * exit * exit
+        );
+        tremorX = amp * Math.sin(phase);
+        tremorY = amp * 0.5 * Math.sin(phase * 0.73 + 1.1);
+      }
+      return {
+        transform: [
+          { translateY: lift + tremorY },
+          { translateX: tremorX },
+          { scale: punch },
+        ],
+        letterSpacing: interpolate(flash, [0, 1], [0.2, -0.3]),
+        textShadowRadius: interpolate(flash, [0, 1], [0, 10]),
       };
     });
     // Icon + name only ever show on the card that's actually centered (or
@@ -1124,44 +1319,60 @@ export default function SellerStudioRadialMenu({
     // non-center card doesn't select it the way the old grid's individual
     // pressable tiles did.
     return (
-      <Animated.View
-        key={item.id}
-        style={[styles.card, { width: cardAreaSize.width, height: cardAreaSize.height }, cardStyle]}
-        pointerEvents="none"
-        accessibilityLabel={item.label}
-        testID={`seller-control-center-item-${item.id}`}
-      >
-        <StudioCoverBackdrop />
-        <Animated.View style={[styles.cardContent, contentStyle]}>
-          <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
-            {/* Interim look until this card has real hero-art cover art
-                (see PR adding StudioCoverHeroArt's bitmap manifest): a
-                large, light-weight glyph sitting directly on the cover's own
-                lighting — never a ring around it. Dev, explicitly: "Never
-                the ring + box combo" (the old always-on medallion ring is
-                already gone; the interactive "landed" ring that used to
-                appear once a card locked is removed too, since the glyph
-                alone is what needs to read clean right now — landedPulse
-                still drives the card's own subtle scale-up on lock). */}
-            <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />
-            {locked && (
-              <View style={styles.cardLock}>
-                <Feather name="lock" size={14} color={theme.text} />
-              </View>
-            )}
+      <React.Fragment>
+        <Animated.View
+          style={[styles.card, { width: cardAreaSize.width, height: cardAreaSize.height }, cardStyle]}
+          pointerEvents="none"
+          accessibilityLabel={item.label}
+          testID={`seller-control-center-item-${item.id}`}
+        >
+          <StudioCoverBackdrop />
+          <Animated.View style={[styles.cardContent, contentStyle]}>
+            <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
+              {/* Interim look until this card has real hero-art cover art
+                  (see PR adding StudioCoverHeroArt's bitmap manifest): a
+                  large, light-weight glyph sitting directly on the cover's own
+                  lighting — never a ring around it. Dev, explicitly: "Never
+                  the ring + box combo" (the old always-on medallion ring is
+                  already gone; the interactive "landed" ring that used to
+                  appear once a card locked is removed too, since the glyph
+                  alone is what needs to read clean right now — landedPulse
+                  still drives the card's own subtle scale-up on lock). */}
+              <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />
+              {locked && (
+                <View style={styles.cardLock}>
+                  <Feather name="lock" size={14} color={theme.text} />
+                </View>
+              )}
+            </Animated.View>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.85)']}
+              style={styles.cardBottomVignette}
+              pointerEvents="none"
+            />
           </Animated.View>
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.85)']}
-            style={styles.cardBottomVignette}
-            pointerEvents="none"
-          />
-          <Animated.Text style={[styles.cardLabel, cardLabelFadeStyle]} numberOfLines={2}>{item.label}</Animated.Text>
+          {/* The edge-trace's slight brighten while it pushes in — see
+              pushBrightenStyle above. A sibling of cardContent (not inside
+              it), so it washes the whole cover, not just the icon/name. */}
+          <Animated.View style={[styles.cardBrightenWash, pushBrightenStyle]} pointerEvents="none" />
         </Animated.View>
-        {/* The edge-trace's slight brighten while it pushes in — see
-            pushBrightenStyle above. A sibling of cardContent (not inside
-            it), so it washes the whole cover, not just the icon/name. */}
-        <Animated.View style={[styles.cardBrightenWash, pushBrightenStyle]} pointerEvents="none" />
-      </Animated.View>
+        {/* The title, deliberately NOT inside the scaled `card` View above —
+            see labelAnchorStyle's comment: this is what keeps it fully
+            visible and pinned in place through the whole zoom-through
+            burst, with its own independent punch/flash on top
+            (labelPunchStyle). Same box/size as the card so it lines up with
+            the old bottom-anchored position exactly. */}
+        <Animated.View
+          style={[
+            styles.cardLabelLayer,
+            { width: cardAreaSize.width, height: cardAreaSize.height },
+            labelAnchorStyle,
+          ]}
+          pointerEvents="none"
+        >
+          <Animated.Text style={[styles.cardLabel, labelPunchStyle]} numberOfLines={2}>{item.label}</Animated.Text>
+        </Animated.View>
+      </React.Fragment>
     );
   }
 
@@ -1215,17 +1426,17 @@ export default function SellerStudioRadialMenu({
             ever combined with another Pan via Gesture.Race.
             Dev: the card cover must fill the ENTIRE screen edge to edge —
             no black bars above/below it — with the header and position
-            dots floating ON TOP as overlays, not sharing flex space with
+            hints floating ON TOP as overlays, not sharing flex space with
             the cover. So `page` itself carries no top/bottom padding
             anymore (that's what carved out the bars): the card area below
-            is sized to the full page, and the header/dots are positioned
+            is sized to the full page, and the header/hints are positioned
             absolutely over it instead. */}
         <Animated.View
           style={[styles.page, { height: pageHeight }, pageAnimatedStyle]}
         >
           {/* ── Card carousel — now the page's own full-bleed content,
               edge to edge, top to bottom. Rendered FIRST so the header and
-              dots overlays below paint on top of it. ── */}
+              hint overlays below paint on top of it. ── */}
           <GestureDetector gesture={cardAreaGesture}>
             <View
               style={styles.cardArea}
@@ -1268,7 +1479,7 @@ export default function SellerStudioRadialMenu({
                   <AnimatedPath
                     d={tracePath.d}
                     stroke="#ffffff"
-                    strokeWidth={3}
+                    strokeWidth={TRACE_STROKE_WIDTH}
                     fill="none"
                     strokeDasharray={tracePath.length}
                     animatedProps={traceAnimatedProps}
@@ -1324,7 +1535,12 @@ export default function SellerStudioRadialMenu({
                 <Text style={styles.storeName} numberOfLines={1}>{headerTitle ?? 'Your store'}</Text>
               </View>
               <Pressable
-                onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}
+                onPress={() => {
+                  // Under the first-time coach's scrim the X dismisses the
+                  // coach first — never closes the page from under it.
+                  if (coachVisible) { dismissCoach(); return; }
+                  cancelEnter(); hapticDismiss(); collapse();
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Close Studio tools"
                 testID="seller-studio-menu-close"
@@ -1335,17 +1551,26 @@ export default function SellerStudioRadialMenu({
             </View>
           </GestureDetector>
 
-          {/* Small position dots — replaces the old "X / 16" text. Floats
-              on top of the cover too, same no-background rule as the
-              header above. */}
-          <View
-            style={[styles.dotsRow, { position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }]}
-            testID="seller-studio-position-dots"
-          >
-            {CARD_ITEMS.map((item, i) => (
-              <View key={item.id} style={[styles.dot, i === cardIndexJS && styles.dotActive]} />
-            ))}
-          </View>
+          {/* ── Persistent swipe hint: tiny ‹ › chevrons pinned to the left/
+              right screen edges at mid-height (replaces the old row of
+              position dots at the bottom, now removed entirely). Reads the
+              carousel's live index and drag directly on the UI thread; never
+              takes a touch. See components/StudioMenuHints.tsx. ── */}
+          <StudioEdgeChevrons
+            cardIndex={cardIndex}
+            cardCount={CARD_ITEMS.length}
+            dragX={scrubDragX}
+            dragPxPerCard={SCRUB_PX_PER_CARD}
+            insetLeft={insets.left}
+            insetRight={insets.right}
+            reduceMotion={reduceMotion}
+          />
+
+          {/* ── First-time coach mark (see coachVisible above): rendered
+              INSIDE the page so it sits over everything, header and X
+              included; pointerEvents none, so the gestures underneath both
+              dismiss it and still go through. ── */}
+          <StudioSwipeCoach visible={coachVisible} reduceMotion={reduceMotion} />
         </Animated.View>
       </Modal>
 
@@ -1358,13 +1583,6 @@ export default function SellerStudioRadialMenu({
           setUpsellFeature(null);
           router.push('/subscription' as never);
         }}
-      />
-
-      <FirstRunTip
-        id="studio-menu-scrub"
-        variant="fullscreen"
-        contentReady={open}
-        fullscreen={{ title: 'Studio', subtitle: 'Scrub through your tools', rows: STUDIO_MENU_SCRUB_ROWS }}
       />
     </>
   );
@@ -1457,10 +1675,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // itself never scrolls.
   cardArea: {
     // Dev: fills the ENTIRE screen now, edge to edge — the header and
-    // position dots are separate absolutely-positioned overlays on top of
+    // edge chevrons are separate absolutely-positioned overlays on top of
     // this (see the render below), not flex siblings carving space out of
     // it. That also means the edge-trace (sized to this View's own
-    // measured bounds) now outlines the whole screen, header and dots
+    // measured bounds) now outlines the whole screen, header and chevrons
     // included, not just the space between them.
     position: 'absolute',
     top: 0,
@@ -1493,6 +1711,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // The edge-trace's own slight brighten while it pushes in — see
   // pushBrightenStyle; a plain white wash, opacity-only.
   cardBrightenWash: { ...StyleSheet.absoluteFill, backgroundColor: '#ffffff' },
+  // The title's own layer, a sibling of `card` (not a child) so the card's
+  // zoom-through scale never touches it — see labelAnchorStyle's comment on
+  // CarouselCard. Same box, same bottom-anchored position cardLabel always
+  // had inside the old cardContent (flex-end + the same paddingBottom).
+  cardLabelLayer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: SP.xl,
+  },
   cardLabel: {
     // Dropped from 24/bold — Dev: with the fill pill now the only visible
     // action, the big bottom title was reading like a second button.
@@ -1503,6 +1731,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.2,
     wordWrap: 'normal',
+    // textShadowRadius is animated (labelPunchStyle, the burst-sync
+    // brightness flash) — color/offset stay fixed so only the radius pulse
+    // reads as a glow.
+    textShadowColor: '#ffffff',
+    textShadowOffset: { width: 0, height: 0 },
   },
   // Sits directly behind cardLabel (painted first, in the same paddingBottom
   // footprint) so the poster-style caption stays legible over busy cover art.
@@ -1526,23 +1759,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Position dots — replaces the old "X / 16" text indicator.
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: SP.xs,
-    paddingBottom: SP.sm,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: theme.border,
-  },
-  dotActive: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.text },
 
   // The destination fade during the zoom-through burst — see enterFadeStyle.
   enterFadeWash: { ...StyleSheet.absoluteFill, backgroundColor: '#ffffff' },

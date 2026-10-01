@@ -104,7 +104,7 @@ const HIDE_SCROLLBARS_CSS = `
  * Opens a fresh browser context for one device and role. Returns the context,
  * the page, and `activity.lastApiAt` (when the fake API last answered).
  */
-export async function openContext(browser, { device, role, origin, images, videos = {}, seedOptions = {}, apiOptions = {}, onUnseeded }) {
+export async function openContext(browser, { device, role, origin, images, videos = {}, seedOptions = {}, apiOptions = {}, onUnseeded, installClock = true }) {
   const context = await browser.newContext({
     viewport: device.viewport,
     deviceScaleFactor: device.scale,
@@ -118,7 +118,13 @@ export async function openContext(browser, { device, role, origin, images, video
   });
   // The demo data is written for one fixed moment (see DEMO_NOW); the clock
   // keeps ticking from there so animations and timers behave normally.
-  await context.clock.install({ time: DEMO_NOW });
+  // `installClock: false` opts out (real clock, real `now`) for specs that
+  // measure animation timing frame by frame — Playwright's fake clock paces
+  // requestAnimationFrame/setTimeout slightly off real time, which skews a
+  // frame-by-frame log of a timed animation even though the app itself is
+  // fine. The demo data's relative dates are then off, which such a spec
+  // doesn't care about.
+  if (installClock) await context.clock.install({ time: DEMO_NOW });
   const user = role === 'seller' ? SELLER_USER : BUYER_USER;
   await context.addInitScript(clerkStubScript(user));
   await context.addInitScript((seed) => {
@@ -197,13 +203,16 @@ export async function waitForQuietNetwork(activity, quietMs = 700, timeout = 10_
  * the app remounts its navigation tree once and settles on "/". Navigating
  * client-side after that lands on the target screen with everything loaded.
  */
-export async function openScreen(page, activity, origin, role, target, { beforeNavigate } = {}) {
-  await page.goto(`${origin}/?bt_preview=${role}`);
+export async function openScreen(page, activity, origin, role, target, { beforeNavigate, extraQuery = '' } = {}) {
+  // `extraQuery` ("&demo=1", "&tips=1", …) rides along on both the first
+  // load and the client-side navigation, so flags that lib/devPreview.ts
+  // only reads from the URL on first load are honoured.
+  await page.goto(`${origin}/?bt_preview=${role}${extraQuery}`);
   await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
   await waitForQuietNetwork(activity, 800, 15_000);
   await beforeNavigate?.();
   await page.evaluate((url) => {
     history.pushState(history.state, '', url);
     window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
-  }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+  }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}${extraQuery}`);
 }

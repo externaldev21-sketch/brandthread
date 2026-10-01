@@ -53,3 +53,4 @@ test-results/
 playwright-report/
 e2e/.theme-consistency-crawl-out/
 e2e/.studio-header-text-fit-out/
+e2e/.studio-menu-polish-out/
