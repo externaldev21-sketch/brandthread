@@ -56,10 +56,10 @@ export function rankRecommendedBrands(
     const likedBoost = liked.has(c.sellerId);
     const popularity = maxLog > 0 ? Math.log1p(c.followerCount) / maxLog : 0;
     const score = 3 * ratio + (similar ? 1.5 : 0) + (likedBoost ? 2 : 0) + popularity;
-    let reason = "Popular on Brandthread";
-    if (likedBoost) reason = "You liked this brand";
-    else if (matched.length > 0) reason = `Matches your ${matched[0]} style`;
-    else if (similar) reason = "Similar to brands you liked";
+    let reason = "Popular right now";
+    if (likedBoost) reason = "You liked this";
+    else if (matched.length > 0) reason = "Matches your style";
+    else if (similar) reason = "Similar to your picks";
     return { c, score, reason };
   });
 

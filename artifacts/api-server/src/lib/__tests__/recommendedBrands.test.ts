@@ -20,7 +20,7 @@ describe("rankRecommendedBrands", () => {
       { ...ctx, styleInterests: ["streetwear"] },
     );
     expect(out.map((b) => b.id)).toEqual(["match", "popular"]);
-    expect(out[0].reason).toBe("Matches your streetwear style");
+    expect(out[0].reason).toBe("Matches your style");
   });
 
   it("boosts brands sharing a type with liked brands, and brands liked but not followed", () => {
@@ -29,13 +29,13 @@ describe("rankRecommendedBrands", () => {
       { ...ctx, likedBrandIds: ["liked"], likedBrandTypes: ["footwear"] },
     );
     expect(out.map((b) => b.id)).toEqual(["liked", "same-type", "other"]);
-    expect(out[1].reason).toBe("Similar to brands you liked");
+    expect(out[1].reason).toBe("Similar to your picks");
   });
 
   it("falls back to popularity for a buyer with no signals", () => {
     const out = rankRecommendedBrands([brand("a", { followerCount: 1 }), brand("b", { followerCount: 100 })], ctx);
     expect(out.map((b) => b.id)).toEqual(["b", "a"]);
-    expect(out[0].reason).toBe("Popular on Brandthread");
+    expect(out[0].reason).toBe("Popular right now");
   });
 
   it("drops excluded (followed/blocked) ids, honors the limit and returns [] when empty", () => {

@@ -37,10 +37,10 @@ async function main() {
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
   const browser = await launchBrowser();
   const issues = [];
-  const shot = async (page, name, zoom) => {
+  const shot = async (page, name, zoom, root) => {
     await page.waitForTimeout(800);
     await page.screenshot({ path: path.join(OUT, `${name}.png`), animations: 'disabled', caret: 'hide' });
-    issues.push(...(await assertTextFits(page, name)).map((i) => ({ screen: name, ...i })));
+    issues.push(...(await assertTextFits(page, name, root)).map((i) => ({ screen: name, ...i })));
     if (zoom) {
       await page.screenshot({ path: path.join(OUT, `${name}-zoom.png`), animations: 'disabled', clip: zoom });
     }
@@ -49,6 +49,7 @@ async function main() {
     // 1) Sizes step, from a seeded per-user onboarding draft.
     {
       const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images: {} });
+      await context.addInitScript(() => localStorage.setItem('bt_preview_demo', '1'));
       await context.addInitScript(() => {
         localStorage.setItem('onboarding_draft:user_jordan', JSON.stringify({
           version: 8, ownerId: 'user_jordan', flow: 'buyer', step: 5, firstName: 'Jordan', lastName: '',
@@ -64,14 +65,16 @@ async function main() {
     // 2) Brands you might like row on Discover (demo sample brands).
     {
       const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images: {} });
+      await context.addInitScript(() => localStorage.setItem('bt_preview_demo', '1'));
       await openReliably(page, activity, origin, '/discover?demo=1');
       await waitForQuietNetwork(activity, 800, 8000);
-      await shot(page, '02-brands-you-might-like', { x: 0, y: 100, width: 393, height: 360 });
+      await shot(page, '02-brands-you-might-like', { x: 0, y: 100, width: 393, height: 360 }, '[data-testid="brands-you-might-like"]');
       await context.close();
     }
     // 3) Contacts pre-permission + results (demo people, no real contacts read).
     {
       const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images: {} });
+      await context.addInitScript(() => localStorage.setItem('bt_preview_demo', '1'));
       await openReliably(page, activity, origin, '/find-friends-contacts?demo=1');
       await shot(page, '03-contacts-pre-permission');
       await page.getByText('Continue', { exact: true }).first().click();
@@ -82,9 +85,10 @@ async function main() {
     // 4) The single "Find from contacts" entry row on the connections screen.
     {
       const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images: {} });
+      await context.addInitScript(() => localStorage.setItem('bt_preview_demo', '1'));
       await openReliably(page, activity, origin, '/buyer-friend-requests');
       await waitForQuietNetwork(activity, 800, 8000);
-      await shot(page, '05-connections-entry-row', { x: 0, y: 100, width: 393, height: 240 });
+      await shot(page, '05-connections-entry-row', { x: 0, y: 100, width: 393, height: 240 }, '[data-testid="find-from-contacts"]');
       await context.close();
     }
   } finally {

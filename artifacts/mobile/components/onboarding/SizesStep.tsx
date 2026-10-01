@@ -40,8 +40,8 @@ export function SizesStep({ sizes, onChange }: Props) {
             {options.map((option) => {
               const selected = sizes[key] === option;
               return (
+                <View key={option} style={styles.cell}>
                 <PressableScale
-                  key={option}
                   testID={`onboarding-size-${key}-${option}`}
                   style={[styles.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 }]}
                   accessibilityRole="radio"
@@ -52,6 +52,7 @@ export function SizesStep({ sizes, onChange }: Props) {
                   <Text style={[styles.chipText, selected && { color: theme.text }]}>{option}</Text>
                   {selected && <Feather name="check" size={13} color={theme.text} />}
                 </PressableScale>
+                </View>
               );
             })}
           </View>
@@ -66,8 +67,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   section: { marginTop: SPACE.lg },
   sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: 'Inter_600SemiBold', marginBottom: SPACE.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs },
+  cell: { width: '31.5%' },
   chip: {
-    width: '31.5%', minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12,
+    width: '100%', minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },

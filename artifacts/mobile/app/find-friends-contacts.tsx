@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
@@ -59,7 +59,10 @@ export default function FindFriendsContacts() {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { userId } = useAuth();
-  const demo = isPreviewDemoMode();
+  // `?demo=1` comes from the route params (the URL is not always settled at first render);
+  // isPreviewDemoMode() still gates it to dev/web preview builds, so it is always false on device.
+  const { demo: demoParam } = useLocalSearchParams<{ demo?: string }>();
+  const demo = demoParam === '1' ? isPreviewDemoMode('?bt_preview=buyer&demo=1') : isPreviewDemoMode();
 
   const [phase, setPhase] = useState<Phase>('intro');
   const [matches, setMatches] = useState<ContactMatch[]>([]);

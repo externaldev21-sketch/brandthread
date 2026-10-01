@@ -19,12 +19,12 @@ import { SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { DiscoverEntityCard } from './DiscoverEntityCard';
 
-const CARD_WIDTH = 150;
+const CARD_WIDTH = 160;
 
 const DEMO_BRANDS: RecommendedBrand[] = [
-  { id: 'demo-b1', sellerId: 'demo-b1', name: 'Atelier Nord', brandType: null, logoUrl: null, verified: true, followerCount: 1200, reason: 'Matches your minimal style' },
-  { id: 'demo-b2', sellerId: 'demo-b2', name: 'Field Studio', brandType: null, logoUrl: null, verified: false, followerCount: 640, reason: 'Matches your streetwear style' },
-  { id: 'demo-b3', sellerId: 'demo-b3', name: 'Kiln & Co', brandType: null, logoUrl: null, verified: true, followerCount: 3100, reason: 'Popular on Brandthread' },
+  { id: 'demo-b1', sellerId: 'demo-b1', name: 'Atelier Nord', brandType: null, logoUrl: null, verified: true, followerCount: 1200, reason: 'Matches your style' },
+  { id: 'demo-b2', sellerId: 'demo-b2', name: 'Field Studio', brandType: null, logoUrl: null, verified: false, followerCount: 640, reason: 'Matches your style' },
+  { id: 'demo-b3', sellerId: 'demo-b3', name: 'Kiln & Co', brandType: null, logoUrl: null, verified: true, followerCount: 3100, reason: 'Popular right now' },
 ];
 
 export function BrandsYouMightLikeRow() {
