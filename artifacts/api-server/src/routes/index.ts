@@ -27,6 +27,7 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import accountDeletionPublicRouter from "./account-deletion-public";
 import featuredPublicRouter from "./featured-public";
 import adminRouter from "./admin";
 import { auditModerationActions } from "../lib/admin/moderationAudit";
@@ -114,6 +115,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches

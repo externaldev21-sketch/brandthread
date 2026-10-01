@@ -34,6 +34,9 @@
           "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
+        ],
+        "LSApplicationQueriesSchemes": [
+          "instagram-stories"
         ]
       },
       "config": {
@@ -225,7 +228,16 @@
         "backgroundColor": "#0A0A0B"
       },
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_ADVERTISE"
       ],
       "intentFilters": [
         {
@@ -328,12 +340,6 @@
       ],
       "expo-web-browser",
       "expo-apple-authentication",
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Brandthread uses Face ID to confirm it's you when you turn on or use biometric unlock for your account."
-        }
-      ],
       [
         "expo-media-library",
         {
