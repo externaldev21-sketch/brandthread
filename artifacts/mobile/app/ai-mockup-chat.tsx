@@ -11,6 +11,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import Composer from '@/components/ui/Composer';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
@@ -129,11 +130,14 @@ export default function AIMockupChatScreen() {
               {msg.content}
             </Text>
             {msg.image && (
-              <Image
-                source={{ uri: `data:image/png;base64,${msg.image}` }}
-                style={styles.mockupImage}
-                resizeMode="cover"
-              />
+              <View>
+                <Image
+                  source={{ uri: `data:image/png;base64,${msg.image}` }}
+                  style={styles.mockupImage}
+                  resizeMode="cover"
+                />
+                <AiGeneratedBadge />
+              </View>
             )}
           </View>
         )}

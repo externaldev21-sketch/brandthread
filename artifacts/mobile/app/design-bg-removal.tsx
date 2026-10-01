@@ -47,6 +47,7 @@ if (Platform.OS !== 'web') {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   MediaLibrary = require('expo-media-library/legacy');
 }
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -417,12 +418,14 @@ export default function DesignBgRemovalScreen() {
             strokes={strokes}
             onCommitStroke={(st) => { setStrokes(p => [...p, st]); setRedo([]); }}
           />
+          <AiGeneratedBadge />
         </View>
       ) : (
         <PressableScale onPress={pickPhoto} style={s.fillCenter} activeScale={0.995} accessibilityRole="button" accessibilityLabel="Replace photo" testID="bg-removal-stage">
           <View ref={canvasRef} collapsable={false} style={[frame, s.photoRound, s.clip]}>
             {renderBackdrop()}
             <Image source={{ uri: cutout }} style={frame} resizeMode="cover" />
+            <AiGeneratedBadge />
           </View>
         </PressableScale>
       );
