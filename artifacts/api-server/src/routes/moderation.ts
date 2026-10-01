@@ -24,6 +24,7 @@ import {
   resolveReportTarget,
 } from "../lib/reportTargets";
 import { profilesById, type ReportTargetType } from "../lib/safety";
+import heldRouter from "./moderationHeld";
 
 const router = Router();
 router.use(requireAuth);
@@ -39,6 +40,7 @@ router.get("/me", async (req, res) => {
 });
 
 router.use(requireModerator);
+router.use("/held", heldRouter);
 
 // ─── GET /api/moderation/reports ─────────────────────────────────────────────
 router.get("/reports", async (req, res) => {
