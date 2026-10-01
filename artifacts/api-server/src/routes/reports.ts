@@ -12,7 +12,7 @@
  * content are resolved server-side and stored for moderators.
  */
 import { Router } from "express";
-import { conversationParticipants, conversations, db, messageReports, reports } from "@workspace/db";
+import { communities, communityMembers, conversationParticipants, conversations, db, messageReports, reports } from "@workspace/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -82,6 +82,13 @@ router.post("/", rateLimit("report"), async (req, res) => {
       return res.status(200).json({ status: "not_reportable", code: "SYSTEM_ACCOUNT_IMMUNE" });
     }
 
+    // Community chats: only members can report a message; any signed-in
+    // member can report a (non-official) group. Counts feed the moderation queue.
+    if (targetType === "community_message") {
+      const [member] = await db.select({ u: communityMembers.userId }).from(communityMembers)
+        .where(and(eq(communityMembers.communityId, target.containerId!), eq(communityMembers.userId, reporterId))).limit(1);
+      if (!member) return res.status(403).json({ error: "Only group members can report a message" });
+    }
     if (targetType === "message") {
       const [participant] = await db
         .select({ userId: conversationParticipants.userId })
@@ -144,6 +151,10 @@ router.post("/", rateLimit("report"), async (req, res) => {
         source: "user",
       })
       .returning();
+
+    if (targetType === "community") {
+      await db.update(communities).set({ reportCount: sql`${communities.reportCount} + 1` }).where(eq(communities.id, target.targetId));
+    }
 
     return res.status(201).json(serializeReportForClient(report));
   } catch (err) {

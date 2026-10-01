@@ -669,6 +669,25 @@ export function respond({ method, path, query, role, options = {} }) {
   // boost only accepts video/2+-image slideshows), so an honest empty state
   // — no eligible posts yet, no active boosts — is the real answer here,
   // not fabricated boost data.
+  // Community discovery (signed-out read-only list): the six launch groups, same shape as
+  // GET /api/communities/public — the real seeded rows from migration 110.
+  if (p === '/communities/public') {
+    const launch = [
+      ['Graphic Design Community', 'graphic-design', 'pen-tool', 'Logos, type, layouts and print-ready files. Share work, get feedback.', 12480],
+      ['Photography & Content', 'photography-content', 'camera', 'Product shots, lookbooks, reels and everything content.', 8915],
+      ['Ads & Marketing', 'ads-marketing', 'trending-up', "What's converting, what's not, and the tactics behind it.", 10342],
+      ['Creative Direction', 'creative-direction', 'compass', 'Concepts, moodboards and building a brand people remember.', 5207],
+      ['Streetwear Founders', 'streetwear-founders', 'shopping-bag', 'Founders talking drops, pricing and growing a label.', 9861],
+      ['Sourcing & Manufacturing', 'sourcing-manufacturing', 'package', 'Factories, fabrics, samples and getting production right.', 6733],
+    ];
+    return {
+      communities: launch.map(([name, slug, iconKey, description, memberCount]) => ({
+        id: `launch-${slug}`, name, slug, description, iconKey, kind: 'official', verified: true, visibility: 'public',
+        requireApproval: false, memberCount, joined: false, role: null, muted: false, unreadCount: 0, createdAt: '2026-01-01T00:00:00.000Z',
+      })),
+      nextOffset: null,
+    };
+  }
   if (p === '/boosts/targets') return [];
   if (p === '/boosts/summary') return { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
   if (p === '/boosts') return [];

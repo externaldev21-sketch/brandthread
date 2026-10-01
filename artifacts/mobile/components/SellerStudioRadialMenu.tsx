@@ -24,9 +24,8 @@
  *    remaining width/height, edge to edge — a neighbor is visible ONLY
  *    mid-transition (the ~90ms slide between cards), never at rest, per
  *    Dev's own screenshot ("no slivers, no half-words").
- *  - The "Entering page" auto-enter fill button, pinned above the home
- *    indicator.
- *  - A row of small position dots.
+ *  - A thin white edge-trace that draws clockwise around the card on lock
+ *    (see AUTO_ENTER_MS) and a row of small position dots.
  *
  * Interaction:
  *  - A horizontal drag anywhere on the card area SCRUBS through the list —
@@ -42,15 +41,19 @@
  *  - Lifting the finger after a horizontal scrub does NOT navigate
  *    (Dev's own live-testing feedback on the first cut: "too fast /
  *    accident-prone"). It LOCKS on whatever card is currently centered — a
- *    quick snap-to-center, a single firmer "landed" haptic, a subtle white
- *    ring + scale-up, and the "Entering page" button appears and fills
- *    left-to-right over EXACTLY AUTO_ENTER_MS (1.5s), opening the card the
- *    instant it completes. A plain "Cancel" text link shows just above the
- *    pill while it counts down; tapping it stops the fill and swaps the
- *    pill to a static "Continue" (tap it any time to still open). Touching/
- *    scrubbing again cancels either state immediately and continues from
- *    the locked card, arming a fresh countdown once it re-locks; a tap on
- *    the pill or a quick upward flick skips the wait and opens right away.
+ *    quick snap-to-center, a single firmer "landed" haptic, and a thin white
+ *    light that traces clockwise around the card's full edge starting from
+ *    top-center, completing the loop in EXACTLY AUTO_ENTER_MS (1.5s) while
+ *    the cover itself slowly pushes in and brightens slightly. When the
+ *    trace closes, the cover zooms through (fast scale + fade) straight
+ *    into the destination, with a firmer haptic than the lock tick. Dev,
+ *    replacing the earlier pill/Cancel/Continue button entirely: "the
+ *    button's making the page look tacky." Touching the screen anywhere, or
+ *    scrubbing to another card, cancels instantly — the trace retracts and
+ *    the push eases back — and continues from wherever the finger lands; a
+ *    tap or a quick upward flick still skips straight to opening. Reduce
+ *    Motion keeps the trace (a real timed cancel window, not decoration)
+ *    but drops the push/zoom in favor of a plain fade on completion.
  *  - A downward drag (anywhere on the card area or the header) or the close
  *    (X) button dismisses the whole page without navigating, sliding it
  *    back down to reveal the screen underneath — the same rubber-band/
@@ -75,12 +78,14 @@ import Animated, {
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
+  useAnimatedProps,
   ReduceMotion,
   useReducedMotion,
   useSharedValue,
   withSequence,
   withTiming,
   Easing,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -93,6 +98,7 @@ import { SHEET_EASING, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion'
 import { StudioCoverBackdrop, StudioCoverGrain } from '@/components/StudioCardCover';
 import { CachedImage } from '@/components/CachedImage';
 import { prefetchImage } from '@/lib/prefetch';
+import Svg, { Path } from 'react-native-svg';
 
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
@@ -113,6 +119,8 @@ import {
 } from '@/lib/sellerControlCenter';
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 // ─── Menu contents ────────────────────────────────────────────────────────────
 // Dev's consolidation pass: the menu should only hold destinations with NO
@@ -208,6 +216,22 @@ const CARD_WINDOW_RADIUS = 2;
  *  never feels noisy. */
 const MICRO_DWELL_MS = 120;
 
+/** Exactly how long the edge-trace takes to draw clockwise around a locked
+ *  card, and thus how long the "cancel window" lasts before it auto-opens.
+ *  A real timed interaction, not decoration — see NO_REDUCE_MOTION above. */
+const AUTO_ENTER_MS = 1500;
+/** How far the cover slowly pushes in while the trace is drawing (Dev:
+ *  "the cover art slowly pushes in"), before the fast zoom-through burst
+ *  once the trace closes. One continuous scale value spans both phases. */
+const PUSH_IN_SCALE = 1.08;
+/** How far the cover scales up in the fast zoom-through burst once the
+ *  trace closes, alongside enterFade, right before navigating. Skipped
+ *  entirely under Reduce Motion (see triggerZoomEnter). */
+const ZOOM_THROUGH_SCALE = 2.2;
+/** Corner radius of the edge-trace rectangle — a "rounded screen-edge"
+ *  look rather than a hard-cornered box. */
+const TRACE_CORNER_RADIUS = 28;
+
 /** Rubber-band resistance for dragging the page up past its resting
  *  position — a diminishing-returns curve (never a hard clamp) that
  *  asymptotically approaches -(dim*c) however far past rest the finger
@@ -216,6 +240,25 @@ function rubberBandUp(value: number, dim = 100, c = 0.55) {
   'worklet';
   const x = -value;
   return -((x * dim * c) / (dim + c * x));
+}
+
+/** Cancel = touching the screen anywhere, or scrubbing to another card
+ *  (Dev): the trace retracts quickly and the push/zoom eases back, rather
+ *  than a hard cut to nothing. Shared by dismissGesture.onStart and
+ *  cardAreaPan.onBegin so a touch anywhere on the page does this
+ *  identically. */
+function retractEnter(
+  traceProgress: SharedValue<number>,
+  zoomScale: SharedValue<number>,
+  enterFade: SharedValue<number>,
+) {
+  'worklet';
+  cancelAnimation(traceProgress);
+  cancelAnimation(zoomScale);
+  cancelAnimation(enterFade);
+  traceProgress.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
+  zoomScale.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) });
+  enterFade.value = 0;
 }
 
 // ─── Per-card signature micro-animations ───────────────────────────────────────
@@ -360,34 +403,33 @@ export default function SellerStudioRadialMenu({
   // new gesture begins on the card area (see cardAreaPan.onBegin), whether
   // that's a fresh scrub or the tap/flick that opens the locked card.
   const landedPulse = useSharedValue(0);
-  // ── Auto-enter fill (replaces tap-to-open as the main path) ─────────────────
-  // 0→1 over AUTO_ENTER_MS the moment a card locks; its completion callback
-  // opens the card exactly like a tap would.
-  //   'hidden'    — no card locked, the pill/Cancel are gone.
-  //   'counting'  — the fill is running; the pill reads "Entering page" and
-  //                 a plain "Cancel" text link shows just above it.
-  //   'cancelled' — the user tapped Cancel: the fill is stopped and reset to
-  //                 empty, the pill reads "Continue" (a static tap target,
-  //                 no more auto-navigate), and Cancel itself is gone (there
-  //                 is nothing left to cancel).
-  // Any new touch on the card area/header — a fresh scrub, or the very tap
-  // that's about to open the locked card — resets this straight to
-  // 'hidden', so a cancelled state never carries over to a different card;
-  // landing and releasing on any card (even the same one again) always
-  // starts a fresh 'counting'.
-  const fillProgress = useSharedValue(0);
-  const [enterState, setEnterState] = useState<'hidden' | 'counting' | 'cancelled'>('hidden');
-  const [enterButtonWidth, setEnterButtonWidth] = useState(0);
-  // A brief fade whenever the pill's own label text changes (counting ->
-  // cancelled reads "Entering page" -> "Continue") — a lightweight
-  // crossfade rather than an abrupt text swap.
-  const pillContentOpacity = useSharedValue(1);
-  useEffect(() => {
-    if (enterState === 'hidden') return;
-    pillContentOpacity.value = 0;
-    pillContentOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enterState]);
+  // ── Auto-enter edge-trace (replaces tap-to-open as the main path) ───────────
+  // Dev, replacing the earlier pill/Cancel/Continue button entirely: "the
+  // button's making the page look tacky." The moment a card locks:
+  //   traceProgress  0→1 over AUTO_ENTER_MS — draws the white edge-trace
+  //                  clockwise from top-center; a real timed cancel window,
+  //                  not decoration, so it always runs at NO_REDUCE_MOTION.
+  //   zoomScale      1 → PUSH_IN_SCALE alongside the trace (the cover
+  //                  "slowly pushes in"), then PUSH_IN_SCALE → ZOOM_THROUGH_SCALE
+  //                  in a fast burst once the trace closes (the "zooms
+  //                  through" into the destination) — one continuous value,
+  //                  never reset between the two phases.
+  //   enterFade      0→1 during that same final burst — the destination
+  //                  fade. Under Reduce Motion, zoomScale never moves at
+  //                  all and enterFade is the ONLY completion effect (a
+  //                  plain fade), per Dev's "Reduce Motion = the trace only
+  //                  + fade".
+  // `entering` mirrors "is a trace/zoom currently live" on the JS side,
+  // purely so the trace overlay unmounts (not just fades) once a card
+  // finishes or is cancelled. Any new touch on the card area/header cancels
+  // all three back to their resting values (see cardAreaPan.onBegin /
+  // dismissGesture.onStart) — a cancelled trace never carries over to a
+  // different card; landing and releasing on any card (even the same one
+  // again) always starts a fresh trace.
+  const traceProgress = useSharedValue(0);
+  const zoomScale = useSharedValue(1);
+  const enterFade = useSharedValue(0);
+  const [entering, setEntering] = useState(false);
 
   // ── Per-card micro-animation trigger (see MICRO_KIND above) ─────────────────
   // A global "play token": microTriggerIndex names which card should play,
@@ -405,11 +447,13 @@ export default function SellerStudioRadialMenu({
       cardIndex.value = 0;
       gestureStartIndex.value = 0;
       landedPulse.value = 0;
-      cancelAnimation(fillProgress);
-      fillProgress.value = 0;
+      cancelAnimation(traceProgress);
+      traceProgress.value = 0;
+      zoomScale.value = 1;
+      enterFade.value = 0;
       microTriggerIndex.value = -1;
       microTriggerSeq.value = 0;
-      setEnterState('hidden');
+      setEntering(false);
       setCardIndexJS(0);
       lastStepAtRef.current = 0;
     }
@@ -498,31 +542,41 @@ export default function SellerStudioRadialMenu({
     });
   }, [translateY, pageHeight, finishClose]);
 
-  /** Cancels the enter-fill and hides the button — used by every path that
+  /** Cancels the edge-trace/push/zoom and hides it — used by every path that
    *  closes the page WITHOUT opening a card (close button, Android back/
    *  Escape). The gesture-driven paths (a new touch on the card area or
    *  header) do the UI-thread equivalent directly in their own onBegin/
    *  onStart instead, for zero-latency cancellation. */
-  const cancelEnterFill = useCallback(() => {
-    cancelAnimation(fillProgress);
-    fillProgress.value = 0;
-    setEnterState('hidden');
-  }, [fillProgress]);
+  const cancelEnter = useCallback(() => {
+    cancelAnimation(traceProgress);
+    cancelAnimation(zoomScale);
+    cancelAnimation(enterFade);
+    traceProgress.value = 0;
+    zoomScale.value = 1;
+    enterFade.value = 0;
+    setEntering(false);
+  }, [traceProgress, zoomScale, enterFade]);
 
   /** Release-to-select / tap-to-select: no closing animation at all — the
    *  page is just gone, in the same frame the navigation fires, per spec
    *  ("no slide, fade or delay"). */
-  const commitAndOpen = useCallback((item: ControlCenterItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  const commitAndOpen = useCallback((item: ControlCenterItem, opts?: { skipHaptic?: boolean }) => {
+    // The auto-enter path already fired its own firmer haptic when the
+    // trace closed (see triggerZoomEnter) — skip this generic one there so
+    // entering doesn't double-buzz. Tap/flick (which never trace) keep it.
+    if (!opts?.skipHaptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     cancelAnimation(translateY);
-    // Every way of opening a card — a tap, an upward flick, tapping the
-    // enter button, or the button's own fill completing on its own — routes
-    // through here, so cancelling the fill unconditionally means it can
-    // never double-fire (e.g. a tap landing right as the fill was about to
-    // complete on its own).
-    cancelAnimation(fillProgress);
-    fillProgress.value = 0;
-    setEnterState('hidden');
+    // Every way of opening a card — a tap, an upward flick, or the trace
+    // completing on its own — routes through here, so cancelling the
+    // trace/zoom unconditionally means it can never double-fire (e.g. a tap
+    // landing right as the trace was about to complete on its own).
+    cancelAnimation(traceProgress);
+    cancelAnimation(zoomScale);
+    cancelAnimation(enterFade);
+    traceProgress.value = 0;
+    zoomScale.value = 1;
+    enterFade.value = 0;
+    setEntering(false);
     setOpen(false);
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
@@ -535,7 +589,7 @@ export default function SellerStudioRadialMenu({
     }
     setNextPushAnimationNone();
     router.push(item.route as never);
-  }, [translateY, fillProgress, planLoading, planError, hasPlan, retryPlan, router]);
+  }, [translateY, traceProgress, zoomScale, enterFade, planLoading, planError, hasPlan, retryPlan, router]);
 
   // ── Gestures ─────────────────────────────────────────────────────────────────
   // Horizontal = scrub through cards, vertical = dismiss, near-zero movement
@@ -562,9 +616,34 @@ export default function SellerStudioRadialMenu({
   commitAndOpenRef.current = commitAndOpen;
   const currentItemRef = useRef(CARD_ITEMS[0]);
   currentItemRef.current = CARD_ITEMS[cardIndexJS] ?? CARD_ITEMS[0];
-  const openCurrentItem = useCallback(() => {
-    commitAndOpenRef.current(currentItemRef.current);
+  const openCurrentItem = useCallback((opts?: { skipHaptic?: boolean }) => {
+    commitAndOpenRef.current(currentItemRef.current, opts);
   }, []);
+
+  /** Fires once the edge-trace closes on its own (never on a cancel) —
+   *  firmer than the lock tick, distinct from commitAndOpen's own light tap
+   *  haptic (which this path skips — see commitAndOpen's skipHaptic). */
+  const fireEnterHaptic = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }, []);
+
+  /** The trace closed on its own: a firmer haptic, then the fast
+   *  zoom-through + fade (or, under Reduce Motion, just the fade), then
+   *  navigate. Reused as the withTiming completion callback for
+   *  traceProgress in cardAreaPan below. */
+  const triggerZoomEnter = useCallback(() => {
+    fireEnterHaptic();
+    if (reduceMotion) {
+      enterFade.value = withTiming(1, { duration: 180, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
+        if (finished) runOnJS(openCurrentItem)({ skipHaptic: true });
+      });
+      return;
+    }
+    zoomScale.value = withTiming(ZOOM_THROUGH_SCALE, { duration: 220, easing: Easing.in(Easing.cubic) });
+    enterFade.value = withTiming(1, { duration: 220, easing: Easing.linear }, (finished) => {
+      if (finished) runOnJS(openCurrentItem)({ skipHaptic: true });
+    });
+  }, [reduceMotion, fireEnterHaptic, zoomScale, enterFade, openCurrentItem]);
 
   /** How far (in either single-axis direction) a drag must travel before its
    *  axis locks in — matches the "decide within the first ~10px" spec. */
@@ -578,15 +657,6 @@ export default function SellerStudioRadialMenu({
   /** How fast the locked card snaps to dead-center on release, and how long
    *  its ring/scale "landed" pulse takes to ramp in. */
   const CARD_LOCK_MS = 100;
-  /** Exactly how long the "Entering page" button takes to fill left-to-right
-   *  and auto-open the locked card — a plain linear fill (no easing curve to
-   *  imply acceleration/deceleration, no countdown number). Briefly lowered
-   *  to 1000ms per earlier live-testing feedback, then moved back to 1500ms
-   *  per Dev's follow-up after using it more ("the little timer bar... is
-   *  too short... change it back to the other timer that it was at") — one
-   *  named constant drives both the fill animation and the auto-navigate
-   *  timing, so they can never drift apart. */
-  const AUTO_ENTER_MS = 1500;
 
   const runDismissEnd = useCallback((e: { translationY: number; velocityY: number }) => {
     'worklet';
@@ -610,11 +680,10 @@ export default function SellerStudioRadialMenu({
     .onStart(() => {
       dragStartY.value = translateY.value;
       // A swipe starting on the header should cancel any in-flight
-      // enter-fill on the card area below, same as touching the card area
+      // edge-trace on the card area below, same as touching the card area
       // itself would (spec: "cancel and close, never navigates").
-      cancelAnimation(fillProgress);
-      fillProgress.value = 0;
-      runOnJS(setEnterState)('hidden');
+      retractEnter(traceProgress, zoomScale, enterFade);
+      runOnJS(setEntering)(false);
     })
     .onUpdate((e) => {
       const next = dragStartY.value + e.translationY;
@@ -622,7 +691,7 @@ export default function SellerStudioRadialMenu({
     })
     .onEnd((e) => {
       runDismissEnd(e);
-    }), [translateY, dragStartY, fillProgress, runDismissEnd]);
+    }), [translateY, dragStartY, traceProgress, zoomScale, enterFade, runDismissEnd]);
 
   // Card area: scrub (horizontal) or dismiss (vertical) — a single combined
   // Pan that locks its own axis, per constraint 1 above.
@@ -634,13 +703,12 @@ export default function SellerStudioRadialMenu({
       // Any new touch on the card area — a fresh scrub, or the tap/flick
       // that's about to open the locked card — clears the "landed" ring so
       // it never lingers on a card that's no longer the settled one, and
-      // cancels any in-flight enter-fill immediately (spec: "if the user
-      // touches/scrubs again during the fill, the fill cancels and resets
-      // immediately and the carousel continues from that card").
+      // cancels any in-flight edge-trace immediately (Dev: "touching the
+      // screen anywhere... cancels" — the trace retracts and the carousel
+      // continues from that card).
       landedPulse.value = 0;
-      cancelAnimation(fillProgress);
-      fillProgress.value = 0;
-      runOnJS(setEnterState)('hidden');
+      retractEnter(traceProgress, zoomScale, enterFade);
+      runOnJS(setEntering)(false);
     })
     .onUpdate((e) => {
       if (cardGestureAxis.value === 'none') {
@@ -685,23 +753,30 @@ export default function SellerStudioRadialMenu({
         microFast.value = false;
         microTriggerIndex.value = target;
         microTriggerSeq.value = microTriggerSeq.value + 1;
-        // Auto-enter: the "Entering page" button appears and fills over
-        // EXACTLY AUTO_ENTER_MS; when it completes, open the card exactly
-        // like a tap would. onBegin above cancels this the instant any new
-        // touch starts, and commitAndOpen cancels it unconditionally on
-        // every path that actually opens a card (tap, flick, or this fill
+        // Auto-enter: the edge-trace draws clockwise around the card over
+        // EXACTLY AUTO_ENTER_MS while it slowly pushes in; when the trace
+        // closes, triggerZoomEnter fires the zoom-through/fade and opens
+        // the card. onBegin above cancels this the instant any new touch
+        // starts, and commitAndOpen cancels it unconditionally on every
+        // path that actually opens a card (tap, flick, or the trace
         // completing), so it can never double-fire.
-        runOnJS(setEnterState)('counting');
-        fillProgress.value = 0;
-        fillProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
-          if (finished) runOnJS(openCurrentItem)();
+        runOnJS(setEntering)(true);
+        traceProgress.value = 0;
+        traceProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
+          if (finished) runOnJS(triggerZoomEnter)();
         });
+        // Reduce Motion: "the trace only + fade" — the push/zoom never
+        // moves at all; triggerZoomEnter's own reduceMotion branch handles
+        // the completion fade.
+        if (!reduceMotion) {
+          zoomScale.value = withTiming(PUSH_IN_SCALE, { duration: AUTO_ENTER_MS, easing: Easing.out(Easing.quad) });
+        }
       }
       // axis === 'none' here means the Pan never crossed AXIS_LOCK_PX at
       // all before release — too small a movement for this Pan to have
       // even activated (see constraint 2), so it never reaches onEnd for
       // that case; the Race'd tapGesture below handles it instead.
-    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, fillProgress, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, fireLandedHaptic]);
+    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, traceProgress, zoomScale, enterFade, reduceMotion, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, triggerZoomEnter, fireLandedHaptic]);
 
   // A genuine tap (near-zero movement) — see constraint 2 above for why
   // this can't just be "the Pan's onEnd when its axis never locked".
@@ -719,16 +794,43 @@ export default function SellerStudioRadialMenu({
   const pageAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }));
-  // The reveal itself — see the enterButton JSX below for how this width,
-  // animating against a FIXED-width inner label of the same total button
-  // width, produces the left-to-right white-fill/black-text-reveal effect.
-  const enterFillStyle = useAnimatedStyle(() => ({
-    width: fillProgress.value * enterButtonWidth,
+
+  // ── Edge-trace geometry ──────────────────────────────────────────────────
+  // A rounded-rect path starting and ending at top-center so the stroke
+  // reveal below draws clockwise from there, per Dev's spec — an SVG
+  // <Rect>'s own implicit path always starts at its top-LEFT corner, which
+  // is why this is a hand-built <Path> instead. Recomputed only when the
+  // measured card area actually changes (see cardAreaSize/onLayout above).
+  const tracePath = useMemo(() => {
+    const { width: w, height: h } = cardAreaSize;
+    if (w === 0 || h === 0) return { d: '', length: 0 };
+    const r = Math.min(TRACE_CORNER_RADIUS, w / 2, h / 2);
+    const cx = w / 2;
+    const d = [
+      `M ${cx} 0`,
+      `L ${w - r} 0`,
+      `A ${r} ${r} 0 0 1 ${w} ${r}`,
+      `L ${w} ${h - r}`,
+      `A ${r} ${r} 0 0 1 ${w - r} ${h}`,
+      `L ${r} ${h}`,
+      `A ${r} ${r} 0 0 1 0 ${h - r}`,
+      `L 0 ${r}`,
+      `A ${r} ${r} 0 0 1 ${r} 0`,
+      `L ${cx} 0`,
+    ].join(' ');
+    const length = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+    return { d, length };
+  }, [cardAreaSize]);
+  // strokeDasharray is the full path length (one dash spanning it exactly);
+  // dashoffset shrinks from that full length to 0 as traceProgress goes
+  // 0→1, revealing the stroke from its start point (top-center) clockwise.
+  const traceAnimatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: tracePath.length * (1 - traceProgress.value),
   }));
-  // Crossfades the pill's own label text on "Entering page" <-> "Continue".
-  const pillContentStyle = useAnimatedStyle(() => ({
-    opacity: pillContentOpacity.value,
-  }));
+  // The destination fade during the final zoom-through burst (or, under
+  // Reduce Motion, the ONLY completion effect) — a plain white wash over
+  // the card, per Dev's "Reduce Motion = the trace only + fade".
+  const enterFadeStyle = useAnimatedStyle(() => ({ opacity: enterFade.value }));
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
@@ -757,21 +859,24 @@ export default function SellerStudioRadialMenu({
   function CarouselCard({ item, itemIndex }: { item: ControlCenterItem; itemIndex: number }) {
     const locked = isLocked(item);
     const microKind = MICRO_KIND[item.id] ?? 'pop-in';
-    const isGoLive = item.id === 'go-live';
     const cover = coverArt[item.id];
 
     const cardStyle = useAnimatedStyle(() => {
       const distance = itemIndex - cardIndex.value;
       const absDistance = Math.abs(distance);
+      const isCurrent = absDistance < 0.01;
       // landedPulse only ever applies to whichever card is actually
       // dead-center (absDistance ~0) — a neighbor mid-scrub never gets the
       // scale-up, even while landedPulse is still ramping in from the
-      // previous card's release.
-      const landedBoost = absDistance < 0.01 ? landedPulse.value * 0.05 : 0;
+      // previous card's release. zoomScale (the edge-trace's push-in, then
+      // its zoom-through burst on completion) is exactly the same rule —
+      // it only ever multiplies the entering card's own scale.
+      const landedBoost = isCurrent ? landedPulse.value * 0.05 : 0;
+      const pushScale = isCurrent ? zoomScale.value : 1;
       return {
         transform: [
           { translateX: distance * cardSpacing },
-          { scale: 1 + landedBoost },
+          { scale: (1 + landedBoost) * pushScale },
         ],
         // Fully opaque right up to the moment it stops being adjacent —
         // zero peek at rest (Dev, firm): at any integer distance >= 1 the
@@ -780,6 +885,16 @@ export default function SellerStudioRadialMenu({
         // width), so this opacity fade only ever plays out DURING the
         // ~90ms slide between two adjacent integer positions.
         opacity: interpolate(absDistance, [0, 1], [1, 0], Extrapolation.CLAMP),
+      };
+    });
+    // The cover's own slight brighten while it pushes in (Dev: "the cover
+    // art slowly pushes in and brightens slightly") — a thin white wash
+    // whose opacity tracks zoomScale's own push-in range, only ever visible
+    // on the entering card.
+    const pushBrightenStyle = useAnimatedStyle(() => {
+      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+      return {
+        opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.12], Extrapolation.CLAMP) : 0,
       };
     });
     // Icon + name only ever show on the card that's actually centered (or
@@ -800,9 +915,6 @@ export default function SellerStudioRadialMenu({
     const microTranslateX = useSharedValue(0);
     const microTranslateY = useSharedValue(0);
     const microOpacity = useSharedValue(1);
-    // go-live only:
-    const liveDotScale = useSharedValue(0);
-    const liveSweepProgress = useSharedValue(0);
 
     useAnimatedReaction(
       () => (microTriggerIndex.value === itemIndex ? microTriggerSeq.value : -1),
@@ -832,12 +944,14 @@ export default function SellerStudioRadialMenu({
             );
             break;
           case 'pulse-dot':
-            liveDotScale.value = withSequence(
-              withTiming(1.3, { duration: 150, easing: Easing.out(Easing.quad) }),
-              withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) }),
+            // Dev: no red anywhere on Go Live unless it's part of the cover
+            // photo itself — this used to pulse a separate red dot + sweep;
+            // now just a plain scale pulse on the icon, same as every other
+            // "pop" style kind.
+            microScale.value = withSequence(
+              withTiming(1.12, { duration: 150, easing: Easing.out(Easing.quad) }),
+              withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) }),
             );
-            liveSweepProgress.value = 0;
-            liveSweepProgress.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
             break;
           case 'rise':
             microScaleY.value = 0;
@@ -931,15 +1045,6 @@ export default function SellerStudioRadialMenu({
         { scaleY: microScaleY.value },
       ],
     }));
-    const liveDotStyle = useAnimatedStyle(() => ({ transform: [{ scale: liveDotScale.value }] }));
-    const liveSweepStyle = useAnimatedStyle(() => ({
-      opacity: interpolate(liveSweepProgress.value, [0, 0.15, 0.85, 1], [0, 0.5, 0.5, 0], Extrapolation.CLAMP),
-      transform: [
-        { translateX: interpolate(liveSweepProgress.value, [0, 1], [-70, 70]) },
-        { rotate: '20deg' },
-      ],
-    }));
-
     // pointerEvents="none": the whole card area's gesture (scrub/dismiss/
     // tap, composed in cardAreaGesture) handles all real touch input — an
     // individual card never receives its own touches, since which card is
@@ -987,12 +1092,6 @@ export default function SellerStudioRadialMenu({
                 <Feather name="lock" size={14} color={theme.text} />
               </View>
             )}
-            {isGoLive && (
-              <>
-                <Animated.View style={[styles.liveDot, liveDotStyle]} pointerEvents="none" />
-                <Animated.View style={[styles.liveSweep, liveSweepStyle]} pointerEvents="none" />
-              </>
-            )}
           </Animated.View>
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.85)']}
@@ -1001,6 +1100,10 @@ export default function SellerStudioRadialMenu({
           />
           <Text style={styles.cardLabel} numberOfLines={2}>{item.label}</Text>
         </Animated.View>
+        {/* The edge-trace's slight brighten while it pushes in — see
+            pushBrightenStyle above. A sibling of cardContent (not inside
+            it), so it washes the whole cover, not just the icon/name. */}
+        <Animated.View style={[styles.cardBrightenWash, pushBrightenStyle]} pointerEvents="none" />
       </Animated.View>
     );
   }
@@ -1035,7 +1138,7 @@ export default function SellerStudioRadialMenu({
         transparent
         animationType="none"
         statusBarTranslucent
-        onRequestClose={() => { cancelEnterFill(); collapse(); }}
+        onRequestClose={() => { cancelEnter(); collapse(); }}
       >
         {/* The full-screen page itself — no separate backdrop layer: it
             fully covers whatever screen was behind it (Dashboard, Products,
@@ -1108,7 +1211,7 @@ export default function SellerStudioRadialMenu({
                 <Feather name="arrow-up-right" size={13} color={theme.text} />
               </PressableScale>
               <PressableScale
-                onPress={() => { cancelEnterFill(); hapticDismiss(); collapse(); }}
+                onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}
                 accessibilityRole="button"
                 accessibilityLabel="Close Studio tools"
                 testID="seller-studio-menu-close"
@@ -1130,64 +1233,49 @@ export default function SellerStudioRadialMenu({
                 <CarouselCard key={item.id} item={item} itemIndex={itemIndex} />
               ))}
               <StudioCoverGrain />
+              {/* ── Edge-trace (replaces the old pill/Cancel/Continue button
+                  entirely — Dev: "the button's making the page look tacky")
+                  A thin white light traces clockwise around the card's full
+                  edge from top-center, closing over EXACTLY AUTO_ENTER_MS —
+                  see tracePath/traceAnimatedProps above for the geometry and
+                  cardAreaPan's onEnd for what starts/cancels it. Always
+                  mounted (never conditionally, unlike the old pill) so a
+                  cancel's quick retract-to-zero is something to actually
+                  see rather than an abrupt unmount; strokeDashoffset simply
+                  sits at the full path length — invisible — whenever
+                  traceProgress is 0. */}
+              {tracePath.d !== '' && (
+                <Svg
+                  width={cardAreaSize.width}
+                  height={cardAreaSize.height}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                  testID="seller-studio-entering-trace"
+                >
+                  <AnimatedPath
+                    d={tracePath.d}
+                    stroke="#ffffff"
+                    strokeWidth={2.5}
+                    fill="none"
+                    strokeDasharray={tracePath.length}
+                    animatedProps={traceAnimatedProps}
+                  />
+                </Svg>
+              )}
+              {/* The destination fade during the zoom-through burst (or, under
+                  Reduce Motion, the only completion effect at all). */}
+              <Animated.View style={[styles.enterFadeWash, enterFadeStyle]} pointerEvents="none" />
+              {/* Screen-reader equivalent of the visual trace — there's no
+                  button anymore to carry an accessibilityLabel, so a polite
+                  live-region announcement is the only way a VoiceOver/
+                  TalkBack user learns a card is about to open on its own. */}
+              {entering && (
+                <Text style={styles.srOnly} accessibilityLiveRegion="polite" accessibilityRole="text">
+                  {`Entering ${currentItemRef.current?.label ?? 'page'}`}
+                </Text>
+              )}
             </View>
           </GestureDetector>
-
-          {/* ── Cancel link + auto-enter fill button ──
-              Appears the instant a card locks. While 'counting', the pill
-              reads "Entering page" and fills left-to-right over EXACTLY
-              AUTO_ENTER_MS, opening the card when it completes; a plain
-              "Cancel" text link (no background/border) sits just above it.
-              Tapping Cancel stops the fill, resets it to empty, and swaps
-              the pill to a static "Continue" (still tappable to open) with
-              a brief crossfade — see the block comment above cardAreaPan's
-              onEnd for the full cancel/skip rules. The fill "reveal" itself
-              is two identical labels: a plain white-on-dark one underneath,
-              and a black-on-white copy inside a width-animated, overflow-
-              hidden container on top, both using the SAME fixed
-              enterButtonWidth so the revealed black text lines up exactly
-              with the white text it's covering rather than re-centering as
-              the fill container shrinks/grows. */}
-          {enterState !== 'hidden' && (
-            <>
-              {enterState === 'counting' && (
-                <Pressable
-                  testID="seller-studio-enter-cancel"
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel entering page"
-                  onPress={() => {
-                    cancelAnimation(fillProgress);
-                    fillProgress.value = 0;
-                    setEnterState('cancelled');
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  }}
-                  hitSlop={{ top: 14, bottom: 14, left: 20, right: 20 }}
-                  style={styles.cancelLink}
-                >
-                  <Text style={styles.cancelLinkLabel}>Cancel</Text>
-                </Pressable>
-              )}
-              <Pressable
-                testID="seller-studio-enter-button"
-                accessibilityRole="button"
-                accessibilityLabel={enterState === 'cancelled' ? 'Continue to page' : 'Entering page. Tap to open now.'}
-                onPress={openCurrentItem}
-                onLayout={(e) => setEnterButtonWidth(e.nativeEvent.layout.width)}
-                style={styles.enterButton}
-              >
-                <Animated.Text style={[styles.enterButtonLabelBase, pillContentStyle]}>
-                  {enterState === 'cancelled' ? 'Continue' : 'Entering page'}
-                </Animated.Text>
-                <Animated.View style={[styles.enterButtonFill, enterFillStyle]} pointerEvents="none">
-                  <View style={[styles.enterButtonFillInner, { width: enterButtonWidth }]}>
-                    <Animated.Text style={[styles.enterButtonLabelFilled, pillContentStyle]} numberOfLines={1}>
-                      {enterState === 'cancelled' ? 'Continue' : 'Entering page'}
-                    </Animated.Text>
-                  </View>
-                </Animated.View>
-              </Pressable>
-            </>
-          )}
 
           {/* Small position dots — replaces the old "X / 16" text. */}
           <View style={styles.dotsRow} testID="seller-studio-position-dots">
@@ -1358,25 +1446,9 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // usage) — no shadow-double/emboss treatment, which was part of what made
   // it read as a boxed UI icon rather than art sitting on the cover.
   cardIconGlyph: { opacity: 0.92 },
-  // go-live's own extras — a small red "LIVE" dot and a soft diagonal
-  // highlight sweep, both purely decorative (pointerEvents "none").
-  liveDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#ff3b30',
-    borderWidth: 1.5,
-    borderColor: '#000',
-  },
-  liveSweep: {
-    position: 'absolute',
-    width: 24,
-    height: 140,
-    backgroundColor: '#ffffff',
-  },
+  // The edge-trace's own slight brighten while it pushes in — see
+  // pushBrightenStyle; a plain white wash, opacity-only.
+  cardBrightenWash: { ...StyleSheet.absoluteFill, backgroundColor: '#ffffff' },
   cardLabel: {
     // Dropped from 24/bold — Dev: with the fill pill now the only visible
     // action, the big bottom title was reading like a second button.
@@ -1428,43 +1500,9 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   dotActive: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.text },
 
-  // Plain text link, no background/border — sits just above the pill while
-  // it's counting down. theme.muted is this app's own silver token (never
-  // hardcoded), so it matches across every preset.
-  cancelLink: {
-    alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  cancelLinkLabel: { fontSize: 14, fontFamily: FONT.medium, color: theme.muted },
-
-  // ── Auto-enter fill button ──
-  // Dev, after #525 shipped: "less bold and smaller." A compact pill sized
-  // to its own label (not full width), a thin 1px hairline instead of a
-  // heavy solid block, and a Medium-weight label instead of Bold — the fill
-  // itself still runs the full AUTO_ENTER_MS, just reads as a subtle
-  // white/silver wash behind lighter text rather than a loud CTA.
-  enterButton: {
-    height: 42,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: theme.border,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    marginTop: SP.xs,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  enterButtonLabelBase: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text, letterSpacing: 0.2 },
-  enterButtonFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#ffffff',
-    overflow: 'hidden',
-  },
-  enterButtonFillInner: { height: '100%', alignItems: 'center', justifyContent: 'center' },
-  enterButtonLabelFilled: { fontSize: FS.base, fontFamily: FONT.medium, color: '#000000', letterSpacing: 0.2 },
+  // The destination fade during the zoom-through burst — see enterFadeStyle.
+  enterFadeWash: { ...StyleSheet.absoluteFill, backgroundColor: '#ffffff' },
+  // Visually invisible but still reachable by VoiceOver/TalkBack — see the
+  // live-region announcement above.
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
 });

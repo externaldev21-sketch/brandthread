@@ -22,6 +22,19 @@ import type {
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
+import type {
+  Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
+  CommunityMessage, CommunityMessagesPage, CommunityReaction, CreateCommunityInput, UpdateCommunityInput,
+} from '@/lib/communities/types';
+
+function communityQuery(params: { q?: string; offset?: number }): string {
+  const q = new URLSearchParams();
+  if (params.q?.trim()) q.set('q', params.q.trim());
+  if (params.offset) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return qs ? `?${qs}` : '';
+}
+
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
@@ -986,6 +999,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
+      /** Ship part of an order: tracking for just these items (409 AUTO_REFUNDED on a refunded order). */
+      addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
+        patch(`/api/orders/${id}/items-tracking`, body),
       updateTracking: (id: string, body: {
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
@@ -1436,6 +1452,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
         get:    (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
+        /** "I received it": marks the order delivered (idempotent). 409 NOT_SHIPPED | ALREADY_REFUNDED. */
+        confirmReceipt: (id: string) => post<{ delivery: unknown }>(
+          `/api/buyer/orders/${encodeURIComponent(id)}/confirm-receipt`, {}
+        ),
         /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
         cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
@@ -1578,6 +1598,73 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         del<{ ok: boolean }>(
           `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
         ),
+    },
+    /** Topic group chats ("Graphic Design Community"). Use via lib/communities/useCommunityClient. */
+    communities: {
+      /** Signed-out safe: official + public groups, read-only. */
+      publicList: (params: { q?: string; offset?: number } = {}) =>
+        freshGet<{ communities: Community[]; nextOffset: number | null }>(
+          `/api/communities/public${communityQuery(params)}`,
+        ),
+      list: (params: { q?: string; offset?: number } = {}) =>
+        freshGet<{ communities: Community[]; nextOffset: number | null }>(`/api/communities${communityQuery(params)}`),
+      mine: () => quietGet<Community[]>('/api/communities/mine'),
+      get: (id: string) => freshGet<Community>(`/api/communities/${encodeURIComponent(id)}`),
+      create: (body: CreateCommunityInput) => post<Community>('/api/communities', body),
+      update: (id: string, body: UpdateCommunityInput) => patch<Community>(`/api/communities/${encodeURIComponent(id)}`, body),
+      remove: (id: string) => del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}`),
+      join: (id: string) => post<Community>(`/api/communities/${encodeURIComponent(id)}/join`, {}),
+      joinByCode: (code: string) =>
+        post<{ status: 'joined' | 'requested'; community?: Community }>('/api/communities/join-by-code', { code }),
+      invitePreview: (code: string) =>
+        freshGet<CommunityInvitePreview>(`/api/communities/invite/${encodeURIComponent(code)}`),
+      leave: (id: string) => post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/leave`, {}),
+      setMuted: (id: string, muted: boolean) =>
+        patch<{ muted: boolean }>(`/api/communities/${encodeURIComponent(id)}/mute`, { muted }),
+      markRead: (id: string, seq?: number) =>
+        patch<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/read`, seq === undefined ? {} : { seq }),
+      invite: (id: string) => freshGet<{ code: string; url: string }>(`/api/communities/${encodeURIComponent(id)}/invite`),
+      resetInvite: (id: string) => post<{ code: string; url: string }>(`/api/communities/${encodeURIComponent(id)}/invite/reset`, {}),
+      members: (id: string, params: { q?: string; offset?: number } = {}) =>
+        freshGet<{ memberCount: number; members: CommunityMember[]; nextOffset: number | null }>(
+          `/api/communities/${encodeURIComponent(id)}/members${communityQuery(params)}`,
+        ),
+      removeMember: (id: string, userId: string) =>
+        del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`),
+      banMember: (id: string, userId: string) =>
+        post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/ban`, {}),
+      unban: (id: string, userId: string) =>
+        del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/bans/${encodeURIComponent(userId)}`),
+      bans: (id: string) =>
+        freshGet<{ userId: string; name: string; bannedAt: string }[]>(`/api/communities/${encodeURIComponent(id)}/bans`),
+      setRole: (id: string, userId: string, role: 'admin' | 'member' | 'owner') =>
+        patch<{ ok: boolean; role: string }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/role`, { role }),
+      requests: (id: string) => freshGet<CommunityJoinRequest[]>(`/api/communities/${encodeURIComponent(id)}/requests`),
+      approveRequest: (id: string, userId: string) =>
+        post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/requests/${encodeURIComponent(userId)}/approve`, {}),
+      denyRequest: (id: string, userId: string) =>
+        post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/requests/${encodeURIComponent(userId)}/deny`, {}),
+      messages: (id: string, params: { before?: number; after?: number; limit?: number } = {}) => {
+        const q = new URLSearchParams();
+        if (params.before !== undefined) q.set('before', String(params.before));
+        if (params.after !== undefined) q.set('after', String(params.after));
+        if (params.limit !== undefined) q.set('limit', String(params.limit));
+        const qs = q.toString();
+        return freshGet<CommunityMessagesPage>(`/api/communities/${encodeURIComponent(id)}/messages${qs ? `?${qs}` : ''}`);
+      },
+      send: (id: string, body: { text?: string; attachments?: CommunityAttachment[]; replyToId?: string }) =>
+        post<CommunityMessage>(`/api/communities/${encodeURIComponent(id)}/messages`, body),
+      deleteMessage: (id: string, messageId: string) =>
+        del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`),
+      react: (id: string, messageId: string, reactionType: string) =>
+        put<{ reactions: CommunityReaction[] }>(
+          `/api/communities/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/reactions`, { reactionType }),
+      unreact: (id: string, messageId: string) =>
+        del<{ reactions: CommunityReaction[] }>(
+          `/api/communities/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/reactions`),
+      /** Image moderation runs here (gore/violence/nudity) — a rejected photo throws ApiError(422, code IMAGE_REJECTED). */
+      uploadPhoto: (body: { data: string; mimeType: string }) =>
+        post<{ url: string }>('/api/communities/upload-photo', body),
     },
     /** Brandthread Agent — the official AI friend account's chat backend. */
     brandthreadAgent: {

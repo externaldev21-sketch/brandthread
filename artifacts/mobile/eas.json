@@ -23,6 +23,14 @@
         "buildType": "apk"
       }
     },
+    "staging": {
+      "extends": "preview",
+      "channel": "staging",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_SENTRY_ENVIRONMENT": "staging"
+      }
+    },
     "production": {
       "distribution": "store",
       "environment": "production",
@@ -34,6 +42,31 @@
       "android": {
         "buildType": "app-bundle",
         "autoIncrement": "versionCode"
+      }
+    },
+    "testflight": {
+      "extends": "production",
+      "distribution": "store",
+      "channel": "testflight",
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0",
+        "autoIncrement": "buildNumber"
+      }
+    },
+    "preview-ios-simulator": {
+      "extends": "preview",
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0",
+        "simulator": true
+      }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "production-apk",
+      "android": {
+        "buildType": "apk",
+        "autoIncrement": false
       }
     }
   },
