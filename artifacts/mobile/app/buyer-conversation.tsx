@@ -28,7 +28,6 @@ import {
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import { pickAvatarColor } from '@/lib/avatarColors';
-import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import type { CallLogEntry } from '@/lib/calls/types';
@@ -43,6 +42,8 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import Composer from '@/components/ui/Composer';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth } from '@clerk/expo';
@@ -222,18 +223,11 @@ const AVATAR_GAP = SP.sm;
 const BUBBLE_COLUMN_LEFT = SP.md + AVATAR_SIZE + AVATAR_GAP;
 
 // ─── Composer sizing ────────────────────────────────────────────────────────────
-// One consistent size for every circular control in the composer row (the
-// "+" attach button, the in-pill Thread Cash coin, and the mic⇄send morph) —
-// the previous 44/36/44 mix is exactly what read as mismatched.
-const COMPOSER_CONTROL = 36;
-// Mic / gallery / Thread Cash bill inside the pill are all this size, evenly
-// spaced — per the Instagram/Threads composer reference.
-const COMPOSER_ICON = 22;
-// The pill grows with the TextInput up to ~5 lines, then scrolls internally.
-const COMPOSER_LINE_HEIGHT = 20;
-const COMPOSER_MAX_LINES = 5;
-const COMPOSER_TEXT_V_PADDING = SP.sm; // matches s.textInput's own vertical padding below
-const COMPOSER_MAX_INPUT_HEIGHT = COMPOSER_LINE_HEIGHT * COMPOSER_MAX_LINES + COMPOSER_TEXT_V_PADDING * 2;
+// The composer itself is the shared slim <Composer/>; these only size the
+// accessory controls that sit beside / inside its pill.
+const COMPOSER_ATTACH_SIZE = 36;
+const COMPOSER_CONTROL = 32;
+const COMPOSER_ICON = 20;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -321,6 +315,9 @@ export default function BuyerConversationScreen() {
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
   const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
+  // <Composer/> hides the tab bar itself; keep it hidden while the recording
+  // bar temporarily replaces the composer.
+  useHideTabBar(voiceRecorder.phase !== 'idle');
 
   // Unread-on-open divider: computed once from the conversation's unreadCount
   // *before* markConversationRead() clears it server-side, then held fixed for
@@ -330,7 +327,6 @@ export default function BuyerConversationScreen() {
   const hasScrolledToUnreadRef = useRef(false);
 
   const lastTapRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
-  const micSendMorph = useRef(new Animated.Value(0)).current;
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
@@ -575,15 +571,6 @@ export default function BuyerConversationScreen() {
     });
     return () => sub.remove();
   }, []);
-
-  useEffect(() => {
-    const showSend = text.trim().length > 0 || selectedAttachment != null;
-    Animated.timing(micSendMorph, {
-      toValue: showSend ? 1 : 0,
-      duration: 160,
-      useNativeDriver: true,
-    }).start();
-  }, [text, selectedAttachment, micSendMorph]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -2074,19 +2061,72 @@ export default function BuyerConversationScreen() {
     ? (activeSheetMsg.fromId === myId || activeSheetMsg.fromId === MY_USER_ID)
     : false;
 
-  // Deterministic composer height from typed newlines — react-native-web's
-  // multiline <textarea> doesn't reliably auto-size via onContentSizeChange
-  // (its first measurement fires against the unconstrained intrinsic
-  // <textarea> size before any height is applied, ballooning the box). This
-  // keeps the composer at exactly one line (40pt pill) at rest and grows it
-  // up to COMPOSER_MAX_LINES as the user presses Enter.
-  const composerLines = Math.min(Math.max(text.split('\n').length, 1), COMPOSER_MAX_LINES);
-  const composerInputHeight = composerLines * COMPOSER_LINE_HEIGHT + COMPOSER_TEXT_V_PADDING * 2;
-  const showSendButton = text.trim().length > 0 || selectedAttachment != null;
-  const micOpacity = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const sendOpacity = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const micScale = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] });
-  const sendScale = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
+  const attachmentChip = selectedAttachment && (() => {
+            const uploadingMedia = selectedAttachment.meta?.uploading === 'true';
+            const isMedia = selectedAttachment.type === 'image' || selectedAttachment.type === 'video';
+            return (
+            <View style={s.selectedAttachment} testID="conversation-selected-attachment">
+              {isMedia ? (
+                <MediaUploadThumb
+                  type={selectedAttachment.type as 'image' | 'video'}
+                  uri={selectedAttachment.type === 'image' ? selectedAttachment.uri : undefined}
+                  uploading={uploadingMedia}
+                  size={40}
+                  ringColor={theme.accent}
+                  iconColor={theme.muted}
+                  trackColor={theme.border}
+                />
+              ) : isUploading ? (
+                <UploadRing size={22} color={theme.accent} trackColor={theme.border} />
+              ) : (
+                <Feather
+                  name={
+                    selectedAttachment.type === 'voice' ? 'mic' :
+                    selectedAttachment.type === 'post'  ? 'image' :
+                    selectedAttachment.type === 'order' ? 'package' : 'shopping-bag'
+                  }
+                  size={ICON.sm}
+                  color={theme.accent}
+                />
+              )}
+              <View style={{ flex: 1, marginLeft: SP.sm }}>
+                <Text style={s.selectedAttachmentLabel}>
+                  {
+                    uploadingMedia ? 'Uploading…' :
+                    selectedAttachment.type === 'image' ? 'Photo attached' :
+                    selectedAttachment.type === 'video' ? 'Video attached' :
+                    selectedAttachment.type === 'voice' ? 'Voice message' :
+                    selectedAttachment.type === 'post'  ? 'Post attached'  :
+                    selectedAttachment.type === 'order' ? 'Order attached' : 'Product attached'
+                  }
+                </Text>
+                <Text style={s.selectedAttachmentTitle} numberOfLines={1}>
+                  {selectedAttachment.title}
+                </Text>
+              </View>
+              <PressableScale rippleEnabled={false}
+                onPress={() => { mediaUploadTokenRef.current++; setSelectedAttachment(null); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
+                testID="conversation-selected-attachment-remove"
+              >
+                <Feather name="x" size={ICON.sm} color={theme.muted} />
+              </PressableScale>
+            </View>
+            );
+          })();
+
+  // Reply preview — Mobbin: Instagram "Replying to a message".
+  const replyBanner = replyTo && !isRequestMode && !messaging.blockedByMe && !messaging.unavailable ? (
+        <ReplyBanner
+          testID="conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
+      ) : null;
 
   return (
     <KeyboardAvoidingView
@@ -2346,20 +2386,6 @@ export default function BuyerConversationScreen() {
         <LikeBurst key={likeBurst.key} x={likeBurst.x} y={likeBurst.y} color={theme.accent} onDone={() => setLikeBurst(null)} />
       )}
 
-      {/* Reply preview — Mobbin: Instagram "Replying to a message"
-          (mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). Fades/
-          slides in (ReplyBanner), never bounces — this is UI chrome, not
-          the swipe gesture that (usually) triggers it. */}
-      {replyTo && !isRequestMode && !messaging.blockedByMe && !messaging.unavailable && (
-        <ReplyBanner
-          testID="conversation-reply-banner"
-          theme={theme}
-          fromName={replyTo.fromName}
-          previewText={messagePreviewText(replyTo)}
-          onCancel={() => setReplyTo(null)}
-        />
-      )}
-
       {/* Input row — request mode replaces the composer entirely with the
           accept/block/delete bottom panel (see RequestActionPanel below). */}
       {isRequestMode && participant ? (
@@ -2382,66 +2408,11 @@ export default function BuyerConversationScreen() {
             }
           }}
         />
-      ) : !isDisabled ? (
-        <View>
-          {selectedAttachment && (() => {
-            const uploadingMedia = selectedAttachment.meta?.uploading === 'true';
-            const isMedia = selectedAttachment.type === 'image' || selectedAttachment.type === 'video';
-            return (
-            <View style={s.selectedAttachment} testID="conversation-selected-attachment">
-              {isMedia ? (
-                <MediaUploadThumb
-                  type={selectedAttachment.type as 'image' | 'video'}
-                  uri={selectedAttachment.type === 'image' ? selectedAttachment.uri : undefined}
-                  uploading={uploadingMedia}
-                  size={40}
-                  ringColor={theme.accent}
-                  iconColor={theme.muted}
-                  trackColor={theme.border}
-                />
-              ) : isUploading ? (
-                <UploadRing size={22} color={theme.accent} trackColor={theme.border} />
-              ) : (
-                <Feather
-                  name={
-                    selectedAttachment.type === 'voice' ? 'mic' :
-                    selectedAttachment.type === 'post'  ? 'image' :
-                    selectedAttachment.type === 'order' ? 'package' : 'shopping-bag'
-                  }
-                  size={ICON.sm}
-                  color={theme.accent}
-                />
-              )}
-              <View style={{ flex: 1, marginLeft: SP.sm }}>
-                <Text style={s.selectedAttachmentLabel}>
-                  {
-                    uploadingMedia ? 'Uploading…' :
-                    selectedAttachment.type === 'image' ? 'Photo attached' :
-                    selectedAttachment.type === 'video' ? 'Video attached' :
-                    selectedAttachment.type === 'voice' ? 'Voice message' :
-                    selectedAttachment.type === 'post'  ? 'Post attached'  :
-                    selectedAttachment.type === 'order' ? 'Order attached' : 'Product attached'
-                  }
-                </Text>
-                <Text style={s.selectedAttachmentTitle} numberOfLines={1}>
-                  {selectedAttachment.title}
-                </Text>
-              </View>
-              <PressableScale rippleEnabled={false}
-                onPress={() => { mediaUploadTokenRef.current++; setSelectedAttachment(null); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
-                testID="conversation-selected-attachment-remove"
-              >
-                <Feather name="x" size={ICON.sm} color={theme.muted} />
-              </PressableScale>
-            </View>
-            );
-          })()}
-          <View style={[s.inputRow, { paddingBottom: composerBottomPad }]}>
-            {voiceRecorder.phase !== 'idle' ? (
-              <VoiceRecordingBar
+) : !isDisabled ? (
+        voiceRecorder.phase !== 'idle' ? (
+          <View style={[s.voiceBarWrap, { paddingBottom: composerBottomPad }]}>
+            {attachmentChip}
+            <VoiceRecordingBar
                 theme={theme}
                 phase={voiceRecorder.phase}
                 elapsedMs={voiceRecorder.elapsedMs}
@@ -2453,77 +2424,46 @@ export default function BuyerConversationScreen() {
                 onLock={voiceRecorder.lock}
                 onSend={() => { void voiceRecorder.finish(); }}
               />
-            ) : (<>
-            {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
-                (for seller chats) products/posts, via the same "Add to
-                message" sheet as before. IG-style camera-circle trigger
-                (Mobbin: mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7)
-                — a solid white circle with a black camera glyph, replacing
-                the bare "+" glyph. Same action as before (opens the
-                multi-option sheet: Photos / Video clip / Product or post),
-                just a new visual — the sheet has more than one real option,
-                so this stays an entry point to that sheet rather than a
-                direct camera action. */}
-            <PressableScale rippleEnabled={false}
-              bounce={false}
-              onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
-              style={s.cameraCircleBtn}
-              disabled={isUploading || isSending}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              testID="conversation-attach"
-              accessibilityRole="button"
-              accessibilityLabel="Attach"
-            >
-              {isUploading
-                ? <UploadRing size={ICON.md} color={theme.onAccent} />
-                : <Feather name="camera" size={20} color={theme.onAccent} />
-              }
-            </PressableScale>
-
-            {/* One pill: text input, the Thread Cash coin (left of the
-                mic/send control), and the mic⇄send morph — all inside the
-                same rounded bounds instead of floating as separate siblings. */}
-            <View style={s.pill}>
-              <TextInput
-                ref={textInputRef}
-                nativeID={CHAT_INPUT_NATIVE_ID}
-                style={[s.textInput, WEB_INPUT_RESET, { height: composerInputHeight }]}
-                value={text}
-                onChangeText={handleChangeText}
-                placeholder="Message…"
-                placeholderTextColor={theme.muted}
-                multiline
-                returnKeyType="default"
-                autoCapitalize="sentences"
-                onKeyPress={Platform.OS === 'web' ? (e: any) => {
-                  // Web hardware-keyboard Enter sends; Shift+Enter still
-                  // inserts a newline (native platforms use their own
-                  // return-key handling and never see this multiline
-                  // <textarea> key event, so this is web-only).
-                  if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                    e.preventDefault();
-                    hapticPrimaryAction();
-                    handleSend();
-                  }
-                } : undefined}
-              />
-
-              {/* Mic ⇄ Send morph, inside the pill's own bounds */}
-              <View style={s.morphContainer}>
-                <Animated.View
-                  pointerEvents={showSendButton ? 'none' : 'auto'}
-                  style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
-                >
-                  {/* Native: press-and-hold starts recording, then slide-to-
-                      cancel/lock via the same gesture (see useVoiceRecorder).
-                      Web has no press-hold-and-drag parity, so a tap toggles
-                      recording instead — see docs/dm-flows.md. */}
+          </View>
+        ) : (
+          <Composer
+            testID="conversation"
+            value={text}
+            onChangeText={handleChangeText}
+            onSend={() => { hapticPrimaryAction(); handleSend(); }}
+            canSend={canSend}
+            placeholder="Message…"
+            inputRef={textInputRef}
+            nativeID={CHAT_INPUT_NATIVE_ID}
+            topSlot={<>{replyBanner}{attachmentChip}</>}
+            leftAccessory={
+              <PressableScale rippleEnabled={false}
+                bounce={false}
+                onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
+                style={s.attachCircleBtn}
+                disabled={isUploading || isSending}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="conversation-attach"
+                accessibilityRole="button"
+                accessibilityLabel="Attach"
+              >
+                {isUploading
+                  ? <UploadRing size={ICON.md} color="#000000" />
+                  : <Feather name="camera" size={18} color="#000000" />
+                }
+              </PressableScale>
+            }
+            rightAccessory={<>
+              {/* Native: press-and-hold starts recording, then slide-to-
+                  cancel/lock via the same gesture (see useVoiceRecorder).
+                  Web has no press-hold-and-drag parity, so a tap toggles
+                  recording instead — see docs/dm-flows.md. */}
                   {voiceRecorder.isWeb ? (
                     <PressableScale rippleEnabled={false}
                       bounce={false}
                       onPress={() => { void voiceRecorder.startWeb(); }}
                       disabled={isUploading || isSending}
-                      style={s.morphFaceInner}
+                      style={s.composerIconBtn}
                       testID="conversation-mic"
                       accessibilityRole="button"
                       accessibilityLabel="Record voice message"
@@ -2533,7 +2473,7 @@ export default function BuyerConversationScreen() {
                   ) : (
                     <View
                       {...voiceRecorder.panHandlers}
-                      style={s.morphFaceInner}
+                      style={s.composerIconBtn}
                       testID="conversation-mic"
                       accessibilityRole="button"
                       accessibilityLabel="Record voice message"
@@ -2541,31 +2481,8 @@ export default function BuyerConversationScreen() {
                       <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
                     </View>
                   )}
-                </Animated.View>
-                <Animated.View
-                  pointerEvents={showSendButton ? 'auto' : 'none'}
-                  style={[
-                    StyleSheet.absoluteFill, s.morphFace,
-                    { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
-                  ]}
-                >
-                  <PressableScale rippleEnabled={false}
-                    bounce={false}
-                    onPress={() => { hapticPrimaryAction(); handleSend(); }}
-                    disabled={!canSend}
-                    style={s.morphFaceInner}
-                    activeOpacity={0.8}
-                    testID="conversation-send"
-                    accessibilityRole="button"
-                    accessibilityLabel="Send message"
-                  >
-                    <Feather name="send" size={COMPOSER_ICON} color={canSend ? theme.onAccent : theme.muted} />
-                  </PressableScale>
-                </Animated.View>
-              </View>
 
-              {/* Gallery quick-attach — evenly spaced with mic and the
-                  Thread Cash bill, per the Instagram/Threads composer. */}
+              {/* Gallery quick-attach */}
               <PressableScale rippleEnabled={false}
                 bounce={false}
                 onPress={handlePickPhoto}
@@ -2579,15 +2496,9 @@ export default function BuyerConversationScreen() {
                 <Feather name="image" size={COMPOSER_ICON} color={theme.muted} />
               </PressableScale>
 
-              {/* Minimal Thread Cash entry — works for any conversation
-                  participant (buyer-to-buyer friends included). Always
-                  rendered once the feature flag is on: disabled with an
-                  explanation rather than hidden when not yet confirmed as a
-                  mutual follow. The transfer is already final by the time
-                  onSent fires, so the bubble is posted immediately rather
-                  than staged in the composer. The server independently
-                  re-validates mutual follow at send AND claim — this is an
-                  affordance check only, never the security boundary. */}
+              {/* Thread Cash — disabled with an explanation rather than hidden
+                  when not yet confirmed as a mutual follow. The server
+                  independently re-validates at send AND claim. */}
               {threadCashSendEnabled && sellerUserId ? (
                 <ThreadCashAttachButton
                   recipientId={sellerUserId}
@@ -2668,10 +2579,9 @@ export default function BuyerConversationScreen() {
                   }}
                 />
               ) : null}
-            </View>
-            </>)}
-          </View>
-        </View>
+            </>}
+          />
+        )
       ) : (
         <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: composerBottomPad }]}>
           <Text style={s.disabledInputText}>Messaging disabled</Text>
@@ -3574,104 +3484,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     gap: SP.sm,
   },
-  // A light, borderless "+" — no filled grey blob. Sized a touch larger than
-  // the glyph controls inside the pill (COMPOSER_CONTROL+4) so it optically
-  // centers against the pill's own ~44pt height (see `pill` below); keeps a
-  // generous hitSlop at the call site for a full 44pt tap target.
-  roundInputBtn: {
-    width: COMPOSER_CONTROL + 4,
-    height: COMPOSER_CONTROL + 4,
-    borderRadius: (COMPOSER_CONTROL + 4) / 2,
+  // Attach trigger left of the pill — solid white circle, black glyph.
+  attachCircleBtn: {
+    width: COMPOSER_ATTACH_SIZE,
+    height: COMPOSER_ATTACH_SIZE,
+    borderRadius: COMPOSER_ATTACH_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
-  },
-  // IG-style camera-circle attach trigger — a solid accent-filled circle
-  // with an onAccent camera glyph, 36pt diameter (Mobbin: Instagram DM
-  // composer, mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7).
-  // Themed like every other filled control in this composer (e.g. the
-  // send button) instead of a fixed white/black pair.
-  cameraCircleBtn: {
-    width: COMPOSER_CONTROL,
-    height: COMPOSER_CONTROL,
-    borderRadius: COMPOSER_CONTROL / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-    backgroundColor: theme.accent,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.accent,
-  },
-  // The single composer pill — holds the TextInput, the Thread Cash coin,
-  // and the mic⇄send morph, all inside one rounded surface. ~44pt tall at
-  // rest for a single line (Dev feedback: the bar read as too tall/thick
-  // before) and only grows as composerInputHeight grows with typed lines.
-  pill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: theme.cardElevated,
-    borderRadius: RADIUS.xxl,
+    backgroundColor: '#FFFFFF',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
-    paddingLeft: SP.sm,
-    paddingRight: SP.xs,
-    gap: SP.sm,
-    minHeight: COMPOSER_CONTROL + SP.sm,
   },
-  textInput: {
-    flex: 1,
-    paddingVertical: COMPOSER_TEXT_V_PADDING,
-    paddingRight: SP.xs,
-    fontSize: FS.base,
-    lineHeight: COMPOSER_LINE_HEIGHT,
-    fontFamily: FONT.regular,
-    color: theme.text,
-    textAlignVertical: 'center',
-    maxHeight: COMPOSER_MAX_INPUT_HEIGHT,
-    // A bare <textarea> on web ships its own default padding/line-height —
-    // the explicit `height` set inline on the element (from
-    // composerContentHeight) is what actually keeps it at rest/growing
-    // correctly; this minHeight is just a native-platform floor.
-    minHeight: COMPOSER_CONTROL,
-    // Matches the icons' own marginBottom below so the placeholder/typed
-    // text sits on the exact same baseline as the mic/send/gallery glyphs —
-    // without this the text box (flush to the pill's bottom edge) sat ~4pt
-    // lower than the icons, reading as "placeholder sits low/off-center".
-    marginBottom: SP.xs,
-    ...(Platform.OS === 'web' ? { paddingTop: COMPOSER_TEXT_V_PADDING, paddingBottom: COMPOSER_TEXT_V_PADDING } : null),
-  },
-  // Sits inside the pill, after mic/send and gallery.
+  // Inside-the-pill controls (mic, gallery, Thread Cash coin).
   threadCashCoinBtn: {
     width: COMPOSER_CONTROL,
     height: COMPOSER_CONTROL,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SP.xs,
   },
-  // Gallery quick-attach — same touch target as the other pill controls.
   composerIconBtn: {
     width: COMPOSER_CONTROL,
     height: COMPOSER_CONTROL,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SP.xs,
   },
-  morphContainer: {
-    width: COMPOSER_CONTROL,
-    height: COMPOSER_CONTROL,
-    marginBottom: SP.xs,
-  },
-  morphFace: {
-    borderRadius: COMPOSER_CONTROL / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  morphFaceInner: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+  voiceBarWrap: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    backgroundColor: theme.background,
   },
   modalBackdrop: {
     flex: 1,
