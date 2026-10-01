@@ -109,6 +109,8 @@ import webhooksShippoRouter from "./webhooks-shippo";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
+import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
+import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
 const router = Router();
 
@@ -145,6 +147,7 @@ router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
+router.use("/giveaways",       publicGiveawaysRouter); // public reads; per-viewer entry status when signed in
 
 // ─── Authenticated seller + shared routes ─────────────────────────────────────
 // tc (teamContext) is applied to every seller-scoped route so X-Store-Context
@@ -209,6 +212,8 @@ router.use("/brandthread-agent",         brandthreadAgentRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
+router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
+router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 // Comments are attributed to the person writing them, so they are mounted

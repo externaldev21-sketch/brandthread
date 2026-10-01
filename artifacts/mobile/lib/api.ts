@@ -2472,6 +2472,35 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
         get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
     },
+    /** Seller follower push broadcasts (1 per rolling 24h, enforced server-side). */
+    sellerPush: {
+      status: () => get<any>('/api/seller/push-broadcasts'),
+      preview: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+        post<any>('/api/seller/push-broadcasts/preview', body),
+      send: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+        post<any>('/api/seller/push-broadcasts', body),
+      results: (id: string) => get<any>(`/api/seller/push-broadcasts/${encodeURIComponent(id)}`),
+    },
+    /** Seller giveaway tool. */
+    sellerGiveaways: {
+      list: () => get<{ giveaways: any[] }>('/api/seller/giveaways'),
+      get: (id: string) => get<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`),
+      create: (body: unknown) => post<any>('/api/seller/giveaways', body),
+      rulesTemplate: (query: string) => get<{ rulesText: string }>(`/api/seller/giveaways/rules-template?${query}`),
+      end: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/end`, {}),
+      cancel: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/cancel`, {}),
+      draw: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/draw`, {}),
+      redraw: (id: string, winnerId: string, reason: string) =>
+        post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/redraw`, { reason }),
+      markShipped: (id: string, winnerId: string, shipped: boolean) =>
+        post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/shipped`, { shipped }),
+      myPosts: () => get<any[]>('/api/posts/mine?limit=30'),
+    },
+    /** Buyer-facing giveaway reads (card on a brand's profile + the entry page). */
+    giveaways: {
+      liveForSeller: (sellerId: string) => get<{ giveaway: any | null }>(`/api/giveaways/seller/${encodeURIComponent(sellerId)}/live`),
+      get: (code: string) => get<any>(`/api/giveaways/${encodeURIComponent(code)}`),
+    },
     /** Returns — buyer-initiated return requests */
     returns: {
       create: (data: {

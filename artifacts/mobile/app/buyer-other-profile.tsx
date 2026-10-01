@@ -25,6 +25,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
+import { GiveawayProfileCard } from '@/components/GiveawayProfileCard';
 import { hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { muteUser, restrictUser, createOrGetConversation } from '@/services/socialService';
 import { useApi } from '@/lib/api';
@@ -425,6 +426,7 @@ export default function BuyerOtherProfileScreen() {
         />
         <ProfileButton label="More" icon="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="More options" />
       </View>
+      <GiveawayProfileCard sellerId={canonicalUserId} enabled={canonicalReady && !iBlockedThem && !previewAsVisitor} />
     </>
   );
 

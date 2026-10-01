@@ -34,6 +34,7 @@ const SELLER_ROWS: NotifRow[] = [
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'New messages and replies from customers' },
   { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'New disputes and time-sensitive case updates' },
   { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low stock and out-of-stock warnings' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
   { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'A reminder before your free trial converts to paid' },
 ];
 
@@ -44,6 +45,7 @@ const BUYER_ROWS: NotifRow[] = [
   { key: 'friend_activity', icon: 'users',           label: 'Social',            description: 'New followers, likes, and friend activity' },
   { key: 'price_alerts',    icon: 'tag',             label: 'Price & stock alerts', description: 'Price drops and back-in-stock alerts on saved items' },
   { key: 'return_updates',  icon: 'refresh-ccw',     label: 'Returns',           description: 'Updates on your return and refund requests' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
 ];
 
 const QUIET_HOURS_PRESETS: { id: string; start: string; end: string; label: string }[] = [
