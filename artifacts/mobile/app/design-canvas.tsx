@@ -4016,7 +4016,7 @@ export default function DesignCanvasScreen() {
           quick size control, so that part is unchanged. ── */}
       {activeTopTool === 'brush' ? (
         <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
-          <View style={styles.layersModalOverlay}>
+          <View style={styles.modalOverlay}>
             <BrushLibraryComponent
               brushes={brushes}
               activeBrushId={activeBrushId}
