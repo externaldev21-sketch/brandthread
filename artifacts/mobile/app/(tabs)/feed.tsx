@@ -3374,7 +3374,7 @@ export default function FeedScreen({
               returnKeyType="search"
               onSubmitEditing={() => setShowSearch(false)}
             />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Close search" accessibilityRole="button"
               style={styles.topIconBtn}
               activeOpacity={0.7}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
@@ -3384,7 +3384,7 @@ export default function FeedScreen({
           </View>
         ) : (
           <View style={styles.topRow}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Notifications" accessibilityRole="button"
               style={styles.topAvatarBtn}
               activeOpacity={0.75}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -3396,7 +3396,7 @@ export default function FeedScreen({
               {hasUnread && <View style={styles.unreadDot} />}
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Search" accessibilityRole="button"
               style={styles.topIconBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}

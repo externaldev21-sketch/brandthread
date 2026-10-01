@@ -847,7 +847,7 @@ function BuyerAuthStep({
           <Text style={sba.sub}>We sent a 6-digit code to {email}</Text>
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Verification code</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Verification code"
               style={[sba.input, sba.codeInput]}
               placeholder="000000"
               placeholderTextColor={MUTED2}
@@ -882,7 +882,7 @@ function BuyerAuthStep({
 
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Choose your @username</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Username"
               testID="onboarding-username-input"
               style={[sba.input, (usernameError || usernameLiveCheck.error) ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
               placeholder="e.g. alex_style"
@@ -917,7 +917,7 @@ function BuyerAuthStep({
 
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Referral code (optional)</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Referral code"
               testID="onboarding-referral-input"
               style={sba.input}
               placeholder="e.g. FASHION"
@@ -934,7 +934,7 @@ function BuyerAuthStep({
 
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Email address</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Email"
               style={sba.input}
               placeholder="mila@nightshiftstudio.co"
               placeholderTextColor={MUTED2}
@@ -949,7 +949,7 @@ function BuyerAuthStep({
           <View style={sba.inputWrap}>
             <Text style={sba.label}>Password</Text>
             <View style={sba.pwRow}>
-              <TextInput
+              <TextInput accessibilityLabel="Password"
                 style={[sba.input, sba.pwInput]}
                 placeholder="Minimum 8 characters"
                 placeholderTextColor={MUTED2}
@@ -958,7 +958,7 @@ function BuyerAuthStep({
                 secureTextEntry={!showPw}
                 autoComplete="new-password"
               />
-              <TouchableOpacity style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
+              <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
                 <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
               </TouchableOpacity>
             </View>

@@ -563,7 +563,7 @@ export default function EditProfileScreen() {
           <View>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Username</Text>
-              <TextInput
+              <TextInput accessibilityLabel="Username"
                 style={[
                   styles.rowInput,
                   usernameStatus === 'taken' && { color: theme.error },
@@ -596,7 +596,7 @@ export default function EditProfileScreen() {
             <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
-            <TouchableOpacity onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
+            <TouchableOpacity accessibilityLabel="Copy profile link" accessibilityRole="button" onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
               <Feather name="copy" size={17} color={theme.muted} />
             </TouchableOpacity>
           </View>

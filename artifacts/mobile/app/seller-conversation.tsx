@@ -2020,7 +2020,7 @@ export default function SellerConversationScreen() {
           <View style={s.sheetHandle} />
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Choose a product</Text>
-            <PressableScale onPress={() => setShowProductPicker(false)}>
+            <PressableScale accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
               <Feather name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>

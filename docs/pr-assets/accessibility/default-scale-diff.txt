@@ -1,0 +1,19 @@
+screen                  pixels  closest diff ratio
+buyer-cart              334836             0 0.0000%
+buyer-checkout          334836             0 0.0000%
+buyer-discover          334836             0 0.0000%
+buyer-feed              334836             0 0.0000%
+buyer-inbox             334836             0 0.0000%
+buyer-orders            334836             0 0.0000%
+buyer-product           334836             0 0.0000%
+buyer-profile           334836             0 0.0000%
+buyer-search            334836             0 0.0000%
+buyer-settings          334836             0 0.0000%
+edit-profile            334836             0 0.0000%
+forgot-password         334836             0 0.0000%
+onboarding              334836             0 0.0000%
+seller-products         334836             0 0.0000%
+seller-studio           334836             0 0.0000%
+sign-in                 334836             0 0.0000%
+IDENTICAL: 16 screens, 0 differing pixels
+

@@ -8,6 +8,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface ScreenHeaderAction {
   icon: keyof typeof Feather.glyphMap;
@@ -104,13 +105,15 @@ export function ScreenHeader({
             <Animated.Text
               testID="screen-header-title"
               {...({ dataSet: { variant } } as object)}
+              accessibilityRole="header"
+              maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
               style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}
               numberOfLines={1}
             >
               {title}
             </Animated.Text>
           ) : (
-            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
+            <Text testID="screen-header-title" {...({ dataSet: { variant } } as object)} accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
           )}
         </View>
 
@@ -148,6 +151,7 @@ export function ScreenHeader({
 
       {subtitle && !scrollY && (
         <Text
+          maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
           style={[
             styles.subtitle,
             {
@@ -169,7 +173,7 @@ export function ScreenHeader({
       {scrollY && (
         <Animated.View style={{ opacity: largeTitleOpacity!, transform: [{ scale: largeTitleScale! }], height: largeTitleHeight!, overflow: 'hidden' }}>
           <View style={styles.largeTitleWrap}>
-            <Text style={[TYPE_SCALE.title1, { color: colors.foreground, fontFamily: FONT.bold }]} numberOfLines={1}>{title}</Text>
+            <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.title1, { color: colors.foreground, fontFamily: FONT.bold }]} numberOfLines={1}>{title}</Text>
             {subtitle && <Text style={[styles.subtitle, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={1}>{subtitle}</Text>}
           </View>
         </Animated.View>
