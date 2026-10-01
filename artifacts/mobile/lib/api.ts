@@ -1776,18 +1776,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>>(`/api/public/products/${encodeURIComponent(productId)}/videos${limit ? `?limit=${limit}` : ''}`),
     },
     public: {
-      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; size?: string; brand?: string; limit?: number; offset?: number }) => {
+      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string | string[]; size?: string | string[]; color?: string | string[]; brand?: string | string[]; inStock?: boolean; facets?: boolean; limit?: number; offset?: number }) => {
         const params = new URLSearchParams();
         if (opts.q) params.set('q', opts.q);
         if (opts.sort) params.set('sort', opts.sort);
         if (opts.minPriceCents !== undefined) params.set('minPriceCents', String(opts.minPriceCents));
         if (opts.maxPriceCents !== undefined) params.set('maxPriceCents', String(opts.maxPriceCents));
-        if (opts.category) params.set('category', opts.category);
-        if (opts.size) params.set('size', opts.size);
-        if (opts.brand) params.set('brand', opts.brand);
+        // Multi-value filters are sent as repeated params (?size=M&size=L).
+        for (const key of ['category', 'size', 'color', 'brand'] as const) {
+          const raw = opts[key];
+          for (const v of Array.isArray(raw) ? raw : raw ? [raw] : []) params.append(key, v);
+        }
+        if (opts.inStock) params.set('inStock', '1');
+        if (opts.facets) params.set('facets', '1');
         if (opts.limit) params.set('limit', String(opts.limit));
         if (opts.offset) params.set('offset', String(opts.offset));
-        return get<{ results: any[]; pagination: { limit: number; offset: number; returned: number; total?: number; hasMore: boolean } }>(`/api/public/search?${params.toString()}`);
+        return get<{
+          results: any[];
+          pagination: { limit: number; offset: number; returned: number; total?: number; hasMore: boolean };
+          facets?: {
+            sizes: Array<{ value: string; count: number }>;
+            colors: Array<{ value: string; count: number }>;
+            categories: Array<{ value: string; count: number }>;
+            brands: Array<{ id: string; name: string; count: number }>;
+            price: { minCents: number; maxCents: number } | null;
+            inStockCount: number;
+          };
+        }>(`/api/public/search?${params.toString()}`);
       },
       /** Trending search terms (real logged queries once there's enough volume, else categories + brands) for the search empty state. */
       trending: (limit = 8) =>
