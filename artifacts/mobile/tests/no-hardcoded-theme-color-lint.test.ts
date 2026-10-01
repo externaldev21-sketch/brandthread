@@ -395,6 +395,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/ui/SegmentedControl.tsx',
   'components/ui/SuccessCheck.tsx',
   'components/web/WebAppShell.tsx',
+  'lib/adjustmentsCatalog.ts', // GRADIENT_MAP_PRESETS: real colour-ramp data (Mono = black→white), not theme colours
   'lib/backgroundPalette.ts',
   'lib/canvasPresets.ts',
   'lib/color.ts',
