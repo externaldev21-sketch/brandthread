@@ -20,10 +20,6 @@ export type OrderRisk = {
   flags: { code: string; label: string; severity: 'info' | 'medium' | 'high' }[];
 };
 
-const SILVER = '#C0C0C0';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-
 export function shouldShowOrderRisk(risk: OrderRisk | null | undefined): risk is OrderRisk {
   return !!risk && (risk.level === 'elevated' || risk.level === 'highest');
 }
@@ -32,6 +28,9 @@ export function OrderRiskBadge({ risk }: { risk: OrderRisk | null | undefined })
   const { theme } = useAppTheme();
   const [open, setOpen] = useState(false);
   if (!shouldShowOrderRisk(risk)) return null;
+  const SILVER = theme.muted;
+  const WHITE = theme.text;
+  const BLACK = theme.background;
   const highest = risk.level === 'highest';
   const label = highest ? 'High risk · review before shipping' : 'Review before shipping';
 
@@ -46,7 +45,7 @@ export function OrderRiskBadge({ risk }: { risk: OrderRisk | null | undefined })
         style={[styles.pill, { backgroundColor: highest ? WHITE : SILVER }]}
       >
         <Feather name="shield" size={12} color={BLACK} />
-        <Text style={styles.pillText}>{label}</Text>
+        <Text style={[styles.pillText, { color: BLACK }]}>{label}</Text>
         <Feather name={open ? 'chevron-up' : 'chevron-down'} size={12} color={BLACK} />
       </Pressable>
 
@@ -84,7 +83,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.xs + 2, alignSelf: 'flex-start',
     borderRadius: RADIUS.pill, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs + 2, minHeight: 28,
   },
-  pillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: BLACK },
+  pillText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   panel: { marginTop: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, gap: SP.sm },
   panelTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
   flagRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },

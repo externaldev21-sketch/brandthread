@@ -823,7 +823,7 @@ export default function OrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={order.orderNumber}
-        subtitle={order.customer.name}
+        hideDivider
         variant="push"
         onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
@@ -1102,20 +1102,20 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       <View style={s.actionSection}>
         <SectionHeader title="Actions" />
         <View style={s.actionRow}>
-          <SecondaryButton
+          <View style={s.actionCell}><SecondaryButton
             label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
             onPress={onMessageBuyer}
             icon="message-circle"
             disabled={messagingBuyer || !order.customer.buyerUserId}
-            style={{ flex: 1 }}
-          />
+            style={s.actionFill}
+          /></View>
           {order.payment.amountPaidCents > order.payment.amountRefundedCents && (
-            <SecondaryButton
+            <View style={s.actionCell}><SecondaryButton
               label="Refund"
               onPress={() => router.push(`/refund-detail?orderId=${order.id}` as never)}
               icon="credit-card"
-              style={{ flex: 1 }}
-            />
+              style={s.actionFill}
+            /></View>
           )}
         </View>
         {order.autoRefundedAt ? (
@@ -1123,21 +1123,21 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         ) : null}
         {!order.autoRefundedAt && order.status === 'new' && (
           <View style={s.actionRow}>
-            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ flex: 1 }} />
-            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={{ flex: 1 }} accent={RED} />
+            <View style={s.actionCell}><PrimaryButton label="Start Processing" onPress={onMarkProcessing} icon="play" style={s.actionFill} /></View>
+            <View style={s.actionCell}><SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={s.actionFill} accent={RED} /></View>
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'processing' && (
           <View style={s.actionRow}>
-            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
-            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+            <View style={s.actionCell}><PrimaryButton label="Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={s.actionFill} /></View>
+            <View style={s.actionCell}><SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={s.actionFill} /></View>
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
             <View style={s.actionRow}>
-              <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
-              <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ flex: 1 }} />
+              <View style={s.actionCell}><PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={s.actionFill} /></View>
+              <View style={s.actionCell}><SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={s.actionFill} /></View>
             </View>
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
@@ -1938,7 +1938,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Tab bar
   tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
-  tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
+  tabBarContent:    { paddingHorizontal: SP.md, paddingRight: SP.lg, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
   tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
   tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
   tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
@@ -1966,6 +1966,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Actions
   actionSection:    { gap: SP.sm },
   actionRow:        { flexDirection: 'row', gap: SP.sm },
+  actionCell:       { flex: 1, flexBasis: 0, minWidth: 0 },
+  actionFill:       { width: '100%' },
   actionCol:        { gap: SP.sm },
   readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },

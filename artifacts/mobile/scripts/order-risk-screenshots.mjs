@@ -49,8 +49,9 @@ const RISKS = {
   },
 };
 
+let STATUS = 'pending';
 const sellerOrder = (risk) => ({
-  id: ORDER_ID, orderNumber: 'BT-00042', ownerId: 'seller', buyerId: BUYER_USER.id, status: 'pending',
+  id: ORDER_ID, orderNumber: 'BT-00042', ownerId: 'seller', buyerId: BUYER_USER.id, status: STATUS,
   totalCents: 16000, subtotalCents: 14800, shippingCents: 1200, paidAt: iso(now - 3 * 60 * 60_000),
   shippingAddress: { name: 'Jordan Reyes', street: '1120 NW Everett Street', city: 'Portland', state: 'OR', zip: '97209', country: 'US' },
   createdAt: iso(now - 3 * 60 * 60_000), updatedAt: iso(now - 3 * 60 * 60_000),
@@ -90,6 +91,40 @@ async function shot(page, name) {
   console.log(`  ok ${name}`);
 }
 
+
+/** Flags text clipped by its own box or by an ancestor, and text touching its container edge. */
+async function audit(page, label) {
+  const issues = await page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('div, span')) {
+      if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0) continue;
+      const text = el.textContent.trim().slice(0, 40);
+      if (el.scrollWidth > el.clientWidth + 1) out.push(`clipped: "${text}" ${el.scrollWidth}>${el.clientWidth}`);
+      if (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth) out.push(`ellipsis: "${text}"`);
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        const pr = p.getBoundingClientRect();
+        const pcs = getComputedStyle(p);
+        if ((pcs.overflowX === 'hidden' || pcs.overflowX === 'clip') && pr.width > 0 && (r.left < pr.left - 1 || r.right > pr.right + 1) && !p.matches('[data-testid]')) {
+          out.push(`overflows parent: "${text}"`); break;
+        }
+        p = p.parentElement;
+      }
+      if (r.right > innerWidth + 1 && !el.closest('[role=tablist]')) {
+        const scroller = el.closest('div[style*="overflow-x"], div[class*="scroll"]');
+        if (!scroller) out.push(`off-screen: "${text}" right=${Math.round(r.right)}`);
+      }
+    }
+    return [...new Set(out)];
+  });
+  console.log(`  audit [${label}]: ${issues.length ? issues.join(' | ') : 'clean'}`);
+  return issues;
+}
+
 async function run() {
   if (!process.argv.includes('--skip-build') || !existsSync(path.join(DEFAULT_BUILD_DIR, 'index.html'))) buildPreviewWeb(DEFAULT_BUILD_DIR);
   mkdirSync(OUT, { recursive: true });
@@ -97,17 +132,35 @@ async function run() {
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(WORK_DIR, 'demo-images'));
   try {
-    for (const kind of ['none', 'elevated', 'highest']) {
-      const { context, page } = await open(browser, images, server.origin, RISKS[kind]);
-      const badge = await page.getByTestId('order-risk-badge').count();
-      console.log(`  [${kind}] badge count: ${badge}`);
-      await shot(page, `${kind === 'none' ? '01-before-no-risk' : kind === 'elevated' ? '02-badge-elevated' : '04-badge-highest'}`);
-      if (badge) {
-        await page.getByTestId('order-risk-badge').click();
-        await page.getByTestId('order-risk-panel').waitFor({ timeout: 5_000 });
-        await shot(page, kind === 'elevated' ? '03-explanation-elevated' : '05-explanation-highest');
+    for (const status of ['pending', 'processing']) {
+      STATUS = status;
+      for (const kind of ['none', 'elevated', 'highest']) {
+        const { context, page } = await open(browser, images, server.origin, RISKS[kind]);
+        const tag = `${status}-${kind}`;
+        const badge = await page.getByTestId('order-risk-badge').count();
+        await audit(page, tag);
+        if (status === 'pending') {
+          await shot(page, `${kind === 'none' ? '01-after-no-risk' : kind === 'elevated' ? '02-badge-elevated' : '04-badge-highest'}`);
+          if (badge) {
+            await page.getByTestId('order-risk-badge').click();
+            await page.getByTestId('order-risk-panel').waitFor({ timeout: 5_000 });
+            await audit(page, `${tag}-open`);
+            await shot(page, kind === 'elevated' ? '03-explanation-elevated' : '05-explanation-highest');
+          }
+        } else if (kind === 'none') {
+          await shot(page, '06-processing-actions');
+        }
+        if (kind === 'none') {
+          // Zoomed crops (3x) of the header+tabs, step tracker and action buttons.
+          await page.evaluate(() => { const sc = [...document.querySelectorAll('div')].find((d) => d.scrollHeight > d.clientHeight + 4 && getComputedStyle(d).overflowY !== 'visible'); if (sc) sc.scrollTop = 0; });
+          await page.screenshot({ path: path.join(OUT, `zoom-${status}-header-tabs.png`), clip: { x: 0, y: 0, width: 393, height: 200 } });
+          const y = await page.getByText('Actions', { exact: true }).first().evaluate((el) => el.getBoundingClientRect().top);
+          await page.screenshot({ path: path.join(OUT, `zoom-${status}-actions.png`), clip: { x: 0, y: Math.max(0, y - 10), width: 393, height: Math.min(300, 852 - y) } });
+          const t = await page.getByText('Placed', { exact: true }).first().evaluate((el) => el.getBoundingClientRect().top);
+          await page.screenshot({ path: path.join(OUT, `zoom-${status}-steps.png`), clip: { x: 0, y: Math.max(0, t - 50), width: 393, height: 90 } });
+        }
+        await context.close();
       }
-      await context.close();
     }
   } finally {
     server.close();
