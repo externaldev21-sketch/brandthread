@@ -24,6 +24,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+import { CaptionSpans } from '@/components/social/CaptionText';
 
 export interface RepostFriend {
   userId: string;
@@ -163,7 +164,7 @@ export function CaptionBlock({
         hitSlop={{ top: 4, bottom: 4 }}
       >
         <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-          {caption}
+          <CaptionSpans text={caption} />
           {caption.length > 86 && (
             <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
           )}

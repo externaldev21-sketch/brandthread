@@ -45,6 +45,8 @@ import { ProductTile } from '@/components/search/ProductTile';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
 import { TagRow, type SearchTag } from '@/components/search/TagRow';
+import { TrendingTags } from '@/components/search/TrendingTags';
+import { hashtagHref, normalizeTag } from '@/lib/hashtagText';
 import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
 import { VideoTile } from '@/components/search/VideoTile';
@@ -164,6 +166,7 @@ export default function BuyerSearchScreen() {
   const [activeTab, setActiveTab] = useState<SearchTabKey>('forYou');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people, setPeople] = useState<SearchPerson[]>([]);
+  const [serverTags, setServerTags] = useState<SearchTag[]>([]);
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -218,10 +221,12 @@ export default function BuyerSearchScreen() {
   }
 
   const performSearch = useCallback(async (term: string) => {
-    const [productRes, peopleRes] = await Promise.allSettled([
+    const [productRes, peopleRes, tagRes] = await Promise.allSettled([
       api.public.search({ q: term, limit: 30 }),
       api.social.search(term, 20),
+      previewMode ? Promise.resolve({ tags: [] as SearchTag[] }) : Promise.resolve().then(() => api.hashtags.search(term, 12)),
     ]);
+    setServerTags(tagRes.status === 'fulfilled' ? tagRes.value.tags : []);
     setResults(productRes.status === 'fulfilled' ? productRes.value.results ?? [] : []);
     let peopleResult = peopleRes.status === 'fulfilled' ? (peopleRes.value as unknown as SearchPerson[]) : [];
     if (peopleResult.length === 0 && previewMode) {
@@ -259,7 +264,22 @@ export default function BuyerSearchScreen() {
   const productResults = productResultsRaw.length > 0 ? productResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
-  const tagRows = useMemo(() => deriveTags(videoResults, trimmedQuery), [videoResults, trimmedQuery]);
+  // Server-side hashtag search first (real post counts), then tags derived
+  // from the matched captions for anything the index does not know yet.
+  const tagRows = useMemo(() => {
+    const merged = new Map<string, SearchTag>();
+    for (const t of serverTags) merged.set(t.tag, t);
+    for (const t of deriveTags(videoResults, trimmedQuery)) {
+      const key = normalizeTag(t.tag);
+      if (key && !merged.has(key)) merged.set(key, { tag: key, postCount: t.postCount });
+    }
+    return [...merged.values()];
+  }, [serverTags, videoResults, trimmedQuery]);
+
+  function openHashtag(tag: string) {
+    hapticPrimaryAction();
+    router.push(hashtagHref(normalizeTag(tag)) as never);
+  }
 
   const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
   const { width: winWidth } = useWindowDimensions();
@@ -494,6 +514,7 @@ export default function BuyerSearchScreen() {
   function renderRecent() {
     return (
       <View testID="buyer-search-recent">
+        <TrendingTags onPress={openHashtag} />
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>Recent</Text>
           {recentSearches.length > 0 && (
@@ -532,7 +553,7 @@ export default function BuyerSearchScreen() {
           </View>
         );
       }
-      return <View>{tagRows.map((t) => <TagRow key={t.tag} tag={t} onPress={() => submitTerm(t.tag)} />)}</View>;
+      return <View>{tagRows.map((t) => <TagRow key={t.tag} tag={t} onPress={() => openHashtag(t.tag)} />)}</View>;
     }
     if (activeTab === 'brands') {
       if (brandRows.length === 0) return renderNoResults();
