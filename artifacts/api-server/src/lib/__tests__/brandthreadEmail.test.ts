@@ -333,7 +333,7 @@ describe("Brandthread transactional email", () => {
 
   it("sends the payout and abandoned-cart emails through the shared Resend path", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test");
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }));
+    const fetchMock = vi.fn(async (_url: unknown, _init?: unknown) => ({ ok: true, status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     expect(await sendPayoutEmail({ to: "seller@example.com", amountCents: 12345, payoutId: "po_1" })).toBe(true);
