@@ -2142,6 +2142,8 @@ export const shippingLabels = pgTable('shipping_labels', {
   providerShipmentId: text('provider_shipment_id'),
   providerTransactionId: text('provider_transaction_id'),
   providerRateId: text('provider_rate_id').notNull(),
+  /** order_items.id values this label covers; null = the whole order (migration 112). */
+  itemIds: uuid('item_ids').array(),
   carrier: text('carrier'),
   service: text('service'),
   trackingNumber: text('tracking_number'),
