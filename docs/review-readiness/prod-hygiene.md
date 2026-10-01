@@ -55,13 +55,16 @@ Verification status (what was and was not run):
 - Ran: `expo export --platform web` of this branch finished; `text-fit-check.mjs`
   ran at 393x852 on `/inbox` (buyer, demo data) and `/help`, `/general-settings`,
   `/manufacturer-messages` (seller, demo data). Screenshots are in
-  `docs/pr-assets/claude-review-ready-prod-hygiene/`.
+  `docs/pr-assets/claude-review-ready-prod-hygiene/after/` (settings, help,
+  manufacturer error state). No `before/` set: the rebuild of origin/dev for
+  comparison was not completed, and the kept visible changes (route targets,
+  copy) do not alter the layout of these screens.
 - Not possible: a screenshot of the manufacturer chat header with call buttons.
   The demo data has no seeded manufacturer thread, so the screen renders its
   "Conversation unavailable" state. The call-button change is therefore verified
   by typecheck/tests only.
-- Full vitest on clean origin/dev: 32 failing files. On this branch: see PR body
-  for the final comparison.
+- Full vitest on clean origin/dev: 32 failing files (37 tests). On this branch: 32 failing
+  files (37 tests), the identical set, so this PR introduces no failures.
 
 Text-fit findings on existing screens (not touched, other areas): `/help` category
 grid "Feature" text box extends past 393px; `/inbox` Notes bubble "Your thoughts go
