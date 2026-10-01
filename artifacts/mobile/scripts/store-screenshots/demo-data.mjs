@@ -669,12 +669,12 @@ export function respond({ method, path, query, role, options = {} }) {
   // GET /api/communities/public — the real seeded rows from migration 110.
   if (p === '/communities/public') {
     const launch = [
-      ['Graphic Design Community', 'graphic-design', 'pen-tool', 'Logos, type, layouts and print-ready files. Share work, get feedback.', 12480],
-      ['Photography & Content', 'photography-content', 'camera', 'Product shots, lookbooks, reels and everything content.', 8915],
-      ['Ads & Marketing', 'ads-marketing', 'trending-up', "What's converting, what's not, and the tactics behind it.", 10342],
-      ['Creative Direction', 'creative-direction', 'compass', 'Concepts, moodboards and building a brand people remember.', 5207],
-      ['Streetwear Founders', 'streetwear-founders', 'shopping-bag', 'Founders talking drops, pricing and growing a label.', 9861],
-      ['Sourcing & Manufacturing', 'sourcing-manufacturing', 'package', 'Factories, fabrics, samples and getting production right.', 6733],
+      ['Graphic Design Community', 'graphic-design', 'pen-tool', 'Logos, type, layouts and print-ready files.', 12480],
+      ['Photography & Content', 'photography-content', 'camera', 'Product shots, lookbooks, reels and content.', 8915],
+      ['Ads & Marketing', 'ads-marketing', 'trending-up', "What's converting, what's not, and why.", 10342],
+      ['Creative Direction', 'creative-direction', 'compass', 'Concepts, moodboards and memorable brands.', 5207],
+      ['Streetwear Founders', 'streetwear-founders', 'shopping-bag', 'Drops, pricing and growing a label.', 9861],
+      ['Sourcing & Manufacturing', 'sourcing-manufacturing', 'package', 'Factories, fabrics, samples and production.', 6733],
     ];
     return {
       communities: launch.map(([name, slug, iconKey, description, memberCount]) => ({

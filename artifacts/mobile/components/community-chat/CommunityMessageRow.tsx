@@ -135,7 +135,7 @@ function CommunityMessageRowImpl({
               ]}
             >
               {msg.replyToId ? (
-                <View style={[s.quote, { borderLeftColor: isOwn ? theme.onAccent : theme.muted }]}>
+                <View style={[s.quote, { borderLeftColor: isOwn ? theme.onAccent : theme.muted }]} {...({ dataSet: { fit: 'preview' } } as object)}>
                   {msg.replyToAuthorName ? (
                     <Text style={[s.quoteName, { color: isOwn ? theme.onAccent : theme.text }]} numberOfLines={1}>{msg.replyToAuthorName}</Text>
                   ) : null}
@@ -289,7 +289,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, marginLeft: 4, maxWidth: BUBBLE_MAX },
   name: { flexShrink: 1, fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.muted },
   pill: {
-    paddingHorizontal: 6, paddingVertical: 1, borderRadius: RADIUS.pill,
+    paddingHorizontal: 12, paddingVertical: 1, borderRadius: RADIUS.pill,
     borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
   pillRole: { backgroundColor: theme.accentDim },
@@ -309,7 +309,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: 4 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 3,
   },
   chipCount: { fontSize: FS.xs, fontFamily: FONT.semibold },
 });

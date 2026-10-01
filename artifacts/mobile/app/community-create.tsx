@@ -83,7 +83,7 @@ export default function CommunityCreateScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="New group" />
+      <ScreenHeader divider={false} title="New group" />
       <KeyboardAwareScrollViewCompat
         contentContainerStyle={[styles.content, { paddingBottom: barInset + SP.xl }]}
         showsVerticalScrollIndicator={false}
