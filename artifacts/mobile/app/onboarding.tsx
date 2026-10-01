@@ -72,6 +72,7 @@ import {
 import { ApiError } from '@/lib/networkNotice';
 import {
   APPLE_OAUTH_STRATEGY,
+  oauthProviderVisibility,
   isOAuthCancellationError,
   isOAuthFlowComplete,
   makeBrandthreadRedirectUri,
@@ -641,9 +642,10 @@ function BuyerAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
-  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
-  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
+    apple: useFeatureFlag('oauthAppleEnabled'),
+    google: useFeatureFlag('oauthGoogleEnabled'),
+  });
   const usernameLiveCheck = useUsernameLiveCheck(username);
 
   const [phase, setPhase]               = useState<BuyerAuthPhase>('choose');
@@ -1091,9 +1093,10 @@ function SharedAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
-  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
-  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
+    apple: useFeatureFlag('oauthAppleEnabled'),
+    google: useFeatureFlag('oauthGoogleEnabled'),
+  });
   const showAnyOAuth = appleOAuthEnabled || googleOAuthEnabled;
   const usernameLiveCheck = useUsernameLiveCheck(username);
 

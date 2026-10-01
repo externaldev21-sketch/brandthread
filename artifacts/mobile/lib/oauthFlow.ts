@@ -1,6 +1,21 @@
 export const BRANDTHREAD_URL_SCHEME = 'brandthread';
 export const APPLE_OAUTH_STRATEGY = 'oauth_apple' as const;
 
+/**
+ * Which social buttons to render. App Store 4.8: on iOS, Google may only be
+ * offered while Sign in with Apple is offered too, so a server-side flag flip
+ * that turns Apple off can never leave Google as the only social login.
+ * Apple is iOS-only in the app (Android/web have no Apple button today).
+ */
+export function oauthProviderVisibility(
+  os: string,
+  flags: { apple: boolean; google: boolean },
+): { apple: boolean; google: boolean } {
+  const apple = os === 'ios' && flags.apple;
+  const google = flags.google && (os !== 'ios' || apple);
+  return { apple, google };
+}
+
 type RedirectUriFactory = (options: { scheme: string }) => string;
 
 export function makeBrandthreadRedirectUri(makeRedirectUri: RedirectUriFactory): string {
