@@ -20,7 +20,7 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
-import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -2351,6 +2351,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Record a story view */
       viewStory: (storyId: string) =>
         post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {}),
+      // ── Interactive story stickers ─────────────────────────────────────────
+      /** Vote on a poll sticker. 409 ALREADY_VOTED carries the current stickerState. */
+      pollVote: (storyId: string, overlayId: string, optionIndex: number) =>
+        post<{ ok: boolean; stickerState: StoryStickerState | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/poll-vote`, { overlayId, optionIndex }),
+      /** Answer a question sticker (one answer per person). */
+      questionAnswer: (storyId: string, overlayId: string, answer: string) =>
+        post<{ ok: boolean; stickerState: StoryStickerState | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/question-answer`, { overlayId, answer }),
+      /** Author only: every answer to the story's question stickers. */
+      questionAnswers: (storyId: string) =>
+        get<{ storyId: string; questions: Array<{ overlayId: string; prompt: string; answers: Array<{
+          userId: string; name: string; handle: string; initials: string; avatarUrl: string | null; answer: string; createdAt: number;
+        }> }> }>(`/api/social/stories/${encodeURIComponent(storyId)}/question-answers`),
+      /** Author only: the DM to reply to someone's answer in (send the message with the normal messages endpoint). */
+      questionReplyConversation: (storyId: string, userId: string) =>
+        post<{ conversationId: string; route: 'inbox' | 'requests'; isRequest: boolean }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/question-reply-conversation`, { userId }),
       /** Block a user — removes mutual follows, prevents messaging/following */
       block: (userId: string) =>
         post<{ ok: boolean }>('/api/social/block', { userId }),

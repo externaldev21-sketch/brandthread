@@ -291,6 +291,46 @@ export async function notifyStoryMention(input: {
   }
 }
 
+/**
+ * "@name answered your question" — sent to the story's author. One row per
+ * (author, story, answerer): the answer table's primary key already stops a
+ * second answer, and the lookup below covers a retried request.
+ */
+export async function notifyStoryQuestionAnswer(input: {
+  storyId: string; answererId: string; authorId: string; media: unknown;
+}): Promise<void> {
+  try {
+    if (input.answererId === input.authorId) return;
+    if ((await blockedUserIds(input.authorId)).has(input.answererId)) return;
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.authorId),
+        eq(notificationsFeed.type, "story_reply"),
+        eq(notificationsFeed.targetId, input.storyId),
+        eq(notificationsFeed.actorId, input.answererId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const actor = await actorFields(input.answererId);
+    if (!actor) return;
+    const handle = actor.actorHandle ?? actor.actorName;
+    await publishNotification({
+      userId: input.authorId,
+      category: "social",
+      type: "story_reply",
+      title: `${handle.startsWith("@") ? handle : `@${handle}`} answered your question`,
+      ...actor,
+      targetId: input.storyId,
+      targetType: "story",
+      targetImageUrl: firstStoryImage(input.media),
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.storyId }, "Story question notification failed");
+  }
+}
+
 /** "@name shared your story" — sent to the original author when a tagged person reshares. */
 export async function notifyStoryReshare(input: {
   reshareStoryId: string; resharerId: string; originalAuthorId: string; media: unknown;

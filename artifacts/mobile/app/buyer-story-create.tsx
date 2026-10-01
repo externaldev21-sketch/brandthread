@@ -49,6 +49,8 @@ import { MediaCropper } from '@/components/media/MediaCropper';
 import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { MentionPickerSheet, MentionSuggestionsBar } from '@/components/MentionPickerSheet';
+import { PollSticker, QuestionSticker, ProductSticker, CountdownSticker, STICKER } from '@/components/social/StoryStickers';
+import { PollComposer, QuestionComposer, CountdownPicker } from '@/components/social/StoryStickerComposer';
 import { MentionStickerView, ReshareCard, RESHARE_CARD_WIDTH, RESHARE_CARD_HEIGHT } from '@/components/StoryMentionSticker';
 import { InlineSlider } from '@/components/InlineSlider';
 import {
@@ -642,6 +644,9 @@ export default function StoryComposer() {
   const [drawWidth, setDrawWidth] = useState(4);
   const [strokes, setStrokes] = useState<DrawStroke[]>([]);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  const [questionComposerOpen, setQuestionComposerOpen] = useState(false);
+  const [countdownPickerOpen, setCountdownPickerOpen] = useState(false);
   const [taggableProducts, setTaggableProducts] = useState<Product[]>([]);
   const [shopModalOpen, setShopModalOpen] = useState(false);
   const [shopUrlDraft, setShopUrlDraft] = useState('');
@@ -2054,11 +2059,14 @@ export default function StoryComposer() {
               <StickerTile icon="at-sign" label="Mention" onPress={() => { setStickerSheetOpen(false); setMentionPickerOpen(true); }} />
               <StickerTile icon="map-pin" label="Location" onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setStickerSheetOpen(false); }} />
               <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
-              <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { addOverlay({ type: 'poll', pollQuestion: 'This or that?', pollOptions: [{ label: 'This', votes: 0 }, { label: 'That', votes: 0 }] }); setStickerSheetOpen(false); }} />
-              <StickerTile icon="help-circle" label="Question" onPress={() => { addOverlay({ type: 'question', questionPrompt: 'Ask me anything' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { setStickerSheetOpen(false); setPollComposerOpen(true); }} />
+              <StickerTile icon="help-circle" label="Question" onPress={() => { setStickerSheetOpen(false); setQuestionComposerOpen(true); }} />
               <StickerTile icon="link" label="Link" onPress={() => { addOverlay({ type: 'link', linkUrl: 'https://', linkText: 'Link' }); setStickerSheetOpen(false); }} />
               {isSeller ? (
                 <StickerTile icon="shopping-bag" label="Product" onPress={() => { setStickerSheetOpen(false); openProductPicker(); }} />
+              ) : null}
+              {isSeller ? (
+                <StickerTile icon="clock" label="Countdown" onPress={() => { setStickerSheetOpen(false); setCountdownPickerOpen(true); }} />
               ) : null}
               {isSeller ? (
                 <StickerTile icon="external-link" label="Shop link" onPress={() => { setStickerSheetOpen(false); setShopUrlDraft(''); setShopModalOpen(true); }} />
@@ -2072,6 +2080,32 @@ export default function StoryComposer() {
           </View>
         </ModalSafeArea>
       </Modal>
+
+      {/* ── Interactive sticker composers: poll, question, drop countdown ── */}
+      <PollComposer
+        visible={pollComposerOpen}
+        onClose={() => setPollComposerOpen(false)}
+        onAdd={({ question, options }) => {
+          addOverlay({ type: 'poll', x: W / 2 - STICKER.card / 2, y: H * 0.34, pollQuestion: question, pollOptions: options.map((label) => ({ label, votes: 0 })) });
+          setPollComposerOpen(false);
+        }}
+      />
+      <QuestionComposer
+        visible={questionComposerOpen}
+        onClose={() => setQuestionComposerOpen(false)}
+        onAdd={(prompt) => {
+          addOverlay({ type: 'question', x: W / 2 - STICKER.card / 2, y: H * 0.34, questionPrompt: prompt });
+          setQuestionComposerOpen(false);
+        }}
+      />
+      <CountdownPicker
+        visible={countdownPickerOpen}
+        onClose={() => setCountdownPickerOpen(false)}
+        onPick={(drop) => {
+          addOverlay({ type: 'countdown', x: W / 2 - STICKER.card / 2, y: H * 0.34, dropId: drop.id, dropName: drop.name, dropReleaseAt: drop.releaseAt });
+          setCountdownPickerOpen(false);
+        }}
+      />
 
       {/* ── Product tag picker (sellers) ── */}
       <Modal visible={productPickerOpen} transparent animationType="slide" onRequestClose={() => setProductPickerOpen(false)}>
@@ -2091,6 +2125,7 @@ export default function StoryComposer() {
                     hapticLight();
                     addOverlay({
                       type: 'product',
+                      x: W / 2 - STICKER.card / 2, y: H * 0.34,
                       productId: p.id,
                       productName: p.name,
                       productImageUri: p.media?.[0]?.uri,
@@ -2241,37 +2276,17 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
     case 'time':
       return <View style={styles.pillChip}><Feather name="clock" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
     case 'question':
-      return (
-        <View style={styles.questionCard}>
-          <Text style={styles.questionCardTitle}>{ov.questionPrompt}</Text>
-          <View style={styles.questionInputMock}><Text style={styles.questionInputMockText}>Type your answer…</Text></View>
-        </View>
-      );
+      return <QuestionSticker prompt={ov.questionPrompt ?? ''} mode="editor" />;
     case 'poll':
-      return (
-        <View style={styles.pollCard}>
-          <Text style={styles.pollQuestion}>{ov.pollQuestion}</Text>
-          <View style={styles.pollOptionsRow}>
-            {(ov.pollOptions ?? []).map((o, i) => (
-              <View key={i} style={styles.pollOption}><Text style={styles.pollOptionText}>{o.label}</Text></View>
-            ))}
-          </View>
-        </View>
-      );
+      return <PollSticker question={ov.pollQuestion ?? ''} options={(ov.pollOptions ?? []).map((o) => o.label)} mode="editor" />;
+    case 'countdown':
+      return <CountdownSticker name={ov.dropName ?? 'Drop'} releaseAt={ov.dropReleaseAt ?? null} mode="editor" />;
     case 'link':
       return <View style={styles.pillChip}><Feather name="link-2" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.linkText || ov.linkUrl}</Text></View>;
     case 'shop':
       return <View style={styles.pillChip}><Feather name="external-link" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.shopLabel || ov.shopUrl}</Text></View>;
     case 'product':
-      return (
-        <View style={styles.productCard}>
-          {ov.productImageUri ? <Image source={{ uri: ov.productImageUri }} style={styles.productCardImg} /> : <View style={[styles.productCardImg, { backgroundColor: '#333' }]} />}
-          <View style={{ marginLeft: 8, maxWidth: 130 }}>
-            <Text style={styles.productCardName} numberOfLines={1}>{ov.productName}</Text>
-            {typeof ov.productPriceCents === 'number' ? <Text style={styles.productCardPrice}>${(ov.productPriceCents / 100).toFixed(2)}</Text> : null}
-          </View>
-        </View>
-      );
+      return <ProductSticker name={ov.productName ?? 'Product'} imageUrl={ov.productImageUri} priceCents={ov.productPriceCents} mode="editor" />;
     case 'threadcash':
       return <View style={styles.pillChip}><ThreadCashBillIcon size={16} /><Text style={styles.pillChipText}>{ov.text}</Text></View>;    default:
       return null;
@@ -2465,7 +2480,7 @@ const styles = StyleSheet.create({
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: SP.sm },
   sheetTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginBottom: SP.md },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  stickerTile: { width: 78, height: 78, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  stickerTile: { width: Math.floor((W - SP.md * 2 - SP.sm * 3) / 4), height: 78, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', gap: 6 },
   stickerTileLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.medium },
   emptyText: { color: MUTED, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
   productRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
