@@ -358,7 +358,7 @@ export default function CommunityMembersScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Members" />
+      <ScreenHeader divider={false} title="Members" />
       {community && !needsSignIn ? (
         <View style={styles.searchWrap}>
           <SearchBar value={query} onChange={setQuery} placeholder="Search members" />
@@ -390,7 +390,7 @@ function FullScreenModal({ visible, title, onClose, children }: { visible: boole
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <ModalSafeArea>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <ScreenHeader title={title} variant="modal" onBack={onClose} />
+          <ScreenHeader divider={false} title={title} variant="modal" onBack={onClose} />
           {children}
         </View>
       </ModalSafeArea>
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.base },
   sub: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
-  badge: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 1 },
+  badge: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 1 },
   badgeText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   menuBtn: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.lg },

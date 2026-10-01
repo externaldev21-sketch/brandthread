@@ -1577,7 +1577,7 @@ export default function InboxScreen() {
                       style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
                       numberOfLines={1}
                     >
-                      {myNote ? myNote.text : 'Your thoughts go here...'}
+                      {myNote ? myNote.text : 'Note'}
                     </Text>
                   </View>
                   <View style={[s.noteBubbleTail, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} />
@@ -2003,7 +2003,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   activeRailNoteWrap: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
-    maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
+    maxWidth: 84, paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
   noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },

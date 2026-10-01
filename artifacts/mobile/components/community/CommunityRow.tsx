@@ -1,12 +1,15 @@
-/** One community in a list: tile, name (+ verified mark), member count, one-line description, Join / Joined pill. */
+/**
+ * One community in a list: tile, name (+ verified mark), member count, Join / Joined pill, and the description
+ * underneath across the full card width so nothing is ever cut off (names wrap instead of ellipsising).
+ */
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { formatMemberCount, type Community } from '@/lib/communities/types';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CommunityAvatar } from './CommunityAvatar';
-import { VerifiedMark } from './VerifiedMark';
+import { VerifiedGlyph } from './VerifiedMark';
 
 export interface CommunityRowProps {
   community: Community;
@@ -24,22 +27,22 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
     <View>
       <PressableScale
         onPress={onPress}
-        style={styles.row}
+        style={styles.card}
         accessibilityRole="button"
         accessibilityLabel={`${community.name}, ${formatMemberCount(community.memberCount)}`}
       >
+        <View style={styles.top}>
         <CommunityAvatar community={community} size={52} />
         <View style={styles.copy}>
           <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{community.name}</Text>
-            {community.verified ? <VerifiedMark size={14} /> : null}
+            <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={2}>
+              {community.name}
+              {community.verified ? <VerifiedGlyph size={15} /> : null}
+            </Text>
           </View>
           <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
             {formatMemberCount(community.memberCount)}
           </Text>
-          {community.description ? (
-            <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={1}>{community.description}</Text>
-          ) : null}
         </View>
         <PressableScale
           onPress={joined ? onPress : onJoin}
@@ -62,6 +65,10 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
             </Text>
           )}
         </PressableScale>
+        </View>
+        {community.description ? (
+          <Text style={[styles.desc, { color: colors.mutedForeground }]}>{community.description}</Text>
+        ) : null}
       </PressableScale>
       {error ? <Text style={[styles.error, { color: colors.mutedForeground }]}>{error}</Text> : null}
     </View>
@@ -69,13 +76,15 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.md - 4, paddingVertical: SP.sm + 2, minHeight: 72 },
+  card: { paddingVertical: SP.sm + 2, gap: SP.sm },
+  top: { flexDirection: 'row', alignItems: 'center', gap: SP.md - 4, minHeight: 56 },
   copy: { flex: 1, gap: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.base },
   meta: { fontFamily: FONT.regular, fontSize: FS.meta },
-  desc: { fontFamily: FONT.regular, fontSize: FS.sm },
+  // Balanced wrapping (web) keeps a long user-written description from ending on a lone word.
+  desc: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, ...(Platform.OS === 'web' ? ({ textWrap: 'balance' } as object) : null) },
   pill: { minWidth: 72, height: 36, paddingHorizontal: SP.md, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  error: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, paddingLeft: 52 + SP.md - 4, paddingBottom: SP.sm },
+  error: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, paddingBottom: SP.sm },
 });

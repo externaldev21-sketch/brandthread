@@ -201,7 +201,7 @@ export default function CommunityScreen() {
               <CommunityAvatar community={c} size={40} />
               <View style={styles.mineCopy}>
                 <View style={styles.nameRow}>
-                  <Text style={[styles.mineName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+                  <Text style={[styles.mineName, { color: colors.foreground }]} numberOfLines={2}>{c.name}</Text>
                   {c.verified ? <VerifiedMark size={13} /> : null}
                 </View>
                 <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>{formatMemberCount(c.memberCount)}</Text>
@@ -344,7 +344,7 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Community" />
+      <ScreenHeader divider={false} title="Community" />
       <View style={styles.searchWrap}>
         <SearchBar value={query} onChange={setQuery} placeholder="Search groups" />
       </View>

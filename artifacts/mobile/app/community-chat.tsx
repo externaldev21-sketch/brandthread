@@ -308,7 +308,6 @@ export default function CommunityChatScreen() {
               replyTo={replyTo}
               onCancelReply={() => setReplyTo(null)}
               onNotice={chat.flash}
-              bottomInset={insets.bottom}
             />
           </>
         );
@@ -347,7 +346,7 @@ export default function CommunityChatScreen() {
               <CommunityAvatar community={community} size={36} />
               <View style={s.titleText}>
                 <View style={s.nameRow}>
-                  <Text style={s.name} numberOfLines={1}>{community.name}</Text>
+                  <Text style={s.name} numberOfLines={2}>{community.name}</Text>
                   {community.verified && <VerifiedMark size={14} />}
                 </View>
                 <Text style={s.members} numberOfLines={1}>{formatMemberCount(community.memberCount)}</Text>
@@ -417,7 +416,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: COMP.iconBtn },
   titleText: { flexShrink: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { flexShrink: 1, fontSize: FS.md, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 },
+  name: { flexShrink: 1, fontSize: FS.base, lineHeight: 18, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 },
   members: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   centerPad: { flex: 1, justifyContent: 'center', paddingHorizontal: SP.md },

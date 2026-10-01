@@ -1,0 +1,18 @@
+{
+  "00-community-signed-out-readonly": [],
+  "00b-community-join-prompts-sign-in": [],
+  "01-community-list": [],
+  "02-community-joined-on-top": [],
+  "03-chat": [],
+  "03b-chat-realtime-message": [],
+  "04-members": [],
+  "05-chat-menu": [],
+  "06-chat-muted": [],
+  "07-inbox-group-rows": [],
+  "08-inbox-plus-menu": [],
+  "09-create-group-empty": [],
+  "10-create-group-filled": [],
+  "11-create-group-private": [],
+  "12-private-invite-join": [],
+  "13-buyer-profile-groups-row": []
+}

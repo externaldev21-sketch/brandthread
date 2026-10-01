@@ -38,12 +38,12 @@ function community(partial: Partial<Community> & Pick<Community, 'id' | 'name' |
 }
 
 const COMMUNITIES: Community[] = [
-  community({ id: 'demo-c-graphic', name: 'Graphic Design Community', slug: 'graphic-design', iconKey: 'pen-tool', memberCount: 12480, description: 'Logos, type, layouts and print-ready files. Share work, get feedback.' }),
-  community({ id: 'demo-c-photo', name: 'Photography & Content', slug: 'photography-content', iconKey: 'camera', memberCount: 8915, description: 'Product shots, lookbooks, reels and everything content.' }),
-  community({ id: 'demo-c-ads', name: 'Ads & Marketing', slug: 'ads-marketing', iconKey: 'trending-up', memberCount: 10342, description: "What's converting, what's not, and the tactics behind it." }),
-  community({ id: 'demo-c-creative', name: 'Creative Direction', slug: 'creative-direction', iconKey: 'compass', memberCount: 5207, description: 'Concepts, moodboards and building a brand people remember.' }),
-  community({ id: 'demo-c-founders', name: 'Streetwear Founders', slug: 'streetwear-founders', iconKey: 'shopping-bag', memberCount: 9861, description: 'Founders talking drops, pricing and growing a label.' }),
-  community({ id: 'demo-c-sourcing', name: 'Sourcing & Manufacturing', slug: 'sourcing-manufacturing', iconKey: 'package', memberCount: 6733, description: 'Factories, fabrics, samples and getting production right.' }),
+  community({ id: 'demo-c-graphic', name: 'Graphic Design Community', slug: 'graphic-design', iconKey: 'pen-tool', memberCount: 12480, description: 'Logos, type, layouts and print-ready files.' }),
+  community({ id: 'demo-c-photo', name: 'Photography & Content', slug: 'photography-content', iconKey: 'camera', memberCount: 8915, description: 'Product shots, lookbooks, reels and content.' }),
+  community({ id: 'demo-c-ads', name: 'Ads & Marketing', slug: 'ads-marketing', iconKey: 'trending-up', memberCount: 10342, description: "What's converting, what's not, and why." }),
+  community({ id: 'demo-c-creative', name: 'Creative Direction', slug: 'creative-direction', iconKey: 'compass', memberCount: 5207, description: 'Concepts, moodboards and memorable brands.' }),
+  community({ id: 'demo-c-founders', name: 'Streetwear Founders', slug: 'streetwear-founders', iconKey: 'shopping-bag', memberCount: 9861, description: 'Drops, pricing and growing a label.' }),
+  community({ id: 'demo-c-sourcing', name: 'Sourcing & Manufacturing', slug: 'sourcing-manufacturing', iconKey: 'package', memberCount: 6733, description: 'Factories, fabrics, samples and production.' }),
   community({ id: 'demo-c-denim', name: 'Raw Denim Heads', slug: 'raw-denim-heads', kind: 'user', verified: false, iconKey: 'scissors', memberCount: 1842, description: 'Fades, washes, and selvedge talk.' }),
   community({ id: 'demo-c-embroidery', name: 'Embroidery & Patches', slug: 'embroidery-patches', kind: 'user', verified: false, iconKey: 'feather', memberCount: 764, description: 'Digitizing, thread choices and patch suppliers.' }),
 ];
