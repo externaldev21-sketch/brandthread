@@ -1,11 +1,11 @@
 /**
  * Community — find and join topic group chats.
- * Your groups on top, an invite-link field, official Brandthread communities,
+ * Your groups on top, official Brandthread communities,
  * then popular user-created groups. All reads/writes go through
  * useCommunityClient (live / demo / readonly), never the API directly.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -22,10 +22,8 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useCommunityClient } from '@/lib/communities/useCommunityClient';
 import { formatMemberCount, type Community } from '@/lib/communities/types';
 import { describeCommunityError } from '@/lib/communities/errors';
-import { parseInviteCode } from '@/lib/communities/inviteLink';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
-import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 type ListRowItem =
@@ -58,9 +56,6 @@ export default function CommunityScreen() {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [preview, setPreview] = useState<Community | null>(null);
-
-  const [inviteText, setInviteText] = useState('');
-  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const generation = useRef(0);
   const searching = debounced.length > 0;
@@ -152,18 +147,6 @@ export default function CommunityScreen() {
     }
   }, [client, joining]);
 
-  const submitInvite = () => {
-    const code = parseInviteCode(inviteText);
-    if (!code) {
-      setInviteError("That doesn't look like an invite link. Paste the full link or the code.");
-      return;
-    }
-    setInviteError(null);
-    Keyboard.dismiss();
-    setInviteText('');
-    router.push(`/community-join?code=${encodeURIComponent(code)}` as never);
-  };
-
   const rows = useMemo<ListRowItem[]>(() => {
     if (searching) return items.map((c) => ({ key: c.id, type: 'community' as const, community: c }));
     const official = items.filter((c) => c.kind === 'official');
@@ -204,7 +187,9 @@ export default function CommunityScreen() {
                   <Text style={[styles.mineName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
                   {c.verified ? <VerifiedMark size={13} /> : null}
                 </View>
-                <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>{formatMemberCount(c.memberCount)}</Text>
+                {c.memberCount > 0 ? (
+                  <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>{formatMemberCount(c.memberCount)}</Text>
+                ) : null}
               </View>
               {c.unreadCount > 0 && !c.muted ? <View style={[styles.unreadDot, { backgroundColor: colors.foreground }]} /> : null}
               <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
@@ -221,31 +206,6 @@ export default function CommunityScreen() {
       ) : null}
 
       {!searching ? (
-        <View style={styles.block}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Have an invite link?</Text>
-          <View style={styles.inviteRow}>
-            <View style={[styles.inviteField, { backgroundColor: colors.card }]}>
-              <Feather name="link" size={16} color={colors.mutedForeground} />
-              <TextInput
-                value={inviteText}
-                onChangeText={(t) => { setInviteText(t); if (inviteError) setInviteError(null); }}
-                placeholder="Paste link or code"
-                placeholderTextColor={colors.subtle}
-                style={[styles.inviteInput, { color: colors.foreground }, WEB_INPUT_RESET]}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="go"
-                onSubmitEditing={submitInvite}
-                accessibilityLabel="Invite link or code"
-              />
-            </View>
-            <Button label="Open" size="small" variant="secondary" disabled={!inviteText.trim()} onPress={submitInvite} />
-          </View>
-          {inviteError ? <Text style={[styles.inlineNote, { color: colors.mutedForeground }]}>{inviteError}</Text> : null}
-        </View>
-      ) : null}
-
-      {!searching ? (
         <PressableScale
           onPress={() => { hapticLight(); router.push('/community-create' as never); }}
           style={[styles.createRow, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -257,7 +217,6 @@ export default function CommunityScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.mineName, { color: colors.foreground }]}>Create a group</Text>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>Start a chat around something you love</Text>
           </View>
           <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
         </PressableScale>
@@ -286,7 +245,7 @@ export default function CommunityScreen() {
   const body = () => {
     if (loading && !refreshing) {
       return (
-        <View style={styles.pad}>
+        <View style={[styles.pad, { paddingBottom: barInset + SP.lg }]}>
           {header}
           {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={styles.skelRow}>
@@ -302,7 +261,7 @@ export default function CommunityScreen() {
     }
     if (error && items.length === 0) {
       return (
-        <View style={styles.pad}>
+        <View style={[styles.pad, { paddingBottom: barInset + SP.lg }]}>
           {header}
           <ErrorState message={error} onRetry={() => { void load(); }} />
         </View>
@@ -344,7 +303,7 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Community" />
+      <ScreenHeader title="Community" divider={false} />
       <View style={styles.searchWrap}>
         <SearchBar value={query} onChange={setQuery} placeholder="Search groups" />
       </View>
@@ -381,7 +340,9 @@ function PreviewSheetBody({ community, joined, joining, error, needsSignIn, onJo
         <Text style={[styles.sheetName, { color: colors.foreground }]}>{community.name}</Text>
         {community.verified ? <VerifiedMark size={16} /> : null}
       </View>
-      <Text style={[styles.meta, { color: colors.mutedForeground }]}>{formatMemberCount(community.memberCount)}</Text>
+      {community.memberCount > 0 ? (
+        <Text style={[styles.meta, { color: colors.mutedForeground }]}>{formatMemberCount(community.memberCount)}</Text>
+      ) : null}
       {community.description ? (
         <Text style={[styles.sheetDesc, { color: colors.mutedForeground }]}>{community.description}</Text>
       ) : null}
@@ -412,9 +373,6 @@ const styles = StyleSheet.create({
   unreadDot: { width: 8, height: 8, borderRadius: 4 },
   linkBtn: { minHeight: COMP.minTouchTarget, justifyContent: 'center' },
   linkText: { fontFamily: FONT.medium, fontSize: FS.sm },
-  inviteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  inviteField: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: COMP.minTouchTarget, paddingHorizontal: SP.md, borderRadius: RADIUS.md },
-  inviteInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base },
   inlineNote: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, marginTop: SP.sm },
   createRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.md - 4, marginTop: SP.md, padding: SP.md - 4,

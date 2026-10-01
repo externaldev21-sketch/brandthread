@@ -44,6 +44,8 @@ interface ScreenHeaderProps {
    * itself, only which icon a screen that already has one shows.
    */
   variant?: 'push' | 'modal';
+  /** Hairline under the header. Pass false on screens whose content sits flush below the title. */
+  divider?: boolean;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
@@ -61,7 +63,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', divider = true,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -84,7 +86,7 @@ export function ScreenHeader({
   const closeOrBack = () => (onBack ? onBack() : goBackOr(router));
 
   return (
-    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
+    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, divider ? null : styles.noDivider]}>
       <View style={styles.container}>
         {variant === 'push' && (
           <PressableScale
@@ -182,6 +184,7 @@ const styles = StyleSheet.create({
   wrap: {
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  noDivider: { borderBottomWidth: 0 },
   container: {
     flexDirection: 'row',
     // Center the title with the back/close button on the same row. The
