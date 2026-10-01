@@ -16,6 +16,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { DisputeEvidenceFile, DisputeFileType, DisputeTimeline } from '@/lib/disputeTypes';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -2664,6 +2665,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/disputes/${encodeURIComponent(id)}/submit`, {}),
       accept: (id: string) =>
         post<any>(`/api/disputes/${encodeURIComponent(id)}/accept`, {}),
+      /** Stored status events merged with Stripe's live state. */
+      timeline: (id: string) =>
+        freshGet<DisputeTimeline>(`/api/disputes/${encodeURIComponent(id)}/timeline`),
+      /** JPEG / PNG / PDF, 5 MB max. `type` is the Stripe evidence field. */
+      uploadEvidenceFile: (
+        id: string,
+        file: { uri: string; mimeType: string; name?: string },
+        type: DisputeFileType,
+      ) => uploadImage<{ file: DisputeEvidenceFile }>(
+        `/api/disputes/${encodeURIComponent(id)}/evidence/upload?type=${encodeURIComponent(type)}${file.name ? `&filename=${encodeURIComponent(file.name)}` : ''}`,
+        { uri: file.uri, mimeType: file.mimeType },
+        getToken,
+        getCacheScope,
+      ),
     },
     /** Finance / Payouts dashboard — real Stripe Connect data */
     finance: {
