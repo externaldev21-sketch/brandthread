@@ -43,6 +43,9 @@ const TYPE_FILTERS: { key: TypeFilter; label: string }[] = [
   { key: 'product', label: 'Products' },
   { key: 'profile', label: 'Profiles' },
   { key: 'message', label: 'Messages' },
+  { key: 'community', label: 'Groups' },
+  { key: 'community_message', label: 'Group chats' },
+  { key: 'review', label: 'Reviews' },
 ];
 
 const ACTION_LABELS: Record<string, string> = {

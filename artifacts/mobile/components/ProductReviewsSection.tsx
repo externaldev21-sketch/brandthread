@@ -21,7 +21,8 @@
  * won't until that migration lands).
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { useReviewActions } from '@/lib/useReviewActions';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -35,6 +36,7 @@ export interface ReviewItem {
   id: string;
   rating: number;
   body?: string | null;
+  buyerId?: string | null;
   buyerName?: string | null;
   buyerAvatar?: string | null;
   createdAt: string;
@@ -110,6 +112,7 @@ export function ProductReviewsSection({
   const [loading, setLoading] = useState(!seed);
   const [openPhoto, setOpenPhoto] = useState<{ photos: string[]; index: number } | null>(null);
   const [helpfulVotes, setHelpfulVotes] = useState<Record<string, number>>({});
+  const openReviewActions = useReviewActions(!seed);
 
   useEffect(() => {
     if (seed) { setData(seed); setLoading(false); return; }
@@ -171,7 +174,7 @@ export function ProductReviewsSection({
       {topReviews.map(review => {
         const helpfulCount = (review.helpfulCount ?? 0) + (helpfulVotes[review.id] ?? 0);
         return (
-          <View key={review.id} style={s.reviewCard}>
+          <Pressable key={review.id} style={s.reviewCard} onLongPress={() => openReviewActions(review)} delayLongPress={400}>
             <View style={s.reviewHeader}>
               {review.buyerAvatar ? (
                 <CachedImage source={{ uri: review.buyerAvatar }} style={s.avatar} recyclingKey={review.id} />
@@ -236,7 +239,7 @@ export function ProductReviewsSection({
               <Feather name="thumbs-up" size={12} color={MUTED} />
               <Text style={s.helpfulText}>Helpful ({helpfulCount})</Text>
             </TouchableOpacity>
-          </View>
+          </Pressable>
         );
       })}
 

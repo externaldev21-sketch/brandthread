@@ -13,7 +13,7 @@
  */
 import { Router } from "express";
 import { communities, communityMembers, conversationParticipants, conversations, db, messageReports, reports } from "@workspace/db";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import {
@@ -29,6 +29,7 @@ const router = Router();
 router.use(requireAuth);
 
 export const MAX_REPORT_NOTE_LENGTH = 1000;
+export const REPORT_RESOLVED_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 function serializeReportForClient(report: typeof reports.$inferSelect) {
   const { reporterId: _reporterId, ...safeReport } = report;
@@ -136,6 +137,21 @@ router.post("/", rateLimit("report"), async (req, res) => {
       ))
       .limit(1);
     if (existing) return res.status(200).json({ status: "already_reported", id: existing.id });
+
+    // Once a report is resolved the same person can't re-file on the same
+    // target for 24 hours - stops report spam against reviewed content.
+    const [recent] = await db
+      .select({ id: reports.id })
+      .from(reports)
+      .where(and(
+        eq(reports.reporterId, reporterId),
+        eq(reports.targetType, targetType),
+        eq(reports.targetId, target.targetId),
+        inArray(reports.status, ["reviewed", "actioned", "dismissed"]),
+        gt(reports.resolvedAt, new Date(Date.now() - REPORT_RESOLVED_COOLDOWN_MS)),
+      ))
+      .limit(1);
+    if (recent) return res.status(200).json({ status: "already_reported", id: recent.id });
 
     const [report] = await db
       .insert(reports)

@@ -72,6 +72,7 @@ import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
+import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
@@ -1607,7 +1608,9 @@ function RootLayout() {
                               <ThreadPullProvider>
                                 <CallSessionProvider>
                                   <FirstRunTipsProvider>
-                                    <RootLayoutNav />
+                                    <ReportSheetProvider>
+                                      <RootLayoutNav />
+                                    </ReportSheetProvider>
                                     <GlobalCallOverlay />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>

@@ -123,7 +123,7 @@ export async function mutedPhrasesFor(userId: string | null | undefined): Promis
 export type ReportTargetType =
   | "post" | "video" | "live" | "live_comment" | "comment"
   | "story" | "product" | "profile" | "message"
-  | "community_message" | "community";
+  | "community_message" | "community" | "review";
 
 /**
  * Put content held by the automatic filter into the moderation queue. Held

@@ -5,7 +5,8 @@
  * screens on Mobbin.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView, Pressable } from 'react-native';
+import { useReviewActions } from '@/lib/useReviewActions';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -22,6 +23,7 @@ export default function ProductReviewsScreen() {
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const api = useApi();
   const { theme } = useAppTheme();
+  const openReviewActions = useReviewActions();
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -90,7 +92,7 @@ export default function ProductReviewsScreen() {
             contentContainerStyle={{ padding: SP.md }}
             ListEmptyComponent={<View style={s.center}><Text style={s.muted}>No matching reviews</Text></View>}
             renderItem={({ item }) => (
-              <View style={s.card}>
+              <Pressable style={s.card} onLongPress={() => openReviewActions(item)} delayLongPress={400}>
                 <View style={s.headerRow}>
                   {item.buyerAvatar ? (
                     <CachedImage source={{ uri: item.buyerAvatar }} style={s.avatar} recyclingKey={item.id} />
@@ -132,7 +134,7 @@ export default function ProductReviewsScreen() {
                     ))}
                   </View>
                 )}
-              </View>
+              </Pressable>
             )}
           />
         </>
