@@ -8,6 +8,7 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -160,6 +161,9 @@ export const users = pgTable('users', {
   // verification for sellers. A system account is excluded from seller
   // search/ranking and cannot be reported (see reports.ts).
   isSystemAccount: boolean('is_system_account').notNull().default(false),
+  // Internal App Review demo account (migration 240). Never purged by the
+  // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
+  isReviewAccount: boolean('is_review_account').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -2312,3 +2316,5 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
   targetIdx: index('media_moderation_results_target_idx').on(table.targetType, table.targetId),
   reviewIdx: index('media_moderation_results_review_idx').on(table.verdict, table.reviewedAt, table.createdAt),
 }));
+
+export * from './ranking';
