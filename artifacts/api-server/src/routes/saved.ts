@@ -7,6 +7,7 @@
  */
 import { Router } from "express";
 import { db, savedItems } from "@workspace/db";
+import { notifyPostSave } from "../lib/activityEvents";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
@@ -51,6 +52,7 @@ router.post("/", async (req, res) => {
         lastNotifiedPriceCents: typeof priceCents === "number" ? priceCents : null,
       })
       .returning();
+    if (row.itemType === "post") void notifyPostSave({ postId: row.targetId, saverId: userId });
     return res.status(201).json((await adaptSavedRows([row]))[0]);
   } catch (err: any) {
     if (err?.code === "23505") {

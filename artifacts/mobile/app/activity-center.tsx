@@ -292,7 +292,7 @@ function ActivityAvatarStack({ row, styles }: { row: ActivityRow; styles: Styles
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-const ActivityRowView = React.memo(function ActivityRowView({
+export const ActivityRowView = React.memo(function ActivityRowView({
   row,
   unread,
   now,
@@ -465,7 +465,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   );
 });
 
-function SkeletonRows({ styles }: { styles: Styles }) {
+export function SkeletonRows({ styles }: { styles: Styles }) {
   return (
     <View style={styles.skeletonWrap} accessibilityLabel="Loading activity">
       <SkeletonBlock width={72} height={12} style={{ marginBottom: SP.md }} />
@@ -1385,7 +1385,7 @@ export default function ActivityCenterScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.background,

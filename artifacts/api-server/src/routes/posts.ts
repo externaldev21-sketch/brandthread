@@ -22,7 +22,7 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
-import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { notifyPostLike, notifyPostShare, notifyRepost } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -1427,6 +1427,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
 
   if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
+    if (type === "share") void notifyPostShare({ postId: id, sharerId: clerkId });
     return res.json({ action: "recorded" });
   }
 
