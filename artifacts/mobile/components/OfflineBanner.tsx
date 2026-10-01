@@ -1,5 +1,5 @@
 /**
- * OfflineBanner — a slim, solid pill shown ONLY while the device is actually
+ * OfflineBanner — a slim, solid strip shown ONLY while the device is actually
  * offline (hooks/useIsOffline). Absolutely positioned below the top safe-area
  * inset so it never shifts layout and never sits under the notch; it
  * auto-dismisses when the connection returns. "Retry" re-checks connectivity
@@ -47,7 +47,7 @@ export default function OfflineBanner() {
   if (!offline) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { top: top + SPACING.xxs }]}>
+    <View pointerEvents="box-none" style={[styles.wrap, { top: top + HEADER_BLOCK }]}>
       <View
         accessibilityRole="alert"
         accessibilityLiveRegion="polite"
@@ -77,17 +77,21 @@ export default function OfflineBanner() {
   );
 }
 
+// ScreenHeader occupies inset + 12 (top pad) + 44 (row) + 16 (bottom pad) + 1
+// (hairline). The strip starts right below it so it can never cover a header
+// title or back arrow; it floats over content only, and never shifts layout.
+const HEADER_BLOCK = 73;
+
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 1000, elevation: 1000 },
+  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'stretch', zIndex: 1000, elevation: 1000 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
+    justifyContent: 'center',
     height: 32,
-    paddingLeft: SPACING.sm,
-    paddingRight: SPACING.xs,
-    borderRadius: 16,
-    borderWidth: 1,
+    paddingHorizontal: SPACING.sm,
+    borderBottomWidth: 1,
   },
   text: { fontFamily: FONT.medium },
   retry: { paddingHorizontal: SPACING.xs, minWidth: 44, alignItems: 'center', justifyContent: 'center' },

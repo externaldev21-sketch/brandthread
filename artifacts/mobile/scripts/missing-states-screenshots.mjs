@@ -37,6 +37,13 @@ const SCREENS = [
   { name: 'store-pages', role: 'seller', target: '/store-pages' },
   { name: 'store-collections', role: 'seller', target: '/store-collections' },
   { name: 'drafts', role: 'seller', target: '/drafts' },
+  { name: 'buyer-restricted', role: 'buyer', target: '/buyer-restricted' },
+  { name: 'buyer-highlights-manager', role: 'buyer', target: '/buyer-highlights-manager' },
+  { name: 'buyer-post-comments', role: 'buyer', target: '/buyer-post-comments?postId=post_demo' },
+  { name: 'shopify-import', role: 'seller', target: '/shopify-import' },
+  { name: 'public-collection', role: 'buyer', target: '/c/col_demo' },
+  { name: 'activity-people', role: 'buyer', target: '/activity-people?type=like&ids=u1,u2' },
+  { name: 'friends', role: 'buyer', target: '/friends' },
 ];
 
 const only = process.argv[4] ? process.argv[4].split(',') : null;
@@ -101,6 +108,14 @@ async function offlineShots(browser, origin, images) {
     await page.waitForTimeout(500);
     await page.screenshot({ path: path.join(OUT, 'offline-banner-back-online-hidden.png') });
     console.log('  offline banner shown then hidden: ok');
+    await page.evaluate(() => { history.pushState(history.state, '', '/buyer-search-history?bt_preview=buyer'); window.dispatchEvent(new PopStateEvent('popstate', { state: history.state })); });
+    await page.waitForTimeout(1200);
+    await page.route(`${DEMO_API}/**`, block);
+    await context.setOffline(true);
+    await banner.waitFor({ state: 'visible', timeout: 15_000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(OUT, 'offline-banner-on-header-screen.png') });
+    console.log('  offline banner on header screen: ok');
   } catch (e) {
     console.warn(`  offline flow failed: ${String(e.message).split('\n')[0]}`);
     await page.screenshot({ path: path.join(OUT, 'offline-banner-FAILED.png') }).catch(() => {});
