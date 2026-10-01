@@ -10,12 +10,19 @@
  * catalog so the product, brand, price and photo match what the preview shows
  * everywhere else.
  *
+ * The demo cast (demo=1 only) also covers the delivery guarantee: buyer
+ * orders mid-transit, delivered, pre-order, auto-refunded and partially
+ * refunded, and seller orders with a deadline countdown
+ * (lib/previewDeliveryOrders.ts).
+ *
  * Gating: `__DEV__` + `isPreviewCatalogEnabled()` (dev only — dead code in production)
  * and only for `preview-order-*` ids; screens use it only when the real
  * request fails, never over real API data.
  */
 import type { PreviewCatalogProduct } from './previewCatalog';
 import { isPreviewDemoMode } from './devPreview';
+import { buildDemoBuyerOrders, buildDemoSellerOrders, isPreviewSellerOrderId } from './previewDeliveryOrders';
+import { buildDemoReorderOrders } from './previewReorderOrder';
 
 // previewCatalog pulls in bundled image assets (expo-asset). It's required
 // lazily, only once a preview order is actually requested in a dev build, so
@@ -68,86 +75,32 @@ export function getPreviewBuyerOrder(id: string | null | undefined): Record<stri
   readPlaced();
   const placedOrder = placed.get(id!);
   if (placedOrder) return placedOrder;
-  // The one hard-seeded order (the Activity feed's "Your order shipped" row)
-  // is part of the demo cast, not a fresh account's real history — only
-  // shown under the explicit demo=1 opt-in. An order actually PLACED this
-  // session (the `placed` map above) always shows regardless.
-  if (id === 'preview-order-02') return getDemoDeliveredOrder();
-  if (!isPreviewDemoMode() || id !== 'preview-order-01') return null;
-  const product = previewCatalogProduct('preview-product-01');
-  if (!product) return null;
-  const now = Date.now();
-  const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
-  return {
-    id,
-    orderNumber: 'BT-10428',
-    ownerId: product.sellerId,
-    sellerDisplayName: product.sellerDisplayName,
-    status: 'shipped',
-    stripePaymentIntentId: 'pi_preview_order_01',
-    items: [{
-      productId: product.productId,
-      productName: product.name,
-      variantLabel: 'Black / M',
-      quantity: 1,
-      priceCents: product.currentPriceCents,
-      imageUrl: product.images[0],
-    }],
-    shippingAddress: {
-      name: 'Jordan Reyes', street: '148 Mercer Street', city: 'New York', state: 'NY', zip: '10012', country: 'US',
-    },
-    subtotalCents: product.currentPriceCents,
-    shippingCents: 0,
-    totalCents: product.currentPriceCents,
-    trackingNumber: '1Z999AA10123456784',
-    carrier: 'UPS',
-    trackingStatus: 'in_transit',
-    estimatedDelivery: new Date(now + 2 * DAY).toISOString(),
-    shippedAt: iso(200 * 60_000), // matches the seeded "Your order shipped" row (200 min ago)
-    paidAt: iso(2 * DAY - 2 * 60_000), // captured two minutes after the order was placed
-    isCustomerVisible: true,
-    createdAt: iso(2 * DAY),
-  };
+  // The seeded orders (the Activity feed's "Your order shipped" row and the
+  // delivery-guarantee cast) are part of the demo cast, not a fresh account's
+  // real history, so they only show under the explicit demo=1 opt-in. An
+  // order actually PLACED this session (the `placed` map above) always shows.
+  if (!isPreviewDemoMode()) return null;
+  return demoBuyerOrders().find(o => o.id === id) ?? null;
 }
 
-/**
- * A delivered demo order for reviewing "Reorder" (demo=1 only): two items that
- * are still sold and one whose product no longer exists.
- */
-function getDemoDeliveredOrder(): Record<string, unknown> | null {
-  if (!__DEV__ || !isPreviewDemoMode()) return null;
-  const a = previewCatalogProduct('preview-product-02');
-  const b = previewCatalogProduct('preview-product-03');
-  if (!a || !b) return null;
-  const now = Date.now();
-  const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
-  const line = (p: PreviewCatalogProduct, variantLabel: string, quantity: number) => ({
-    productId: p.productId, productName: p.name, variantLabel, quantity,
-    priceCents: p.currentPriceCents, imageUrl: p.images[0],
-  });
-  const items = [
-    line(a, a.sizes[1] ?? 'S', 1),
-    line(b, b.sizes[1] ?? 'M', 1),
-    { productId: 'preview-product-gone', productName: 'Wool Scarf', variantLabel: 'One size', quantity: 1, priceCents: 9500 },
-  ];
-  const subtotalCents = items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
-  return {
-    id: 'preview-order-02',
-    orderNumber: 'BT-10377',
-    ownerId: a.sellerId,
-    sellerDisplayName: a.sellerDisplayName,
-    status: 'delivered',
-    stripePaymentIntentId: 'pi_preview_order_02',
-    items,
-    shippingAddress: { name: 'Jordan Reyes', street: '148 Mercer Street', city: 'New York', state: 'NY', zip: '10012', country: 'US' },
-    subtotalCents, shippingCents: 0, totalCents: subtotalCents,
-    trackingNumber: '1Z999AA10123456701', carrier: 'UPS', trackingStatus: 'delivered',
-    shippedAt: iso(9 * DAY), paidAt: iso(10 * DAY), isCustomerVisible: true, createdAt: iso(10 * DAY),
-  };
+function demoBuyerOrders(): Record<string, unknown>[] {
+  return [...buildDemoBuyerOrders(previewCatalogProduct), ...buildDemoReorderOrders(previewCatalogProduct)];
 }
 
-/** GET /api/buyer/orders rows for the signed-out demo=1 preview (empty otherwise). */
-export function getPreviewBuyerOrderRows(): Record<string, unknown>[] {
-  const demo = getDemoDeliveredOrder();
-  return demo ? [demo] : [];
+/** The buyer's Orders list in the preview (GET /api/buyer/orders shape). Empty unless demo=1. */
+export function getPreviewBuyerOrders(): Record<string, unknown>[] {
+  if (!__DEV__ || !isPreviewDemoMode()) return [];
+  readPlaced();
+  return [...placed.values(), ...demoBuyerOrders()];
+}
+
+/** Seller orders with delivery-guarantee countdowns (GET /api/orders shape). Empty unless demo=1. */
+export function getPreviewSellerOrders(): Record<string, unknown>[] {
+  if (!__DEV__ || !isPreviewDemoMode()) return [];
+  return buildDemoSellerOrders();
+}
+
+export function getPreviewSellerOrder(id: string | null | undefined): Record<string, unknown> | null {
+  if (!__DEV__ || !isPreviewSellerOrderId(id) || !isPreviewDemoMode()) return null;
+  return buildDemoSellerOrders().find(o => o.id === id) ?? null;
 }

@@ -30,6 +30,8 @@ import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
 import { useReorderFlow } from '@/components/orders/ReorderFlow';
+import { mapDelivery, safeTrackingUrl } from '@/lib/deliveryGuarantee';
+import { DeliveryTrackerCard, AutoRefundCard } from '@/components/orders/DeliveryTracker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
@@ -384,6 +386,7 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
     ? { name: dbAddr.name ?? '', line1: dbAddr.street ?? '', line2: '', city: dbAddr.city ?? '', state: dbAddr.state ?? '', zip: dbAddr.zip ?? '', country: dbAddr.country ?? 'US', phone: '' }
     : { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
 
+  const delivery = mapDelivery(row.delivery);
   const status = (row.status === 'pending' ? 'new' : row.status === 'fulfilled' ? 'ready_to_ship' : (row.status ?? 'new')) as OrderStatus;
   return {
     id:                row.id,
@@ -420,11 +423,13 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
     estimatedDelivery: row.estimatedDelivery ?? undefined,
     shippedAt:         row.shippedAt         ?? undefined,
     paidAt:            row.paidAt            ?? undefined,
-    isPreOrder:        false,
+    isPreOrder:        delivery?.isPreorder ?? false,
+    preOrderEstShipDate: delivery?.promisedShipDate ?? undefined,
     hasReturnRequest:  false,
     cancellationReason: row.cancellationReason ?? null,
     cancellationNotes:  row.cancellationNotes ?? null,
     isCustomerVisible: row.isCustomerVisible === true,
+    delivery,
     createdAt:         row.createdAt ?? new Date().toISOString(),
   };
 }
@@ -521,6 +526,8 @@ export default function BuyerOrderDetailScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [trackingCopied, setTrackingCopied] = useState(false);
+  const [showReceiptSheet, setShowReceiptSheet] = useState(false);
+  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [returnRequest, setReturnRequest] = useState<any | null>(null);
 
   const consecutiveFailuresRef = useRef(0);
@@ -636,11 +643,38 @@ export default function BuyerOrderDetailScreen() {
 
   function handleTrackOnCarrier() {
     if (!order?.trackingNumber) return;
-    const url = carrierTrackingUrl(order.trackingCarrier, order.trackingNumber);
+    // Prefer the server's carrier link; fall back to the generic builder.
+    const url = safeTrackingUrl(order.delivery?.trackingUrl) ?? carrierTrackingUrl(order.trackingCarrier, order.trackingNumber);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Linking.openURL(url).catch(() => {
       Alert.alert("Couldn't open tracking", 'Try again in a moment.');
     });
+  }
+
+  async function handleConfirmReceipt() {
+    if (!order || confirmingReceipt) return;
+    setConfirmingReceipt(true);
+    try {
+      const res = await api.buyer.orders.confirmReceipt(order.id);
+      const delivery = mapDelivery(res?.delivery);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowReceiptSheet(false);
+      if (delivery) setOrder(prev => (prev ? { ...prev, status: 'delivered', fulfillmentStatus: 'fulfilled', delivery } : prev));
+      // Re-read so the status, steps and review prompt all come from the server.
+      loadBuyerOrder(order.id).then(row => setOrder(adaptOrderDetail(row))).catch(() => {});
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setShowReceiptSheet(false);
+      const code = err?.code;
+      Alert.alert(
+        "Couldn't confirm delivery",
+        code === 'NOT_SHIPPED' ? "This order hasn't shipped yet, so there is nothing to confirm."
+          : code === 'ALREADY_REFUNDED' ? 'This order was already refunded, so it cannot be marked as received.'
+          : 'Check your connection and try again.',
+      );
+    } finally {
+      setConfirmingReceipt(false);
+    }
   }
 
   function handleContactSeller() {
@@ -841,10 +875,15 @@ export default function BuyerOrderDetailScreen() {
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
           <GradientCard colors={GRAD_CARD_GLOW} glow>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, flexWrap: 'wrap' }}>
-              <StatusBadge label={statusBadgeLabel(order.status)} variant={statusBadgeVariant(order.status)} />
-              <Text style={styles.fulfillmentStatus}>{fulfillmentStatusLabel(order.fulfillmentStatus)}</Text>
+              <StatusBadge
+                label={order.delivery?.autoRefund ? (order.delivery.autoRefund.partial ? 'PARTIALLY REFUNDED' : 'REFUNDED') : statusBadgeLabel(order.status)}
+                variant={order.delivery?.autoRefund ? 'neutral' : statusBadgeVariant(order.status)}
+              />
+              <Text style={styles.fulfillmentStatus}>
+                {order.delivery?.autoRefund ? 'Not delivered in time' : fulfillmentStatusLabel(order.fulfillmentStatus)}
+              </Text>
             </View>
-            {order.isPreOrder && order.preOrderEstShipDate && (
+            {!order.delivery && order.isPreOrder && order.preOrderEstShipDate && (
               <View style={styles.preOrderInfoRow}>
                 <Feather name="clock" size={ICON.xs} color={CYAN} />
                 <Text style={[styles.preOrderInfoText, { color: CYAN }]}>
@@ -852,7 +891,7 @@ export default function BuyerOrderDetailScreen() {
                 </Text>
               </View>
             )}
-            {order.trackingNumber && (
+            {!order.delivery && order.trackingNumber && (
               <View style={styles.trackingInfoRow}>
                 <Feather name="truck" size={ICON.xs} color={theme.muted} />
                 <Text style={[styles.trackingInfoText, { color: theme.text }]}>
@@ -873,6 +912,24 @@ export default function BuyerOrderDetailScreen() {
             refund states are handled by the cards below (BuyerCancellation-
             DetailsCard / return request card / BuyerTrackingAlertCard) — this
             tracker itself collapses to a single exception pill for those. */}
+        {order.delivery ? (
+          <View style={{ marginBottom: SP.xs }}>
+            <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>
+              {order.delivery.autoRefund ? 'Refund' : 'Delivery'}
+            </Text>
+            {order.delivery.autoRefund ? <AutoRefundCard autoRefund={order.delivery.autoRefund} /> : null}
+            {!order.delivery.autoRefund || order.delivery.autoRefund.partial ? (
+              <DeliveryTrackerCard
+                delivery={order.delivery}
+                status={order.status}
+                onCopyTracking={handleCopyTracking}
+                trackingCopied={trackingCopied}
+                onOpenTracking={handleTrackOnCarrier}
+                onConfirmReceipt={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowReceiptSheet(true); }}
+              />
+            ) : null}
+          </View>
+        ) : (
         <View style={{ marginBottom: SP.md }}>
           <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order Progress</Text>
           <BrandthreadCard style={{ marginHorizontal: SP.md }} glow={!isTerminal}>
@@ -893,6 +950,7 @@ export default function BuyerOrderDetailScreen() {
             />
           </BrandthreadCard>
         </View>
+        )}
 
         {/* Return request: tap for its full status (/return-detail). */}
         {returnRequest && (
@@ -930,7 +988,7 @@ export default function BuyerOrderDetailScreen() {
           </TouchableOpacity>
         )}
 
-        <BuyerCancellationDetailsCard order={order} />
+        {!order.delivery?.autoRefund && <BuyerCancellationDetailsCard order={order} />}
         <BuyerTrackingAlertCard trackingStatus={order.trackingStatus} />
 
         {/* ── 2. Items (with thumbnails) ───────────────────────────────────── */}
@@ -1026,7 +1084,7 @@ export default function BuyerOrderDetailScreen() {
         </View>
 
         {/* ── 5. Tracking ─────────────────────────────────────────────────── */}
-        {order.trackingNumber && (
+        {!order.delivery && order.trackingNumber && (
           <SectionCard title="Tracking">
             <Text style={styles.trackingNumberDisplay}>{order.trackingNumber}</Text>
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, flexWrap: 'wrap' }}>
@@ -1063,7 +1121,7 @@ export default function BuyerOrderDetailScreen() {
         )}
 
         {/* Pre-order info */}
-        {order.isPreOrder && (
+        {!order.delivery && order.isPreOrder && (
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
             <Text style={[sc.title, { paddingHorizontal: 0, marginBottom: SP.sm }]}>Pre-order Status</Text>
             <GradientCard colors={[theme.secondaryDim, `${theme.secondary}0A`]} style={{ borderColor: `${theme.secondary}59` }}>
@@ -1171,6 +1229,34 @@ export default function BuyerOrderDetailScreen() {
                 >
                   <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Yes, Cancel</Text>
                 </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </ModalSafeArea>
+      </Modal>
+
+      {/* ── "I received it" confirmation ─────────────────────────────────── */}
+      <Modal visible={showReceiptSheet} transparent animationType="slide" onRequestClose={() => setShowReceiptSheet(false)}>
+        <ModalSafeArea>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+              <View style={{ alignItems: 'center', marginBottom: SP.md }}>
+                <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
+                  <Feather name="package" size={24} color={theme.text} />
+                </View>
+                <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Did it arrive?</Text>
+              </View>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
+                Confirming marks this order as delivered and ends the delivery guarantee, so you will no longer be refunded automatically if it is late. Only confirm once it is in your hands.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: SP.sm }}>
+                <SecondaryButton label="Not yet" onPress={() => setShowReceiptSheet(false)} style={{ flex: 1 }} />
+                <PrimaryButton
+                  label={confirmingReceipt ? 'Confirming…' : 'Yes, I received it'}
+                  onPress={handleConfirmReceipt}
+                  disabled={confirmingReceipt}
+                  style={{ flex: 1 }}
+                />
               </View>
             </View>
           </View>

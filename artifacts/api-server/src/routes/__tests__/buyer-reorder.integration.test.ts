@@ -68,7 +68,7 @@ describe("POST /api/buyer/orders/:id/reorder", () => {
   it("resolves the buyer's own order with current price and clamped stock", async () => {
     const response = await reorder(orderId, buyerId);
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = (await response.json()) as { addable: unknown[]; unavailable: unknown[] };
     expect(body.unavailable).toEqual([]);
     expect(body.addable).toEqual([
       expect.objectContaining({
