@@ -305,7 +305,9 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   // them onto useAppTheme() like the rest of the ratchet.
   'components/ai-tools/AiResultViewer.tsx',
   'components/ai-tools/AiResultsGrid.tsx',
+  'components/ai-tools/AiSlimComposer.tsx',
   'components/ai-tools/AiToolButtons.tsx',
+  'components/ai-tools/AiToolProgressBar.tsx',
   'components/ai-tools/BgRemovalGlowSweep.tsx',
   'components/ai-tools/ReferencePhotoTiles.tsx',
   'components/analytics/AnalyticsKit.tsx',
