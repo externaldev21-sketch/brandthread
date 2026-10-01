@@ -67,6 +67,8 @@ export interface BuyerPost {
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Tagged place, when the author added one (see /api/places). */
+  location?: { id: string; name: string } | null;
 }
 
 // ─── Repost Record ────────────────────────────────────────────────────────────
@@ -366,6 +368,8 @@ export interface StoryOverlay {
   cardRadius?: number;
   // location sticker
   locationLabel?: string;
+  /** Resolved /api/places id; when set, the viewer may open the location page from the sticker. */
+  locationPlaceId?: string;
   // question sticker (answers are not yet persisted server-side — UI-only)
   questionPrompt?: string;
   // poll sticker (results are not yet persisted server-side — UI-only)

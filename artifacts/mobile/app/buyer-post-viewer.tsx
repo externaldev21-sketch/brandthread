@@ -36,6 +36,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { LocationTag } from '@/components/social/LocationTag';
 
 function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -273,6 +274,10 @@ export default function BuyerPostViewer() {
         {/* Caption */}
         {caption ? (
           <Text style={s.caption}>{caption}</Text>
+        ) : null}
+
+        {post?.location ? (
+          <LocationTag location={post.location} style={{ marginHorizontal: SP.md, marginTop: SP.sm }} />
         ) : null}
 
         {/* Timestamp */}
