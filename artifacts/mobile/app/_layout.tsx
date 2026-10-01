@@ -731,7 +731,9 @@ function AuthGate() {
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     // Team invite links must be viewable signed-out (deep-link entry point)
     // (community invite links share this: the preview is public, joining needs sign-in)
-    const inInvite        = (segments[0] as string) === 'team-invite' || (segments[0] as string) === 'community-join';
+    const inInvite        = (segments[0] as string) === 'team-invite' || (segments[0] as string) === 'community-join'
+      // Referral invite links (brandthread.app/invite/CODE) are public entry points too.
+      || (segments[0] as string) === 'invite';
     // Thread explainer is a post-onboarding buyer screen — let authenticated
     // users stay on it; the screen itself handles its own seen-state redirect.
     const inThreadExplainer = (segments[0] as string) === 'thread-explainer';

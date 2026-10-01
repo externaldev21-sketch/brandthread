@@ -36,6 +36,7 @@ import {
   releaseThreadCashRedemption,
 } from "../lib/threadCash/wallet";
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
+import { qualifyReferralForOrderSafe } from "../lib/referrals/rewards";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
 import { applyDisputePause, applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
@@ -688,6 +689,7 @@ export async function handleCheckoutPaid(
   if (existing) {
     await recordPaidPhysicalOrder(existing);
     await awardPurchasePoints(existing);
+    await qualifyReferralForOrderSafe(existing.id); // referral: inviter's $10 on first paid order (idempotent)
     try {
       await sendOrderConfirmationForOrder(existing.id);
     } catch (err) {
@@ -1228,6 +1230,8 @@ export async function handleCheckoutPaid(
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
       }
+
+      await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's $10 on first paid order (idempotent)
 
       // One-page checkout: pay the seller their share now (separate charges
       // and transfers). A failure is retried by webhook redelivery and the

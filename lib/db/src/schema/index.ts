@@ -37,6 +37,8 @@ export const users = pgTable('users', {
   // Referral / invite system
   inviteCode:     text('invite_code').unique(),   // lazily generated on first /referrals/code call
   referredByCode: text('referred_by_code'),       // code used when this user signed up
+  inviteLinkClicks:    integer('invite_link_clicks').notNull().default(0),
+  inviteLastClickedAt: timestamp('invite_last_clicked_at', { withTimezone: true }),
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
@@ -867,7 +869,17 @@ export const referrals = pgTable('referrals', {
   inviteeId:  text('invitee_id').notNull().unique(), // Clerk userId of the new user
   inviteCode: text('invite_code').notNull(),         // the code that was used
   joinedAt:   timestamp('joined_at').defaultNow().notNull(),
-  // Reward/status columns can be added here later without breaking existing rows
+  // Migration 119: reward lifecycle. pending -> qualified (first qualifying paid
+  // order) -> rewarded (inviter cash credited) | capped (inviter hit the cap).
+  status:              text('status').notNull().default('pending'),
+  qualifiedAt:         timestamp('qualified_at', { withTimezone: true }),
+  qualifyingOrderId:   text('qualifying_order_id'),
+  inviteeRewardCents:  integer('invitee_reward_cents').notNull().default(0),
+  inviterRewardCents:  integer('inviter_reward_cents').notNull().default(0),
+  inviteeRewardEntryId: uuid('invitee_reward_entry_id'),
+  inviterRewardEntryId: uuid('inviter_reward_entry_id'),
+  rewardedAt:          timestamp('rewarded_at', { withTimezone: true }),
+  source:              text('source').notNull().default('code'), // 'code' | 'link'
 });
 
 // ─── Blocks (server-side enforcement; replaces local AsyncStorage blocks) ─────

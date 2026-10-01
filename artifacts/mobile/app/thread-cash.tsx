@@ -32,6 +32,7 @@ function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
     case 'daily_checkin': return 'Daily check-in';
     case 'streak_bonus': return 'Streak bonus';
+    case 'referral': return 'Referral';
     case 'redemption': return 'Used at checkout';
     case 'checkout_spend': return 'Spent on an order';
     case 'refund_credit': return 'Returned from a refund';
@@ -54,6 +55,7 @@ function historyGlyph(
   switch (entry.source) {
     case 'daily_checkin': return { icon: 'check-circle', color: theme.success };
     case 'streak_bonus': return { icon: 'zap', color: theme.accent };
+    case 'referral': return { icon: 'users', color: theme.success };
     case 'redemption':
     case 'checkout_spend': return { icon: 'shopping-bag', color: theme.muted };
     case 'refund_credit':
@@ -79,6 +81,7 @@ function historyGlyph(
 // explicit ?bt_preview=buyer&demo=1 opt-in.
 const PREVIEW_HISTORY: ThreadCashEntry[] = [
   { id: 'p1', buyerId: 'preview', amountCents: 10, source: 'daily_checkin', referenceId: null, note: null, createdAt: new Date().toISOString() },
+  { id: 'p7', buyerId: 'preview', amountCents: 1000, source: 'referral', referenceId: null, note: 'Referral welcome credit', createdAt: new Date(Date.now() - 0.5 * 864e5).toISOString() },
   { id: 'p2', buyerId: 'preview', amountCents: 500, source: 'send_received', referenceId: null, note: 'For the drop', createdAt: new Date(Date.now() - 864e5).toISOString() },
   { id: 'p3', buyerId: 'preview', amountCents: -800, source: 'checkout_spend', referenceId: null, note: null, createdAt: new Date(Date.now() - 2 * 864e5).toISOString() },
   { id: 'p4', buyerId: 'preview', amountCents: 100, source: 'streak_bonus', referenceId: null, note: null, createdAt: new Date(Date.now() - 3 * 864e5).toISOString() },
@@ -220,7 +223,7 @@ export default function ThreadCashScreen() {
                   {formatCents(status?.balanceCents ?? 0)}
                 </Text>
               )}
-              <Text style={styles.balanceHint} numberOfLines={2}>
+              <Text style={styles.balanceHint}>
                 Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
               </Text>
             </BrandthreadCard>

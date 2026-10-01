@@ -2365,14 +2365,25 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Get (or lazily generate) my invite code + shareable link */
       code: () =>
         get<{ code: string; link: string; shareText: string }>('/api/referrals/code'),
-      /** How many people signed up using my code */
+      /** My invitees (with reward status), pending vs earned Thread Cash, link clicks */
       stats: () =>
-        get<{ total: number; pointsEarned: number; referrals: Array<{ inviteeId: string; name: string | null; joinedAt: string }> }>(
-          '/api/referrals/stats'
-        ),
+        get<{
+          total: number;
+          pointsEarned: number;
+          clicks?: number;
+          earnedCents?: number;
+          pendingCents?: number;
+          referrals: Array<{
+            inviteeId: string;
+            name: string | null;
+            joinedAt: string;
+            status?: 'pending' | 'qualified' | 'rewarded' | 'capped';
+            rewardCents?: number;
+          }>;
+        }>('/api/referrals/stats'),
       /** Attribute a referral to the current user — call once after signup with the code they entered */
       apply: (code: string, expectedClerkId?: string) =>
-        post<{ ok: boolean; inviterId: string }>('/api/referrals/apply', {
+        post<{ ok: boolean; inviterId: string; inviteeRewardCents?: number }>('/api/referrals/apply', {
           code,
           ...(expectedClerkId ? { expectedClerkId } : {}),
         }),
