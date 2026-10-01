@@ -26,6 +26,9 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import featuredPublicRouter from "./featured-public";
+import adminRouter from "./admin";
+import { auditModerationActions } from "../lib/admin/moderationAudit";
 import profileMediaRouter from "./profile-media";
 import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
@@ -110,6 +113,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
@@ -198,7 +202,8 @@ router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
-router.use("/moderation",                moderationRouter);
+router.use("/moderation",                auditModerationActions, moderationRouter);
+router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
