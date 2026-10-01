@@ -21,6 +21,11 @@ import crypto from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { boosts, db, posts, users } from "@workspace/db";
 
+// This file covers the direct pay -> active lifecycle (boosts created with the
+// admin-review gate off). The review gate itself is covered in
+// promotions-approval.integration.test.ts.
+process.env.PROMOTION_REVIEW_REQUIRED = "false";
+
 // ── Stripe mock ───────────────────────────────────────────────────────────────
 
 const stripeState = vi.hoisted(() => ({

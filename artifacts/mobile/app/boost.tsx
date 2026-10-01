@@ -89,6 +89,9 @@ type Boost = {
   estimatedImpressions: number;
   paid?: boolean;
   paidAt?: string | null;
+  /** Admin review outcome, shown to the seller when a boost is rejected. */
+  rejectionReason?: string | null;
+  refundStatus?: string;
 };
 
 type Summary = {
@@ -158,6 +161,9 @@ function statusBg(s: string): string {
 
 function statusLabel(s: string): string {
   if (s === 'pending_payment') return 'Pending payment';
+  if (s === 'in_review')       return 'In review';
+  if (s === 'active')          return 'Live';
+  if (s === 'completed')       return 'Ended';
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -638,7 +644,7 @@ export default function BoostScreen() {
         result = await boostsRef.current.verify(boostId);
       }
       const boost = result as Boost;
-      if (boost.status === 'active') {
+      if (boost.status === 'active' || boost.status === 'in_review') {
         setActiveBoost(boost);
         setSucceeded(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -816,7 +822,9 @@ export default function BoostScreen() {
     const title     = isActive ? 'Pause Boost' : 'Cancel Boost';
     const message   = isActive
       ? 'Pause this boost? You can reactivate it later by contacting support.'
-      : 'Are you sure you want to cancel this boost? This cannot be undone.';
+      : boost.status === 'in_review'
+        ? 'Cancel this boost? Your payment will be refunded in full.'
+        : 'Are you sure you want to cancel this boost? This cannot be undone.';
 
     Alert.alert(title, message, [
       { text: 'Keep Running', style: 'cancel' },
@@ -960,7 +968,13 @@ export default function BoostScreen() {
               </Text>
             )}
 
-            {(b.status === 'active' || b.status === 'paused') && (
+            {b.status === 'rejected' && (
+              <Text style={s.historyMetaSmall}>
+                {b.rejectionReason ? `${b.rejectionReason}. ` : ''}Your payment was refunded.
+              </Text>
+            )}
+
+            {(b.status === 'active' || b.status === 'paused' || b.status === 'in_review') && (
               <TouchableOpacity
                 style={s.pauseBtn}
                 onPress={() => handlePause(b)}
@@ -1048,6 +1062,21 @@ export default function BoostScreen() {
               ))}
             </View>
           )}
+
+          <TouchableOpacity
+            style={s.featuredRow}
+            onPress={() => router.push('/featured-slot' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Get featured on Discover"
+            testID="boost-featured-row"
+          >
+            <Feather name="star" size={ICON.md} color={FG} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.featuredRowTitle}>Featured on Discover</Text>
+              <Text style={s.historyMetaSmall}>Put your brand at the top of Discover</Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.md} color={MUTED} />
+          </TouchableOpacity>
 
           {renderHistory()}
         </ScrollView>
@@ -1167,9 +1196,11 @@ export default function BoostScreen() {
           <View style={s.successIcon}>
             <Feather name="zap" size={32} color={FG} />
           </View>
-          <Text style={s.successTitle}>Boost active!</Text>
+          <Text style={s.successTitle}>{b?.status === 'in_review' ? 'Boost in review' : 'Boost active!'}</Text>
           <Text style={s.successSub}>
-            Your post is now being promoted. Check back to see how it's performing.
+            {b?.status === 'in_review'
+              ? "Your payment is confirmed. We'll review your boost before it goes live, and refund you in full if it isn't approved."
+              : "Your post is now being promoted. Check back to see how it's performing."}
           </Text>
 
           {b && (
@@ -1380,6 +1411,12 @@ const s = StyleSheet.create({
   statusBadgeText:  { fontFamily: FONT.semibold, fontSize: FS.xs },
   progressTrack:    { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   progressFill:     { height: 4, borderRadius: 2, backgroundColor: FG },
+  featuredRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    paddingVertical: SP.md, marginTop: SP.lg,
+    borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  },
+  featuredRowTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   pauseBtn:         { marginTop: SP.sm, paddingVertical: SP.xs, alignItems: 'center' },
   pauseBtnText:     { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
 

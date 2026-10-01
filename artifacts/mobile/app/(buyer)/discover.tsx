@@ -49,6 +49,7 @@ import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
+import { DiscoverFeaturedRail } from '@/components/discover/DiscoverFeaturedRail';
 import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
 import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
@@ -298,6 +299,7 @@ export default function DiscoverScreen() {
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
+      {filter === 'forYou' && <DiscoverFeaturedRail />}
     </>
   );
 

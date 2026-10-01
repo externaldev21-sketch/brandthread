@@ -22,6 +22,7 @@ import {
   markBoostCheckoutFailed,
 } from "./boosts";
 import { fulfilCreditCheckoutSession, grantRevenueCatCreditPurchase } from "../lib/aiCredits/purchases";
+import { activateFeaturedSlotFromCheckoutSession, markFeaturedSlotCheckoutFailed } from "./featured-slots";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
@@ -281,6 +282,13 @@ router.post("/stripe", async (req: Request, res: Response) => {
           if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
           break;
         }
+        // ── Featured slot checkout ───────────────────────────────────────────
+        if (cs.metadata?.kind === "featured_slot") {
+          if (cs.payment_status === "paid" || cs.payment_status === "no_payment_required") {
+            await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
+          }
+          break;
+        }
         // ── Regular buyer checkout ───────────────────────────────────────────
         if (cs.payment_status === "paid") {
           await handleCheckoutPaid(cs, event.id, paidAt);
@@ -299,6 +307,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await activateAdCampaignFromCheckoutSession(cs, paidAt);
         } else if (cs.metadata?.kind === "boost") {
           await activateBoostFromCheckoutSession(cs, paidAt);
+        } else if (cs.metadata?.kind === "featured_slot") {
+          await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
         } else {
           await handleCheckoutPaid(cs, event.id, paidAt);
         }
@@ -313,6 +323,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await markAdCampaignCheckoutFailed(cs);
         } else if (cs.metadata?.kind === "boost") {
           await markBoostCheckoutFailed(cs);
+        } else if (cs.metadata?.kind === "featured_slot") {
+          await markFeaturedSlotCheckoutFailed(cs);
         } else {
           await releaseCheckoutLoyaltyRedemption(cs);
         }
