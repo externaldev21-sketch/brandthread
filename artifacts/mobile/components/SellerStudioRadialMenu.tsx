@@ -14,18 +14,20 @@
  * ones that have NO other way into them — see MENU_EXCLUDED_IDS below for
  * the removed items and where each one's real entry point now lives.
  *
- * Layout, top to bottom:
- *  - Header (below the notch): the seller's real profile photo + store name
- *    on the left (an initials circle, matching the store name's own first
- *    letter, only when there's no photo yet; a neutral store icon — never a
- *    random letter — when there's no store name either), a compact
- *    unfilled "View store" button, and a close (X) button.
- *  - The card area: the current card's full-bleed cover fills the entire
- *    remaining width/height, edge to edge — a neighbor is visible ONLY
- *    mid-transition (the ~90ms slide between cards), never at rest, per
- *    Dev's own screenshot ("no slivers, no half-words").
- *  - A thin white edge-trace that draws clockwise around the card on lock
- *    (see AUTO_ENTER_MS) and a row of small position dots.
+ * Layout: the current card's full-bleed cover fills the ENTIRE screen, edge
+ * to edge, top to bottom — no bars, no letterboxing above/below it. The
+ * header and the row of position dots FLOAT on top of that cover as two
+ * absolutely-positioned overlays (no background of their own — legibility
+ * comes from the cover's own dark vignette, same as the icon/name already
+ * relied on). Header: the seller's real profile photo + store name on the
+ * left (an initials circle, matching the store name's own first letter,
+ * only when there's no photo yet; a neutral store icon — never a random
+ * letter — when there's no store name either) and a close (X) button on the
+ * right. A neighbor card is visible ONLY mid-transition (the ~90ms slide
+ * between cards), never at rest, per Dev's own screenshot ("no slivers, no
+ * half-words"). A thin white edge-trace draws clockwise around the WHOLE
+ * SCREEN on lock (see AUTO_ENTER_MS) — inset from the physical screen edges
+ * on every side, header and dots included, not just the area between them.
  *
  * Interaction:
  *  - A horizontal drag anywhere on the card area SCRUBS through the list —
@@ -65,6 +67,7 @@ import {
   Image,
   Modal,
   Pressable,
+  StatusBar,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -90,6 +93,7 @@ import Animated, {
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
@@ -105,10 +109,8 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { getSetupState, completionPercent, completedRequiredTaskCount, requiredTaskCount } from '@/lib/setupStore';
 import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';
 import { SCRUB_PX_PER_CARD, indexForDrag } from '@/lib/studioCardCarousel';
-import { PressableScale } from '@/components/BrandthreadUI';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { STUDIO_MENU_SCRUB_ROWS } from '@/lib/firstRunTips/content';
 import {
@@ -297,16 +299,50 @@ const MICRO_KIND: Record<string, MicroKind> = {
   'ai-photoshoot': 'blink',      // shutter blink
 };
 
+/** The header's animated avatar — a moving profile picture, muted and
+ *  looped, autoplaying the instant it mounts (mirrors
+ *  components/profile/ProfileStoryAvatar.tsx's own AvatarVideo; not reused
+ *  directly since that component brings its own story-ring/badge geometry
+ *  this plain circular header avatar doesn't need). */
+function HeaderAvatarVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  useEffect(() => { player.play(); }, [player]);
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+      testID="seller-studio-header-avatar-video"
+    />
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface SellerStudioRadialMenuProps {
   hideTrigger?: boolean;
   openRequestKey?: number;
+  /** Incrementing this while the page is open closes it — the Studio tab
+   *  button toggles between this and openRequestKey depending on whether
+   *  the caller currently thinks the page is open (see onOpenChange). */
+  closeRequestKey?: number;
+  /** Fired whenever the page's own open/closed state changes, so a parent
+   *  (the tab bar) can track it without owning the state itself — used to
+   *  toggle the Studio button's own label and which of
+   *  openRequestKey/closeRequestKey a re-tap should bump. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export default function SellerStudioRadialMenu({
   hideTrigger = false,
   openRequestKey = 0,
+  closeRequestKey = 0,
+  onOpenChange,
 }: SellerStudioRadialMenuProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -344,25 +380,22 @@ export default function SellerStudioRadialMenu({
   // The seller's own account name/username — always populated by Clerk at
   // sign-up, unlike brandName (which stays null until the seller explicitly
   // names their store). Used as the header title's fallback instead of a
-  // "Name your store" placeholder, per Dev's "fresh seller" screenshot.
+  // "Name your store" placeholder, per Dev's "fresh seller" screenshot —
+  // formatted as "@handle" when it's the bare username with no display name.
   const [accountName, setAccountName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [setupPercent, setSetupPercent] = useState(0);
-  const [setupDone, setSetupDone] = useState(0);
-  const [setupTotal, setSetupTotal] = useState(0);
+  // A moving profile picture (any account type — see lib/api.ts's
+  // avatarVideo namespace and components/profile/ProfileStoryAvatar.tsx's
+  // own AvatarVideo, which this reimplements locally rather than importing
+  // that component's whole story-ring geometry for a plain circle). Takes
+  // priority over the static avatarUrl when set.
+  const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
 
   // ── Store header data — refreshed each time the page opens ────────────────
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !userId) return;
     let cancelled = false;
-    getSetupState().then((state) => {
-      if (cancelled) return;
-      setSetupPercent(completionPercent(state));
-      setSetupDone(completedRequiredTaskCount(state));
-      setSetupTotal(requiredTaskCount(state));
-    });
-    if (!userId) return () => { cancelled = true; };
 
     api.seller.getProfile().then((profile) => {
       if (cancelled) return;
@@ -373,9 +406,14 @@ export default function SellerStudioRadialMenu({
       // why avatarUrl was always null before — api.seller.getProfile() is
       // the endpoint that actually carries profileImageUrl.
       setBrandName(profile?.brandName ?? null);
-      setAccountName(profile?.displayName ?? profile?.username ?? null);
+      setAccountName(profile?.displayName?.trim() || (profile?.username ? `@${profile.username}` : null));
       setAvatarUrl(profile?.profileImageUrl ?? null);
     }).catch(() => {});
+    api.avatarVideo.get().then((res) => {
+      if (cancelled) return;
+      setAvatarVideoUrl(res?.avatarVideoUrl ?? null);
+    }).catch(() => {});
+
     return () => { cancelled = true; };
   }, [open, api, userId]);
 
@@ -553,6 +591,23 @@ export default function SellerStudioRadialMenu({
     enterFade.value = 0;
     setEntering(false);
   }, [traceProgress, zoomScale, enterFade]);
+
+  // Lets the Studio tab button toggle: it bumps openRequestKey when the
+  // caller thinks the page is closed and closeRequestKey when it thinks the
+  // page is open — onOpenChange below is what keeps that belief in sync
+  // with this component's own (otherwise fully internal) `open` state.
+  useEffect(() => {
+    if (closeRequestKey > 0 && open) {
+      cancelEnter();
+      collapse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeRequestKey]);
+
+  useEffect(() => {
+    onOpenChange?.(open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   /** Release-to-select / tap-to-select: no closing animation at all — the
    *  page is just gone, in the same frame the navigation fires, per spec
@@ -838,14 +893,13 @@ export default function SellerStudioRadialMenu({
   const isLocked = (item: ControlCenterItem) =>
     GROWTH_PLAN_ENFORCEMENT_ENABLED && !!item.growthOnly && !planLoading && !planError && !hasPlan('growth');
 
-  const storeIsLive = setupPercent >= 100;
   const hasStoreName = !!brandName?.trim();
   // The header title always shows something real — the store name once
-  // set, the seller's own account name/username until then — never a bare
-  // "Name your store" placeholder as the title itself (that's now the small
-  // link below instead).
+  // set, else the seller's own display name/@handle — never a bare
+  // "Name your store" placeholder, per Dev's header spec (avatar + name
+  // only, no subtitle).
   const headerTitle = hasStoreName ? brandName!.trim() : (accountName?.trim() || null);
-  const headerMonogram = (hasStoreName ? brandName : accountName)?.trim()?.[0]?.toUpperCase() ?? null;
+  const headerMonogram = (hasStoreName ? brandName : accountName?.replace(/^@/, ''))?.trim()?.[0]?.toUpperCase() ?? null;
 
   // ── Card renderer ────────────────────────────────────────────────────────────
   // Every mounted card (the current one plus CARD_WINDOW_RADIUS neighbors on
@@ -1143,89 +1197,35 @@ export default function SellerStudioRadialMenu({
         statusBarTranslucent
         onRequestClose={() => { cancelEnter(); collapse(); }}
       >
+        {/* Android draws the OS status bar with the app-wide StatusBar's own
+            backgroundColor (see app/_layout.tsx) — without overriding it
+            here too, that leaves the current theme's ordinary background
+            colour showing behind the notch while this page's own background
+            is pure black, a visible seam right where Dev's "no colour step"
+            spec means there shouldn't be one. (iOS's `backgroundColor` prop
+            is a no-op; statusBarTranslucent above already lets this page's
+            own black background show straight through there.) */}
+        <StatusBar backgroundColor="#000000" barStyle="light-content" animated />
         {/* The full-screen page itself — no separate backdrop layer: it
             fully covers whatever screen was behind it (Dashboard, Products,
             whichever), sliding up from/down to offscreen. Header and card
             area are SIBLING GestureDetectors, each with its own single
             Gesture.Pan (dismissGesture, cardAreaGesture) — see the block
             comment above cardAreaGesture's definition for why neither is
-            ever combined with another Pan via Gesture.Race. */}
+            ever combined with another Pan via Gesture.Race.
+            Dev: the card cover must fill the ENTIRE screen edge to edge —
+            no black bars above/below it — with the header and position
+            dots floating ON TOP as overlays, not sharing flex space with
+            the cover. So `page` itself carries no top/bottom padding
+            anymore (that's what carved out the bars): the card area below
+            is sized to the full page, and the header/dots are positioned
+            absolutely over it instead. */}
         <Animated.View
-          style={[
-            styles.page,
-            {
-              height: pageHeight,
-              paddingTop: headerTopInset,
-              paddingBottom: Math.max(insets.bottom, 16),
-            },
-            pageAnimatedStyle,
-          ]}
+          style={[styles.page, { height: pageHeight }, pageAnimatedStyle]}
         >
-          <GestureDetector gesture={dismissGesture}>
-            {/* ── Store header ──
-                Always the seller's real profile photo + real store name. No
-                photo yet: an initials monogram (from the store name once
-                set, else the seller's own account name/username — never a
-                generic bag icon, and never blank). No store name yet: the
-                title falls back to the seller's own account name/username
-                (always real, from Clerk) with a small tappable "Set store
-                name" link underneath — never a grey placeholder AS the
-                title. No "?" help icon (Settings > Help & support covers it
-                — see services/settingsCatalog.ts). "View store" is a
-                compact, unfilled text+icon button. A close (X) replaces the
-                old swipe-only dismissal now that this is a full page, not a
-                sheet with a visible "outside" to tap. */}
-            <View style={styles.header}>
-              <View style={styles.avatar}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : headerMonogram ? (
-                  <Text style={styles.avatarLetter}>{headerMonogram}</Text>
-                ) : (
-                  <Feather name="shopping-bag" size={18} color={theme.text} />
-                )}
-              </View>
-              <View style={styles.headerTextBlock}>
-                <Text style={styles.storeName} numberOfLines={1}>{headerTitle ?? 'Your store'}</Text>
-                {!hasStoreName && (
-                  <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/settings' as never)); }}>
-                    <Text style={styles.setStoreNameLink} numberOfLines={1}>Set store name</Text>
-                  </Pressable>
-                )}
-                {!storeIsLive && setupPercent > 0 && (
-                  <Pressable
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); collapse(() => router.push('/settings' as never)); }}
-                    accessibilityRole="progressbar"
-                    accessibilityLabel={`Store setup, ${setupDone} of ${setupTotal} steps complete`}
-                    hitSlop={{ top: 6, bottom: 6, left: 0, right: 6 }}
-                    style={styles.setupBarTrack}
-                  >
-                    <View style={[styles.setupBarFill, { width: `${setupPercent}%` }]} />
-                  </Pressable>
-                )}
-              </View>
-              <PressableScale
-                onPress={() => collapse(() => router.push('/store-preview' as never))}
-                accessibilityRole="button"
-                accessibilityLabel="View store"
-                style={styles.viewStoreBtn}
-              >
-                <Text style={styles.viewStoreLabel}>View store</Text>
-                <Feather name="arrow-up-right" size={13} color={theme.text} />
-              </PressableScale>
-              <PressableScale
-                onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}
-                accessibilityRole="button"
-                accessibilityLabel="Close Studio tools"
-                testID="seller-studio-menu-close"
-                style={styles.closeBtn}
-              >
-                <Feather name="x" size={20} color={theme.text} />
-              </PressableScale>
-            </View>
-          </GestureDetector>
-
-          {/* ── Card carousel ── */}
+          {/* ── Card carousel — now the page's own full-bleed content,
+              edge to edge, top to bottom. Rendered FIRST so the header and
+              dots overlays below paint on top of it. ── */}
           <GestureDetector gesture={cardAreaGesture}>
             <View
               style={styles.cardArea}
@@ -1290,8 +1290,58 @@ export default function SellerStudioRadialMenu({
             </View>
           </GestureDetector>
 
-          {/* Small position dots — replaces the old "X / 16" text. */}
-          <View style={styles.dotsRow} testID="seller-studio-position-dots">
+          {/* ── Store header — floats on top of the full-bleed cover below,
+              no background of its own (Dev: "legibility via the cover's
+              existing dark vignette only, no translucent bars" — the
+              cover's own gradient is already darkest at its top/bottom
+              extremes, exactly where this sits). Dev's final call: the
+              seller's real profile picture (animated if they set one,
+              muted + looped) and their real name (store name, else display
+              name/@handle — never blank, never a generic bag icon once any
+              identity exists) on the left, no subtitle of any kind, and a
+              close (X) on the right. Closing is swipe-down (dismissGesture,
+              this same GestureDetector), the X itself, Android back
+              (Modal's onRequestClose), or tapping the Studio tab button
+              again (openRequestKey toggling, see the effect near the top of
+              this component). */}
+          <GestureDetector gesture={dismissGesture}>
+            <View
+              style={[styles.header, { position: 'absolute', top: headerTopInset, left: 0, right: 0 }]}
+              testID="seller-studio-header"
+            >
+              <View style={styles.avatar}>
+                {avatarVideoUrl ? (
+                  <HeaderAvatarVideo uri={avatarVideoUrl} />
+                ) : avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : headerMonogram ? (
+                  <Text style={styles.avatarLetter}>{headerMonogram}</Text>
+                ) : (
+                  <Feather name="shopping-bag" size={18} color={theme.text} />
+                )}
+              </View>
+              <View style={styles.headerTextBlock}>
+                <Text style={styles.storeName} numberOfLines={1}>{headerTitle ?? 'Your store'}</Text>
+              </View>
+              <Pressable
+                onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}
+                accessibilityRole="button"
+                accessibilityLabel="Close Studio tools"
+                testID="seller-studio-menu-close"
+                style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
+              >
+                <Feather name="x" size={20} color={theme.text} />
+              </Pressable>
+            </View>
+          </GestureDetector>
+
+          {/* Small position dots — replaces the old "X / 16" text. Floats
+              on top of the cover too, same no-background rule as the
+              header above. */}
+          <View
+            style={[styles.dotsRow, { position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }]}
+            testID="seller-studio-position-dots"
+          >
             {CARD_ITEMS.map((item, i) => (
               <View key={item.id} style={[styles.dot, i === cardIndexJS && styles.dotActive]} />
             ))}
@@ -1391,36 +1441,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // shorter than its row siblings.
   headerTextBlock: { flex: 1, justifyContent: 'center', gap: 4 },
   storeName: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  // A small secondary link, never the title itself — shown only until the
-  // seller sets a real store name (the title already reads their account
-  // name/username in the meantime, never a grey placeholder).
-  setStoreNameLink: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
-  // A thin silver progress bar replaces the old tiny "X% set up" text —
-  // Dev: clean, no clutter. Tappable (opens the setup checklist), and
-  // hidden entirely once setup reaches 100% (see storeIsLive in the
-  // component) or before any progress has been made at all.
-  setupBarTrack: {
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: theme.border,
-    overflow: 'hidden',
-    alignSelf: 'stretch',
-  },
-  setupBarFill: { height: '100%', backgroundColor: theme.text, borderRadius: 1.5 },
-  // Compact, unfilled text+icon button — Dev's own call: the old solid
-  // white pill was "too big and eye-catching". No background, a hairline
-  // border only, ~32pt tall, matching the avatar's own vertical center.
-  viewStoreBtn: {
-    height: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  viewStoreLabel: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
+  // Dev: the X stays — the header's one action, on the right.
   closeBtn: {
     width: 32,
     height: 32,
@@ -1435,7 +1456,17 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // animated translateX/opacity in CarouselCard's own style — this View
   // itself never scrolls.
   cardArea: {
-    flex: 1,
+    // Dev: fills the ENTIRE screen now, edge to edge — the header and
+    // position dots are separate absolutely-positioned overlays on top of
+    // this (see the render below), not flex siblings carving space out of
+    // it. That also means the edge-trace (sized to this View's own
+    // measured bounds) now outlines the whole screen, header and dots
+    // included, not just the space between them.
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
