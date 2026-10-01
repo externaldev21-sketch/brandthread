@@ -30,6 +30,9 @@ import {
   publishingRestriction,
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
+import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
+import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
+import { storyListedFor } from "../lib/storyVisibility";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -695,7 +698,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .where(and(
       eq(storyMentions.mentionedUserId, other),
       gt(stories.expiresAt, new Date()),
-      ne(stories.moderationStatus, "removed"),
+      storyListedFor(myId),
       ne(stories.privacyVisibility, "friends"),
       notBlockedWith(myId, stories.authorId),
       authorInGoodStanding(stories.authorId),
@@ -1091,10 +1094,14 @@ async function isFollowing(followerId: string, followingId: string): Promise<boo
 async function loadActiveStory(storyId: string) {
   const [row] = await db.select().from(stories).where(eq(stories.id, storyId)).limit(1);
   if (!row) return null;
-  if (row.moderationStatus === "removed") return null;
+  if (row.moderationStatus === "removed" || row.moderationStatus === "held") return null;
   if (new Date(row.expiresAt).getTime() <= Date.now()) return null;
   return row;
 }
+
+/** Upper bound on media items in one story and rows returned by story list endpoints. */
+const MAX_STORY_MEDIA_ITEMS = 20;
+const STORY_LIST_CAP = 100;
 
 // ─── POST /api/social/stories — create a story ───────────────────────────────
 router.post("/stories", async (req, res) => {
@@ -1108,6 +1115,9 @@ router.post("/stories", async (req, res) => {
 
   if (!Array.isArray(rawMedia) || rawMedia.length === 0) {
     res.status(400).json({ error: "media[] required" }); return;
+  }
+  if (rawMedia.length > MAX_STORY_MEDIA_ITEMS) {
+    res.status(400).json({ error: `A story can have up to ${MAX_STORY_MEDIA_ITEMS} items`, code: "VALIDATION_ERROR" }); return;
   }
 
   const restriction = await publishingRestriction(myId);
@@ -1156,6 +1166,24 @@ router.post("/stories", async (req, res) => {
   // untaggable people (self, blocked either way, deleted/suspended) are dropped silently.
   const { media, mentions } = await sanitizeStoryMentions(rawMedia, myId);
 
+  // Automatic media screening (off when the AI integration env is missing).
+  const storyUrls = (media as any[]).map((item) => ({
+    url: typeof item?.uri === "string" ? item.uri : typeof item?.url === "string" ? item.url : "",
+    video: item?.type === "video",
+  })).filter((item) => /^https?:\/\//i.test(item.url));
+  const storyVerdict = storyUrls.length > 0
+    ? await screenMediaRefs({
+        images: storyUrls.filter((item) => !item.video).map((item) => item.url),
+        videos: storyUrls.filter((item) => item.video).map((item) => item.url),
+        extraHosts: [req.get("host") ?? ""].filter(Boolean),
+      })
+    : null;
+  if (storyVerdict?.verdict === "reject") {
+    void recordRejectedUpload({ ownerId: myId, surface: "story", verdict: storyVerdict });
+    res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED", categories: storyVerdict.categories }); return;
+  }
+  const storyHeld = !!storyVerdict && isFlagged(storyVerdict);
+
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const visibility = privacy?.visibility === "friends" ? "friends" : "public";
 
@@ -1172,11 +1200,21 @@ router.post("/stories", async (req, res) => {
     privacyReplyPerm:   privacy?.replyPermission ?? "everyone",
     originalStoryId:    reshareOf?.id ?? null,
     originalAuthorId:   reshareOf?.authorId ?? null,
+    moderationStatus:   storyHeld ? "held" : "visible",
+    moderationReason:   storyHeld ? `media:${storyVerdict!.categories.join(",")}`.slice(0, 200) : null,
     expiresAt,
   }).returning();
 
+  if (storyHeld && storyVerdict) {
+    await recordHeldMedia({
+      targetType: "story", targetId: row.id, ownerId: myId, verdict: storyVerdict,
+      refs: storyUrls.map((item) => item.url).filter((url) => !url.includes("?")).slice(0, 4),
+      excerpt: `Story by ${myName}`, label: "Story",
+    });
+  }
+
   await recordStoryMentions(row.id, myId, mentions);
-  for (const mention of mentions) {
+  for (const mention of storyHeld ? [] : mentions) {
     void notifyStoryMention({
       storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
     });
@@ -1192,7 +1230,7 @@ router.post("/stories", async (req, res) => {
   }
 
   const [view] = await withOriginalInfo([buildStoryView(row, false)]);
-  res.status(201).json(view);
+  res.status(201).json(storyHeld ? { ...view, moderation: { status: "held", message: MEDIA_HELD_MESSAGE } } : view);
 });
 
 // ─── GET /api/social/stories/me — my active stories ─────────────────────────
@@ -1200,7 +1238,8 @@ router.get("/stories/me", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const now  = new Date();
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")));
+    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), storyListedFor(myId)))
+    .orderBy(asc(stories.createdAt)).limit(STORY_LIST_CAP);
 
   const likedSet = rows.length
     ? new Set(
@@ -1229,7 +1268,8 @@ router.get("/stories/user/:userId", async (req, res) => {
   }
 
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")));
+    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), storyListedFor(myId)))
+    .orderBy(asc(stories.createdAt)).limit(STORY_LIST_CAP);
 
   if (!rows.length) { res.json([]); return; }
 
@@ -1266,8 +1306,9 @@ router.get("/stories/following", async (req, res) => {
   const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
 
   const rows = await db.select().from(stories)
-    .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
-    .orderBy(desc(stories.createdAt));
+    .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), storyListedFor(myId)))
+    .orderBy(desc(stories.createdAt))
+    .limit(STORY_LIST_CAP * 10);
   if (!rows.length) { res.json([]); return; }
 
   const blockedIds = new Set(
@@ -1349,7 +1390,8 @@ router.get("/stories/:id/viewers", async (req, res) => {
 
   const viewRows = await db.select({ userId: storyViews.userId, viewedAt: storyViews.viewedAt })
     .from(storyViews).where(eq(storyViews.storyId, storyId))
-    .orderBy(desc(storyViews.viewedAt));
+    .orderBy(desc(storyViews.viewedAt))
+    .limit(500);
   if (!viewRows.length) { res.json([]); return; }
 
   const profiles = await profilesById(viewRows.map((r) => r.userId));
@@ -1388,28 +1430,31 @@ router.post("/stories/:id/like", async (req, res) => {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
-  const [existing] = await db.select({ storyId: storyLikes.storyId })
-    .from(storyLikes)
-    .where(and(eq(storyLikes.storyId, storyId), eq(storyLikes.userId, myId)))
-    .limit(1);
-
+  // Counter changes are driven only by rows actually inserted/deleted, so
+  // concurrent taps and retries cannot make likes_count drift from story_likes.
+  const removing = (req.body as { liked?: unknown } | undefined)?.liked === false;
   let liked: boolean;
-  if (existing) {
-    await db.delete(storyLikes)
-      .where(and(eq(storyLikes.storyId, storyId), eq(storyLikes.userId, myId)));
+  const deleted = await db.delete(storyLikes)
+    .where(and(eq(storyLikes.storyId, storyId), eq(storyLikes.userId, myId)))
+    .returning({ storyId: storyLikes.storyId });
+  if (deleted.length > 0) {
     await db.update(stories)
-      .set({ likesCount: sql`GREATEST(likes_count - 1, 0)` })
+      .set({ likesCount: sql`GREATEST(likes_count - ${deleted.length}, 0)` })
       .where(eq(stories.id, storyId));
+    liked = false;
+  } else if (removing) {
     liked = false;
   } else {
     const inserted = await db.insert(storyLikes).values({ storyId, userId: myId })
       .onConflictDoNothing()
       .returning({ storyId: storyLikes.storyId });
-    await db.update(stories)
-      .set({ likesCount: sql`likes_count + 1` })
-      .where(eq(stories.id, storyId));
+    if (inserted.length > 0) {
+      await db.update(stories)
+        .set({ likesCount: sql`likes_count + 1` })
+        .where(eq(stories.id, storyId));
+      void notifyStoryLike({ storyId, likerId: myId });
+    }
     liked = true;
-    if (inserted.length > 0) void notifyStoryLike({ storyId, likerId: myId });
   }
 
   const [row] = await db.select({ likesCount: stories.likesCount })
@@ -1428,18 +1473,14 @@ router.post("/stories/:id/view", async (req, res) => {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
-  const [existing] = await db.select({ storyId: storyViews.storyId })
-    .from(storyViews)
-    .where(and(eq(storyViews.storyId, storyId), eq(storyViews.userId, myId)))
-    .limit(1);
-
-  if (!existing) {
-    await db.insert(storyViews).values({ storyId, userId: myId }).onConflictDoNothing();
+  const inserted = await db.insert(storyViews).values({ storyId, userId: myId })
+    .onConflictDoNothing()
+    .returning({ storyId: storyViews.storyId });
+  if (inserted.length > 0) {
     await db.update(stories)
       .set({ viewsCount: sql`views_count + 1` })
       .where(eq(stories.id, storyId));
   } else {
-    // Update viewedAt
     await db.update(storyViews)
       .set({ viewedAt: new Date() })
       .where(and(eq(storyViews.storyId, storyId), eq(storyViews.userId, myId)));
