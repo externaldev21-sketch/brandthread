@@ -28,6 +28,8 @@ export interface TextFitOptions {
   groupSelectors?: string[];
   /** Skip elements inside these selectors (e.g. a photo under test). */
   ignore?: string[];
+  /** Skip text runs equal to one of these strings (pre-existing chrome outside the change under test). */
+  ignoreText?: string[];
 }
 
 export interface TextFitReport {
@@ -58,6 +60,7 @@ export async function textFitReport(page: EvaluatingPage, options: TextFitOption
       const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
       const el = node.parentElement;
       // icon-font glyphs (Feather etc.) live in the private-use area: not copy
+      if ((opts.ignoreText ?? []).includes(text)) continue;
       if (!text || /^[\uE000-\uF8FF\s]+$/.test(text) || !el || seen.has(el) || ignored(el)) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || el.getClientRects().length === 0) continue;
