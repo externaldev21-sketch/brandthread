@@ -5,6 +5,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
+export * from './productLaunches';
 export * from './threadCash';
 export * from './threadCashExpiry';
 export * from './shopifyFulfillment';

@@ -4,8 +4,9 @@
  * variant edit) call into these so the notification logic lives in one
  * place.
  */
-import { and, eq } from "drizzle-orm";
-import { db, savedItems } from "@workspace/db";
+import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { db, productVariants, products, savedItems, waitlistEntries } from "@workspace/db";
+import { productThumbnail } from "./activityEvents";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
 
@@ -71,16 +72,81 @@ export async function notifyStockLevelChanged(input: {
   }).catch((err) => logger.warn({ err, productId: input.productId }, "Low stock notification failed"));
 }
 
-/** Buyer-facing restock alert for everyone who saved/wishlisted the product. */
+/**
+ * Notifies waitlist members for a restocked product, once each. Entries for a
+ * specific variant are notified only while that variant has stock; product
+ * level entries (no variant) on any restock. The UPDATE ... WHERE notified_at
+ * IS NULL RETURNING is the claim, so repeated restocks, overlapping writers
+ * and the seller's manual "Notify now" can never send a second notification.
+ * Returns the user ids that were notified.
+ */
+export async function notifyWaitlistRestock(input: {
+  productId: string;
+  ownerId: string;
+  productName: string;
+  variantId?: string;
+}): Promise<string[]> {
+  const inStock = await db
+    .select({ id: productVariants.id })
+    .from(productVariants)
+    .where(and(eq(productVariants.productId, input.productId), gt(productVariants.stock, 0)));
+  const inStockIds = inStock.map((v) => v.id);
+  const variantIds = input.variantId ? inStockIds.filter((id) => id === input.variantId) : inStockIds;
+
+  const claimed = await db
+    .update(waitlistEntries)
+    .set({ notifiedAt: new Date() })
+    .where(and(
+      eq(waitlistEntries.productId, input.productId),
+      isNull(waitlistEntries.notifiedAt),
+      variantIds.length > 0
+        ? or(isNull(waitlistEntries.variantId), inArray(waitlistEntries.variantId, variantIds))
+        : isNull(waitlistEntries.variantId),
+    ))
+    .returning({ userId: waitlistEntries.userId, variantLabel: waitlistEntries.variantLabel });
+  if (claimed.length === 0) return [];
+
+  const [product] = await db.select({ images: products.images }).from(products).where(eq(products.id, input.productId)).limit(1);
+  const image = productThumbnail(product?.images);
+  await Promise.all(claimed.map((entry) =>
+    publishNotification({
+      userId: entry.userId,
+      category: "order",
+      type: "waitlist_restock",
+      title: "Back in stock!",
+      body: `${input.productName}${entry.variantLabel ? ` (${entry.variantLabel})` : ""} is available again. Grab it before it sells out.`,
+      targetId: input.productId,
+      targetType: "product",
+      targetImageUrl: image,
+      cta: "Shop now",
+      analyticsOwnerId: input.ownerId,
+      pushChannelId: "stock",
+    }).catch((err) => logger.warn({ err, userId: entry.userId, productId: input.productId }, "Waitlist restock notification failed"))
+  ));
+  return [...new Set(claimed.map((c) => c.userId))];
+}
+
+/** Buyer-facing restock alert for everyone who saved/wishlisted the product and everyone on its waitlist. */
 export async function notifyBackInStock(input: {
   productId: string;
   ownerId: string;
   productName: string;
   previousStock: number;
   newStock: number;
+  variantId?: string;
 }): Promise<void> {
   if (!isRestock(input)) return;
-  const likers = await likersOf(input.productId);
+  const waitlisted = new Set(await notifyWaitlistRestock({
+    productId: input.productId,
+    ownerId: input.ownerId,
+    productName: input.productName,
+    variantId: input.variantId,
+  }).catch((err) => {
+    logger.warn({ err, productId: input.productId }, "Waitlist restock failed");
+    return [] as string[];
+  }));
+  // Someone on the waitlist already got a restock notification; don't double up.
+  const likers = (await likersOf(input.productId)).filter((userId) => !waitlisted.has(userId));
   // Stamp the Saved screen's "Back in stock" badge window for everyone who saved this.
   await db.update(savedItems)
     .set({ backInStockAt: new Date() })

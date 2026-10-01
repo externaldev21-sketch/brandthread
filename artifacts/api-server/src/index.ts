@@ -9,6 +9,7 @@ import { startTrendingJob }       from "./jobs/computeTrending";
 import { startSellerRankingJob }  from "./jobs/computeSellerRanking";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
+import { startProductLaunchJob } from "./jobs/productLaunches";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDisputeEvidenceReminderJob } from "./jobs/disputeEvidenceReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
@@ -77,6 +78,7 @@ const server = app.listen(port, (err) => {
   startSellerRankingJob();
   startTeamInviteReminderJob();
   startScheduledDropBroadcastJob();
+  startProductLaunchJob();
   startSellerTrialReminderJob();
   startDisputeEvidenceReminderJob();
   startDesignStudioObjectCleanupJob();

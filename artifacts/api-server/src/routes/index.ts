@@ -96,6 +96,8 @@ import discountCodesRouter from "./discount-codes";
 import salesRouter from "./sales";
 import returnsRouter from "./returns";
 import sellerVerificationRouter from "./seller-verification";
+import productLaunchesRouter from "./product-launches";
+import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
 import productPairingsRouter from "./product-pairings";
@@ -235,6 +237,8 @@ router.use("/ai",              tc, aiSafetyGuard("ai-chat", { mode: "chat" }), a
 // get swallowed by buyerRouter's lack of those handlers.
 // Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
 // scoped to the actual buyer, not the team store owner.
+router.use("/product-launches",          tc, productLaunchesRouter);
+router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
 router.use("/product-pairings",          productPairingsRouter);
