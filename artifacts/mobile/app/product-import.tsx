@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as WebBrowser from 'expo-web-browser';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -15,59 +18,8 @@ import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-
-function parseCsvLine(line: string): string[] {
-  const values: string[] = [];
-  let value = '';
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (character === '"') {
-      if (quoted && line[index + 1] === '"') {
-        value += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === ',' && !quoted) {
-      values.push(value.trim());
-      value = '';
-    } else {
-      value += character;
-    }
-  }
-  values.push(value.trim());
-  return values;
-}
-
-function parseProductCsv(csv: string): { name: string; description?: string; category?: string; price?: string }[] {
-  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length < 2) return [];
-
-  const headers = parseCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
-  const nameIndex = headers.indexOf('name');
-  if (nameIndex < 0) throw new Error('CSV must include a name column.');
-
-  const descriptionIndex = headers.indexOf('description');
-  const categoryIndex = headers.indexOf('category');
-  const priceIndex = headers.indexOf('price');
-
-  return lines.slice(1).map((line) => {
-    const values = parseCsvLine(line);
-    const name = values[nameIndex]?.trim() ?? '';
-    if (!name) throw new Error('Every product must have a name.');
-    const description = descriptionIndex >= 0 ? values[descriptionIndex]?.trim() : undefined;
-    const category = categoryIndex >= 0 ? values[categoryIndex]?.trim() : undefined;
-    const price = priceIndex >= 0 ? values[priceIndex]?.trim() : undefined;
-    return {
-      name,
-      ...(description ? { description } : {}),
-      ...(category ? { category } : {}),
-      ...(price ? { price } : {}),
-    };
-  });
-}
+import { ProductImportPreview } from '@/components/products/ProductImportPreview';
+import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 
 function methodIcon(method: string): keyof typeof Feather.glyphMap {
   if (method === 'CSV') return 'file-text';
@@ -98,25 +50,105 @@ export default function ProductImportScreen() {
   const [bulkCategory, setBulkCategory] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [importing, setImporting] = useState(false);
-  const [csvUploading, setCsvUploading] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [csvText, setCsvText] = useState('');
 
-  async function importCsv() {
-    if (!csvText.trim()) return;
-    setCsvUploading(true);
-    setShowCsvModal(false);
+  const { isSignedIn } = useAuth();
+  const [providers, setProviders] = useState<ImportProviders | null>(null);
+  const [runs, setRuns] = useState<ImportRun[]>([]);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [result, setResult] = useState<ImportCommitResult | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ kind: 'csv'; text: string; filename?: string } | { kind: 'etsy' } | null>(null);
+  const [etsyBusy, setEtsyBusy] = useState(false);
+
+  const loadProviders = useCallback(async () => {
+    // Signed-out web preview has no token: never call the protected API.
+    if (!isSignedIn) return;
     try {
-      const rows = parseProductCsv(csvText.trim());
-      if (rows.length === 0) throw new Error('CSV contains no products.');
-      const res = await api.products.import(rows);
-      const count = res.successCount;
-      Alert.alert('Import complete', `${count} product${count !== 1 ? 's' : ''} imported successfully.`);
-      setCsvText('');
-    } catch {
-      Alert.alert('Import failed', 'Could not import products. Check your CSV format and try again.');
+      const [p, r] = await Promise.all([api.productImport.providers(), api.productImport.runs()]);
+      setProviders(p);
+      setRuns(r.runs);
+    } catch { /* the method cards still work; Etsy stays hidden behind its own state */ }
+  }, [api, isSignedIn]);
+
+  useFocusEffect(useCallback(() => { void loadProviders(); }, [loadProviders]));
+  useEffect(() => { void loadProviders(); }, [loadProviders]);
+
+  function messageOf(error: unknown): string {
+    const raw = error instanceof Error ? error.message : '';
+    return raw.replace(/^API \d+:\s*/, '') || 'Something went wrong. Try again.';
+  }
+
+  async function startReview(next: NonNullable<typeof pending>) {
+    setPending(next);
+    setPreview(null);
+    setResult(null);
+    setReviewError(null);
+    setReviewBusy(true);
+    setReviewOpen(true);
+    try {
+      setPreview(next.kind === 'csv' ? await api.productImport.previewCsv(next.text) : await api.productImport.etsyPreview());
+    } catch (error) {
+      setReviewOpen(false);
+      Alert.alert('Import', messageOf(error));
     } finally {
-      setCsvUploading(false);
+      setReviewBusy(false);
+    }
+  }
+
+  async function commitReview() {
+    if (!pending) return;
+    setReviewBusy(true);
+    setReviewError(null);
+    try {
+      const res = pending.kind === 'csv'
+        ? await api.productImport.commitCsv(pending.text, pending.filename)
+        : await api.productImport.etsyCommit();
+      setResult(res);
+      void loadProviders();
+    } catch (error) {
+      setReviewError(messageOf(error));
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  async function pickCsvFile() {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled || !picked.assets?.[0]) return;
+      const asset = picked.assets[0];
+      const text = await (asset.file ? asset.file.text() : fetch(asset.uri).then((r) => r.text()));
+      if (!text.trim()) { Alert.alert('Import', 'The file is empty.'); return; }
+      void startReview({ kind: 'csv', text, filename: asset.name });
+    } catch {
+      Alert.alert('Import', "We couldn't read that file.");
+    }
+  }
+
+  function importCsv() {
+    if (!csvText.trim()) return;
+    setShowCsvModal(false);
+    void startReview({ kind: 'csv', text: csvText });
+  }
+
+  async function connectEtsy() {
+    setEtsyBusy(true);
+    try {
+      const { authorizeUrl } = await api.productImport.etsyConnect();
+      await WebBrowser.openAuthSessionAsync(authorizeUrl);
+      await loadProviders();
+    } catch (error) {
+      Alert.alert('Etsy', messageOf(error));
+    } finally {
+      setEtsyBusy(false);
     }
   }
 
@@ -164,7 +196,7 @@ export default function ProductImportScreen() {
 
   return (
     <View style={s.screen}>
-      <Header title="Import Products" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }} />
+      <Header title="Import Products" dividerVariant="none" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -192,22 +224,29 @@ export default function ProductImportScreen() {
             <View style={s.expanded}>
               <View style={s.divider} />
               <BrandthreadCard style={s.stepsCard}>
-                <Text style={s.stepText}>1. Download the Brandthread CSV template</Text>
-                <Text style={s.stepText}>2. Fill in your product names, prices, and categories</Text>
-                <Text style={s.stepText}>3. Upload the completed file to import</Text>
+                <Text style={s.stepText}>1. Export from Shopify or Etsy, or use the template</Text>
+                <Text style={s.stepText}>2. Pick the file; layout is detected</Text>
+                <Text style={s.stepText}>3. Review the preview, then import</Text>
               </BrandthreadCard>
               <PrimaryButton
-                label="Download template"
-                onPress={() => Alert.alert('CSV Template', 'name,description,price,cost,category\n"Product Name","Description",0,0,"Other"\n\nCopy this format for your import file.')}
-                icon="download"
-                style={s.expandedBtn}
-              />
-              <SecondaryButton
-                label={csvUploading ? 'Importing...' : 'Upload CSV'}
-                onPress={() => setShowCsvModal(true)}
+                label="Choose CSV file"
+                onPress={() => { void pickCsvFile(); }}
                 icon="upload"
                 style={s.expandedBtn}
-                disabled={csvUploading}
+                disabled={reviewBusy}
+              />
+              <SecondaryButton
+                label="Paste CSV"
+                onPress={() => setShowCsvModal(true)}
+                icon="clipboard"
+                style={s.expandedBtn}
+                disabled={reviewBusy}
+              />
+              <SecondaryButton
+                label="Download template"
+                onPress={() => Alert.alert('CSV Template', 'name,description,category,price,sku,images,tags,size,color,stock\n"Product Name","Description","Tops",29.99,"TEE-1","https://example.com/a.jpg|https://example.com/b.jpg","cotton,basics","M","Black",10\n\nRows with the same name become variants of one product. Shopify and Etsy export files are recognised automatically.')}
+                icon="download"
+                style={s.expandedBtn}
               />
             </View>
           )}
@@ -229,6 +268,38 @@ export default function ProductImportScreen() {
             <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
           </View>
         </GradientCard>
+
+        {/* ── METHOD: Etsy (env-gated; reason shown only to the signed-in seller) ── */}
+        {isSignedIn && providers ? (
+          <GradientCard
+            style={s.methodCard}
+            onPress={() => {
+              if (!providers.etsy.enabled || etsyBusy || reviewBusy) return;
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (providers.etsy.connected) void startReview({ kind: 'etsy' });
+              else void connectEtsy();
+            }}
+          >
+            <View style={[s.methodRow, !providers.etsy.enabled && { opacity: 0.6 }]}>
+              <View style={[s.methodIconWrap, { backgroundColor: theme.secondaryDim }]}>
+                <Feather name="tag" size={ICON.md} color={theme.secondary} />
+              </View>
+              <View style={s.methodInfo}>
+                <Text style={s.methodTitle}>Import from Etsy</Text>
+                <Text style={s.methodDesc}>
+                  {!providers.etsy.enabled
+                    ? (providers.etsy.reason ?? "Etsy import isn't enabled on this server.")
+                    : providers.etsy.connected
+                      ? "Import your active listings"
+                      : 'Connect your shop to import active listings'}
+                </Text>
+              </View>
+              {providers.etsy.enabled
+                ? <StatusBadge label={providers.etsy.connected ? 'Connected' : 'Connect'} variant={providers.etsy.connected ? 'success' : 'neutral'} />
+                : <StatusBadge label="Unavailable" variant="neutral" />}
+            </View>
+          </GradientCard>
+        ) : null}
 
         {/* ── METHOD C: Manual Bulk Entry ── */}
         <GradientCard
@@ -286,11 +357,29 @@ export default function ProductImportScreen() {
         {/* ── Import History ── */}
         <SectionHeader title="Recent imports" style={s.sectionHeader} />
 
-        <EmptyState
-          icon="clock"
-          title="No imports yet"
-          description="Products you import will show up here."
-        />
+        {runs.length > 0 ? runs.map((run) => (
+          <BrandthreadCard key={run.id} style={s.historyCard}>
+            <View style={s.historyRow}>
+              <View style={[s.historyIconWrap, { backgroundColor: theme.accentDim }]}>
+                <Feather name={run.source === 'etsy_api' ? 'tag' : 'file-text'} size={ICON.sm} color={theme.accent} />
+              </View>
+              <View style={s.historyInfo}>
+                <Text style={s.historyLabel} numberOfLines={1}>
+                  {run.filename || (run.source === 'etsy_api' ? 'Etsy shop' : 'Pasted CSV')}
+                </Text>
+                <Text style={s.historyDate}>
+                  {run.created} new · {run.updated} updated{run.failed + run.skipped > 0 ? ` · ${run.failed + run.skipped} not imported` : ''} · {new Date(run.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          </BrandthreadCard>
+        )) : (
+          <EmptyState
+            icon="clock"
+            title="No imports yet"
+            description="Products you import will show up here."
+          />
+        )}
       </ScrollView>
 
       {/* ── CSV Paste Modal ── */}
@@ -308,10 +397,10 @@ export default function ProductImportScreen() {
             </TouchableOpacity>
           </View>
           <Text style={{ fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 }}>
-            Expected format: <Text style={{ color: FG }}>name, description, price, cost, category</Text>
+            Expected format: <Text style={{ color: FG }}>name, description, category, price, sku, images, tags, size, color, stock</Text>
           </Text>
           <Text style={{ fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginBottom: 12 }}>
-            Paste your CSV content below (including the header row).
+            Paste your CSV content below (including the header row). Shopify and Etsy exports work too.
           </Text>
           <TextInput
             style={{ backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: 12, padding: 12, flex: 1, textAlignVertical: 'top' }}
@@ -325,16 +414,27 @@ export default function ProductImportScreen() {
           />
           <TouchableOpacity
             style={{ marginTop: 16, backgroundColor: theme.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !csvText.trim() ? 0.5 : 1, shadowColor: theme.shadowColor }}
-            disabled={!csvText.trim() || csvUploading}
+            disabled={!csvText.trim() || reviewBusy}
             activeOpacity={0.85}
             onPress={importCsv}
           >
             <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: theme.onAccent }}>
-              {csvUploading ? 'Importing…' : 'Import Products'}
+              Review import
             </Text>
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <ProductImportPreview
+        visible={reviewOpen}
+        preview={preview}
+        result={result}
+        busy={reviewBusy}
+        error={reviewError}
+        onClose={() => setReviewOpen(false)}
+        onCommit={() => { void commitReview(); }}
+        onViewProducts={() => { setReviewOpen(false); router.push('/(tabs)/products' as never); }}
+      />
     </View>
   );
 }
