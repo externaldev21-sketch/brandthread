@@ -15,6 +15,8 @@ import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ListSkeleton } from '@/components/layout';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, SegmentedControl } from '@/components/ui';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
@@ -52,9 +54,12 @@ export default function BuyerFriendRequestsScreen() {
   const [sentSet,  setSentSet]  = useState<Set<string>>(new Set()); // local optimistic follows
   const [loading,  setLoading]  = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const pull = usePullToRefresh(() => loadData(true));
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setLoadFailed(false);
     try {
       const [followers, following, sugs] = await Promise.all([
         api.social.followers(),
@@ -93,13 +98,13 @@ export default function BuyerFriendRequestsScreen() {
 
       setSuggestions(sugs);
     } catch {
-      // Degrade to empty lists on error
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
 
   // ── Follow back (accept incoming) ───────────────────────────────────────────
   const handleFollowBack = async (row: FollowRow) => {
@@ -327,7 +332,13 @@ export default function BuyerFriendRequestsScreen() {
         <SegmentedControl options={tabOptions} selectedId={tab} onChange={(id) => setTab(id as Tab)} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.huge + SPACING.xxl }}>
+      <ScrollView
+        refreshControl={pull.refreshControl}
+        contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.huge + SPACING.xxl }}
+      >
+        {loadFailed && !loading && incoming.length === 0 && sent.length === 0 && suggestions.length === 0 ? (
+          <View style={{ padding: SPACING.md }}><RetryRow label="Couldn't load people" onRetry={() => { void loadData(); }} /></View>
+        ) : null}
         {tab === 'incoming'  && renderIncoming()}
         {tab === 'sent'      && renderSent()}
         {tab === 'suggested' && renderSuggested()}

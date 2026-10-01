@@ -15,6 +15,7 @@ import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
 import { COMP } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 type ShopifyProductRow = {
   shopifyProductId: string;
@@ -54,8 +55,8 @@ export default function ShopifyImportScreen() {
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
 
-  const loadProducts = useCallback(async () => {
-    setLoadingProducts(true);
+  const loadProducts = useCallback(async (silent = false) => {
+    if (!silent) setLoadingProducts(true);
     try {
       const res = await api.shopify.products();
       setProducts(res.products);
@@ -69,6 +70,7 @@ export default function ShopifyImportScreen() {
   }, [api]);
 
   useEffect(() => { if (connected) loadProducts(); }, [connected, loadProducts]);
+  const pull = usePullToRefresh(() => loadProducts(true));
 
   async function handleConnect() {
     if (shopDomain.trim().length < 3) {
@@ -198,6 +200,7 @@ export default function ShopifyImportScreen() {
             <FlatList
               data={products}
               keyExtractor={(item) => item.shopifyProductId}
+              refreshControl={pull.refreshControl}
               contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
               renderItem={({ item }) => (
                 <TouchableOpacity

@@ -53,6 +53,7 @@ import { bumpCommentCount } from '@/lib/commentCountBus';
 import { buildPreviewComments, previewNotificationComments } from '@/lib/previewComments';
 import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const MAX_COMMENT_LENGTH = 1000;
 // Links the comment list's KeyboardGestureArea to the composer's TextInput
@@ -723,6 +724,7 @@ export default function BuyerPostCommentsScreen() {
   }, [api, postId, params.postAuthorName, targetCommentId, myName]);
 
   useEffect(() => { load(); }, [load]);
+  const pull = usePullToRefresh(load);
 
   const loadMore = useCallback(async () => {
     if (!meta.nextCursor || loadingMore) return;
@@ -1068,6 +1070,7 @@ export default function BuyerPostCommentsScreen() {
           <FlatList
             ref={listRef}
             data={loading ? [] : visibleRows}
+            refreshControl={pull.refreshControl}
             keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}
             extraData={highlightId}
             onScrollToIndexFailed={handleScrollToIndexFailed}

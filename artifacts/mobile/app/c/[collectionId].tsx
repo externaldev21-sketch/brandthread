@@ -20,6 +20,7 @@ import {
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ResponsiveContainer } from '@/components/layout';
 import { formatCents } from '@/lib/money';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -64,6 +65,15 @@ export default function PublicCollectionScreen() {
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
+  const pull = usePullToRefresh(async () => {
+    if (!collectionId) return;
+    try {
+      const data = await fetchPublicCollection(collectionId);
+      setState({ kind: 'ready', data });
+    } catch {
+      // Keep showing what is already on screen.
+    }
+  });
 
   useEffect(() => {
     if (!collectionId) { setState({ kind: 'not_found' }); return; }
@@ -107,6 +117,7 @@ export default function PublicCollectionScreen() {
   return (
     <ScrollView
       style={styles.root}
+      refreshControl={pull.refreshControl}
       contentContainerStyle={{ paddingTop: headerTopInset + SP.lg, paddingBottom: insets.bottom + SP.xxl }}
       showsVerticalScrollIndicator={false}
     >

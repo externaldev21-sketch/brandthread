@@ -62,6 +62,7 @@ import { WebAppShell } from '@/components/web/WebAppShell';
 import { PhoneFrameSafeArea } from '@/components/web/PhoneFrameSafeArea';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
+import OfflineBanner from '@/components/OfflineBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
@@ -1201,6 +1202,7 @@ function RootLayoutNav() {
       <StoreContextBanner />
       <NotificationBanner />
       <NetworkNoticeBanner />
+      <OfflineBanner />
       <ActionSheetHost />
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
