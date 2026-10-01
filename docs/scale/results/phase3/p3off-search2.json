@@ -1,0 +1,25 @@
+{
+  "scenario": "search",
+  "steps": [
+    5,
+    10,
+    20,
+    40,
+    80,
+    160
+  ],
+  "stepSeconds": 15,
+  "requests": 635,
+  "rps": 5.282462542890096,
+  "serverErrorRate": 0.4456692913385827,
+  "rateLimitedRate": 0,
+  "dropped": 1556,
+  "endpoints": {
+    "search": {
+      "p50": 51040.054456,
+      "p95": 60001.137855,
+      "p99": 60002.9696328,
+      "max": 60009.956526
+    }
+  }
+}

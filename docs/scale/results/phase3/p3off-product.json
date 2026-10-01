@@ -1,0 +1,24 @@
+{
+  "scenario": "product",
+  "steps": [
+    50,
+    100,
+    200,
+    400,
+    800
+  ],
+  "stepSeconds": 15,
+  "requests": 17460,
+  "rps": 232.05705730738077,
+  "serverErrorRate": 0,
+  "rateLimitedRate": 0,
+  "dropped": 156,
+  "endpoints": {
+    "product": {
+      "p50": 4.7309470000000005,
+      "p95": 335.65606744999957,
+      "p99": 455.51792256999994,
+      "max": 481.325862
+    }
+  }
+}

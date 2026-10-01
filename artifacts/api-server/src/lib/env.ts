@@ -32,6 +32,7 @@ const REQUIRED_VARS: RequiredVar[] = [
 // shipping labels, ...) rather than the whole server, so a missing one is
 // worth a warning but never a boot failure.
 const OPTIONAL_VARS = [
+  "REDIS_URL",
   "AGORA_APP_ID",
   "AGORA_APP_CERTIFICATE",
   "AGORA_CUSTOMER_ID",

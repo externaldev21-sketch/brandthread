@@ -1,6 +1,7 @@
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { consumeRateLimitRedis } from "../lib/rateLimitStore";
 import type { Request, RequestHandler } from "express";
 
 export type RateLimitPolicyName =
@@ -310,7 +311,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
     const identity = rateLimitIdentity(req, policy);
     const key = `${policy.id}:${identity}`;
     try {
-      const counter = await consumeRateLimitBucket(key, policy);
+      const counter = (await consumeRateLimitRedis(key, policy.windowMs)) ?? (await consumeRateLimitBucket(key, policy));
       const remaining = Math.max(0, policy.limit - counter.count);
       const retryAfterSeconds = Math.max(
         1,
