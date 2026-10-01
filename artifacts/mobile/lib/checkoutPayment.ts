@@ -13,6 +13,7 @@
  *  - turning a wallet sheet's contact into the page's address and contact.
  */
 import type { CheckoutAddress, CheckoutContact, CheckoutSession } from '@/services/cartTypes';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 
 /** Stripe's minimum USD card charge (the server enforces it too). */
 export const MIN_CARD_CHARGE_CENTS_CLIENT = 50;
@@ -57,6 +58,8 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** Live the buyer is shopping from — lets a live-only code validate server-side. */
+  liveStreamId?: string;
 };
 
 export type PaymentIntentAddress = {
@@ -85,6 +88,10 @@ export type QuoteBody = {
 
 type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
 
+function liveStreamIdFor(group: { sellerId?: string | null }): string | undefined {
+  return getLiveCheckoutContext(group.sellerId ?? null)?.streamId;
+}
+
 /** One group per seller. A promo code applies to single-seller orders, as before. */
 export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
   const code = session.deliveryGroups.length === 1 ? session.discounts.find(d => d.isValid)?.code : undefined;
@@ -95,6 +102,7 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
       quantity: Number(item.quantity),
     })),
     ...(code ? { discountCode: String(code) } : {}),
+    ...(code && liveStreamIdFor(group) ? { liveStreamId: liveStreamIdFor(group) } : {}),
   }));
 }
 

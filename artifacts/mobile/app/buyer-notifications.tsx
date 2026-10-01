@@ -91,6 +91,8 @@ function notifIcon(type: Notification['type']): string {
     case 'order_exception': return 'alert-triangle';
     case 'order_returned_to_sender': return 'corner-up-left';
     case 'drop_live': return 'zap';
+    case 'live_reminder':
+    case 'live_started': return 'video';
     case 'product_restocked': return 'refresh-cw';
     case 'price_drop': return 'trending-down';
     case 'saved_product_update': return 'bookmark';
@@ -176,6 +178,12 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
       // own history, which both duplicates it and breaks that tab's back
       // behavior. navigate reuses the existing tab instance and its stack.
       router.navigate('/(buyer)/orders' as any);
+      break;
+    case 'live_started':
+      router.push((notif.targetId ? `/live?streamId=${encodeURIComponent(notif.targetId)}` : '/live') as any);
+      break;
+    case 'live_reminder':
+      router.push('/live' as any);
       break;
     case 'drop_live':
     case 'product_restocked':

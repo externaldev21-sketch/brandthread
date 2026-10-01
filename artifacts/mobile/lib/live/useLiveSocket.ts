@@ -30,7 +30,9 @@ import { API_BASE_URL } from '@/lib/api';
 export type LiveSocketEvent =
   | { type: 'comment'; comment: any }
   | { type: 'products'; productTags: any[] }
-  | { type: 'viewerCount'; count: number };
+  | { type: 'viewerCount'; count: number }
+  | { type: 'pinned'; productId: string | null }
+  | { type: 'liveCode'; code: { id: string; code: string; type: string; value: number } };
 
 interface UseLiveSocketOptions {
   streamId: string | undefined;

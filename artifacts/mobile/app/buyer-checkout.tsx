@@ -95,6 +95,7 @@ import {
 } from '@/components/checkout/StripePayment';
 import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
 import { FONT, FS, SP } from '@/lib/theme';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
 
@@ -317,6 +318,25 @@ export default function BuyerCheckoutScreen() {
   // preview products, so there is no server cart or Stripe to talk to.
   const previewOnly = !!current?.deliveryGroups?.length && current.deliveryGroups.every(isPreviewCheckoutGroup);
 
+  // ── Live-only code tapped in a live ─────────────────────────────────────
+  // A viewer who tapped a live code in the stream has it applied here once
+  // (the server still validates it against the live at checkout).
+  const liveCodeToApply = !previewOnly && session?.deliveryGroups?.length === 1 && !session.discounts.some(d => d.isValid)
+    ? getLiveCheckoutContext(session.deliveryGroups[0].sellerId)?.code ?? null
+    : null;
+  useEffect(() => {
+    if (!liveCodeToApply || !sessionRef.current) return;
+    let active = true;
+    void applyDiscount(liveCodeToApply, sessionRef.current.summary.subtotalCents, sessionRef.current.discounts)
+      .then(async discount => {
+        if (!active || !discount.isValid || !sessionRef.current) return;
+        await persist({ ...sessionRef.current, discounts: [discount], idempotencyKey: `ck_${randomUUID()}` });
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveCodeToApply]);
+
   // ── Thread Cash (item 109) ──────────────────────────────────────────────
   // Single-seller, signed-in orders only (a token discounts one Stripe
   // session), behind the OFF-by-default 'threadCashCheckoutDiscount' flag.
@@ -386,6 +406,7 @@ export default function BuyerCheckoutScreen() {
       const result = await validateCart(
         current.deliveryGroups.flatMap(g => g.items),
         current.discounts.filter(d => d.isValid).map(d => d.code),
+        getLiveCheckoutContext(current.deliveryGroups[0]?.sellerId)?.streamId,
       );
       if (!result.isValid) {
         // Out of stock / price changed / unavailable — shown inline, not as an alert.
@@ -699,7 +720,10 @@ export default function BuyerCheckoutScreen() {
                 ? { threadCashToken: current.threadCashRedemption.token }
                 : {}),
               ...(current.deliveryGroups.length === 1 && current.discounts.find(d => d.isValid)
-                ? { discountCode: current.discounts.find(d => d.isValid)!.code }
+                ? {
+                    discountCode: current.discounts.find(d => d.isValid)!.code,
+                    ...(getLiveCheckoutContext(group.sellerId) ? { liveStreamId: getLiveCheckoutContext(group.sellerId)!.streamId } : {}),
+                  }
                 : {}),
             },
           );
