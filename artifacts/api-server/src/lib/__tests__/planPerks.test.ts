@@ -9,7 +9,7 @@ vi.mock("../nativeEntitlements", () => ({
   },
 }));
 
-import { MONTHLY_ALLOWANCE } from "../aiCredits/catalogue";
+import { creditPolicyForPlan } from "../aiCredits/catalogue";
 import { PLATFORM_FEE_BPS, destinationApplicationFeeCents, platformFeeCents, splitOrder } from "../money/fees";
 import { PLAN_CATALOGUE } from "../planCatalogue";
 import {
@@ -99,11 +99,11 @@ describe("buildPlanPerks", () => {
     expect(perks.map((p) => p.planId)).toEqual(["starter", "growth", "pro"]);
     for (const perk of perks) {
       expect(perk.amountCents).toBe(PLAN_CATALOGUE[perk.planId].amountCents);
-      expect(perk.monthlyAiCredits).toBe(MONTHLY_ALLOWANCE[perk.planId]);
+      expect(perk.monthlyAiCredits).toBe(creditPolicyForPlan(perk.planId).monthlyAllowance);
       expect(perk.platformFeeBps).toBe(platformFeeBpsForPlan(perk.planId));
     }
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({
-      amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: 600, advancedAnalytics: true,
+      amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true,
     });
   });
 

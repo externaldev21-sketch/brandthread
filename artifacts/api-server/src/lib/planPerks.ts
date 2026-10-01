@@ -5,7 +5,7 @@
  * aiCredits/catalogue, so nothing is stated twice.
  */
 import { getEffectiveEntitlement } from "./nativeEntitlements";
-import { MONTHLY_ALLOWANCE } from "./aiCredits/catalogue";
+import { creditPolicyForPlan } from "./aiCredits/catalogue";
 import { PLATFORM_FEE_BPS } from "./money/fees";
 import { PLAN_CATALOGUE, PLAN_IDS, isSellerPlanId, type SellerPlanId } from "./planCatalogue";
 
@@ -47,14 +47,9 @@ export async function resolveSellerPlatformFeeBps(sellerId: string): Promise<num
   }
 }
 
-/**
- * Monthly AI credits for a plan: `null` means unlimited (never show a count).
- * The only place that reads the credit catalogue; when it exports
- * `creditPolicyForPlan`, swap this body (null allowance -> unlimited).
- */
+/** Monthly AI credits for a plan from the credit policy; `null` means unlimited (never show a count). */
 export function monthlyAiCreditsForPlan(planId: SellerPlanId): number | null {
-  const allowance = MONTHLY_ALLOWANCE[planId] as number | null | undefined;
-  return typeof allowance === "number" ? allowance : null;
+  return creditPolicyForPlan(planId).monthlyAllowance;
 }
 
 export type PlanPerksPayload = {
