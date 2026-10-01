@@ -24,6 +24,7 @@ const GUEST_TOP_LEVEL = new Set([
   'seller-profile',
   'profile-videos',
   'profile-products',
+  'hashtag',
   'muted-words',
   'live-replays',
   'live-replay',

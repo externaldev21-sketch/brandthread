@@ -33,6 +33,7 @@ import {
 } from "../lib/mediaModerationStore";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { decodeCursor, encodeCursor } from "../lib/cursor";
+import { mergeHashtags, syncPostHashtags } from "../lib/hashtags";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -799,7 +800,8 @@ router.post("/", requireAuth, async (req, res) => {
     mediaType: (mediaType as any) ?? "photo",
     aspectRatio: aspectRatio ?? "9:16",
     caption:   caption   ?? "",
-    hashtags: hashtags ?? [],
+    // Normalised, plus any #tags written in the caption (additive).
+    hashtags: mergeHashtags(hashtags, caption),
     styleTags: styleTags ?? [],
     sound: sound ?? null,
     visibility: resolvedVisibility,
@@ -813,6 +815,10 @@ router.post("/", requireAuth, async (req, res) => {
     updatedAt: now,
   }).returning();
 
+  // The tag index is rebuildable from posts.hashtags, so a failure here must
+  // not fail the post itself.
+  await syncPostHashtags(post.id, post.hashtags ?? [], post.createdAt)
+    .catch((err) => req.log.error({ err, postId: post.id }, "Could not index post hashtags"));
   if (!captionHeld && screenHeld && heldVerdict) {
     await recordHeldMedia({
       targetType: post.mediaType === "video" ? "video" : "post",
@@ -1057,7 +1063,12 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (!Array.isArray(body.hashtags) || body.hashtags.some((tag) => typeof tag !== "string")) {
       return res.status(400).json({ error: "hashtags must be an array of strings" });
     }
-    updates.hashtags = body.hashtags as string[];
+  }
+  if (body.caption !== undefined || body.hashtags !== undefined) {
+    updates.hashtags = mergeHashtags(
+      body.hashtags !== undefined ? body.hashtags : existing.hashtags,
+      body.caption !== undefined ? body.caption : existing.caption,
+    );
   }
   if (body.styleTags !== undefined) {
     if (!Array.isArray(body.styleTags) || body.styleTags.some((tag) => typeof tag !== "string")) {
@@ -1146,6 +1157,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }
     const updated = await db.transaction(async (tx) => {
       const [post] = await tx.update(posts).set(updates).where(eq(posts.id, id)).returning();
+      if (updates.hashtags !== undefined) {
+        await syncPostHashtags(id, updates.hashtags, post.createdAt, tx as any);
+      }
       if (taggedProductIds !== undefined) {
         const validIds = (taggedProductIds as string[]).filter((productId) => UUID_RE.test(productId));
         const ownedProducts = validIds.length > 0

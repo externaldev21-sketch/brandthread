@@ -1,0 +1,7 @@
+captured 01-hashtag-top-demo.png  text-fit issues: 0
+captured 02-hashtag-recent-demo.png  text-fit issues: 0
+captured 03-hashtag-following-demo.png  text-fit issues: 0
+captured 04-hashtag-long-tag-demo.png  text-fit issues: 0
+captured 05-hashtag-empty-fresh.png  text-fit issues: 0
+captured 06-search-trending-demo.png  text-fit issues: 0
+TOTAL text-fit issues: 0

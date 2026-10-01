@@ -2440,3 +2440,4 @@ export * from './storyHighlights';
 export * from './ranking';
 
 export * from './comments';
+export * from './hashtags';
