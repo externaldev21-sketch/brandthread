@@ -34,7 +34,7 @@ export function DeadlineChip({ countdown }: { countdown: DeadlineCountdown }) {
 const chipStyles = StyleSheet.create({
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end',
-    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2,
+    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 4,
   },
   text: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });
