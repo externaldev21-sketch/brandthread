@@ -2525,3 +2525,4 @@ export * from './ranking';
 
 export * from './comments';
 export * from './hashtags';
+export * from './captions';

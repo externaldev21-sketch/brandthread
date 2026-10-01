@@ -14,7 +14,8 @@ export type FeatureFlagKey =
   | 'oauthGoogleEnabled'
   | 'oauthAppleEnabled'
   | 'hostedCheckoutFallback'
-  | 'live_tips';
+  | 'live_tips'
+  | 'autoCaptions';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -43,6 +44,9 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // Live tips (gift button in the live viewer). OFF until Thread Cash is
   // finalised; the server enforces it too (POST /thread-cash/live-gift).
   live_tips: false,
+  // Auto captions (Whisper) on video posts. OFF until the server has the AI keys
+  // and an operator flips it (PUT /api/feature-flags/autoCaptions).
+  autoCaptions: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';
