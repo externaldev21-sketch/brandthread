@@ -9,7 +9,9 @@ export type PlanPerk = {
   name: string;
   amountCents: number;
   platformFeeBps: number;
-  monthlyAiCredits: number;
+  /** null when unlimited. */
+  monthlyAiCredits: number | null;
+  unlimitedAiCredits: boolean;
   advancedAnalytics: boolean;
 };
 
@@ -59,8 +61,15 @@ export const DEMO_PERKS: PerksResponse = {
   currentPlan: 'starter',
   hasAdvancedAnalytics: false,
   plans: [
-    { planId: 'starter', name: 'Brandthread Starter Plan', amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 50, advancedAnalytics: false },
-    { planId: 'growth', name: 'Brandthread Growth Plan', amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 150, advancedAnalytics: false },
-    { planId: 'pro', name: 'Brandthread Pro Plan', amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: 600, advancedAnalytics: true },
+    { planId: 'starter', name: 'Brandthread Starter Plan', amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, unlimitedAiCredits: false, advancedAnalytics: false },
+    { planId: 'growth', name: 'Brandthread Growth Plan', amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, unlimitedAiCredits: false, advancedAnalytics: false },
+    { planId: 'pro', name: 'Brandthread Pro Plan', amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true },
   ],
 };
+
+/** "Unlimited AI credits" or "1,000 AI credits per month"; never a count for unlimited plans. */
+export function aiCreditsLabel(perk: PlanPerk): string {
+  return perk.unlimitedAiCredits || perk.monthlyAiCredits === null
+    ? 'Unlimited AI credits'
+    : `${perk.monthlyAiCredits.toLocaleString('en-US')} AI credits per month`;
+}

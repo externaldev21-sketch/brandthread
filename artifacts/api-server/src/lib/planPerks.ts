@@ -47,12 +47,24 @@ export async function resolveSellerPlatformFeeBps(sellerId: string): Promise<num
   }
 }
 
+/**
+ * Monthly AI credits for a plan: `null` means unlimited (never show a count).
+ * The only place that reads the credit catalogue; when it exports
+ * `creditPolicyForPlan`, swap this body (null allowance -> unlimited).
+ */
+export function monthlyAiCreditsForPlan(planId: SellerPlanId): number | null {
+  const allowance = MONTHLY_ALLOWANCE[planId] as number | null | undefined;
+  return typeof allowance === "number" ? allowance : null;
+}
+
 export type PlanPerksPayload = {
   planId: SellerPlanId;
   name: string;
   amountCents: number;
   platformFeeBps: number;
-  monthlyAiCredits: number;
+  /** null when unlimited. */
+  monthlyAiCredits: number | null;
+  unlimitedAiCredits: boolean;
   advancedAnalytics: boolean;
 };
 
@@ -62,7 +74,8 @@ export function buildPlanPerks(): PlanPerksPayload[] {
     name: PLAN_CATALOGUE[planId].name,
     amountCents: PLAN_CATALOGUE[planId].amountCents,
     platformFeeBps: PLAN_PERKS[planId].platformFeeBps,
-    monthlyAiCredits: MONTHLY_ALLOWANCE[planId],
+    monthlyAiCredits: monthlyAiCreditsForPlan(planId),
+    unlimitedAiCredits: monthlyAiCreditsForPlan(planId) === null,
     advancedAnalytics: PLAN_PERKS[planId].advancedAnalytics,
   }));
 }
