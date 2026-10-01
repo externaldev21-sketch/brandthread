@@ -36,7 +36,7 @@ describe('Seller Studio page has no close (X) button — Dev\'s final layout cal
   });
 
   it('Android back and web Escape still close it via the Modal\'s own onRequestClose', () => {
-    expect(studio).toContain('onRequestClose={() => { cancelEnterFill(); collapse(); }}');
+    expect(studio).toContain('onRequestClose={() => { cancelEnter(); collapse(); }}');
   });
 });
 
