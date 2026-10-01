@@ -1,5 +1,5 @@
 /**
- * Seller launch checklist (migration 112).
+ * Seller launch checklist (migration 114).
  * GET  /api/seller/launch-checklist               — ordered steps + done flags from real account state
  * POST /api/seller/launch-checklist/preview-seen  — the seller has viewed their store as a buyer
  * POST /api/seller/launch-checklist/dismiss       — hide the dashboard card
