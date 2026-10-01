@@ -23,6 +23,7 @@ import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
 import { requireAuth } from "./middlewares/requireAuth";
 import { profileLanding } from "./routes/profileLanding";
 import { IP_NOTICE_PATHS, ipNoticePage } from "./routes/ipNoticePage";
+import { aiUsageContext } from "./lib/aiUsage";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -162,6 +163,8 @@ app.use(
 );
 
 app.use(appRateLimiter);
+// Attributes AI calls made while handling a request to the signed-in caller.
+app.use(aiUsageContext);
 app.get("/u/:username", rateLimit("public-read"), profileLanding);
 // Public IP / DMCA notice form (creates an ip_case via POST /api/ip-cases).
 app.get([...IP_NOTICE_PATHS], rateLimit("public-read"), ipNoticePage);
