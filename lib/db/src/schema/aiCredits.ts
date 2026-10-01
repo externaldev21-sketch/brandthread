@@ -1,7 +1,7 @@
 import { pgTable, uuid, text, integer, timestamp, date, jsonb, primaryKey, index } from 'drizzle-orm/pg-core';
 
 // ─── AI credits ─────────────────────────────────────────────────────────────
-// Created by migration 112. Every AI tool call debits credits server-side.
+// Created by migration 119. Every AI tool call debits credits server-side.
 // Three buckets, spent in this order: rollover (last month's unused credits,
 // one month only), the monthly allowance (resets each UTC month) and purchased
 // packs (never expire). Pro is unlimited and only tracked in ai_pro_usage.

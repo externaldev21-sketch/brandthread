@@ -33,6 +33,7 @@ import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 import { db, users } from "@workspace/db";
 import { eq, or, sql } from "drizzle-orm";
+import { MEDIA_REJECTED_MESSAGE, screenVideo } from "../lib/mediaModeration";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
@@ -187,6 +188,15 @@ export function createProfileCoverRouter({
         // Re-validate what will actually be served.
         const renderedError = coverDurationError(await processor.probeDuration(output));
         if (renderedError) return res.status(400).json({ error: renderedError, code: "cover_too_long" });
+
+        // Automatic frame screening (off when the AI integration env is
+        // missing). Profile videos have no held state, so flagged ones are
+        // refused; a screening outage never blocks the upload.
+        const screened = await screenVideo({ buffer: bytes });
+        if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
+          void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_video", verdict: { ...screened, verdict: "reject" } }));
+          return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+        }
 
         const videoPath = await storage.createObjectEntityFromBuffer(await fs.readFile(output), "video/mp4");
         created.push(videoPath);

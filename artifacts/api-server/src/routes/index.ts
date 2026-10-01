@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import healthRouter from "./health";
+import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
 import authRouter from "./auth";
 import productsRouter from "./products";
 import ordersRouter from "./orders";
@@ -28,6 +29,9 @@ import aiCreditsRouter from "./ai-credits";
 import { aiCreditsGate } from "../lib/aiCredits/gate";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import featuredPublicRouter from "./featured-public";
+import adminRouter from "./admin";
+import { auditModerationActions } from "../lib/admin/moderationAudit";
 import profileMediaRouter from "./profile-media";
 import profileCoverRouter from "./profile-cover";
 import avatarVideoRouter from "./avatar-video";
@@ -112,6 +116,21 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
+// Shared response cache for the public read paths that dominate traffic. A no-op
+// unless REDIS_URL is set. Registered before the routers so a hit never reaches
+// them. See docs/scale/CACHE.md for keys, TTLs and invalidation.
+router.get("/public/search", responseCache({ name: "search", ttlSeconds: 30, scope: "viewer-blocks" }));
+router.get("/public/profiles/:username", responseCache({ name: "profile", ttlSeconds: 20, scope: "viewer-blocks" }));
+router.get("/public/products/:id", responseCache({ name: "product", ttlSeconds: 15, scope: "anon", idKey: (req) => String(req.params.id) }));
+// A seller edit or delete drops the cached product page immediately.
+router.use("/products", (req, res, next) => {
+  const id = /^\/([0-9a-f-]{36})(\/|$)/i.exec(req.path)?.[1];
+  if (id && req.method !== "GET" && req.method !== "HEAD") {
+    res.once("finish", () => { if (res.statusCode < 400) void invalidateResponseCache("product", id); });
+  }
+  next();
+});
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
@@ -204,7 +223,8 @@ router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
-router.use("/moderation",                moderationRouter);
+router.use("/moderation",                auditModerationActions, moderationRouter);
+router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
