@@ -76,6 +76,7 @@ import {
   TransformMode, ExtHandleKind,
   computeHandlePositions, applyFreeformHandle, applyUniformHandle,
   transformToQuad, deriveAffineFromQuad, defaultWarpMesh, deriveAffineFromWarpMesh,
+  computeRotationDelta, applyRotateHandle,
   DistortQuad, WarpMeshPoint,
 } from '@/lib/transformModel';
 import {
@@ -215,6 +216,8 @@ type HandleKind =
 
 // Handle size constant (display px) for hit-testing overlay
 const HS = 22; // tap target — larger than visual for 44pt finger usability
+// Distance (display px) from the layer's top edge up to the rotate handle.
+const ROTATE_HANDLE_OFFSET = 28;
 
 // Selection mode
 type SelectionSubMode = SelectionMode;
@@ -405,6 +408,13 @@ export default function DesignCanvasScreen() {
     origTransform: import('../services/designTypes').DesignTransform;
     origQuad: DistortQuad | null;
     origMesh: WarpMeshPoint[] | null;
+    // Rotate-only: the layer's (unrotated) center and the drag's start
+    // touch position, both in LOCATION space (locationX/locationY — local
+    // to the canvas View extTransformPanResponder is attached to), not
+    // page space. Needed because rotation measures an angle from a fixed
+    // point, unlike the other handles which only ever need a page-space
+    // delta (where any canvas offset cancels out).
+    cx?: number; cy?: number; startLocX?: number; startLocY?: number;
   } | null>(null);
   const pendingExtHandleRef = useRef<ExtHandleKind>('move');
 
@@ -1347,14 +1357,22 @@ export default function DesignCanvasScreen() {
         const layer = layersRef.current.find(l => l.id === selId);
         if (!layer || layer.locked) return;
         const kind = pendingExtHandleRef.current;
+        const sx = dispScaleXRef.current || 1;
+        const sy = dispScaleYRef.current || 1;
+        const t = layer.transform;
         extHandleDragRef.current = {
           layerId: selId,
           kind,
           startX: e.nativeEvent.pageX,
           startY: e.nativeEvent.pageY,
-          origTransform: { ...layer.transform },
+          origTransform: { ...t },
           origQuad: distortQuadRef.current ? { ...distortQuadRef.current } : null,
           origMesh: warpMeshRef.current ? [...warpMeshRef.current] : null,
+          // Only meaningful for 'rotate', but cheap to always capture.
+          cx: (t.x + t.width  / 2) * sx,
+          cy: (t.y + t.height / 2) * sy,
+          startLocX: e.nativeEvent.locationX,
+          startLocY: e.nativeEvent.locationY,
         };
       },
 
@@ -1366,6 +1384,20 @@ export default function DesignCanvasScreen() {
         const ddx = (e.nativeEvent.pageX - drag.startX) / sx;
         const ddy = (e.nativeEvent.pageY - drag.startY) / sy;
         const mode = transformModeRef.current;
+
+        if (drag.kind === 'rotate') {
+          const deltaDeg = computeRotationDelta(
+            drag.cx ?? 0, drag.cy ?? 0,
+            drag.startLocX ?? 0, drag.startLocY ?? 0,
+            e.nativeEvent.locationX, e.nativeEvent.locationY,
+          );
+          setLayers(prev => prev.map(l =>
+            l.id === drag.layerId
+              ? { ...l, transform: applyRotateHandle(drag.origTransform, deltaDeg) }
+              : l
+          ));
+          return;
+        }
 
         setLayers(prev => prev.map(l => {
           if (l.id !== drag.layerId) return l;
@@ -1630,6 +1662,18 @@ export default function DesignCanvasScreen() {
   }
 
   // ─── LayersPanel handlers (components/design-studio/LayersPanel.tsx) ──────
+  /** Toggles the pinned "Background colour" row's visibility checkbox — flips
+   * the real canvas backgroundOpacity between 0 and 1, which both the live
+   * canvas and the export SVG's background Rect read (see bgOpacity above). */
+  function handleToggleCanvasBackgroundVisible() {
+    setProject(p => {
+      if (!p) return p;
+      const current = p.canvas.backgroundOpacity ?? 1;
+      return { ...p, canvas: { ...p.canvas, backgroundOpacity: current === 0 ? 1 : 0 } };
+    });
+    markDirty();
+  }
+
   function handleRenameLayer(id: string, name: string) {
     mutateLayer(prev => prev.map(l => l.id === id ? { ...l, name, updatedAt: new Date().toISOString() } : l));
   }
@@ -3039,6 +3083,11 @@ export default function DesignCanvasScreen() {
   }
 
   const bgHex = project?.canvas?.backgroundHex ?? BG;
+  // Real background-visibility toggle, driven from the Layers panel's pinned
+  // "Background colour" row checkbox — not a fake control. `backgroundOpacity`
+  // is an existing DesignCanvas field (services/designTypes.ts); undefined
+  // means fully visible (1), matching the old always-opaque default.
+  const bgOpacity = project?.canvas?.backgroundOpacity ?? 1;
 
   // ─── Selection handle positions (display px) ───────────────────────────────
   // Computed here so we can use them both in the SVG overlay and the Pressable overlays
@@ -3350,7 +3399,7 @@ export default function DesignCanvasScreen() {
               pointerEvents="none"
             >
               {/* Canvas background */}
-              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} />
+              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} opacity={bgOpacity} />
 
               {/* Layer paths and live strokes are stored in logical coordinates. */}
               <G transform={`scale(${dispScaleX} ${dispScaleY})`}>
@@ -3482,6 +3531,26 @@ export default function DesignCanvasScreen() {
                         />
                       );
                     })}
+                    {/* Rotate handle — a small circle offset above top-center,
+                        connected by a stem line, same as Procreate's own
+                        rotate handle. Only meaningful for freeform/uniform
+                        (distort/warp already give full per-corner control). */}
+                    {(transformMode === 'freeform' || transformMode === 'uniform') && (() => {
+                      const rhX = cx;
+                      const rhY = t.y * dispScaleY - ROTATE_HANDLE_OFFSET;
+                      return (
+                        <G key="rotate-handle">
+                          <Line
+                            x1={rhX} y1={t.y * dispScaleY} x2={rhX} y2={rhY}
+                            stroke={PURPLE_LIGHT} strokeWidth={1} opacity={0.7}
+                          />
+                          <Circle
+                            cx={rhX} cy={rhY} r={VS / 2 + 1}
+                            fill={CARD_ELEVATED} stroke={PURPLE_LIGHT} strokeWidth={1.5}
+                          />
+                        </G>
+                      );
+                    })()}
                     {/* Warp mesh grid lines */}
                     {transformMode === 'warp' && warpMesh && warpMesh.map((p, pi) => (
                       <Circle key={`wp${pi}`}
@@ -3585,24 +3654,47 @@ export default function DesignCanvasScreen() {
             </Pressable>
           )}
 
-          {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles) ── */}
+          {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles + rotate) ── */}
           {selectedLayer && activeTopTool === 'transform' && (() => {
             const handles = computeHandlePositions(selectedLayer.transform);
-            return handles.map(h => (
+            const t = selectedLayer.transform;
+            const rotateHandle = (transformMode === 'freeform' || transformMode === 'uniform') ? (
               <Pressable
-                key={h.kind}
+                key="rotate"
+                testID="transform-handle-rotate"
                 style={[
                   styles.handlePressable,
                   {
-                    left:   h.lx * dispScaleX - HS / 2,
-                    top:    h.ly * dispScaleY - HS / 2,
+                    left: (t.x + t.width / 2) * dispScaleX - HS / 2,
+                    top:  t.y * dispScaleY - ROTATE_HANDLE_OFFSET - HS / 2,
                     width:  HS,
                     height: HS,
                   },
                 ]}
-                onPressIn={() => { pendingExtHandleRef.current = h.kind; }}
+                onPressIn={() => { pendingExtHandleRef.current = 'rotate'; }}
               />
-            ));
+            ) : null;
+            return (
+              <>
+                {handles.map(h => (
+                  <Pressable
+                    key={h.kind}
+                    testID={`transform-handle-${h.kind}`}
+                    style={[
+                      styles.handlePressable,
+                      {
+                        left:   h.lx * dispScaleX - HS / 2,
+                        top:    h.ly * dispScaleY - HS / 2,
+                        width:  HS,
+                        height: HS,
+                      },
+                    ]}
+                    onPressIn={() => { pendingExtHandleRef.current = h.kind; }}
+                  />
+                ))}
+                {rotateHandle}
+              </>
+            );
           })()}
 
           {/* Select mode intentionally has no handle Pressables: transformPanResponder
@@ -3623,7 +3715,7 @@ export default function DesignCanvasScreen() {
               viewBox={`${exportX} ${exportY} ${exportW} ${exportH}`}
               pointerEvents="none"
             >
-              <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} />
+              <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} opacity={bgOpacity} />
               {/* Garment guide/template layers (layer.isTemplate) are a non-exportable
                   placement aid and are always excluded from the flattened export. */}
               {sortedLayers.filter(layer => !layer.isTemplate).map(layer =>
@@ -4106,15 +4198,16 @@ export default function DesignCanvasScreen() {
           </View>
         </View>
       </Modal>
-      {/* ── LAYER MANAGER ── */}
+      {/* ── LAYER MANAGER — Procreate's own full-height Layers sheet, dropping
+          down from the top under the status bar, not a small corner popover. ── */}
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
+        <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View>
+          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
             <LayersPanelComponent
               layers={layers}
               selectedLayerId={selectedLayerId}
-              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('select'); }}
+              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('transform'); }}
               onAddLayer={handleAddDrawingLayer}
               onDuplicateLayer={handleDuplicateLayer}
               onDeleteLayer={handleDeleteLayer}
@@ -4128,6 +4221,9 @@ export default function DesignCanvasScreen() {
               onReorder={handleReorderLayers}
               onMergeDown={handleMergeLayerDown}
               onClose={closeSheet}
+              canvasBackgroundHex={project?.canvas?.backgroundHex ?? '#FFFFFF'}
+              canvasBackgroundVisible={(project?.canvas?.backgroundOpacity ?? 1) !== 0}
+              onToggleBackgroundVisible={handleToggleCanvasBackgroundVisible}
             />
           </View>
         </View>
@@ -5524,6 +5620,10 @@ const styles = StyleSheet.create({
   wrenchItemText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
 
   modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  // Layers sheet drops from the top under the status bar — Procreate's own
+  // placement — rather than sitting at the bottom like the other sheets.
+  layersModalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-start' },
+  layersModalSheetWrap: { paddingTop: Platform.OS === 'ios' ? 54 : 32 },
   sheet: {
     backgroundColor: SURFACE,
     borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
