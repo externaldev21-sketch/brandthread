@@ -10,6 +10,7 @@
  * lib/onboardingFlow.ts (a plain, RN-free module) so they're independently
  * unit-testable and are not duplicated as hand-maintained index objects here.
  */
+import { track } from '@/lib/analytics';
 import { LegalConsent } from '@/components/legal/LegalConsent';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { LegalContinueNotice } from '@/components/legal/LegalConsent';
@@ -739,6 +740,7 @@ function BuyerAuthStep({
         }
         return;
       }
+      track('signup_started', { method: 'email' });
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
@@ -761,6 +763,7 @@ function BuyerAuthStep({
     try {
       await signUp.verifications.verifyEmailCode({ code });
       if (signUp.status === 'complete') {
+        track('signup_completed', { method: 'email' });
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
             const referralQuery = referralCode

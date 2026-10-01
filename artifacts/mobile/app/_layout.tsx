@@ -76,6 +76,8 @@ import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
+import AnalyticsBridge from '@/components/AnalyticsBridge';
+import { wrapRootComponent } from '@/lib/monitoring';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 import { getDevWebPreviewRole } from '@/lib/devPreview';
@@ -1515,13 +1517,14 @@ function RootLayoutNav() {
       <PushRegistrar />
       <AffiliateRefCapture />
       <MarketingPixelTracker />
+      <AnalyticsBridge />
       <LegalAcceptanceGate />
       <AppLockGate />
     </View>
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -1618,3 +1621,5 @@ export default function RootLayout() {
     </AppIntroSplash>
   );
 }
+
+export default wrapRootComponent(RootLayout);

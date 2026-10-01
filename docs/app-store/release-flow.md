@@ -83,6 +83,7 @@ eas env:create --environment production --name EXPO_PUBLIC_API_BASE_URL --value 
 | `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` | RevenueCat App Store public key |
 | `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` | RevenueCat Play Store public key |
 | `EXPO_PUBLIC_SENTRY_DSN` | Optional. Sentry DSN for crash reports (same value as `SENTRY_DSN`, see [Crash reporting](#crash-and-error-reporting-sentry)) |
+| `EXPO_PUBLIC_POSTHOG_KEY` | Optional. PostHog project key for funnel analytics (`EXPO_PUBLIC_POSTHOG_HOST` optional, defaults to `https://us.i.posthog.com`). See [observability](../reliability/observability.md) |
 | `SENTRY_ORG`, `SENTRY_PROJECT` | Optional. Sentry organisation and project slugs, used to upload source maps |
 | `SENTRY_AUTH_TOKEN` | Optional. Sentry auth token. Create it with visibility **secret** |
 

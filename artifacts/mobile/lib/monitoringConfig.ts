@@ -79,3 +79,15 @@ export function scrubBreadcrumb<T extends BreadcrumbLike>(breadcrumb: T, isDev: 
   }
   return { ...breadcrumb, data };
 }
+
+/**
+ * Groups an API path for reporting: drops the query string and replaces ids
+ * (UUIDs, numbers, long opaque tokens) with ":id", so one failing endpoint is
+ * one Sentry issue and no account or record id is sent.
+ */
+export function normalizeApiPath(path: string): string {
+  return stripUrlQuery(path)
+    .split('/')
+    .map((segment) => (/^[0-9]+$/.test(segment) || /^[0-9a-f-]{16,}$/i.test(segment) || /^(user|post|prod|ord)_[A-Za-z0-9]+$/.test(segment) || segment.length > 24 ? ':id' : segment))
+    .join('/');
+}
