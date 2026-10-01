@@ -356,6 +356,12 @@ function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
   const segments = useSegments();
   const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
+  const [studioCloseRequestKey, setStudioCloseRequestKey] = useState(0);
+  // Tracks the Studio page's own open/closed state (reported via
+  // onOpenChange below) so a second tap of the same tab button can close it
+  // instead of doing nothing — see SellerStudioRadialMenu's
+  // openRequestKey/closeRequestKey doc comments.
+  const [isStudioOpen, setIsStudioOpen] = useState(false);
 
   // Honor the dev web preview bypass: PREVIEW_ROLE is evaluated at module load
   // time (before Clerk resolves) so it must be checked independently of
@@ -370,6 +376,14 @@ function SellerBarGate() {
   const firstSegment = (segments[0] as string | undefined) ?? '';
   const isFullScreenRoute = SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
+  // The Studio radial menu force-unmounts on a full-screen route (see
+  // below) without ever reporting itself closed — reset the tracked state
+  // to match so the tab button doesn't get stuck reading "Close Studio
+  // tools" after it comes back.
+  useEffect(() => {
+    if (isFullScreenRoute) setIsStudioOpen(false);
+  }, [isFullScreenRoute]);
+
   if (!showBar) return null;
 
   // The bar itself stays mounted through a full-screen route so it can
@@ -379,8 +393,22 @@ function SellerBarGate() {
   // as before.
   return (
     <>
-      <SellerGlobalTabBar hidden={isFullScreenRoute} onOpenStudio={() => setStudioOpenRequestKey((k) => k + 1)} />
-      {!isFullScreenRoute && <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />}
+      <SellerGlobalTabBar
+        hidden={isFullScreenRoute}
+        isStudioOpen={isStudioOpen}
+        onOpenStudio={() => {
+          if (isStudioOpen) setStudioCloseRequestKey((k) => k + 1);
+          else setStudioOpenRequestKey((k) => k + 1);
+        }}
+      />
+      {!isFullScreenRoute && (
+        <SellerStudioRadialMenu
+          hideTrigger
+          openRequestKey={studioOpenRequestKey}
+          closeRequestKey={studioCloseRequestKey}
+          onOpenChange={setIsStudioOpen}
+        />
+      )}
     </>
   );
 }
