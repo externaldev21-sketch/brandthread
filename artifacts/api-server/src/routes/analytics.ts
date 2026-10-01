@@ -3,6 +3,7 @@ import { db, orders, customers, productVariants, drops, products, orderItems, us
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
+import { buildAdvancedAnalyticsResponse, ADVANCED_MONTHS } from "./analyticsAdvanced";
 import {
   DAY_MS,
   TEN_MIN_MS,
@@ -665,6 +666,51 @@ router.get("/customers", requirePlan("pro"), async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch customer analytics");
     res.status(500).json({ error: "Failed to fetch customer analytics" });
+  }
+});
+
+// GET /api/analytics/advanced  (Brandthread Pro)
+// Customer cohorts by first-order month, lifetime value and average order
+// value by month, from real non-cancelled orders. Existing analytics stay
+// free; only this additional module is plan-gated.
+router.get("/advanced", requirePlan("pro"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  try {
+    const since = sql`date_trunc('month', now()) - make_interval(months => ${ADVANCED_MONTHS - 1})`;
+    const cohorts = await db.execute(sql`
+      WITH b AS (
+        SELECT buyer_id, MIN(created_at) AS first_at, COUNT(*)::int AS order_count,
+               COALESCE(SUM(total_cents), 0)::bigint AS total_cents
+        FROM orders
+        WHERE owner_id = ${ownerId} AND status != 'cancelled' AND buyer_id IS NOT NULL
+        GROUP BY buyer_id
+      )
+      SELECT to_char(date_trunc('month', first_at), 'YYYY-MM') AS cohort,
+             COUNT(*)::int AS customers,
+             SUM(CASE WHEN order_count > 1 THEN 1 ELSE 0 END)::int AS repeat_customers,
+             COALESCE(SUM(total_cents), 0)::bigint AS revenue_cents
+      FROM b
+      WHERE first_at >= ${since}
+      GROUP BY 1
+    `);
+    const monthly = await db.execute(sql`
+      SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+             COUNT(*)::int AS orders,
+             COALESCE(SUM(total_cents), 0)::bigint AS revenue_cents
+      FROM orders
+      WHERE owner_id = ${ownerId} AND status != 'cancelled' AND created_at >= ${since}
+      GROUP BY 1
+    `);
+    const lifetime = await db.execute(sql`
+      SELECT COUNT(DISTINCT buyer_id)::int AS customers,
+             COALESCE(SUM(total_cents), 0)::bigint AS revenue_cents
+      FROM orders
+      WHERE owner_id = ${ownerId} AND status != 'cancelled' AND buyer_id IS NOT NULL
+    `);
+    res.json(buildAdvancedAnalyticsResponse(cohorts.rows, monthly.rows, lifetime.rows));
+  } catch (err) {
+    req.log.error({ err }, "Failed to load advanced analytics");
+    res.status(500).json({ error: "Failed to load advanced analytics" });
   }
 });
 

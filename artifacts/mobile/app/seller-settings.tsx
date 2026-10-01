@@ -182,7 +182,7 @@ export default function SellerSettingsScreen() {
                 testID={item.action === 'account-scope' ? 'account-reach' : undefined}
                 destructive={item.destructive}
                 soon={item.soon}
-                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : undefined}
+                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : item.route === '/ai-credits' && !planLoading && !planError && hasPlan('pro') ? 'Unlimited' : undefined}
                 last={i === group.items.length - 1}
                 onPress={() => handleItem(item)}
               />

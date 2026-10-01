@@ -134,6 +134,8 @@ export function paymentIntentMoney(input: {
   sellerStripeAccountId: string;
   merchandiseCents: number;
   preTaxTotalCents: number;
+  /** Seller-plan commission in bps (lib/planPerks); defaults to the standard rate. */
+  platformFeeBps?: number | null;
 }): {
   paymentIntentData: Record<string, unknown>;
   /** The charge model to persist on the checkout (and then the order). */
@@ -144,6 +146,7 @@ export function paymentIntentMoney(input: {
   const fee = destinationApplicationFeeCents({
     merchandiseCents: input.merchandiseCents,
     preTaxTotalCents: input.preTaxTotalCents,
+    platformFeeBps: input.platformFeeBps,
   });
   if (input.plan.chargeModel === "held") {
     return {

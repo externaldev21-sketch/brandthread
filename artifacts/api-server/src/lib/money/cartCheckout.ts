@@ -34,6 +34,7 @@ import { validateDiscountCode, DiscountValidationError } from "../discounts";
 import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
+import { resolveSellerPlatformFeeBps } from "../planPerks";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -135,6 +136,8 @@ export type PricedGroup = {
   merchandiseDiscountCents: number;
   shippingDiscountCents: number;
   platformFeeCents: number;
+  /** Commission rate (bps) fixed for this checkout from the seller's plan. */
+  platformFeeBps: number;
   processingFeeEstimateCents: number;
 };
 
@@ -270,9 +273,11 @@ export async function priceCartGroup(input: {
     : 0;
   const merchandiseDiscountCents = Math.max(0, Math.min(subtotalCents, discountCents - shippingDiscountCents));
 
+  const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
   const fee = destinationApplicationFeeCents({
     merchandiseCents: Math.max(0, subtotalCents - discountCents),
     preTaxTotalCents: Math.max(0, subtotalCents + shippingCents - discountCents),
+    platformFeeBps,
   });
 
   return {
@@ -289,6 +294,7 @@ export async function priceCartGroup(input: {
     merchandiseDiscountCents,
     shippingDiscountCents,
     platformFeeCents: fee.platformFeeCents,
+    platformFeeBps,
     processingFeeEstimateCents: fee.processingFeeEstimateCents,
   };
 }

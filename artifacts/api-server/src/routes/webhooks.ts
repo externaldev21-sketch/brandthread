@@ -21,6 +21,7 @@ import {
   activateBoostFromCheckoutSession,
   markBoostCheckoutFailed,
 } from "./boosts";
+import { fulfilCreditCheckoutSession, grantRevenueCatCreditPurchase } from "../lib/aiCredits/purchases";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
@@ -270,6 +271,11 @@ router.post("/stripe", async (req: Request, res: Response) => {
           // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
           break;
         }
+        // ── AI credit pack checkout ──────────────────────────────────────────
+        if (cs.metadata?.kind === "ai_credits") {
+          if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
+          break;
+        }
         // ── Regular buyer checkout ───────────────────────────────────────────
         if (cs.payment_status === "paid") {
           await handleCheckoutPaid(cs, event.id, paidAt);
@@ -282,7 +288,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "checkout.session.async_payment_succeeded": {
         const cs = event.data.object as any;
         const paidAt = new Date(event.created * 1000);
-        if (cs.metadata?.kind === "ad_campaign") {
+        if (cs.metadata?.kind === "ai_credits") {
+          await fulfilCreditCheckoutSession(cs);
+        } else if (cs.metadata?.kind === "ad_campaign") {
           await activateAdCampaignFromCheckoutSession(cs, paidAt);
         } else if (cs.metadata?.kind === "boost") {
           await activateBoostFromCheckoutSession(cs, paidAt);
@@ -515,6 +523,15 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
       req.log.info({ eventId, result }, "RevenueCat promotion purchase processed");
       res.json({ received: true, promotion: result.status });
       return;
+    }
+    // One-off AI credit packs (store consumables): credit once per event id.
+    // Subscription events fall through to the reconciliation below, untouched.
+    if (event.type === "NON_RENEWING_PURCHASE") {
+      const credit = await grantRevenueCatCreditPurchase({ eventId, appUserId, productId: event.product_id });
+      if (credit.handled) {
+        res.json({ received: true, credited: credit.granted === true });
+        return;
+      }
     }
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.
@@ -953,6 +970,8 @@ export async function handleCheckoutPaid(
       shippingCents,
       taxCents,
       grossCents: totalCents,
+      // Rate fixed when the checkout was created; null (older sessions) = standard 5%.
+      platformFeeBps: csRecord.platformFeeBps,
       processingFeeCents: chargeModel === "held"
         ? chargeDetails.processingFeeCents
         : chargeModel === "transfer"

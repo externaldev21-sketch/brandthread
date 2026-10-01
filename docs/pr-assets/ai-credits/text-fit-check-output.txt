@@ -1,0 +1,15 @@
+
+/ai-credits?bt_preview=seller&demo=1
+  OK - no text-fit issues
+
+/ai-credits?bt_preview=seller&demo=1&demoPlan=pro
+  OK - no text-fit issues
+
+/ai-credits?bt_preview=seller&demo=1&demoPlan=none
+  OK - no text-fit issues
+
+/_tmp-ai-credits-preview?bt_preview=seller
+  OK - no text-fit issues
+
+/seller-settings?bt_preview=seller&demo=1
+  OK - no text-fit issues
