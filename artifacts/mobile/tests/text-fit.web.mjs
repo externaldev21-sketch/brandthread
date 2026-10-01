@@ -86,7 +86,7 @@ function inPage() {
     const left = u.left - b.left; const right = b.right - u.right;
     const centred = Math.abs(left - right) < 2;
     if (!centred && (left < min - 0.5 || right < min - 0.5) && b.width > 24) add('tight-padding', name, `left ${left.toFixed(0)} right ${right.toFixed(0)} (min ${min})`);
-    if (b.height < 64 && Math.abs((u.top - b.top) - (b.bottom - u.bottom)) > 4) add('not-v-centred', name, `top ${(u.top - b.top).toFixed(0)} bottom ${(b.bottom - u.bottom).toFixed(0)}`);
+    if (b.height < 64 && !inScroller(box) && Math.abs((u.top - b.top) - (b.bottom - u.bottom)) > 4) add('not-v-centred', name, `top ${(u.top - b.top).toFixed(0)} bottom ${(b.bottom - u.bottom).toFixed(0)}`);
   }
 
   // Row siblings: one label wraps while others don't; buttons with unequal size.

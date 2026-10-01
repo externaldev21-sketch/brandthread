@@ -821,7 +821,7 @@ export default function OrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={order.orderNumber}
-        subtitle={order.customer.name}
+        divider={false}
         variant="push"
         onBack={() => goBackOr(router, '/(tabs)/orders')}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
@@ -1023,6 +1023,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             <StatusBadge label={order.paymentStatus.replace(/_/g, ' ').toUpperCase()} variant={paymentVariant(order.paymentStatus)} />
           </View>
         </View>
+        {order.customer.name ? <Text style={s.heroCustomer}>{order.customer.name}</Text> : null}
         <Text style={s.heroDate}>{fmt(order.createdAt)}</Text>
         <View style={s.heroMeta}>
           <Text style={s.heroMetaText}>Source: {order.source}</Text>
@@ -1963,6 +1964,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Actions
   actionSection:    { gap: SP.sm },
   actionCell:       { flex: 1 },
+  heroCustomer:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.xs },
   actionRow:        { flexDirection: 'row', gap: SP.sm },
   actionCol:        { gap: SP.sm },
   readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
