@@ -280,6 +280,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
       .from(posts)
       .where(and(
         inArray(posts.userId, followedIds),
+        eq(posts.surface, "thread"),
         eq(posts.postStatus, "published"),
         gte(posts.createdAt, followedSince),
       ))
@@ -288,7 +289,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
     db
       .select({ id: posts.id, userId: posts.userId, createdAt: posts.createdAt, styleTags: posts.styleTags })
       .from(posts)
-      .where(and(eq(posts.postStatus, "published"), gte(posts.createdAt, freshSince)))
+      .where(and(eq(posts.surface, "thread"), eq(posts.postStatus, "published"), gte(posts.createdAt, freshSince)))
       .orderBy(desc(posts.createdAt))
       .limit(200),
     db
@@ -315,6 +316,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
     .from(posts)
     .where(and(
       inArray(posts.userId, [...new Set(trendingSellerIds)].slice(0, 30)),
+      eq(posts.surface, "thread"),
       eq(posts.postStatus, "published"),
       gte(posts.createdAt, similarSince),
     ))

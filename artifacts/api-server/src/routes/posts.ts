@@ -21,6 +21,9 @@ import postVideoRouter, {
   setComposedMediaVisibility,
 } from "./post-video";
 import postSlideRouter from "./post-slide";
+import postUploadRouter from "./post-upload";
+import postCarouselRouter from "./post-carousel";
+import { MAX_SLIDES_BY_SURFACE, isPostSurface, type PostSurface } from "../lib/postLimits";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -53,6 +56,9 @@ function validObjectPath(value: unknown): value is string {
 function visiblePostCondition(now = new Date()) {
   return publicPostCondition(now);
 }
+
+/** Only Thread-surface posts (never a profile-only POST) feed the Threads feed. */
+const threadSurfaceCondition = () => eq(posts.surface, "thread");
 
 /** Current access rule shared by watch recording and history reads. */
 function watchedPostAccessCondition(viewerId: string) {
@@ -155,6 +161,8 @@ async function productMinPrices(productIds: string[]): Promise<Record<string, nu
 
 router.use("/", postVideoRouter);
 router.use("/", postSlideRouter);
+router.use("/", postUploadRouter);
+router.use("/", postCarouselRouter);
 
 // ─── GET /api/posts/repost-context ────────────────────────────────────────────
 // Returns only the small, privacy-safe avatar context needed for Thread cards.
@@ -386,6 +394,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         mediaUrls:   posts.mediaUrls,
         mediaType:   posts.mediaType,
         aspectRatio: posts.aspectRatio,
+        surface: posts.surface,
         caption:     posts.caption,
         hashtags:    posts.hashtags,
         styleTags:   posts.styleTags,
@@ -406,7 +415,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         eq(users.accountType, "seller"),        // seller-only gate
         inArray(posts.userId, followedIds),     // followed-only gate
       ))
-      .where(and(visiblePostCondition(), notBlockedWith(clerkId, posts.userId)))
+      .where(and(visiblePostCondition(), threadSurfaceCondition(), notBlockedWith(clerkId, posts.userId)))
       .orderBy(desc(posts.createdAt))
       .limit(lim)
       .offset(off);
@@ -513,6 +522,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       mediaUrls: p.mediaUrls,
       mediaType: p.mediaType,
       aspectRatio: p.aspectRatio,
+      surface: p.surface,
       caption:   p.caption,
       hashtags:  p.hashtags,
       styleTags: p.styleTags,
@@ -581,8 +591,11 @@ router.post("/", requireAuth, async (req, res) => {
     mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
     mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
-    sound, visibility, taggedProductIds, isDraft, scheduledAt,
+    sound, visibility, taggedProductIds, isDraft, scheduledAt, surface: requestedSurface,
+    slides: requestedSlides,
   } = req.body as {
+    surface?:           string;
+    slides?:            unknown;
     mediaUrl?:          string;
     thumbnailUrl?:      string;
     mediaPath?:         string;
@@ -608,12 +621,23 @@ router.post("/", requireAuth, async (req, res) => {
   // ── Buyer posting rules ─────────────────────────────────────────────────────
   // Buyers may only post photos (single or carousel) to their own profile —
   // no video, no product tagging (they don't own products), no scheduling.
+  if (requestedSurface !== undefined && !isPostSurface(requestedSurface)) {
+    return res.status(400).json({ error: "surface must be 'thread' or 'profile'" });
+  }
+  const surface: PostSurface = requestedSurface ?? (isBuyer ? "profile" : "thread");
   if (isBuyer) {
-    const requestedType = (mediaType as string | undefined) ?? "photo";
-    if (requestedType !== "photo" && requestedType !== "slideshow") {
+    // Buyers can NEVER create Threads — enforced here, not just hidden in the UI.
+    if (surface === "thread") {
       return res.status(403).json({
-        error: "Buyer accounts can only post photos (single or carousel).",
-        code:  "BUYER_PHOTO_ONLY",
+        error: "Buyer accounts cannot post to Threads.",
+        code:  "BUYER_NO_THREADS",
+      });
+    }
+    const requestedType = (mediaType as string | undefined) ?? "photo";
+    if (requestedType !== "photo" && requestedType !== "slideshow" && requestedType !== "video") {
+      return res.status(403).json({
+        error: "Buyer accounts can post photos, slideshows and videos.",
+        code:  "BUYER_MEDIA_TYPE",
       });
     }
     if (taggedProductIds && taggedProductIds.length > 0) {
@@ -661,8 +685,9 @@ router.post("/", requireAuth, async (req, res) => {
     if (!Array.isArray(requestedMediaPaths)) {
       return res.status(400).json({ error: "mediaPaths must be an array" });
     }
-    if (requestedMediaPaths.length > MAX_SLIDES) {
-      return res.status(400).json({ error: `mediaPaths: max ${MAX_SLIDES} entries` });
+    const slideCap = MAX_SLIDES_BY_SURFACE[surface];
+    if (requestedMediaPaths.length > slideCap) {
+      return res.status(400).json({ error: `mediaPaths: max ${slideCap} entries` });
     }
     if (requestedMediaPaths.some((p) => !validObjectPath(p))) {
       return res.status(400).json({ error: "mediaPaths must be an array of valid object paths" });
@@ -708,8 +733,36 @@ router.post("/", requireAuth, async (req, res) => {
       ? "scheduled"
       : "published";
 
-  const mediaUrl = mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? "");
-  const thumbnailUrl = thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
+  // POST carousels: ordered slides, each a photo or a video. URLs are derived
+  // from the owned object paths here (never trusted from the client) so they
+  // stay valid — the media route serves them while the post is public.
+  type SlideRecord = NonNullable<typeof posts.$inferInsert.slides>[number];
+  let slideRecords: SlideRecord[] = [];
+  if (requestedSlides !== undefined) {
+    const cap = MAX_SLIDES_BY_SURFACE[surface];
+    if (!Array.isArray(requestedSlides) || requestedSlides.length === 0 || requestedSlides.length > cap) {
+      return res.status(400).json({ error: `slides: between 1 and ${cap} entries` });
+    }
+    for (const raw of requestedSlides as Array<Record<string, unknown>>) {
+      if (!raw || (raw.kind !== "photo" && raw.kind !== "video") || !validObjectPath(raw.path) || !validObjectPath(raw.thumbnailPath)) {
+        return res.status(400).json({ error: "slides must be { kind, path, thumbnailPath } with valid object paths" });
+      }
+      slideRecords.push({
+        kind: raw.kind, path: raw.path, url: composedMediaUrl(req, raw.path),
+        thumbnailPath: raw.thumbnailPath, thumbnailUrl: composedMediaUrl(req, raw.thumbnailPath),
+        ...(typeof raw.duration === "number" && Number.isFinite(raw.duration) ? { duration: raw.duration } : {}),
+      });
+    }
+    const all = slideRecords.flatMap((sl) => [sl.path, sl.thumbnailPath]);
+    if (new Set(all).size !== all.length) return res.status(400).json({ error: "slides must not reuse the same media" });
+  }
+  const singleVideo = slideRecords.length === 1 && slideRecords[0].kind === "video";
+  const mediaUrl = slideRecords.length > 0
+    ? (singleVideo ? slideRecords[0].url : (slideRecords[0].kind === "video" ? slideRecords[0].thumbnailUrl : slideRecords[0].url))
+    : mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? "");
+  const thumbnailUrl = slideRecords.length > 0
+    ? slideRecords[0].thumbnailUrl
+    : thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
   const resolvedVisibility = visibility ?? {
     isPublic: true,
     allowComments: true,
@@ -727,11 +780,15 @@ router.post("/", requireAuth, async (req, res) => {
     userId:    clerkId,
     mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
-    mediaUrls: mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
-    mediaPaths: resolvedMediaPaths,
+    mediaUrls: slideRecords.length > 0
+      ? slideRecords.map((sl) => sl.url)
+      : mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
+    mediaPaths: slideRecords.length > 0 ? slideRecords.map((sl) => sl.path) : resolvedMediaPaths,
+    slides: slideRecords,
     slideOverlays: safeSlideOverlays as any,
-    mediaType: (mediaType as any) ?? "photo",
-    aspectRatio: aspectRatio ?? "9:16",
+    mediaType: slideRecords.length > 0 ? (singleVideo ? "video" : "slideshow") : ((mediaType as any) ?? "photo"),
+    aspectRatio: slideRecords.length > 0 && surface === "profile" ? "3:4" : (aspectRatio ?? "9:16"),
+    surface,
     caption:   caption   ?? "",
     hashtags: hashtags ?? [],
     styleTags: styleTags ?? [],
@@ -761,6 +818,7 @@ router.post("/", requireAuth, async (req, res) => {
     ...(mediaPath ? [mediaPath] : []),
     ...(thumbnailPath ? [thumbnailPath] : []),
     ...resolvedMediaPaths,
+    ...slideRecords.flatMap((sl) => [sl.path, sl.thumbnailPath]),
   ];
   if (allComposedPaths.length > 0) {
     try {
@@ -860,8 +918,11 @@ router.patch("/:id", requireAuth, async (req, res) => {
   // see the matching isBuyer block in POST / above).
   if (isBuyerPoster) {
     const nextMediaType = (body.mediaType as string | undefined) ?? existing.mediaType;
-    if (nextMediaType !== "photo" && nextMediaType !== "slideshow") {
-      return res.status(403).json({ error: "Buyer accounts can only post photos (single or carousel).", code: "BUYER_PHOTO_ONLY" });
+    if (nextMediaType !== "photo" && nextMediaType !== "slideshow" && nextMediaType !== "video") {
+      return res.status(403).json({ error: "Buyer accounts can post photos, slideshows and videos.", code: "BUYER_MEDIA_TYPE" });
+    }
+    if (body.surface === "thread" || existing.surface === "thread") {
+      return res.status(403).json({ error: "Buyer accounts cannot post to Threads.", code: "BUYER_NO_THREADS" });
     }
     if (Array.isArray(body.taggedProductIds) && body.taggedProductIds.length > 0) {
       return res.status(403).json({ error: "Buyer accounts cannot tag products.", code: "BUYER_NO_PRODUCT_TAGS" });
@@ -893,8 +954,10 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (!Array.isArray(body.mediaPaths)) {
       return res.status(400).json({ error: "mediaPaths must be an array" });
     }
-    if ((body.mediaPaths as unknown[]).length > MAX_SLIDES) {
-      return res.status(400).json({ error: `mediaPaths: max ${MAX_SLIDES} entries` });
+    const patchSurface = isPostSurface(body.surface) ? body.surface : (isPostSurface(existing.surface) ? existing.surface : "thread");
+    const patchCap = MAX_SLIDES_BY_SURFACE[patchSurface];
+    if ((body.mediaPaths as unknown[]).length > patchCap) {
+      return res.status(400).json({ error: `mediaPaths: max ${patchCap} entries` });
     }
     if ((body.mediaPaths as unknown[]).some((p) => !validObjectPath(p))) {
       return res.status(400).json({ error: "mediaPaths must be an array of valid object paths" });
@@ -918,6 +981,10 @@ router.patch("/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "mediaType must be a non-empty string" });
     }
     updates.mediaType = body.mediaType;
+  }
+  if (body.surface !== undefined) {
+    if (!isPostSurface(body.surface)) return res.status(400).json({ error: "surface must be 'thread' or 'profile'" });
+    updates.surface = body.surface;
   }
   if (body.aspectRatio !== undefined) {
     if (!["9:16", "3:4", "1:1"].includes(body.aspectRatio as string)) {
@@ -1035,6 +1102,8 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }),
     // Include all slide media paths (new or existing)
     ...((updates.mediaPaths as string[] | undefined) ?? existing.mediaPaths ?? []),
+    // Carousel posters
+    ...(existing.slides ?? []).map((sl) => sl.thumbnailPath),
   ].filter((p): p is string => !!p);
 
   const taggedProductIds = body.taggedProductIds;
@@ -1097,7 +1166,10 @@ router.delete("/:id", requireAuth, async (req, res) => {
   if (!deleted) return res.status(404).json({ error: "Post not found" });
 
   // Fire-and-forget: clean up all composed slide media paths
-  const slidePaths = (existing.mediaPaths ?? []).filter(Boolean);
+  const slidePaths = [
+    ...(existing.mediaPaths ?? []),
+    ...(existing.slides ?? []).map((sl) => sl.thumbnailPath),
+  ].filter(Boolean);
   if (slidePaths.length > 0) {
     Promise.all(
       slidePaths.map((p) =>
@@ -1364,6 +1436,18 @@ router.get("/:id", async (req, res) => {
   const viewerId = optionalViewerId(req);
   if (viewerId && viewerId !== post.userId && await isBlockedEitherWay(viewerId, post.userId)) {
     return res.status(404).json({ error: "Post not found" });
+  }
+  // A buyer's profile POST is for the buyer and their mutual friends — never a public link.
+  if (post.surface === "profile" && viewerId !== post.userId) {
+    const [author] = await db.select({ accountType: users.accountType }).from(users).where(eq(users.clerkId, post.userId)).limit(1);
+    if (author?.accountType === "buyer") {
+      const edges = viewerId ? await db.select({ followerId: follows.followerId }).from(follows).where(or(
+        and(eq(follows.followerId, viewerId), eq(follows.followingId, post.userId)),
+        and(eq(follows.followerId, post.userId), eq(follows.followingId, viewerId)),
+      )) : [];
+      const mutual = !!viewerId && edges.some((e) => e.followerId === viewerId) && edges.some((e) => e.followerId === post.userId);
+      if (!mutual) return res.status(404).json({ error: "Post not found" });
+    }
   }
 
   const [sellerRows, tags, likeRows, repostRows] = await Promise.all([

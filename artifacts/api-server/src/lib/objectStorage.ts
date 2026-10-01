@@ -171,6 +171,65 @@ export class ObjectStorageService {
     return objectPath;
   }
 
+  /**
+   * Lists the object entities stored under a `/objects/<prefix>` path (used by
+   * chunked uploads to find which parts have already landed).
+   */
+  async listObjectEntities(
+    prefixPath: string,
+  ): Promise<Array<{ objectPath: string; size: number }>> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const entityId = prefixPath.slice('/objects/'.length);
+    const fullPath = `${privateObjectDir.replace(/\/$/, '')}/${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const [files] = await objectStorageClient.bucket(bucketName).getFiles({ prefix: objectName });
+    const dirPrefix = objectName.slice(0, objectName.length - entityId.length);
+    return files.map((file) => ({
+      objectPath: `/objects/${file.name.slice(dirPrefix.length)}`,
+      size: Number(file.metadata.size ?? 0),
+    }));
+  }
+
+  /**
+   * Server-side concatenation of stored parts (GCS compose, max 32 per call —
+   * larger sets are folded through intermediates). Nothing is downloaded.
+   */
+  async combineObjectEntities(
+    partPaths: string[],
+    destinationPath: string,
+    contentType: string,
+  ): Promise<void> {
+    if (partPaths.length === 0) throw new Error('No parts to combine');
+    const dest = await this.resolveObjectFile(destinationPath);
+    const parts = await Promise.all(partPaths.map((p) => this.resolveObjectFile(p)));
+    const intermediates: File[] = [];
+    let level = parts;
+    while (level.length > 32) {
+      const next: File[] = [];
+      for (let i = 0; i < level.length; i += 32) {
+        const group = level.slice(i, i + 32);
+        if (group.length === 1) { next.push(group[0]); continue; }
+        const tmp = await this.resolveObjectFile(`/objects/uploads/chunked/tmp-${randomUUID()}`);
+        await dest.bucket.combine(group, tmp);
+        intermediates.push(tmp);
+        next.push(tmp);
+      }
+      level = next;
+    }
+    await dest.bucket.combine(level, dest);
+    await dest.setMetadata({ contentType, cacheControl: 'private, max-age=0' });
+    await Promise.all(intermediates.map((f) => f.delete({ ignoreNotFound: true })));
+  }
+
+  /** A File handle for an `/objects/...` path that may not exist yet. */
+  private async resolveObjectFile(objectPath: string): Promise<File> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const entityId = objectPath.slice('/objects/'.length);
+    const fullPath = `${privateObjectDir.replace(/\/$/, '')}/${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    return objectStorageClient.bucket(bucketName).file(objectName);
+  }
+
   async deleteObjectEntity(objectPath: string): Promise<void> {
     const file = await this.getObjectEntityFile(objectPath);
     await file.delete({ ignoreNotFound: true });

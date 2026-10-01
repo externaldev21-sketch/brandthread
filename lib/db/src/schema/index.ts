@@ -504,6 +504,13 @@ export const posts = pgTable('posts', {
   }>>().notNull().default([]),
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
+  /** 'thread' = public Threads feed (sellers only); 'profile' = the author's own profile grid. */
+  surface: text('surface').notNull().default('thread'),
+  /** Ordered carousel slides (photos and/or videos) for POST carousels; empty for legacy posts. */
+  slides: jsonb('slides').$type<Array<{
+    kind: 'photo' | 'video'; path: string; url: string;
+    thumbnailPath: string; thumbnailUrl: string; duration?: number;
+  }>>().notNull().default([]),
   caption: text('caption'),
   hashtags: json('hashtags').$type<string[]>().notNull().default([]),
   // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
