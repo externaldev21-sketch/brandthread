@@ -20,3 +20,9 @@ For explicitly ordered PR batches, drive the sequence from the complete authorit
 **Why:** A specially designated final PR can have a lower number than preceding entries. An incomplete loop can merge it prematurely; an end-only audit discovers the mistake after the no-history-rewrite constraint prevents same-branch repair.
 
 **How to apply:** Verify the ledger equals the exact requested prefix and confirm each incoming head's ancestry before the final merge. Deduplicate ledger rows before counting coverage. With user approval, recover premature terminal merges on a new branch from the preceding commit while retaining the original branch intact; never disguise a reset.
+
+Keep the authoritative ordered request and per-step audit ledger in an ignored workspace directory, not only in `/tmp`.
+
+**Why:** A workspace runtime replacement discarded temporary audit files while preserving the repository. Git ancestry could recover coverage, but it could not independently recover the user's intended order; the earlier complete-prefix verification was essential.
+
+**How to apply:** Persist the original sequence before starting a long batch and append each actual merge or already-included result durably. Distinguish requested order from order reconstructed from Git history.

@@ -131,3 +131,17 @@ mtime_ms = 1790804919685
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/d88b9a03-97bf-45bd-812e-7f86d4a9d5bc/eb7fe2a1-77a5-46b5-b735-74714430ce23"
 storage_version_token = "1790804920286611"
 content_type = "text/plain"
+
+[[outputs]]
+id = "bhy-EkIAIc9iE6XAU94HB"
+uri = "file://.local/ordered-pr-sync/pr-status.csv"
+type = "table"
+title = "Ordered PR merge audit"
+description = "All 103 requested PR heads: 102 normal merges, #661 already included, no skipped PRs; #629 is the final PR merge. Includes pinned head and merge SHAs."
+logical_id = "aaa71c83-07cc-420a-aaf1-0955f2634196"
+content_hash = "sha256:1041e96cfe83d0ce0bca3f85dcc5fdcae40f1217a0664a7a0130a4f12ecb7cf3"
+size = 9634
+mtime_ms = 1790895781353
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/aaa71c83-07cc-420a-aaf1-0955f2634196/f45f13db-1bf7-43ee-8cdf-b009c9cb0b77"
+storage_version_token = "1790895933784336"
+content_type = "text/csv"

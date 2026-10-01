@@ -44,3 +44,9 @@ If Playwright is installed but its downloaded Chromium binary is missing, use th
 **Why:** The normal Playwright launch failed despite the package being present; the system binary opened the running Expo web preview and captured browser console messages.
 
 **How to apply:** Pass `executablePath` and `args: ['--no-sandbox']` to `chromium.launch` after confirming the system binary exists. Do not mistake a failed Playwright launch for an app startup failure.
+
+Read-only agent contexts can also prevent Chromium from starting because its configuration/crash-report directory resolves inside the workspace, even when the browser profile and HOME are temporary.
+
+**Why:** Chromium failed before page navigation while trying to write its crash-report settings in a read-only workspace; redirecting browser configuration and cache locations to writable temporary directories allowed the same installed browser to run.
+
+**How to apply:** Keep browser profiles, configuration, and caches in writable temporary directories for automated checks. Account for XDG/Chromium configuration-home selection rather than changing repository permissions or app authentication. Confirm the endpoint is serving before attributing a browser launch or HTTP failure to UI code.
