@@ -1,17 +1,46 @@
 /**
- * AI credits catalogue: what each AI tool costs, how many free credits each
- * plan gets per month, the purchasable packs, and the spend-cap config.
- * Everything a product decision can change lives here.
+ * AI credits catalogue: THE one place a product decision can change.
+ *
+ *  - PLAN_CREDIT_POLICY   what each seller plan gets
+ *  - AI_TOOL_RULES        which endpoints cost credits (and which are free text)
+ *  - CREDIT_PACKS         top-up packs (Starter / Growth only)
+ *  - getSpendCaps()       emergency spend cap, hidden fair-use and anti-abuse limits
+ *
+ * Credits are tied to the seller plan (planCatalogue: Starter $29, Growth $79,
+ * Pro $199). One credit is roughly $0.01 of provider cost, so a 2-credit
+ * background removal is about two cents and a 50-credit video about fifty.
  */
 
 export type AiCreditPlan = "free" | "starter" | "growth" | "pro";
 
-/** Free credits granted each UTC month. Unused monthly credits do not roll over. */
-export const MONTHLY_ALLOWANCE: Record<AiCreditPlan, number> = {
-  free: 20,
-  starter: 50,
-  growth: 150,
-  pro: 600,
+export type PlanCreditPolicy = {
+  /** Credits granted each UTC month. `null` means unlimited (Pro). */
+  monthlyAllowance: number | null;
+  /** Unused monthly credits carry over one month (never above one allowance). */
+  rollover: boolean;
+  /** May buy credit packs. */
+  packsEligible: boolean;
+};
+
+export const PLAN_CREDIT_POLICY: Record<AiCreditPlan, PlanCreditPolicy> = {
+  // No active paid plan: no credits (chat is never charged).
+  free:    { monthlyAllowance: 0,    rollover: false, packsEligible: false },
+  starter: { monthlyAllowance: 1000, rollover: true,  packsEligible: true },
+  growth:  { monthlyAllowance: 4000, rollover: true,  packsEligible: true },
+  // Unlimited. Hidden fair-use limits live in getSpendCaps().
+  pro:     { monthlyAllowance: null, rollover: false, packsEligible: false },
+};
+
+export function creditPolicyForPlan(plan: AiCreditPlan): PlanCreditPolicy {
+  return PLAN_CREDIT_POLICY[plan] ?? PLAN_CREDIT_POLICY.free;
+}
+
+/** Derived from PLAN_CREDIT_POLICY. `null` is unlimited: display code treats it as Infinity. */
+export const MONTHLY_ALLOWANCE: Record<AiCreditPlan, number | null> = {
+  free: PLAN_CREDIT_POLICY.free.monthlyAllowance,
+  starter: PLAN_CREDIT_POLICY.starter.monthlyAllowance,
+  growth: PLAN_CREDIT_POLICY.growth.monthlyAllowance,
+  pro: PLAN_CREDIT_POLICY.pro.monthlyAllowance,
 };
 
 export type AiToolRule = {
@@ -20,32 +49,51 @@ export type AiToolRule = {
   path: RegExp;
   tool: string;
   label: string;
+  /**
+   * 'credits' debits `cost` credits before the handler and refunds on failure.
+   * 'text' is free on every plan: never debited, never shown, only subject to
+   * the silent anti-abuse ceiling.
+   */
+  kind: "credits" | "text";
   cost: number;
-  /** 'text' tools are unlimited on paid plans: never debited (cost 0), only the route rate limit applies. */
-  kind?: "text";
 };
 
+const text = (path: RegExp, tool: string, label: string): AiToolRule =>
+  ({ method: "POST", path, tool, label, kind: "text", cost: 0 });
+const gen = (path: RegExp, tool: string, label: string, cost: number): AiToolRule =>
+  ({ method: "POST", path, tool, label, kind: "credits", cost });
+
 /**
- * Every endpoint that calls a paid AI provider. The gate debits this cost
- * before the handler runs and refunds it automatically if the handler answers
- * with an error status, so routes never need their own billing code.
+ * Every endpoint that calls an AI provider. Generations cost credits (about
+ * one cent each); text is free. The gate refunds automatically if a handler
+ * answers with an error status, so routes never need their own billing code.
  */
 export const AI_TOOL_RULES: AiToolRule[] = [
-  { method: "POST", path: /^\/ai\/chat(\/stream)?$/,              tool: "ai_chat",          label: "AI assistant",          cost: 1 },
-  { method: "POST", path: /^\/ai\/brand-memory\/rebuild$/,        tool: "brand_memory",     label: "Brand memory",          cost: 1 },
-  { method: "POST", path: /^\/brandthread-agent\/(chat|message)s?$/, tool: "agent_chat",    label: "Brandthread agent",     cost: 1 },
-  { method: "POST", path: /^\/store\/ai\//,                       tool: "store_ai",         label: "Store AI",              cost: 2 },
-  { method: "POST", path: /^\/ai-helpers\/caption$/,            tool: "ai_caption",       label: "Caption and hashtags",  cost: 0, kind: "text" },
-  { method: "POST", path: /^\/ai-helpers\/product-description$/, tool: "ai_product_description", label: "Product description", cost: 0, kind: "text" },
-  { method: "POST", path: /^\/ai-helpers\/size-chart$/,          tool: "ai_size_chart",    label: "Size chart",            cost: 0, kind: "text" },
-  { method: "POST", path: /^\/logo\/(generate|logo)$/,            tool: "logo",             label: "Logo",                  cost: 5 },
-  { method: "POST", path: /^\/mockup\/generate$/,                 tool: "mockup",           label: "Mockup",                cost: 5 },
-  { method: "POST", path: /^\/photography\/generate$/,            tool: "photoshoot",       label: "AI photoshoot",         cost: 8 },
-  { method: "POST", path: /^\/photography\/(mockup-to-model|outfit-swap)$/, tool: "model_photo", label: "Model photo",      cost: 10 },
-  { method: "POST", path: /^\/lifestyle\/generate$/,              tool: "lifestyle",        label: "Lifestyle image",       cost: 6 },
-  { method: "POST", path: /^\/techpack\/generate$/,               tool: "techpack",         label: "Tech pack",             cost: 4 },
-  { method: "POST", path: /^\/bg-removal\/remove$/,               tool: "bg_remove",        label: "Remove background",     cost: 2 },
-  { method: "POST", path: /^\/bg-removal\/replace$/,              tool: "bg_replace",       label: "Replace background",    cost: 4 },
+  // ── Text: free on every plan ──────────────────────────────────────────────
+  text(/^\/ai\/chat(\/stream)?$/,                 "ai_chat",      "AI assistant"),
+  text(/^\/ai\/brand-memory\/rebuild$/,           "brand_memory", "Brand memory"),
+  text(/^\/brandthread-agent\/(chat|message)s?$/, "agent_chat",   "Brandthread agent"),
+  text(/^\/store\/ai\//,                          "store_ai",     "Store AI"),
+  text(/^\/ai-helpers\/caption$/,                 "ai_caption",   "Caption and hashtags"),
+  text(/^\/ai-helpers\/product-description$/,     "ai_product_description", "Product description"),
+  text(/^\/ai-helpers\/size-chart$/,              "ai_size_chart", "Size chart"),
+
+  // ── Image generation ──────────────────────────────────────────────────────
+  gen(/^\/bg-removal\/remove$/,                   "bg_remove",    "Remove background",     2),
+  gen(/^\/bg-removal\/replace$/,                  "bg_replace",   "Replace background",    4),
+  gen(/^\/photography\/generate$/,                "photoshoot",   "AI photoshoot",         8),
+  gen(/^\/photography\/(mockup-to-model|outfit-swap)$/, "model_photo", "Mockup to model",  8),
+  gen(/^\/mockup\/generate$/,                     "mockup",       "Mockup",                5),
+  gen(/^\/logo\/(generate|logo)$/,                "logo",         "Logo",                  5),
+  gen(/^\/lifestyle\/generate$/,                  "lifestyle",    "Lifestyle image",       6),
+  gen(/^\/techpack\/generate$/,                   "techpack",     "Tech pack",             4),
+
+  // ── Routes that land with their features. Adjust the path here if the final
+  //    route differs; nothing else needs to change. ─────────────────────────
+  gen(/^\/ai-design\/generate$/,                  "ai_design",         "AI design",           5),
+  gen(/^\/ai-design\/(refine|variation)s?$/,      "ai_design_refine",  "AI design refine",    4),
+  gen(/^\/campaign(-gen)?\/generate$/,            "campaign_gen",      "Campaign set",       10),
+  gen(/^\/video\/generate$/,                      "video_gen",         "AI video",           50),
 ];
 
 export function findToolRule(method: string, path: string): AiToolRule | null {
@@ -54,14 +102,20 @@ export function findToolRule(method: string, path: string): AiToolRule | null {
 
 export type CreditPack = { id: string; credits: number; amountCents: number; label: string };
 
+/** Starter / Growth only. Prices are proposals (about 1.2 cents per credit, cheaper in bulk). */
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "credits_100",  credits: 100,  amountCents: 499,  label: "100 credits" },
-  { id: "credits_300",  credits: 300,  amountCents: 1299, label: "300 credits" },
-  { id: "credits_1000", credits: 1000, amountCents: 3499, label: "1,000 credits" },
+  { id: "credits_500",  credits: 500,  amountCents: 599,  label: "500 credits" },
+  { id: "credits_1500", credits: 1500, amountCents: 1499, label: "1,500 credits" },
+  { id: "credits_5000", credits: 5000, amountCents: 4499, label: "5,000 credits" },
 ];
 
 export function findPack(id: string): CreditPack | null {
   return CREDIT_PACKS.find((p) => p.id === id) ?? null;
+}
+
+/** Packs a plan may buy (empty for Pro and for accounts without a paid plan). */
+export function packsForPlan(plan: AiCreditPlan): CreditPack[] {
+  return creditPolicyForPlan(plan).packsEligible ? CREDIT_PACKS : [];
 }
 
 function intEnv(name: string, fallback: number): number {
@@ -72,10 +126,20 @@ function intEnv(name: string, fallback: number): number {
 }
 
 export type SpendCaps = {
-  perUserDaily: number;
+  /** Emergency stop for all AI spend, in credits per UTC day. */
   globalDaily: number;
   /** Percent-of-cap levels that raise an alert, ascending. */
   alertThresholds: number[];
+  /** Hidden: Pro generations per UTC day per user. */
+  proDailyGenerations: number;
+  /** Hidden: credits-worth a Pro user generates per month before jobs use the slow queue. */
+  proFairUseCredits: number;
+  /** Max Pro low-priority jobs running at once, across the server. */
+  lowPriorityConcurrency: number;
+  /** How long a low-priority job waits for a slot before it runs anyway. */
+  lowPriorityWaitMs: number;
+  /** Silent per-user ceiling for free text (chat) requests per UTC day. */
+  textDailyPerUser: number;
 };
 
 /** Read at call time so tests and env changes take effect without a restart. */
@@ -85,8 +149,15 @@ export function getSpendCaps(): SpendCaps {
     .map((s) => Number.parseInt(s.trim(), 10))
     .filter((n) => Number.isFinite(n) && n > 0 && n <= 100);
   return {
-    perUserDaily: intEnv("AI_DAILY_CREDIT_CAP_PER_USER", 300),
-    globalDaily: intEnv("AI_GLOBAL_DAILY_CREDIT_CAP", 100_000),
+    globalDaily: intEnv("AI_GLOBAL_DAILY_CREDIT_CAP", 250_000),
     alertThresholds: [...new Set(parsed)].sort((a, b) => a - b),
+    proDailyGenerations: intEnv("AI_PRO_DAILY_GENERATION_CEILING", 400),
+    proFairUseCredits: intEnv("AI_PRO_FAIR_USE_CREDITS", 10_000),
+    lowPriorityConcurrency: intEnv("AI_LOW_PRIORITY_CONCURRENCY", 2),
+    lowPriorityWaitMs: intEnv("AI_LOW_PRIORITY_WAIT_MS", 10 * 60_000),
+    textDailyPerUser: intEnv("AI_TEXT_DAILY_LIMIT_PER_USER", 500),
   };
 }
+
+/** Share of the allowance at or below which a balance counts as low. */
+export const LOW_CREDITS_FRACTION = 0.2;

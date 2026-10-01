@@ -21,6 +21,7 @@ import {
   activateBoostFromCheckoutSession,
   markBoostCheckoutFailed,
 } from "./boosts";
+import { fulfilCreditCheckoutSession, grantRevenueCatCreditPurchase } from "../lib/aiCredits/purchases";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
@@ -71,6 +72,7 @@ import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 
 /**
@@ -259,6 +261,11 @@ router.post("/stripe", async (req: Request, res: Response) => {
           // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
           break;
         }
+        // ── AI credit pack checkout ──────────────────────────────────────────
+        if (cs.metadata?.kind === "ai_credits") {
+          if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
+          break;
+        }
         // ── Regular buyer checkout ───────────────────────────────────────────
         if (cs.payment_status === "paid") {
           await handleCheckoutPaid(cs, event.id, paidAt);
@@ -271,7 +278,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "checkout.session.async_payment_succeeded": {
         const cs = event.data.object as any;
         const paidAt = new Date(event.created * 1000);
-        if (cs.metadata?.kind === "ad_campaign") {
+        if (cs.metadata?.kind === "ai_credits") {
+          await fulfilCreditCheckoutSession(cs);
+        } else if (cs.metadata?.kind === "ad_campaign") {
           await activateAdCampaignFromCheckoutSession(cs, paidAt);
         } else if (cs.metadata?.kind === "boost") {
           await activateBoostFromCheckoutSession(cs, paidAt);
@@ -477,6 +486,15 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     if (!recorded) {
       res.json({ received: true, duplicate: true });
       return;
+    }
+    // One-off AI credit packs (store consumables): credit once per event id.
+    // Subscription events fall through to the reconciliation below, untouched.
+    if (event.type === "NON_RENEWING_PURCHASE") {
+      const credit = await grantRevenueCatCreditPurchase({ eventId, appUserId, productId: event.product_id });
+      if (credit.handled) {
+        res.json({ received: true, credited: credit.granted === true });
+        return;
+      }
     }
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.
@@ -1142,6 +1160,11 @@ export async function handleCheckoutPaid(
     }
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
+
+    // For You: a purchase is the strongest taste signal (seller + style of the content that sold it).
+    if (buyerId) {
+      void recordPurchaseSignals({ buyerId, sellerId: ownerId, variantIds: rawItems.map((i) => i.variantId) });
+    }
 
     if (createdOrderId) {
       const [createdOrder] = await db

@@ -8,9 +8,8 @@ import { getSpendCaps } from "./catalogue";
 type AlertInput = {
   day: string;
   clerkUserId: string;
-  userSpent?: number;
   globalSpent?: number;
-  blocked: "user_daily_cap" | "global_daily_cap" | "insufficient_credits" | null;
+  blocked: "global_daily_cap" | null;
 };
 
 /** Records (once per day and level) and delivers a spend alert. Returns the alerts that fired. */
@@ -67,10 +66,5 @@ export async function raiseSpendAlerts(input: AlertInput): Promise<void> {
   }
   if (input.blocked === "global_daily_cap" && (await fireOnce(input.day, "global", 101))) {
     await deliver("AI spend: global daily cap reached, AI calls are blocked", { day: input.day, cap: caps.globalDaily }, true);
-  }
-  if (input.blocked === "user_daily_cap" && (await fireOnce(input.day, `user:${input.clerkUserId}`, 100))) {
-    await deliver("AI spend: a user hit the per-user daily cap", {
-      day: input.day, userId: input.clerkUserId, cap: caps.perUserDaily,
-    }, false);
   }
 }

@@ -2,12 +2,14 @@ import { pgTable, uuid, text, integer, timestamp, date, jsonb, primaryKey, index
 
 // ─── AI credits ─────────────────────────────────────────────────────────────
 // Created by migration 112. Every AI tool call debits credits server-side.
-// Two buckets: the monthly allowance (resets each UTC month, no rollover)
-// and purchased packs (never expire). Monthly credits are spent first.
+// Three buckets, spent in this order: rollover (last month's unused credits,
+// one month only), the monthly allowance (resets each UTC month) and purchased
+// packs (never expire). Pro is unlimited and only tracked in ai_pro_usage.
 
 export const aiCreditAccounts = pgTable('ai_credit_accounts', {
   clerkUserId:      text('clerk_user_id').primaryKey(),
   monthlyBalance:   integer('monthly_balance').notNull().default(0),
+  rolloverBalance:  integer('rollover_balance').notNull().default(0),
   purchasedBalance: integer('purchased_balance').notNull().default(0),
   monthlyAllowance: integer('monthly_allowance').notNull().default(0),
   monthlyPeriod:    text('monthly_period').notNull().default(''),
@@ -24,6 +26,7 @@ export const aiCreditLedger = pgTable('ai_credit_ledger', {
   reference:      text('reference'),
   idempotencyKey: text('idempotency_key'),
   monthlyDelta:   integer('monthly_delta').notNull().default(0),
+  rolloverDelta:  integer('rollover_delta').notNull().default(0),
   purchasedDelta: integer('purchased_delta').notNull().default(0),
   balanceAfter:   integer('balance_after').notNull().default(0),
   meta:           jsonb('meta').$type<Record<string, unknown>>(),
@@ -55,4 +58,13 @@ export const aiCreditPurchases = pgTable('ai_credit_purchases', {
   status:                  text('status').notNull().default('pending_payment'),
   paidAt:                  timestamp('paid_at', { withTimezone: true }),
   createdAt:               timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const aiProUsage = pgTable('ai_pro_usage', {
+  clerkUserId:      text('clerk_user_id').primaryKey(),
+  period:           text('period').notNull().default(''),
+  creditsUsed:      integer('credits_used').notNull().default(0),
+  day:              text('day').notNull().default(''),
+  generationsToday: integer('generations_today').notNull().default(0),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
