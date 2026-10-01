@@ -20,6 +20,7 @@ import { trackAfter } from '@/lib/analytics/trackAfter';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
+import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -2970,8 +2971,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       statementCsvUrl: () => '/api/finance/statement.csv',
       /** Fee schedule (no auth). Derived server-side from lib/money/fees.ts. */
       feeSchedule: () => get<any>('/api/public/fee-schedule'),
-      payout: (data: { idempotencyKey: string; amount: number; currency: string }) =>
+      payout: (data: { idempotencyKey: string; amount: number; currency: string; method?: 'standard' | 'instant' }) =>
         post<any>('/api/finance/payout', data),
+      /** Current schedule, Instant eligibility and fee quote (optionally for an amount in cents), next payout estimate. */
+      payoutSchedule: (amountCents?: number) =>
+        freshGet<PayoutScheduleInfo>(`/api/finance/payout-schedule${amountCents ? `?amount=${amountCents}` : ''}`),
+      setPayoutSchedule: (data: { interval: 'daily' | 'weekly' | 'manual'; weeklyAnchor?: WeeklyAnchor }) =>
+        patch<{ changed: boolean; schedule: PayoutScheduleInfo['schedule'] }>('/api/finance/payout-schedule', data),
+      /** One payout with its Sales / fees / refunds / holds breakdown. */
+      payoutDetail: (id: string) =>
+        freshGet<PayoutDetail>(`/api/finance/payouts/${encodeURIComponent(id)}`),
     },
     /** Seller payment settings (Buy now, pay later opt-in). */
     sellerPaymentSettings: {
