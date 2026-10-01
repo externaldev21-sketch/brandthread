@@ -21,6 +21,7 @@ import type {
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -975,6 +976,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload one product photo and return the URL to store in `images`. */
       uploadImage: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ objectPath: string }>('/api/products/images', image, getToken, getCacheScope),
+    },
+    /** Bulk product actions ("Select products") and per-product search listing (SEO). */
+    productBulk: {
+      list: (params: { q?: string; status?: string } = {}) => {
+        const qs = new URLSearchParams();
+        if (params.q) qs.set('q', params.q);
+        if (params.status && params.status !== 'all') qs.set('status', params.status);
+        const s = qs.toString();
+        return get<BulkProductList>(`/api/product-bulk/products${s ? `?${s}` : ''}`);
+      },
+      price: (body: BulkPriceRequest) => post<BulkPriceResult>('/api/product-bulk/price', body),
+      status: (body: { productIds: string[]; status: 'active' | 'draft' | 'archived' }) =>
+        post<{ status: string; updated: string[]; unchanged: string[] }>('/api/product-bulk/status', body),
+      duplicate: (body: { productIds: string[]; copyInventory?: boolean }) =>
+        post<{ created: Array<{ sourceId: string; id: string; name: string }> }>('/api/product-bulk/duplicate', body),
+    },
+    productSeo: {
+      get: (productId: string) => get<ProductSeoDetail>(`/api/product-seo/${encodeURIComponent(productId)}`),
+      save: (productId: string, body: ProductSeoInput) =>
+        put<ProductSeoDetail>(`/api/product-seo/${encodeURIComponent(productId)}`, body),
     },
     ipCases: {
       create: (body: { listingProductId: string; claimantName: string; claimantEmail: string; rightsType: string; description: string; evidenceReferences: string[] }) =>
