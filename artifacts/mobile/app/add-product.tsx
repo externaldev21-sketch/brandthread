@@ -13,7 +13,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput,
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
+import { takePendingAiDescription, toUploadObjectPath } from '@/lib/aiHelperHandoff';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -439,6 +440,13 @@ export default function AddProductScreen() {
     markUnsavedChanges();
     setDraftData(prev => ({ ...prev, ...patch }));
   }
+
+  // AI description chosen on /ai-helper ("Use in product") lands in this draft only.
+  useFocusEffect(useCallback(() => {
+    const text = takePendingAiDescription();
+    if (text) { setDescOpen(true); patchDraft({ description: text }); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
 
   function buildDraftSnapshot(): ProductDraft {
     const productOptions: ProductOption[] = localOptions.map((o, i) => ({
@@ -1142,6 +1150,10 @@ export default function AddProductScreen() {
   // Description and category are collapsed "+ Add…" rows until tapped/set,
   // same as the Shopify iOS Add Product screen this page is modeled on.
   function renderBasicInfo() {
+    const aiPaths = (draftData.media ?? []).map(m => toUploadObjectPath(m.uri)).filter((x): x is string => !!x).slice(0, 4);
+    const aiDescriptionHref = aiPaths.length > 0 || editProductId
+      ? `/ai-helper?mode=description${editProductId ? `&productId=${editProductId}` : `&paths=${encodeURIComponent(aiPaths.join(','))}`}${draftData.name ? `&name=${encodeURIComponent(draftData.name)}` : ''}`
+      : null;
     const showDescription = descOpen || !!draftData.description;
     return (
       <>
@@ -1166,6 +1178,13 @@ export default function AddProductScreen() {
             <Text style={s.plusRowText}>Add description</Text>
           </TouchableOpacity>
         )}
+
+        {aiDescriptionHref ? (
+          <TouchableOpacity style={s.plusRow} onPress={() => router.push(aiDescriptionHref as never)} accessibilityRole="button" testID="add-product-ai-description">
+            <Feather name="zap" size={15} color={theme.accentLight} />
+            <Text style={s.plusRowText}>Write with AI</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity style={s.plusRow} onPress={openCategoryPicker} accessibilityRole="button" testID="add-product-category-row">
           <Feather name={draftData.category ? 'tag' : 'plus'} size={15} color={theme.accentLight} />
@@ -1690,6 +1709,17 @@ export default function AddProductScreen() {
     );
   }
 
+  /** AI size chart entry — only for a saved product, since the chart is written to it directly. */
+  function renderSizeChartAi() {
+    if (!editProductId) return null;
+    return (
+      <TouchableOpacity style={s.plusRow} onPress={() => router.push(`/ai-helper?mode=size-chart&productId=${editProductId}` as never)} accessibilityRole="button" testID="add-product-ai-size-chart">
+        <Feather name="zap" size={15} color={theme.accentLight} />
+        <Text style={s.plusRowText}>Generate size chart with AI</Text>
+      </TouchableOpacity>
+    );
+  }
+
   function renderSalesModel() {
     const sm = draftData.salesModel ?? 'pre-made';
     const ps = draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false };
@@ -2086,6 +2116,7 @@ export default function AddProductScreen() {
             hint={draftData.sizeChartImageUrl ? 'Added' : 'Optional'}
           >
             {renderSizeChart()}
+            {renderSizeChartAi()}
           </CollapsibleSection>
 
           <CollapsibleSection
