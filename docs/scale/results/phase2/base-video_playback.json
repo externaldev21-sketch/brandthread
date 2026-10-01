@@ -1,0 +1,24 @@
+{
+  "scenario": "video_playback",
+  "steps": [
+    50,
+    100,
+    200,
+    400,
+    800
+  ],
+  "stepSeconds": 15,
+  "requests": 15160,
+  "rps": 188.71898956375878,
+  "serverErrorRate": 0,
+  "rateLimitedRate": 0,
+  "dropped": 2456,
+  "endpoints": {
+    "video_playback": {
+      "p50": 238.785748,
+      "p95": 4633.338709000001,
+      "p99": 5245.64406058,
+      "max": 5361.582505
+    }
+  }
+}

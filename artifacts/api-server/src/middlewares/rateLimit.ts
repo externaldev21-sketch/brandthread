@@ -245,15 +245,27 @@ export function rateLimitPolicyFor(
   return null;
 }
 
+// Expired buckets used to be deleted inside every request's statement, i.e. a
+// table-range DELETE on the hot path of every API call. They are only garbage,
+// so it is enough for each instance to sweep them once a minute, off-path.
+const BUCKET_SWEEP_EVERY_MS = 60_000;
+let lastBucketSweepAt = 0;
+
+function sweepExpiredBuckets(): void {
+  const now = Date.now();
+  if (now - lastBucketSweepAt < BUCKET_SWEEP_EVERY_MS) return;
+  lastBucketSweepAt = now;
+  void db
+    .execute(sql`DELETE FROM rate_limit_buckets WHERE expires_at < now() - interval '1 hour'`)
+    .catch(() => { lastBucketSweepAt = 0; });
+}
+
 export async function consumeRateLimitBucket(
   bucketKey: string,
   policy: RateLimitPolicy,
 ): Promise<{ count: number; resetAt: Date }> {
+  sweepExpiredBuckets();
   const result = await db.execute(sql`
-    WITH expired_cleanup AS (
-      DELETE FROM rate_limit_buckets
-      WHERE expires_at < now() - interval '1 hour'
-    )
     INSERT INTO rate_limit_buckets (
       bucket_key, request_count, window_started_at, expires_at
     )

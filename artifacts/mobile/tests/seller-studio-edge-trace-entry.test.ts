@@ -26,13 +26,22 @@ describe('Studio edge-trace entry: lock -> trace -> zoom-through, replacing the 
     expect(studio).not.toContain('seller-studio-enter-button');
   });
 
-  it('the edge-trace path starts and ends at top-center, drawn clockwise (M cx,0 ... A ... back to cx,0)', () => {
+  it('the edge-trace path starts and ends at top-center, drawn clockwise (M cx,top ... A ... back to cx,top)', () => {
     const pathBlock = studio.slice(studio.indexOf('const tracePath = useMemo'), studio.indexOf('const traceAnimatedProps'));
-    expect(pathBlock).toContain('`M ${cx} 0`');
-    expect(pathBlock).toContain('`L ${cx} 0`'); // closes back at top-center
+    expect(pathBlock).toContain('`M ${cx} ${top}`');
+    expect(pathBlock).toContain('`L ${cx} ${top}`'); // closes back at top-center
     // Every arc sweeps clockwise (sweep-flag 1) — "0 0 1" in each `A r r ...` command.
     const arcCount = (pathBlock.match(/A \$\{r\} \$\{r\} 0 0 1/g) ?? []).length;
     expect(arcCount).toBe(4);
+  });
+
+  it('the trace rectangle is inset from the card edges so the full stroke paints on-screen (Dev: the trace was drawn exactly on the card edges, clipping the left/right strokes behind the device frame)', () => {
+    const pathBlock = studio.slice(studio.indexOf('const tracePath = useMemo'), studio.indexOf('const traceAnimatedProps'));
+    expect(pathBlock).toContain('const left = TRACE_INSET');
+    expect(pathBlock).toContain('const right = w - TRACE_INSET');
+    expect(pathBlock).toContain('const top = TRACE_INSET');
+    expect(pathBlock).toContain('const bottom = h - TRACE_INSET');
+    expect(studio).toMatch(/const TRACE_INSET = \d+/);
   });
 
   it('the trace runs at NO_REDUCE_MOTION over exactly AUTO_ENTER_MS — a real cancel window, not decoration', () => {

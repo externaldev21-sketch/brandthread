@@ -19,24 +19,26 @@ FROM generate_series(1, :users) g ON CONFLICT DO NOTHING;
 
 INSERT INTO posts (user_id, media_url, thumbnail_url, media_type, aspect_ratio, caption, hashtags, style_tags, created_at, published_at)
 SELECT 'lt_user_'||(1 + (g % :sellers)), '/api/posts/media/uploads/lt-'||g||'.mp4', '/api/posts/media/uploads/lt-'||g||'.jpg',
-       CASE WHEN g % 10 < 8 THEN 'video' ELSE 'photo' END, '9:16', 'lt post '||g||' streetwear drop',
+       CASE WHEN g % 10 < 8 THEN 'video' ELSE 'photo' END, '9:16', (ARRAY['hoodie','tee','street','vintage','denim','cargo','crewneck','sneaker','runway','capsule','drop','oversized','graphic','linen','knit','boxy','archive','y2k','minimal','techwear','utility','satin','wool','fleece','tote','beanie','jacket','bomber','trench','denim','pleated','washed','embroidered','patchwork','reversible','heavyweight','organic','limited','preorder','restock'])[1 + g % 40] || ' ' ||
+       (ARRAY['hoodie','tee','street','vintage','denim','cargo','crewneck','sneaker','runway','capsule','drop','oversized','graphic','linen','knit','boxy','archive','y2k','minimal','techwear','utility','satin','wool','fleece','tote','beanie','jacket','bomber','trench','denim','pleated','washed','embroidered','patchwork','reversible','heavyweight','organic','limited','preorder','restock'])[1 + (g / 40) % 40] || ' ' ||
+       substr(md5(g::text), 1, 7) || ' ' || substr(md5((g*7)::text), 1, 7) || ' lt post '||g,
        '["streetwear","drop"]'::json,
        (ARRAY['["streetwear"]','["minimal"]','["vintage"]','["techwear"]','["y2k"]'])[1 + g % 5]::jsonb,
        now() - (g % 20000) * interval '1 minute' - (random()*interval '10 minutes'), now()
 FROM generate_series(1, :posts) g;
 
 INSERT INTO products (owner_id, name, description, category, status, images, tags, style_tags, created_at)
-SELECT 'lt_user_'||(1 + (g % :sellers)), 'LT Product '||g, 'synthetic product '||g, (ARRAY['tees','hoodies','pants','hats'])[1 + g % 4], 'active',
+SELECT 'lt_user_'||(1 + (g % :sellers)), (ARRAY['Hoodie','Tee','Cargo Pant','Crewneck','Bomber','Tote','Beanie','Denim Jacket'])[1 + g % 8] || ' ' || (ARRAY['Classic','Washed','Heavyweight','Boxy','Vintage','Cropped'])[1 + g % 6] || ' LT Product '||g, 'synthetic product '||g, (ARRAY['tees','hoodies','pants','hats'])[1 + g % 4], 'active',
        ('["/api/posts/media/uploads/lt-p'||g||'.jpg"]')::json, '["lt"]'::json, '["streetwear"]'::jsonb, now() - (g % 9000) * interval '1 minute'
 FROM generate_series(1, :products) g;
 
 INSERT INTO product_variants (product_id, size, color, sku, price_cents, stock)
 SELECT p.id, s, 'Black', 'LT-'||substr(p.id::text,1,8)||'-'||s, 2000 + (random()*8000)::int, 500
-FROM products p, unnest(ARRAY['S','M','L']) s WHERE p.name LIKE 'LT Product %';
+FROM products p, unnest(ARRAY['S','M','L']) s WHERE p.name LIKE '% LT Product %';
 
 INSERT INTO post_tagged_products (post_id, product_id, position)
 SELECT po.id, (SELECT id FROM products WHERE owner_id = po.user_id ORDER BY id LIMIT 1), 0
-FROM posts po WHERE po.caption LIKE 'lt post %' AND po.user_id <> '' AND random() < 0.4
+FROM posts po WHERE po.caption LIKE '% lt post %' AND po.user_id <> '' AND random() < 0.4
   AND EXISTS (SELECT 1 FROM products WHERE owner_id = po.user_id);
 
 INSERT INTO follows (follower_id, following_id)

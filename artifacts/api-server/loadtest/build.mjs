@@ -8,7 +8,7 @@ import { rm } from "node:fs/promises";
 
 globalThis.require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const out = path.join(root, "dist-loadtest");
+const out = path.join(root, process.env.LT_OUT || "dist-loadtest");
 await rm(out, { recursive: true, force: true });
 
 await build({

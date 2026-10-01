@@ -270,7 +270,7 @@ export async function withOriginalInfo<T extends { originalStoryId?: string | nu
   const authorIds = [...new Set(reshares.map((v) => v.originalAuthorId!))];
   const [liveRows, authorRows] = await Promise.all([
     db.select({ id: stories.id }).from(stories)
-      .where(and(inArray(stories.id, storyIds), gt(stories.expiresAt, new Date()), ne(stories.moderationStatus, "removed"))),
+      .where(and(inArray(stories.id, storyIds), gt(stories.expiresAt, new Date()), eq(stories.moderationStatus, "visible"))),
     db.select({ clerkId: users.clerkId, username: users.username, name: users.name, displayName: users.displayName, deletedAt: users.deletedAt })
       .from(users).where(inArray(users.clerkId, authorIds)),
   ]);
