@@ -24,7 +24,6 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 type Mode = 'caption' | 'description' | 'size-chart';
 const TONES = ['casual', 'bold', 'luxury', 'playful', 'minimal', 'professional'] as const;
 const GARMENTS = ['tee', 'hoodie', 'jacket', 'pants', 'shorts', 'dress'] as const;
-const TOOL_BY_MODE: Record<Mode, string> = { caption: 'ai_caption', description: 'ai_product_description', 'size-chart': 'ai_size_chart' };
 const TITLE: Record<Mode, string> = { caption: 'Caption', description: 'Product description', 'size-chart': 'Size chart' };
 
 type StoredChart = { columns: string[]; rows: { size: string; values: string[] }[]; unit: 'inches' | 'cm'; notes?: string };
@@ -63,30 +62,17 @@ export default function AiHelperScreen() {
   const [unit, setUnit] = useState<'cm' | 'in'>('cm');
   const [base, setBase] = useState({ chest: '', waist: '', length: '' });
   const [grade, setGrade] = useState({ chest: '', waist: '', length: '' });
-  const [cost, setCost] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<{ message: string; credits?: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [pick, setPick] = useState(0);
 
-  useEffect(() => {
-    if (signedOut || demo) return;
-    let live = true;
-    api.aiHelpers.credits().then((c) => {
-      const t = c.tools.find((x) => x.tool === TOOL_BY_MODE[mode]);
-      if (live && t) setCost(t.cost);
-    }).catch(() => {});
-    return () => { live = false; };
-  }, [api, mode, signedOut, demo]);
-
-  const explain = useCallback((e: unknown): { message: string; credits?: boolean } => {
+  const explain = useCallback((e: unknown): { message: string } => {
     const err = e as { status?: number; code?: string; message?: string };
-    if (err.status === 402) return { message: 'You are out of AI credits.', credits: true };
-    if (err.status === 429) return { message: 'You have reached the AI limit for now.', credits: true };
-    if (err.status === 503 && err.code === 'ai_unavailable') return { message: 'AI is not available right now.' };
-    if (err.status === 503) return { message: 'AI credits are temporarily unavailable.', credits: true };
+    if (err.status === 429) return { message: 'Too many requests. Try again in a minute.' };
+    if (err.status === 503) return { message: 'AI is not available right now.' };
     if (err.status === 422 || err.status === 400 || err.status === 404) return { message: err.message || 'That could not be used.' };
     return { message: 'Something went wrong. Try again.' };
   }, []);
@@ -156,7 +142,7 @@ export default function AiHelperScreen() {
   const canSave = result && !saved && !demo && (
     result.kind === 'description' || (result.kind === 'caption' && p.postId) || (result.kind === 'size-chart' && p.productId));
   const saveLabel = result?.kind === 'description' ? 'Use in product' : result?.kind === 'caption' ? 'Save to post' : 'Save to product';
-  const genLabel = `Generate${cost ? ` · ${cost} credit${cost === 1 ? '' : 's'}` : ''}`;
+  const genLabel = 'Generate';
 
   const chips = (items: readonly string[], value: string, set: (v: any) => void) => (
     <View style={s.chipRow}>
@@ -209,9 +195,6 @@ export default function AiHelperScreen() {
             {error && (
               <View style={s.errorBox}>
                 <Text style={s.errorText}>{error.message}</Text>
-                {error.credits && (
-                  <TouchableOpacity onPress={() => router.push('/ai-credits' as never)} accessibilityRole="button"><Text style={s.link}>Get credits</Text></TouchableOpacity>
-                )}
               </View>
             )}
 

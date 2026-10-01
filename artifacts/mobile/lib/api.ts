@@ -959,8 +959,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/auth/data-export', { include }),
     },
     aiHelpers: {
-      /** Credit balance plus per-tool prices (`tools[].cost`). */
-      credits: () => freshGet<{ balance: number; tools: { tool: string; label: string; cost: number }[] }>('/api/ai/credits'),
       caption: (body: { draft?: string; description?: string; imagePath?: string; tone?: string }) =>
         postExpensive<{ captions: string[]; hashtags: string[] }>('/api/ai-helpers/caption', body),
       productDescription: (body: { productId?: string; imagePaths?: string[]; name?: string; details?: string; tone?: string }) =>
