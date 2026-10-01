@@ -9,6 +9,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { writeLandingPage } = require('./landing-page');
 
 const projectRoot = path.resolve(__dirname, '..');
 const outputDir = path.join(projectRoot, 'static-build');
@@ -273,4 +274,7 @@ function uploadAndRemoveSourceMaps() {
 uploadAndRemoveSourceMaps();
 addCanonicalMetadata();
 writePublicCrawlFiles();
+// After addCanonicalMetadata so the landing page keeps its own head. Served by
+// server/serve.js for signed-out visits to "/" and for "/welcome".
+writeLandingPage(outputDir, projectRoot);
 console.log('Web export complete.');

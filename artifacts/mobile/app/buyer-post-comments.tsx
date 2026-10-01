@@ -26,6 +26,7 @@ import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
+import Composer from '@/components/ui/Composer';
 import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -374,58 +375,6 @@ function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expan
   );
 }
 
-// ─── Animated send button ─────────────────────────────────────────────────────
-// Tight, crisp: scales down on press, pops on send, morphs the arrow to a
-// check for a beat once the comment lands.
-
-function AnimatedSendButton({
-  disabled, sending, justSent, onPress, accessibilityLabel, accentColor, onAccentColor,
-}: {
-  disabled: boolean;
-  sending: boolean;
-  justSent: boolean;
-  onPress: () => void;
-  accessibilityLabel: string;
-  accentColor: string;
-  onAccentColor: string;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!justSent) return;
-    Animated.sequence([
-      Animated.spring(scale, { toValue: 1.18, speed: 40, bounciness: 10, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, speed: 30, bounciness: 6, useNativeDriver: true }),
-    ]).start();
-  }, [justSent, scale]);
-
-  return (
-    <PressableScale
-      style={[csndBtn.root, { backgroundColor: accentColor }, disabled && csndBtn.disabled]}
-      onPress={onPress}
-      onPressIn={() => Animated.spring(scale, { toValue: 0.86, speed: 50, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, speed: 30, bounciness: 6, useNativeDriver: true }).start()}
-      disabled={disabled}
-      activeOpacity={0.9}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Animated.View style={{ transform: [{ scale }] }}>
-        {sending
-          ? <InlineSpinner style={{ paddingVertical: 0 }} />
-          : justSent
-            ? <Feather name="check" size={17} color={onAccentColor} />
-            : <Feather name="arrow-up" size={18} color={onAccentColor} />}
-      </Animated.View>
-    </PressableScale>
-  );
-}
-
-const csndBtn = StyleSheet.create({
-  root: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  disabled: { opacity: 0.28 },
-});
-
 // ─── Comment actions sheet ────────────────────────────────────────────────────
 
 type SheetStep = 'menu' | 'confirm-delete' | 'confirm-block';
@@ -685,7 +634,6 @@ export default function BuyerPostCommentsScreen() {
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Row | null>(null);
   const [sending, setSending] = useState(false);
-  const [justSent, setJustSent] = useState(false);
   /** True only on the first load (no prior data) */
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -916,8 +864,6 @@ export default function BuyerPostCommentsScreen() {
       setCommentsSynced(prev => prev.map(c => (c.id === optimistic.id ? finalized : c)));
       bumpCommentCount(postId, 1);
       hapticSuccess();
-      setJustSent(true);
-      setTimeout(() => setJustSent(false), 900);
       setSending(false);
       return;
     }
@@ -933,8 +879,6 @@ export default function BuyerPostCommentsScreen() {
       await load();
       bumpCommentCount(postId, 1);
       hapticSuccess();
-      setJustSent(true);
-      setTimeout(() => setJustSent(false), 900);
     } catch (error) {
       // Remove optimistic item, keep the draft for editing, show inline error
       setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
@@ -1192,7 +1136,7 @@ export default function BuyerPostCommentsScreen() {
           </View>
         ) : null}
 
-        <View style={[s.inputWrap, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+        <View style={[s.inputWrap, composerLocked && { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
           {sendError ? (
             <PressableScale style={s.sendErrorBanner} onPress={() => { hapticLight(); setSendError(null); }} accessibilityRole="alert">
               <Feather name="alert-circle" size={12} color={theme.error} />
@@ -1260,59 +1204,44 @@ export default function BuyerPostCommentsScreen() {
                   </PressableScale>
                 ))}
               </View>
-              {/* TikTok's composer: a slim 36pt pill (avatar left, @ + emoji
-                  tools inside the pill on the right), growing up to ~4 lines
-                  as you type — never a boxy full-height field. The send
-                  arrow only exists once there's something to send. */}
-              <View style={s.inputRow}>
-                <Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />
-                <View style={s.inputShell}>
-                  <TextInput
-                    ref={inputRef}
-                    nativeID={COMMENT_INPUT_NATIVE_ID}
-                    style={s.input}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder={replyingTo ? `Reply to ${replyingTo.author.name}…` : 'Add comment…'}
-                    placeholderTextColor={MUTED}
-                    multiline
-                    maxLength={MAX_COMMENT_LENGTH}
-                    returnKeyType="default"
-                    accessibilityLabel="Comment"
-                  />
-                  <PressableScale
-                    style={s.inputTool}
-                    onPress={() => { hapticLight(); inputRef.current?.focus(); }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Emoji"
-                  >
-                    <Feather name="smile" size={18} color={MUTED} />
-                  </PressableScale>
-                  <PressableScale
-                    style={s.inputTool}
-                    onPress={() => {
-                      hapticLight();
-                      setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
-                      inputRef.current?.focus();
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Mention someone"
-                  >
-                    <Text style={[s.mentionIcon, { fontSize: 18, lineHeight: 20 }]}>@</Text>
-                  </PressableScale>
-                </View>
-                {inputText.trim().length > 0 || sending || justSent ? (
-                  <AnimatedSendButton
-                    disabled={!inputText.trim() || sending}
-                    sending={sending}
-                    justSent={justSent}
-                    onPress={handleSend}
-                    accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
-                    accentColor={theme.accent}
-                    onAccentColor={theme.onAccent}
-                  />
-                ) : null}
-              </View>
+              <Composer
+                inputRef={inputRef}
+                nativeID={COMMENT_INPUT_NATIVE_ID}
+                value={inputText}
+                onChangeText={setInputText}
+                onSend={handleSend}
+                canSend={inputText.trim().length > 0 && !sending}
+                placeholder={replyingTo ? `Reply to ${replyingTo.author.name}…` : 'Add comment…'}
+                accessibilityLabel="Comment"
+                maxLength={MAX_COMMENT_LENGTH}
+                hideTabBar={false}
+                style={s.composerFlush}
+                leftAccessory={<Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />}
+                rightAccessory={(
+                  <>
+                    <PressableScale
+                      style={s.inputTool}
+                      onPress={() => { hapticLight(); inputRef.current?.focus(); }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Emoji"
+                    >
+                      <Feather name="smile" size={18} color={MUTED} />
+                    </PressableScale>
+                    <PressableScale
+                      style={s.inputTool}
+                      onPress={() => {
+                        hapticLight();
+                        setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
+                        inputRef.current?.focus();
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Mention someone"
+                    >
+                      <Text style={s.mentionIcon}>@</Text>
+                    </PressableScale>
+                  </>
+                )}
+              />
             </>
           )}
         </View>
@@ -1480,19 +1409,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // background — sitting directly above the composer.
   emojiRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 10 },
   emojiBtn: { alignItems: 'center', justifyContent: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },
-  // TikTok's composer pill: 44pt tall at rest (a real touch target, not just
-  // the surrounding row's padding), 22pt radius, a flat dark fill and no
-  // border at all — never the old boxy full-height field. Still allowed to
-  // grow (up to ~4 lines) as you type past one line.
-  inputShell: {
-    flex: 1, minHeight: 44, maxHeight: 104, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#262626', borderRadius: 22, paddingLeft: 14, paddingRight: 4,
-  },
-  input: {
-    flex: 1, paddingHorizontal: 0, paddingVertical: 0, fontFamily: FONT.regular,
-    fontSize: 14, lineHeight: 18, color: FG, maxHeight: 76, minHeight: 18,
-  },
+  composerFlush: { paddingHorizontal: 0, paddingTop: 0, backgroundColor: CARD },
   inputTool: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 18, lineHeight: 20 },
 
