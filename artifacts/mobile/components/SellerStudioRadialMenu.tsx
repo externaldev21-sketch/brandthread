@@ -232,6 +232,14 @@ const ZOOM_THROUGH_SCALE = 2.6;
 /** Corner radius of the edge-trace rectangle — a "rounded screen-edge"
  *  look rather than a hard-cornered box. */
 const TRACE_CORNER_RADIUS = 28;
+/** How far the trace rectangle sits inside the card's measured bounds.
+ *  Dev: live-inspected at 393x852 and found the path drawn exactly ON the
+ *  card edges (x=0 and x=w), so half the stroke fell outside the Svg's own
+ *  viewport and the visible half landed on the physical screen edge, where
+ *  the device frame/rounded corners hid it — only the top/bottom segments
+ *  (mid-screen) ever showed. Must clear strokeWidth/2 plus a margin so the
+ *  full stroke paints on-screen on every edge. */
+const TRACE_INSET = 8;
 
 /** Rubber-band resistance for dragging the page up past its resting
  *  position — a diminishing-returns curve (never a hard clamp) that
@@ -793,21 +801,25 @@ export default function SellerStudioRadialMenu({
   const tracePath = useMemo(() => {
     const { width: w, height: h } = cardAreaSize;
     if (w === 0 || h === 0) return { d: '', length: 0 };
-    const r = Math.min(TRACE_CORNER_RADIUS, w / 2, h / 2);
-    const cx = w / 2;
+    const left = TRACE_INSET;
+    const top = TRACE_INSET;
+    const right = w - TRACE_INSET;
+    const bottom = h - TRACE_INSET;
+    const r = Math.min(TRACE_CORNER_RADIUS, (right - left) / 2, (bottom - top) / 2);
+    const cx = (left + right) / 2;
     const d = [
-      `M ${cx} 0`,
-      `L ${w - r} 0`,
-      `A ${r} ${r} 0 0 1 ${w} ${r}`,
-      `L ${w} ${h - r}`,
-      `A ${r} ${r} 0 0 1 ${w - r} ${h}`,
-      `L ${r} ${h}`,
-      `A ${r} ${r} 0 0 1 0 ${h - r}`,
-      `L 0 ${r}`,
-      `A ${r} ${r} 0 0 1 ${r} 0`,
-      `L ${cx} 0`,
+      `M ${cx} ${top}`,
+      `L ${right - r} ${top}`,
+      `A ${r} ${r} 0 0 1 ${right} ${top + r}`,
+      `L ${right} ${bottom - r}`,
+      `A ${r} ${r} 0 0 1 ${right - r} ${bottom}`,
+      `L ${left + r} ${bottom}`,
+      `A ${r} ${r} 0 0 1 ${left} ${bottom - r}`,
+      `L ${left} ${top + r}`,
+      `A ${r} ${r} 0 0 1 ${left + r} ${top}`,
+      `L ${cx} ${top}`,
     ].join(' ');
-    const length = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+    const length = 2 * (right - left - 2 * r) + 2 * (bottom - top - 2 * r) + 2 * Math.PI * r;
     return { d, length };
   }, [cardAreaSize]);
   // strokeDasharray is the full path length (one dash spanning it exactly);
@@ -1256,7 +1268,7 @@ export default function SellerStudioRadialMenu({
                   <AnimatedPath
                     d={tracePath.d}
                     stroke="#ffffff"
-                    strokeWidth={2.5}
+                    strokeWidth={3}
                     fill="none"
                     strokeDasharray={tracePath.length}
                     animatedProps={traceAnimatedProps}
