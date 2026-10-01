@@ -23,9 +23,10 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import {
-  validateOverlaysArray, MAX_SLIDES,
+  validateOverlaysArray,
   type ValidatedOverlay,
 } from "../lib/slideValidation";
+import { MAX_SLIDES_BY_SURFACE, isPostSurface } from "../lib/postLimits";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -37,9 +38,13 @@ const MAX_SLIDE_BYTES = 20 * 1024 * 1024;  // 20 MB per slide
 const MAX_TOTAL_BYTES = 80 * 1024 * 1024;  // 80 MB total
 const SLIDE_PREVIEW_TTL_SECONDS = 60 * 60; // 1 hour signed URL
 
-// Output portrait canvas for slides (matching video compose)
-const SLIDE_W = 720;
-const SLIDE_H = 1280;
+// Output canvases per post aspect ratio (the client pre-crops each slide to the
+// chosen ratio; compose fills the canvas, cropping any rounding slack).
+const SLIDE_CANVAS: Record<string, { w: number; h: number }> = {
+  "9:16": { w: 720, h: 1280 },
+  "3:4": { w: 810, h: 1080 },
+  "1:1": { w: 1080, h: 1080 },
+};
 
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
 
@@ -53,10 +58,11 @@ interface SlideInput {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/** Sellers and buyers can both publish their own media (buyers: profile POSTs only). */
 async function isSeller(clerkId: string): Promise<boolean> {
   const [user] = await db.select({ accountType: users.accountType })
     .from(users).where(eq(users.clerkId, clerkId)).limit(1);
-  return user?.accountType === "seller";
+  return user?.accountType === "seller" || user?.accountType === "buyer";
 }
 
 function validObjectPath(value: unknown): value is string {
@@ -107,6 +113,8 @@ function buildImageDrawtext(
   overlay: ValidatedOverlay,
   textFile: string,
   fontPath: string,
+  SLIDE_W: number,
+  SLIDE_H: number,
 ): string {
   const hexRaw   = overlay.color.replace("#", "");
   const ffColor  = `0x${hexRaw}`;
@@ -146,7 +154,7 @@ router.post(
   async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;
     if (!(await isSeller(clerkId))) {
-      return res.status(403).json({ error: "Seller account required" });
+      return res.status(403).json({ error: "Seller or buyer account required" });
     }
     const contentType = String(req.get("content-type") ?? "").split(";")[0].toLowerCase();
     if (!IMAGE_TYPES.has(contentType)) {
@@ -181,14 +189,23 @@ router.post(
 router.post("/compose-slideshow", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!(await isSeller(clerkId))) {
-    return res.status(403).json({ error: "Seller account required" });
+    return res.status(403).json({ error: "Seller or buyer account required" });
   }
 
-  const body = req.body as { slides?: unknown };
+  const body = req.body as { slides?: unknown; aspectRatio?: unknown; surface?: unknown; coverIndex?: unknown };
   const rawSlides = body.slides;
+  const canvas = SLIDE_CANVAS[String(body.aspectRatio ?? "9:16")];
+  if (!canvas) return res.status(400).json({ error: "aspectRatio must be 9:16, 3:4, or 1:1" });
+  const SLIDE_W = canvas.w;
+  const SLIDE_H = canvas.h;
+  const [acct] = await db.select({ accountType: users.accountType })
+    .from(users).where(eq(users.clerkId, clerkId)).limit(1);
+  // Buyers can only ever compose profile POSTs; sellers choose the destination.
+  const surface = acct?.accountType === "buyer" ? "profile" : (isPostSurface(body.surface) ? body.surface : "thread");
+  const maxSlides = MAX_SLIDES_BY_SURFACE[surface];
 
-  if (!Array.isArray(rawSlides) || rawSlides.length === 0 || rawSlides.length > MAX_SLIDES) {
-    return res.status(400).json({ error: `Provide between 1 and ${MAX_SLIDES} slides` });
+  if (!Array.isArray(rawSlides) || rawSlides.length === 0 || rawSlides.length > maxSlides) {
+    return res.status(400).json({ error: `Provide between 1 and ${maxSlides} slides` });
   }
 
   // Validate each slide entry
@@ -259,7 +276,7 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
         // No overlays — just resize/pad to portrait canvas
         await exec("ffmpeg", [
           "-y", "-i", inputPath,
-          "-vf", `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=decrease,pad=${SLIDE_W}:${SLIDE_H}:(ow-iw)/2:(oh-ih)/2,setsar=1`,
+          "-vf", `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=increase,crop=${SLIDE_W}:${SLIDE_H},setsar=1`,
           "-frames:v", "1", "-q:v", "3", outputPath,
         ], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
       } else {
@@ -271,10 +288,10 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
           const fontPath = bold ? boldFont : regularFont;
           const textFile = await writeTextFile(dir, `${si}_${ov.id}`, ov.text);
           textFiles.push(textFile);
-          drawtextParts.push(`drawtext=${buildImageDrawtext(ov, textFile, fontPath)}`);
+          drawtextParts.push(`drawtext=${buildImageDrawtext(ov, textFile, fontPath, SLIDE_W, SLIDE_H)}`);
         }
         const overlayFilter = drawtextParts.join(",");
-        const baseFilter = `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=decrease,pad=${SLIDE_W}:${SLIDE_H}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+        const baseFilter = `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=increase,crop=${SLIDE_W}:${SLIDE_H},setsar=1`;
 
         await exec("ffmpeg", [
           "-y", "-i", inputPath,
@@ -291,11 +308,13 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
     }
 
     // Phase 3: thumbnail = first rendered slide (already portrait JPEG)
-    const thumbSrcPath = join(dir, "rendered_0.jpg");
+    const coverIndex = Number.isInteger(body.coverIndex) && Number(body.coverIndex) >= 0 && Number(body.coverIndex) < slideInputs.length
+      ? Number(body.coverIndex) : 0;
+    const thumbSrcPath = join(dir, `rendered_${coverIndex}.jpg`);
     const thumbPath    = join(dir, "thumbnail.jpg");
     await exec("ffmpeg", [
       "-y", "-i", thumbSrcPath,
-      "-vf", `scale=360:640:force_original_aspect_ratio=decrease,pad=360:640:(ow-iw)/2:(oh-ih)/2`,
+      "-vf", `scale=360:${Math.round((360 * SLIDE_H) / SLIDE_W)}:force_original_aspect_ratio=increase,crop=360:${Math.round((360 * SLIDE_H) / SLIDE_W)}`,
       "-frames:v", "1", "-q:v", "4", thumbPath,
     ], { timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
     const thumbBytes = await fs.readFile(thumbPath);

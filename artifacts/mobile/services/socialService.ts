@@ -21,6 +21,7 @@ import type {
   SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
   Comment,
 } from './socialTypes';
+import type { PostSlide } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
 
 // ─── Keys (scoped by user ID so two accounts never share storage) ─────────────
@@ -577,6 +578,10 @@ export interface SellerThreadPost {
   viewsCount?:       number;
   /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
   mediaPaths?:       string[];
+  /** POST carousels: ordered photo/video slides with stable URLs. */
+  slides?:           PostSlide[];
+  /** Where it lives: Threads feed or the author's profile grid. */
+  surface?:          'thread' | 'profile';
   /** Per-slide overlay metadata — used to restore draft editors */
   slideOverlays?:    Array<{
     slideIndex: number;
@@ -655,6 +660,8 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     // Slideshow persistence fields
     mediaPaths:      Array.isArray(p.mediaPaths) && p.mediaPaths.length > 0 ? p.mediaPaths : undefined,
     slideOverlays:   Array.isArray(p.slideOverlays) && p.slideOverlays.length > 0 ? p.slideOverlays : undefined,
+    slides:          mapSlides(p.slides),
+    surface:         p.surface === 'profile' ? 'profile' : 'thread',
   };
 }
 
@@ -675,11 +682,15 @@ export async function createSellerPost(params: {
   /** @deprecated use productTags instead */
   productTagIds?: string[];
   sound?: SellerPostSound | null;
-  visibility?: { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  visibility?: { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  /** Where the post lives: the Threads feed (sellers only) or the author's own profile grid. */
+  surface?: 'thread' | 'profile';
   isDraft?: boolean;
   scheduledAt?: string | null;
   /** Ordered object storage paths for slideshow slides */
   mediaPaths?: string[];
+  /** POST carousels: ordered photo/video slides (server derives stable URLs from the paths). */
+  slides?: Array<{ kind: 'photo' | 'video'; path: string; thumbnailPath: string; duration?: number }>;
   /** Per-slide overlay metadata */
   slideOverlays?: Array<{ slideIndex: number; overlays: any[] }>;
 }): Promise<SellerThreadPost> {
@@ -694,9 +705,11 @@ export async function createSellerPost(params: {
       thumbnailPath: params.thumbnailPath,
       mediaUrls: params.mediaUris ?? [],
       mediaPaths: params.mediaPaths ?? [],
+      slides: params.slides,
       slideOverlays: params.slideOverlays ?? [],
       mediaType: params.contentType,
       aspectRatio: params.aspectRatio ?? '9:16',
+      surface: params.surface,
       caption: params.caption,
       hashtags: params.hashtags,
       styleTags: params.styleTags ?? [],
@@ -736,7 +749,7 @@ export async function updateSellerPost(
     'caption' | 'hashtags' | 'styleTags' | 'mediaUris' | 'thumbnailUri' | 'aspectRatio' |
     'contentType' | 'postStatus' | 'isDraft' | 'isArchived' | 'isDeleted' |
     'sound' | 'productTags' | 'visibility' | 'scheduledAt' | 'publishedAt'
-  >>,
+  >> & { surface?: 'thread' | 'profile' },
 ): Promise<SellerThreadPost> {
   const k = K();
   const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}`, {
@@ -746,6 +759,7 @@ export async function updateSellerPost(
       mediaUrls: patch.mediaUris,
       mediaType: patch.contentType,
       aspectRatio: patch.aspectRatio,
+      surface: patch.surface,
       caption: patch.caption,
       hashtags: patch.hashtags,
       styleTags: patch.styleTags,
@@ -827,6 +841,17 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
  * profile video endpoints) to a SellerThreadPost. Exported so the profile video
  * grid and the feed player read one shape.
  */
+/** API `slides` → client slides (drops malformed entries; undefined when there are none). */
+export function mapSlides(raw: unknown): PostSlide[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out = raw.flatMap((r: any) => (
+    r && (r.kind === 'photo' || r.kind === 'video') && typeof r.url === 'string'
+      ? [{ kind: r.kind, url: r.url, thumbnailUrl: typeof r.thumbnailUrl === 'string' ? r.thumbnailUrl : undefined, duration: typeof r.duration === 'number' ? r.duration : undefined } as PostSlide]
+      : []
+  ));
+  return out.length > 0 ? out : undefined;
+}
+
 export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
@@ -852,6 +877,8 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
     thumbnailUri:      p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
+    slides:            mapSlides(p.slides),
+    surface:           p.surface === 'profile' ? 'profile' : 'thread',
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:        'published' as const,
     isDraft:           false,

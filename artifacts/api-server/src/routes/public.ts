@@ -1613,6 +1613,7 @@ router.get("/posts", async (req, res) => {
       .where(and(
         ownerId ? eq(posts.userId, ownerId) : undefined,
         eq(users.accountType, "seller"),
+        ownerId ? undefined : eq(posts.surface, "thread"),
         publicPostCondition(),
         notBlockedWith(viewerId, posts.userId),
       ))

@@ -48,7 +48,7 @@ import {
   CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover,
 } from '@/components/profile/ProfileCover';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
-import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
@@ -134,7 +134,7 @@ export default function ProfileScreen() {
   const router  = useRouter();
   const api = useApi();
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
-  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   // The seller tab bar floats over content (same metrics as the global bar).
   const sellerBarInset = useTabBarMetrics(2).occupiedHeight;
   const { isLoaded: authLoaded, userId } = useAuth();
@@ -479,7 +479,10 @@ export default function ProfileScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const isLive = !post.isDraft && !(post.scheduledAt && new Date(post.scheduledAt).getTime() > Date.now());
     // Published posts play in the feed player; drafts and scheduled posts open the editor.
-    if (isLive) {
+    if (isLive && post.surface === 'profile') {
+      // POST (profile surface): the 3:4 carousel viewer, not the Threads video player.
+      router.push(('/buyer-post-viewer?postId=' + encodeURIComponent(post.id)) as never);
+    } else if (isLive) {
       router.push(profileVideosHref({ source: 'creator', id: userId, startPostId: post.id, title: brandTitle }) as never);
     } else {
       router.push(('/create-post?editId=' + encodeURIComponent(post.id)) as never);

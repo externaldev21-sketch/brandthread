@@ -1,3 +1,5 @@
+> **Superseded** by [create-flow.md](create-flow.md): the create flow was rebuilt on TikTok (THREAD) and Instagram (POST). This file documents the earlier Instagram-picker iteration.
+
 # Thread creation flows (post / reel), modeled on Instagram iOS
 
 > **Fidelity directive (owner, verbatim):** "When I'm sending you these

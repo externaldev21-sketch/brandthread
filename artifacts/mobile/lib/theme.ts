@@ -56,6 +56,22 @@ export const TEXT_SECONDARY = '#C0C0C0';
 export const TEXT_TERTIARY  = '#B0B0B0';
 export const MUTED   = TEXT_SECONDARY;
 export const SUBTLE  = TEXT_TERTIARY;
+/**
+ * The create flow's fixed canvas (capture → gallery → edit → post): true black,
+ * white and silver whatever Appearance theme is selected — it is a camera-style
+ * surface, like the story camera. The only colour is LIVE/record red.
+ */
+export const CREATE_CANVAS = {
+  black: '#000000',
+  white: '#FFFFFF',
+  silver: '#C0C0C0',
+  silverDim: '#8E8E93',
+  surface: '#1C1C1E',
+  surface2: '#2C2C2E',
+  line: '#2C2C2E',
+  live: '#FF3B30',
+} as const;
+
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
 

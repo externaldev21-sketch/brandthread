@@ -148,7 +148,7 @@ export async function computeTrendingForToday(): Promise<void> {
         eq(users.clerkId, posts.userId),
         eq(users.accountType, "seller"),
       ))
-      .where(gte(posts.createdAt, since48))
+      .where(and(gte(posts.createdAt, since48), eq(posts.surface, "thread")))
       .orderBy(desc(posts.createdAt))
       .limit(CANDIDATE_POOL);
 

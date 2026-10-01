@@ -17,7 +17,10 @@ const exec = promisify(execFile);
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 const FILTERS = new Set(["none", "warm", "cool", "mono"]);
 const MAX_CLIP_BYTES = 80 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 240 * 1024 * 1024;
+// Clips arriving through the chunked upload (routes/post-upload.ts) can be up
+// to 10 minutes long, so compose accepts far more than the single-shot limit.
+const MAX_COMPOSE_CLIP_BYTES = 1024 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 1536 * 1024 * 1024;
 const MAX_CLIPS = 12;
 const MAX_TOTAL_DURATION_SECONDS = 600;
 // Composed output resolution — 1080p vertical, matching the quality the
@@ -46,10 +49,11 @@ const ALLOWED_NAMED_COLORS = new Set([
   "#aaaaaa",
 ]);
 
+/** Sellers and buyers can both publish their own media (buyers: profile POSTs only). */
 async function isSeller(clerkId: string): Promise<boolean> {
   const [user] = await db.select({ accountType: users.accountType })
     .from(users).where(eq(users.clerkId, clerkId)).limit(1);
-  return user?.accountType === "seller";
+  return user?.accountType === "seller" || user?.accountType === "buyer";
 }
 
 function validSpeed(value: unknown): value is 0.5 | 1 | 2 | 3 {
@@ -339,7 +343,7 @@ router.post(
   express.raw({ type: [...VIDEO_TYPES], limit: MAX_CLIP_BYTES }),
   async (req, res) => {
     const clerkId = (req as any).clerkUserId as string;
-    if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller account required" });
+    if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
     const contentType = String(req.get("content-type") ?? "").split(";")[0].toLowerCase();
     if (!VIDEO_TYPES.has(contentType)) return res.status(415).json({ error: "Unsupported video type" });
     const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
@@ -364,7 +368,7 @@ router.post(
 
 router.post("/compose-video", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller account required" });
+  if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
   const body = req.body as {
     clips?: Array<{ objectPath?: string; speed?: number; filter?: string }>;
     trimStart?: number;
@@ -407,18 +411,22 @@ router.post("/compose-video", requireAuth, async (req, res) => {
       if (!allowed) return res.status(403).json({ error: "A clip is not owned by this seller" });
       const [metadata] = await file.getMetadata();
       const size = Number(metadata.size ?? 0);
-      if (!Number.isFinite(size) || size <= 0 || size > MAX_CLIP_BYTES) {
+      if (!Number.isFinite(size) || size <= 0 || size > MAX_COMPOSE_CLIP_BYTES) {
         return res.status(400).json({ error: "A clip is empty or too large" });
       }
       const contentType = String(metadata.contentType ?? "").split(";")[0].toLowerCase();
       totalBytes += size;
       if (totalBytes > MAX_TOTAL_BYTES) return res.status(400).json({ error: "Combined clips are too large" });
       const path = join(dir, `input-${index}.mp4`);
-      const [bytes] = await file.download();
-      if (!isSupportedVideo(contentType, bytes)) {
+      // Stream to disk (a 10 minute clip can be hundreds of MB) and sniff only the header.
+      await file.download({ destination: path });
+      const handle = await fs.open(path, "r");
+      const head = Buffer.alloc(16);
+      await handle.read(head, 0, 16, 0).catch(() => undefined);
+      await handle.close();
+      if (!isSupportedVideo(contentType, head)) {
         return res.status(400).json({ error: "A clip is not a supported video file" });
       }
-      await fs.writeFile(path, bytes);
       inputs.push(path);
       const clipDuration = await duration(path);
       if (clipDuration > MAX_TOTAL_DURATION_SECONDS) {
@@ -515,7 +523,7 @@ router.post("/compose-video", requireAuth, async (req, res) => {
       "-c:v", "libx264", "-profile:v", "high", "-level:v", "4.0", "-pix_fmt", "yuv420p",
       "-preset", "veryfast", "-crf", "20", "-maxrate", "8.5M", "-bufsize", "16M",
       "-c:a", "aac", "-movflags", "+faststart", output,
-    ], { timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
+    ], { timeout: 20 * 60_000, maxBuffer: 8 * 1024 * 1024 });
 
     const outputDuration = await duration(output);
     const thumbnail = join(dir, "thumbnail.jpg");
@@ -568,7 +576,7 @@ router.post("/compose-video", requireAuth, async (req, res) => {
 // frame other than whatever the fixed offset in compose-video produced.
 router.post("/compose-video/thumbnail", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller account required" });
+  if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller or buyer account required" });
   const { mediaPath, offset } = req.body as { mediaPath?: string; offset?: number };
   if (!validObjectPath(mediaPath)) {
     return res.status(400).json({ error: "Invalid mediaPath" });
@@ -637,6 +645,8 @@ router.get("/media/*path", async (req, res) => {
       .where(or(
         sql`${posts.mediaUrl} LIKE ${mediaSuffix}`,
         sql`${posts.thumbnailUrl} LIKE ${mediaSuffix}`,
+        // POST carousel slides (and their posters) live in posts.slides.
+        sql`${posts.slides}::text LIKE ${`%/api/posts/media/${suffix}%`}`,
       ))
       .limit(1);
     const due = linkedPost?.postStatus === "scheduled" &&

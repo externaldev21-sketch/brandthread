@@ -107,14 +107,36 @@ describe("buyer posting rules", () => {
     postIds.push(res.body.id);
   });
 
-  it("rejects a buyer video post", async () => {
+  it("allows a buyer video post on their profile (never the Threads feed)", async () => {
     authState.clerkUserId = buyerId;
     const res = await request("/api/posts", {
       method: "POST",
       body: JSON.stringify({ mediaType: "video", mediaUrls: ["https://cdn.test/buyer.mp4"] }),
     });
+    expect(res.status).toBe(201);
+    expect(res.body.surface).toBe("profile");
+    postIds.push(res.body.id);
+  });
+
+  it("rejects a buyer creating a Thread (403, enforced server-side)", async () => {
+    authState.clerkUserId = buyerId;
+    const res = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({ mediaType: "video", surface: "thread", mediaUrls: ["https://cdn.test/buyer.mp4"] }),
+    });
     expect(res.status).toBe(403);
-    expect(res.body.code).toBe("BUYER_PHOTO_ONLY");
+    expect(res.body.code).toBe("BUYER_NO_THREADS");
+  });
+
+  it("caps profile POST slideshows at 14 slides", async () => {
+    authState.clerkUserId = buyerId;
+    const paths = Array.from({ length: 15 }, (_, i) => `/objects/uploads/s/slide-${i}.jpg`);
+    const res = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({ mediaType: "slideshow", mediaPaths: paths }),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/max 14/i);
   });
 
   it("rejects a buyer scheduling a post", async () => {

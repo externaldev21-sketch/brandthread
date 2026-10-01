@@ -53,6 +53,8 @@ const videoRowSelection = {
   mediaUrls:    posts.mediaUrls,
   mediaType:    posts.mediaType,
   aspectRatio:  posts.aspectRatio,
+  surface:      posts.surface,
+  slides:       posts.slides,
   caption:      posts.caption,
   hashtags:     posts.hashtags,
   styleTags:    posts.styleTags,
@@ -78,6 +80,8 @@ type VideoRow = {
   mediaUrls: string[];
   mediaType: string;
   aspectRatio: string;
+  surface: string;
+  slides: Array<{ kind: 'photo' | 'video'; path: string; url: string; thumbnailPath: string; thumbnailUrl: string; duration?: number }>;
   caption: string | null;
   hashtags: string[];
   styleTags: string[];
@@ -168,6 +172,8 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     mediaUrls:    row.mediaUrls,
     mediaType:    row.mediaType,
     aspectRatio:  row.aspectRatio,
+    surface:      row.surface,
+    slides:       row.slides ?? [],
     caption:      row.caption,
     hashtags:     row.hashtags,
     styleTags:    row.styleTags,

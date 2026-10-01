@@ -11,7 +11,7 @@ import { computeProfileLayout, type ProfileLayout } from './profileGeometry';
  *    1440px browser (tiles and hero keep their phone proportions).
  */
 export {
-  PROFILE_GRID_GAP, PROFILE_WEB_COLUMN, SHOP_PILL_HEIGHT, TILE_ASPECT_4_5, TILE_ASPECT_9_16, computeProfileLayout,
+  PROFILE_GRID_GAP, PROFILE_WEB_COLUMN, SHOP_PILL_HEIGHT, TILE_ASPECT_3_4, TILE_ASPECT_4_5, TILE_ASPECT_9_16, computeProfileLayout,
   type ProfileLayout,
 } from './profileGeometry';
 
