@@ -1099,20 +1099,20 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       <View style={s.actionSection}>
         <SectionHeader title="Actions" />
         <View style={s.actionRow}>
-          <SecondaryButton
+          <View style={s.actionCell}><SecondaryButton
             label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
             onPress={onMessageBuyer}
             icon="message-circle"
             disabled={messagingBuyer || !order.customer.buyerUserId}
-            style={{ flex: 1 }}
-          />
+            style={{ width: '100%' }}
+          /></View>
           {order.payment.amountPaidCents > order.payment.amountRefundedCents && (
-            <SecondaryButton
+            <View style={s.actionCell}><SecondaryButton
               label="Refund"
               onPress={() => router.push(`/refund-detail?orderId=${order.id}` as never)}
               icon="credit-card"
-              style={{ flex: 1 }}
-            />
+              style={{ width: '100%' }}
+            /></View>
           )}
         </View>
         {order.autoRefundedAt ? (
@@ -1120,21 +1120,21 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         ) : null}
         {!order.autoRefundedAt && order.status === 'new' && (
           <View style={s.actionRow}>
-            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ flex: 1 }} />
-            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={{ flex: 1 }} accent={RED} />
+            <View style={s.actionCell}><PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ width: '100%' }} /></View>
+            <View style={s.actionCell}><SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={{ width: '100%' }} accent={RED} /></View>
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'processing' && (
           <View style={s.actionRow}>
-            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
-            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+            <View style={s.actionCell}><PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ width: '100%' }} /></View>
+            <View style={s.actionCell}><SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ width: '100%' }} /></View>
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
             <View style={s.actionRow}>
-              <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
-              <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ flex: 1 }} />
+              <View style={s.actionCell}><PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ width: '100%' }} /></View>
+              <View style={s.actionCell}><SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ width: '100%' }} /></View>
             </View>
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
@@ -1962,6 +1962,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Actions
   actionSection:    { gap: SP.sm },
+  actionCell:       { flex: 1 },
   actionRow:        { flexDirection: 'row', gap: SP.sm },
   actionCol:        { gap: SP.sm },
   readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },

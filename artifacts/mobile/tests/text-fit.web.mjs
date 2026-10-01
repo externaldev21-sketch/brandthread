@@ -49,13 +49,17 @@ function inPage() {
   const container = (el) => {
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
       const cs = getComputedStyle(p); const r = rect(p);
-      const boxed = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderLeftWidth) > 0 || alpha(cs.backgroundColor) > 0.04;
+      const boxed = parseFloat(cs.borderLeftWidth) > 0 || alpha(cs.backgroundColor) > 0.04;
       if (boxed && r.width < W - 1) return p;
     }
     return null;
   };
 
-  const texts = [...document.querySelectorAll('body *')].filter((el) => hasOwnText(el) && visible(el));
+  const inScroller = (el) => { for (let p = el.parentElement; p; p = p.parentElement) { const cs = getComputedStyle(p); if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') return true; } return false; };
+  const inFixed = (el) => { for (let p = el; p; p = p.parentElement) if (getComputedStyle(p).position === 'fixed') return true; return false; };
+
+  const texts = [...document.querySelectorAll('body *')].filter((el) => hasOwnText(el) && visible(el) && !inFixed(el));
+  const boxes = new Map(); // container -> text elements inside
   for (const el of texts) {
     const cs = getComputedStyle(el);
     const r = rect(el);
@@ -63,21 +67,24 @@ function inPage() {
     if (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) add('ellipsis', el, 'label truncated');
     const webkitClamp = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
     if (webkitClamp && el.scrollHeight > el.clientHeight + 1) add('clamped', el, 'text cut by line clamp');
-    if (r.right > W + 0.5 || r.left < -0.5) add('off-screen', el, `x ${Math.round(r.left)}..${Math.round(r.right)}`);
-    const tr = textRect(el);
+    if ((r.right > W + 0.5 || r.left < -0.5) && !inScroller(el)) add('off-screen', el, `x ${Math.round(r.left)}..${Math.round(r.right)}`);
     const box = container(el);
-    if (box) {
-      const b = rect(box);
-      if (tr.left < b.left - 0.5 || tr.right > b.right + 0.5 || tr.top < b.top - 0.5 || tr.bottom > b.bottom + 0.5) {
-        add('overflows-container', el, `text ${Math.round(tr.left)}-${Math.round(tr.right)} box ${Math.round(b.left)}-${Math.round(b.right)}`);
-      } else {
-        const min = b.height < 80 ? 12 : 16;
-        const left = tr.left - b.left; const right = b.right - tr.right;
-        const centred = Math.abs(left - right) < 2; // centred text in a wide button is fine
-        if ((left < min - 0.5 && !centred) || (right < min - 0.5 && !centred)) add('tight-padding', el, `left ${left.toFixed(0)} right ${right.toFixed(0)} (min ${min})`);
-        if (b.height < 80 && tr.height > 0 && Math.abs((tr.top - b.top) - (b.bottom - tr.bottom)) > 4) add('not-v-centred', el, `top ${(tr.top - b.top).toFixed(0)} bottom ${(b.bottom - tr.bottom).toFixed(0)}`);
-      }
+    if (box) { const list = boxes.get(box) ?? []; list.push(el); boxes.set(box, list); }
+  }
+  // Per container: all content (text + icons) must fit inside with padding, and sit centred.
+  for (const [box, els] of boxes) {
+    const b = rect(box);
+    const rects = els.map(textRect).concat([...box.querySelectorAll('svg, img')].filter(visible).map(rect));
+    const u = { left: Math.min(...rects.map((x) => x.left)), right: Math.max(...rects.map((x) => x.right)), top: Math.min(...rects.map((x) => x.top)), bottom: Math.max(...rects.map((x) => x.bottom)) };
+    const name = els[0];
+    if (u.left < b.left - 0.5 || u.right > b.right + 0.5 || u.top < b.top - 0.5 || u.bottom > b.bottom + 0.5) {
+      add('overflows-container', name, `content ${Math.round(u.left)}-${Math.round(u.right)} box ${Math.round(b.left)}-${Math.round(b.right)}`); continue;
     }
+    const min = b.height < 80 ? 12 : 16;
+    const left = u.left - b.left; const right = b.right - u.right;
+    const centred = Math.abs(left - right) < 2;
+    if (!centred && (left < min - 0.5 || right < min - 0.5) && b.width > 24) add('tight-padding', name, `left ${left.toFixed(0)} right ${right.toFixed(0)} (min ${min})`);
+    if (b.height < 64 && Math.abs((u.top - b.top) - (b.bottom - u.bottom)) > 4) add('not-v-centred', name, `top ${(u.top - b.top).toFixed(0)} bottom ${(b.bottom - u.bottom).toFixed(0)}`);
   }
 
   // Row siblings: one label wraps while others don't; buttons with unequal size.
@@ -87,7 +94,7 @@ function inPage() {
   }));
   for (const row of rows) {
     const kids = [...row.children].filter(visible);
-    if (kids.length < 2) continue;
+    if (kids.length < 2 || inFixed(row) || inScroller(row)) continue;
     const lineCount = (el) => {
       const t = [...el.querySelectorAll('*')].concat(el).filter(hasOwnText)[0];
       if (!t) return 0;
