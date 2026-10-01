@@ -119,7 +119,7 @@ export function OrderStatusTimeline({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: SP.sm },
   rowCompact: { paddingVertical: 0 },
-  stageCol: { alignItems: 'center', width: 66 },
+  stageCol: { alignItems: 'center', minWidth: 56 },
   dot: {
     width: 24,
     height: 24,

@@ -73,6 +73,8 @@ import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
+import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
+import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -418,6 +420,20 @@ router.post("/stripe", async (req: Request, res: Response) => {
           stripeReferenceId(event.data.object.charge),
         )) {
           await handleDisputeClosed(event.data.object);
+        }
+        break;
+
+      // ── Stripe Radar manual reviews (risk flags on orders; best effort) ──
+      case "review.opened":
+      case "review.closed":
+        try {
+          await applyReviewToOrders(
+            dbReviewDeps,
+            event.type === "review.opened" ? "opened" : "closed",
+            event.data.object as any,
+          );
+        } catch (err) {
+          req.log.warn({ err, eventId: event.id }, "Radar review event could not update order risk");
         }
         break;
 
@@ -1143,6 +1159,18 @@ export async function handleCheckoutPaid(
     }
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
+
+    // Seller-only Radar risk flags. Best effort: enrichOrderRisk never throws.
+    if (createdOrderId) {
+      await enrichOrderRisk(dbEnrichDeps, {
+        orderId: createdOrderId,
+        buyerId: buyerId ?? null,
+        guestEmail,
+        totalCents,
+        shippingCountry: shippingAddress?.country ?? null,
+        radar: chargeDetails.radar ?? null,
+      });
+    }
 
     // For You: a purchase is the strongest taste signal (seller + style of the content that sold it).
     if (buyerId) {

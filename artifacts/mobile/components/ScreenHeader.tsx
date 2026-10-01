@@ -48,6 +48,8 @@ interface ScreenHeaderProps {
   variant?: 'push' | 'modal';
   /** Hairline under the header (default true); pass false for edge-to-edge canvases or a bare header. */
   divider?: boolean;
+  /** Compatibility alias for divider={false}. */
+  hideDivider?: boolean;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
@@ -65,7 +67,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, divider = true,
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, divider = true, hideDivider = false,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -88,7 +90,7 @@ export function ScreenHeader({
   const closeOrBack = () => (onBack ? onBack() : goBackOr(router));
 
   return (
-    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, !divider && { borderBottomWidth: 0 }]}>
+    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, (!divider || hideDivider) && { borderBottomWidth: 0 }]}>
       <View style={styles.container}>
         {variant === 'push' && (
           showBack ? (
