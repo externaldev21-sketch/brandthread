@@ -36,6 +36,8 @@ import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
 import { broadcastToRoom } from "../ws/liveHub";
+import { canJoinStream, checkCommentAllowed } from "../lib/liveModeration";
+import { loadEffectiveSettings, loadLastCommentAt, loadRestriction } from "../lib/liveModerationState";
 
 const router = Router();
 
@@ -44,7 +46,7 @@ const hostPlan = requirePlan("pro");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateToken(
+export function generateToken(
   appId: string,
   appCert: string,
   channelName: string,
@@ -68,7 +70,7 @@ function generateToken(
   }
 }
 
-function uidFromClerkId(clerkId: string): number {
+export function uidFromClerkId(clerkId: string): number {
   let h = 0;
   for (let i = 0; i < clerkId.length; i++) {
     h = (Math.imul(31, h) + clerkId.charCodeAt(i)) | 0;
@@ -245,13 +247,19 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
   try {
     const rows = await db.execute(sql`
-      SELECT id, channel_name, status, agora_uid
+      SELECT id, channel_name, status, agora_uid, seller_id
       FROM live_streams WHERE id = ${id}::uuid
     `);
     if (!rows.rows.length) return res.status(404).json({ error: "Stream not found" });
     const stream = rows.rows[0] as any;
     if (stream.status !== "live") {
       return res.status(410).json({ error: "Stream has ended" });
+    }
+
+    // Moderation: a viewer the host banned can't rejoin this stream. (See
+    // routes/live-moderation.ts.) Streams with no moderation rows are unaffected.
+    if (!canJoinStream(await loadRestriction(String(id), viewerId), viewerId === stream.seller_id)) {
+      return res.status(403).json({ error: "You can't join this live.", code: "BANNED" });
     }
 
     // Presence: mark this viewer live right away so the count feels instant
@@ -419,6 +427,35 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
   }
 
   try {
+    // Moderation (banned words / slow mode / mute / ban). No-op for a stream
+    // with no settings. The host is never restricted.
+    const [modStream] = await db.execute(sql`
+      SELECT seller_id FROM live_streams WHERE id = ${req.params.id}::uuid LIMIT 1
+    `).then((r) => r.rows as any[]);
+    if (modStream) {
+      const [settings, restriction] = await Promise.all([
+        loadEffectiveSettings(String(req.params.id), modStream.seller_id),
+        loadRestriction(String(req.params.id), userId),
+      ]);
+      const lastCommentAt = settings.slowModeSeconds > 0
+        ? await loadLastCommentAt(String(req.params.id), userId)
+        : null;
+      const verdict = checkCommentAllowed({
+        isHost: userId === modStream.seller_id,
+        restriction,
+        bannedWords: settings.bannedWords,
+        slowModeSeconds: settings.slowModeSeconds,
+        lastCommentAt,
+        now: Date.now(),
+        message,
+      });
+      if (!verdict.ok) {
+        return res.status(verdict.status).json({
+          error: verdict.error, code: verdict.code, retryAfterSeconds: verdict.retryAfterSeconds,
+        });
+      }
+    }
+
     const result = await db.execute(sql`
       INSERT INTO live_comments (stream_id, user_id, display_name, avatar_url, message)
       VALUES (${req.params.id}::uuid, ${userId}, ${displayName ?? "Viewer"}, ${avatarUrl ?? null}, ${message.trim()})
@@ -441,6 +478,7 @@ router.get("/:id/comments", async (req, res) => {
       SELECT id, user_id, display_name, avatar_url, message, created_at
       FROM live_comments lc
       WHERE stream_id = ${req.params.id}::uuid
+        AND removed_at IS NULL
         ${since ? sql`AND created_at > ${since}::timestamptz` : sql``}
         AND NOT EXISTS (
           SELECT 1 FROM users su WHERE su.clerk_id = lc.user_id AND su.suspended_at IS NOT NULL
