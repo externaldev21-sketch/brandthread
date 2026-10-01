@@ -56,41 +56,41 @@ const clerkAppearance = {
     logoImageUrl: `${window.location.origin}${basePath}/logo.png`,
   },
   variables: {
-    colorPrimary: '#00cc66',
-    colorForeground: '#e8f5ee',
-    colorMutedForeground: '#6b8f7a',
+    colorPrimary: '#d9d9d9',
+    colorForeground: '#f5f5f5',
+    colorMutedForeground: '#9a9a9a',
     colorDanger: '#ef4444',
-    colorBackground: '#0d1410',
-    colorInput: '#1a2420',
-    colorInputForeground: '#e8f5ee',
-    colorNeutral: '#2a3830',
+    colorBackground: '#0a0a0a',
+    colorInput: '#1a1a1a',
+    colorInputForeground: '#f5f5f5',
+    colorNeutral: '#2a2a2a',
     fontFamily: 'Inter, system-ui, sans-serif',
-    borderRadius: '0.375rem',
+    borderRadius: '0.25rem',
   },
   elements: {
     rootBox: 'w-full flex justify-center',
-    cardBox: 'rounded-xl w-[440px] max-w-full overflow-hidden border border-[#2a3830] bg-[#0d1410]',
+    cardBox: 'rounded-xl w-[440px] max-w-full overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]',
     card: '!shadow-none !border-0 !bg-transparent !rounded-none',
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-[#e8f5ee] font-bold',
-    headerSubtitle: 'text-[#6b8f7a]',
-    socialButtonsBlockButtonText: 'text-[#e8f5ee]',
-    formFieldLabel: 'text-[#a0c4b0] text-sm',
-    footerActionLink: 'text-[#00cc66] hover:text-[#00ff80]',
-    footerActionText: 'text-[#6b8f7a]',
-    dividerText: 'text-[#6b8f7a]',
-    identityPreviewEditButton: 'text-[#00cc66]',
-    formFieldSuccessText: 'text-[#00cc66]',
-    alertText: 'text-[#e8f5ee]',
+    headerTitle: 'text-[#f5f5f5] font-bold',
+    headerSubtitle: 'text-[#9a9a9a]',
+    socialButtonsBlockButtonText: 'text-[#f5f5f5]',
+    formFieldLabel: 'text-[#c0c0c0] text-sm',
+    footerActionLink: 'text-[#d9d9d9] hover:text-[#ffffff]',
+    footerActionText: 'text-[#9a9a9a]',
+    dividerText: 'text-[#9a9a9a]',
+    identityPreviewEditButton: 'text-[#d9d9d9]',
+    formFieldSuccessText: 'text-[#d9d9d9]',
+    alertText: 'text-[#f5f5f5]',
     logoBox: 'mb-2',
     logoImage: 'h-10 w-auto',
-    socialButtonsBlockButton: 'border-[#2a3830] bg-[#1a2420] hover:bg-[#243228] text-[#e8f5ee]',
-    formButtonPrimary: 'bg-[#00cc66] hover:bg-[#00b359] text-black font-semibold',
-    formFieldInput: 'bg-[#1a2420] border-[#2a3830] text-[#e8f5ee]',
-    footerAction: 'border-t border-[#1a2420]',
-    dividerLine: 'bg-[#2a3830]',
-    alert: 'bg-[#1a2420] border-[#2a3830]',
-    otpCodeFieldInput: 'bg-[#1a2420] border-[#2a3830] text-[#e8f5ee]',
+    socialButtonsBlockButton: 'border-[#2a2a2a] bg-[#1a1a1a] hover:bg-[#242424] text-[#f5f5f5]',
+    formButtonPrimary: 'bg-[#d9d9d9] hover:bg-[#ffffff] text-black font-semibold',
+    formFieldInput: 'bg-[#1a1a1a] border-[#2a2a2a] text-[#f5f5f5]',
+    footerAction: 'border-t border-[#1a1a1a]',
+    dividerLine: 'bg-[#2a2a2a]',
+    alert: 'bg-[#1a1a1a] border-[#2a2a2a]',
+    otpCodeFieldInput: 'bg-[#1a1a1a] border-[#2a2a2a] text-[#f5f5f5]',
     formFieldRow: '',
     main: '',
   },
@@ -109,7 +109,7 @@ function SignInPage() {
         routing="path"
         path={`${basePath}/sign-in`}
         signUpUrl={`${basePath}/sign-up`}
-        forceRedirectUrl={`${basePath}/onboard`}
+        forceRedirectUrl={`${basePath}/dashboard`}
       />
     </div>
   );
@@ -196,6 +196,7 @@ function AppRouter() {
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
+      afterSignOutUrl={basePath || '/'}
       localization={{
         signIn: {
           start: {

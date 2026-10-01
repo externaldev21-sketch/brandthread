@@ -10,32 +10,30 @@ export default function Landing() {
         style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
       ></div>
 
-      <header className="h-20 border-b border-border px-8 flex items-center justify-between z-10 shrink-0 bg-background/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary text-primary-foreground rounded flex items-center justify-center font-bold tracking-tighter text-xl">
+      <header className="h-20 border-b border-border px-4 sm:px-8 flex items-center justify-between z-10 shrink-0 bg-background/80 backdrop-blur-md">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 bg-primary text-primary-foreground rounded flex items-center justify-center font-bold tracking-tighter text-xl shrink-0">
             B
           </div>
-          <span className="font-semibold tracking-tight uppercase opacity-90">Brandthread</span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-muted-foreground border border-border ml-2">MANUFACTURERS</span>
+          <span className="font-semibold tracking-tight uppercase opacity-90 truncate">Brandthread</span>
+          <span className="hidden sm:inline px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-muted-foreground border border-border ml-2 shrink-0">Manufacturers</span>
         </div>
-        <div>
-          <div className="flex items-center gap-6">
-            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
-            <Link href="/join" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2">
-              List your factory <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+          <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
+          <Link href="/join" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2">
+            Get started <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center p-8 z-10">
         <div className="max-w-4xl w-full text-center space-y-8">
-          <div className="inline-flex items-center gap-2 border border-border bg-secondary/50 px-4 py-2 rounded-full text-sm font-mono mb-4 text-muted-foreground">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            Manufacturer Network Open
+          <div className="inline-flex items-center gap-2 border border-border bg-secondary/50 px-4 py-2 rounded-full text-sm font-medium mb-4 text-muted-foreground">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+            Now accepting manufacturers
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1.1] text-foreground">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tighter leading-[1.1] text-foreground text-balance">
             The supply side of <br />
             <span className="text-primary">next-generation brands.</span>
           </h1>
