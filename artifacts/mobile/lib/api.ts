@@ -3,6 +3,7 @@
  * Base URL is resolved from EXPO_PUBLIC_API_BASE_URL (set in the dev script).
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
+import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
 import { useAuth } from '@clerk/expo';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
@@ -2544,6 +2545,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sellerDemand:  () => get<any[]>('/api/waitlist/seller'),
       sellerNotify:  (variantId: string) =>
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
+    },
+    /** Reusable size chart templates — seller CRUD, apply to products. */
+    sizeChartTemplates: {
+      list:   () => get<{ templates: SizeChartTemplateSummary[]; presets: SizeChartPreset[] }>('/api/size-chart-templates'),
+      get:    (id: string) => get<SizeChartTemplateDetail>(`/api/size-chart-templates/${encodeURIComponent(id)}`),
+      create: (data: { name: string; chart?: SizeChartData; fromProductId?: string }) =>
+        post<SizeChartTemplateSummary>('/api/size-chart-templates', data),
+      update: (id: string, data: { name?: string; chart?: SizeChartData }) =>
+        put<SizeChartTemplateSummary>(`/api/size-chart-templates/${encodeURIComponent(id)}`, data),
+      delete: (id: string) => del<{ success: boolean }>(`/api/size-chart-templates/${encodeURIComponent(id)}`),
+      apply:  (id: string, productIds: string[]) =>
+        post<{ applied: number }>(`/api/size-chart-templates/${encodeURIComponent(id)}/apply`, { productIds }),
+      sync:   (id: string) => post<{ synced: number }>(`/api/size-chart-templates/${encodeURIComponent(id)}/sync`, {}),
     },
     /** Product bundles — seller CRUD. */
     bundles: {

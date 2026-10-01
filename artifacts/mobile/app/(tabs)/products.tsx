@@ -746,6 +746,7 @@ export default function ProductsScreen() {
               { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
               { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
               { text: 'Export products', onPress: () => { void handleExportProducts(); } },
+              { text: 'Size charts', onPress: () => router.push('/size-chart-templates' as never) },
               { text: 'Cancel', style: 'cancel' },
             ]),
             accessibilityLabel: 'More product actions',
