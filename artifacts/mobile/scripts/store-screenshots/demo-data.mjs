@@ -1247,7 +1247,7 @@ export function respond({ method, path, query, role, options = {} }) {
   // role/account this fixture wasn't written for) can leave
   // SellerDashboardTrafficSources-adjacent state undefined. Real seller
   // products/inventory/top-sellers, not fabricated for this response alone.
-  if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
+  if (p === '/products') return role === 'seller' && !options.emptyProducts ? SELLER_PRODUCTS : [];
   if (p === '/inventory') return role === 'seller' ? SELLER_PRODUCTS.map((product) => product.inventory) : [];
   if (p === '/analytics/products') return role === 'seller'
     ? SELLER_PRODUCTS.filter((product) => product.totalRevenueCents > 0).map((product) => ({

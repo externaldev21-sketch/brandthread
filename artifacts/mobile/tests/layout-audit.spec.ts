@@ -105,6 +105,11 @@ const SCREENS = [
   { id: 'seller-settings', title: 'Seller settings', role: 'seller', path: '/seller-settings', ready: 'Settings', hasTabBar: false },
   { id: 'manufacturer-hub', title: 'Manufacturer hub', role: 'seller', path: '/manufacturer-hub', ready: 'Porto Knit Collective', hasTabBar: false },
   { id: 'theme-picker', title: 'Theme picker', role: 'seller', path: '/appearance', ready: 'Follow app theme', hasTabBar: false },
+  // Dev's text-fit/alignment follow-up on AI Photoshoot (#569): no tab-bar
+  // check here since this screen calls useHideTabBar() itself — the bar is
+  // gone (or sliding away) by design while this screen is focused, so an
+  // overlap check against it would be testing the wrong thing.
+  { id: 'design-ai-photoshoot', title: 'AI Photoshoot', role: 'seller', path: '/design-ai-photoshoot', ready: 'Product photos', hasTabBar: false },
 ];
 
 // ─── In-page audit: overflow + tab-bar overlap ─────────────────────────────
@@ -160,6 +165,13 @@ function auditPage(tabBarSelector: string | null) {
 
   const overflowViolations = [];
   const overlapViolations = [];
+  // Dev's text-fit follow-up (#569): a text element whose content is wider
+  // than its own box (an ellipsis-cut "Processi…" label) or one whose
+  // bounding box spills past its immediate parent's (not just the page's —
+  // a button/chip text overflowing ITS OWN pill, even if the pill itself
+  // fits the screen, is exactly the "choppy" bug Dev flagged).
+  const truncationViolations = [];
+  const parentOverflowViolations = [];
 
   const all = document.body.querySelectorAll('*');
   for (const el of all) {
@@ -186,6 +198,52 @@ function auditPage(tabBarSelector: string | null) {
           page: { width: pageWidth, height: pageHeight },
           direction: [overflowsRight && 'right', overflowsLeft && 'left', overflowsBottom && 'bottom'].filter(Boolean).join('+'),
         });
+      }
+    }
+
+    // Text truncation: a leaf element (no element children) whose own text
+    // content is clipped by its box — RN Web renders a numberOfLines-clamped
+    // <Text> as a plain element with overflow:hidden + a scrollWidth (or, for
+    // a multi-line clamp, scrollHeight) larger than what's actually shown.
+    const hasText = (el.textContent || '').trim().length > 0;
+    const isLeaf = el.children.length === 0;
+    if (hasText && isLeaf) {
+      const clampedHorizontally = el.scrollWidth > el.clientWidth + EPS && style.whiteSpace !== 'normal';
+      const clampedVertically = el.scrollHeight > el.clientHeight + EPS && style.overflowY === 'hidden';
+      if (clampedHorizontally || clampedVertically) {
+        truncationViolations.push({
+          selector: describe(el),
+          text: (el.textContent || '').trim().slice(0, 60),
+          scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
+          scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
+        });
+      }
+    }
+
+    // Bounding box overflowing its own immediate parent — catches text or a
+    // button's content spilling past its own pill/card, independent of
+    // whether the outer page happens to still be within bounds.
+    const parent = el.parentElement;
+    if (parent && parent !== document.body) {
+      const parentStyle = getComputedStyle(parent);
+      const parentClips = parentStyle.overflowX === 'hidden' || parentStyle.overflowX === 'auto' || parentStyle.overflowX === 'scroll'
+        || parentStyle.overflowY === 'hidden' || parentStyle.overflowY === 'auto' || parentStyle.overflowY === 'scroll';
+      // Only meaningful when the parent actually clips its content — an
+      // overflow:visible parent (most plain layout Views) lets children
+      // legitimately extend past its box shorthand (padding auto-sizing,
+      // negative-margin badges, etc.), so that's not a real bug on its own.
+      if (parentClips) {
+        const parentRect = parent.getBoundingClientRect();
+        const overflowsParent =
+          rect.right > parentRect.right + EPS || rect.left < parentRect.left - EPS ||
+          rect.bottom > parentRect.bottom + EPS || rect.top < parentRect.top - EPS;
+        if (overflowsParent) {
+          parentOverflowViolations.push({
+            selector: describe(el),
+            rect: { left: Math.round(rect.left), top: Math.round(rect.top), right: Math.round(rect.right), bottom: Math.round(rect.bottom) },
+            parentRect: { left: Math.round(parentRect.left), top: Math.round(parentRect.top), right: Math.round(parentRect.right), bottom: Math.round(parentRect.bottom) },
+          });
+        }
       }
     }
   }
@@ -235,6 +293,8 @@ function auditPage(tabBarSelector: string | null) {
     pageHeight,
     overflowViolations: overflowViolations.slice(0, 20),
     overlapViolations: overlapViolations.slice(0, 20),
+    truncationViolations: truncationViolations.slice(0, 20),
+    parentOverflowViolations: parentOverflowViolations.slice(0, 20),
   };
 }
 
@@ -311,6 +371,18 @@ async function auditOne(
       failures.push(
         `element overlaps the floating tab bar at ${viewport.id}: ${v.selector} ` +
         `rect=${JSON.stringify(v.rect)} tabBarRect=${JSON.stringify(v.tabBarRect)}`,
+      );
+    }
+    for (const v of result.truncationViolations) {
+      failures.push(
+        `text is truncated/clamped at ${viewport.id}: ${v.selector} text="${v.text}" ` +
+        `scrollWidth=${v.scrollWidth} clientWidth=${v.clientWidth} scrollHeight=${v.scrollHeight} clientHeight=${v.clientHeight}`,
+      );
+    }
+    for (const v of result.parentOverflowViolations) {
+      failures.push(
+        `element overflows its own parent container at ${viewport.id}: ${v.selector} ` +
+        `rect=${JSON.stringify(v.rect)} parentRect=${JSON.stringify(v.parentRect)}`,
       );
     }
     return { status: failures.length ? 'fail' : 'pass', failures };

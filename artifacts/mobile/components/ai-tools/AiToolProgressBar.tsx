@@ -11,7 +11,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
-import { BORDER, FG } from '@/lib/theme';
 
 export function AiToolProgressBar({ step }: { step: 1 | 2 }) {
   const reduceMotion = useReducedMotion();
@@ -38,13 +37,19 @@ export function AiToolProgressBar({ step }: { step: 1 | 2 }) {
   );
 }
 
+// Dev's explicit spec (follow-up screenshot review): a dedicated bar, not a
+// divider line — full-width #2A2A2A track, white fill, 3px tall, flush
+// (zero margin) directly under ScreenHeader. Fixed values rather than
+// theme tokens because the whole AI-tools family is still pre-Appearance-
+// theme monochrome (see this component's allowlist entry in
+// tests/no-hardcoded-theme-color-lint.test.ts).
 const s = StyleSheet.create({
   track: {
-    height: 2,
-    backgroundColor: BORDER,
+    height: 3,
+    backgroundColor: '#2A2A2A',
   },
   fill: {
-    height: 2,
-    backgroundColor: FG,
+    height: 3,
+    backgroundColor: '#FFFFFF',
   },
 });
