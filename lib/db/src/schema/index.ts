@@ -1195,6 +1195,9 @@ export const notificationsFeed = pgTable('notifications_feed', {
   dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
+  liveStartedUnique: uniqueIndex('notifications_feed_live_started_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'live_started' AND ${table.targetId} IS NOT NULL`),
   priceDropUnique: uniqueIndex('notifications_feed_price_drop_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'price_drop' AND ${table.targetId} IS NOT NULL`),

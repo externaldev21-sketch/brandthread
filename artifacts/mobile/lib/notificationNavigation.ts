@@ -87,6 +87,10 @@ export function createNotificationResponseHandler(
       }
       return;
     }
+    if (data?.targetType === 'live' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/buyer-live?streamId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`);
       return;
