@@ -396,7 +396,7 @@ export default function PayoutsScreen() {
            {!isPreview && !isReadOnly && !connectLoading && connectStatus?.providerConfigured && !connectStatus.verified && (
              <TouchableOpacity
                testID="seller-payouts-setup-checklist"
-               style={styles.settingsRow}
+               style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
                onPress={() => { haptic(); router.push('/payout-setup' as never); }}
                accessibilityRole="button"
                accessibilityLabel="Open payout setup checklist"
