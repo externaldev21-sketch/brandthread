@@ -15,6 +15,7 @@ import usersRouter from "./users";
 import commerceRouter from "./commerce";
 import insightsRouter from "./insights";
 import growthRouter from "./growth";
+import accessRouter from "./access";
 
 const router = Router();
 router.use(requireAuth);
@@ -32,5 +33,6 @@ router.use("/users", usersRouter);
 router.use(commerceRouter);
 router.use(insightsRouter);
 router.use(growthRouter);
+router.use("/access", accessRouter); // invite-only launch waitlist
 
 export default router;

@@ -108,3 +108,16 @@ export const boostReviews = pgTable("boost_reviews", {
   reviewedBy: text("reviewed_by").notNull(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Invite-only launch waitlist (migration 241) ─────────────────────────────
+// People who asked for access while `inviteOnlySignup` is on. Unique on
+// lower(email) (index created in the migration — Drizzle can't express it).
+export const accessWaitlistSignups = pgTable("access_waitlist_signups", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  invitedAt: timestamp("invited_at", { withTimezone: true }),
+  invitedBy: text("invited_by"),
+  /** The single-use admin_invite_codes row issued to this person. */
+  inviteCodeId: uuid("invite_code_id").references(() => adminInviteCodes.id, { onDelete: "set null" }),
+});

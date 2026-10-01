@@ -49,7 +49,7 @@ interface ScreenHeaderProps {
    * itself, only which icon a screen that already has one shows.
    */
   variant?: 'push' | 'modal';
-  /** Compatibility alias for divider={false}. */
+  /** Compatibility alias for divider={false}; hides the hairline under the header. */
   hideDivider?: boolean;
 }
 

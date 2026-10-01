@@ -227,6 +227,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },
       { label: 'Review promotions', description: 'Approve or reject paid boosts and Featured slots', aliases: ['promotions', 'boosts', 'featured', 'approve', 'admin'], icon: 'check-square', route: '/admin-promotions', audience: 'seller', requiresModerator: true },
+      { label: 'Invites and waitlist', description: 'Invite-only launch switch, access codes and waitlist', aliases: ['invite', 'invites', 'access code', 'waitlist', 'launch', 'admin'], icon: 'user-plus', route: '/admin-invites', audience: 'seller', requiresModerator: true },
     ],
   },
   {
