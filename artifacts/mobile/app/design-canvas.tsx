@@ -33,7 +33,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import Svg, {
-  Path, Rect, Circle, G, Line, Text as SvgText,
+  Path, Rect, Circle, G, Line, Text as SvgText, TSpan,
   Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
 } from 'react-native-svg';
 import { File, Paths, EncodingType } from 'expo-file-system';
@@ -128,10 +128,9 @@ import {
 } from '@/lib/colorModel';
 import { getColorPickerState, saveColorPickerState } from '@/services/designService';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { DESIGN_STUDIO_FONTS, DEFAULT_DESIGN_STUDIO_FONT, useDesignStudioFonts } from '@/lib/designStudioFonts';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const FONT_FAMILIES = ['System', 'serif', 'monospace', 'Inter_400Regular', 'Georgia'];
 
 interface BrushDef {
   name: string;
@@ -276,6 +275,11 @@ export default function DesignCanvasScreen() {
   const params = useLocalSearchParams<{ id?: string; addAssetId?: string }>();
   const projectId = params.id ?? '';
   const addAssetId = params.addAssetId ?? '';
+
+  // Real Google Fonts for the text-layer font picker (lib/designStudioFonts.ts).
+  // Gated into the screen's own loading state below — same "never render
+  // text in a system fallback font" rule app/_layout.tsx applies to Inter.
+  const [designFontsLoaded] = useDesignStudioFonts();
 
   // ── Project state ──────────────────────────────────────────────────────────
   const [project, setProject]         = useState<DesignProject | null>(null);
@@ -1720,6 +1724,7 @@ export default function DesignCanvasScreen() {
   function handleAddText(
     content: string, fontSize: number, color: string,
     bold: boolean, italic: boolean, align: 'left'|'center'|'right', fontFamily: string,
+    letterSpacing: number = 0, lineHeight: number = 1.4,
   ) {
     if (!content.trim()) return;
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
@@ -1729,7 +1734,7 @@ export default function DesignCanvasScreen() {
       id: uid(), name: 'Text', type: 'text',
       visible: true, locked: false, order: maxOrder + 1,
       transform: { x: 50, y: 120, width: Math.min(lw - 100, 400), height: 80, rotation: 0, scaleX: 1, scaleY: 1 },
-      data: { kind: 'text', content, fontFamily, fontSize, bold, italic, underline: false, align, color, letterSpacing: 0, lineHeight: 1.4 } as DesignTextLayer,
+      data: { kind: 'text', content, fontFamily, fontSize, bold, italic, underline: false, align, color, letterSpacing, lineHeight } as DesignTextLayer,
       opacity: 1,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
@@ -2985,20 +2990,35 @@ export default function DesignCanvasScreen() {
 
     if (layer.type === 'text') {
       const d = layer.data as DesignTextLayer;
+      const fs = (d.fontSize ?? 24) * Math.min(xScale, yScale);
+      const lh = (d.lineHeight ?? 1.4) * fs;
+      // Multi-line support: SVG <Text> doesn't wrap or honor newlines on its
+      // own, so each '\n'-separated line becomes its own <TSpan> offset by
+      // the real line-height — previously this was always a single line
+      // with lineHeight completely unused. textAnchor="middle" centers each
+      // TSpan independently around the same x, matching the field's
+      // centered horizontal anchor.
+      const lines = (d.content ?? d.text ?? '').split('\n');
+      const anchorX = (t.x + t.width / 2) * xScale;
+      const startY = (t.y + fs) * yScale;
       return (
         <G key={layer.id} opacity={layer.opacity}>
           {filterDefs}
           {clipDefs}
           <SvgText
-            x={(t.x + t.width / 2) * xScale} y={(t.y + (d.fontSize ?? 24)) * yScale}
+            x={anchorX} y={startY}
             fill={d.color ?? d.textColor ?? FG}
-            fontSize={(d.fontSize ?? 24) * Math.min(xScale, yScale)}
+            fontSize={fs}
             textAnchor="middle"
+            fontFamily={d.fontFamily}
             fontWeight={d.bold ? 'bold' : 'normal'}
             fontStyle={d.italic ? 'italic' : 'normal'}
+            letterSpacing={d.letterSpacing ?? 0}
             transform={transformAttr} filter={filterRef} mask={clipMaskRef}
           >
-            {d.content ?? d.text ?? ''}
+            {lines.map((line, i) => (
+              <TSpan key={i} x={anchorX} dy={i === 0 ? 0 : lh}>{line}</TSpan>
+            ))}
           </SvgText>
         </G>
       );
@@ -3013,8 +3033,10 @@ export default function DesignCanvasScreen() {
   // project fetch itself is fast (AsyncStorage); what actually takes a
   // moment is this screen's own large bundle hydrating on web, and a
   // skeleton reads as "the editor is opening" rather than "something is
-  // stuck".
-  if (loading) {
+  // stuck". Also waits on designFontsLoaded so the font picker and any
+  // already-placed text layer never render in a system fallback font for a
+  // flash before their real face loads in.
+  if (loading || !designFontsLoaded) {
     const skW = Math.min(SW - SP.lg * 2, 420);
     return (
       <View style={[styles.root, { paddingTop: headerTopInset }]}>
@@ -3651,6 +3673,8 @@ export default function DesignCanvasScreen() {
                     fontStyle: d.italic ? 'italic' : 'normal',
                     textAlign: d.align ?? d.alignment ?? 'center',
                     fontFamily: d.fontFamily ?? FONT.regular,
+                    letterSpacing: (d.letterSpacing ?? 0) * Math.min(dispScaleX, dispScaleY),
+                    lineHeight: (d.fontSize ?? 24) * (d.lineHeight ?? d.lineSpacing ?? 1.4) * Math.min(dispScaleX, dispScaleY),
                   },
                 ]}
                 value={editingTextValue}
@@ -5256,7 +5280,10 @@ function WrenchActionsSheet({
 interface TextSheetProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (content: string, fontSize: number, color: string, bold: boolean, italic: boolean, align: 'left'|'center'|'right', fontFamily: string) => void;
+  onAdd: (
+    content: string, fontSize: number, color: string, bold: boolean, italic: boolean,
+    align: 'left'|'center'|'right', fontFamily: string, letterSpacing: number, lineHeight: number,
+  ) => void;
   drawColor: string;
   PURPLE_DIM: string;
   PURPLE_LIGHT: string;
@@ -5269,13 +5296,15 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
   const [bold, setBold]             = useState(false);
   const [italic, setItalic]         = useState(false);
   const [align, setAlign]           = useState<'left'|'center'|'right'>('center');
-  const [fontFamily, setFontFamily] = useState('System');
+  const [fontFamily, setFontFamily] = useState(DEFAULT_DESIGN_STUDIO_FONT);
+  const [letterSpacing, setLetterSpacing] = useState(0);
+  const [lineHeight, setLineHeight]       = useState(1.4);
 
   useEffect(() => { if (visible) setColor(drawColor); }, [visible, drawColor]);
 
   function submit() {
     if (!content.trim()) return;
-    onAdd(content.trim(), fontSize, color, bold, italic, align, fontFamily);
+    onAdd(content.trim(), fontSize, color, bold, italic, align, fontFamily, letterSpacing, lineHeight);
     setContent('');
   }
 
@@ -5294,23 +5323,42 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
             </View>
 
             <TextInput
-              style={[styles.textInput, { fontWeight: bold ? 'bold' : 'normal', fontStyle: italic ? 'italic' : 'normal', textAlign: align, color, fontSize }]}
+              style={[
+                styles.textInput,
+                {
+                  fontWeight: bold ? 'bold' : 'normal', fontStyle: italic ? 'italic' : 'normal',
+                  textAlign: align, color, fontSize, fontFamily,
+                },
+              ]}
               value={content}
               onChangeText={setContent}
               placeholder="Type something…"
               placeholderTextColor={SUBTLE}
               multiline autoFocus
+              testID="add-text-input"
             />
 
             <Text style={styles.sheetLabel}>Font</Text>
+            {/* Each chip's own label renders in that font, not a plain list
+                of names — the real preview Dev asked for, not a generic
+                system-font list. */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.sm }}>
-              {FONT_FAMILIES.map(ff => (
+              {DESIGN_STUDIO_FONTS.map(f => (
                 <TouchableOpacity
-                  key={ff}
-                  style={[styles.fontChip, fontFamily === ff && styles.fontChipActive]}
-                  onPress={() => setFontFamily(ff)}
+                  key={f.family}
+                  style={[styles.fontChip, fontFamily === f.family && styles.fontChipActive]}
+                  onPress={() => setFontFamily(f.family)}
+                  testID={`font-chip-${f.family}`}
                 >
-                  <Text style={[styles.fontChipText, fontFamily === ff && { color: PURPLE_LIGHT }]}>{ff}</Text>
+                  <Text
+                    style={[
+                      styles.fontChipText,
+                      { fontFamily: f.family },
+                      fontFamily === f.family && { color: PURPLE_LIGHT },
+                    ]}
+                  >
+                    {f.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -5327,6 +5375,34 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
                 <Feather name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{fontSize}</Text>
+            </View>
+
+            <Text style={styles.sheetLabel}>Letter spacing: {letterSpacing.toFixed(1)}</Text>
+            <View style={styles.sliderRow} testID="letter-spacing-row">
+              <TouchableOpacity onPress={() => setLetterSpacing(v => Math.max(-2, Math.round((v - 0.5) * 10) / 10))} testID="letter-spacing-minus">
+                <Feather name="minus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${((letterSpacing + 2) / 12) * 100}%` }]} />
+              </View>
+              <TouchableOpacity onPress={() => setLetterSpacing(v => Math.min(10, Math.round((v + 0.5) * 10) / 10))} testID="letter-spacing-plus">
+                <Feather name="plus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <Text style={styles.sliderValue}>{letterSpacing.toFixed(1)}</Text>
+            </View>
+
+            <Text style={styles.sheetLabel}>Line height: {lineHeight.toFixed(2)}×</Text>
+            <View style={styles.sliderRow} testID="line-height-row">
+              <TouchableOpacity onPress={() => setLineHeight(v => Math.max(0.8, Math.round((v - 0.1) * 100) / 100))} testID="line-height-minus">
+                <Feather name="minus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${((lineHeight - 0.8) / 1.7) * 100}%` }]} />
+              </View>
+              <TouchableOpacity onPress={() => setLineHeight(v => Math.min(2.5, Math.round((v + 0.1) * 100) / 100))} testID="line-height-plus">
+                <Feather name="plus" size={14} color={MUTED} />
+              </TouchableOpacity>
+              <Text style={styles.sliderValue}>{lineHeight.toFixed(2)}</Text>
             </View>
 
             <View style={styles.toggleRow}>
