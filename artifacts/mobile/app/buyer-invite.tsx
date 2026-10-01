@@ -248,7 +248,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   codeText: { fontSize: 32, fontFamily: FONT.bold, color: theme.text, letterSpacing: 6 },
   copyPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: theme.accentDim, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.pill,
+    backgroundColor: theme.accentDim, paddingHorizontal: 14, paddingVertical: SP.sm, borderRadius: RADIUS.pill,
   },
   copyPillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
 

@@ -223,7 +223,7 @@ export default function ThreadCashScreen() {
                   {formatCents(status?.balanceCents ?? 0)}
                 </Text>
               )}
-              <Text style={styles.balanceHint} numberOfLines={2}>
+              <Text style={styles.balanceHint}>
                 Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
               </Text>
             </BrandthreadCard>
