@@ -70,6 +70,17 @@ describe('seller home dashboard data contract', () => {
     expect(source).not.toContain('styles.statGrid');
   });
 
+  it('always opens on Today, never a persisted or Week default', () => {
+    expect(source).toContain("useState<SellerDashboardRange>('today')");
+    expect(source).not.toContain("useState<SellerDashboardRange>('week')");
+  });
+
+  it('shows the empty-sales message once (in the chart) and hides the flat "—" delta on stat tiles', () => {
+    expect(source).not.toContain(">{EMPTY_CHART_MESSAGE[range]}<");
+    expect(source).toContain('emptyMessage={EMPTY_CHART_MESSAGE[range]}');
+    expect(source).toContain("return { direction: 'flat', label: '' }");
+  });
+
   it('hides action-needed/top-products/recent-orders and shows the setup card for a brand-new seller', () => {
     expect(source).toContain('const newSeller = everSoldCount !== null && isNewSeller(everSoldCount)');
     expect(source).toContain('newSeller ? (');
