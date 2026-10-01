@@ -17,6 +17,7 @@ import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeSta
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
+import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/profile/ImageSourceSheet';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
@@ -184,6 +185,11 @@ export default function BuyerEditProfileScreen() {
         setUsernameStatus('ok');
         setUsernameError('');
         return true;
+      }
+      if (result.code === 'USERNAME_COOLDOWN' && result.nextChangeAt) {
+        setUsernameStatus('invalid');
+        setUsernameError(formatHandleCooldown(result.nextChangeAt));
+        return false;
       }
       setUsernameStatus('taken');
       setUsernameError(result.error ?? 'Username already taken');

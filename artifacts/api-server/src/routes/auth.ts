@@ -22,6 +22,8 @@ import {
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
+import { buildAccountDataExport } from "../lib/dataExport";
+import { decideUsernameChange, usernameNextChangeAt } from "../lib/usernameCooldown";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -235,75 +237,7 @@ router.post("/data-export", requireAuth, async (req, res) => {
   }
 
   try {
-    const result: Record<string, unknown> = {};
-    if (include.includes("profile")) {
-      const [profile] = await db.select({
-        clerkId: users.clerkId,
-        email: users.email,
-        name: users.name,
-        displayName: users.displayName,
-        accountType: users.accountType,
-        username: users.username,
-        bio: users.bio,
-        website: users.website,
-        brandName: users.brandName,
-        brandType: users.brandType,
-        brandStage: users.brandStage,
-        notificationPreferences: users.notificationPreferences,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
-      result.profile = profile ?? null;
-    }
-
-    if (include.includes("orders")) {
-      const ownedOrders = await db.select().from(orders)
-        .where(or(eq(orders.buyerId, clerkUserId), eq(orders.ownerId, clerkUserId)))
-        .orderBy(asc(orders.createdAt));
-      const orderIds = ownedOrders.map((order) => order.id);
-      const items = orderIds.length
-        ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds))
-        : [];
-      const itemsByOrder = new Map<string, typeof items>();
-      for (const item of items) {
-        const group = itemsByOrder.get(item.orderId) ?? [];
-        group.push(item);
-        itemsByOrder.set(item.orderId, group);
-      }
-      result.orders = ownedOrders.map((order) => ({
-        ...order,
-        items: itemsByOrder.get(order.id) ?? [],
-        relationship: order.buyerId === clerkUserId ? "buyer" : "seller",
-      }));
-    }
-
-    if (include.includes("messages")) {
-      const memberships = await db.select({
-        conversationId: conversationParticipants.conversationId,
-      }).from(conversationParticipants).where(eq(conversationParticipants.userId, clerkUserId));
-      const conversationIds = memberships.map((membership) => membership.conversationId);
-      const conversationRows = conversationIds.length
-        ? await db.select().from(conversations).where(inArray(conversations.id, conversationIds)).orderBy(asc(conversations.createdAt))
-        : [];
-      const messageRows = conversationIds.length
-        ? await db.select({
-            id: messages.id,
-            conversationId: messages.conversationId,
-            senderId: messages.senderId,
-            senderName: messages.senderName,
-            body: messages.body,
-            attachment: messages.attachment,
-            attachments: messages.attachments,
-            replyToId: messages.replyToId,
-            status: messages.status,
-            deliveredAt: messages.deliveredAt,
-            readAt: messages.readAt,
-            deletedAt: messages.deletedAt,
-            createdAt: messages.createdAt,
-          }).from(messages).where(inArray(messages.conversationId, conversationIds)).orderBy(asc(messages.createdAt))
-        : [];
-      result.messages = { conversations: conversationRows, messages: messageRows };
-    }
+    const result = await buildAccountDataExport(clerkUserId, include as string[]);
 
     const exportedAt = new Date().toISOString();
     res.setHeader("Content-Disposition", `attachment; filename="brandthread-my-data-${Date.now()}.json"`);
@@ -870,29 +804,54 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   if (tags         !== undefined) updates.tags         = tags;
   if (socialLinks  !== undefined) updates.socialLinks   = socialLinks;
 
-  // Username: format + uniqueness check
+  // Username: format + uniqueness check + 30-day change cooldown
   if (username !== undefined) {
     const uname = String(username).trim().toLowerCase();
-    if (uname === "") {
-      // Allow clearing username
-      updates.username = null;
-    } else {
+    if (uname !== "") {
       const fmtErr = validateUsername(uname);
       if (fmtErr) {
         res.status(400).json({ error: fmtErr });
         return;
       }
-      // Check uniqueness — skip if this user already owns it
-      const [taken] = await db
-        .select({ clerkId: users.clerkId })
-        .from(users)
-        .where(eq(sql`lower(${users.username})`, uname))
-        .limit(1);
-      if (taken && taken.clerkId !== clerkId) {
-        res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
-        return;
+    }
+    const [existingHandle] = await db
+      .select({ username: users.username, usernameChangedAt: users.usernameChangedAt })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    const decision = decideUsernameChange({
+      current: existingHandle?.username ?? null,
+      requested: uname,
+      changedAt: existingHandle?.usernameChangedAt ?? null,
+    });
+    if (decision.kind === "blocked") {
+      const retryAfterSec = Math.max(1, Math.ceil((decision.nextChangeAt.getTime() - Date.now()) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSec));
+      res.status(429).json({
+        error: "You can change your username once every 30 days.",
+        code: "USERNAME_COOLDOWN",
+        nextChangeAt: decision.nextChangeAt.toISOString(),
+      });
+      return;
+    }
+    if (decision.kind === "allowed") {
+      if (uname === "") {
+        // Allow clearing username
+        updates.username = null;
+      } else {
+        // Check uniqueness — skip if this user already owns it
+        const [taken] = await db
+          .select({ clerkId: users.clerkId })
+          .from(users)
+          .where(eq(sql`lower(${users.username})`, uname))
+          .limit(1);
+        if (taken && taken.clerkId !== clerkId) {
+          res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
+          return;
+        }
+        updates.username = uname;
       }
-      updates.username = uname;
+      if (decision.stamp) updates.usernameChangedAt = new Date();
     }
   }
 
@@ -907,7 +866,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       res.status(404).json({ error: "User not found" });
       return;
     }
-    res.json(updated);
+    res.json({ ...updated, usernameNextChangeAt: usernameNextChangeAt(updated.usernameChangedAt)?.toISOString() ?? null });
   } catch (err) {
     // The pre-check above has a race window; the DB's own unique index is
     // the real guarantee. Map its violation to the same 409 the pre-check gives.
@@ -930,6 +889,28 @@ router.get("/username/check", requireAuth, async (req, res) => {
   const fmtErr = validateUsername(raw);
   if (fmtErr) {
     res.json({ available: false, error: fmtErr });
+    return;
+  }
+
+  // The 30-day @handle change cooldown surfaces here so the edit screens can
+  // explain it inline before anyone taps Save.
+  const [ownHandle] = await db
+    .select({ username: users.username, usernameChangedAt: users.usernameChangedAt })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+  const cooldown = decideUsernameChange({
+    current: ownHandle?.username ?? null,
+    requested: raw,
+    changedAt: ownHandle?.usernameChangedAt ?? null,
+  });
+  if (cooldown.kind === "blocked") {
+    res.json({
+      available: false,
+      code: "USERNAME_COOLDOWN",
+      nextChangeAt: cooldown.nextChangeAt.toISOString(),
+      error: "You can change your username once every 30 days.",
+    });
     return;
   }
 
@@ -1092,7 +1073,7 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found — call POST /auth/sync first" });
     return;
   }
-  res.json(user);
+  res.json({ ...user, usernameNextChangeAt: usernameNextChangeAt(user.usernameChangedAt)?.toISOString() ?? null });
 });
 
 // ─── POST /api/auth/password-reset/request ──────────────────────────────────
