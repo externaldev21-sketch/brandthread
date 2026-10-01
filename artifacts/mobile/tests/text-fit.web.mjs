@@ -55,10 +55,12 @@ function inPage() {
     return null;
   };
 
+  // The web preview's own "Customize" widget is not app UI.
+  const isDevOnly = (el) => /^Customize$/.test((el.innerText || '').trim());
   const inScroller = (el) => { for (let p = el.parentElement; p; p = p.parentElement) { const cs = getComputedStyle(p); if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') return true; } return false; };
   const inFixed = (el) => { for (let p = el; p; p = p.parentElement) if (getComputedStyle(p).position === 'fixed') return true; return false; };
 
-  const texts = [...document.querySelectorAll('body *')].filter((el) => hasOwnText(el) && visible(el) && !inFixed(el));
+  const texts = [...document.querySelectorAll('body *')].filter((el) => hasOwnText(el) && visible(el) && !inFixed(el) && !isDevOnly(el));
   const boxes = new Map(); // container -> text elements inside
   for (const el of texts) {
     const cs = getComputedStyle(el);
@@ -94,7 +96,7 @@ function inPage() {
   }));
   for (const row of rows) {
     const kids = [...row.children].filter(visible);
-    if (kids.length < 2 || inFixed(row) || inScroller(row)) continue;
+    if (kids.length < 2 || inFixed(row) || inScroller(row) || kids.some((k) => /^Customize$/.test((k.innerText || '').trim()))) continue;
     const lineCount = (el) => {
       const t = [...el.querySelectorAll('*')].concat(el).filter(hasOwnText)[0];
       if (!t) return 0;
