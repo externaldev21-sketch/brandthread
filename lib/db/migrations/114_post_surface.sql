@@ -1,4 +1,4 @@
--- ─── Migration 111: post surface (Threads feed vs profile-only POST) ─────────
+-- ─── Migration 114: post surface (Threads feed vs profile-only POST) ─────────
 -- 'thread'  = public Threads feed (sellers only).
 -- 'profile' = "POST": shows on the author's own profile grid, never in the feed.
 -- Existing rows stay 'thread' (every pre-existing seller post was a Thread);
