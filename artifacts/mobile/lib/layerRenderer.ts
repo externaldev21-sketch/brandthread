@@ -32,7 +32,7 @@
  * channel sliders — reviewers can see channel-specific colour shifts.
  */
 
-import { sampleCurve, CurvesAdjustment, CurvePoint } from './adjustmentsModel';
+import { sampleCurve, CurvesAdjustment, CurvePoint, HsbAdjustment } from './adjustmentsModel';
 import type { DesignTransform } from '../services/designTypes';
 
 // ─── Stable transform builder ─────────────────────────────────────────────────
@@ -177,4 +177,71 @@ export function isIdentityCurves(adj: CurvesAdjustment): boolean {
     pts.length === 2 && pts[0].t === 0 && pts[0].v === 0 && pts[1].t === 1 && pts[1].v === 1;
   return isLinear(adj.gamma.points) && isLinear(adj.red.points) &&
          isLinear(adj.green.points) && isLinear(adj.blue.points);
+}
+
+// ─── HSB → feColorMatrix ───────────────────────────────────────────────────────
+
+/**
+ * Real hue-rotate / saturate matrices — the same NTSC luminance-weighted
+ * formulas the SVG spec itself defines for feColorMatrix type="hueRotate"
+ * and type="saturate" (and that CSS's filter: hue-rotate()/saturate() use
+ * under the hood), not an invented approximation. Composing them by 3×3
+ * matrix multiplication, then applying brightness as a post-multiply gain,
+ * gives one real colour-space transform per layer — not three separate,
+ * independently-approximated effects.
+ */
+const LUM_R = 0.213, LUM_G = 0.715, LUM_B = 0.072;
+
+function hueRotate3x3(deg: number): number[] {
+  const rad = (deg * Math.PI) / 180;
+  const cosA = Math.cos(rad), sinA = Math.sin(rad);
+  return [
+    LUM_R + cosA * (1 - LUM_R) - sinA * LUM_R,  LUM_G - cosA * LUM_G - sinA * LUM_G,        LUM_B - cosA * LUM_B + sinA * (1 - LUM_B),
+    LUM_R - cosA * LUM_R + sinA * 0.143,        LUM_G + cosA * (1 - LUM_G) + sinA * 0.140,  LUM_B - cosA * LUM_B - sinA * 0.283,
+    LUM_R - cosA * LUM_R - sinA * (1 - LUM_R),  LUM_G - cosA * LUM_G + sinA * LUM_G,        LUM_B + cosA * (1 - LUM_B) + sinA * LUM_B,
+  ];
+}
+
+function saturate3x3(sat: number): number[] {
+  const s = Math.max(0, 1 + sat); // sat ∈ [-1,1] → factor ∈ [0,2]
+  return [
+    LUM_R + (1 - LUM_R) * s,  LUM_G - LUM_G * s,        LUM_B - LUM_B * s,
+    LUM_R - LUM_R * s,        LUM_G + (1 - LUM_G) * s,  LUM_B - LUM_B * s,
+    LUM_R - LUM_R * s,        LUM_G - LUM_G * s,        LUM_B + (1 - LUM_B) * s,
+  ];
+}
+
+function multiply3x3(a: number[], b: number[]): number[] {
+  const out = new Array(9).fill(0);
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      let sum = 0;
+      for (let k = 0; k < 3; k++) sum += a[r * 3 + k] * b[k * 3 + c];
+      out[r * 3 + c] = sum;
+    }
+  }
+  return out;
+}
+
+/**
+ * hsbToColorMatrixValues — 20-element flat array for SVG feColorMatrix
+ * type="matrix": hue rotation and saturation composed via 3×3 matrix
+ * multiplication (hue applied first, then saturation), brightness applied
+ * as a uniform post-multiply gain on all three rows.
+ */
+export function hsbToColorMatrixValues(adj: HsbAdjustment): number[] {
+  const hue = hueRotate3x3(adj.hue);
+  const sat = saturate3x3(adj.saturation);
+  const combined = multiply3x3(sat, hue);
+  const brightGain = Math.max(0, 1 + adj.brightness);
+  return [
+    combined[0] * brightGain, combined[1] * brightGain, combined[2] * brightGain, 0, 0,
+    combined[3] * brightGain, combined[4] * brightGain, combined[5] * brightGain, 0, 0,
+    combined[6] * brightGain, combined[7] * brightGain, combined[8] * brightGain, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+export function hsbToColorMatrixString(adj: HsbAdjustment): string {
+  return hsbToColorMatrixValues(adj).map(v => v.toFixed(4)).join(' ');
 }
