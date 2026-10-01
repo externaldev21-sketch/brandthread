@@ -505,6 +505,21 @@ router.get("/:id", async (req, res) => {
 });
 
 // ─── GET /api/conversations/:id/messages ─────────────────────────────────────
+const lastSweepAt = new Map<string, number>();
+const SWEEP_EVERY_MS = 60_000;
+
+function sweepExpiredMessages(conversationId: string): void {
+  const now = Date.now();
+  if (now - (lastSweepAt.get(conversationId) ?? 0) < SWEEP_EVERY_MS) return;
+  lastSweepAt.set(conversationId, now);
+  if (lastSweepAt.size > 5_000) {
+    for (const [key, at] of lastSweepAt) if (now - at > SWEEP_EVERY_MS) lastSweepAt.delete(key);
+  }
+  void db.delete(messages)
+    .where(and(eq(messages.conversationId, conversationId), sql`${messages.disappearAt} IS NOT NULL AND ${messages.disappearAt} < now()`))
+    .catch(() => { lastSweepAt.delete(conversationId); });
+}
+
 router.get("/:id/messages", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
@@ -523,17 +538,18 @@ router.get("/:id/messages", async (req, res) => {
 
   if (!isMember) return res.status(403).json({ error: "Not a participant" });
 
-  // Disappearing messages: an opportunistic sweep in place of a cron job —
-  // hard-delete anything in this conversation whose disappear_at has passed
-  // before returning the list. See docs/dm-flows.md.
-  await db.delete(messages)
-    .where(and(eq(messages.conversationId, id), sql`${messages.disappearAt} IS NOT NULL AND ${messages.disappearAt} < now()`));
+  // Disappearing messages: expired rows are hidden by the query itself, and the
+  // hard delete (an opportunistic sweep in place of a cron job, see
+  // docs/dm-flows.md) runs off the request path, at most once a minute per
+  // conversation per instance. Reads used to wait on a DELETE every time.
+  sweepExpiredMessages(id);
+  const notExpired = sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now())`;
 
   const whereClause = q
-    ? and(eq(messages.conversationId, id), ilike(messages.body, `%${q}%`))
+    ? and(eq(messages.conversationId, id), notExpired, ilike(messages.body, `%${q}%`))
     : before
-      ? and(eq(messages.conversationId, id), sql`${messages.createdAt} < ${new Date(before)}`)
-      : eq(messages.conversationId, id);
+      ? and(eq(messages.conversationId, id), notExpired, sql`${messages.createdAt} < ${new Date(before)}`)
+      : and(eq(messages.conversationId, id), notExpired);
 
   const msgs = await db.select().from(messages)
     .where(whereClause)
@@ -1261,6 +1277,21 @@ router.post("/upload-media", async (req, res) => {
   try {
     const { objectStorageClient } = await import("../lib/objectStorage");
     const buffer = Buffer.from(base64, "base64");
+
+    // Automatic screening (off when the AI integration env is missing). A DM
+    // has no held state, so flagged media is refused; an outage of the
+    // screening provider never blocks messaging.
+    if (normalizedMimeType.startsWith("image/") || normalizedMimeType.startsWith("video/")) {
+      const { screenImageBuffer, screenVideo, MEDIA_REJECTED_MESSAGE } = await import("../lib/mediaModeration");
+      const verdict = normalizedMimeType.startsWith("image/")
+        ? await screenImageBuffer(buffer, normalizedMimeType)
+        : await screenVideo({ buffer });
+      if ((verdict.verdict === "hold" && !verdict.unverified) || verdict.verdict === "reject") {
+        const { recordRejectedUpload } = await import("../lib/mediaModerationStore");
+        void recordRejectedUpload({ ownerId: userId, surface: "dm", verdict: { ...verdict, verdict: "reject" } });
+        return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+      }
+    }
     const bucket = objectStorageClient.bucket(BUCKET_ID);
     const file   = bucket.file(filename);
     await file.save(buffer, { contentType: normalizedMimeType, resumable: false });
