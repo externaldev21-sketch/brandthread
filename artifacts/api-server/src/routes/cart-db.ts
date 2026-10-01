@@ -10,6 +10,7 @@ import { Router } from "express";
 import { db, cartItems } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { newlyAddedVariantIds, recordAddToCartEvents } from "../lib/sellerProductEvents";
 
 const router = Router();
 router.use(requireAuth);
@@ -33,6 +34,15 @@ router.post("/sync", async (req, res) => {
     savedItems?: any[];
   };
 
+  // Analytics only: remember which lines were already in the cart so a full
+  // replace sync can tell genuinely new add-to-carts apart. Never blocks sync.
+  const previousVariantIds: string[] = await db
+    .select({ variantId: cartItems.variantId, savedForLater: cartItems.savedForLater })
+    .from(cartItems)
+    .where(eq(cartItems.userId, userId))
+    .then((prev) => prev.filter((r) => !r.savedForLater).map((r) => r.variantId))
+    .catch(() => []);
+
   await db.delete(cartItems).where(eq(cartItems.userId, userId));
 
   const rows: (typeof cartItems.$inferInsert)[] = [
@@ -53,6 +63,12 @@ router.post("/sync", async (req, res) => {
   if (rows.length > 0) {
     await db.insert(cartItems).values(rows);
   }
+
+  // Fire-and-forget: recordAddToCartEvents swallows its own errors.
+  void recordAddToCartEvents(
+    userId,
+    newlyAddedVariantIds(previousVariantIds, rows.filter((r) => !r.savedForLater).map((r) => r.variantId)),
+  );
 
   return res.json({ ok: true, count: rows.length });
 });
