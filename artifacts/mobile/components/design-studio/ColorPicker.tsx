@@ -8,7 +8,7 @@
  * itself, not just this sheet.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -57,6 +57,14 @@ export default function ColorPicker(props: ColorPickerProps) {
   const [tab, setTab] = useState<ColorPickerTab>('disc');
   const [hexInput, setHexInput] = useState(color);
   const [hexError, setHexError] = useState(false);
+
+  // Every other control (Disc/Classic/Harmony drags, Value sliders, tapping
+  // a palette/recent swatch) changes `color` via `onChange` without ever
+  // touching this local text field's own state — without this sync the hex
+  // field would silently go stale after any of those (a real bug this
+  // rebuild's e2e drag test caught), showing whatever was last typed
+  // instead of the colour actually in effect.
+  useEffect(() => { setHexInput(color); setHexError(false); }, [color]);
   const [harmonyRule, setHarmonyRule] = useState<HarmonyRule>('complementary');
   const [editingPaletteId, setEditingPaletteId] = useState<string | null>(null);
   const [editingPaletteName, setEditingPaletteName] = useState('');
