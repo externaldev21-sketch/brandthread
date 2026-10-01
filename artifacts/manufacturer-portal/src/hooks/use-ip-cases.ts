@@ -18,6 +18,16 @@ export interface IpCase {
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  takedownAt?: string | null;
+  sellerNotifiedAt?: string | null;
+  counterNoticeStatus?: 'none' | 'received' | 'reinstated' | 'upheld';
+  counterNoticeStatement?: string | null;
+  sellerStanding?: {
+    ipStrikeCount: number;
+    ipRepeatInfringer: boolean;
+    ipRepeatInfringerFlaggedAt: string | null;
+    threshold: number;
+  } | null;
   listingContext: {
     id: string;
     name: string;
@@ -146,5 +156,26 @@ export function useUpdateIpCase() {
       // Invalidate to refresh fully
       queryClient.invalidateQueries({ queryKey: ['ip-cases'] });
     }
+  });
+}
+
+export function useResolveCounterNotice() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, outcome, notes }: { id: string; outcome: 'reinstate' | 'uphold'; notes?: string }) => {
+      const token = await getToken();
+      const res = await fetch(`/api/ip-cases/${id}/counter-notice/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ outcome, notes }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error || 'Failed to resolve counter-notice');
+      }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ip-cases'] }),
   });
 }

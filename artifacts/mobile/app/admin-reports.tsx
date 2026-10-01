@@ -23,7 +23,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import {
-  REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget, shortRelativeTime,
+  REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget, reportSla, shortRelativeTime,
 } from '@/lib/safety';
 import type {
   ModerationAction, ModerationQueue, ModerationQueueItem, ProfileSummary, ReportTargetType,
@@ -254,6 +254,7 @@ function QueueCard({ item, onPress }: { item: ModerationQueueItem; onPress: () =
   const s = useMemo(() => makeStyles(theme), [theme]);
   const type = normalizeReportTarget(item.targetType);
   const auto = item.source === 'auto_filter';
+  const sla = item.status === 'pending' ? reportSla(item.createdAt, item.dueBy) : null;
   return (
     <PressableScale onPress={onPress} style={s.card} accessibilityRole="button" accessibilityLabel={`Review ${TARGET_LABELS[type]} report`}>
       <View style={s.cardTop}>
@@ -281,9 +282,10 @@ function QueueCard({ item, onPress }: { item: ModerationQueueItem; onPress: () =
           </View>
         ) : <View style={{ flex: 1 }} />}
         {item.status === 'pending' ? (
-          item.openReportsOnTarget > 1
-            ? <Text style={s.countTag}>{item.openReportsOnTarget} reports</Text>
-            : null
+          <View style={s.slaRow}>
+            {item.openReportsOnTarget > 1 ? <Text style={s.countTag}>{item.openReportsOnTarget} reports</Text> : null}
+            <Text style={[s.countTag, sla?.overdue && { color: theme.error }]} testID="report-sla">{sla?.label}</Text>
+          </View>
         ) : (
           <Text style={s.countTag}>{ACTION_LABELS[item.resolution?.action ?? ''] ?? item.status}</Text>
         )}
@@ -516,6 +518,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   ownerRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
   ownerName: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs + 1, flexShrink: 1 },
   suspendedTag: { color: theme.error, fontFamily: FONT.semibold, fontSize: 11 },
+  slaRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   countTag: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11 },
   toast: {
     position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6,
