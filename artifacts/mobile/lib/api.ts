@@ -1081,6 +1081,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>;
         stats: { totalCustomers: number; repeatCustomers: number; repeatRate: number; avgOrdersPerCustomer: number };
       }>(`/api/analytics/customers?limit=${limit}`),
+      /** Brandthread Pro: cohorts, lifetime value and order value by month. 403 PLAN_REQUIRED below Pro. */
+      advanced:   () => get<{
+        months: string[];
+        cohorts: Array<{ month: string; customers: number; repeatCustomers: number; repeatRate: number; revenueCents: number }>;
+        orderValue: Array<{ month: string; orders: number; revenueCents: number; averageOrderCents: number }>;
+        lifetime: { customers: number; revenueCents: number; averageLifetimeValueCents: number };
+      }>('/api/analytics/advanced'),
     },
     inventory: {
       list:   () => get<any[]>('/api/inventory'),
@@ -1978,6 +1985,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
         }>('/api/seller/subscription/status'),
+        /** What each plan includes (price, commission, AI credits, advanced analytics) plus the caller's plan. */
+        perks: () => get<import('./proPerks').PerksResponse>('/api/seller/subscription/perks'),
         dismissTrialBanner: (trialEndAt: string) =>
           post<{ ok: boolean; trialEndAt: string }>('/api/seller/subscription/trial-banner/dismiss', { trialEndAt }),
         /** Read-only invoice summaries for the active seller store. */

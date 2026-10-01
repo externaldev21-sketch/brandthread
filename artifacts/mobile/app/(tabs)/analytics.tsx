@@ -9,9 +9,11 @@
  * the stat-row-above-chart hierarchy and the muted axis labels.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
-import { GRID_MAX_WIDTH, SP } from '@/lib/theme';
+import { GRID_MAX_WIDTH, SP, FONT, FS, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
@@ -88,6 +90,7 @@ function formatChartDollars(cents: number): string {
 export default function AnalyticsScreen() {
   const colors = useColors();
   const api = useApi();
+  const router = useRouter();
   const { userId } = useAuth();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const scrollResetRef = useScrollReset<ScrollView>();
@@ -202,6 +205,22 @@ export default function AnalyticsScreen() {
             <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" />
           </Card>
 
+          {/* ── Brandthread Pro module (additive; the views above stay free) ── */}
+          <Card>
+            <TouchableOpacity
+              style={s.advancedRow}
+              activeOpacity={0.7}
+              onPress={() => router.push('/analytics-advanced' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Advanced analytics, Brandthread Pro"
+            >
+              <Feather name="bar-chart-2" size={18} color={colors.foreground} />
+              <Text style={s.advancedLabel}>Advanced analytics</Text>
+              <View style={s.proChip}><Text style={s.proChipText}>PRO</Text></View>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </Card>
+
           <View style={{ height: 120 }} />
         </ResponsiveContainer>
       </ScrollView>
@@ -222,4 +241,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   content: { paddingTop: SP.md },
 
   statsRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
+
+  advancedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md },
+  advancedLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
+  proChip: { backgroundColor: colors.foreground, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 3 },
+  proChipText: { fontSize: 10, fontFamily: FONT.bold, color: colors.background, letterSpacing: 0.6 },
 });

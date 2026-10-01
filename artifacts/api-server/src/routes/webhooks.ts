@@ -912,6 +912,8 @@ export async function handleCheckoutPaid(
       shippingCents,
       taxCents,
       grossCents: totalCents,
+      // Rate fixed when the checkout was created; null (older sessions) = standard 5%.
+      platformFeeBps: csRecord.platformFeeBps,
       processingFeeCents: chargeModel === "held"
         ? chargeDetails.processingFeeCents
         : chargeModel === "transfer"

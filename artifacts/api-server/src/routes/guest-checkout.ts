@@ -11,6 +11,7 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
+import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
@@ -243,11 +244,13 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       tax_behavior: "exclusive",
       product_data: { name: shippingLineName },
     }, quantity: 1 });
+    const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: subtotalCents,
       preTaxTotalCents: subtotalCents + shippingCents,
+      platformFeeBps,
     });
     const checkoutIdValue = crypto.randomUUID();
     const accessToken = guestAccessToken(checkoutIdValue);
@@ -260,6 +263,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         chargeModel: chargePlan.chargeModel,
         dropId: chargePlan.dropId,
         platformFeeCents: money.platformFeeCents,
+        platformFeeBps,
         processingFeeEstimateCents: money.processingFeeEstimateCents,
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
