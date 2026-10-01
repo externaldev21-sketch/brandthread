@@ -109,6 +109,7 @@ import webhooksShippoRouter from "./webhooks-shippo";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
+import growthRouter from "./growth";
 
 const router = Router();
 
@@ -268,5 +269,7 @@ router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
+// Seller growth tools: tracked UTM links, link-in-bio, store pixels.
+router.use("/growth",              tc, growthRouter);
 
 export default router;

@@ -16,6 +16,7 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import { recordCheckoutAttribution } from "../lib/growth/attribution";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -307,6 +308,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       },
     }, key ? { idempotencyKey: `guest_cs_${key}` } : {});
     await db.update(checkoutSessions).set({ stripeSessionId: session.id }).where(eq(checkoutSessions.id, checkout.id));
+    // Additive growth attribution (tracked link / UTM); best effort, never blocks checkout.
+    await recordCheckoutAttribution({
+      checkoutSessionId: checkout.id, stripeSessionId: session.id, sellerId, attribution: req.body?.attribution,
+    });
     // This is the sole response containing this token. It is not logged or stored raw.
     return void res.status(201).json({ sessionId: session.id, url: session.url, guestAccessToken: accessToken });
   } catch (error: any) {
