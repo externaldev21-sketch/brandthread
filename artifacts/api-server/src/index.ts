@@ -23,6 +23,7 @@ import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { pool } from "@workspace/db";
+import { closeRedis } from "./lib/redis";
 
 validateEnv();
 
@@ -113,6 +114,7 @@ function shutdown(signal: NodeJS.Signals): void {
       logger.info({ signal }, "HTTP server closed; no longer accepting connections");
     }
 
+    await closeRedis().catch(() => {});
     try {
       await pool.end();
       logger.info("Database pool closed");
