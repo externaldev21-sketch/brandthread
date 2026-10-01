@@ -48,6 +48,7 @@ export function CaptionBlock({
   style,
   onHeightChange,
   topSlot,
+  sponsored,
 }: {
   creator: string;
   verified: boolean;
@@ -75,6 +76,8 @@ export function CaptionBlock({
    *  an 8px gap below it — see the module comment above. `undefined` when
    *  this post has no tagged product (no leftover gap in that case). */
   topSlot?: React.ReactNode;
+  /** Paid promotion (admin-approved boost) served in For You: shows the "Sponsored" label beside the brand name. */
+  sponsored?: boolean;
 }) {
   const handleLayout = onHeightChange
     ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
@@ -150,6 +153,7 @@ export function CaptionBlock({
               clip's silver dress). The same text shadow as the rest of
               this block keeps it legible on light and dark video alike. */}
           {verified && <Feather name="check-circle" size={14} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
+          {sponsored && <Text style={styles.sponsoredLabel} accessibilityLabel="Sponsored">Sponsored</Text>}
         </View>
       </TouchableOpacity>
 
@@ -229,6 +233,11 @@ const styles = StyleSheet.create({
   creatorName: {
     fontSize: 16, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  sponsoredLabel: {
+    fontSize: 11, fontFamily: FONT.semibold, color: ON_DARK, letterSpacing: 0.2,
+    borderWidth: 1, borderColor: ON_DARK, borderRadius: RADII.pill, paddingHorizontal: 7, paddingVertical: 1,
+    overflow: 'hidden', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
     fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
