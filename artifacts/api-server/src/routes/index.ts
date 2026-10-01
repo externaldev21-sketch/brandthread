@@ -123,6 +123,9 @@ import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 import sharePreviewRouter from "./share-preview";
+import affiliatePublicRouter from "./affiliate-public";
+import affiliateCreatorRouter from "./affiliate-creator";
+import sellerAffiliateRouter from "./seller-affiliate";
 
 const router = Router();
 
@@ -130,6 +133,7 @@ const router = Router();
 router.use("/config/features", featureFlagsRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
+router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
@@ -228,6 +232,7 @@ router.use("/communities",               communitiesRouter);
 router.use("/brandthread-agent",         aiSafetyGuard("brandthread-agent", { mode: "chat" }), brandthreadAgentRouter);
 // Stripe redirects the seller's browser here with no app session: mounted before the owner-only router.
 router.use("/seller/connect/onboard",    connectRedirectRouter);
+router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliate / creator program (seller side)
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
@@ -247,6 +252,8 @@ router.use("/social",                    storyMentionsRouter);
 router.use("/social",                    closeFriendsRouter);
 router.use("/social",                    storyHighlightsRouter);
 router.use("/referrals",                 referralsRouter);
+router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
+router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);

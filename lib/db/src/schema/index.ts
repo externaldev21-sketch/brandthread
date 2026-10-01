@@ -12,6 +12,7 @@ export * from './communities';
 export * from './iapPromotions';
 export * from './sales';
 export * from './sellerAnalytics';
+export * from './affiliate';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
