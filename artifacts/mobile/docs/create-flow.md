@@ -71,4 +71,4 @@ BASE_URL=http://127.0.0.1:8081 pnpm exec playwright test -c e2e/playwright.confi
 
 `scripts/store-screenshots/text-fit.mjs` flags truncated/ellipsised text, text overflowing its box, labels cut by the
 screen edge, <12px button padding, off-centre button text and unequal buttons in a row. Screenshots, zoomed
-button-group crops and Mobbin side-by-sides: `docs/polish/screenshots/create-flow/`.
+button-group crops and Mobbin side-by-sides: `artifacts/mobile/docs/polish/screenshots/create-flow/`.
