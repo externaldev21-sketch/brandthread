@@ -736,7 +736,7 @@ export default function ProfileScreen() {
             action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
             testID={`seller-own-empty-${activeTab.toLowerCase()}`}
             actionStyle="text"
-            showGridPreview={activeTab === 'Posts'}
+            alignTop={activeTab === 'Posts'}
           />
         )}
         refreshing={refreshing}
