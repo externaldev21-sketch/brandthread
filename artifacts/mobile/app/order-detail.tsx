@@ -35,6 +35,7 @@ import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
 import { getPreviewSellerOrder } from '@/lib/previewOrders';
+import { ApiError } from '@/lib/networkNotice';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -472,6 +473,7 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
   const [loading, setLoading] = useState(!cachedOrder);
   const [updatesPaused, setUpdatesPaused] = useState(false);
+  const [orderLoadFailed, setOrderLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
   // Item 108: this order's real return requests (GET /api/returns, seller).
   // null = not loaded yet; the Returns tab shows a spinner until then.
@@ -556,11 +558,14 @@ export default function OrderDetailScreen() {
       });
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      setOrderLoadFailed(false);
       queryClient.setQueryData(queryKeys.order(id), raw);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
-    } catch {
+    } catch (loadErr) {
       if (generationRef.current !== generation) return; // stale focus cycle
+      // A 404 is a real "not found"; anything else is a load failure to retry.
+      if (!hasLoadedRef.current) setOrderLoadFailed(!(loadErr instanceof ApiError && loadErr.status === 404));
       if (!hasLoadedRef.current) setOrder(null);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3) {
@@ -832,9 +837,11 @@ export default function OrderDetailScreen() {
         )}
         <EmptyState
           icon="alert-circle"
-          title="Order not found"
-          description="This order may have been deleted or the ID is invalid."
-          action={{ label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
+          title={orderLoadFailed ? "Couldn't load this order" : 'Order not found'}
+          description={orderLoadFailed ? 'Check your connection and try again.' : 'This order may have been deleted or the ID is invalid.'}
+          action={orderLoadFailed
+            ? { label: 'Retry', onPress: retryUpdates, icon: 'refresh-cw' }
+            : { label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
         />
       </View>
     );
