@@ -977,7 +977,7 @@ export default function ProfileScreen() {
             description={emptyDescription}
             action={emptyAction}
             actionStyle="text"
-            showGridPreview={activeTab === 'Posts'}
+            alignTop={activeTab === 'Posts'}
           />
         )}
         showsVerticalScrollIndicator={false}
