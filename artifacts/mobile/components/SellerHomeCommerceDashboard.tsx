@@ -172,7 +172,7 @@ function formatMetricValue(metric: MetricKey, value: number): string {
 
 function compactDelta(current: number, previous: number): { direction: 'up' | 'down' | 'flat'; label: string } {
   const change = computeMetricChange(current, previous);
-  if (change.direction === 'flat') return { direction: 'flat', label: '—' };
+  if (change.direction === 'flat') return { direction: 'flat', label: '' };
   if (change.percent == null) return { direction: change.direction, label: 'New' };
   const sign = change.percent > 0 ? '+' : '';
   return { direction: change.direction, label: `${sign}${change.percent}%` };
@@ -197,7 +197,7 @@ export default function SellerHomeCommerceDashboard({
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
 
-  const [range, setRange] = useState<SellerDashboardRange>('week');
+  const [range, setRange] = useState<SellerDashboardRange>('today');
   const [metric, setMetric] = useState<MetricKey>('sales');
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
@@ -764,9 +764,10 @@ export default function SellerHomeCommerceDashboard({
                 </Text>
                 {isEmptyChart && scrubIndex === null ? (
                   // Never a fabricated "+31.1%"-style comparison for a
-                  // brand-new/zero-sales account — matches Shopify's own
-                  // zero-state chart ("$0.00 —", no percent).
-                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{EMPTY_CHART_MESSAGE[range]}</Text>
+                  // brand-new/zero-sales account. The range-aware empty
+                  // message is shown once, in the chart itself; this blank
+                  // line only holds the hero's height so nothing jumps.
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>{' '}</Text>
                 ) : deltaLine && scrubIndex === null && heroSettled ? (
                   <Text
                     style={[
