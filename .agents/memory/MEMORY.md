@@ -31,6 +31,7 @@
 - [Seller vacation enforcement](seller-vacation-enforcement.md) — vacation mode is a server-side commerce and buyer-to-seller messaging boundary; public surfaces expose its effective status and message.
 - [Freelancer marketplace payments](freelancer-marketplace.md) — escrow transfer-on-complete; live payout-readiness gate; source_transaction mandatory; claim-then-pay idempotency; 5% fee pending.
 - [DB migration runner](db-migrations-runner.md) — ordered schema_migrations-tracked runner; every migration statement must be idempotent; clean boot = push then migrate.
+- [Non-interactive DB bootstrap](test-database-bootstrap.md) — Drizzle push can print a TTY error and exit zero; unattended setup must independently verify the schema.
 - [Sample image upload security](sample-image-upload-security.md) — sample images use authenticated, size-limited proxy upload with byte-signature validation before storage.
 - [Store preview links](store-preview-links.md) — public preview tokens are bearer credentials: store only the latest SHA-256 fingerprint and reject all earlier links.
 - [Truthful seller profile metrics](truthful-seller-profile-metrics.md) — count settled paid orders and deduplicated signed-in storefront visits; never fabricate growth.

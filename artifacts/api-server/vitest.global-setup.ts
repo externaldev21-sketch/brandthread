@@ -1,4 +1,4 @@
-import pg from "pg";
+import { resolveTestDatabaseUrl, verifyTestDatabaseSchema } from "../../lib/db/src/testing/index";
 
 /**
  * Runs once for the whole `vitest run`, in the main process, before any test
@@ -21,15 +21,13 @@ export default async function globalSetup() {
     );
   }
   const realSnapshot = process.env.BRANDTHREAD_REAL_DATABASE_URL_SNAPSHOT;
-  if (realSnapshot && realSnapshot === testUrl) {
-    throw new Error("Resolved test database is identical to the real DATABASE_URL. Refusing to run tests.");
+  const resolution = resolveTestDatabaseUrl({
+    databaseUrl: realSnapshot,
+    testDatabaseUrl: testUrl,
+  });
+  if (!resolution.ok) {
+    throw new Error(`[api-server tests] ${resolution.reason}`);
   }
 
-  const client = new pg.Client({ connectionString: testUrl });
-  await client.connect();
-  try {
-    await client.query("SELECT 1");
-  } finally {
-    await client.end();
-  }
+  await verifyTestDatabaseSchema(testUrl);
 }
