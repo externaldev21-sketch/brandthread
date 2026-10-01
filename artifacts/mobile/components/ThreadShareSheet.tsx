@@ -30,6 +30,8 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
+import { quotePostHref } from '@/lib/quotePost';
+import { useRouter } from 'expo-router';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -64,6 +66,7 @@ export function ThreadShareSheet({
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
@@ -308,6 +311,16 @@ export function ThreadShareSheet({
               <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
               {isVideo && mediaUri ? (
                 <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />
+              ) : null}
+              {isUUID(postId) ? (
+                <ShareAction
+                  label="Quote"
+                  icon="edit-3"
+                  onPress={() => {
+                    onClose();
+                    router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never);
+                  }}
+                />
               ) : null}
             </View>
           </View>

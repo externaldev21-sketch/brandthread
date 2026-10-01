@@ -1,0 +1,2 @@
+quote-post (empty): OK (0 issues)
+quote-post (filled): OK (0 issues)

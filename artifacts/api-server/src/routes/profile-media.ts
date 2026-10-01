@@ -22,6 +22,7 @@
  *   Public posts that tag the product, newest first — the "Featured in" strip
  *   on product detail links into these.
  */
+import { attachQuoteData } from "../lib/quotedPosts";
 import { Router, type Request } from "express";
 import { and, asc, count, desc, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
 import {
@@ -160,7 +161,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     tagsByPost.get(tag.postId)!.push(tag);
   }
 
-  return rows.map((row) => ({
+  const mapped = rows.map((row) => ({
     id:           row.id,
     userId:       row.userId,
     mediaUrl:     row.mediaUrl,
@@ -195,6 +196,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     viewsCount:    views.get(row.id) ?? 0,
     repostedByMe:  repostedByMe.has(row.id),
   }));
+  return attachQuoteData(mapped, viewerId);
 }
 
 async function isMutualFollow(a: string, b: string): Promise<boolean> {

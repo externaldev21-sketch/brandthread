@@ -12,6 +12,7 @@
  * POST   /api/social/suggested/:userId/dismiss — hide a suggestion
  */
 import { Router } from "express";
+import { attachQuoteData } from "../lib/quotedPosts";
 import { publicCoverFields } from "../lib/profileCover";
 import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
@@ -200,7 +201,7 @@ async function buildBuyerPosts(
     mine.get(row.postId)!.add(row.type);
   }
 
-  return rows.map((row) => {
+  const mapped = rows.map((row) => {
     const name = row.displayName || row.name || "Buyer";
     return {
       id: row.id,
@@ -229,6 +230,7 @@ async function buildBuyerPosts(
       updatedAt: row.createdAt,
     };
   });
+  return attachQuoteData(mapped, viewerId);
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
