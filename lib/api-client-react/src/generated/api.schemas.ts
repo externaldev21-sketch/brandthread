@@ -1182,9 +1182,18 @@ export interface DeleteAccountInput {
   confirmation: DeleteAccountInputConfirmation;
 }
 
+export type LegalAcceptanceInputSource = typeof LegalAcceptanceInputSource[keyof typeof LegalAcceptanceInputSource];
+
+
+export const LegalAcceptanceInputSource = {
+  signup: 'signup',
+  update_prompt: 'update_prompt',
+} as const;
+
 export interface LegalAcceptanceInput {
   /** @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$ */
   version: string;
+  source?: LegalAcceptanceInputSource;
 }
 
 export type RenewCallToken200 = CallCredentials & {

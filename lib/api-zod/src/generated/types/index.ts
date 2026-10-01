@@ -46,6 +46,7 @@ export * from './getModerationAccess200';
 export * from './getPartnerManufacturer200';
 export * from './healthStatus';
 export * from './legalAcceptanceInput';
+export * from './legalAcceptanceInputSource';
 export * from './likeCommentInput';
 export * from './likePostComment200';
 export * from './listAccountSessions200';
