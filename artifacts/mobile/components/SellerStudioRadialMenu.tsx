@@ -101,6 +101,8 @@ import Svg, { Path } from 'react-native-svg';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
+import { SELLER_ACTIVITY_ROUTE_LIVE } from '@/lib/sellerActivityRoute';
+import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -163,7 +165,12 @@ const MENU_EXCLUDED_IDS = [
 // whichever card is CARD_ORDER[0], so post-video (label "Create post")
 // leads. The rest keeps its prior most-used-first order.
 const CARD_ORDER = [
-  'post-video', 'add-product', 'go-live', 'analytics', 'payouts', 'customers', 'community',
+  'post-video', 'add-product', 'go-live', 'analytics',
+  // '/seller-activity' doesn't exist yet (see lib/sellerActivityRoute.ts) —
+  // this only resolves to a real item once that flag flips, at which point
+  // CARD_ITEMS below naturally picks it up right after Analytics.
+  ...(SELLER_ACTIVITY_ROUTE_LIVE ? ['activity'] : []),
+  'payouts', 'customers', 'community',
   'manufacturer', 'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
 ];
 const CARD_ITEMS: ControlCenterItem[] = CARD_ORDER
@@ -274,6 +281,7 @@ const MICRO_KIND: Record<string, MicroKind> = {
   'add-product': 'swing',        // hanger swings once and settles
   'go-live': 'pulse-dot',        // LIVE dot pulses once + lens-flare sweep
   'analytics': 'rise',           // rises from 0 into place
+  'activity': 'pop-in',          // pops in
   'payouts': 'flip',             // coin flips once
   'community': 'pop-in',         // pops in
   'manufacturer': 'turn-60',     // gear turns 60 degrees
@@ -845,6 +853,11 @@ export default function SellerStudioRadialMenu({
   function CarouselCard({ item, itemIndex }: { item: ControlCenterItem; itemIndex: number }) {
     const locked = isLocked(item);
     const microKind = MICRO_KIND[item.id] ?? 'pop-in';
+    // Called unconditionally (every card, not just 'activity') per the
+    // Rules of Hooks — only actually rendered below for the Activity card,
+    // and only when there's something unread to show (Dev: "optional small
+    // unread dot ... only if the activity API exposes an unread count").
+    const unreadActivityCount = useActivityUnreadCount();
 
     const cardStyle = useAnimatedStyle(() => {
       const distance = itemIndex - cardIndex.value;
@@ -1064,6 +1077,9 @@ export default function SellerStudioRadialMenu({
               <View style={styles.cardLock}>
                 <Feather name="lock" size={14} color={theme.text} />
               </View>
+            )}
+            {item.id === 'activity' && unreadActivityCount > 0 && (
+              <View style={[styles.cardUnreadDot, { backgroundColor: theme.accent }]} testID="seller-control-center-activity-unread-dot" />
             )}
           </Animated.View>
           <LinearGradient
@@ -1454,6 +1470,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // A presence-only dot (no count) — Dev's own call for this one: "optional
+  // small unread dot", not a numbered badge like ActivityBellButton's own.
+  cardUnreadDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 
   // Position dots — replaces the old "X / 16" text indicator.
