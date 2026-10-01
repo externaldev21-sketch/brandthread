@@ -1,0 +1,24 @@
+{
+  "scenario": "dm_read",
+  "steps": [
+    50,
+    100,
+    200,
+    400,
+    800
+  ],
+  "stepSeconds": 15,
+  "requests": 8706,
+  "rps": 113.52723760191839,
+  "serverErrorRate": 0,
+  "rateLimitedRate": 0,
+  "dropped": 1056,
+  "endpoints": {
+    "dm_read": {
+      "p50": 6.383205500000001,
+      "p95": 1571.63230475,
+      "p99": 1848.6364944,
+      "max": 1873.450921
+    }
+  }
+}

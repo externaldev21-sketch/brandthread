@@ -26,6 +26,7 @@ import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { decodeCursor, encodeCursor } from "../lib/cursor";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -361,22 +362,23 @@ router.get("/feed", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
   const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
+  // Optional keyset pagination: pass the X-Next-Cursor header value back as
+  // ?cursor= to page without OFFSET. Offset still works unchanged.
+  const cursor = req.query.cursor === undefined ? null : decodeCursor(req.query.cursor);
+  if (req.query.cursor !== undefined && !cursor) {
+    return res.status(400).json({ error: "Invalid cursor", code: "VALIDATION_ERROR" });
+  }
 
   try {
-    // 1. Which seller accounts does this buyer follow?
-    const followRows = await db
+    // 1+2. Posts from the sellers this buyer follows (seller-only gate via
+    // users join). The follow list is a subquery, not a round trip that ships
+    // every followed id back into an IN (...) list. A buyer who follows nobody
+    // simply matches no rows and gets the same empty feed (real empty, not demo).
+    const followedIds = db
       .select({ followingId: follows.followingId })
       .from(follows)
       .where(eq(follows.followerId, clerkId));
 
-    const followedIds = followRows.map((r) => r.followingId);
-
-    // No followed sellers → return empty feed (real empty, not demo)
-    if (followedIds.length === 0) {
-      return res.json([]);
-    }
-
-    // 2. Fetch posts from those followed accounts (seller-only gate via users join)
     const pageRows = await db
       .select({
         id:          posts.id,
@@ -392,6 +394,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         sound:       posts.sound,
         visibility:  posts.visibility,
         createdAt:   posts.createdAt,
+        cursorTs:    sql<string>`${posts.createdAt}::text`,
         displayName: users.displayName,
         brandName:   users.brandName,
         verified:    users.verified,
@@ -406,10 +409,19 @@ router.get("/feed", requireAuth, async (req, res) => {
         eq(users.accountType, "seller"),        // seller-only gate
         inArray(posts.userId, followedIds),     // followed-only gate
       ))
-      .where(and(visiblePostCondition(), notBlockedWith(clerkId, posts.userId)))
-      .orderBy(desc(posts.createdAt))
+      .where(and(
+        visiblePostCondition(),
+        notBlockedWith(clerkId, posts.userId),
+        cursor ? sql`(${posts.createdAt}, ${posts.id}) < (${cursor.ts}::timestamp, ${cursor.id}::uuid)` : undefined,
+      ))
+      .orderBy(desc(posts.createdAt), desc(posts.id))
       .limit(lim)
-      .offset(off);
+      .offset(cursor ? 0 : off);
+
+    const last = pageRows[pageRows.length - 1];
+    if (last && pageRows.length === lim) {
+      res.setHeader("X-Next-Cursor", encodeCursor({ ts: last.cursorTs, id: last.id }));
+    }
 
     // Muted words hide matching captions from this viewer only.
     const muted = await mutedPhrasesFor(clerkId);
