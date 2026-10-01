@@ -12,6 +12,7 @@ type RevenueCatContextValue = {
   managementURL: null;
   purchase: (_package: RevenueCatPackage) => Promise<never>;
   restore: () => Promise<never>;
+  purchaseConsumable: (_productId: string) => Promise<never>;
   refresh: () => Promise<void>;
 };
 
@@ -21,7 +22,7 @@ const unavailable = async (): Promise<never> => {
 
 const value: RevenueCatContextValue = {
   available: false, packages: [], customerInfo: null, managementURL: null,
-  purchase: unavailable, restore: unavailable, refresh: async () => {},
+  purchase: unavailable, restore: unavailable, purchaseConsumable: unavailable, refresh: async () => {},
 };
 const RevenueCatContext = createContext<RevenueCatContextValue>(value);
 

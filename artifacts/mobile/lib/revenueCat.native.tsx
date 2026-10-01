@@ -19,6 +19,8 @@ type RevenueCatContextValue = {
   managementURL: string | null;
   purchase: (pkg: RevenueCatPackage) => Promise<CustomerInfo>;
   restore: () => Promise<CustomerInfo>;
+  /** Buys a consumable (Boost / Create-ad budget) through the store's own purchase sheet. */
+  purchaseConsumable: (productId: string) => Promise<{ transactionId: string }>;
   refresh: () => Promise<void>;
 };
 
@@ -131,10 +133,18 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     );
   }, [available, sync, sessionGuard]);
 
+  const purchaseConsumable = useCallback(async (productId: string) => {
+    if (!available) throw new Error('RevenueCat is not configured for this build.');
+    const [product] = await Purchases.getProducts([productId], Purchases.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
+    if (!product) throw new Error('This purchase is not available yet.');
+    const result = await Purchases.purchaseStoreProduct(product);
+    return { transactionId: result.transaction.transactionIdentifier };
+  }, [available]);
+
   const value = useMemo(() => ({
     available, packages, customerInfo, managementURL: customerInfo?.managementURL ?? null,
-    purchase, restore, refresh,
-  }), [available, packages, customerInfo, purchase, restore, refresh]);
+    purchase, restore, purchaseConsumable, refresh,
+  }), [available, packages, customerInfo, purchase, restore, purchaseConsumable, refresh]);
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;
 }
