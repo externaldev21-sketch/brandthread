@@ -36,8 +36,7 @@
  */
 
 import { Platform } from 'react-native';
-
-const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
+import { NAVIGATION_ISOLATION_TEST } from './buildFlags';
 
 /**
  * Hard gate, independent of EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST: the

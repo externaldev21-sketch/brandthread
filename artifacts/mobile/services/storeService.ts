@@ -1565,5 +1565,5 @@ export function generatePolicyDraft(type: StorePolicy['type'], storeName: string
     terms: `TERMS OF SERVICE\n\nBy purchasing from ${storeName}, you agree to these terms. We reserve the right to refuse service, cancel orders, or limit quantities at our discretion.\n\nPrices and availability are subject to change without notice.${disclaimer}`,
     pre_order: `PRE-ORDER POLICY\n\nPre-order items are charged at the time of purchase. Estimated delivery dates are provided but not guaranteed.\n\nIf we are unable to fulfill a pre-order within 90 days of the estimated date, you may request a full refund.${disclaimer}`,
   };
-  return templates[type] ?? `${type.toUpperCase()} POLICY\n\nContent coming soon.${disclaimer}`;
+  return templates[type] ?? `${type.toUpperCase()} POLICY\n\nPlease contact us for details.${disclaimer}`;
 }

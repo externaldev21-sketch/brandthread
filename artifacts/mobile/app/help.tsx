@@ -215,7 +215,7 @@ export default function HelpScreen() {
             <Feather name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/chat')} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={scrollToContact} activeOpacity={0.8}>
             <Feather name="message-circle" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
           </TouchableOpacity>
