@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   FlatList,
   StyleSheet,
@@ -13,10 +12,10 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import Composer from '@/components/ui/Composer';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
@@ -56,7 +55,6 @@ const INITIAL_MSG: Message = {
 
 export default function AIPhotographyChatScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MSG]);
   const [mode, setMode] = useState<PhotographyMode>('free');
@@ -69,7 +67,6 @@ export default function AIPhotographyChatScreen() {
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const flatRef = useRef<FlatList>(null);
 
-  const bottomPad = insets.bottom;
 
   useEffect(() => {
     if (!outfitSwapEnabled && mode === 'outfitSwap') setMode('free');
@@ -497,60 +494,44 @@ export default function AIPhotographyChatScreen() {
       )}
 
       {/* Input */}
-      <View style={[styles.inputBar, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: bottomPad + 12 }]}>
-        <View style={[styles.inputWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Composer
+        testID="ai-photography"
+        value={input}
+        onChangeText={setInput}
+        onSend={() => sendMessage(input)}
+        canSend={(mode === 'free' ? photos.length > 0 : !!heroPhoto) && !loading}
+        editable={!loading}
+        maxLength={500}
+        enterToSend={false}
+        placeholder={mode === 'outfitSwap' ? 'Add outfit notes (optional)...' : 'Describe the shot you want...'}
+        leftAccessory={
           <TouchableOpacity
             onPress={pickPhotos}
             activeOpacity={0.8}
             disabled={(mode === 'free' ? photos.length >= MAX_PHOTOS : (heroPhoto ? garments.length >= MAX_GARMENTS : false)) || loading}
             style={styles.attachBtn}
+            accessibilityLabel="Add photos"
             testID="ai-photography-attach"
           >
             <Feather
               name="camera"
-              size={18}
+              size={20}
               color={(mode === 'free' ? photos.length >= MAX_PHOTOS : (heroPhoto ? garments.length >= MAX_GARMENTS : false))
                 ? colors.mutedForeground
                 : colors.primary}
             />
           </TouchableOpacity>
-          <TextInput
-            style={[styles.input, { color: colors.foreground }]}
-            testID="ai-photography-input"
-            placeholder={mode === 'outfitSwap' ? 'Add outfit notes (optional)...' : 'Describe the shot you want...'}
-            placeholderTextColor={colors.mutedForeground}
-            value={input}
-            onChangeText={setInput}
-            multiline
-            maxLength={500}
-            editable={!loading}
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage(input)}
-          />
-          <TouchableOpacity
-            onPress={() => sendMessage(input)}
-            activeOpacity={0.8}
-            disabled={(mode === 'free' ? photos.length === 0 : !heroPhoto) || loading}
-            style={[styles.sendBtn, {
-              backgroundColor: (mode === 'free' ? photos.length > 0 : !!heroPhoto) && !loading ? colors.primary : colors.secondary,
-            }]}
-            testID="ai-photography-send"
-          >
-            <Feather
-              name="send"
-              size={16}
-              color={(mode === 'free' ? photos.length > 0 : !!heroPhoto) && !loading ? colors.primaryForeground : colors.mutedForeground}
-            />
-          </TouchableOpacity>
-        </View>
-        {(mode === 'free' ? photos.length === 0 : !heroPhoto && garments.length === 0) && (
-          <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-            {mode === 'free'
-              ? 'Tap the camera icon to add product or reference photos first.'
-              : 'Tap the camera icon to add one hero photo. Garments can follow in this chat.'}
-          </Text>
-        )}
-      </View>
+        }
+        topSlot={
+          (mode === 'free' ? photos.length === 0 : !heroPhoto && garments.length === 0) ? (
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+              {mode === 'free'
+                ? 'Tap the camera icon to add product or reference photos first.'
+                : 'Tap the camera icon to add one hero photo. Garments can follow in this chat.'}
+            </Text>
+          ) : null
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -595,10 +576,6 @@ const styles = StyleSheet.create({
     position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
   },
-  inputBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
-  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingLeft: 10, paddingRight: 6, paddingVertical: 6, gap: 8 },
-  attachBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  input: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, maxHeight: 100, paddingTop: 6, paddingBottom: 6 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, // 44x44 minimum touch target (COMP.minTouchTarget); was 36x36.
+  attachBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   hint: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginTop: 6, marginBottom: 4 },
 });

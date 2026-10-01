@@ -15,6 +15,7 @@ import { reversePurchasePointsOnce } from "../../routes/loyalty";
 import { advanceDropEscrow, recoverLabelCost, sweepOrderReleases } from "./escrow";
 import { expireStockReservations, sweepTransferOrders } from "./cartTransfers";
 import { refundOrder, RefundError } from "./refunds";
+import { payoutHoldApplies } from "../delivery/payoutGate";
 import { DROP_OPEN_STATES, orderStatusMachine, type OrderStatus } from "./stateMachines";
 
 /**
@@ -79,16 +80,22 @@ export async function failDrop(
   const summary: DropFailureSummary = { dropId, state: drop?.escrowState ?? null, refunded: 0, pending: 0, errors: 0 };
   if (drop?.escrowState !== "failing") return summary;
 
-  const unshipped = await db.select({
+  const heldOrders = await db.select({
     id: orders.id,
     status: orders.status,
     buyerId: orders.buyerId,
     orderNumber: orders.orderNumber,
+    deliverBy: orders.deliverBy,
   }).from(orders).where(and(
     eq(orders.dropId, dropId),
     eq(orders.chargeModel, "held"),
     eq(orders.fundsState, "held"),
   ));
+  // Hold-until-delivered: a shipped order stays held until it is delivered
+  // (then released) or its own delivery deadline refunds it, so a drop's
+  // deadline no longer refunds parcels already on their way.
+  const unshipped = heldOrders.filter((order) =>
+    !(payoutHoldApplies({ deliverBy: order.deliverBy }) && order.status === "shipped"));
 
   for (const order of unshipped) {
     const status = order.status as OrderStatus;
@@ -212,6 +219,7 @@ export async function runMoneySweep(now = new Date()): Promise<{
     WHERE o.charge_model IN ('destination', 'transfer') AND l.status = 'active'
       AND EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id)
       AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label-recovery/' || l.id)
+      AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id AND t.kind = 'label_paid_from_held')
     LIMIT 100
   `));
   for (const label of unrecovered) await recoverLabelCost(label.id);
