@@ -1,8 +1,9 @@
 /**
  * Shippo tracking webhook — moves an order's tracking status (and, when the
- * carrier confirms transit/delivery, its order status) using the same
- * TRACKING_STATUSES vocabulary and buyer-notification shapes as
- * PATCH /api/orders/:id/tracking. Idempotent: each (transaction, status)
+ * carrier confirms transit/delivery, its order status) through
+ * lib/delivery/deliveryState.ts, the same path the hourly poll uses. A
+ * carrier "delivered" is what makes an order delivered (and starts the
+ * seller's payout clock). Idempotent: each (transaction, status, scan time)
  * delivery is claimed once in `shippo_webhook_events`, so a retried or
  * duplicate delivery from the carrier is a no-op.
  *
@@ -20,20 +21,13 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, orders, shippingLabels, shippoWebhookEvents, users } from "@workspace/db";
-import { publishNotification } from "./notifications-feed";
+import { db, orderItems, orders, shippingLabels, shippoWebhookEvents, users } from "@workspace/db";
+import { applyShippoTrack, mapShippoStatus } from "../lib/delivery/trackingSync";
+import type { ShippoTrack } from "../lib/shippo";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
 
 const router = Router();
-
-const SHIPPO_STATUS_MAP: Record<string, string> = {
-  PRE_TRANSIT: "accepted",
-  TRANSIT: "in_transit",
-  DELIVERED: "delivered",
-  RETURNED: "returned_to_sender",
-  FAILURE: "exception",
-};
 
 function timingSafeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -67,13 +61,17 @@ router.post("/", async (req, res) => {
   const transactionId: string | undefined = data.transaction ?? body.transaction;
   const metadata: unknown = data.metadata ?? body.metadata;
 
-  const mapped = shippoStatus ? SHIPPO_STATUS_MAP[shippoStatus] : undefined;
-  if (!mapped || !transactionId) {
+  const mapped = mapShippoStatus(shippoStatus, data.tracking_status?.status_details);
+  if (!mapped || (!transactionId && !data.tracking_number)) {
     // Unrecognized or informational-only event (e.g. UNKNOWN) — accept and no-op.
     return void res.status(200).json({ ok: true, ignored: true });
   }
 
-  const dedupeId = `${transactionId}:${mapped}`;
+  const trackingNumber = (data.tracking_number as string | undefined) ?? undefined;
+  // Each new scan (status_date) is its own event, so later transit and
+  // out-for-delivery updates are not swallowed by the first one.
+  const statusDate = data.tracking_status?.status_date as string | undefined;
+  const dedupeId = `${transactionId ?? `track:${trackingNumber}`}:${mapped}${statusDate ? `:${statusDate}` : ""}`;
   const claimed = await db.insert(shippoWebhookEvents).values({ id: dedupeId, orderId: null })
     .onConflictDoNothing()
     .returning({ id: shippoWebhookEvents.id });
@@ -84,19 +82,25 @@ router.post("/", async (req, res) => {
   try {
     const labelId = labelIdFromMetadata(metadata);
     let orderId: string | null = null;
-    let ownerId: string | null = null;
     if (labelId) {
-      const [label] = await db.select({ orderId: shippingLabels.orderId, ownerId: shippingLabels.ownerId })
+      const [label] = await db.select({ orderId: shippingLabels.orderId })
         .from(shippingLabels).where(eq(shippingLabels.id, labelId)).limit(1);
-      if (label) { orderId = label.orderId; ownerId = label.ownerId; }
+      if (label) orderId = label.orderId;
     }
-    if (!orderId) {
+    if (!orderId && typeof metadata === "string") {
+      // Seller-typed numbers are registered with `brandthread-order/<orderId>` (lib/delivery/trackingSync.ts).
+      const match = metadata.match(/^brandthread-order\/([0-9a-f-]{36})$/i);
+      if (match) orderId = match[1];
+    }
+    if (!orderId && trackingNumber) {
       // Fall back to a tracking-number match when metadata is missing/unrecognized.
-      const trackingNumber = data.tracking_number as string | undefined;
-      if (trackingNumber) {
-        const [order] = await db.select({ id: orders.id, ownerId: orders.ownerId })
-          .from(orders).where(eq(orders.trackingNumber, trackingNumber)).limit(1);
-        if (order) { orderId = order.id; ownerId = order.ownerId; }
+      const [order] = await db.select({ id: orders.id }).from(orders)
+        .where(eq(orders.trackingNumber, trackingNumber)).limit(1);
+      if (order) orderId = order.id;
+      if (!orderId) {
+        const [item] = await db.select({ orderId: orderItems.orderId }).from(orderItems)
+          .where(eq(orderItems.trackingNumber, trackingNumber)).limit(1);
+        if (item) orderId = item.orderId;
       }
     }
     if (!orderId) {
@@ -104,40 +108,20 @@ router.post("/", async (req, res) => {
       return void res.status(200).json({ ok: true, unresolved: true });
     }
 
-    const shouldMarkShipped = mapped === "in_transit" || mapped === "accepted";
-    const [updated] = await db.update(orders).set({
-      trackingStatus: mapped,
-      ...(shouldMarkShipped ? { status: "shipped", shippedAt: new Date() } : {}),
-      ...(mapped === "delivered" ? { status: "delivered" } : {}),
-      updatedAt: new Date(),
-    }).where(eq(orders.id, orderId)).returning();
-    if (!updated) return void res.status(200).json({ ok: true, unresolved: true });
+    // One code path for webhook and poll: scan history, statuses, ETA,
+    // delivery (which starts the seller's payout clock) and the buyer alerts.
+    const [before] = await db.select({ status: orders.status, trackingNumber: orders.trackingNumber }).from(orders)
+      .where(eq(orders.id, orderId)).limit(1);
+    const applied = await applyShippoTrack(
+      orderId,
+      trackingNumber ?? before?.trackingNumber ?? (transactionId as string),
+      data as ShippoTrack,
+    );
+    if (!applied) return void res.status(200).json({ ok: true, unresolved: true });
 
-    const alertMap: Record<string, { type: string; title: string; body: string; targetType: string } | undefined> = {
-      delivered: {
-        type: "order_delivered", title: "Your order was delivered!",
-        body: `Order #${updated.orderNumber} has been delivered.`, targetType: "order",
-      },
-      exception: {
-        type: "order_exception", title: "Delivery problem with your order",
-        body: `Order #${updated.orderNumber} has a delivery exception. Check the tracking details or contact the seller.`,
-        targetType: "buyer_order",
-      },
-      returned_to_sender: {
-        type: "order_returned_to_sender", title: "Your package is being returned",
-        body: `Order #${updated.orderNumber} is being returned to the sender. Contact the seller for help.`,
-        targetType: "buyer_order",
-      },
-    };
-    const alert = alertMap[mapped];
-    if (alert && updated.buyerId) {
-      publishNotification({
-        userId: updated.buyerId, category: "orders", pushCategory: "order",
-        type: alert.type, title: alert.title, body: alert.body,
-        targetId: updated.id, targetType: alert.targetType,
-      }).catch(() => { /* non-critical */ });
-    }
-    if (shouldMarkShipped) {
+    const [updated] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    // The "your order shipped" email, once, when the carrier first confirms transit.
+    if (updated && (mapped === "in_transit" || mapped === "accepted") && before?.status !== "shipped") {
       void notifyOrderShipped(updated).catch((err) => {
         logger.error({ err, orderId: updated.id }, "Shippo webhook: shipping email delivery failed");
       });
@@ -146,7 +130,7 @@ router.post("/", async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (err) {
     logger.error({ err, transactionId }, "Shippo webhook processing failed");
-    res.status(200).json({ ok: true, error: "processing_failed" }); // Ack so Shippo doesn't hammer retries; the sweep/manual review covers gaps.
+    res.status(200).json({ ok: true, error: "processing_failed" }); // Ack so Shippo doesn't hammer retries; the hourly tracking poll covers gaps.
   }
 });
 
