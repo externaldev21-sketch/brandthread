@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 interface Location {
   id: string;
@@ -289,7 +290,7 @@ const s = StyleSheet.create({
   rowDescription: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   rowAddress: { fontSize: 11, fontFamily: FONT.regular, marginTop: 1 },
   locActions: { flexDirection: 'column', alignItems: 'flex-end', gap: 6 },
-  statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  statusPill: { borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 4 },
   statusPillText: { fontSize: 11, fontFamily: FONT.semibold },
   iconAction: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Modal

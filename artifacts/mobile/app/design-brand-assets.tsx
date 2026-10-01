@@ -28,6 +28,7 @@ import {
 } from '@/services/designService';
 import { BRAND_ASSET_TYPES } from '@/services/designTypes';
 import type { BrandAsset, BrandAssetType } from '@/services/designTypes';
+import { radius } from '@/constants/radii';
 
 function formatDate(iso: string): string {
   try {
@@ -321,7 +322,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   tabsScroll:    { flexGrow: 0 },
   tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
-  tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   tabText:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
@@ -347,7 +348,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   assetType:     { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
   assetDate:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
-  fab:           { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  fab:           { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: radius.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   fabText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.onAccent },
   });
 };

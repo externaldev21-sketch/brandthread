@@ -34,6 +34,7 @@ import {
 } from '@/services/manufacturerService';
 
 import { QuoteRequest, Manufacturer } from '@/services/manufacturerTypes';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -791,7 +792,7 @@ const sc = StyleSheet.create({
   tagChip: {
     flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     paddingHorizontal: SP.sm, paddingVertical: SP.xs,
-    backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill,
+    backgroundColor: PURPLE_DIM, borderRadius: radius.sm,
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   tagChipText: {

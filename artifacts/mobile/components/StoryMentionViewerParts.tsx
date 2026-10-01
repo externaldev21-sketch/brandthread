@@ -19,6 +19,7 @@ import {
   clampMentionOpacity, clampOverlayScale, mentionHitRect, withAt, type TaggedPerson,
 } from '@/lib/storyMentionSticker';
 import type { StoryOriginal, StoryOverlay } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
   popoverRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   popoverHandle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
   popoverName: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
-  popoverBtn: { minHeight: 44, borderRadius: RADIUS.pill, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  popoverBtn: { minHeight: 44, borderRadius: radius.md, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   popoverBtnText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.sm },
   avatar: { backgroundColor: '#2A2A2E', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm },

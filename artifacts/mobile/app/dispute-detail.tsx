@@ -18,6 +18,7 @@ import { DisputeTimeline } from '@/components/disputes/DisputeTimeline';
 import { DisputeEvidenceFiles } from '@/components/disputes/DisputeEvidenceFiles';
 import { demoDisputeDetail } from '@/components/disputes/demoDisputes';
 import type { DisputeEvidenceFile } from '@/lib/disputeTypes';
+import { radius } from '@/constants/radii';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -645,7 +646,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chip:               {
     flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     paddingHorizontal: SP.sm, paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   chipActive:         { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

@@ -18,6 +18,7 @@ import {
   EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_ALL_DOCUMENT_ORDER, LEGAL_VERSION,
   type LegalDocId,
 } from '@/content/legal';
+import { radius, nestedRadius } from '@/constants/radii';
 
 export type { LegalSection } from '@/content/legal';
 
@@ -205,7 +206,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flexDirection: 'row',
     padding: 4,
     marginBottom: 36,
-    borderRadius: 999,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,
@@ -222,7 +223,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     paddingHorizontal: 16,
     // 44px minimum comfortable touch target (COMP.minTouchTarget); was 34px.
     height: 44,
-    borderRadius: 999,
+    borderRadius: nestedRadius(radius.md, 4),
     alignItems: 'center',
     justifyContent: 'center',
   },

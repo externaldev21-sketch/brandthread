@@ -7,7 +7,7 @@ import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export type SearchPerson = {
@@ -159,7 +159,7 @@ export function FollowPill({
 
 const pillStyles = StyleSheet.create({
   pill: {
-    height: 32, paddingHorizontal: 16, borderRadius: RADII.pill,
+    height: 32, paddingHorizontal: 16, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center', minWidth: 88,
   },
   // theme-exempt: fixed white-fill/black-text pill per spec, with a dark

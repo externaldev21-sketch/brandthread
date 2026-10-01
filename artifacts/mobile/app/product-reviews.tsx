@@ -21,6 +21,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
+import { radius } from '@/constants/radii';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -73,13 +74,10 @@ export default function ProductReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Reviews" />
-      {totalCount > 0 && (
-        <View style={s.summary}>
-          {!!productName && <Text style={s.summaryName} numberOfLines={1}>{productName}</Text>}
-          <Text style={s.summaryMeta}>{avgRating.toFixed(1)} average · {totalCount} reviews</Text>
-        </View>
-      )}
+      <ScreenHeader
+        title={productName || 'Reviews'}
+        subtitle={totalCount > 0 ? `${avgRating.toFixed(1)} · ${totalCount} reviews` : undefined}
+      />
       {loading ? (
         <View style={{ padding: SP.md }}>
           {[0, 1, 2].map(i => (
@@ -97,7 +95,7 @@ export default function ProductReviewsScreen() {
         <ErrorState message="Couldn't load reviews." onRetry={() => { void load(); }} style={{ flex: 1 }} />
       ) : (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipsScroll} contentContainerStyle={s.chipsRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
             <Chip label="With photos" active={photosOnly} onPress={() => setPhotosOnly(v => !v)} accent={theme.accent} />
             {([5, 4, 3, 2, 1] as const).map(star => (
               <Chip
@@ -127,7 +125,8 @@ export default function ProductReviewsScreen() {
             contentContainerStyle={{ padding: SP.md }}
             ListEmptyComponent={<View style={s.center}><Text style={s.muted}>No matching reviews</Text></View>}
             renderItem={({ item }) => (
-              <Pressable style={s.card} onLongPress={() => openReviewActions(item)} delayLongPress={400}>
+              <>
+                <Pressable style={s.card} onLongPress={() => openReviewActions(item)} delayLongPress={400}>
                 <View style={s.headerRow}>
                   {item.buyerAvatar ? (
                     <CachedImage source={{ uri: item.buyerAvatar }} style={s.avatar} recyclingKey={item.id} />
@@ -165,8 +164,9 @@ export default function ProductReviewsScreen() {
                     ))}
                   </View>
                 )}
-              </Pressable>
+                </Pressable>
                 <SellerReplyBlock reply={item.sellerReply} repliedAt={item.sellerRepliedAt} />
+              </>
             )}
           />
         </>
@@ -192,12 +192,8 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   muted: { color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.sm },
-  summary: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: 2 },
-  summaryName: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  summaryMeta: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  chipsScroll: { flexGrow: 0 },
   chipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: BORDER_SUBTLE },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER_SUBTLE },
   chipText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: MUTED },
   card: { paddingBottom: SP.md, marginBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },

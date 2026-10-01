@@ -21,6 +21,7 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { parseProfileDeepLink } from '@/lib/shareProfile';
 import { hapticSuccess } from '@/lib/haptics';
+import { radius } from '@/constants/radii';
 
 interface ShareProfileQrScannerProps {
   onClose: () => void;
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
     marginTop: SP.sm,
     paddingHorizontal: SP.lg,
     paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: '#FFFFFF',
   },
   permissionBtnText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.sm },

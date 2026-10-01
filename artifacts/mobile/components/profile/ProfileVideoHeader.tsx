@@ -31,6 +31,7 @@ import { hapticSelection } from '@/lib/haptics';
 import { loadBuyerSettings } from '@/lib/buyerSettings';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import type { ProfileStat } from './ProfileControls';
+import { radius } from '@/constants/radii';
 
 /** Share of the video layer's height (from the bottom) covered by the fade. */
 export const PROFILE_VIDEO_FADE_FRACTION = 0.4;
@@ -274,7 +275,7 @@ const styles = StyleSheet.create({
 
   affordance: {
     flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
-    borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
+    borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
   },
   affordancePressed: { opacity: 0.6 },
   affordanceText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },

@@ -22,6 +22,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { radius } from '@/constants/radii';
 
 export function CashOutSheet({
   visible, balanceCents, onClose, onCashedOut,
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
   },
   dollarSign: { fontFamily: FONT.bold, fontSize: FS.lg },
   input: { flex: 1, fontFamily: FONT.bold, fontSize: FS.lg, height: '100%' },
-  allChip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
+  allChip: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
   allChipText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   quoteRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
   quoteValue: { fontFamily: FONT.bold, fontSize: FS.md },
   feeText: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 4 },
   errorText: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.xs },
-  confirmBtn: { height: 52, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', marginTop: SP.md },
+  confirmBtn: { height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.md },
   confirmBtnDisabled: { opacity: 0.4 },
   confirmBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });

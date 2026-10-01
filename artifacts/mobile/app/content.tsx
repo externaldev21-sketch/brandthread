@@ -18,6 +18,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
+import { radius } from '@/constants/radii';
 
 type FilterTab = 'all' | ContentStatus;
 
@@ -476,7 +477,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   libraryCount: { fontSize: FS.xs, fontFamily: FONT.regular },
   filterScroll: { flexGrow: 0, marginBottom: SP.md },
   filterRow: { flexDirection: 'row', gap: SP.xs },
-  filterTab: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
+  filterTab: { borderRadius: radius.md, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1, minHeight: 44, justifyContent: 'center' },
   filterText: { fontSize: FS.sm, fontFamily: FONT.medium },
 
   // Post cards

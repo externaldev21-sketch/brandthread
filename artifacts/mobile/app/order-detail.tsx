@@ -15,7 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
@@ -1993,7 +1993,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Tab bar
   tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
   tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
-  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
+  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
   tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
   tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
@@ -2059,7 +2059,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Chips
   chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip:             { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  chip:             { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   chipActive:       { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   chipText:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   chipTextActive:   { color: FG },
@@ -2139,7 +2139,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   noteMeta:         { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   pinToggle:        { fontSize: FS.xs, fontFamily: FONT.medium },
   noteTypeRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
   noteTypeText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
 
   // Returns

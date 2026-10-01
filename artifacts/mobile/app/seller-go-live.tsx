@@ -24,6 +24,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
+import { radius } from '@/constants/radii';
 
 const FG = '#FFFFFF';
 const GLASS = 'rgba(0,0,0,0.5)';
@@ -392,12 +393,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     titleInput:        { color: FG, fontSize: FS.md, fontFamily: FONT.bold, paddingVertical: 6 },
     descInput:         { color: 'rgba(255,255,255,0.9)', fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 2, maxHeight: 60 },
 
-    goLiveBtn:         { marginTop: SP.xs, borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+    goLiveBtn:         { marginTop: SP.xs, borderRadius: radius.md, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
     liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
     goLiveBtnText:      { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },
 
     // Feature-products entry point
-    featureProductsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GLASS, borderRadius: RADIUS.pill, paddingHorizontal: 14, height: 38, alignSelf: 'flex-start' },
+    featureProductsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GLASS, borderRadius: radius.md, paddingHorizontal: 14, height: 38, alignSelf: 'flex-start' },
     featureProductsText: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
 
     // Product picker sheet

@@ -23,6 +23,8 @@ import { FONT } from '@/lib/theme';
 import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { Glass } from '@/components/ui/Glass';
+import { radius, nestedRadius } from '@/constants/radii';
+
 
 /**
  * Shared building blocks for the buyer and seller floating tab bars.
@@ -336,16 +338,16 @@ export function TabBarCircle({
       onPressOut={onPressOut}
       testID={testID}
       hitSlop={hitSlop}
-      style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: size / 2 }, animatedStyle]}
+      style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: radius.bar }, animatedStyle]}
     >
-      <TabBarGlass theme={theme} radius={size / 2} animatedStyle={glassAnimatedStyle} />
+      <TabBarGlass theme={theme} radius={radius.bar} animatedStyle={glassAnimatedStyle} />
       {/* Full-circle press fill — this button IS the circle (no row/capsule
           edge to clip against), so it's sized to the whole button rather
           than the fixed PRESS_HIGHLIGHT_SIZE the packed capsule slots use. */}
       <Animated.View
         pointerEvents="none"
         style={[
-          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: size / 2, backgroundColor: `${theme.accent}22` },
+          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.bar, backgroundColor: `${theme.accent}22` },
           highlightStyle,
         ]}
       />
@@ -355,7 +357,7 @@ export function TabBarCircle({
             styles.activeFill,
             {
               top: inset, left: inset, right: inset, bottom: inset,
-              borderRadius: (size - inset * 2) / 2,
+              borderRadius: nestedRadius(radius.bar, inset),
               backgroundColor: `${theme.accent}26`,
               borderColor: `${theme.accent}59`,
             },
@@ -474,7 +476,7 @@ export function TabBarIndicator({
       width,
       height: indicatorHeight,
       top: (capsuleHeight - indicatorHeight) / 2,
-      borderRadius: indicatorHeight / 2,
+      borderRadius: nestedRadius(radius.bar, pad),
       // `translateX`, not `left` — a layout property like `left` forces a
       // reflow every frame (especially costly on react-native-web, where
       // this bar is verified at 390x844), while `transform` is
@@ -497,7 +499,7 @@ export function TabBarIndicator({
           stacked directly on top of the first would double the cost for no
           visible gain. The specular edge + border still read as glass on
           their own, on top of the bar's already-refracted backdrop. */}
-      <Glass variant="regular" tint="dark" radius={metrics.indicatorHeight / 2} noBlur style={StyleSheet.absoluteFill} />
+      <Glass variant="regular" tint="dark" radius={nestedRadius(radius.bar, metrics.capsulePadding)} noBlur style={StyleSheet.absoluteFill} />
     </Animated.View>
   );
 }

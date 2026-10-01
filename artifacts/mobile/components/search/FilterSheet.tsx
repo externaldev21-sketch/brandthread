@@ -14,6 +14,7 @@ import {
   countActiveFilters, hasValue, priceBucketsFor, toggleValue,
   type SearchFacets, type SearchFilters, type SearchSort,
 } from '@/lib/searchFilters';
+import { radius } from '@/constants/radii';
 
 export type { SearchFilters, SearchSort } from '@/lib/searchFilters';
 export { countActiveFilters } from '@/lib/searchFilters';
@@ -283,7 +284,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   swatch: { width: 34, height: 34, borderRadius: RADII.pill, borderWidth: 1 },
   applyBtn: {
     marginTop: SPACING.lg, marginHorizontal: SCREEN_GUTTER,
-    height: 50, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
   },
   applyText: { ...TYPE_SCALE.body, fontFamily: FONT.bold },
 });

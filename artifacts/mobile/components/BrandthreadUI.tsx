@@ -40,6 +40,7 @@ import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { radius } from '@/constants/radii';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -702,7 +703,7 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
 
 const fcS = StyleSheet.create({
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34,
-                  borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+                  borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   active:       { borderColor: BORDER_ACTIVE },
   label:        { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   activeLabel:  { fontFamily: FONT.semibold },

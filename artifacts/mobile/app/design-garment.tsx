@@ -22,6 +22,7 @@ import {
 } from '@/lib/theme';
 import { getProject, updateProject } from '@/services/designService';
 import { GARMENT_TYPES, GARMENT_TEMPLATES, GARMENT_VIEWS } from '@/services/designTypes';
+import { radius } from '@/constants/radii';
 
 function viewLabel(view: string): string {
   return GARMENT_VIEWS.find(v => v.value === view)?.label ?? view;
@@ -399,7 +400,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   section:      { paddingHorizontal: SP.md, paddingTop: SP.md },
   sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
 
-  typePill:     { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  typePill:     { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   typePillActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   typePillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
@@ -428,7 +429,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colorSwatchActive: { borderColor: PURPLE_LIGHT, borderWidth: 2.5 },
 
   zoneGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  zoneChip:     { paddingHorizontal: SP.sm, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  zoneChip:     { paddingHorizontal: SP.sm, paddingVertical: 7, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   zoneChipActive: { backgroundColor: CYAN_DIM, borderColor: CYAN },
   zoneChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 

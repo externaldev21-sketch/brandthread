@@ -13,9 +13,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS,
+  FONT, FS, SP,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { radius } from '@/constants/radii';
 
 export interface StyleTag {
   key:   string;   // stored value (lowercase, stable)
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     gap:               5,
     paddingHorizontal: 11,
     paddingVertical:   7,
-    borderRadius:      RADIUS.pill,
+    borderRadius:      radius.sm,
     borderWidth:       1,
     borderColor:       BORDER,
     backgroundColor:   CARD,

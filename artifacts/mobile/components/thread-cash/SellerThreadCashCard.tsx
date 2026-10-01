@@ -19,6 +19,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { hapticLight } from '@/lib/haptics';
+import { radius } from '@/constants/radii';
 
 export function SellerThreadCashCard({
   balanceCents, loading, error, onReload, onCashOutPress,
@@ -119,13 +120,13 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  historyBtn: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
+  historyBtn: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
   historyBtnText: { fontFamily: FONT.medium, fontSize: FS.xs },
   balance: { fontFamily: FONT.bold, fontSize: FS.h1, letterSpacing: -0.5 },
   subtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   cashOutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    height: 44, borderRadius: RADIUS.pill, marginTop: SP.md,
+    height: 44, borderRadius: radius.md, marginTop: SP.md,
   },
   cashOutBtnDisabled: { borderWidth: 1, backgroundColor: 'transparent' },
   cashOutBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },

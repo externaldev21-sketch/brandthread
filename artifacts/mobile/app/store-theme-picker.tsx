@@ -22,6 +22,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getThemes, getStorefront, applyTheme } from '@/services/storeService';
 import { StoreTheme, TYPOGRAPHY_STYLES } from '@/services/storeTypes';
+import { radius } from '@/constants/radii';
 
 export default function StoreThemePicker() {
   const { theme } = useAppTheme();
@@ -552,7 +553,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: CARD_ELEVATED,
     borderWidth: 1,
     borderColor: BORDER,

@@ -36,6 +36,7 @@ import {
 } from '@/lib/theme';
 import type { DesignLayer, BlendModeKind } from '@/services/designTypes';
 import { blendLetter, computeDragTargetIndex, clampSwipeTranslateX, shouldSwipeOpen } from '@/lib/layersPanelModel';
+import { radius } from '@/constants/radii';
 
 export interface LayersPanelProps {
   layers: DesignLayer[]; // any order; will be rendered top-first (highest `order` first)
@@ -448,7 +449,7 @@ const s = StyleSheet.create({
   menuItemText: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, includeFontPadding: false },
   blendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: SP.xs },
   blendChip: {
-    paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: radius.sm,
     backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER_SUBTLE,
   },
   blendChipActive: { backgroundColor: FG, borderColor: FG },

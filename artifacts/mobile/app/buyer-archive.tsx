@@ -22,6 +22,7 @@ import type { BuyerPost } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { radius } from '@/constants/radii';
 
 const { width } = Dimensions.get('window');
 const GAP = SP.xs;
@@ -201,7 +202,7 @@ export default function BuyerArchive() {
 const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
   tabRow: { flexDirection: 'row', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
-  tabPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER },
+  tabPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.sm, backgroundColor: CARD, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER },
   tabPillActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   tabText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabTextActive: { color: theme.accent },

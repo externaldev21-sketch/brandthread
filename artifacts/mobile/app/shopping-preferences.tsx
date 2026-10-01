@@ -21,6 +21,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
+import { radius } from '@/constants/radii';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
 const BOTTOMS = ['28', '29', '30', '31', '32', '33', '34', '36', '38', '40+'];
@@ -272,7 +273,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
 
   // Categories
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   catChipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
   catEmoji: { fontSize: 14 },
   catLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
@@ -285,6 +286,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
 
   // Save
   saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
-  saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  saveBtn: { height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   saveBtnText: { color: '#FFF', fontFamily: FONT.bold, fontSize: FS.base },
 });

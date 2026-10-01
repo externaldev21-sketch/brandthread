@@ -39,6 +39,7 @@ import { generatePhotoshootShot, createBrandAsset } from '@/services/designServi
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { radius } from '@/constants/radii';
 
 const MAX_REFS = 6; // seller-facing cap. NOTE: combined with product photos,
 // the real generate call can still be rejected by the backend's own,
@@ -604,7 +605,7 @@ const s = StyleSheet.create({
   presetTileLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
   presetTileLabelActive: { color: FG, fontFamily: FONT.semibold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.md },
-  chip: { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  chip: { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
   chipActive: { backgroundColor: FG, borderColor: FG },
   chipText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
   chipTextActive: { color: BG },

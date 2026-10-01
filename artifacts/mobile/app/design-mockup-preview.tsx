@@ -18,7 +18,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
   BLUE, ORANGE, GOLD,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
@@ -28,6 +28,7 @@ import { getProject, createBrandAsset } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { radius } from '@/constants/radii';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -255,7 +256,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   tabsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   tabBtn: {
     paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   tabBtnActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
@@ -292,7 +293,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   shadowPill: {
     paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   shadowPillActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

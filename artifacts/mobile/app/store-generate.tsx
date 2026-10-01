@@ -28,6 +28,7 @@ import { StoreGenerationAnswers, StoreColorPalette,
   COLOR_PRESETS, TypographyStyle, BrandStyle, BrandMood,
   HomepagePriority, TargetCustomer, StoreFeature, StoreContent } from '@/services/storeTypes';
 
+import { radius } from '@/constants/radii';
 const TOTAL_STEPS = 10;
 
 const DEFAULT_ANSWERS: Partial<StoreGenerationAnswers> = {
@@ -1081,7 +1082,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chip: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: CARD,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1089,7 +1090,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chipGrad: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
   },
   chipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   chipTextActive: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
@@ -1197,7 +1198,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   aiToolChip: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER_ACTIVE,
     backgroundColor: PURPLE_DIM,
@@ -1260,7 +1261,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 4,
     backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     paddingHorizontal: SP.sm,
     paddingVertical: 2,
   },

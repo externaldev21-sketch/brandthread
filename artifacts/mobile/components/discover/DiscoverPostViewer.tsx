@@ -19,7 +19,7 @@ import FollowButton from '@/components/social/FollowButton';
 import { formatCents } from '@/lib/money';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   caption: { color: '#FFFFFF', fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm },
   shopPill: {
     marginTop: SP.sm, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#FFFFFF', borderRadius: RADII.pill, paddingHorizontal: 14, paddingVertical: 9,
+    backgroundColor: '#FFFFFF', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 9,
   },
   shopPillText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.xs },
   actionRail: { position: 'absolute', right: SP.md, alignItems: 'center', gap: SP.md },

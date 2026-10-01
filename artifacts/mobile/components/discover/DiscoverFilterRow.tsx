@@ -6,7 +6,7 @@ import { hapticToggle } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 
 export type DiscoverFilterKey = 'forYou' | 'fits' | 'brands' | 'people' | 'drops';
 
@@ -91,7 +91,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.sm,
   },
   pill: {
-    height: 34, minWidth: 34, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    height: 34, minWidth: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: SPACING.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface,
   },
   pillActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },

@@ -29,6 +29,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type {
   TextOverlay, TextOverlayAlign, TextOverlayBgStyle, TextOverlayFontStyle,
 } from '@/lib/videoEditing';
+import { radius } from '@/constants/radii';
 
 // ─── Design tokens (monochrome Brandthread identity) ─────────────────────────
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -558,7 +559,7 @@ const createEditorStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => S
   fontChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: 'transparent',
     backgroundColor: theme.surface,

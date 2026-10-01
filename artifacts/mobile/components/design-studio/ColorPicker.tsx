@@ -19,6 +19,7 @@ import {
   computeHarmonyHues, HARMONY_RULES, HARMONY_RULE_LABELS, HarmonyRule,
   BrandPalette,
 } from '@/lib/colorModel';
+import { radius } from '@/constants/radii';
 
 export type ColorPickerTab = 'disc' | 'classic' | 'harmony' | 'value' | 'palettes';
 const TABS: { key: ColorPickerTab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
@@ -459,7 +460,7 @@ const s = StyleSheet.create({
 
   harmonyWrap: { gap: SP.sm },
   harmonyChip: {
-    paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: RADIUS.pill, marginRight: SP.xs,
+    paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: radius.sm, marginRight: SP.xs,
     backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER_SUBTLE,
   },
   harmonyChipActive: { backgroundColor: FG, borderColor: FG },

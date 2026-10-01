@@ -35,6 +35,7 @@ import {
   SP,
   RADIUS,
 } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -726,7 +727,7 @@ const s = StyleSheet.create({
   addAudioPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: GLASS,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     paddingHorizontal: SP.md, paddingVertical: 7,
   },
   addAudioText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
@@ -788,7 +789,7 @@ const s = StyleSheet.create({
   durationRow: { flexDirection: 'row', gap: 6 },
   durationBtn: {
     paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: GLASS,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
@@ -803,7 +804,7 @@ const s = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 11, paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: GLASS_LT,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
@@ -829,7 +830,7 @@ const s = StyleSheet.create({
   captureModeToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: SP.sm + 2, paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: GLASS_LT,
   },
   captureModeToggleDisabled: { opacity: 0.4 },
@@ -872,7 +873,7 @@ const s = StyleSheet.create({
   tagProductBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: SP.md, paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: 'rgba(0,0,0,0.72)',
     borderWidth: 1, borderColor: `${ACCENT}55`,
   },

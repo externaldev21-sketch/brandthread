@@ -92,6 +92,7 @@ import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
+import { radius } from '@/constants/radii';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -2996,7 +2997,7 @@ const requestPanelStyles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     height: 44,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3148,7 +3149,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   requestProfilePill: {
     height: 34,
     paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
     alignItems: 'center',
@@ -3449,7 +3450,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 3,
     backgroundColor: theme.card,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: theme.border,
     paddingHorizontal: SP.xs,

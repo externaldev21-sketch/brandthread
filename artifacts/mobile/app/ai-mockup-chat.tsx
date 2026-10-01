@@ -16,6 +16,7 @@ import Composer from '@/components/ui/Composer';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 interface Message {
   id: string;
@@ -179,6 +180,6 @@ const styles = StyleSheet.create({
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
   loadingText: { fontSize: 13, fontFamily: FONT.regular },
   suggestionList: { gap: 8, paddingBottom: 8 },
-  suggestion: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
+  suggestion: { borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, maxWidth: 220, alignSelf: 'center' },
   suggestionText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
 });

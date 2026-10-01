@@ -8,6 +8,7 @@ import { BrandthreadHeader, BrandthreadScreen, PrimaryButton, SecondaryButton, P
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { radius } from '@/constants/radii';
 
 type StoredCase = { listingId: string; caseReference: string; statusToken: string; status: string; submittedAt: string };
 const CASES_KEY = 'bt:ip-cases:v1';
@@ -81,7 +82,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   input:{color:theme.text,fontFamily:FONT.regular,fontSize:FS.base,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.sm,backgroundColor:theme.card,padding:SP.sm,minHeight:46},
   area:{height:100,textAlignVertical:'top'},
   rights:{flexDirection:'row',gap:SP.xs,flexWrap:'wrap'},
-  right:{borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.pill,paddingHorizontal:SP.sm,paddingVertical:7,backgroundColor:theme.card},
+  right:{borderWidth:1,borderColor:theme.border,borderRadius:radius.sm,paddingHorizontal:SP.sm,paddingVertical:7,backgroundColor:theme.card},
   rightSelected:{borderColor:theme.success},
   rightText:{color:theme.muted,fontFamily:FONT.medium,fontSize:FS.xs},
   rightTextSelected:{color:theme.success},

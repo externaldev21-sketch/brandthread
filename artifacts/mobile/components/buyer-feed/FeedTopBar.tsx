@@ -16,6 +16,7 @@ import { Glass } from '@/components/ui/Glass';
 import { FONT, ON_DARK } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
+import { radius } from '@/constants/radii';
 
 export function FeedTopBar({
   topInset,
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   iconBtn: { minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   liveBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 30,
-    paddingHorizontal: 8, borderRadius: 15, width: 52, justifyContent: 'center',
+    paddingHorizontal: 8, borderRadius: radius.sm, width: 52, justifyContent: 'center',
   },
   liveBtnActive: {
     overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)', width: 'auto',
