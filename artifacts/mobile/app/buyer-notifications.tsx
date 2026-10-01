@@ -153,6 +153,7 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
   }
   switch (notif.type) {
     case 'friend_request':
+    case 'follow_request':
       router.push('/buyer-friend-requests' as any);
       break;
     case 'order_confirmed':

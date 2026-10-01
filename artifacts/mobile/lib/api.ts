@@ -2223,13 +2223,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     social: {
       /** Follow another buyer */
       follow: (userId: string) =>
-        post<{ ok: boolean; isFollowing: boolean; followersCount: number }>('/api/social/follow', { userId }),
+        post<{ ok: boolean; isFollowing: boolean; followersCount: number; status?: 'requested' }>('/api/social/follow', { userId }),
       /** Unfollow a buyer */
       unfollow: (userId: string) =>
         del<{ ok: boolean; isFollowing: boolean; followersCount: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
       /** Check follow status between me and another user */
       status: (userId: string) =>
-        get<{ isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean; followersCount: number }>(
+        get<{
+          isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean; followersCount: number;
+          /** 'requested' while a follow request to a private account is pending. */
+          status?: 'following' | 'requested' | 'none'; isPrivate?: boolean;
+        }>(
           `/api/social/status/${encodeURIComponent(userId)}`
         ),
       /** Get a buyer's public profile + follow counts */
@@ -2241,6 +2245,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
+          isPrivate?: boolean; followRequested?: boolean; contentHidden?: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
@@ -2381,10 +2386,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     privacy: {
       /** Get current server-side privacy preferences */
       get: () =>
-        get<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy'),
+        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean }>('/api/auth/privacy'),
       /** Update server-side privacy preferences */
-      update: (settings: { dmPrivacy?: 'requests' | 'followers_only' }) =>
-        patch<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy', settings),
+      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean }) =>
+        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean }>('/api/auth/privacy', settings),
+    },
+    /** Private-account follow requests (incoming) and the Close Friends list. */
+    followRequests: {
+      list: (limit = 50, offset = 0) =>
+        get<Array<{ userId: string; name: string; username: string | null; handle: string; avatarUrl: string | null; requestedAt: string }>>(
+          `/api/social/follow-requests?limit=${limit}&offset=${offset}`,
+        ),
+      approve: (userId: string) =>
+        post<{ ok: boolean; status: 'approved' }>(`/api/social/follow-requests/${encodeURIComponent(userId)}/approve`, {}),
+      decline: (userId: string) =>
+        post<{ ok: boolean; status: 'declined' }>(`/api/social/follow-requests/${encodeURIComponent(userId)}/decline`, {}),
+    },
+    closeFriends: {
+      get: () =>
+        get<{ friendIds: string[]; friends: Array<{ userId: string; name: string; username: string | null; handle: string; avatarUrl: string | null }> }>(
+          '/api/social/close-friends',
+        ),
+      replace: (friendIds: string[]) =>
+        put<{ ok: boolean; friendIds: string[]; skipped: string[] }>('/api/social/close-friends', { friendIds }),
     },
     /**
      * Server-side "seen" state for the buyer "Watching Threads" gesture coach

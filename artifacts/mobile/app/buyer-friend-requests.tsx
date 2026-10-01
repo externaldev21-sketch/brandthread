@@ -16,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ListSkeleton } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Button, SegmentedControl } from '@/components/ui';
+import { Avatar, Button, SegmentedControl } from '@/components/ui';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -33,6 +33,9 @@ type FollowRow = {
   color: string;
   isFollowingBack?: boolean; // for incoming: have I followed back?
 };
+
+// Real incoming follow requests to a private account (server-backed).
+type RequestRow = { userId: string; name: string; handle: string; avatarUrl: string | null };
 
 export default function BuyerFriendRequestsScreen() {
   const { theme } = useAppTheme();
@@ -52,15 +55,19 @@ export default function BuyerFriendRequestsScreen() {
   const [sentSet,  setSentSet]  = useState<Set<string>>(new Set()); // local optimistic follows
   const [loading,  setLoading]  = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set()); // follows that became requests (private accounts)
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [followers, following, sugs] = await Promise.all([
+      const [followers, following, sugs, reqs] = await Promise.all([
         api.social.followers(),
         api.social.following(),
         getFriendSuggestions(),
+        api.followRequests.list().catch(() => [] as RequestRow[]),
       ]);
+      setRequests(Array.isArray(reqs) ? reqs : []);
 
       // Incoming = people who follow me but I don't follow back
       setIncoming(
@@ -115,6 +122,21 @@ export default function BuyerFriendRequestsScreen() {
     }
   };
 
+  // ── Follow requests (private account): Confirm creates the follow, Delete drops it ──
+  const handleRequest = async (row: RequestRow, action: 'approve' | 'decline') => {
+    setActionId(row.userId);
+    try {
+      if (action === 'approve') await api.followRequests.approve(row.userId);
+      else await api.followRequests.decline(row.userId);
+      setRequests(prev => prev.filter(r => r.userId !== row.userId));
+      if (action === 'approve') void loadData();
+    } catch {
+      Alert.alert('Error', action === 'approve' ? 'Could not confirm the request.' : 'Could not delete the request.');
+    } finally {
+      setActionId(null);
+    }
+  };
+
   // ── Dismiss incoming (do nothing — they still follow me) ────────────────────
   const handleDismiss = (row: FollowRow) => {
     setIncoming(prev => prev.filter(r => r.userId !== row.userId));
@@ -137,7 +159,8 @@ export default function BuyerFriendRequestsScreen() {
   const handleFollowSuggestion = async (sug: FriendSuggestion) => {
     setSentSet(prev => new Set([...prev, sug.userId]));
     try {
-      await api.social.follow(sug.userId);
+      const res = await api.social.follow(sug.userId);
+      if (res?.status === 'requested') setRequestedIds(prev => new Set([...prev, sug.userId]));
       // Keep the local social service in sync for anything that reads it.
       await sendFriendRequest({ userId: sug.userId, name: sug.name, handle: sug.handle, initials: sug.initials, color: sug.color }).catch(() => {});
     } catch {
@@ -161,7 +184,7 @@ export default function BuyerFriendRequestsScreen() {
   // ── Tab bar ────────────────────────────────────────────────────────────────
 
   const tabOptions: { id: Tab; label: string; count?: number }[] = [
-    { id: 'incoming',  label: incoming.length > 0 ? `Incoming · ${incoming.length}` : 'Incoming' },
+    { id: 'incoming',  label: incoming.length + requests.length > 0 ? `Incoming · ${incoming.length + requests.length}` : 'Incoming' },
     { id: 'sent',      label: sent.length > 0 ? `Sent · ${sent.length}` : 'Sent' },
     { id: 'suggested', label: 'Suggested' },
   ];
@@ -170,6 +193,28 @@ export default function BuyerFriendRequestsScreen() {
 
   function renderIncoming() {
     if (loading) return <ListSkeleton rows={4} />;
+    const requestRows = requests.length === 0 ? null : (
+      <View>
+        <Text style={[TYPE_SCALE.footnote, s.sectionLabel]}>Follow requests</Text>
+        {requests.map(row => (
+          <View key={row.userId} style={s.row} testID={`follow-request-${row.userId}`}>
+            <PressableScaleRow onPress={() => goToProfile({ userId: row.userId, name: row.name, handle: row.handle, initials: '', color: '' })}>
+              <Avatar uri={row.avatarUrl} name={row.name} size={48} />
+              <View style={s.rowCenter}>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
+              </View>
+            </PressableScaleRow>
+            <View style={s.rowActions}>
+              <View style={s.requestBtn}><Button label="Delete" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} disabled={actionId === row.userId} onPress={() => handleRequest(row, 'decline')} /></View>
+              <View style={s.requestBtn}><Button label="Confirm" variant="primary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={actionId === row.userId} onPress={() => handleRequest(row, 'approve')} /></View>
+            </View>
+          </View>
+        ))}
+        {incoming.length > 0 ? <Text style={[TYPE_SCALE.footnote, s.sectionLabel]}>Followers</Text> : null}
+      </View>
+    );
+    if (incoming.length === 0 && requestRows) return requestRows;
     if (incoming.length === 0) {
       return (
         <EmptyState
@@ -184,6 +229,7 @@ export default function BuyerFriendRequestsScreen() {
         data={incoming}
         keyExtractor={r => r.userId}
         scrollEnabled={false}
+        ListHeaderComponent={requestRows}
         renderItem={({ item: row }) => (
           <View style={s.row}>
             <PressableScaleRow onPress={() => goToProfile(row)} onLongPress={() =>
@@ -302,7 +348,7 @@ export default function BuyerFriendRequestsScreen() {
               <View style={s.rowActions}>
                 {followed ? (
                   <View style={[s.requestedPill, { borderColor: theme.accent }]}>
-                    <Text style={[TYPE_SCALE.caption, s.requestedPillText, { color: theme.accent }]}>Following</Text>
+                    <Text style={[TYPE_SCALE.caption, s.requestedPillText, { color: theme.accent }]}>{requestedIds.has(sug.userId) ? 'Requested' : 'Following'}</Text>
                   </View>
                 ) : (
                   <Button label="Follow" variant="primary" size="small" onPress={() => handleFollowSuggestion(sug)} />
@@ -359,6 +405,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   rowName:         { color: palette.foreground },
   rowHandle:       { color: palette.mutedForeground },
   rowMutual:       { color: palette.mutedForeground },
+  requestBtn:      { width: 96, flexShrink: 0 }, // Delete / Confirm: equal width
+  sectionLabel:    { color: palette.mutedForeground, paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.xs },
   rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   requestedPill:   { paddingHorizontal: SPACING.sm, paddingVertical: 4, backgroundColor: palette.card, borderWidth: 1, borderRadius: RADII.pill },
   requestedPillText: {},

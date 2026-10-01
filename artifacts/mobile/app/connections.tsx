@@ -205,7 +205,10 @@ export default function ConnectionsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (row.accountType === 'seller') await setSellerFollowing(row.id, true);
-      else await api.social.follow(row.id);
+      else if ((await api.social.follow(row.id))?.status === 'requested') {
+        // Private account: request sent, not following yet.
+        setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
+      }
     } catch {
       setList((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: false } : u)));
     } finally {

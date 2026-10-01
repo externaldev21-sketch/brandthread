@@ -70,6 +70,8 @@ type RemoteProfile = {
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
   postsCount: number;
+  /** Private account: a follow request from me is pending / the account is private. */
+  followRequested?: boolean; isPrivate?: boolean;
 };
 
 export default function BuyerOtherProfileScreen() {
@@ -121,6 +123,7 @@ export default function BuyerOtherProfileScreen() {
   const isFollowedBy  = profile?.isFollowedBy ?? false;
   const isMutual      = profile?.isMutual     ?? false;
   const iBlockedThem  = profile?.iBlockedThem ?? false;
+  const followRequested = profile?.followRequested ?? false;
 
   const videos = useCreatorVideos(canonicalReady && !iBlockedThem ? canonicalUserId : null, { asVisitor: previewAsVisitor });
 
@@ -195,17 +198,46 @@ export default function BuyerOtherProfileScreen() {
   const handleFollow = async () => {
     if (!canonicalReady || followLoading) return;
     const wasFollowing = isFollowing;
+    // Tapping "Requested" cancels the pending request (DELETE /follow).
+    if (followRequested) {
+      setFollowLoading(true);
+      setProfile(prev => prev ? { ...prev, followRequested: false } : prev);
+      try {
+        await api.social.unfollow(canonicalUserId);
+        hapticLight();
+      } catch {
+        setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
+        Alert.alert("Couldn't cancel request", 'Try again.');
+      } finally {
+        setFollowLoading(false);
+      }
+      return;
+    }
     setFollowLoading(true);
-    setProfile(prev => prev ? {
+    // A private account turns a follow into a request: show "Requested" right away.
+    const optimisticRequest = !wasFollowing && profile?.isPrivate === true;
+    setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: true } : {
       ...prev,
       isFollowing: !wasFollowing,
       isMutual: wasFollowing ? false : prev.isFollowedBy,
       followersCount: Math.max(0, prev.followersCount + (wasFollowing ? -1 : 1)),
-    } : prev);
+    }) : prev);
     try {
       const result = wasFollowing
         ? await api.social.unfollow(canonicalUserId)
         : await api.social.follow(canonicalUserId);
+      if (!wasFollowing && result && 'status' in result && result.status === 'requested') {
+        // Private account: a request was sent, nothing was followed yet.
+        setProfile(prev => prev ? {
+          ...prev,
+          isFollowing: false,
+          isMutual: false,
+          followRequested: true,
+          followersCount: typeof result.followersCount === 'number' ? result.followersCount : Math.max(0, prev.followersCount - 1),
+        } : prev);
+        hapticLight();
+        return;
+      }
       if (!wasFollowing) void requestContextualPushPermission(currentUserId, api);
       const confirmedCount = typeof result?.followersCount === 'number' ? result.followersCount : undefined;
       if (confirmedCount != null) {
@@ -222,12 +254,12 @@ export default function BuyerOtherProfileScreen() {
       void videos.reload();
       hapticLight();
     } catch {
-      setProfile(prev => prev ? {
+      setProfile(prev => prev ? (optimisticRequest ? { ...prev, followRequested: false } : {
         ...prev,
         isFollowing: wasFollowing,
         isMutual: wasFollowing ? prev.isMutual : false,
         followersCount: Math.max(0, prev.followersCount + (wasFollowing ? 1 : -1)),
-      } : prev);
+      }) : prev);
       Alert.alert("Couldn't follow", 'Try again.');
     } finally {
       setFollowLoading(false);
@@ -398,11 +430,11 @@ export default function BuyerOtherProfileScreen() {
       <View style={styles.actionRow}>
         <View style={styles.flex}>
           <FollowMorphButton
-            following={isFollowing}
+            following={isFollowing || followRequested}
             onChange={handleFollow}
             disabled={followDisabled}
             followLabel={isFollowedBy ? 'Follow back' : 'Follow'}
-            followingLabel={isMutual ? 'Friends' : 'Following'}
+            followingLabel={followRequested ? 'Requested' : isMutual ? 'Friends' : 'Following'}
             style={styles.followMorphBtn}
             labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
