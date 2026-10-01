@@ -129,6 +129,7 @@ import {
   pushRecentColor, addColorToPalette, createPalette, type BrandPalette,
 } from '@/lib/colorModel';
 import { getColorPickerState, saveColorPickerState } from '@/services/designService';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -264,6 +265,7 @@ const DEFAULT_GUIDE_SETTINGS: GuideSettings = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DesignCanvasScreen() {
+  useHideTabBar();
   const { theme } = useAppTheme();
   const {
     accent: PURPLE,
