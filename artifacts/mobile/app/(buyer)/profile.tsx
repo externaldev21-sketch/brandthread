@@ -805,7 +805,7 @@ export default function ProfileScreen() {
   ];
 
   const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({
-    id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor,
+    id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null,
   }));
 
   const topBar = (
@@ -928,8 +928,8 @@ export default function ProfileScreen() {
           onNew={() => { hapticSelection(); router.push('/buyer-highlights-manager?create=1' as any); }}
           onPressItem={(item) => {
             hapticSelection();
-            // Highlights are local label/emoji/colour records with no story
-            // media yet, so a tap opens that highlight in the manager.
+            // Tapping one of my highlights opens it in the manager, where its
+            // name, cover and saved stories are edited.
             router.push(`/buyer-highlights-manager?edit=${encodeURIComponent(item.id)}` as any);
           }}
         />

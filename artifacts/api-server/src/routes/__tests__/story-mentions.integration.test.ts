@@ -118,6 +118,8 @@ describe("story mentions", () => {
     const rows = await db.select().from(storyMentions).where(eq(storyMentions.storyId, res.body.id));
     expect(rows.map((r) => r.mentionedUserId).sort()).toEqual([seller, friend, stranger].sort());
     expect(rows.find((r) => r.mentionedUserId === stranger)!.sticker).toMatchObject({ source: "text" });
+    // Let the fire-and-forget notifications land so they can't leak into the next test.
+    await vi.waitFor(() => expect(published.calls.filter((c) => c.type === "story_mention")).toHaveLength(3));
   });
 
   it("silently drops self, blocked and unknown users (sticker removed, no notification)", async () => {

@@ -28,19 +28,22 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { CachedImage } from '@/components/CachedImage';
+import { canSyncSocialServer } from '@/services/socialService';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
 
 function HLFormModal({
   visible, title, label, setLabel, emoji, setEmoji, coverColor, setCoverColor, coverColors,
-  onSave, onClose, s, insets, colors,
+  onSave, onSelectStories, onClose, s, insets, colors,
 }: {
   visible: boolean; title: string;
   label: string; setLabel: (v: string) => void;
   emoji: string; setEmoji: (v: string) => void;
   coverColor: string; setCoverColor: (v: string) => void;
   coverColors: string[];
-  onSave: () => void; onClose: () => void;
+  onSave: () => void; onSelectStories?: () => void; onClose: () => void;
   s: ReturnType<typeof makeStyles>;
   insets: { bottom: number };
   colors: ReturnType<typeof useColors>;
@@ -119,6 +122,7 @@ function HLFormModal({
                 {coverColors.map(c => (
                   <PressableScale
                     key={c}
+                    noMinHeight
                     style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && [s.colorSwatchActive, { borderColor: colors.foreground }]]}
                     onPress={() => { hapticSelection(); setCoverColor(c); }}
                     accessibilityRole="button"
@@ -128,9 +132,24 @@ function HLFormModal({
                 ))}
               </View>
 
+              {onSelectStories ? (
+                <PressableScale
+                  style={[s.selectStories, { borderColor: colors.border }]}
+                  onPress={() => { hapticSelection(); onSelectStories(); }}
+                  disabled={!label.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select stories for this highlight"
+                  testID="highlight-select-stories"
+                >
+                  <Feather name="image" size={18} color={colors.foreground} />
+                  <Text style={[s.selectStoriesLabel, { color: colors.foreground }]}>Select stories</Text>
+                  <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                </PressableScale>
+              ) : null}
+
               <View style={s.modalActions}>
-                <Button label="Cancel" variant="secondary" onPress={onClose} style={{ flex: 1 }} />
-                <Button label="Save" variant="primary" onPress={onSave} disabled={!label.trim()} style={{ flex: 1 }} />
+                <View style={{ flex: 1 }}><Button label="Cancel" variant="secondary" onPress={onClose} fullWidth /></View>
+                <View style={{ flex: 1 }}><Button label="Save" variant="primary" onPress={onSave} disabled={!label.trim()} fullWidth /></View>
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -196,6 +215,27 @@ export default function BuyerHighlightsManager() {
     hapticSuccessAction();
     setHighlights(prev => [...prev, h]);
     setCreating(false);
+  }
+
+  // Stories are saved server-side, so the step needs a signed-in account (or the demo preview).
+  const canSelectStories = canSyncSocialServer() || isPreviewDemoMode();
+
+  async function handleSelectStoriesCreate() {
+    if (!label.trim()) return;
+    const h = await createHighlight({ emoji, label, coverColor });
+    hapticSuccessAction();
+    setHighlights(prev => [...prev, h]);
+    setCreating(false);
+    router.push(`/buyer-highlight-stories?highlightId=${encodeURIComponent(h.id)}` as any);
+  }
+
+  async function handleSelectStoriesEdit() {
+    if (!editing) return;
+    const id = editing.id;
+    await updateHighlight(id, { emoji, label, coverColor });
+    setHighlights(prev => prev.map(h => h.id === id ? { ...h, emoji, label, coverColor } : h));
+    setEditing(null);
+    router.push(`/buyer-highlight-stories?highlightId=${encodeURIComponent(id)}` as any);
   }
 
   async function handleSaveEdit() {
@@ -270,8 +310,10 @@ export default function BuyerHighlightsManager() {
           <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
         </PressableScale>
       </View>
-      <View style={[s.circle, { backgroundColor: item.coverColor }]}>
-        <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
+      <View style={[s.circle, { backgroundColor: item.coverColor, overflow: 'hidden' }]}>
+        {item.coverUrl
+          ? <CachedImage source={{ uri: item.coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <Text style={{ fontSize: 22 }}>{item.emoji}</Text>}
       </View>
       <Text style={[s.rowLabel, { color: colors.foreground }]} numberOfLines={1}>{item.label}</Text>
       <PressableScale
@@ -330,6 +372,7 @@ export default function BuyerHighlightsManager() {
         setCoverColor={setCoverColor}
         coverColors={COVER_COLORS}
         onSave={handleSaveCreate}
+        onSelectStories={canSelectStories ? handleSelectStoriesCreate : undefined}
         onClose={() => setCreating(false)}
         s={s}
         insets={insets}
@@ -346,6 +389,7 @@ export default function BuyerHighlightsManager() {
         setCoverColor={setCoverColor}
         coverColors={COVER_COLORS}
         onSave={handleSaveEdit}
+        onSelectStories={canSelectStories ? handleSelectStoriesEdit : undefined}
         onClose={() => setEditing(null)}
         s={s}
         insets={insets}
@@ -373,6 +417,8 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   colorRow: { flexDirection: 'row', gap: 10, marginBottom: SPACING.lg, flexWrap: 'wrap' },
   colorSwatch: { width: 32, height: 32, borderRadius: 16 },
   colorSwatchActive: { borderWidth: 3 },
+  selectStories: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADII.input, paddingHorizontal: SPACING.md, height: 48, marginBottom: SPACING.md },
+  selectStoriesLabel: { flex: 1, fontFamily: FONT.medium, ...TYPE_SCALE.body },
   modalActions: { flexDirection: 'row', gap: SPACING.sm },
 });
 

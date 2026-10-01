@@ -153,13 +153,12 @@ describe("stories", () => {
     expect(ownEntry).toBeTruthy();
     expect(ownEntry.closeFriendsOnly).toBe(true);
 
-    // Existing simplification (unrelated to this change): the tray hides
-    // any "friends"-visibility story from non-authors outright, rather than
-    // checking actual close-friend membership — so it never appears in the
-    // follower's tray here.
+    // A "friends" story is for mutual follows only: this follower does not
+    // have the author following back, so the new story is not in their tray.
     const followerTray = await request("/api/social/stories/following", followerId);
     expect(followerTray.status).toBe(200);
-    expect((followerTray.body as any[]).find((e: any) => e.authorId === authorId)).toBeFalsy();
+    const entry = (followerTray.body as any[]).find((e: any) => e.authorId === authorId);
+    expect(entry?.storyIds ?? []).not.toContain((res.body as any).id);
   });
 
   it("lets the author delete their own story early", async () => {
