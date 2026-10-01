@@ -21,6 +21,8 @@ import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
 import { DiscoverShopTheLookRail } from './DiscoverShopTheLookRail';
 import { DiscoverTrendingBrandsRail } from './DiscoverTrendingBrandsRail';
+import { ShopByCategoryRail, TrendingProductsRail } from './DiscoverShopRails';
+import type { DiscoveryCategory } from '@/lib/discoveryShelves';
 import type { DiscoverPost, DiscoverPersonSuggestion, DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
 
@@ -47,6 +49,10 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   shopTheLookPosts?: DiscoverPost[];
   onOpenShopTheLook?: (post: DiscoverPost) => void;
   trendingBrands?: BrandCardData[];
+  trendingProducts?: any[];
+  shopCategories?: DiscoveryCategory[];
+  onSeeAllTrendingProducts?: () => void;
+  onSeeAllTrendingBrands?: () => void;
   people?: DiscoverPersonSuggestion[];
   showRails?: boolean;
   onEndReached?: () => void;
@@ -63,6 +69,10 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   shopTheLookPosts = [],
   onOpenShopTheLook,
   trendingBrands = [],
+  trendingProducts = [],
+  shopCategories = [],
+  onSeeAllTrendingProducts,
+  onSeeAllTrendingBrands,
   people = [],
   showRails = true,
   onEndReached,
@@ -97,6 +107,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       hasHighDemand: highDemandItems.length > 0,
       hasTrendingBrands: trendingBrands.length > 0,
       hasShopTheLook: shopTheLookPosts.length > 0,
+      hasTrendingProducts: trendingProducts.length > 0,
+      hasShopCategories: shopCategories.length > 0,
       hasPeople: people.length > 0,
     });
   }, [
@@ -107,6 +119,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
     highDemandItems.length,
     trendingBrands.length,
     shopTheLookPosts.length,
+    trendingProducts.length,
+    shopCategories.length,
     people.length,
   ]);
 
@@ -181,10 +195,16 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
           return <DiscoverPeopleRow people={people} />;
         }
         if (row.kind === 'trendingBrands') {
-          return <DiscoverTrendingBrandsRail brands={trendingBrands} />;
+          return <DiscoverTrendingBrandsRail brands={trendingBrands} onSeeAll={onSeeAllTrendingBrands} />;
         }
         if (row.kind === 'shopTheLook') {
           return <DiscoverShopTheLookRail posts={shopTheLookPosts} onPress={onOpenShopTheLook ?? (() => {})} />;
+        }
+        if (row.kind === 'trendingProducts') {
+          return <TrendingProductsRail products={trendingProducts} onSeeAll={onSeeAllTrendingProducts} />;
+        }
+        if (row.kind === 'shopByCategory') {
+          return <ShopByCategoryRail categories={shopCategories} />;
         }
         // Rail row (Just Dropped / High Demand)
         const items = row.kind === 'justDropped' ? justDroppedItems : highDemandItems;

@@ -2433,6 +2433,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       unsubscribe: (id: string) =>
         del<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),
     },
+    /** Buyer discovery: normalized categories and real-signal trending (public). */
+    publicDiscovery: {
+      categories: () =>
+        get<{ categories: Array<{ slug: string; label: string; productCount: number; coverImageUrl: string | null }> }>(
+          '/api/public/categories',
+        ),
+      categoryProducts: (slug: string, opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        if (opts.limit) params.set('limit', String(opts.limit));
+        if (opts.offset) params.set('offset', String(opts.offset));
+        const q = params.toString();
+        return get<{ slug: string; label: string | null; total: number; products: any[] }>(
+          `/api/public/categories/${encodeURIComponent(slug)}/products${q ? `?${q}` : ''}`,
+        );
+      },
+      trendingProducts: (limit = 12) =>
+        get<{ windowDays: number; products: any[] }>(`/api/public/trending/products?limit=${encodeURIComponent(String(limit))}`),
+      trendingBrands: (limit = 12) =>
+        get<{ windowDays: number; brands: Array<{
+          id: string; sellerId: string; name: string; brandType: string | null; logoUrl: string | null;
+          coverImageUrl: string | null; followerCount: number; verified: boolean;
+        }> }>(`/api/public/trending/brands?limit=${encodeURIComponent(String(limit))}`),
+    },
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
       list:   () => get<any[]>('/api/discount-codes'),

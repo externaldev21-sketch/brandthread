@@ -198,6 +198,7 @@ export const storeVisits = pgTable('store_visits', {
 }, (table) => ({
   sellerIdIndex:        index('store_visits_seller_id_idx').on(table.sellerId),
   sellerCreatedAtIndex: index('store_visits_seller_created_at_idx').on(table.sellerId, table.createdAt),
+  productCreatedAtIndex: index('store_visits_product_created_at_idx').on(table.productId, table.createdAt),
 }));
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -1041,6 +1042,7 @@ export const savedItems = pgTable('saved_items', {
 }, (table) => ({
   collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
+  typeCreatedAtIndex: index('saved_items_type_created_at_idx').on(table.itemType, table.createdAt),
 }));
 
 // ─── First-run tips (per-account "seen" tracking) ─────────────────────────────
@@ -1331,6 +1333,7 @@ export const follows = pgTable('follows', {
 }, (t) => ({
   pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
   followingIdx: index('follows_following_idx').on(t.followingId),
+  createdAtIdx: index('follows_created_at_idx').on(t.createdAt),
 }));
 
 // Dismissed "Suggested for you" rows on the Activity tab — the X on a
