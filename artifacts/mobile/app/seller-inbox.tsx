@@ -692,7 +692,7 @@ export default function SellerInboxScreen() {
           },
           {
             icon: 'plus',
-            onPress: () => openInboxComposeMenu(router),
+            onPress: () => openInboxComposeMenu(router, undefined, true),
             accessibilityLabel: 'Create or join a group',
           },
         ]}
