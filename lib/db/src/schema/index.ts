@@ -2317,4 +2317,5 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
   reviewIdx: index('media_moderation_results_review_idx').on(table.verdict, table.reviewedAt, table.createdAt),
 }));
 
+export * from './storyHighlights';
 export * from './ranking';

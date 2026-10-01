@@ -117,6 +117,7 @@
     { "match": "/buyer-problem-report", "owner": "profilesSocial" },
     { "match": "/buyer-notifications", "owner": "profilesSocial" },
     { "match": "/buyer-highlights-manager", "owner": "profilesSocial" },
+    { "match": "/buyer-highlight-stories", "owner": "profilesSocial" },
     { "match": "/buyer-archive", "owner": "profilesSocial" },
     { "match": "/buyer-drafts", "owner": "profilesSocial" },
     { "match": "/buyer-conversation", "owner": "profilesSocial" },

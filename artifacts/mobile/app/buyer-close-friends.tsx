@@ -1,10 +1,11 @@
 /**
  * Close Friends — manage close friends list with star toggle.
- * Selection is persisted via socialService.getCloseFriendIds / saveCloseFriendIds,
- * which scope the key by the current Clerk user ID so accounts never share the list.
+ * Selection is persisted via socialService.getCloseFriendIds / saveCloseFriendIds:
+ * the server list (GET/PUT /api/social/close-friends) decides who can open Close
+ * Friends stories; a per-account local copy is the offline cache.
  */
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -63,6 +64,8 @@ export default function BuyerCloseFriends() {
       await saveCloseFriendIds(Array.from(closeFriends));
       hapticSuccessAction();
       goBackOr(router);
+    } catch {
+      Alert.alert('Could not save', 'Your Close Friends list was not saved. Try again.');
     } finally {
       setSaving(false);
     }
