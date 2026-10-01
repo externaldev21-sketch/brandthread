@@ -24,7 +24,7 @@ Both are computed by `computeHeldFunds()`. `GET /api/finance/balance` returns th
 
 ## Delivery guarantee hook
 
-"Hold until delivered" is not on dev yet and is not built here. `holdReleaseDate()` accepts an optional `extraHoldUntil` callback. When that work lands it returns the date funds must stay held until, and the policy takes the later of the two dates. `deliveredAt`, when supplied, also becomes the clock start.
+The delivery guarantee (`lib/delivery/payoutGate.ts`, controlled by its own `PAYOUT_MODE` env) is a separate mechanism and is not wired into this policy. `holdReleaseDate()` accepts an optional `extraHoldUntil` callback for it: return the date funds must stay held until (for example an order's `payout_release_at`) and the policy takes the later of the two dates. `deliveredAt`, when supplied, also becomes the clock start. Wiring it in is a follow-up.
 
 ## Instant payouts
 

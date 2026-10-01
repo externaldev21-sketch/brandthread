@@ -79,13 +79,14 @@ export function isDomesticCountry(country: string | null | undefined): boolean {
 
 /**
  * ─── HOOK: delivery guarantee / hold until delivered ─────────────────────
- * Order tracking and the "hold until delivered" guarantee are NOT on dev yet
- * and are intentionally NOT implemented here. When that work lands it plugs
- * in through `extraHoldUntil` (see HoldReleaseOptions): return the date the
- * delivery guarantee requires funds to stay held until (for example the
- * order's delivered-at plus a buffer), or null when it does not apply.
- * holdReleaseDate() then takes the later of that date and the policy date.
- * Nothing else in this file needs to change.
+ * The "hold until delivered" guarantee (lib/delivery/payoutGate.ts, its own
+ * PAYOUT_MODE env) is a separate mechanism and is intentionally NOT wired
+ * into this policy yet. When it should apply here it plugs in through
+ * `extraHoldUntil` (see HoldReleaseOptions): return the date the guarantee
+ * requires funds to stay held until (for example the order's
+ * payout_release_at), or null when it does not apply. holdReleaseDate() then
+ * takes the later of that date and the policy date. Nothing else in this
+ * file needs to change.
  */
 export type ExtraHoldUntil = (ctx: { paidAt: Date; country: string | null | undefined }) => Date | null;
 

@@ -134,7 +134,7 @@ async function call(method: string, path: string, body?: unknown) {
     headers: { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: (await response.json()) as any };
 }
 
 beforeAll(async () => {
