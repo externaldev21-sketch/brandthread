@@ -8,6 +8,7 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
