@@ -29,6 +29,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
+import { buildPostUrl } from '@/lib/shareLinks';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -80,7 +81,10 @@ export function ThreadShareSheet({
     api.posts.interact(postId, { type: 'share' }).catch(() => {});
   }, [api, postId]);
 
-  const postUrl = ExpoLinking.createURL('/buyer-post-viewer', {
+  // Shared out as the canonical https link (/p/:id) so it opens the app via
+  // universal links and unfurls with Open Graph in other apps. Demo/preview
+  // ids that can't form a public link keep the in-app deep link.
+  const postUrl = buildPostUrl(postId) ?? ExpoLinking.createURL('/buyer-post-viewer', {
     queryParams: { postId },
   });
   const shareText = productName

@@ -15,11 +15,14 @@ import { Router, type IRouter } from "express";
 
 const router: IRouter = Router();
 
-const DEEP_LINK_PATHS = [
+export const DEEP_LINK_PATHS = [
   "/u/*",
   "/c/*",
   "/store/*",
   "/drops/*",
+  "/p/*",
+  "/tag/*",
+  "/place/*",
   "/onboarding*",
   "/team-invite*",
 ];

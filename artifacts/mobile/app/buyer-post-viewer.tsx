@@ -5,9 +5,10 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { buildPostUrl } from '@/lib/shareLinks';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share, Animated, useWindowDimensions,
+  TextInput, Modal, Share, Animated, useWindowDimensions, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -184,7 +185,11 @@ export default function BuyerPostViewer() {
     const caption = post?.caption || params.postCaption || '';
     const handle = post?.authorHandle ? `@${post.authorHandle}` : MY_HANDLE;
     try {
-      await Share.share({ message: `${handle} on Brandthread: "${caption}"`, title: 'Share Post' });
+      const link = post?.id ? buildPostUrl(post.id) : null;
+      const message = `${handle} on Brandthread: "${caption}"`;
+      await Share.share(link
+        ? { message: Platform.OS === 'ios' ? message : `${message} ${link}`, url: link, title: 'Share Post' }
+        : { message, title: 'Share Post' });
     } catch {}
   };
 
