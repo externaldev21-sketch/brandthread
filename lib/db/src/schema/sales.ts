@@ -2,7 +2,7 @@ import { pgTable, uuid, text, integer, boolean, timestamp, primaryKey, index } f
 
 // ─── Automatic sales ────────────────────────────────────────────────────────
 // Seller-defined price reductions that apply automatically (no code) for a
-// date range. Resolved by api-server/src/lib/pricing/sales.ts. Migration 112.
+// date range. Resolved by api-server/src/lib/pricing/sales.ts. Migration 120.
 
 export const sales = pgTable('sales', {
   id:           uuid('id').primaryKey().defaultRandom(),

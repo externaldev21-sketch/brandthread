@@ -1,4 +1,4 @@
--- 112: Automatic sales (percent / fixed amount off a store, selected products
+-- 120: Automatic sales (percent / fixed amount off a store, selected products
 -- or a collection for a date range) + persisted variant compare-at price.
 -- Idempotent (IF NOT EXISTS).
 
