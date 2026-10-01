@@ -259,6 +259,10 @@ import liveRouter from "./live";
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
 router.use("/live",                      tc, liveRouter);
+import liveReplaysRouter from "./live-replays";
+import liveTipsRouter from "./live-tips";
+router.use("/live-replays",              tc, liveReplaysRouter);
+router.use("/live-tips",                 tc, liveTipsRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);

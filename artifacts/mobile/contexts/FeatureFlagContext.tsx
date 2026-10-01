@@ -12,7 +12,8 @@ export type FeatureFlagKey =
   | 'threadCashSend'
   | 'oauthGoogleEnabled'
   | 'oauthAppleEnabled'
-  | 'hostedCheckoutFallback';
+  | 'hostedCheckoutFallback'
+  | 'live_tips';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -38,6 +39,9 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // One-page checkout kill switch (migration 107): ON sends every buyer back
   // to Stripe-hosted Checkout instead of paying in the app.
   hostedCheckoutFallback: false,
+  // Live tips (gift button in the live viewer). OFF until Thread Cash is
+  // finalised; the server enforces it too (POST /thread-cash/live-gift).
+  live_tips: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

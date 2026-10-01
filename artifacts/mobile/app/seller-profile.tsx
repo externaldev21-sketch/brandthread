@@ -187,6 +187,18 @@ export default function SellerProfileScreen() {
   // The signed-out web preview (?bt_preview=…) must never reach protected APIs.
   const devPreview = isSellerDevPreview() || isBuyerDevPreview();
 
+  // Replays row in the "..." menu: only when this seller has >=1 saved live
+  // replay the viewer may see (public API; never called from the dev preview).
+  const [replayCount, setReplayCount] = useState(0);
+  useEffect(() => {
+    if (!canonicalSellerId || devPreview) return undefined;
+    let active = true;
+    api.liveReplays.bySeller(canonicalSellerId, { limit: 1 })
+      .then((res) => { if (active) setReplayCount(res.replays.length); })
+      .catch(() => { if (active) setReplayCount(0); });
+    return () => { active = false; };
+  }, [api, canonicalSellerId, devPreview]);
+
   // ── Profile load ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
@@ -412,6 +424,12 @@ export default function SellerProfileScreen() {
     const sellerId = seller.sellerId;
     const items: ProfileMenuItem[] = [];
     if (caps.showShare) items.push({ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare });
+    if (replayCount > 0) {
+      items.push({
+        key: 'replays', icon: 'video', label: 'Replays',
+        onPress: () => router.push(`/live-replays?sellerId=${encodeURIComponent(sellerId)}` as never),
+      });
+    }
     if (caps.showViewAsVisitor) {
       items.push({
         key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
@@ -438,7 +456,7 @@ export default function SellerProfileScreen() {
       );
     }
     return items;
-  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, router, seller]);
+  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, replayCount, router, seller]);
 
   const openVideo = useCallback((item: ProfileGridItem) => {
     if (!seller) return;

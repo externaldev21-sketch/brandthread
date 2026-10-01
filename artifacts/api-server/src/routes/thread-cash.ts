@@ -21,7 +21,8 @@
  * POST /api/thread-cash/claim       — claim a Thread Cash send
  * POST /api/thread-cash/cancel      — sender cancels a still-pending send
  *                                      (send/claim/cancel feature-flagged: 'threadCashSend')
- * POST /api/thread-cash/live-gift   — gift a live stream's host: instant, no mutual-follow
+ * POST /api/thread-cash/live-gift   — gated by the 'live_tips' flag (OFF by default, lib/liveTips.ts).
+ *                                      Gift a live stream's host: instant, no mutual-follow
  *                                      gate, no pending claim (unlike /send). Lands on the
  *                                      seller's balance with source 'live_gift'.
  * POST /api/thread-cash/cash-out    — SELLER-ONLY. Converts a seller's earned Thread
@@ -59,6 +60,7 @@ import {
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
+import { liveTipsGate } from "../lib/liveTips";
 
 const router = Router();
 router.use(requireAuth);
@@ -426,7 +428,7 @@ router.post("/send", async (req, res) => {
 // gated on mutual follow, never sits pending a claim, unlike /send). The
 // seller's credit lands with source 'live_gift', which cashOut.ts already
 // treats as real, cashable value.
-router.post("/live-gift", async (req, res) => {
+router.post("/live-gift", liveTipsGate(), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { streamId, amountCents: rawAmount } = req.body ?? {};
   const amountCents = Math.floor(Number(rawAmount));
