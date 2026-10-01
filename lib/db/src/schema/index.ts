@@ -1148,6 +1148,7 @@ export const cartItems = pgTable('cart_items', {
   itemData:              json('item_data').notNull().default({}),
   updatedAt:             timestamp('updated_at').defaultNow().notNull(),
   notifiedAbandonedAt:   timestamp('notified_abandoned_at'),
+  pushRemindedAt:        timestamp('push_reminded_at'),
 });
 
 // ─── In-app notification feed ─────────────────────────────────────────────────

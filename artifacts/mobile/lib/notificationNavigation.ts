@@ -91,6 +91,10 @@ export function createNotificationResponseHandler(
       router.push(`/buyer-live?streamId=${encodeURIComponent(data.targetId)}`);
       return;
     }
+    if (data?.targetType === 'cart') {
+      router.push('/(buyer)/cart');
+      return;
+    }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`);
       return;

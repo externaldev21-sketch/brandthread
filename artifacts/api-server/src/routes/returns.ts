@@ -6,6 +6,7 @@ import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds"
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
+import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -136,6 +137,9 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
   }).catch((err) => {
     logger.warn({ err, returnId, status }, "Return status push notification failed");
   });
+
+  // Settings → Notifications → Email (Returns).
+  if (!(await isChannelEnabledForUser(row.buyerId, "return", "email"))) return;
 
   const sent = await sendReturnStatusEmail({
     to: row.buyerEmail,

@@ -611,6 +611,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
         : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
     case 'live':
       return id ? `/buyer-live?streamId=${q(id)}` : null;
+
+    case 'cart':
+      return '/(buyer)/cart';
     case 'thread_cash_transfer':
       return '/thread-cash';
     case 'product':
