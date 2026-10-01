@@ -25,6 +25,7 @@ import { profileLanding } from "./routes/profileLanding";
 import {
   bioLinkRedirect, bioPageHandler, bioProductRedirect, bioShopRedirect, trackedLinkRedirect,
 } from "./routes/growthPublic";
+import { aiUsageContext } from "./lib/aiUsage";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -164,6 +165,8 @@ app.use(
 );
 
 app.use(appRateLimiter);
+// Attributes AI calls made while handling a request to the signed-in caller.
+app.use(aiUsageContext);
 app.get("/u/:username", rateLimit("public-read"), profileLanding);
 // Growth: tracked short links + server-rendered link-in-bio pages (public, unauthenticated).
 app.get("/l/:code", trackedLinkRedirect);
