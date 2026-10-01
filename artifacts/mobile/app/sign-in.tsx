@@ -106,12 +106,14 @@ export default function SignInScreen() {
   const [totpCode, setTotpCode]     = useState('');
   const [totpError, setTotpError]   = useState('');
   const [totpLoading, setTotpLoading] = useState(false);
+  // Lets someone without their authenticator app finish with a saved backup code.
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   const isFetching = fetchStatus === 'fetching' || loading;
   const identifierKind = detectIdentifierKind(identifier);
   const canSendCode = identifierKind !== 'invalid' && (identifierKind !== 'phone' || phoneSupported) && !sendingCode;
   const canSubmitPassword = identifierKind !== 'invalid' && password.length >= 1;
-  const canVerifyTotp = totpCode.length === 6;
+  const canVerifyTotp = useBackupCode ? totpCode.trim().length >= 6 : totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
   useEffect(() => {
@@ -241,7 +243,9 @@ export default function SignInScreen() {
     setTotpLoading(true);
     setTotpError('');
     try {
-      const { error: err } = await signIn.mfa.verifyTOTP({ code: totpCode });
+      const { error: err } = useBackupCode
+        ? await signIn.mfa.verifyBackupCode({ code: totpCode.trim() })
+        : await signIn.mfa.verifyTOTP({ code: totpCode });
       if (err) { setTotpError("That code isn't right. Try again."); return; }
       if (signIn.status === 'complete') {
         await finalizeSignIn();
@@ -393,7 +397,7 @@ export default function SignInScreen() {
               color={theme.muted}
               style={s.backBtn}
               accessibilityLabel="Go back"
-              onPress={() => { setNeedsTotp(false); setTotpCode(''); setTotpError(''); }}
+              onPress={() => { setNeedsTotp(false); setUseBackupCode(false); setTotpCode(''); setTotpError(''); }}
             />
 
             <View style={s.logoRow}>
@@ -402,7 +406,9 @@ export default function SignInScreen() {
             </View>
 
             <Text style={s.headline}>Two-factor authentication</Text>
-            <Text style={s.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+            <Text style={s.subtitle}>
+              {useBackupCode ? 'Enter one of your saved backup codes.' : 'Enter the 6-digit code from your authenticator app.'}
+            </Text>
 
             <View style={s.fieldWrap}>
               <Text style={s.label}>Code</Text>
@@ -411,10 +417,15 @@ export default function SignInScreen() {
                 placeholder="000000"
                 placeholderTextColor={theme.subtle}
                 value={totpCode}
-                onChangeText={t => { setTotpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setTotpError(''); }}
-                keyboardType="number-pad"
+                onChangeText={t => {
+                  setTotpCode(useBackupCode ? t.replace(/\s/g, '').slice(0, 16) : t.replace(/[^0-9]/g, '').slice(0, 6));
+                  setTotpError('');
+                }}
+                keyboardType={useBackupCode ? 'default' : 'number-pad'}
+                autoCapitalize="none"
+                autoCorrect={false}
                 textContentType="oneTimeCode"
-                maxLength={6}
+                maxLength={useBackupCode ? 16 : 6}
                 autoFocus
                 returnKeyType="go"
                 onSubmitEditing={handleVerifyTotp}
@@ -435,6 +446,14 @@ export default function SignInScreen() {
               loading={totpLoading}
               fullWidth
               style={s.primaryWrap}
+            />
+            <Button
+              testID="toggle-backup-code"
+              label={useBackupCode ? 'Use authenticator app' : 'Use a backup code'}
+              variant="tertiary"
+              size="small"
+              onPress={() => { setUseBackupCode(v => !v); setTotpCode(''); setTotpError(''); }}
+              style={{ marginTop: 8 }}
             />
           </ScrollView>
         </KeyboardAvoidingView>

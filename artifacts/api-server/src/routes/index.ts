@@ -85,6 +85,7 @@ import sellerSettingsExtRouter from "./seller-settings-route";
 import buyerPaymentsRouter from "./buyer-payments";
 import supportRouter from "./support";
 import sellerExportRouter from "./seller-export";
+import dataExportJobsRouter from "./data-export-jobs";
 import supportChatRouter from "./support-chat";
 import freelancersRouter from "./freelancers";
 import freelancerConnectRouter from "./freelancer-connect";
@@ -133,6 +134,7 @@ router.use("/seller/export",   sellerExportRouter);
 // so routes that already mount it internally get a free no-op on the second call.
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
+router.use("/auth/data-export", dataExportJobsRouter); // async emailed export (/jobs*, /download); instant POST stays in authRouter
 router.use("/auth",            authRouter);
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.

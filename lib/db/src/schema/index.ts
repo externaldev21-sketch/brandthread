@@ -122,6 +122,8 @@ export const users = pgTable('users', {
   // a UNIQUE INDEX on lower(username) WHERE username IS NOT NULL —
   // migration 109 — not by this .unique(). Always store/compare lowercased.
   username: text('username').unique(),
+  // When the @handle last changed (migration 117). Drives the 30-day change cooldown.
+  usernameChangedAt: timestamp('username_changed_at', { withTimezone: true }),
   // Storefront visit counter — incremented by a public endpoint each time a buyer
   // views this seller's storefront. Drives the real conversion rate stat.
   storefrontVisitCount: integer('storefront_visit_count').notNull().default(0),

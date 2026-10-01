@@ -95,6 +95,7 @@ const TABS: {
       'push-notifications', 'biometric-unlock', 'app-icon', 'app-theme', 'appearance', 'plan-details',
       'payouts', 'subscription', 'seller-data-export', 'account-switcher',
       'login-methods', 'account-type-settings', 'seller-verification',
+      'change-password', 'change-email', 'change-phone', 'backup-codes', 'disable-two-factor',
     ],
     destination: '/(tabs)/profile',
   },
@@ -150,6 +151,11 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'login-methods': 'profile',
   'account-type-settings': 'profile',
   'seller-verification': 'profile',
+  'change-password': 'profile',
+  'change-email': 'profile',
+  'change-phone': 'profile',
+  'backup-codes': 'profile',
+  'disable-two-factor': 'profile',
   // Design Studio → no primary tab active (returns 'index' as safe fallback)
   // All other seller screens default to 'index'
 };

@@ -97,3 +97,24 @@ export async function sendVerifyEmailEmail(options: { to: string; code: string }
   });
   return send({ to: options.to, subject: "Verify your email for Brandthread", html });
 }
+
+/** "Your data export is ready" — link is a 7-day, single-purpose download token. */
+export async function sendDataExportReadyEmail(options: {
+  to: string;
+  downloadUrl: string;
+  expiresAt: Date;
+}): Promise<boolean> {
+  const expires = options.expiresAt.toUTCString();
+  const html = renderBrandthreadEmail({
+    preheader: "Your Brandthread data export is ready",
+    eyebrow: "Your data",
+    title: "Your data export is ready",
+    subtitle: "Download a copy of the information you asked for.",
+    bodyHtml: `
+      <p style="margin:0 0 18px;"><a href="${options.downloadUrl}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px;">Download my data</a></p>
+      <p style="margin:0 0 12px;color:#666666;">This link expires on ${expires}. Anyone with the link can download the file, so don't share it.</p>
+      <p style="margin:0;color:#666666;">If you didn't request this, secure your account by changing your password.</p>
+    `,
+  });
+  return send({ to: options.to, subject: "Your Brandthread data export is ready", html });
+}
