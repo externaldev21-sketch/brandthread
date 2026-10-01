@@ -376,6 +376,12 @@ export async function notifyCommentActivity(input: {
   authorId: string;
   body: string;
   parentAuthorId?: string | null;
+  /**
+   * Server-verified mentions (see commentMentions.ts). When provided they are
+   * the only people notified as "mention"; when omitted the body is re-parsed
+   * (legacy behaviour).
+   */
+  mentionedUserIds?: string[];
 }): Promise<void> {
   try {
     const post = await loadPost(input.postId);
@@ -408,7 +414,15 @@ export async function notifyCommentActivity(input: {
       deliveries.push({ ...base, userId: input.parentAuthorId, type: "comment_reply", title: `${actor.actorName} replied to your comment` });
     }
 
-    const handles = extractMentions(input.body);
+    if (input.mentionedUserIds) {
+      for (const clerkId of input.mentionedUserIds) {
+        if (notified.has(clerkId) || blocked.has(clerkId)) continue;
+        notified.add(clerkId);
+        deliveries.push({ ...base, userId: clerkId, type: "mention", title: `${actor.actorName} mentioned you in a comment` });
+      }
+    }
+
+    const handles = input.mentionedUserIds ? [] : extractMentions(input.body);
     if (handles.length > 0) {
       const mentioned = await db
         .select({ clerkId: users.clerkId })
@@ -424,6 +438,45 @@ export async function notifyCommentActivity(input: {
     await fanOut(deliveries, (delivery) => publishNotification(delivery));
   } catch (err) {
     logger.warn({ err, postId: input.postId, commentId: input.commentId }, "Comment notification failed");
+  }
+}
+
+/**
+ * "Your comment was pinned" — tells a comment's author the post owner pinned
+ * it. Deduped per (comment, recipient): re-pinning after an unpin stays quiet.
+ */
+export async function notifyCommentPinned(input: {
+  postId: string; commentId: string; ownerId: string; commentAuthorId: string; body: string;
+}): Promise<void> {
+  try {
+    if (input.commentAuthorId === input.ownerId) return;
+    if ((await blockedUserIds(input.ownerId)).has(input.commentAuthorId)) return;
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.commentAuthorId),
+        eq(notificationsFeed.type, "comment_pinned"),
+        eq(notificationsFeed.commentId, input.commentId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const [post, actor] = await Promise.all([loadPost(input.postId), actorFields(input.ownerId)]);
+    if (!post || !actor) return;
+    await publishNotification({
+      userId: input.commentAuthorId,
+      category: "social",
+      type: "comment_pinned",
+      title: "Your comment was pinned",
+      body: excerpt(input.body),
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+      commentId: input.commentId,
+    });
+  } catch (err) {
+    logger.warn({ err, commentId: input.commentId }, "Comment pinned notification failed");
   }
 }
 

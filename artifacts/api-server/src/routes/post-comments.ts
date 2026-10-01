@@ -6,6 +6,8 @@
  * POST   /api/posts/:postId/comments                       — add a comment or reply
  * DELETE /api/posts/:postId/comments/:commentId            — author or post owner
  * POST   /api/posts/:postId/comments/:commentId/like       — { liked: boolean }
+ * POST   /api/posts/:postId/comments/:commentId/pin        — post owner pins (replaces any other pin)
+ * DELETE /api/posts/:postId/comments/:commentId/pin        — post owner unpins
  *
  * Safety rules:
  *   • Slurs and threats are rejected; profanity/abuse/spam is held (visible to
@@ -26,7 +28,8 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition } from "../lib/postVisibility";
-import { notifyCommentActivity, notifyCommentLike } from "../lib/activityEvents";
+import { notifyCommentActivity, notifyCommentLike, notifyCommentPinned } from "../lib/activityEvents";
+import { mentionsForComments, recordCommentMentions, resolveCommentMentions, type CommentMention } from "../lib/commentMentions";
 import { recordPostSignal } from "../lib/ranking/signals";
 import {
   authorInGoodStanding,
@@ -62,6 +65,12 @@ export interface CommentView {
   isMine: boolean;
   canDelete: boolean;
   pendingReview: boolean;
+  /** The post owner pinned this (top-level) comment. */
+  pinned: boolean;
+  /** The post owner liked this comment ("Creator liked"). */
+  creatorLiked: boolean;
+  /** Verified @mentions, resolved server-side. */
+  mentions: CommentMention[];
   replies: CommentView[];
   /** Roots only: true when more replies exist beyond the inline page. */
   hasMoreReplies?: boolean;
@@ -122,6 +131,7 @@ router.get("/:postId/comments", async (req, res) => {
       .where(and(
         eq(postComments.postId, postId),
         sql`${postComments.parentId} IS NULL`,
+        sql`${postComments.pinnedAt} IS NULL`,
         visibility,
         standing,
         before ? lt(postComments.createdAt, before) : undefined,
@@ -129,7 +139,20 @@ router.get("/:postId/comments", async (req, res) => {
       .orderBy(desc(postComments.createdAt))
       .limit(PAGE_SIZE + 1);
     const hasMore = topLevel.length > PAGE_SIZE;
-    const page = topLevel.slice(0, PAGE_SIZE);
+    const rest = topLevel.slice(0, PAGE_SIZE);
+    // The pinned comment always leads the first page, however old it is.
+    const pinnedRows = before ? [] : await db
+      .select()
+      .from(postComments)
+      .where(and(
+        eq(postComments.postId, postId),
+        sql`${postComments.parentId} IS NULL`,
+        sql`${postComments.pinnedAt} IS NOT NULL`,
+        visibility,
+        standing,
+      ))
+      .limit(1);
+    const page = [...pinnedRows, ...rest];
 
     // At most REPLIES_PER_ROOT + 1 replies per root (the extra row only proves
     // that more exist), selected with a window so it stays one query.
@@ -174,7 +197,7 @@ router.get("/:postId/comments", async (req, res) => {
     });
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles, totalRows] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, totalRows, creatorLikeRows, mentionsByComment] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -192,7 +215,13 @@ router.get("/:postId/comments", async (req, res) => {
           standing,
           blocked.size > 0 ? notInArray(postComments.authorId, [...blocked]) : undefined,
         )),
+      ids.length ? db.select({ commentId: postCommentLikes.commentId })
+        .from(postCommentLikes)
+        .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId)))
+        : Promise.resolve([]),
+      mentionsForComments(ids),
     ]);
+    const creatorLiked = new Set(creatorLikeRows.map((row) => row.commentId));
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
 
@@ -211,6 +240,9 @@ router.get("/:postId/comments", async (req, res) => {
       isMine: !!viewerId && comment.authorId === viewerId,
       canDelete: !!viewerId && (comment.authorId === viewerId || post.userId === viewerId),
       pendingReview: comment.moderationStatus === "held",
+      pinned: comment.pinnedAt != null,
+      creatorLiked: creatorLiked.has(comment.id),
+      mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
       replies: [],
     });
 
@@ -237,6 +269,7 @@ router.get("/:postId/comments", async (req, res) => {
       hiddenByMutedWords,
       commentsDisabled,
       canComment: !!viewerId && !commentsDisabled,
+      isPostOwner: !!viewerId && viewerId === post.userId,
       nextCursor: hasMore ? page[page.length - 1].createdAt.toISOString() : null,
     });
   } catch (err) {
@@ -291,7 +324,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       && (c.authorId === viewerId || !matchesMutedWords(c.body, muted)));
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, mentionsByComment] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -300,9 +333,14 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
         .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, viewerId)))
         : Promise.resolve([]),
       profilesById(shown.map((c) => c.authorId)),
+      mentionsForComments(ids),
     ]);
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
+    const creatorLikedRows = ids.length ? await db.select({ commentId: postCommentLikes.commentId })
+      .from(postCommentLikes)
+      .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId))) : [];
+    const creatorLikedIds = new Set(creatorLikedRows.map((row) => row.commentId));
 
     const replies: CommentView[] = shown.map((comment) => ({
       id: comment.id,
@@ -319,6 +357,9 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       isMine: !!viewerId && comment.authorId === viewerId,
       canDelete: !!viewerId && (comment.authorId === viewerId || post.userId === viewerId),
       pendingReview: comment.moderationStatus === "held",
+      pinned: false,
+      creatorLiked: creatorLikedIds.has(comment.id),
+      mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
       replies: [],
     }));
     return res.json({
@@ -398,6 +439,9 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       moderationReason: held ? decision.category : null,
     }).returning();
 
+    const mentions = await resolveCommentMentions(body, authorId);
+    await recordCommentMentions(created.id, mentions);
+
     if (held) {
       await enqueueAutoFilterReport({
         targetType: "comment",
@@ -412,7 +456,10 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
     // Held comments are invisible to everyone but their author, so nobody
     // else is told about them until a moderator approves.
     if (!held) {
-      void notifyCommentActivity({ postId, commentId: created.id, authorId, body, parentAuthorId });
+      void notifyCommentActivity({
+        postId, commentId: created.id, authorId, body, parentAuthorId,
+        mentionedUserIds: mentions.map((m) => m.userId),
+      });
       void recordPostSignal(authorId, postId, "comment");
     }
 
@@ -429,6 +476,9 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       isMine: true,
       canDelete: true,
       pendingReview: held,
+      pinned: false,
+      creatorLiked: false,
+      mentions,
       replies: [],
     };
     return res.status(201).json({
@@ -462,6 +512,79 @@ router.delete("/:postId/comments/:commentId", requireAuth, async (req, res) => {
   }
   await db.delete(postComments).where(eq(postComments.id, commentId));
   return res.json({ ok: true });
+});
+
+// ─── POST/DELETE /api/posts/:postId/comments/:commentId/pin ─────────────────
+// Post owner only; top-level visible comments only; one pin per post.
+async function loadPinTarget(postId: string, commentId: string) {
+  const [row] = await db
+    .select({
+      id: postComments.id,
+      authorId: postComments.authorId,
+      body: postComments.body,
+      parentId: postComments.parentId,
+      status: postComments.moderationStatus,
+      pinnedAt: postComments.pinnedAt,
+      postOwnerId: posts.userId,
+    })
+    .from(postComments)
+    .innerJoin(posts, eq(posts.id, postComments.postId))
+    .where(and(eq(postComments.id, commentId), eq(postComments.postId, postId)))
+    .limit(1);
+  return row ?? null;
+}
+
+router.post("/:postId/comments/:commentId/pin", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const postId = String(req.params.postId);
+  const commentId = String(req.params.commentId);
+  if (!UUID_RE.test(postId) || !UUID_RE.test(commentId)) return res.status(404).json({ error: "Comment not found" });
+  try {
+    const row = await loadPinTarget(postId, commentId);
+    if (!row) return res.status(404).json({ error: "Comment not found" });
+    if (row.postOwnerId !== viewerId) {
+      return res.status(403).json({ error: "Only the post owner can pin a comment." });
+    }
+    if (row.parentId || row.status !== "visible") {
+      return res.status(400).json({ error: "Only top-level comments can be pinned.", code: "NOT_PINNABLE" });
+    }
+    if (row.authorId !== viewerId && (await blockRelation(viewerId, row.authorId)) !== "none") {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+    if (!row.pinnedAt) {
+      await db.transaction(async (tx) => {
+        await tx.update(postComments).set({ pinnedAt: null })
+          .where(and(eq(postComments.postId, postId), sql`${postComments.pinnedAt} IS NOT NULL`));
+        await tx.update(postComments).set({ pinnedAt: new Date() }).where(eq(postComments.id, commentId));
+      });
+      void notifyCommentPinned({
+        postId, commentId, ownerId: viewerId, commentAuthorId: row.authorId, body: row.body,
+      });
+    }
+    return res.json({ pinned: true, commentId });
+  } catch (err) {
+    req.log.error({ err, postId, commentId }, "Failed to pin comment");
+    return res.status(500).json({ error: "Could not pin this comment. Try again." });
+  }
+});
+
+router.delete("/:postId/comments/:commentId/pin", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const postId = String(req.params.postId);
+  const commentId = String(req.params.commentId);
+  if (!UUID_RE.test(postId) || !UUID_RE.test(commentId)) return res.status(404).json({ error: "Comment not found" });
+  try {
+    const row = await loadPinTarget(postId, commentId);
+    if (!row) return res.status(404).json({ error: "Comment not found" });
+    if (row.postOwnerId !== viewerId) {
+      return res.status(403).json({ error: "Only the post owner can unpin a comment." });
+    }
+    await db.update(postComments).set({ pinnedAt: null }).where(eq(postComments.id, commentId));
+    return res.json({ pinned: false, commentId });
+  } catch (err) {
+    req.log.error({ err, postId, commentId }, "Failed to unpin comment");
+    return res.status(500).json({ error: "Could not unpin this comment. Try again." });
+  }
 });
 
 // ─── POST /api/posts/:postId/comments/:commentId/like ────────────────────────

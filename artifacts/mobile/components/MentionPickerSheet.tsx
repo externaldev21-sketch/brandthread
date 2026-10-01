@@ -129,19 +129,27 @@ export function MentionPickerSheet({
 
 /** Suggestions strip for the text tool: shown while the caret is in an "@partial" token. */
 export function MentionSuggestionsBar({
-  query, active, enabled, onPick,
+  query, active, enabled, onPick, demoPeople,
 }: {
   query: string;
   active: boolean;
   enabled: boolean;
   onPick: (person: MentionPerson) => void;
+  /** Preview/demo only: local people to suggest instead of calling the API. */
+  demoPeople?: MentionPerson[];
 }) {
-  const { people, loading } = useMentionSearch(query, active, enabled);
+  const search = useMentionSearch(query, active, enabled && !demoPeople);
+  const q = query.trim().toLowerCase().replace(/^@/, '');
+  const people = demoPeople
+    ? demoPeople.filter((p) => !q || (p.username ?? p.handle ?? '').toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
+    : search.people;
+  const loading = search.loading;
+  const enabledForCopy = demoPeople ? true : enabled;
   if (!active) return null;
   return (
     <View style={styles.bar} testID="mention-suggestions">
       {!people.length ? (
-        <Text style={styles.barEmpty}>{!enabled ? 'Sign in to tag people.' : loading ? 'Searching…' : 'No people found.'}</Text>
+        <Text style={styles.barEmpty}>{!enabledForCopy ? 'Sign in to tag people.' : loading ? 'Searching…' : 'No people found.'}</Text>
       ) : (
         <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.barContent}>
           {people.map((p) => (

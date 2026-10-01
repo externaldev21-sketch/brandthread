@@ -37,6 +37,12 @@ export interface ThreadComment {
   canDelete: boolean;
   /** Held by the content filter — visible only to its author until reviewed. */
   pendingReview: boolean;
+  /** Pinned to the top by the post owner (top-level comments only). */
+  pinned?: boolean;
+  /** The post owner liked this comment. */
+  creatorLiked?: boolean;
+  /** Server-verified @mentions in `body`. */
+  mentions?: { userId: string; handle: string }[];
   replies: ThreadComment[];
 }
 
@@ -46,6 +52,8 @@ export interface CommentThread {
   hiddenByMutedWords: number;
   commentsDisabled: boolean;
   canComment: boolean;
+  /** The viewer owns the post (can pin / unpin comments). */
+  isPostOwner?: boolean;
   nextCursor: string | null;
 }
 

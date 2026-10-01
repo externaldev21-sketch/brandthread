@@ -1608,10 +1608,13 @@ export const postComments = pgTable('post_comments', {
   moderationReason: text('moderation_reason'),
   moderatedAt:      timestamp('moderated_at', { withTimezone: true }),
   moderatedBy:      text('moderated_by'),
+  // Set while the post owner has this top-level comment pinned (migration 116).
+  pinnedAt:         timestamp('pinned_at', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   parentFk: foreignKey({ columns: [table.parentId], foreignColumns: [table.id] }).onDelete('cascade'),
+  onePinnedPerPost: uniqueIndex('post_comments_one_pinned_per_post').on(table.postId).where(sql`${table.pinnedAt} IS NOT NULL`),
   postCreatedIdx: index('post_comments_post_created_idx').on(table.postId, table.createdAt),
   authorIdx: index('post_comments_author_idx').on(table.authorId),
 }));
@@ -2329,3 +2332,5 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
 }));
 
 export * from './ranking';
+
+export * from './comments';
