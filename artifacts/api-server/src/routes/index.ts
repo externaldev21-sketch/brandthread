@@ -79,6 +79,7 @@ import bundlesRouter from "./bundles";
 import buyerProductsRouter from "./buyer-products";
 import recentlyViewedRouter from "./recently-viewed";
 import firstRunTipsRouter from "./first-run-tips";
+import sellerLaunchChecklistRouter from "./seller-launch-checklist";
 import sellerLocationsRouter from "./seller-locations";
 import sellerMetafieldsRouter from "./seller-metafields";
 import sellerSettingsExtRouter from "./seller-settings-route";
@@ -190,6 +191,7 @@ router.use("/brandthread-agent",         brandthreadAgentRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
+router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 // Comments are attributed to the person writing them, so they are mounted

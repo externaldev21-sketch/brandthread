@@ -143,6 +143,7 @@
     "expo-sharing": "~57.0.21",
     "expo-updates": "~57.0.23",
     "expo-video": "~57.0.4",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-agora": "^4.6.2",
