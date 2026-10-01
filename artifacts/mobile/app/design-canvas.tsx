@@ -96,7 +96,7 @@ import {
 import {
   getProject, createProject, autosaveProject, updateProject,
   createVersion, duplicateProject, syncVerifiedDesignAsset,
-  getBrandAssets,
+  getBrandAssets, whenDesignServiceReady,
 } from '@/services/designService';
 import {
   resolveMasterDescriptor, MasterDescriptor, MasterExportAsset,
@@ -585,6 +585,10 @@ export default function DesignCanvasScreen() {
     let cancelled = false;
     async function load(attempt = 0) {
      try {
+      // Cold load straight to /design-canvas?id=…: the app shell scopes
+      // design storage to the signed-in user in its own effect, which runs
+      // AFTER this screen's — read before it and the project "doesn't exist".
+      await whenDesignServiceReady();
       const proj = projectId
         ? await getProject(projectId)
         : await createProject('canvas', 'Untitled Artwork', {});

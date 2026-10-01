@@ -24,7 +24,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   SectionHeader, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getProject, createBrandAsset } from '@/services/designService';
+import { getProject, createBrandAsset, whenDesignServiceReady } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -63,7 +63,14 @@ export default function DesignMockupPreviewScreen() {
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    let cancelled = false;
+    // On a cold load (deep link / reload) this effect fires before the app
+    // shell has scoped design storage to the signed-in user; reading then
+    // hits the 'anon' namespace and reports a real project as missing.
+    whenDesignServiceReady()
+      .then(() => getProject(projectId))
+      .then(p => { if (!cancelled) { setProject(p); setLoading(false); } });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   // Flattens the on-screen preview panel (garment + composited design layers
@@ -162,7 +169,7 @@ export default function DesignMockupPreviewScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* View tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow} testID="mockup-view-tabs">
           {VIEWS.map(v => (
             <TouchableOpacity
               key={v}
@@ -196,7 +203,7 @@ export default function DesignMockupPreviewScreen() {
               </View>
             )}
           </View>
-          <View style={styles.overlayLabels}>
+          <View style={styles.overlayLabels} testID="mockup-overlay-labels">
             <Text style={[styles.overlayName, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#000' : FG }]}>
               {project.name}
             </Text>

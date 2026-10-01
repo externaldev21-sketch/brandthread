@@ -24,7 +24,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   SectionHeader, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getProject, exportProject } from '@/services/designService';
+import { getProject, exportProject, whenDesignServiceReady } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -81,7 +81,13 @@ export default function DesignExportScreen() {
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    let cancelled = false;
+    // Same cold-load ordering as design-mockup-preview: wait for the app
+    // shell to scope design storage to the signed-in user before reading.
+    whenDesignServiceReady()
+      .then(() => getProject(projectId))
+      .then(p => { if (!cancelled) { setProject(p); setLoading(false); } });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   const handleExport = useCallback(async () => {
