@@ -31,6 +31,9 @@ import {
   publishingRestriction,
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
+import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
+import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
+import { storyListedFor } from "../lib/storyVisibility";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -636,7 +639,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .where(and(
       eq(storyMentions.mentionedUserId, other),
       gt(stories.expiresAt, new Date()),
-      ne(stories.moderationStatus, "removed"),
+      storyListedFor(myId),
       ne(stories.privacyVisibility, "friends"),
       notBlockedWith(myId, stories.authorId),
       authorInGoodStanding(stories.authorId),
@@ -1030,7 +1033,7 @@ async function isFollowing(followerId: string, followingId: string): Promise<boo
 async function loadActiveStory(storyId: string) {
   const [row] = await db.select().from(stories).where(eq(stories.id, storyId)).limit(1);
   if (!row) return null;
-  if (row.moderationStatus === "removed") return null;
+  if (row.moderationStatus === "removed" || row.moderationStatus === "held") return null;
   if (new Date(row.expiresAt).getTime() <= Date.now()) return null;
   return row;
 }
@@ -1102,6 +1105,24 @@ router.post("/stories", async (req, res) => {
   // untaggable people (self, blocked either way, deleted/suspended) are dropped silently.
   const { media, mentions } = await sanitizeStoryMentions(rawMedia, myId);
 
+  // Automatic media screening (off when the AI integration env is missing).
+  const storyUrls = (media as any[]).map((item) => ({
+    url: typeof item?.uri === "string" ? item.uri : typeof item?.url === "string" ? item.url : "",
+    video: item?.type === "video",
+  })).filter((item) => /^https?:\/\//i.test(item.url));
+  const storyVerdict = storyUrls.length > 0
+    ? await screenMediaRefs({
+        images: storyUrls.filter((item) => !item.video).map((item) => item.url),
+        videos: storyUrls.filter((item) => item.video).map((item) => item.url),
+        extraHosts: [req.get("host") ?? ""].filter(Boolean),
+      })
+    : null;
+  if (storyVerdict?.verdict === "reject") {
+    void recordRejectedUpload({ ownerId: myId, surface: "story", verdict: storyVerdict });
+    res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED", categories: storyVerdict.categories }); return;
+  }
+  const storyHeld = !!storyVerdict && isFlagged(storyVerdict);
+
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const visibility = privacy?.visibility === "friends" ? "friends" : "public";
 
@@ -1118,11 +1139,21 @@ router.post("/stories", async (req, res) => {
     privacyReplyPerm:   privacy?.replyPermission ?? "everyone",
     originalStoryId:    reshareOf?.id ?? null,
     originalAuthorId:   reshareOf?.authorId ?? null,
+    moderationStatus:   storyHeld ? "held" : "visible",
+    moderationReason:   storyHeld ? `media:${storyVerdict!.categories.join(",")}`.slice(0, 200) : null,
     expiresAt,
   }).returning();
 
+  if (storyHeld && storyVerdict) {
+    await recordHeldMedia({
+      targetType: "story", targetId: row.id, ownerId: myId, verdict: storyVerdict,
+      refs: storyUrls.map((item) => item.url).filter((url) => !url.includes("?")).slice(0, 4),
+      excerpt: `Story by ${myName}`, label: "Story",
+    });
+  }
+
   await recordStoryMentions(row.id, myId, mentions);
-  for (const mention of mentions) {
+  for (const mention of storyHeld ? [] : mentions) {
     void notifyStoryMention({
       storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
     });
@@ -1138,7 +1169,7 @@ router.post("/stories", async (req, res) => {
   }
 
   const [view] = await withOriginalInfo([buildStoryView(row, false)]);
-  res.status(201).json(view);
+  res.status(201).json(storyHeld ? { ...view, moderation: { status: "held", message: MEDIA_HELD_MESSAGE } } : view);
 });
 
 // ─── GET /api/social/stories/me — my active stories ─────────────────────────
@@ -1146,7 +1177,7 @@ router.get("/stories/me", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const now  = new Date();
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
+    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), storyListedFor(myId)))
     .orderBy(asc(stories.createdAt)).limit(STORY_LIST_CAP);
 
   const likedSet = rows.length
@@ -1176,7 +1207,7 @@ router.get("/stories/user/:userId", async (req, res) => {
   }
 
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
+    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), storyListedFor(myId)))
     .orderBy(asc(stories.createdAt)).limit(STORY_LIST_CAP);
 
   if (!rows.length) { res.json([]); return; }
@@ -1214,7 +1245,7 @@ router.get("/stories/following", async (req, res) => {
   const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
 
   const rows = await db.select().from(stories)
-    .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
+    .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), storyListedFor(myId)))
     .orderBy(desc(stories.createdAt))
     .limit(STORY_LIST_CAP * 10);
   if (!rows.length) { res.json([]); return; }

@@ -60,3 +60,6 @@ Thumbs.db
 # Notch-crawl scratch output (screenshots + JSON report from e2e/notch-crawl.spec.ts)
 artifacts/mobile/.notch-crawl/
 artifacts/mobile/.audit/
+
+# Database dumps
+backups/

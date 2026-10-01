@@ -5,12 +5,12 @@
 import { Router } from "express";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
+import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
-import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gt, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gt, gte, lte, isNull, isNotNull, type SQL } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -534,6 +534,36 @@ function fuzzyMatch(column: any, term: string, pattern: string) {
   return sql`(${ilike(column, pattern)} OR similarity(${column}, ${term}) > ${SIMILARITY_THRESHOLD})`;
 }
 
+/**
+ * Index-friendly twin of fuzzyMatch for the search endpoint. `col % term` is
+ * `similarity(col, term) > pg_trgm.similarity_threshold` and can use the GIN
+ * trigram indexes, whereas `similarity(...) > 0.25` forces a sequential scan.
+ * Only valid inside withTrigramThreshold(), which pins the threshold to 0.25
+ * so results are identical to fuzzyMatch.
+ */
+function trgmMatch(column: any, _term: string, pattern: string) {
+  return sql`(${ilike(column, pattern)} OR ${column} % ${_term})`;
+}
+
+const PRODUCT_SEARCH_CAP = 200;
+const VIDEO_SEARCH_PAGE = 20;
+
+function productSearchOrder(sort: SearchSort, price: SQL, relevance: SQL): SQL[] {
+  const newest = [desc(products.createdAt), asc(products.id)];
+  if (sort === "price_asc") return [asc(price), ...newest];
+  if (sort === "price_desc") return [desc(price), ...newest];
+  if (sort === "newest") return newest;
+  return [desc(relevance), ...newest];
+}
+
+async function withTrigramThreshold<T>(fn: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
+  // readDb is the replica when DATABASE_READ_URL is set, otherwise the primary.
+  return readDb.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('pg_trgm.similarity_threshold', ${String(SIMILARITY_THRESHOLD)}, true)`);
+    return fn(tx);
+  });
+}
+
 /** Best-of(substring exactness, trigram similarity) — used to order "relevance" results server-side. */
 function relevanceScore(column: any, term: string) {
   return sql<number>`GREATEST(similarity(${column}, ${term}), CASE WHEN ${column} ILIKE ${"%" + term + "%"} THEN 0.999 ELSE 0 END)`;
@@ -579,8 +609,8 @@ router.get("/search", async (req, res): Promise<void> => {
     // Do not SQL-limit joined variants: first collapse each product to its
     // lowest price, then filter/sort products, and only then apply the limit.
     const productPrice = sql<number>`min(${productVariants.priceCents})`;
-    const [sellers, prods, videoPosts] = await Promise.all([
-      db.select({
+    const [sellers, prods, videoPosts] = await withTrigramThreshold(async (tx) => [
+      await tx.select({
         clerkId:     users.clerkId,
         displayName: users.displayName,
         brandName:   users.brandName,
@@ -594,14 +624,14 @@ router.get("/search", async (req, res): Promise<void> => {
           isNull(users.deletedAt),
           notBlockedWith(viewerId, users.clerkId),
           or(
-            fuzzyMatch(users.displayName, term, pattern),
-            fuzzyMatch(users.brandName, term, pattern),
-            fuzzyMatch(users.username, term, pattern),
+            trgmMatch(users.displayName, term, pattern),
+            trgmMatch(users.brandName, term, pattern),
+            trgmMatch(users.username, term, pattern),
           ),
         ),
       ).orderBy(desc(relevanceScore(sql`COALESCE(${users.brandName}, ${users.displayName}, ${users.username}, '')`, term)), asc(users.clerkId)).limit(10),
 
-      db.select({
+      await tx.select({
         id:         products.id,
         name:       products.name,
         ownerId:    products.ownerId,
@@ -614,7 +644,7 @@ router.get("/search", async (req, res): Promise<void> => {
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
         .where(and(
           eq(products.status, "active"), isNull(products.deletedAt),
-          fuzzyMatch(products.name, term, pattern),
+          trgmMatch(products.name, term, pattern),
           category ? eq(products.category, category) : undefined,
           notBlockedWith(viewerId, products.ownerId),
           sizeValue ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND pv.size ILIKE ${sizeValue})` : undefined,
@@ -627,35 +657,51 @@ router.get("/search", async (req, res): Promise<void> => {
         .having(and(
           minPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) >= ${minPriceCents}`,
           maxPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) <= ${maxPriceCents}`,
-        )),
-
-      // Videos — matched by caption or by a tagged product's name, same
-      // typo-tolerant relevance as products/brands above. Kept unfiltered by
-      // category/size/brand/price (those are product-only filters).
-      db.select({
-        id:        posts.id,
-        caption:   posts.caption,
-        mediaUrl:  posts.mediaUrl,
-        thumbnailUrl: posts.thumbnailUrl,
-        authorId:  posts.userId,
-        createdAt: posts.createdAt,
-        relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
-      }).from(posts)
-        .where(and(
-          eq(posts.mediaType, "video"),
-          publicPostCondition(),
-          or(
-            fuzzyMatch(posts.caption, term, pattern),
-            sql`EXISTS (
-              SELECT 1 FROM post_tagged_products ptp
-              JOIN products pr ON pr.id = ptp.product_id
-              WHERE ptp.post_id = ${posts.id}
-                AND (pr.name ILIKE ${pattern} OR similarity(pr.name, ${term}) > ${SIMILARITY_THRESHOLD})
-            )`,
-          ),
         ))
-        .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
-        .limit(20),
+        // Same ordering the JS sort below applies, pushed into SQL so a common
+        // term can't pull every matching product into memory. Past the cap a
+        // result is unreachable from the search UI anyway.
+        .orderBy(...productSearchOrder(sort, productPrice, sql`max(${relevanceScore(products.name, term)})`))
+        .limit(Math.max(PRODUCT_SEARCH_CAP, off + lim)),
+
+      // Videos — matched by caption substring or by a tagged product's name
+      // (typo-tolerant on the product name). Kept unfiltered by
+      // category/size/brand/price (those are product-only filters).
+      //
+      // Caption matching is substring-only. It used to also be trigram-fuzzy,
+      // but a whole-caption similarity above 0.25 against a short search term is
+      // only possible for very short captions, and the trigram index cannot
+      // narrow it (measured: ~1 s per search at 60k videos). Product-name
+      // typos still find their tagged videos below.
+      //
+      // Substring matches score 0.999 and fuzzy-only matches score lower, so
+      // when 20 caption matches exist they are the top 20 and the tagged-product
+      // query is skipped.
+      await (async () => {
+        const videoQuery = (match: SQL) => tx.select({
+          id:        posts.id,
+          caption:   posts.caption,
+          mediaUrl:  posts.mediaUrl,
+          thumbnailUrl: posts.thumbnailUrl,
+          authorId:  posts.userId,
+          createdAt: posts.createdAt,
+          relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
+        }).from(posts)
+          .where(and(eq(posts.mediaType, "video"), publicPostCondition(), match))
+          .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
+          .limit(VIDEO_SEARCH_PAGE);
+        const exact = await videoQuery(sql`${ilike(posts.caption, pattern)}`);
+        if (exact.length >= VIDEO_SEARCH_PAGE) return exact;
+        const tagged = await videoQuery(sql`${posts.id} IN (
+          SELECT ptp.post_id FROM post_tagged_products ptp
+          JOIN products pr ON pr.id = ptp.product_id
+          WHERE pr.name ILIKE ${pattern} OR pr.name % ${term}
+        )`);
+        const seenIds = new Set(exact.map((v) => v.id));
+        return [...exact, ...tagged.filter((v) => !seenIds.has(v.id))]
+          .sort((x, y) => Number(y.relevance) - Number(x.relevance) || y.createdAt.getTime() - x.createdAt.getTime())
+          .slice(0, VIDEO_SEARCH_PAGE);
+      })(),
     ]);
 
     // Fetch seller display names for product results

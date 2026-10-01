@@ -26,8 +26,13 @@ import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { screenText, MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
+import {
+  isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs, signedUrlForObjectPath,
+} from "../lib/mediaModerationStore";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/places";
+import { decodeCursor, encodeCursor } from "../lib/cursor";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -364,22 +369,23 @@ router.get("/feed", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
   const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
+  // Optional keyset pagination: pass the X-Next-Cursor header value back as
+  // ?cursor= to page without OFFSET. Offset still works unchanged.
+  const cursor = req.query.cursor === undefined ? null : decodeCursor(req.query.cursor);
+  if (req.query.cursor !== undefined && !cursor) {
+    return res.status(400).json({ error: "Invalid cursor", code: "VALIDATION_ERROR" });
+  }
 
   try {
-    // 1. Which seller accounts does this buyer follow?
-    const followRows = await db
+    // 1+2. Posts from the sellers this buyer follows (seller-only gate via
+    // users join). The follow list is a subquery, not a round trip that ships
+    // every followed id back into an IN (...) list. A buyer who follows nobody
+    // simply matches no rows and gets the same empty feed (real empty, not demo).
+    const followedIds = db
       .select({ followingId: follows.followingId })
       .from(follows)
       .where(eq(follows.followerId, clerkId));
 
-    const followedIds = followRows.map((r) => r.followingId);
-
-    // No followed sellers → return empty feed (real empty, not demo)
-    if (followedIds.length === 0) {
-      return res.json([]);
-    }
-
-    // 2. Fetch posts from those followed accounts (seller-only gate via users join)
     const pageRows = await db
       .select({
         id:          posts.id,
@@ -396,6 +402,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         sound:       posts.sound,
         visibility:  posts.visibility,
         createdAt:   posts.createdAt,
+        cursorTs:    sql<string>`${posts.createdAt}::text`,
         displayName: users.displayName,
         brandName:   users.brandName,
         verified:    users.verified,
@@ -410,10 +417,19 @@ router.get("/feed", requireAuth, async (req, res) => {
         eq(users.accountType, "seller"),        // seller-only gate
         inArray(posts.userId, followedIds),     // followed-only gate
       ))
-      .where(and(visiblePostCondition(), notBlockedWith(clerkId, posts.userId)))
-      .orderBy(desc(posts.createdAt))
+      .where(and(
+        visiblePostCondition(),
+        notBlockedWith(clerkId, posts.userId),
+        cursor ? sql`(${posts.createdAt}, ${posts.id}) < (${cursor.ts}::timestamp, ${cursor.id}::uuid)` : undefined,
+      ))
+      .orderBy(desc(posts.createdAt), desc(posts.id))
       .limit(lim)
-      .offset(off);
+      .offset(cursor ? 0 : off);
+
+    const last = pageRows[pageRows.length - 1];
+    if (last && pageRows.length === lim) {
+      res.setHeader("X-Next-Cursor", encodeCursor({ ts: last.cursorTs, id: last.id }));
+    }
 
     // Muted words hide matching captions from this viewer only.
     const muted = await mutedPhrasesFor(clerkId);
@@ -734,6 +750,42 @@ router.post("/", requireAuth, async (req, res) => {
   if (!locationResult.ok) {
     return res.status(locationResult.status).json({ error: locationResult.error, ...(locationResult.code ? { code: locationResult.code } : {}) });
   }
+  // Automatic media screening (off when the AI integration env is missing).
+  // Clear violations are rejected; anything flagged or unverifiable is held
+  // for a moderator and stays visible to its author only.
+  const isVideoPost = mediaType === "video";
+  const signed = async (path: string | undefined) => (path ? signedUrlForObjectPath(path) : undefined);
+  const storedUrls = mediaPath || resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []));
+  const composedPrimary = await signed(mediaPath);
+  const composedSlides = await Promise.all(resolvedMediaPaths.map((path) => signedUrlForObjectPath(path)));
+  const composedThumb = await signed(thumbnailPath);
+  const mediaRefs = {
+    images: [
+      ...(isVideoPost ? [] : [composedPrimary, ...storedUrls]),
+      ...composedSlides,
+      composedThumb ?? thumbnailUrl,
+    ].filter((v): v is string => !!v && v.length > 0),
+    videos: isVideoPost ? [composedPrimary ?? mediaUrl].filter((v): v is string => !!v) : [],
+    extraHosts: [req.get("host") ?? ""].filter(Boolean),
+  };
+  const mediaVerdict = mediaRefs.images.length + mediaRefs.videos.length > 0
+    ? await screenMediaRefs(mediaRefs)
+    : null;
+  if (mediaVerdict?.verdict === "reject") {
+    void recordRejectedUpload({ ownerId: clerkId, surface: "post", verdict: mediaVerdict });
+    return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED", categories: mediaVerdict.categories });
+  }
+  let textVerdict: Awaited<ReturnType<typeof screenText>> | null = null;
+  if (!captionHeld) {
+    textVerdict = await screenText(publicPostText(caption, hashtags));
+    if (textVerdict.verdict === "reject") {
+      void recordRejectedUpload({ ownerId: clerkId, surface: "post_text", verdict: textVerdict });
+      return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "CONTENT_REJECTED", categories: textVerdict.categories });
+    }
+  }
+  const screenHeld = (!!mediaVerdict && isFlagged(mediaVerdict)) || (!!textVerdict && isFlagged(textVerdict));
+  const heldVerdict = mediaVerdict && isFlagged(mediaVerdict) ? mediaVerdict : textVerdict;
+  const postHeld = captionHeld || screenHeld;
 
   const [post] = await db.insert(posts).values({
     placeId: locationResult.placeId ?? null,
@@ -753,10 +805,24 @@ router.post("/", requireAuth, async (req, res) => {
     postStatus,
     scheduledAt: postStatus === "scheduled" ? parsedScheduledAt : null,
     publishedAt: postStatus === "published" ? now : null,
-    moderationStatus: captionHeld ? "held" : "visible",
-    moderationReason: captionDecision.action === "hold" ? captionDecision.category : null,
+    moderationStatus: postHeld ? "held" : "visible",
+    moderationReason: captionDecision.action === "hold"
+      ? captionDecision.category
+      : screenHeld ? `media:${(heldVerdict?.categories ?? []).join(",")}`.slice(0, 200) : null,
     updatedAt: now,
   }).returning();
+
+  if (!captionHeld && screenHeld && heldVerdict) {
+    await recordHeldMedia({
+      targetType: post.mediaType === "video" ? "video" : "post",
+      targetId: post.id,
+      ownerId: clerkId,
+      verdict: heldVerdict,
+      refs: [...mediaRefs.videos, ...mediaRefs.images].filter((ref) => !ref.includes("?")).slice(0, 4),
+      excerpt: publicPostText(caption, hashtags),
+      label: post.mediaType === "video" ? "Video" : "Post",
+    });
+  }
 
   if (captionDecision.action === "hold") {
     await enqueueAutoFilterReport({
@@ -815,8 +881,13 @@ router.post("/", requireAuth, async (req, res) => {
     ...post,
     location: createdLocation,
     taggedProducts,
-    moderation: captionHeld
-      ? { status: "held", message: "Your caption is in review. The post stays hidden from others until a moderator approves it." }
+    moderation: postHeld
+      ? {
+          status: "held",
+          message: captionHeld
+            ? "Your caption is in review. The post stays hidden from others until a moderator approves it."
+            : MEDIA_HELD_MESSAGE,
+        }
       : { status: "visible" },
   });
 });
