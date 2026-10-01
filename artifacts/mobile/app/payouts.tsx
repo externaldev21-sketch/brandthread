@@ -393,6 +393,19 @@ export default function PayoutsScreen() {
              )}
           </View>
 
+           {!isPreview && !isReadOnly && !connectLoading && connectStatus?.providerConfigured && !connectStatus.verified && (
+             <TouchableOpacity
+               testID="seller-payouts-setup-checklist"
+               style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
+               onPress={() => { haptic(); router.push('/payout-setup' as never); }}
+               accessibilityRole="button"
+               accessibilityLabel="Open payout setup checklist"
+             >
+               <Text style={styles.settingsValue}>Payout setup checklist</Text>
+               <Feather name="chevron-right" size={16} color={theme.muted} />
+             </TouchableOpacity>
+           )}
+
            {!isReadOnly && (
              <TouchableOpacity
                 testID="seller-payouts-bank-account"

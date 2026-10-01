@@ -32,7 +32,7 @@ import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import checkoutIntentRouter from "./checkout-intent";
 import guestCheckoutRouter from "./guest-checkout";
-import connectRouter from "./connect";
+import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
 import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
@@ -187,6 +187,8 @@ router.use("/conversations",             conversationsRouter);
 // declared inside before the router applies requireAuth.
 router.use("/communities",               communitiesRouter);
 router.use("/brandthread-agent",         brandthreadAgentRouter);
+// Stripe redirects the seller's browser here with no app session: mounted before the owner-only router.
+router.use("/seller/connect/onboard",    connectRedirectRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
