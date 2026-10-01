@@ -1,6 +1,9 @@
 /**
- * Real development-DB coverage for the account erasure transaction.  Clerk and
- * auth are mocked only at the boundary; all deletion SQL runs against Postgres.
+ * Real development-DB coverage for account deletion: the request schedules a
+ * 30-day grace period (re-auth required, account hidden, sessions revoked),
+ * and purgeAccount (run by jobs/accountPurge.ts once the grace ends) erases
+ * the data. Clerk and auth are mocked only at the boundary; all SQL runs
+ * against Postgres.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import express from "express";
@@ -8,6 +11,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
+import { purgeAccount } from "../../lib/accountDeletion";
 import { db, buyerAddresses, cartItems, orders, pushTokens, returns, users } from "@workspace/db";
 
 const state = vi.hoisted(() => ({
@@ -25,7 +29,10 @@ vi.mock("../../middlewares/requireAuth", () => ({
 
 vi.mock("@clerk/express", () => ({
   clerkClient: {
+    sessions: { getSessionList: async () => ({ data: [{ id: "sess_1" }] }), revokeSession: async () => undefined },
     users: {
+      getUser: async () => ({ passwordEnabled: true }),
+      verifyPassword: async ({ password }: { password: string }) => ({ verified: password === "correct horse" }),
       deleteUser: async () => {
         state.clerkCalls += 1;
         // Import inside the hoisted mock factory to avoid accessing a static
@@ -89,15 +96,39 @@ afterAll(async () => {
 });
 
 describe("DELETE /api/auth/account", () => {
-  it("erases private data, tombstones the local user, then deletes the Clerk subject", async () => {
+  it("rejects a wrong password and changes nothing", async () => {
     const response = await fetch(`${base}/api/auth/account`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirmation: "DELETE" }),
+      body: JSON.stringify({ confirmation: "DELETE", password: "wrong" }),
+    });
+    expect(response.status).toBe(403);
+    const [user] = await db.select().from(users).where(eq(users.clerkId, state.userId)).limit(1);
+    expect(user.deletionRequestedAt).toBeNull();
+  });
+
+  it("schedules deletion, then purgeAccount erases private data and tombstones the user", async () => {
+    const response = await fetch(`${base}/api/auth/account`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE", password: "correct horse" }),
     });
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    const scheduled = await response.json() as any;
+    expect(scheduled.ok).toBe(true);
+    expect(scheduled.graceDays).toBe(30);
+    const [pending] = await db.select().from(users).where(eq(users.clerkId, state.userId)).limit(1);
+    expect(pending.deletedAt).toBeNull();
+    expect(pending.deletionRequestedAt).toBeInstanceOf(Date);
+    expect(state.clerkCalls).toBe(0);
+    expect(await db.select().from(pushTokens).where(eq(pushTokens.userId, state.userId))).toHaveLength(1);
+
+    // What jobs/accountPurge.ts does when the grace period has ended.
+    expect(await purgeAccount(state.userId)).toBe(true);
+    const { clerkClient } = await import("@clerk/express");
+    await clerkClient.users.deleteUser(state.userId);
+
     const [user] = await db.select().from(users).where(eq(users.clerkId, state.userId)).limit(1);
     expect(user.deletedAt).toBeInstanceOf(Date);
     expect(user.name).toBe("Deleted user");

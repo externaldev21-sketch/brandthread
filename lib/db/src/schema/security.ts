@@ -106,12 +106,11 @@ export const sellerTrialReminderEvents = pgTable("seller_trial_reminder_events",
     .on(table.sellerId, table.trialEndAt),
   trialEndIdx: index("seller_trial_reminder_events_trial_end_idx").on(table.trialEndAt),
 }));
-
 /**
  * Public web account-deletion requests (Google Play account-deletion URL).
  * Only the SHA-256 hash of the emailed token is stored. A request becomes
- * `completed` only after the owner confirms the emailed link and the existing
- * account deletion succeeds.
+ * `completed` only after the owner confirms the emailed link and the deletion
+ * grace period is scheduled.
  */
 export const accountDeletionRequests = pgTable("account_deletion_requests", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -127,4 +126,20 @@ export const accountDeletionRequests = pgTable("account_deletion_requests", {
 }, (table) => ({
   tokenHashIdx: uniqueIndex("account_deletion_requests_token_hash_idx").on(table.tokenHash),
   emailIdx: index("account_deletion_requests_email_idx").on(table.email, table.createdAt),
+}));
+
+/**
+ * Single-use email codes that re-authenticate password-less (OAuth-only)
+ * accounts before they schedule account deletion. Only the SHA-256 hash is
+ * stored; 15-minute expiry is enforced by the route.
+ */
+export const accountDeletionCodes = pgTable("account_deletion_codes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clerkId: text("clerk_id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  clerkIdx: index("account_deletion_codes_clerk_idx").on(table.clerkId, table.createdAt),
 }));

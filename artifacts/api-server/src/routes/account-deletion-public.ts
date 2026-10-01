@@ -7,9 +7,9 @@
  *    find out which emails are registered. If an active account has that
  *    email, a single-use 60-minute link is emailed to it.
  *  POST /api/public/account-deletion/confirm  { token, confirmation: "DELETE" }
- *    Only the holder of the emailed link can reach this. It runs the existing
- *    account deletion (accountDeletionHandler in routes/auth.ts), including
- *    its checks for open orders, held funds and disputes.
+ *    Only the holder of the emailed link can reach this. It schedules
+ *    accountDeletionHandler in routes/auth.ts, including the same blocker
+ *    checks and 30-day grace period used by authenticated deletion.
  */
 import { Router } from "express";
 import { db, users, accountDeletionRequests } from "@workspace/db";
@@ -127,6 +127,7 @@ router.post(
       const result = await runHandlerCapturing(accountDeletionHandler, {
         clerkUserId: claimed.clerkId,
         body: { confirmation: "DELETE" },
+        deletionEmailVerified: true,
         log: req.log,
       });
 

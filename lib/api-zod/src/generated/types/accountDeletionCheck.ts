@@ -5,12 +5,22 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AccountDeletionCheckReauth } from './accountDeletionCheckReauth';
 import type { DeletionBlocker } from './deletionBlocker';
 
 export interface AccountDeletionCheck {
   canDelete: boolean;
   /** @nullable */
   accountType: string | null;
+  /** Days the account stays restorable before permanent deletion */
+  graceDays?: number;
+  /** Proof required by DELETE /auth/account */
+  reauth?: AccountDeletionCheckReauth;
+  /**
+     * Set for a week after signing back in cancelled a scheduled deletion
+     * @nullable
+     */
+  deletionCancelledAt?: Date | null;
   blockers: DeletionBlocker[];
   willDelete: string[];
   willRetain: string[];

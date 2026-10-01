@@ -42,7 +42,7 @@ export function authorInGoodStanding(authorColumn: SQLWrapper): SQL {
   return sql`NOT EXISTS (
     SELECT 1 FROM users su
     WHERE su.clerk_id = ${authorColumn}
-      AND (su.suspended_at IS NOT NULL OR su.deleted_at IS NOT NULL)
+      AND (su.suspended_at IS NOT NULL OR su.deleted_at IS NOT NULL OR su.deletion_requested_at IS NOT NULL)
   )`;
 }
 
@@ -180,6 +180,7 @@ export async function profilesById(ids: string[]) {
       accountType: users.accountType,
       suspendedAt: users.suspendedAt,
       deletedAt: users.deletedAt,
+      deletionRequestedAt: users.deletionRequestedAt,
     })
     .from(users)
     .where(inArray(users.clerkId, unique));
@@ -200,7 +201,7 @@ export interface ProfileSummary {
 export function summarizeProfile(row: {
   clerkId: string; name: string | null; displayName: string | null; brandName?: string | null;
   username: string | null; avatarUrl: string | null; profileImageUrl?: string | null;
-  accountType: string | null; suspendedAt?: Date | null; deletedAt?: Date | null;
+  accountType: string | null; suspendedAt?: Date | null; deletedAt?: Date | null; deletionRequestedAt?: Date | null;
 }): ProfileSummary {
   const name = (row.accountType === "seller" ? row.brandName : null) || row.displayName || row.name || "Brandthread member";
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -213,6 +214,6 @@ export function summarizeProfile(row: {
     avatarUrl: row.profileImageUrl || row.avatarUrl || null,
     accountType: row.accountType,
     suspended: !!row.suspendedAt,
-    deleted: !!row.deletedAt,
+    deleted: !!(row.deletedAt || row.deletionRequestedAt),
   };
 }

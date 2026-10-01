@@ -9,4 +9,8 @@ import type { DeleteAccountInputConfirmation } from './deleteAccountInputConfirm
 
 export interface DeleteAccountInput {
   confirmation: DeleteAccountInputConfirmation;
+  /** Required for accounts that have a password */
+  password?: string;
+  /** Emailed 6-digit code */
+  code?: string;
 }

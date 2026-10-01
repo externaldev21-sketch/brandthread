@@ -31,7 +31,7 @@ const FAQS: Faq[] = [
   { q: 'Can I return or exchange an item?', a: 'Returns and exchanges are handled per-brand. Tap "Get Help" or "Return / Exchange" on any delivered order in My Orders to start the process with that brand.', category: 'General' },
   { q: 'How do I follow a brand?', a: 'Tap a brand\'s name anywhere in the app to view their profile, then tap "Follow". You\'ll see their drops in your Feed.', category: 'General' },
   { q: 'What is escrow protection?', a: 'Escrow protection means your payment is held by Brandthread and only released to the brand after your order ships. If something goes wrong before shipping you can get a full refund.', category: 'Billing', popular: true },
-  { q: 'How do I delete my account?', a: 'Go to Settings → Account → Delete Account. This is permanent and removes all your data. Your order history is retained for legal/tax purposes for 90 days.', category: 'Account' },
+  { q: 'How do I delete my account?', a: 'Go to Settings → Account → Delete Account. Your account is hidden right away and permanently deleted after 30 days. Sign back in during those 30 days to restore it. Order, payment and tax records are kept, without your personal details, for as long as the law requires.', category: 'Account' },
 ];
 
 const CATEGORIES: { key: Category; icon: keyof typeof Feather.glyphMap }[] = [

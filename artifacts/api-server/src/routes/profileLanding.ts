@@ -26,10 +26,11 @@ export async function profileLanding(req: Request, res: Response): Promise<void>
       avatarUrl: users.avatarUrl,
       profileImageUrl: users.profileImageUrl,
       deletedAt: users.deletedAt,
+      deletionRequestedAt: users.deletionRequestedAt,
       suspendedAt: users.suspendedAt,
     }).from(users).where(sql`lower(${users.username}) = ${username}`).limit(1);
 
-    if (!profile || profile.deletedAt || profile.suspendedAt || !profile.username || !profile.accountType) {
+    if (!profile || profile.deletedAt || profile.deletionRequestedAt || profile.suspendedAt || !profile.username || !profile.accountType) {
       res.status(404).send("Profile not found");
       return;
     }

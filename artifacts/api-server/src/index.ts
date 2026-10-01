@@ -14,6 +14,7 @@ import { startMoneySweepJob } from "./jobs/moneySweep";
 import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startAnalyticsRetentionJob } from "./jobs/analyticsRetention";
+import { startAccountPurgeJob } from "./jobs/accountPurge";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
@@ -76,6 +77,7 @@ const server = app.listen(port, (err) => {
   startDeliveryDeadlinesJob();
   startStoryCleanupJob();
   startAnalyticsRetentionJob();
+  startAccountPurgeJob();
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
   startLiveRecordingFinalizeJob();
