@@ -84,7 +84,9 @@ export async function auditTextFit(page, { minButtonPad = 12, minCardPad = 16, a
         const range = document.createRange(); range.selectNodeContents(b);
         const tr = range.getBoundingClientRect();
         const padL = tr.left - br.left, padR = br.right - tr.right;
-        if (tr.width > 0 && (padL < minButtonPad - 0.5 || padR < minButtonPad - 0.5) && !(padL > 40 && padR > 40)) {
+        const bcs = getComputedStyle(b);
+        const boxed = bcs.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(bcs.borderTopWidth) > 0;
+        if (boxed && tr.width > 0 && (padL < minButtonPad - 0.5 || padR < minButtonPad - 0.5) && !(padL > 40 && padR > 40)) {
           // Only flag when the box is tight around the label (icon-only / full-width rows are fine).
           if (br.width < vw * 0.7) problems.push({ kind: 'tight-padding', el: describe(b), detail: `padL ${Math.round(padL)} padR ${Math.round(padR)} (< ${minButtonPad})` });
         }

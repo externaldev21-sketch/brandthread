@@ -53,6 +53,8 @@ import communitiesRouter from "./communities";
 import brandthreadAgentRouter from "./brandthread-agent";
 import savedRouter from "./saved";
 import collectionsRouter from "./collections";
+import productBulkRouter from "./product-bulk";
+import productSeoRouter from "./product-seo";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
@@ -249,6 +251,8 @@ router.use("/buyer/recently-viewed",     recentlyViewedRouter);
 router.use("/first-run-tips",            firstRunTipsRouter);
 router.use("/buyer/saved",               savedRouter);
 router.use("/buyer/collections",         collectionsRouter);
+router.use("/product-bulk",              productBulkRouter);
+router.use("/product-seo",               productSeoRouter);
 router.use("/buyer/cart",                cartDbRouter);
 // One-page checkout (one PaymentIntent per cart). Before /buyer so its card-data guard runs first.
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);

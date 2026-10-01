@@ -77,6 +77,7 @@ const TABS: {
       'product-video',
       'product-launches',
       'waitlist-demand',
+      'products-bulk-edit', 'product-seo',
     ],
     destination: '/(tabs)/products',
   },
@@ -128,6 +129,8 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'product-video': 'products',
   'product-launches': 'products',
   'waitlist-demand': 'products',
+  'products-bulk-edit': 'products',
+  'product-seo': 'products',
   'drafts': 'products',
   // Orders
   'orders': 'orders',

@@ -130,6 +130,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
     { label: 'View store page', icon: 'eye', onPress: () => { closeSheet(); router.push(('/product-store?id=' + p.id) as never); } },
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
     { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
+    { label: 'Search listing (SEO)', icon: 'search', onPress: () => { closeSheet(); router.push(('/product-seo?productId=' + p.id) as never); } },
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
     ...(canManageFit ? [
       { label: 'Complete the fit', icon: 'layers' as const, onPress: () => { closeSheet(); router.push(('/product-pairings?productId=' + p.id) as never); } },
@@ -752,6 +753,7 @@ export default function ProductsScreen() {
           {
             icon: 'more-horizontal',
             onPress: () => showActionSheet('Products', 'Choose an action', [
+              { text: 'Select products', onPress: () => router.push('/products-bulk-edit' as never) },
               { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
               { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
               { text: 'Export products', onPress: () => { void handleExportProducts(); } },

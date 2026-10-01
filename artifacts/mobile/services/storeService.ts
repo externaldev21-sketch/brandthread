@@ -447,6 +447,8 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
       metaTitle:       store.seo.homepageTitle,
       metaDescription: store.seo.homepageDescription,
       keywords:        [],
+      productSeoDefaults: store.seo.productSeoDefaults,
+      sitemapEnabled:     store.seo.sitemapEnabled,
     },
   } as Record<string, unknown>).catch(() => {/* no-op */});
 

@@ -20,6 +20,7 @@ export * from './liveCommerce';
 export * from './growth';
 export * from './emailMarketing';
 export * from './giftCards';
+export * from './productBulkSeo';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
