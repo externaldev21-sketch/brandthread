@@ -245,6 +245,8 @@ export interface PaymentSummary {
   manufacturerAllocationCents: number;
   shippingLabelAllocationCents: number;
   platformFeeCents: number;
+  /** Stripe processing charged to the seller on this order (0 when not recorded). */
+  processingFeeCents?: number;
   payoutStatus: 'available' | 'pending' | 'held' | 'paid';
 }
 

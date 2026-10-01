@@ -461,6 +461,18 @@ export default function PayoutsScreen() {
              </View>
            </View>
 
+           {/* Fees & payments */}
+           <TouchableOpacity
+             style={[styles.settingsSection, styles.feesLinkRow]}
+             testID="seller-payouts-fees-link"
+             accessibilityRole="button"
+             accessibilityLabel="Fees and payments"
+             onPress={() => { haptic(); router.push('/fees' as never); }}
+           >
+             <Text style={styles.feesLinkLabel}>Fees &amp; payments</Text>
+             <Feather name="chevron-right" size={18} color={theme.muted} />
+           </TouchableOpacity>
+
            {/* Tax info status */}
             {!isPreview && connectStatus?.connected && connectStatus.providerConfigured && (() => {
              const cfg = taxInfoConfig(connectStatus.taxInfoStatus, theme);
@@ -536,6 +548,8 @@ const createStyles = (theme: AppThemePreset) => {
   settingsLabel:{ color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
   settingsValue:{ color: text, fontSize: FS.sm, fontFamily: FONT.medium },
    addBankBtn:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: accent, borderStyle: 'dashed' },
+   feesLinkRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+   feesLinkLabel:{ color: text, fontSize: FS.base, fontFamily: FONT.medium },
    addBankText:  { color: accent, fontSize: FS.sm, fontFamily: FONT.medium },
   });
 };

@@ -44,6 +44,7 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 
@@ -1257,6 +1258,7 @@ export default function AddProductScreen() {
   // Pricing row layout).
   function renderPriceEssentials() {
     return (
+      <>
       <View style={s.priceRow}>
         <FormInput
           label="Price *"
@@ -1275,6 +1277,8 @@ export default function AddProductScreen() {
           style={{ flex: 1 }}
         />
       </View>
+      <FeeBreakdown collapsible priceCents={parseDecimalToCents(priceStr)} />
+      </>
     );
   }
 
