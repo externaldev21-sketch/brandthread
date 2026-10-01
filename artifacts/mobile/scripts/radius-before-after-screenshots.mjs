@@ -132,6 +132,33 @@ function snapshotDom({ styleProps, radiusProps }) {
   return out;
 }
 
+
+/** Runs in the page: text that does not fit its box (truncated, clipped, or overflowing its parent). */
+function scanTextFit() {
+  const out = [];
+  const vw = document.documentElement.clientWidth;
+  for (const el of document.body.querySelectorAll('*')) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+    const own = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()).map((n) => n.textContent.trim()).join(' ');
+    if (!own) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    const label = `${el.tagName.toLowerCase()}:"${own.slice(0, 28)}"`;
+    const reasons = [];
+    if (el.scrollWidth > el.clientWidth + 1 && cs.overflowX !== 'visible') reasons.push(`scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`);
+    if (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) reasons.push('ellipsis-truncated');
+    const p = el.parentElement;
+    if (p && p !== document.body) {
+      const pr = p.getBoundingClientRect();
+      if (r.left < pr.left - 1 || r.right > pr.right + 1) reasons.push(`overflows parent horizontally (${Math.round(r.left - pr.left)}/${Math.round(r.right - pr.right)})`);
+    }
+    if (r.right > vw + 1 && r.left < vw) reasons.push('cut off at the screen edge');
+    if (reasons.length) out.push({ el: label, rect: [r.x, r.y, r.width, r.height].map(Math.round), reasons });
+  }
+  return out;
+}
+
 async function capture(buildDir, outDir) {
   mkdirSync(outDir, { recursive: true });
   const browser = await launchBrowser();
@@ -157,6 +184,7 @@ async function capture(buildDir, outDir) {
           await page.screenshot({ path: path.join(outDir, `${id}.png`) });
           const dom = await page.evaluate(snapshotDom, { styleProps: STYLE_PROPS, radiusProps: RADIUS_PROPS });
           writeFileSync(path.join(outDir, `${id}.dom.json`), JSON.stringify(dom));
+          writeFileSync(path.join(outDir, `${id}.fit.json`), JSON.stringify(await page.evaluate(scanTextFit)));
           console.log(`captured ${id} (${dom.length} elements)`);
         } catch (error) {
           console.log(`FAILED ${id}: ${String(error?.message ?? error).split('\n')[0]}`);
@@ -318,8 +346,18 @@ async function compare(beforeDir, afterDir, outDir, before2Dir) {
     writeFileSync(path.join(outDir, `${id}.diff.png`), Buffer.from(result.diffPng, 'base64'));
     copyFileSync(path.join(beforeDir, `${id}.png`), path.join(outDir, `${id}.before.png`));
     copyFileSync(path.join(afterDir, `${id}.png`), path.join(outDir, `${id}.after.png`));
+    const fitOf = (dir) => (existsSync(path.join(dir, `${id}.fit.json`)) ? JSON.parse(readFileSync(path.join(dir, `${id}.fit.json`), 'utf8')) : []);
+    const key = (f) => `${f.el}|${f.reasons.join(';')}`;
+    const fitBefore = fitOf(beforeDir);
+    const fitAfter = fitOf(afterDir);
+    const beforeKeys = new Set(fitBefore.map(key));
+    const newFit = fitAfter.filter((f) => !beforeKeys.has(key(f)));
     const row = {
       id,
+      textFitFindingsBefore: fitBefore.length,
+      textFitFindingsAfter: fitAfter.length,
+      textFitFindingsIntroduced: newFit,
+      textFitFindingsAfterList: fitAfter,
       size: `${result.width}x${result.height}`,
       radiusChangedElements: regions.length,
       changedPixels: result.changed,
@@ -336,7 +374,7 @@ async function compare(beforeDir, afterDir, outDir, before2Dir) {
       unexplainedPixelsOver24: result.strong,
     };
     report.push(row);
-    console.log(`${id}: ${regions.length} radius changes | ${result.changed}px changed = ${result.inCorner} corner + ${result.inBlur} blur + ${result.noisy} noise + ${result.outside} unexplained | ${styleDiffs.length} non-radius DOM diffs${unstable ? ' | UNSTABLE' : ''}`);
+    console.log(`${id}: ${regions.length} radius changes | ${result.changed}px changed = ${result.inCorner} corner + ${result.inBlur} blur + ${result.noisy} noise + ${result.outside} unexplained | ${styleDiffs.length} non-radius DOM diffs | text-fit ${fitBefore.length} -> ${fitAfter.length} (${newFit.length} new)${unstable ? ' | UNSTABLE' : ''}`);
   }
   writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
   await browser.close();
