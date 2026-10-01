@@ -416,7 +416,7 @@ export default function FulfillOrderScreen() {
   if (!order) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Fulfill Order" />
+        <ScreenHeader title="Fulfill Order" divider={false} />
         <View style={s.centered}>
           <Text style={s.errorText}>Couldn't load this order.</Text>
         </View>
@@ -463,7 +463,7 @@ export default function FulfillOrderScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Fulfill Order" />
+      <ScreenHeader title="Fulfill Order" divider={false} />
 
       {/* Stepper */}
       <View style={s.stepperRow}>
