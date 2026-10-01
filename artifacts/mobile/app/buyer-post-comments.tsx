@@ -50,7 +50,10 @@ import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXP
 import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
-import { buildPreviewComments, previewNotificationComments } from '@/lib/previewComments';
+import { buildPreviewComments, previewNotificationComments, PREVIEW_MENTION_PEOPLE } from '@/lib/previewComments';
+import { MentionText } from '@/components/social/MentionText';
+import { MentionSuggestionsBar } from '@/components/MentionPickerSheet';
+import { activeMentionQuery, insertMentionHandle, type CommentMentionRef } from '@/lib/commentMentions';
 import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 
@@ -255,6 +258,7 @@ function CommentRow({
   onLike,
   onReply,
   onMore,
+  onPressMention,
 }: {
   comment: Row;
   /** The comment a notification deep-linked to — briefly tinted. */
@@ -263,6 +267,7 @@ function CommentRow({
   onLike: (comment: Row) => void;
   onReply: (comment: Row) => void;
   onMore: (comment: Row) => void;
+  onPressMention?: (mention: CommentMentionRef) => void;
 }) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
@@ -286,6 +291,13 @@ function CommentRow({
           rippleEnabled={false}
           noMinHeight
         >
+          {comment.pinned && !comment.isReply ? (
+            <View style={s.pinnedRow} testID="comment-pinned-label">
+              <Feather name="bookmark" size={10} color={MUTED} />
+              <Text style={s.pinnedText}>Pinned</Text>
+            </View>
+          ) : null}
+
           <View style={s.commentHeader}>
             <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
             {isCreator && <Text style={[s.creatorBadge, { color: theme.text }]}>· Creator</Text>}
@@ -296,7 +308,12 @@ function CommentRow({
             <Text style={s.replyContext}>Replying to {comment.parentAuthorName}</Text>
           ) : null}
 
-          <Text style={[s.commentText, comment.pendingReview && s.commentTextHeld]}>{comment.body}</Text>
+          <MentionText
+            body={comment.body}
+            mentions={comment.mentions}
+            style={[s.commentText, comment.pendingReview && s.commentTextHeld]}
+            onPressMention={onPressMention}
+          />
 
           {comment.creatorLiked && !isCreator ? (
             <View style={s.creatorLikedBadge}>
@@ -385,8 +402,13 @@ function CommentActionsSheet({
   onReport,
   onBlock,
   onDelete,
+  canPin = false,
+  onTogglePin,
 }: {
   comment: Row | null;
+  /** The viewer owns the post, so top-level comments can be pinned. */
+  canPin?: boolean;
+  onTogglePin?: (comment: Row) => void;
   onClose: () => void;
   onReply: (comment: Row) => void;
   onReport: (comment: Row) => void;
@@ -441,6 +463,13 @@ function CommentActionsSheet({
           <View style={s.sheetGroup}>
             {!comment.pendingReview ? (
               <Option icon="corner-up-left" label="Reply" onPress={() => { onClose(); onReply(comment); }} />
+            ) : null}
+            {canPin && onTogglePin && !comment.isReply && !comment.pendingReview ? (
+              <Option
+                icon="bookmark"
+                label={comment.pinned ? 'Unpin comment' : 'Pin comment'}
+                onPress={() => { onClose(); onTogglePin(comment); }}
+              />
             ) : null}
             {!comment.isMine ? (
               <>
@@ -629,7 +658,7 @@ export default function BuyerPostCommentsScreen() {
   const [comments, setComments] = useState<Row[]>([]);
   /** Root comment ids whose reply thread is expanded (collapsed by default). */
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(new Set());
-  const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null as string | null });
+  const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, isPostOwner: false, nextCursor: null as string | null });
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Row | null>(null);
   const [sending, setSending] = useState(false);
@@ -694,7 +723,7 @@ export default function BuyerPostCommentsScreen() {
       }
       if (!cached) previewCommentsCache.set(postId, seeded);
       setComments(seeded);
-      setMeta({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null });
+      setMeta({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, isPostOwner: !!user?.id && user.id === postAuthorId, nextCursor: null });
       setFetchError(null);
       hasLoadedOnce.current = true;
       setLoading(false);
@@ -710,6 +739,7 @@ export default function BuyerPostCommentsScreen() {
         hiddenByMutedWords: thread.hiddenByMutedWords,
         commentsDisabled: thread.commentsDisabled,
         canComment: thread.canComment,
+        isPostOwner: !!thread.isPostOwner,
         nextCursor: thread.nextCursor,
       });
       hasLoadedOnce.current = true;
@@ -720,7 +750,7 @@ export default function BuyerPostCommentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, postId, params.postAuthorName, targetCommentId, myName]);
+  }, [api, postId, params.postAuthorName, targetCommentId, myName, user?.id, postAuthorId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -812,6 +842,40 @@ export default function BuyerPostCommentsScreen() {
       setSendError(apiErrorMessage(error, 'Could not delete this comment. Try again.'));
     }
   };
+
+  const handleTogglePin = async (comment: Row) => {
+    const pin = !comment.pinned;
+    const applyLocal = () => setCommentsSynced(prev => {
+      const updated = prev.map(c => ({ ...c, pinned: c.isReply ? c.pinned : (c.id === comment.id ? pin : false) }));
+      if (!pin) return updated;
+      // A pinned comment leads the list; keep its replies right behind it.
+      const group = updated.filter(c => c.id === comment.id || c.parentId === comment.id);
+      return [...group, ...updated.filter(c => c.id !== comment.id && c.parentId !== comment.id)];
+    });
+    if (isPreviewPost) {
+      applyLocal();
+      showToast(pin ? 'Comment pinned' : 'Comment unpinned');
+      return;
+    }
+    try {
+      if (pin) await api.comments.pin(postId, comment.id); else await api.comments.unpin(postId, comment.id);
+      hapticSuccess();
+      showToast(pin ? 'Comment pinned' : 'Comment unpinned');
+      await load();
+    } catch (error) {
+      setSendError(apiErrorMessage(error, pin ? 'Could not pin this comment. Try again.' : 'Could not unpin this comment. Try again.'));
+    }
+  };
+
+  const handlePressMention = (mention: CommentMentionRef) => {
+    hapticLight();
+    router.push({
+      pathname: '/buyer-other-profile' as never,
+      params: { userId: mention.userId, handle: `@${mention.handle}` },
+    } as never);
+  };
+
+  const mentionQuery = activeMentionQuery(inputText);
 
   const handleSend = async () => {
     const text = inputText.trim();
@@ -1092,6 +1156,7 @@ export default function BuyerPostCommentsScreen() {
                 onLike={handleLike}
                 onReply={handleReply}
                 onMore={setActionsFor}
+                onPressMention={handlePressMention}
               />
             )
           )}
@@ -1181,6 +1246,20 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : (
             <>
+              {/* @mention suggestions: only while the text ends in an active
+                  "@token"; reads the same mention-search API the story editor
+                  uses (local demo people in preview mode, never the API). */}
+              <MentionSuggestionsBar
+                query={mentionQuery ?? ''}
+                active={mentionQuery !== null}
+                enabled={!isPreviewPost}
+                demoPeople={isPreviewPost ? PREVIEW_MENTION_PEOPLE : undefined}
+                onPick={(person) => {
+                  hapticSelection();
+                  setInputText(value => insertMentionHandle(value, person.username ?? person.handle));
+                  inputRef.current?.focus();
+                }}
+              />
               {/* Bare emoji, evenly spaced across the full width, no chip
                   backgrounds — TikTok's quick-reaction row sits directly
                   above the composer with nothing else around each glyph. */}
@@ -1253,6 +1332,8 @@ export default function BuyerPostCommentsScreen() {
         onReport={handleReport}
         onBlock={handleBlock}
         onDelete={handleDelete}
+        canPin={meta.isPostOwner}
+        onTogglePin={handleTogglePin}
       />
     </View>
   );
@@ -1333,6 +1414,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     borderWidth: 1, borderColor: theme.warning + '55', backgroundColor: theme.warning + '14',
   },
   reviewPillText: { color: theme.warning, fontFamily: FONT.medium, fontSize: 11 },
+  pinnedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
+  pinnedText: { fontFamily: FONT.semibold, fontSize: 11, color: MUTED },
   creatorLikedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
   creatorLikedText: { fontFamily: FONT.semibold, fontSize: 11 },
   commentContentPress: { alignItems: 'flex-start' },
