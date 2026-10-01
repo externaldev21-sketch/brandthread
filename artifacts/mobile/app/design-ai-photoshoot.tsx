@@ -53,7 +53,10 @@ const RATIOS: { value: ImageRatioKind; label: string }[] = [
   { value: '4:5', label: '4:5' },
   { value: '9:16', label: '9:16' },
 ];
-const PRODUCT_TILE = 84;
+// 92, not 84: at FS.xs (11px) the longest tile caption ("Add product")
+// needs this much width to clear a 12px inner margin on each side without
+// wrapping past 2 lines — see the text-fit pass in this screen's PR.
+const PRODUCT_TILE = 92;
 
 // Scene-preset image tiles (item 3 of Dev's follow-up: convert the old text
 // chips to photo+label tiles). No real preset photography exists in this
@@ -64,16 +67,23 @@ const SCENE_ICONS: Record<SceneStyleKind, keyof typeof Feather.glyphMap> = {
   studio: 'aperture', street: 'map', luxury_interior: 'home', outdoor: 'sun',
   industrial: 'tool', minimal: 'minus-circle', runway: 'flag', night: 'moon', custom: 'edit-3',
 };
+// This scene row scrolls like a tab row, so every label must fit one line
+// at PRODUCT_TILE width (text-fit pass) — "Luxury interior" is the one
+// SCENE_STYLES label too long for that; shown as "Luxury" on the tile only,
+// the underlying value/prompt is untouched.
+const SCENE_TILE_LABEL: Partial<Record<SceneStyleKind, string>> = {
+  luxury_interior: 'Luxury',
+};
 
-// Isolates the pinned dock's bottom offset in one place. This screen must
-// keep the floating seller tab bar visible (tests/seller-bottom-navigation-
-// layout.test.ts's mustShowBar list), so today the dock reserves the tab
-// bar's own height on top of the safe-area inset.
-// TODO(useHideTabBar): once components/.../useHideTabBar lands and this
-// screen adopts it (tracked in a sibling session), replace the body with
-// `insets.bottom` alone — the tab bar will be hidden entirely on this
-// screen instead of needing its height reserved here. Isolated here so
-// that swap is a one-line change instead of touching every call site.
+// Isolates the pinned dock's bottom offset in one place (still just this
+// one function to change if that math ever needs to differ). useHideTabBar()
+// below slides the floating seller tab bar away while this screen is
+// focused, but the slide is an animation, not instant — the bar is still
+// visible for a beat on mount/back-navigation — so the dock still reserves
+// the tab bar's own height on top of the safe-area inset, matching the
+// same (COMP.tabBarH + insets.bottom) pattern Mockup to Model's dock uses
+// after adopting the same hook, rather than assuming the bar is gone the
+// instant this screen mounts.
 function getAiToolDockBottomInset(insets: { bottom: number }): number {
   return COMP.tabBarH + insets.bottom;
 }
@@ -384,7 +394,7 @@ export default function AIPhotoshootScreen() {
         {products === null ? (
           <ActivityIndicator style={{ marginTop: SP.lg }} color={FG} />
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tileRow}>
+          <ScrollView horizontal style={s.tileRowScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={s.tileRow}>
             <TouchableOpacity
               style={s.actionTile}
               onPress={pickUploadInsteadOfProduct}
@@ -392,7 +402,7 @@ export default function AIPhotoshootScreen() {
               accessibilityLabel="Upload photos"
             >
               <Feather name="upload" size={20} color={MUTED} />
-              <Text style={s.actionTileLabel}>Upload</Text>
+              <Text style={s.actionTileLabel} numberOfLines={2}>Upload</Text>
             </TouchableOpacity>
             {products.length === 0 && (
               <TouchableOpacity
@@ -402,7 +412,7 @@ export default function AIPhotoshootScreen() {
                 accessibilityLabel="Add a product"
               >
                 <Feather name="plus-circle" size={20} color={MUTED} />
-                <Text style={s.actionTileLabel}>Add product</Text>
+                <Text style={s.actionTileLabel} numberOfLines={2}>Add product</Text>
               </TouchableOpacity>
             )}
             {products.slice(0, 20).map((p) => {
@@ -461,7 +471,7 @@ export default function AIPhotoshootScreen() {
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Scene</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tileRow}>
+        <ScrollView horizontal style={s.tileRowScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={s.tileRow}>
           {SCENE_STYLES.slice(0, 8).map((opt) => {
             const active = sceneStyle === opt.value;
             return (
@@ -478,7 +488,9 @@ export default function AIPhotoshootScreen() {
                 >
                   <Feather name={SCENE_ICONS[opt.value]} size={20} color="#fff" />
                 </LinearGradient>
-                <Text style={[s.presetTileLabel, active && s.presetTileLabelActive]}>{opt.label}</Text>
+                <Text style={[s.presetTileLabel, active && s.presetTileLabelActive]} numberOfLines={1}>
+                  {SCENE_TILE_LABEL[opt.value] ?? opt.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -574,21 +586,22 @@ const s = StyleSheet.create({
   content: { padding: SP.lg },
   sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.sm },
   sectionDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.lg },
+  tileRowScroller: { alignSelf: 'stretch' },
   tileRow: { flexDirection: 'row', gap: 10, paddingRight: SP.lg },
   actionTile: {
     width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12,
   },
-  actionTileLabel: { fontFamily: FONT.medium, fontSize: 11, color: MUTED, textAlign: 'center' },
+  actionTileLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, textAlign: 'center', lineHeight: 14 },
   productTile: { width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, position: 'relative' },
   productTileSelected: { borderColor: FG, borderWidth: 2 },
   productTileImg: { width: '100%', height: '100%' },
   productTileImgEmpty: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
   productTileCheck: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
-  presetTile: { width: PRODUCT_TILE, alignItems: 'center', gap: 6 },
+  presetTile: { width: PRODUCT_TILE, alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   presetTileImg: { width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   presetTileImgActive: { borderWidth: 2, borderColor: FG },
-  presetTileLabel: { fontFamily: FONT.medium, fontSize: 11, color: MUTED, textAlign: 'center' },
+  presetTileLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
   presetTileLabelActive: { color: FG, fontFamily: FONT.semibold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.md },
   chip: { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
