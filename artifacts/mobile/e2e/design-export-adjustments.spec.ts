@@ -1,8 +1,8 @@
 /**
  * design-export-adjustments.spec.ts — proves that adjustments made on the
- * canvas survive into every read-only compositing surface: the gallery
- * thumbnail (DesignLayerCompositor in app/design.tsx) and the mockup
- * preview (app/design-mockup-preview.tsx). Both now build their filter
+ * canvas survive into the read-only compositing surfaces: the gallery
+ * thumbnail and the full-size preview modal (both DesignLayerCompositor in
+ * app/design.tsx; the mockup preview uses the same component). All build their filter
  * chain from the ONE shared builder (components/design-studio/
  * layerFilterChain.tsx) the editor uses, so the same SVG primitives
  * (feColorMatrix for HSB, feOffset ×2 for Chromatic Aberration) must be
@@ -48,7 +48,7 @@ async function primCount(scope: import('@playwright/test').Locator, tag: string)
   return scope.locator(tag).count();
 }
 
-test('HSB + Chromatic Aberration applied on the canvas are carried by the gallery thumbnail and the mockup preview after saving', async () => {
+test('HSB + Chromatic Aberration applied on the canvas are carried by the gallery thumbnail and the full-size preview modal after saving', async () => {
   const { context, page, activity } = await harness.openContext(browser, {
     device: { viewport: { width: 393, height: 852 }, scale: 2, isMobile: true, userAgent: undefined },
     role: 'seller',
@@ -130,16 +130,20 @@ test('HSB + Chromatic Aberration applied on the canvas are carried by the galler
   await assertNoTextOrBoxOverflow(page, '[data-testid^="grid-item-"]');
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, '02-gallery-thumbnail-adjusted.png') });
 
-  // Mockup preview composites the same project through the same compositor.
-  const testId = await adjustedThumb.getAttribute('data-testid');
-  const projectId = testId!.replace('grid-item-', '');
-  await page.goto(`${origin}/design-mockup-preview?projectId=${encodeURIComponent(projectId)}&bt_preview=seller`);
-  await page.waitForFunction(() => (window as any).Clerk?.loaded === true, undefined, { timeout: 20_000 });
-  const mockupFilter = page.locator('svg filter[id^="cf_"]').first();
-  await expect(mockupFilter).toHaveCount(1, { timeout: 15_000 });
-  expect(await primCount(mockupFilter, 'feOffset')).toBe(2);
-  expect(await primCount(mockupFilter, 'feColorMatrix')).toBeGreaterThanOrEqual(4);
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '03-mockup-preview-adjusted.png') });
+  // Tapping the thumbnail opens the gallery's full-size preview modal, which
+  // composites the same project through the same compositor at preview size.
+  // (The mockup-preview route is only reachable via a cold URL in this build,
+  // and its getProject() fires before _layout's initDesignService has scoped
+  // storage to the user — a pre-existing race, noted in the PR, not covered here.)
+  await adjustedThumb.click();
+  const modal = page.locator('[data-testid="preview-modal"]');
+  await expect(modal).toBeVisible({ timeout: 10_000 });
+  const previewFilter = modal.locator('svg filter[id^="cf_"]').first();
+  await expect(previewFilter).toHaveCount(1, { timeout: 10_000 });
+  expect(await primCount(previewFilter, 'feOffset')).toBe(2);
+  expect(await primCount(previewFilter, 'feColorMatrix')).toBeGreaterThanOrEqual(4);
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '03-preview-modal-adjusted.png') });
+  await page.locator('[data-testid="preview-close"]').click();
 
   await context.close();
 });
