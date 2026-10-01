@@ -29,7 +29,7 @@ import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import {
   getShippingRates, purchaseShippingLabel, voidShippingLabel, addTracking as addTrackingService,
   getPackagePresets, createPackagePreset, deletePackagePreset,
-  updateFulfillmentChecklist, PackagePreset,
+  updateFulfillmentChecklist, PackagePreset, getParcelSuggestion,
 } from '@/services/orderService';
 import { sharePackingSlip } from '@/lib/packingSlip';
 
@@ -82,6 +82,7 @@ export default function FulfillOrderScreen() {
   // Step 2 — package
   const [presets, setPresets] = useState<PackagePreset[]>([]);
   const [packageChoice, setPackageChoice] = useState<PackageChoice | null>(null);
+  const [suggestedWeightLb, setSuggestedWeightLb] = useState('');
   const [addingPreset, setAddingPreset] = useState(false);
   const [newPreset, setNewPreset] = useState({ name: '', weightOz: '', lengthIn: '', widthIn: '', heightIn: '' });
 
@@ -102,6 +103,13 @@ export default function FulfillOrderScreen() {
   const [done, setDone] = useState(false);
   const successScale = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!orderId) return;
+    getParcelSuggestion(orderId)
+      .then(result => { if (result.weightKnown && result.weightLb > 0) setSuggestedWeightLb(String(result.weightLb)); })
+      .catch(() => { /* no suggestion: the seller types the weight */ });
+  }, [orderId]);
 
   const purchaseKey = useMemo(() => `fulfill-${orderId}${itemIdsParam ? `-${String(itemIdsParam)}` : ''}`, [orderId, itemIdsParam]);
   // A voided label is no longer usable proof of shipment — treat it the same
@@ -532,7 +540,7 @@ export default function FulfillOrderScreen() {
                 );
               })}
               <TouchableOpacity
-                onPress={() => { Haptics.selectionAsync().catch(() => {}); setPackageChoice({ kind: 'custom', weight: '', length: '', width: '', height: '' }); }}
+                onPress={() => { Haptics.selectionAsync().catch(() => {}); setPackageChoice({ kind: 'custom', weight: suggestedWeightLb, length: '', width: '', height: '' }); }}
                 style={[s.presetChip, packageChoice?.kind === 'custom' && { borderColor: ACCENT, backgroundColor: ACCENT_DIM }]}
               >
                 <Text style={[s.presetChipText, packageChoice?.kind === 'custom' && { color: FG, fontFamily: FONT.semibold }]}>Custom</Text>

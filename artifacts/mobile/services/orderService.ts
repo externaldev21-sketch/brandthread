@@ -331,6 +331,13 @@ export async function markDelivered(orderId: string): Promise<Order | undefined>
   return o;
 }
 
+export type ParcelSuggestion = { weightLb: number; weightOz: number; weightKnown: boolean; unweightedUnits: number };
+
+/** Total weight of an order's items, from the weights sellers set on products. */
+export async function getParcelSuggestion(orderId: string): Promise<ParcelSuggestion> {
+  return await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/parcel-suggestion`) as ParcelSuggestion;
+}
+
 export async function getShippingRates(orderId: string, parcel: {
   itemIds?: string[];
   fromAddress: OrderAddress;

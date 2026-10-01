@@ -135,13 +135,17 @@ export async function purgeTestData(db: QueryRunner, opts: { dryRun: boolean }):
   const hasColumn = (table: string, column: string) =>
     (columnsByTable.get(table) ?? []).some((c) => c.column === column);
 
+  // App Review demo accounts (users.is_review_account, migration 240) are
+  // never purge targets, even if someone gave one a reserved-TLD email.
+  const reviewGuard = hasColumn("users", "is_review_account") ? ` AND COALESCE(is_review_account, false) = false` : "";
+
   const matchedClerkIds = new Set<string>();
   const doomed = new Map<string, Set<string>>();
 
   // ── Anchors ──────────────────────────────────────────────────────────────
   if (columnsByTable.has("users") && hasColumn("users", "email") && hasColumn("users", "clerk_id")) {
     const { rows } = await db.query(
-      `SELECT id, clerk_id FROM "users" WHERE email ~* $1 AND email !~* $2`,
+      `SELECT id, clerk_id FROM "users" WHERE email ~* $1 AND email !~* $2${reviewGuard}`,
       [TEST_EMAIL_TLD_PATTERN, PRODUCTION_EMAIL_EXCLUSION_PATTERN],
     );
     doomed.set("users", new Set(rows.map((r) => r.id as string)));
@@ -238,7 +242,7 @@ export async function purgeTestData(db: QueryRunner, opts: { dryRun: boolean }):
       parts.push(`(business_name ~ $${params.length - 1} OR business_name ~ $${params.length})`);
     } else if (table === "users") {
       params.push(TEST_EMAIL_TLD_PATTERN, PRODUCTION_EMAIL_EXCLUSION_PATTERN);
-      parts.push(`(email ~* $${params.length - 1} AND email !~* $${params.length})`);
+      parts.push(`(email ~* $${params.length - 1} AND email !~* $${params.length}${reviewGuard})`);
     } else {
       for (const col of cols) {
         if (!col.column.includes("email") || !isTextual(col)) continue;

@@ -278,16 +278,30 @@ export async function removeReportedContent(type: ReportTargetType, id: string, 
   }
 }
 
-/** Publish content the automatic filter held, after a moderator approves it. */
-export async function releaseHeldContent(type: ReportTargetType, id: string, moderatorId: string): Promise<void> {
+/**
+ * Publish content the automatic filter held, after a moderator approves it.
+ * Resolves to true when something was actually released (it was held).
+ */
+export async function releaseHeldContent(type: ReportTargetType, id: string, moderatorId: string): Promise<boolean> {
   const now = new Date();
   if (type === "comment") {
-    await db.update(postComments)
+    const rows = await db.update(postComments)
       .set({ moderationStatus: "visible", moderatedAt: now, moderatedBy: moderatorId, updatedAt: now })
-      .where(and(eq(postComments.id, id), eq(postComments.moderationStatus, "held")));
+      .where(and(eq(postComments.id, id), eq(postComments.moderationStatus, "held")))
+      .returning({ id: postComments.id });
+    return rows.length > 0;
   } else if (type === "post" || type === "video") {
-    await db.update(posts)
+    const rows = await db.update(posts)
       .set({ moderationStatus: "visible", moderatedAt: now, updatedAt: now })
-      .where(and(eq(posts.id, id), eq(posts.moderationStatus, "held")));
+      .where(and(eq(posts.id, id), eq(posts.moderationStatus, "held")))
+      .returning({ id: posts.id });
+    return rows.length > 0;
+  } else if (type === "story") {
+    const rows = await db.update(stories)
+      .set({ moderationStatus: "visible", moderatedAt: now })
+      .where(and(eq(stories.id, id), eq(stories.moderationStatus, "held")))
+      .returning({ id: stories.id });
+    return rows.length > 0;
   }
+  return false;
 }
