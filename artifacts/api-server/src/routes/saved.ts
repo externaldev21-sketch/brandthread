@@ -6,10 +6,15 @@
  * DELETE /api/buyer/saved/:targetId           — unsave
  */
 import { Router } from "express";
-import { db, savedItems } from "@workspace/db";
+import { db, savedItems, posts } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
+import { blockRelation } from "../lib/safety";
+import { publicPostCondition as visiblePostCondition } from "../lib/postVisibility";
+import { applyEventToProfile } from "../lib/ranking/forYou";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const router = Router();
 router.use(requireAuth);
@@ -37,6 +42,20 @@ router.post("/", async (req, res) => {
 
   if (!targetId || !title) return res.status(400).json({ error: "targetId and title required" });
 
+  let savedPost: { userId: string; styleTags: unknown } | null = null;
+  if (type === "post") {
+    // Only real, visible posts can be saved, and never across a block.
+    if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return res.status(404).json({ error: "Post not found" });
+    const [post] = await db.select({ userId: posts.userId, styleTags: posts.styleTags }).from(posts)
+      .where(and(eq(posts.id, targetId), visiblePostCondition()))
+      .limit(1);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (post.userId !== userId && (await blockRelation(userId, post.userId)) !== "none") {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    savedPost = post;
+  }
+
   try {
     const [row] = await db.insert(savedItems)
       .values({
@@ -51,9 +70,17 @@ router.post("/", async (req, res) => {
         lastNotifiedPriceCents: typeof priceCents === "number" ? priceCents : null,
       })
       .returning();
+    if (savedPost) {
+      // New row only (a duplicate hits 23505 below), so the taste signal fires once per save.
+      void applyEventToProfile(userId, {
+        type: "save",
+        styleTags: Array.isArray(savedPost.styleTags) ? (savedPost.styleTags as string[]) : [],
+        sellerId: savedPost.userId,
+      }).catch(() => undefined);
+    }
     return res.status(201).json((await adaptSavedRows([row]))[0]);
   } catch (err: any) {
-    if (err?.code === "23505") {
+    if ((err?.code ?? err?.cause?.code) === "23505") {
       // Already saved — fetch + return existing row
       const [row] = await db.select().from(savedItems)
         .where(and(eq(savedItems.userId, userId), eq(savedItems.targetId, targetId)))
