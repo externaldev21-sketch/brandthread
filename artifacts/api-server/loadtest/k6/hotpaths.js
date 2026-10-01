@@ -45,6 +45,21 @@ function record(name, res, okStatuses) {
   check(res, { [`${name} ok`]: (r) => limited || okStatuses.includes(r.status) });
 }
 
+// Search terms: half the traffic is a Zipf-distributed head of 60 popular terms
+// (cacheable), half is a unique tail (typeahead prefixes and typos that never
+// repeat, so every one misses a cache). This avoids flattering a cache with 6 terms.
+const WORDS = ["hoodie", "tee", "street", "vintage", "denim", "cargo", "crewneck", "sneaker", "runway", "capsule", "oversized",
+  "graphic", "linen", "knit", "boxy", "archive", "minimal", "techwear", "utility", "satin", "wool", "fleece", "tote", "beanie",
+  "jacket", "bomber", "trench", "pleated", "washed", "embroidered", "heavyweight", "organic", "limited", "classic", "cropped", "brand", "load"];
+const HEAD = Array.from({ length: 60 }, (_, i) => (i < WORDS.length ? WORDS[i] : `${WORDS[i % WORDS.length]} ${WORDS[(i * 7) % WORDS.length]}`));
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+function searchTerm() {
+  if (Math.random() < 0.5) return HEAD[Math.floor(60 * Math.pow(Math.random(), 2.5))];
+  const w = WORDS[Math.floor(Math.random() * WORDS.length)];
+  const cut = w.slice(0, 3 + Math.floor(Math.random() * (w.length - 2)));
+  return cut + LETTERS[Math.floor(Math.random() * 26)] + LETTERS[Math.floor(Math.random() * 26)];
+}
+
 const scenarios = {
   feed_for_you() {
     const u = buyer();
@@ -73,8 +88,7 @@ const scenarios = {
     record("product", res, [200]);
   },
   search() {
-    const q = ["product", "hood", "tee", "brand", "load", "street"][Math.floor(Math.random() * 6)];
-    const res = http.get(`${BASE}/api/public/search?q=${q}`, { ...anon(), tags: { name: "search" } });
+    const res = http.get(`${BASE}/api/public/search?q=${encodeURIComponent(searchTerm())}`, { ...anon(), tags: { name: "search" } });
     record("search", res, [200]);
   },
   dm_list() {
