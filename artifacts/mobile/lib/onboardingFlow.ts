@@ -19,6 +19,7 @@ export type BuyerStepId =
   | 'AUTH'
   | 'NAME'
   | 'STYLE'
+  | 'SIZES'
   | 'BRANDS'
   | 'LOADING'
   | 'NOTIFICATIONS'
@@ -43,9 +44,9 @@ export interface StepDef<Id extends string> {
   skippable: boolean;
 }
 
-// ─── Step order (v7) ──────────────────────────────────────────────────────
+// ─── Step order (v8) ──────────────────────────────────────────────────────
 // BOTH:   0=Welcome  1=AccountType  2=Auth  3=Name
-// BUYER:  4=Style  5=Brands  6=Loading  7=Notifications  8=Success
+// BUYER:  4=Style  5=Sizes  6=Brands  7=Loading  8=Notifications  9=Success
 // SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
 export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
   { id: 'WELCOME', skippable: false },
@@ -53,6 +54,7 @@ export const BUYER_FLOW_STEPS: StepDef<BuyerStepId>[] = [
   { id: 'AUTH', skippable: false },
   { id: 'NAME', skippable: false },
   { id: 'STYLE', skippable: true },
+  { id: 'SIZES', skippable: true },
   { id: 'BRANDS', skippable: true },
   { id: 'LOADING', skippable: false },
   { id: 'NOTIFICATIONS', skippable: true },
@@ -119,7 +121,17 @@ export function canGoBack(stepIndex: number): boolean {
  * in-flight user resuming mid-onboarding lands back on an equivalent step
  * instead of restarting from scratch.
  */
-export const DRAFT_VERSION = 7;
+export const DRAFT_VERSION = 8;
+
+// v7 order (Welcome + Brands, no Sizes step): the *source* indices for the
+// v7 -> v8 migration. Frozen — never reference the live index maps here.
+const V7_BUYER_STEP_INDEX = {
+  WELCOME: 0, ACCOUNT_TYPE: 1, AUTH: 2, NAME: 3, STYLE: 4, BRANDS: 5, LOADING: 6, NOTIFICATIONS: 7, SUCCESS: 8,
+} as const;
+const V7_SELLER_STEP_INDEX = {
+  WELCOME: 0, ACCOUNT_TYPE: 1, AUTH: 2, NAME: 3, BRAND_NAME: 4, BRAND_STAGE: 5, GOALS: 6, PLAN: 7,
+  LOADING: 8, NOTIFICATIONS: 9, SUCCESS: 10,
+} as const;
 
 // v6 order (no Welcome step, no Brands-to-follow step): kept here only so the
 // migration table below can name its *source* indices clearly.
@@ -135,29 +147,29 @@ const V6_SELLER_STEP_INDEX = {
 function v6ToV7(flow: Flow, v6Step: number): number {
   if (flow === 'buyer') {
     const map: Record<number, number> = {
-      [V6_BUYER_STEP_INDEX.ACCOUNT_TYPE]: BUYER_STEP_INDEX.ACCOUNT_TYPE,
-      [V6_BUYER_STEP_INDEX.AUTH]: BUYER_STEP_INDEX.AUTH,
-      [V6_BUYER_STEP_INDEX.NAME]: BUYER_STEP_INDEX.NAME,
-      [V6_BUYER_STEP_INDEX.STYLE]: BUYER_STEP_INDEX.STYLE,
-      [V6_BUYER_STEP_INDEX.LOADING]: BUYER_STEP_INDEX.LOADING,
-      [V6_BUYER_STEP_INDEX.NOTIFICATIONS]: BUYER_STEP_INDEX.NOTIFICATIONS,
-      [V6_BUYER_STEP_INDEX.SUCCESS]: BUYER_STEP_INDEX.SUCCESS,
+      [V6_BUYER_STEP_INDEX.ACCOUNT_TYPE]: V7_BUYER_STEP_INDEX.ACCOUNT_TYPE,
+      [V6_BUYER_STEP_INDEX.AUTH]: V7_BUYER_STEP_INDEX.AUTH,
+      [V6_BUYER_STEP_INDEX.NAME]: V7_BUYER_STEP_INDEX.NAME,
+      [V6_BUYER_STEP_INDEX.STYLE]: V7_BUYER_STEP_INDEX.STYLE,
+      [V6_BUYER_STEP_INDEX.LOADING]: V7_BUYER_STEP_INDEX.LOADING,
+      [V6_BUYER_STEP_INDEX.NOTIFICATIONS]: V7_BUYER_STEP_INDEX.NOTIFICATIONS,
+      [V6_BUYER_STEP_INDEX.SUCCESS]: V7_BUYER_STEP_INDEX.SUCCESS,
     };
-    return map[v6Step] ?? BUYER_STEP_INDEX.ACCOUNT_TYPE;
+    return map[v6Step] ?? V7_BUYER_STEP_INDEX.ACCOUNT_TYPE;
   }
   const map: Record<number, number> = {
-    [V6_SELLER_STEP_INDEX.ACCOUNT_TYPE]: SELLER_STEP_INDEX.ACCOUNT_TYPE,
-    [V6_SELLER_STEP_INDEX.AUTH]: SELLER_STEP_INDEX.AUTH,
-    [V6_SELLER_STEP_INDEX.NAME]: SELLER_STEP_INDEX.NAME,
-    [V6_SELLER_STEP_INDEX.BRAND_NAME]: SELLER_STEP_INDEX.BRAND_NAME,
-    [V6_SELLER_STEP_INDEX.BRAND_STAGE]: SELLER_STEP_INDEX.BRAND_STAGE,
-    [V6_SELLER_STEP_INDEX.GOALS]: SELLER_STEP_INDEX.GOALS,
-    [V6_SELLER_STEP_INDEX.PLAN]: SELLER_STEP_INDEX.PLAN,
-    [V6_SELLER_STEP_INDEX.LOADING]: SELLER_STEP_INDEX.LOADING,
-    [V6_SELLER_STEP_INDEX.NOTIFICATIONS]: SELLER_STEP_INDEX.NOTIFICATIONS,
-    [V6_SELLER_STEP_INDEX.SUCCESS]: SELLER_STEP_INDEX.SUCCESS,
+    [V6_SELLER_STEP_INDEX.ACCOUNT_TYPE]: V7_SELLER_STEP_INDEX.ACCOUNT_TYPE,
+    [V6_SELLER_STEP_INDEX.AUTH]: V7_SELLER_STEP_INDEX.AUTH,
+    [V6_SELLER_STEP_INDEX.NAME]: V7_SELLER_STEP_INDEX.NAME,
+    [V6_SELLER_STEP_INDEX.BRAND_NAME]: V7_SELLER_STEP_INDEX.BRAND_NAME,
+    [V6_SELLER_STEP_INDEX.BRAND_STAGE]: V7_SELLER_STEP_INDEX.BRAND_STAGE,
+    [V6_SELLER_STEP_INDEX.GOALS]: V7_SELLER_STEP_INDEX.GOALS,
+    [V6_SELLER_STEP_INDEX.PLAN]: V7_SELLER_STEP_INDEX.PLAN,
+    [V6_SELLER_STEP_INDEX.LOADING]: V7_SELLER_STEP_INDEX.LOADING,
+    [V6_SELLER_STEP_INDEX.NOTIFICATIONS]: V7_SELLER_STEP_INDEX.NOTIFICATIONS,
+    [V6_SELLER_STEP_INDEX.SUCCESS]: V7_SELLER_STEP_INDEX.SUCCESS,
   };
-  return map[v6Step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
+  return map[v6Step] ?? V7_SELLER_STEP_INDEX.ACCOUNT_TYPE;
 }
 
 /**
@@ -255,13 +267,20 @@ function restoreLegacyStepToV6(flow: Flow, step: number, version?: number): numb
   return previousLegacySellerStep[step] ?? V6_SELLER_STEP_INDEX.ACCOUNT_TYPE;
 }
 
+/** v7 -> v8: the buyer flow gained a Sizes step after Style; every buyer step from Brands on shifts by one. */
+function v7ToV8(flow: Flow, v7Step: number): number {
+  if (flow === 'seller') return v7Step;
+  return v7Step >= V7_BUYER_STEP_INDEX.BRANDS ? v7Step + 1 : v7Step;
+}
+
 /**
- * Translate a persisted (flow, step, version) draft into the current (v7)
+ * Translate a persisted (flow, step, version) draft into the current (v8)
  * step index for that flow. Unknown/undefined versions are treated as the
  * oldest legacy shape, matching the historical behaviour of this function.
  */
 export function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return clampStep(flow, step);
+  if (version === 7) return clampStep(flow, v7ToV8(flow, step));
   const v6Step = restoreLegacyStepToV6(flow, step, version);
-  return clampStep(flow, v6ToV7(flow, v6Step));
+  return clampStep(flow, v7ToV8(flow, v6ToV7(flow, v6Step)));
 }

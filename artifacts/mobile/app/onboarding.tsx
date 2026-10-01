@@ -88,6 +88,8 @@ import {
   type Flow,
 } from '@/lib/onboardingFlow';
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
+import { SizesStep } from '@/components/onboarding/SizesStep';
+import { EMPTY_SURVEY, hasSurveyAnswers, sanitizeDraftSurvey, saveBuyerSurvey, type OnboardingSurvey } from '@/lib/onboardingSurvey';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
 import { Glow, ThreadDraw, ThreadLogoStitch, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
 import {
@@ -1873,6 +1875,14 @@ export default function OnboardingScreen() {
       : '',
   );
   const [styleInterests, setStyleArr]     = useState<string[]>(DEFAULT_BUYER_INTERESTS);
+  // Optional survey answers (Sizes step + brands picked in the Brands step).
+  // Persisted in the per-Clerk-user draft; saved to buyer_preferences after auth.
+  const [survey, setSurvey]               = useState<OnboardingSurvey>(EMPTY_SURVEY);
+  const setSurveySizes = useCallback((sizes: OnboardingSurvey['sizes']) => setSurvey((prev) => ({ ...prev, sizes })), []);
+  const setSurveyBrands = useCallback((likedBrandIds: string[]) => setSurvey((prev) => (
+    prev.likedBrandIds.length === likedBrandIds.length && prev.likedBrandIds.every((id, i) => id === likedBrandIds[i])
+      ? prev : { ...prev, likedBrandIds }
+  )), []);
 
   // Seller data
   const [brandName, setBrandName]         = useState('');
@@ -1965,6 +1975,7 @@ export default function OnboardingScreen() {
               setLastName(draft.lastName ?? '');
               setUsername(draft.username ?? '');
               setStyleArr(draft.styleInterests ?? DEFAULT_BUYER_INTERESTS);
+              setSurvey(sanitizeDraftSurvey(draft.survey));
               setBrandName(draft.brandName ?? '');
               setBrandStage(draft.brandStage ?? 'idea');
               setGoals(draft.goals ?? DEFAULT_SELLER_GOALS);
@@ -2018,11 +2029,11 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, lastName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
+      flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
       ...overrides,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, lastName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
+  }, [flow, step, firstName, lastName, username, styleInterests, survey, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
 
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
@@ -2225,6 +2236,9 @@ export default function OnboardingScreen() {
       pendingSyncQueued = true;
       failureStage = 'preferences-or-completion';
       await syncBuyerOnboarding(profile.clerkId, styleInterests, api);
+      // Optional survey (sizes + liked brands): best-effort, queued on failure,
+      // never blocks completion (which is already committed server-side above).
+      await saveBuyerSurvey(profile.clerkId, survey, styleInterests, api);
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -2266,6 +2280,7 @@ export default function OnboardingScreen() {
         } catch (storageError) {
           logBuyerOnboardingFailure('local-fallback', storageError, true);
         }
+        void saveBuyerSurvey(profileId, survey, styleInterests, api);
         void syncBuyerOnboarding(profileId, styleInterests, api).catch((backgroundError) => {
           logBuyerOnboardingFailure('background-retry', backgroundError, true);
         });
@@ -2371,6 +2386,7 @@ export default function OnboardingScreen() {
     if (flow === 'buyer') {
       if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
       if (step === BUYER_STEP_INDEX.STYLE) return true;
+      if (step === BUYER_STEP_INDEX.SIZES) return true;
       if (step === BUYER_STEP_INDEX.BRANDS) return true;
     }
     if (flow === 'seller') {
@@ -2502,9 +2518,14 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 5: Brands to follow — personalizes the Thread before the buyer ever sees it
+      // Step 5: Sizes (optional) — seeds My sizes and size recommendations
+      if (step === BUYER_STEP_INDEX.SIZES) return (
+        <SizesStep sizes={survey.sizes} onChange={setSurveySizes} />
+      );
+
+      // Step 6: Brands to follow — personalizes the Thread before the buyer ever sees it
       if (step === BUYER_STEP_INDEX.BRANDS) return (
-        <BrandsToFollowStep />
+        <BrandsToFollowStep onLikedChange={setSurveyBrands} />
       );
 
       // Step 6: Loading
@@ -2722,6 +2743,9 @@ export default function OnboardingScreen() {
     if (flow && isStepSkippable(flow, step)) {
       if (flow === 'buyer' && step === BUYER_STEP_INDEX.STYLE) {
         return styleInterests.length > 0 ? 'Continue' : 'Skip for now';
+      }
+      if (flow === 'buyer' && step === BUYER_STEP_INDEX.SIZES) {
+        return hasSurveyAnswers({ sizes: survey.sizes, likedBrandIds: [] }) ? 'Continue' : 'Skip for now';
       }
       if (flow === 'buyer' && step === BUYER_STEP_INDEX.BRANDS) {
         return 'Continue';

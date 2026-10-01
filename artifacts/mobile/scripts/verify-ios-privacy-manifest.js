@@ -21,6 +21,7 @@ const REQUIRED_COLLECTED_TYPES = [
   'NSPrivacyCollectedDataTypeName',
   'NSPrivacyCollectedDataTypeEmailAddress',
   'NSPrivacyCollectedDataTypePhoneNumber',
+  'NSPrivacyCollectedDataTypeContacts',
   'NSPrivacyCollectedDataTypePhysicalAddress',
   'NSPrivacyCollectedDataTypeUserID',
   'NSPrivacyCollectedDataTypeDeviceID',

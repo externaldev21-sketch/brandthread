@@ -21,6 +21,8 @@ import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { Feather } from '@expo/vector-icons';
+import { CONTACT_SYNC_ENABLED } from '@/lib/contactSyncFlag';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
 
@@ -328,6 +330,19 @@ export default function BuyerFriendRequestsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.huge + SPACING.xxl }}>
+        {CONTACT_SYNC_ENABLED && (
+          <PressableScale
+            testID="find-from-contacts"
+            style={s.contactsRow}
+            accessibilityRole="button"
+            accessibilityLabel="Find from contacts"
+            onPress={() => router.push('/find-friends-contacts' as never)}
+          >
+            <Feather name="book-open" size={20} color={palette.foreground} />
+            <Text style={[TYPE_SCALE.body, s.contactsRowText]}>Find from contacts</Text>
+            <Feather name="chevron-right" size={18} color={palette.mutedForeground} />
+          </PressableScale>
+        )}
         {tab === 'incoming'  && renderIncoming()}
         {tab === 'sent'      && renderSent()}
         {tab === 'suggested' && renderSuggested()}
@@ -352,6 +367,8 @@ const rowStyles = StyleSheet.create({
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
   container:       { flex: 1, backgroundColor: palette.background },
   tabBarWrap:      { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
+  contactsRow:     { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
+  contactsRowText: { flex: 1, color: palette.foreground },
   row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border, gap: SPACING.sm },
   avatar48:        { width: 48, height: 48, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
   avatar48Text:    { color: '#FFFFFF' }, // theme-exempt: initials on a per-user identity color

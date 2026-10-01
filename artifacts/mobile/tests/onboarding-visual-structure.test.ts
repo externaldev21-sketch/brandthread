@@ -91,8 +91,8 @@ describe('onboarding visual structure', () => {
   it('draft version incremented to 7, migration lives in lib/onboardingFlow.ts', () => {
     const onboarding = read('app/onboarding.tsx');
     const flowModule = read('lib/onboardingFlow.ts');
-    expect(DRAFT_VERSION).toBe(7);
-    expect(flowModule).toContain('export const DRAFT_VERSION = 7');
+    expect(DRAFT_VERSION).toBe(8);
+    expect(flowModule).toContain('export const DRAFT_VERSION = 8');
     expect(flowModule).toContain('version === 5');
     expect(onboarding).toContain("PENDING_FLOW_KEY = 'onboarding_pending_flow'");
     expect(onboarding).toContain('[PENDING_FLOW_KEY, selectedFlow]');

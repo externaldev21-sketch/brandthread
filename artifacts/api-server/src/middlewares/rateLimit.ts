@@ -18,7 +18,8 @@ export type RateLimitPolicyName =
   | "comment"
   | "follow"
   | "report"
-  | "feed-event";
+  | "feed-event"
+  | "contact-match";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -139,6 +140,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 120,
     windowMs: 60_000,
     message: "Too many feed events submitted. Please wait a moment and try again.",
+  },
+  "contact-match": {
+    id: "contact-match",
+    // Contact matching is an enumeration surface (up to 2000 hashes per call),
+    // so it is capped per account well below normal read traffic.
+    limit: 10,
+    windowMs: 60 * 60_000,
+    message: "You've checked contacts a lot. Please try again later.",
   },
 };
 

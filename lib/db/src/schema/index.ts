@@ -1395,6 +1395,18 @@ export const follows = pgTable('follows', {
   followingIdx: index('follows_following_idx').on(t.followingId),
 }));
 
+// Opt-in contact-sync lookup (migration 116). One row per (user, kind, hash);
+// present only while the user has opted in to "let friends find me".
+export const userContactHashes = pgTable('user_contact_hashes', {
+  userId:    text('user_id').notNull(),
+  kind:      text('kind').$type<'email' | 'phone'>().notNull(),
+  hash:      text('hash').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.kind, t.hash] }),
+  lookupIdx: index('user_contact_hashes_lookup_idx').on(t.kind, t.hash),
+}));
+
 // Dismissed "Suggested for you" rows on the Activity tab — the X on a
 // suggestion row keeps that person out of future suggestion pages for this
 // viewer (they can still find/follow them by search).

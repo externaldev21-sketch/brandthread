@@ -9,6 +9,9 @@ import {
   scoreCandidate,
   diversifyFeed,
   isCacheFresh,
+  mergePreferenceStyleAffinity,
+  W_LIKED_BRAND,
+  PREFERENCE_STYLE_SEED,
   type RankingCandidate,
 } from "../forYou";
 
@@ -199,5 +202,45 @@ describe("isCacheFresh", () => {
 
   it("is stale after the TTL has elapsed", () => {
     expect(isCacheFresh(new Date(Date.now() - 120_000), 60_000)).toBe(false);
+  });
+});
+
+describe("survey preference seeding", () => {
+  const now = Date.now();
+  const base: RankingCandidate = {
+    id: "p1", sellerId: "brand_a", createdAt: new Date(now), styleTags: ["streetwear"],
+    isFollowed: false, isBoosted: false, isLive: false, sellerScore: 0,
+  };
+
+  it("boosts a candidate from a brand the buyer liked in the survey", () => {
+    const without = scoreCandidate(base, {}, {}, {}, now);
+    const withLiked = scoreCandidate(base, {}, {}, {}, now, new Set(["brand_a"]));
+    expect(withLiked - without).toBeCloseTo(W_LIKED_BRAND, 5);
+    expect(scoreCandidate(base, {}, {}, {}, now, new Set(["brand_b"]))).toBeCloseTo(without, 5);
+  });
+
+  it("seeds survey style interests (case-insensitive) into an empty affinity map", () => {
+    const merged = mergePreferenceStyleAffinity({}, ["Streetwear", " Vintage "]);
+    expect(merged).toEqual({ streetwear: PREFERENCE_STYLE_SEED, vintage: PREFERENCE_STYLE_SEED });
+  });
+
+  it("never lowers a learned score and never overrides a negative one", () => {
+    const merged = mergePreferenceStyleAffinity({ streetwear: 9, vintage: -2 }, ["streetwear", "vintage"]);
+    expect(merged.streetwear).toBe(9);
+    expect(merged.vintage).toBe(-2);
+  });
+
+  it("returns the same map when there are no survey interests and does not mutate input", () => {
+    const learned = { a: 1 };
+    expect(mergePreferenceStyleAffinity(learned, [])).toBe(learned);
+    mergePreferenceStyleAffinity(learned, ["b"]);
+    expect(learned).toEqual({ a: 1 });
+  });
+
+  it("ranks a survey-matching post above a non-matching one for a buyer with no history", () => {
+    const affinity = mergePreferenceStyleAffinity({}, ["streetwear"]);
+    const match = scoreCandidate(base, {}, affinity, {}, now);
+    const miss = scoreCandidate({ ...base, styleTags: ["formal"] }, {}, affinity, {}, now);
+    expect(match).toBeGreaterThan(miss);
   });
 });
