@@ -104,6 +104,24 @@ vi.mock('@/components/ScreenHeader', () => ({
   ),
 }));
 
+// The shared slim Composer pulls in reanimated + keyboard-controller, which are
+// not available here; a structural stand-in keeps the same testIDs and props.
+vi.mock('@/components/ui/Composer', () => ({
+  default: ({ testID, value, onChangeText, onSend, canSend, editable, maxLength, placeholder, leftAccessory, topSlot }: any) =>
+    React.createElement(
+      'Composer',
+      null,
+      topSlot,
+      leftAccessory,
+      React.createElement('TextInput', {
+        testID: `${testID}-input`, value, onChangeText, editable, maxLength, placeholder,
+      }),
+      React.createElement('TouchableOpacity', {
+        testID: `${testID}-send`, onPress: onSend, disabled: !canSend,
+      }),
+    ),
+}));
+
 vi.mock('@/hooks/useApi', () => ({
   useApi: () => apiMock,
 }));

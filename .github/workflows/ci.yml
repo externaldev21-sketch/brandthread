@@ -1,0 +1,87 @@
+# Typecheck + unit tests for the API server, the mobile app and the shared libraries.
+# API tests that need a database run against a throwaway Postgres service container.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Builds the shared libs (db, api-zod, ...) then typechecks every app.
+      - run: pnpm run typecheck
+
+  api-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Throwaway database created for this job only. Nothing here touches a real
+    # database; the suite refuses to run against anything but TEST_DATABASE_URL.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: brandthread_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:ci@localhost:5432/brandthread_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/db exec tsc --build
+      - run: pnpm --filter @workspace/api-server run test
+
+  mobile-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Informational for now: on current dev, 30 of 375 mobile test files fail
+    # (native-module/ESM transform errors and the aiService suite) before this
+    # workflow ever ran. Remove this line once those are fixed to make the job
+    # a required check. See docs/reliability/ci.md.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/mobile run test

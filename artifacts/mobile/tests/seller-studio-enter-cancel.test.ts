@@ -5,100 +5,61 @@ import { describe, expect, it } from 'vitest';
 const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadialMenu.tsx'), 'utf8');
 
 /**
- * Dev's follow-up on the auto-enter pill: a plain "Cancel" text link above
- * it while the 1s fill counts down. Tapping it stops the fill and swaps the
- * pill to a static "Continue" (still tappable to open whenever). Landing on
- * any card afterward — including the same one again — always arms a fresh
- * countdown; a cancelled state never carries over to another card.
+ * The incoming edge-trace replaces the old Cancel/Continue pill, but keeps
+ * the useful cancellation contract: touching cancels the current entry,
+ * and locking again (even the same card) starts a new full-duration window.
  */
-describe('Studio auto-enter: enterState is a real 3-state machine (hidden / counting / cancelled)', () => {
-  it('declares the three states, defaulting to hidden', () => {
-    expect(studio).toContain("useState<'hidden' | 'counting' | 'cancelled'>('hidden')");
+describe('Studio auto-enter cancellation: edge-trace retracts and re-arms', () => {
+  it('a new touch retracts the trace and eases the cover back instead of cutting it off', () => {
+    const retractBody = studio.slice(
+      studio.indexOf('function retractEnter('),
+      studio.indexOf('// ─── Per-card signature micro-animations'),
+    );
+    expect(retractBody).toContain('cancelAnimation(traceProgress);');
+    expect(retractBody).toContain('cancelAnimation(zoomScale);');
+    expect(retractBody).toContain('cancelAnimation(enterFade);');
+    expect(retractBody).toContain('traceProgress.value = withTiming(0, { duration: 180');
+    expect(retractBody).toContain('zoomScale.value = withTiming(1, { duration: 180');
+    expect(retractBody).toContain('enterFade.value = 0;');
   });
 
-  it('a lock arms "counting" (not a plain boolean) — the same state that starts the fill', () => {
-    const horizontalBranch = studio.slice(studio.indexOf("cardGestureAxis.value === 'horizontal') {"));
-    const setCountingIdx = horizontalBranch.indexOf("runOnJS(setEnterState)('counting')");
-    const fillStartIdx = horizontalBranch.indexOf('fillProgress.value = withTiming(1,');
-    expect(setCountingIdx).toBeGreaterThan(-1);
-    expect(fillStartIdx).toBeGreaterThan(setCountingIdx);
+  it('touching the card area or header cancels the current entry and clears the live announcement', () => {
+    const cardAreaPan = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('const tapGesture ='));
+    const cardBegin = cardAreaPan.slice(cardAreaPan.indexOf('.onBegin(() => {'), cardAreaPan.indexOf('.onUpdate('));
+    const dismissGesture = studio.slice(studio.indexOf('const dismissGesture ='), studio.indexOf('const cardAreaPan ='));
+    const headerStart = dismissGesture.slice(dismissGesture.indexOf('.onStart(() => {'), dismissGesture.indexOf('.onUpdate('));
+
+    expect(cardBegin).toContain('retractEnter(traceProgress, zoomScale, enterFade);');
+    expect(cardBegin).toContain('runOnJS(setEntering)(false);');
+    expect(headerStart).toContain('retractEnter(traceProgress, zoomScale, enterFade);');
+    expect(headerStart).toContain('runOnJS(setEntering)(false);');
   });
 
-  it('every path that resets to hidden uses the state machine, not a boolean flag', () => {
-    expect(studio).not.toContain('isLockedJS');
-    expect(studio).not.toContain('setIsLockedJS');
-    // Every touch-driven reset (card area onBegin, header dismiss onStart)
-    // and every close-without-opening path (cancelEnterFill, commitAndOpen)
-    // sets 'hidden'.
-    const hiddenResets = studio.match(/setEnterState\('hidden'\)|runOnJS\(setEnterState\)\('hidden'\)/g) ?? [];
-    expect(hiddenResets.length).toBeGreaterThanOrEqual(4);
-  });
-});
+  it('every horizontal lock starts a new full-duration trace from zero, including after cancelling the same card', () => {
+    const endBlock = studio.slice(
+      studio.indexOf('.onEnd((e) => {', studio.indexOf('const cardAreaPan =')),
+      studio.indexOf('}), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse,'),
+    );
+    const horizontalBranch = endBlock.slice(endBlock.indexOf("cardGestureAxis.value === 'horizontal'"));
+    const traceResetIndex = horizontalBranch.indexOf('traceProgress.value = 0;');
+    const traceStartIndex = horizontalBranch.indexOf('traceProgress.value = withTiming(1,');
 
-describe('Studio auto-enter: Cancel link', () => {
-  it('renders only while counting, as a plain text button with no background/border', () => {
-    expect(studio).toContain("{enterState === 'counting' && (");
-    expect(studio).toContain('testID="seller-studio-enter-cancel"');
-    const cancelStyleBlock = studio.slice(studio.indexOf('cancelLink: {'), studio.indexOf('cancelLinkLabel:'));
-    expect(cancelStyleBlock).not.toContain('backgroundColor');
-    expect(cancelStyleBlock).not.toContain('borderWidth');
+    expect(horizontalBranch).toContain('runOnJS(setEntering)(true);');
+    expect(traceResetIndex).toBeGreaterThan(-1);
+    expect(traceStartIndex).toBeGreaterThan(traceResetIndex);
+    expect(horizontalBranch).toContain('duration: AUTO_ENTER_MS');
+    expect(studio).toContain('const AUTO_ENTER_MS = 1500;');
   });
 
-  it('has at least a 44x44 hit area via hitSlop even though the visible label is small', () => {
-    expect(studio).toMatch(/hitSlop=\{\{ top: 14, bottom: 14, left: 20, right: 20 \}\}/);
-  });
-
-  it('is Inter Medium ~14px, colored from a theme token (never hardcoded)', () => {
-    expect(studio).toContain("cancelLinkLabel: { fontSize: 14, fontFamily: FONT.medium, color: theme.muted }");
-  });
-
-  it('tapping it stops the timer, resets the fill to empty, moves to "cancelled", and fires a light haptic', () => {
-    const cancelOnPress = studio.slice(studio.indexOf('testID="seller-studio-enter-cancel"'), studio.indexOf('testID="seller-studio-enter-button"'));
-    expect(cancelOnPress).toContain('cancelAnimation(fillProgress);');
-    expect(cancelOnPress).toContain('fillProgress.value = 0;');
-    expect(cancelOnPress).toContain("setEnterState('cancelled');");
-    expect(cancelOnPress).toContain('ImpactFeedbackStyle.Light');
-  });
-});
-
-describe('Studio auto-enter: cancelled state shows "Continue", still opens on tap', () => {
-  it('the pill label swaps to "Continue" only when cancelled, "Entering page" otherwise', () => {
-    const labelSwaps = studio.match(/enterState === 'cancelled' \? 'Continue' : 'Entering page'/g) ?? [];
-    // Both the base (white-on-dark) and filled (black-on-white reveal) copies swap identically.
-    expect(labelSwaps.length).toBe(2);
-  });
-
-  it('the pill\'s onPress is unconditionally openCurrentItem — tapping it opens whether counting (skip) or cancelled (continue)', () => {
-    const buttonBlock = studio.slice(studio.indexOf('testID="seller-studio-enter-button"'), studio.indexOf('onLayout={(e) => setEnterButtonWidth'));
-    expect(buttonBlock).toContain('onPress={openCurrentItem}');
-  });
-
-  it('the pill label crossfades on state change via a dedicated opacity animation, not an abrupt swap', () => {
-    expect(studio).toContain("const pillContentOpacity = useSharedValue(1);");
-    expect(studio).toContain('pillContentOpacity.value = 0;');
-    expect(studio).toContain('pillContentOpacity.value = withTiming(1, { duration: 220');
-    expect(studio).toContain('const pillContentStyle = useAnimatedStyle(() => ({\n    opacity: pillContentOpacity.value,\n  }));');
-    expect(studio).toContain('<Animated.Text style={[styles.enterButtonLabelBase, pillContentStyle]}>');
-    expect(studio).toContain('<Animated.Text style={[styles.enterButtonLabelFilled, pillContentStyle]}');
-  });
-});
-
-describe('Studio auto-enter: re-touching always re-arms a fresh countdown, cancelled never carries over', () => {
-  it('cardAreaPan.onBegin resets enterState to hidden immediately, before axis/lock is even decided', () => {
-    const panBlock = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('const tapGesture ='));
-    const beginBlock = panBlock.slice(panBlock.indexOf('.onBegin(() => {'), panBlock.indexOf('.onUpdate('));
-    expect(beginBlock).toContain("runOnJS(setEnterState)('hidden');");
-  });
-
-  it('the header/handle dismiss gesture also resets enterState on its own onStart', () => {
-    const dismissBlock = studio.slice(studio.indexOf('const dismissGesture ='), studio.indexOf('const cardAreaPan ='));
-    const onStartBlock = dismissBlock.slice(dismissBlock.indexOf('.onStart(() => {'), dismissBlock.indexOf('.onUpdate('));
-    expect(onStartBlock).toContain("runOnJS(setEnterState)('hidden');");
-  });
-
-  it('a fresh open resets enterState to hidden alongside the rest of the carousel state', () => {
+  it('opening the menu clears stale trace and zoom state while preserving the return-selection branch', () => {
     const start = studio.indexOf('if (open) {', studio.indexOf('// Fresh opens'));
     const resetBlock = studio.slice(start, studio.indexOf('}, [open]);', start));
-    expect(resetBlock).toContain("setEnterState('hidden');");
+
+    expect(resetBlock).toContain('if (!resumeCardOnOpenRef.current)');
+    expect(resetBlock).toContain('cancelAnimation(traceProgress);');
+    expect(resetBlock).toContain('traceProgress.value = 0;');
+    expect(resetBlock).toContain('zoomScale.value = 1;');
+    expect(resetBlock).toContain('enterFade.value = 0;');
+    expect(resetBlock).toContain('setEntering(false);');
   });
 });

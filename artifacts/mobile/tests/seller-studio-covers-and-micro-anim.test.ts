@@ -126,12 +126,12 @@ describe('Studio card covers: per-card one-shot signature micro-animations', () 
     expect(reduceBlock).not.toMatch(/micro(Scale|Rotate|TranslateX|TranslateY)\.value\s*=\s*withSequence/);
   });
 
-  it('go-live gets its own extra dot-pulse + sweep, rendered only for that one item', () => {
-    expect(studio).toContain("item.id === 'go-live'");
-    expect(studio).toContain('liveDotScale');
-    expect(studio).toContain('liveSweepProgress');
-    expect(studio).toContain('styles.liveDot');
-    expect(studio).toContain('styles.liveSweep');
+  it('go-live has no separate red dot/sweep overlay — Dev: no red anywhere on that card unless it\'s part of the cover art itself', () => {
+    expect(studio).not.toContain('liveDotScale');
+    expect(studio).not.toContain('liveSweepProgress');
+    expect(studio).not.toContain('styles.liveDot');
+    expect(studio).not.toContain('styles.liveSweep');
+    expect(studio).not.toContain("item.id === 'go-live'");
   });
 });
 

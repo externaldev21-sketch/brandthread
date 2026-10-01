@@ -47,6 +47,7 @@ import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 /**
  * `TUTORIAL_ID` also doubles as the app-wide first-run tutorial system's
@@ -59,6 +60,7 @@ const TUTORIAL_ID = 'mockup-to-model';
 const MAX_REFS = 4;
 
 export default function MockupToModelScreen() {
+  useHideTabBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ seedMockupUri?: string }>();

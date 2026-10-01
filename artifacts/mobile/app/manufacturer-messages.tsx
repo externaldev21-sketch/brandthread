@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, FlatList, Image, Modal, Platform, Pressable,
-  RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
@@ -27,6 +27,7 @@ import { useAuth } from '@clerk/expo';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
 import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import Composer from '@/components/ui/Composer';
 import OrderCardBubble from '@/components/manufacturer/OrderCardBubble';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -417,8 +418,15 @@ export default function ManufacturerMessagesScreen() {
 
       {loadError ? <Text style={s.inlineError}>{loadError}</Text> : null}
 
-      <View style={[s.composer, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        {pending.length > 0 && (
+      <Composer
+        testID="mfr-composer"
+        value={draft}
+        onChangeText={setDraft}
+        onSend={() => void send()}
+        canSend={(!!draft.trim() || pending.length > 0) && !sending}
+        placeholder={`Message ${mfrName}…`}
+        topSlot={
+          pending.length > 0 ? (
           <View style={s.previewRow} testID="pending-photos">
             {pending.map((asset, index) => (
               <View key={`${asset.uri}-${index}`} style={s.previewTile}>
@@ -429,31 +437,14 @@ export default function ManufacturerMessagesScreen() {
               </View>
             ))}
           </View>
-        )}
-        <View style={s.inputRow}>
+          ) : null
+        }
+        leftAccessory={
           <TouchableOpacity onPress={() => setAttachOpen(true)} style={s.iconBtn} accessibilityLabel="Add photos" testID="button-attach">
-            <Feather name="image" size={ICON.sm} color={theme.text} />
+            <Feather name="image" size={18} color="#000000" />
           </TouchableOpacity>
-          <TextInput
-            style={s.input}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={`Message ${mfrName}…`}
-            placeholderTextColor={theme.subtle}
-            multiline
-            testID="input-message"
-          />
-          <TouchableOpacity
-            onPress={() => void send()}
-            style={[s.sendBtn, { backgroundColor: theme.accent }, ((!draft.trim() && !pending.length) || sending) && { opacity: 0.4 }]}
-            disabled={(!draft.trim() && !pending.length) || sending}
-            accessibilityLabel="Send"
-            testID="button-send"
-          >
-            {sending ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Feather name="send" size={ICON.sm} color={theme.onAccent} />}
-          </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
       {/* Attach sheet */}
       <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
@@ -536,18 +527,11 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
   emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 19 },
   inlineError: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, textAlign: 'center', paddingVertical: 4 },
-  composer: { backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: SP.sm },
-  previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
+  previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingBottom: SP.sm },
   previewTile: { width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden' },
   previewImage: { width: '100%', height: '100%' },
   previewRemove: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm, paddingHorizontal: SP.md },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
-  input: {
-    flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
-    paddingHorizontal: SP.md, paddingTop: 10, paddingBottom: 10, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text,
-  },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.sm },
   grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: SP.sm },

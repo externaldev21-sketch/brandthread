@@ -121,11 +121,11 @@ describe('Composer', () => {
     expect(comments).not.toContain('guidelinesHint');
   });
 
-  it('uses a custom animated send button', () => {
-    expect(comments).toContain('function AnimatedSendButton(');
-    expect(comments).toContain('<AnimatedSendButton');
-    expect(comments).toContain('justSent');
+  it('uses the shared slim Composer (send button lives inside it)', () => {
+    expect(comments).toContain('<Composer');
+    expect(comments).not.toContain('function AnimatedSendButton(');
   });
+
 });
 
 describe('Collapsible reply threads', () => {

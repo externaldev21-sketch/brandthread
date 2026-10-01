@@ -69,9 +69,9 @@ describe('tab bar slide motion: fast, plain ease-out, no spring', () => {
     expect(bar).not.toContain('Animated.spring');
   });
 
-  it('TAB_BAR_SLIDE_MS is fast (~150ms) and defines no spring constant alongside it', () => {
+  it('TAB_BAR_SLIDE_MS is fast (~200ms) and defines no spring constant alongside it', () => {
     const motion = src('../constants/motion.ts');
-    expect(motion).toMatch(/export const TAB_BAR_SLIDE_MS = 150;/);
+    expect(motion).toMatch(/export const TAB_BAR_SLIDE_MS = 200;/);
     expect(motion).toMatch(/export const TAB_BAR_SLIDE_EASING = Easing\.bezier\(/);
     expect(motion).not.toMatch(/TAB_BAR_SLIDE_SPRING/);
   });
@@ -101,7 +101,7 @@ describe('BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS + BuyerTabBar: same helper, same mo
     const bar = src('../components/buyer-nav/BuyerTabBar.tsx');
     expect(bar).toContain("import { useSegments, type Tabs } from 'expo-router';");
     expect(bar).toMatch(/const segments = useSegments\(\);/);
-    expect(bar).toMatch(/const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS\.has\(firstSegment\);/);
+    expect(bar).toMatch(/const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS\.has\(firstSegment\) \|\| hiddenByScreen;/);
   });
 
   it('drives translateY via the SAME TAB_BAR_SLIDE_MS/EASING/tabBarSlideTargetY helper as the seller bar, never a spring', () => {

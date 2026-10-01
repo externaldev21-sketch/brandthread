@@ -214,42 +214,26 @@ describe('Apple-style quick-reaction emoji — bare, no chip', () => {
   });
 });
 
-describe('TikTok-style composer pill', () => {
-  it('is 44pt tall at rest (a real touch target), 22pt radius, #262626 fill, no border', () => {
-    expect(comments).toContain("backgroundColor: '#262626'");
-    expect(comments).toContain('borderRadius: 22');
-    expect(comments).toContain('minHeight: 44');
-    expect(comments).not.toMatch(/inputShell:\s*\{[^}]*borderWidth/);
+describe('Comment composer uses the shared slim Composer', () => {
+  it('renders the shared <Composer/> instead of a custom TextInput pill', () => {
+    expect(comments).toContain("import Composer from '@/components/ui/Composer'");
+    expect(comments).toContain('<Composer');
+    expect(comments).not.toMatch(/<TextInput[\s/]/);
   });
 
-  it('placeholder/input text is 14pt', () => {
-    expect(comments).toMatch(/input: \{[\s\S]*?fontSize: 14,/);
+  it('keeps the @ and emoji tools inside the pill as the right accessory', () => {
+    const start = comments.indexOf('rightAccessory=');
+    const block = comments.slice(start, start + 1500);
+    expect(block).toContain('accessibilityLabel="Emoji"');
+    expect(block).toContain('accessibilityLabel="Mention someone"');
   });
 
-  it('the @ and emoji tools are 18pt and live inside the pill, not outside it', () => {
-    const shellStart = comments.indexOf('<View style={s.inputShell}>');
-    const sendButtonStart = comments.indexOf('<AnimatedSendButton');
-    const shellBlock = comments.slice(shellStart, sendButtonStart);
-    expect(shellBlock).toContain('accessibilityLabel="Emoji"');
-    expect(shellBlock).toContain('accessibilityLabel="Mention someone"');
-    expect(shellBlock).toContain('name="smile" size={18}');
-    expect(shellBlock).toContain('fontSize: 18');
-  });
-
-  it('the send arrow only renders once there is text to send', () => {
-    expect(comments).toContain('{inputText.trim().length > 0 || sending || justSent ? (');
+  it('links the KeyboardGestureArea to the input and only sends with text', () => {
+    expect(comments).toContain('nativeID={COMMENT_INPUT_NATIVE_ID}');
+    expect(comments).toContain('canSend={inputText.trim().length > 0 && !sending}');
   });
 
   it('uses a 32pt avatar with an explicit dark fill, not the theme-elevated color that used to be indistinguishable from the composer background', () => {
     expect(comments).toContain('<Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />');
-  });
-
-  it('the composer avatar row centers the avatar with the input pill instead of pinning it to the bottom', () => {
-    expect(comments).toContain("inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },");
-  });
-
-  it('the composer area uses 8pt vertical padding plus the safe area at the call site', () => {
-    expect(comments).toContain('paddingTop: 8, paddingHorizontal: 12,');
-    expect(comments).toContain('paddingBottom: Math.max(insets.bottom, SP.sm)');
   });
 });

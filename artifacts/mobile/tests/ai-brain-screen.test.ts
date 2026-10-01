@@ -20,6 +20,7 @@ const screen = read('app/ai-brain.tsx');
 const rootLayout = read('app/_layout.tsx');
 const aurora = read('components/ai/AuroraGlow.tsx');
 const composer = read('components/ai/AiComposer.tsx');
+const sharedComposer = read('components/ui/Composer.tsx');
 
 // ─── Full-screen composer clears the home indicator without a seller bar ─────
 
@@ -32,9 +33,9 @@ describe('ai-brain uses a full-screen composer', () => {
     expect(setBlock![1]).toContain("'ai-brain'");
   });
 
-  it('uses only the safe-area bottom inset for the composer', () => {
-    expect(screen).toContain('const composerBottomInset = Math.max(insets.bottom, 8);');
-    expect(screen).toContain('bottomInset={composerBottomInset}');
+  it('the shared Composer owns safe-area/keyboard bottom padding', () => {
+    expect(screen).not.toContain('composerBottomInset');
+    expect(sharedComposer).toContain('useSafeAreaInsets');
     expect(screen).not.toContain('sellerBar.occupiedHeight');
   });
 
@@ -43,9 +44,10 @@ describe('ai-brain uses a full-screen composer', () => {
     expect(screen).toContain("Platform.OS === 'ios' ? 'padding' : 'height'");
   });
 
-  it('renders the composer through the shared AiComposer component, not an inline input row', () => {
-    expect(screen).toContain('<AiComposer');
-    expect(screen).toContain("from '@/components/ai/AiComposer'");
+  it('renders the composer through the shared slim Composer, not an inline input row', () => {
+    expect(screen).toContain('<Composer');
+    expect(screen).toContain("from '@/components/ui/Composer'");
+    expect(screen).toContain('testID="ai-composer"');
   });
 
   it('keeps the input focusable and submits text from the keyboard or send button', () => {
@@ -54,8 +56,8 @@ describe('ai-brain uses a full-screen composer', () => {
     expect(composer).toContain('onChangeText={onChangeText}');
     expect(composer).toContain('onPress={isGenerating ? onStop : onSend}');
     expect(composer).toContain('zIndex: 1');
-    expect(composer).toContain('height: 36');
-    expect(composer).toContain('minHeight: 36');
+    expect(sharedComposer).toContain('COMPOSER_PILL_MIN_HEIGHT = 40');
+    expect(sharedComposer).toContain('minHeight: COMPOSER_PILL_MIN_HEIGHT');
   });
 
   it('uses preview replies for signed-out previews and guards signed-in token failures', () => {

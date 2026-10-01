@@ -21,6 +21,7 @@ import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
+import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 
 // Smooth ease-out, no bounce/overshoot — this round's explicit spec for the
 // compact <-> regular capsule transition (superseding the earlier SHEET_EASING/
@@ -141,7 +142,9 @@ export function BuyerTabBar({
   // doc above for why this can't be read from `state`/`activeRoute`.
   const segments = useSegments();
   const firstSegment = (segments[0] as string | undefined) ?? '';
-  const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
+  // Also slides away for any screen with a bottom composer (useHideTabBar).
+  const hiddenByScreen = useTabBarHiddenByScreen();
+  const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment) || hiddenByScreen;
 
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the tabPress event and the screen swap — see the hook's doc.

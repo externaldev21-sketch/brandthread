@@ -34,7 +34,8 @@ describe("Apple sign-in native configuration", () => {
   it("pins every iOS build profile to a named Xcode 26 image", () => {
     expect(REQUIRED_IMAGE).toBe("macos-sequoia-15.6-xcode-26.0");
     expect(getIosBuildConfigErrors(easConfig)).toEqual([]);
-    expect(Object.keys(easConfig.build)).toEqual(REQUIRED_PROFILES);
+    // Additive profiles (testflight, preview-ios-simulator, ...) may exist; scripts/eas-profiles.test.ts pins their resolved image.
+    expect(Object.keys(easConfig.build)).toEqual(expect.arrayContaining(REQUIRED_PROFILES));
   });
 
   it("rejects capability or image drift", () => {
