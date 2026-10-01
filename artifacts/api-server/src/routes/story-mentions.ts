@@ -21,6 +21,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
+import { withStickerState } from "../lib/storyStickers";
 
 /** Brand palette is black/white/silver: every avatar without a photo is a white monogram on this. */
 const MONOGRAM_COLOR = "#1C1C1E";
@@ -158,7 +159,7 @@ router.get("/stories/mentions", async (req, res) => {
     const p = profiles.get(r.story.authorId);
     return !p?.deleted && !p?.suspended;
   });
-  const views = await withOriginalInfo(shown.map((r) => storyView(r.story, likedSet.has(r.story.id))));
+  const views = await withStickerState(await withOriginalInfo(shown.map((r) => storyView(r.story, likedSet.has(r.story.id)))), myId);
 
   const items = shown.map((r, i) => {
     const p = profiles.get(r.story.authorId)!;
@@ -211,7 +212,7 @@ router.get("/stories/:id", async (req, res) => {
   }
   const [liked] = await db.select({ s: storyLikes.storyId }).from(storyLikes)
     .where(and(eq(storyLikes.storyId, row.id), eq(storyLikes.userId, myId))).limit(1);
-  const [view] = await withOriginalInfo([storyView(row, !!liked)]);
+  const [view] = await withStickerState(await withOriginalInfo([storyView(row, !!liked)]), myId);
   res.json(view);
 });
 

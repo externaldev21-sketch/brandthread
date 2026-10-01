@@ -37,6 +37,9 @@ import {
   isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation,
 } from '@/lib/previewInbox';
 import { getPreviewActivityStory } from '@/lib/previewActivity';
+import { ViewerStickerLayer } from '@/components/social/StoryStickers';
+import { StoryQuestionResponsesSheet, type QuestionResponses } from '@/components/social/StoryQuestionResponsesSheet';
+import { isPreviewStickerStory, previewStickerStory, PREVIEW_STICKER_ANSWERS } from '@/lib/previewStickers';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia, MessageAttachment } from '@/services/socialTypes';
@@ -104,6 +107,8 @@ function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {
  * (highlights don't expire). `null` for every id outside the preview seed.
  */
 function previewStory(id: string): Story | null {
+  const stickers = previewStickerStory(id);
+  if (stickers) return stickers;
   const seed = getPreviewActivityStory(id);
   if (!seed) return null;
   return {
@@ -147,7 +152,12 @@ export default function BuyerStoryViewer() {
   // Mention popover ("View profile") and the tagged-people sheet; playback is held while either is open.
   const [mentionTap, setMentionTap] = useState<MentionTap | null>(null);
   const [taggedSheetOpen, setTaggedSheetOpen] = useState(false);
-  const overlayPaused = !!mentionTap || taggedSheetOpen;
+  // Author's "Responses" sheet for question stickers.
+  const [responsesOpen, setResponsesOpen] = useState(false);
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const [responses, setResponses] = useState<QuestionResponses | null>(null);
+  const [stickerPaused, setStickerPaused] = useState(false);
+  const overlayPaused = !!mentionTap || taggedSheetOpen || responsesOpen || stickerPaused;
   const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; avatarUrl: string | null; viewedAt: string }>>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -469,6 +479,68 @@ export default function BuyerStoryViewer() {
     router.push(`/buyer-story-viewer?storyId=${encodeURIComponent(originalId)}&allStoryIds=${encodeURIComponent(originalId)}` as never);
   };
 
+  // ── Interactive sticker actions ──────────────────────────────────────────
+  const stickerActions = {
+    vote: async (sid: string, overlayId: string, optionIndex: number) => {
+      hapticLight();
+      try {
+        return (await api.social.pollVote(sid, overlayId, optionIndex)).stickerState;
+      } catch (err) {
+        // Already voted elsewhere: the server sends the current results with the 409.
+        const body = (() => { try { return JSON.parse((err as { body?: string })?.body ?? ''); } catch { return null; } })();
+        if (body?.stickerState) return body.stickerState;
+        throw err;
+      }
+    },
+    answer: async (sid: string, overlayId: string, text: string) => {
+      hapticLight();
+      try {
+        return (await api.social.questionAnswer(sid, overlayId, text)).stickerState;
+      } catch (err) {
+        const body = (() => { try { return JSON.parse((err as { body?: string })?.body ?? ''); } catch { return null; } })();
+        if (body?.stickerState) return body.stickerState;
+        Alert.alert('Could not send your answer', body?.error ?? 'Try again.');
+        throw err;
+      }
+    },
+    notify: async (dropId: string) => { hapticLight(); await api.publicDrops.subscribe(dropId); },
+    openProduct: (productId: string, name: string) => {
+      hapticLight();
+      router.push(`/thread-product-detail?productId=${encodeURIComponent(productId)}&productName=${encodeURIComponent(name)}` as never);
+    },
+    openDrop: (dropId: string, name: string) => {
+      hapticLight();
+      router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(dropId)}&dropName=${encodeURIComponent(name)}` as never);
+    },
+    openResponses: async (sid: string) => {
+      hapticLight();
+      setResponsesOpen(true);
+      if (isPreviewStickerStory(sid)) {
+        setResponses({ questions: [{ overlayId: 'question', prompt: 'What should we drop next?', answers: PREVIEW_STICKER_ANSWERS }] });
+        return;
+      }
+      setResponsesLoading(true);
+      try {
+        setResponses(await api.social.questionAnswers(sid));
+      } catch {
+        setResponses({ questions: [] });
+      } finally {
+        setResponsesLoading(false);
+      }
+    },
+  };
+  const replyToAnswer = async (userId: string) => {
+    if (!currentStory) return;
+    if (isPreviewStickerStory(currentStory.id)) { setResponsesOpen(false); return; }
+    try {
+      const dm = await api.social.questionReplyConversation(currentStory.id, userId);
+      setResponsesOpen(false);
+      router.push(`/buyer-conversation?id=${encodeURIComponent(dm.conversationId)}` as never);
+    } catch {
+      Alert.alert('Could not open the conversation', 'Try again.');
+    }
+  };
+
   const openViewersModal = async () => {
     setViewerModalVisible(true);
     if (!currentStory) return;
@@ -603,6 +675,17 @@ export default function BuyerStoryViewer() {
           44pt square around a tiny/invisible one) and the reshare credit are tappable. */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 6 }]} pointerEvents="box-none">
         <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => { hapticLight(); setMentionTap(t); }} />
+        {/* Interactive stickers: poll, question, product link, drop countdown. */}
+        <ViewerStickerLayer
+          key={currentStory.id}
+          storyId={currentStory.id}
+          overlays={currentSlide.overlays ?? []}
+          state={currentStory.stickerState}
+          isAuthor={isMyStory}
+          local={isPreviewStickerStory(currentStory.id)}
+          actions={stickerActions}
+          onPause={setStickerPaused}
+        />
         {(currentSlide.overlays ?? []).filter(o => o.type === 'reshare_card').map(o => (
           <ViewerReshareCard
             key={o.id}
@@ -948,6 +1031,13 @@ export default function BuyerStoryViewer() {
       )}
       </Animated.View>
 
+      <StoryQuestionResponsesSheet
+        visible={responsesOpen}
+        loading={responsesLoading}
+        data={responses}
+        onClose={() => setResponsesOpen(false)}
+        onReply={(userId) => { void replyToAnswer(userId); }}
+      />
       <MentionPopover target={mentionTap} onClose={() => setMentionTap(null)} onViewProfile={openProfile} />
       <TaggedPeopleSheet visible={taggedSheetOpen} people={slidePeople} onClose={() => setTaggedSheetOpen(false)} onOpen={openProfile} />
 

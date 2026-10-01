@@ -310,7 +310,7 @@ export type StoryReplyPermission = 'everyone' | 'friends' | 'off';
 export type StoryOverlayType =
   | 'link' | 'gif' | 'text'
   | 'mention' | 'location' | 'time' | 'poll' | 'question'
-  | 'product' | 'shop' | 'threadcash'
+  | 'product' | 'shop' | 'threadcash' | 'countdown'
   /** The original story shown as a rounded card in a reshare ("Add to your story"). */
   | 'reshare_card';
 
@@ -376,6 +376,10 @@ export interface StoryOverlay {
   productName?: string;
   productImageUri?: string;
   productPriceCents?: number;
+  // drop countdown sticker (sellers): the server validates dropId; name / date are a snapshot, live data is in Story.stickerState
+  dropId?: string;
+  dropName?: string;
+  dropReleaseAt?: string;
   // shop-link sticker (sellers)
   shopUrl?: string;
   shopLabel?: string;
@@ -424,6 +428,21 @@ export interface Story {
   original?: StoryOriginal | null;
   createdAt: number;         // Unix ms
   expiresAt: number;         // createdAt + 24h
+  /** Live state of interactive stickers (poll results, question status, product / drop facts). Null when there are none. */
+  stickerState?: StoryStickerState | null;
+}
+
+export interface StoryPollState { counts: number[] | null; percentages: number[] | null; total: number | null; myVote: number | null }
+export interface StoryQuestionState { answered: boolean; count: number | null }
+export interface StoryProductState { productId: string; name: string; imageUrl: string | null; priceCents: number | null; available: boolean; soldOut: boolean }
+export interface StoryCountdownState { dropId: string; name: string; releaseAt: string | null; launched: boolean; live: boolean; subscribed: boolean }
+export interface StoryStickerState {
+  /** Server clock (ms) when the state was built: countdowns tick from it, not from the phone's clock. */
+  serverNow: number;
+  polls: Record<string, StoryPollState>;
+  questions: Record<string, StoryQuestionState>;
+  products: Record<string, StoryProductState>;
+  countdowns: Record<string, StoryCountdownState>;
 }
 
 export interface StoryOriginal {
