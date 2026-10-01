@@ -83,9 +83,11 @@ import {
   defaultCurvesAdjustment, curveToTableValues,
   computeHistogramFromColors, HISTOGRAM_UNAVAILABLE,
   netLiquifyDisplacement, DesignLayerAdjustments,
+  HsbAdjustment, defaultHsbAdjustment, isIdentityHsb, clampHsb,
 } from '@/lib/adjustmentsModel';
 import {
   buildLayerTransform, curvesToColorMatrixString, isIdentityCurves,
+  hsbToColorMatrixString,
 } from '@/lib/layerRenderer';
 import {
   DesignPreferences, QuickMenuAction, PressurePoint, DesignTimerState,
@@ -409,7 +411,7 @@ export default function DesignCanvasScreen() {
   const pendingExtHandleRef = useRef<ExtHandleKind>('move');
 
   // ── Adjustments tool state ──────────────────────────────────────────────────
-  const [adjustmentsSubMode, setAdjustmentsSubMode] = useState<'curves' | 'liquify'>('curves');
+  const [adjustmentsSubMode, setAdjustmentsSubMode] = useState<'hsb' | 'curves' | 'liquify'>('curves');
   const [adjustmentsCurveChannel, setAdjustmentsCurveChannel] = useState<CurveChannel>('gamma');
   // Liquify brush settings
   const [liquifySize, setLiquifySize] = useState(40);
@@ -1944,6 +1946,16 @@ export default function DesignCanvasScreen() {
     markDirty();
   }
 
+  // ─── Adjustments: HSB mutations ──────────────────────────────────────────
+  function updateLayerHsb(layerId: string, hsb: HsbAdjustment) {
+    const clamped = clampHsb(hsb);
+    mutateLayer(prev => prev.map(l => {
+      if (l.id !== layerId) return l;
+      return { ...l, adjustments: { ...l.adjustments, hsb: clamped } };
+    }));
+    markDirty();
+  }
+
   function resetLayerAdjustments(layerId: string) {
     mutateLayer(prev => prev.map(l => {
       if (l.id !== layerId) return l;
@@ -2797,6 +2809,14 @@ export default function DesignCanvasScreen() {
     // ── Shared transform: affine→liquify→rotation→flip (same logic as compositor) ──
     const transformAttr = buildLayerTransform(t, xScale, yScale);
 
+    // ── HSB filter: feColorMatrix (hue rotate × saturate × brightness gain),
+    // applied first in the chain, to ALL layer types (unlike Curves'
+    // histogram preview, this is a pure colour-space transform with no
+    // raster/vector distinction) ──
+    const hsbAdj = layer.adjustments?.hsb;
+    const hasRealHsb = !!hsbAdj && !isIdentityHsb(hsbAdj);
+    const hsbMatrixValues = hasRealHsb ? hsbToColorMatrixString(hsbAdj!) : null;
+
     // ── Curves filter: feColorMatrix applied to all layer types ──
     const curvesAdj = layer.adjustments?.curves;
     const hasRealCurves = !!curvesAdj && !isIdentityCurves(curvesAdj);
@@ -2809,21 +2829,28 @@ export default function DesignCanvasScreen() {
     const blendMode = (layer.blendMode ?? legacyImageBlend ?? 'normal') as BlendModeKind;
     const hasBlend = blendMode !== 'normal' && RN_SVG_BLEND_MODES.has(blendMode);
 
-    // ── Combined filter (curves + blend), built once per layer. react-native-svg
-    // (both iOS/Apple and Android native filter pipelines) resolves a feBlend's
-    // in2="BackgroundImage" against whatever was already drawn below it in the
-    // same <Svg> tree, which is exactly the real backdrop compositing a CSS
-    // mix-blend-mode would use — this is real compositing, not a visual no-op. ──
-    const needsFilter = hasRealCurves || hasBlend;
+    // ── Combined filter (hsb + curves + blend), built once per layer, chained
+    // SourceGraphic → hsb'd → curved → blended via each stage's in/result.
+    // react-native-svg (both iOS/Apple and Android native filter pipelines)
+    // resolves a feBlend's in2="BackgroundImage" against whatever was already
+    // drawn below it in the same <Svg> tree, which is exactly the real
+    // backdrop compositing a CSS mix-blend-mode would use — this is real
+    // compositing, not a visual no-op. ──
+    const needsFilter = hasRealHsb || hasRealCurves || hasBlend;
     const filterId = needsFilter ? `lf_${safeSvgId(layer.id)}` : null;
     const filterRef: string | undefined = filterId ? `url(#${filterId})` : undefined;
+    const hsbResult = (hasRealCurves || hasBlend) ? 'hsbd' : undefined;
+    const curvesIn = hasRealHsb ? 'hsbd' : 'SourceGraphic';
     const curvesResult = hasBlend ? 'curved' : undefined;
-    const blendIn = hasRealCurves ? 'curved' : 'SourceGraphic';
+    const blendIn = hasRealCurves ? 'curved' : (hasRealHsb ? 'hsbd' : 'SourceGraphic');
     const filterDefs = needsFilter ? (
       <Defs>
         <Filter id={filterId!} x="-20%" y="-20%" width="140%" height="140%">
+          {hasRealHsb && (
+            <FeColorMatrix type="matrix" values={hsbMatrixValues!} result={hsbResult} />
+          )}
           {hasRealCurves && (
-            <FeColorMatrix type="matrix" values={matrixValues!} result={curvesResult} />
+            <FeColorMatrix type="matrix" in={curvesIn} values={matrixValues!} result={curvesResult} />
           )}
           {hasBlend && blendMode === 'overlay' && (
             <>
@@ -3801,6 +3828,13 @@ export default function DesignCanvasScreen() {
           {activeTopTool === 'adjustments' && (
             <View style={styles.subModeBar} testID="adjustments-mode-bar">
               <TouchableOpacity
+                style={[styles.subModeChip, adjustmentsSubMode === 'hsb' && styles.subModeChipActive]}
+                onPress={() => { setAdjustmentsSubMode('hsb'); openSheet('adjustments'); }}
+                testID="adj-mode-hsb"
+              >
+                <Text style={[styles.subModeLabel, adjustmentsSubMode === 'hsb' && styles.subModeLabelActive]}>HSB</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.subModeChip, adjustmentsSubMode === 'curves' && styles.subModeChipActive]}
                 onPress={() => { setAdjustmentsSubMode('curves'); openSheet('adjustments'); }}
                 testID="adj-mode-curves"
@@ -4550,15 +4584,65 @@ export default function DesignCanvasScreen() {
           <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>Curves</Text>
-              <TouchableOpacity onPress={closeSheet}>
+              <Text style={styles.sheetTitle}>{adjustmentsSubMode === 'hsb' ? 'HSB' : 'Curves'}</Text>
+              <TouchableOpacity onPress={closeSheet} testID="adjustments-sheet-done">
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
               </TouchableOpacity>
             </View>
             {!selectedLayer ? (
               <Text style={{ fontSize: FS.sm, color: MUTED, fontFamily: FONT.regular, marginBottom: SP.md }}>
-                Select a layer to edit its curves.
+                Select a layer to edit its {adjustmentsSubMode === 'hsb' ? 'HSB' : 'curves'}.
               </Text>
+            ) : adjustmentsSubMode === 'hsb' ? (
+              <View testID="adjustments-hsb-panel">
+                {(() => {
+                  const hsb = selectedLayer.adjustments?.hsb ?? defaultHsbAdjustment();
+                  const rows: { key: keyof HsbAdjustment; label: string; min: number; max: number; step: number; format: (v: number) => string }[] = [
+                    { key: 'hue', label: 'Hue', min: -180, max: 180, step: 10, format: v => `${v > 0 ? '+' : ''}${v}°` },
+                    { key: 'saturation', label: 'Saturation', min: -1, max: 1, step: 0.1, format: v => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%` },
+                    { key: 'brightness', label: 'Brightness', min: -1, max: 1, step: 0.1, format: v => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%` },
+                  ];
+                  return (
+                    <View style={{ gap: SP.md }}>
+                      {rows.map(row => {
+                        const value = hsb[row.key];
+                        const pct = ((value - row.min) / (row.max - row.min)) * 100;
+                        return (
+                          <View key={row.key} style={styles.sliderRow}>
+                            <Text style={[styles.sliderLabel, { minWidth: 72 }]}>{row.label}</Text>
+                            <TouchableOpacity
+                              style={styles.animBtn}
+                              onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.max(row.min, +(value - row.step).toFixed(2)) })}
+                              testID={`hsb-${row.key}-dec`}
+                            >
+                              <Feather name="minus" size={14} color={MUTED} />
+                            </TouchableOpacity>
+                            <View style={styles.sliderTrack}>
+                              <View style={[styles.sliderFill, { width: `${Math.max(0, Math.min(100, pct))}%` }]} />
+                            </View>
+                            <TouchableOpacity
+                              style={styles.animBtn}
+                              onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.min(row.max, +(value + row.step).toFixed(2)) })}
+                              testID={`hsb-${row.key}-inc`}
+                            >
+                              <Feather name="plus" size={14} color={MUTED} />
+                            </TouchableOpacity>
+                            <Text style={[styles.sliderValue, { minWidth: 48 }]} testID={`hsb-${row.key}-value`}>{row.format(value)}</Text>
+                          </View>
+                        );
+                      })}
+                      <TouchableOpacity
+                        style={[styles.fontChip, { alignSelf: 'flex-start' }]}
+                        onPress={() => updateLayerHsb(selectedLayer.id, defaultHsbAdjustment())}
+                        testID="hsb-reset"
+                      >
+                        <Feather name="refresh-cw" size={12} color={MUTED} />
+                        <Text style={styles.fontChipText}>Reset</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })()}
+              </View>
             ) : (
               <>
                 {/* Channel tabs */}
