@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -90,7 +90,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
       <Text style={[styles.heading, { color: colors.foreground }]}>Evidence files</Text>
 
       {files.length > 0 ? (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View testID="dispute-files-card" style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {files.map((f, i) => (
             <View
               key={f.id}
@@ -105,8 +105,8 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.fileName, { color: colors.foreground }]} numberOfLines={1}>{f.fileName}</Text>
-                <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.fileName, { color: colors.foreground }]}>{f.fileName}</Text>
+                <Text style={[styles.meta, { color: colors.mutedForeground }]}>
                   {fileTypeLabel(f.evidenceType)} · {formatBytes(f.sizeBytes)} · {shortDate(f.uploadedAt)}
                 </Text>
               </View>
@@ -119,10 +119,9 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
       )}
 
       {!locked && !readOnly ? (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: SP.md, gap: SP.sm }]}>
+        <View testID="dispute-add-file-card" style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: SP.md, gap: SP.sm }]}>
           <Text style={[styles.label, { color: colors.foreground }]}>Add a file</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chipRow}>
+          <View testID="dispute-file-chips" style={styles.chipRow}>
               {DISPUTE_FILE_TYPES.map((t) => {
                 const active = type === t.key;
                 return (
@@ -143,9 +142,8 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
                   </TouchableOpacity>
                 );
               })}
-            </View>
-          </ScrollView>
-          <View style={styles.actions}>
+          </View>
+          <View testID="dispute-file-actions" style={styles.actions}>
             <TouchableOpacity
               disabled={busy}
               onPress={() => void pickPhoto()}
@@ -180,17 +178,17 @@ const styles = StyleSheet.create({
   heading: { fontSize: FS.base, fontFamily: FONT.semibold },
   label: { fontSize: FS.base, fontFamily: FONT.semibold },
   card: { borderRadius: 14, borderWidth: 1 },
-  fileRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, padding: SP.md },
+  fileRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingHorizontal: SP.md, paddingVertical: SP.md },
   fileIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   fileName: { fontSize: FS.sm, fontFamily: FONT.semibold },
   meta: { fontSize: FS.meta, fontFamily: FONT.regular },
-  chipRow: { flexDirection: 'row', gap: SP.sm },
-  chip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, borderWidth: 1 },
-  chipText: { fontSize: FS.meta, fontFamily: FONT.medium },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  chip: { paddingHorizontal: SP.md, paddingVertical: SP.sm + 2, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.pill, borderWidth: 1 },
+  chipText: { fontSize: FS.meta, textAlign: 'center', fontFamily: FONT.medium },
   actions: { flexDirection: 'row', gap: SP.sm },
   action: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
     paddingVertical: SP.sm + 4, borderRadius: RADIUS.md, borderWidth: 1, minHeight: 44,
   },
-  actionText: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  actionText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center' },
 });

@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm + 2, paddingVertical: 3,
+    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 5,
   },
-  chipText: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  chipText: { fontSize: FS.meta, fontFamily: FONT.semibold },
 });

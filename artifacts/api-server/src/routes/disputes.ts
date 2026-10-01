@@ -51,6 +51,8 @@ function rowToDispute(row: typeof disputes.$inferSelect) {
     orderId:              row.orderId,
     sellerId:             row.sellerId,
     amount:               row.amountCents / 100,
+    // dispute-detail.tsx reads amountCents; the list reads amount (dollars).
+    amountCents:          row.amountCents,
     currency:             row.currency,
     reason:               row.reason,
     status:               row.status,

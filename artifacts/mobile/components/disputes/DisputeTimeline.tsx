@@ -53,7 +53,7 @@ export function DisputeTimeline({ disputeId, demo, refreshKey = 0 }: Props) {
       ) : !steps ? (
         <Text style={[styles.meta, { color: colors.mutedForeground }]}>Loading…</Text>
       ) : (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View testID="dispute-timeline-card" style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {steps.map((step, i) => {
             const last = i === steps.length - 1;
             const done = step.state === 'done';
