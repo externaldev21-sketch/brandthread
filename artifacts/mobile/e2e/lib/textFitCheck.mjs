@@ -76,8 +76,17 @@ export async function findBoxOverflow(page, rootSelector = 'body') {
       const r = el.getBoundingClientRect();
       const pr = parent.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
-      const overflowsRight = r.right > pr.right + TOLERANCE;
-      const overflowsBottom = r.bottom > pr.bottom + TOLERANCE;
+      let overflowsRight = r.right > pr.right + TOLERANCE;
+      let overflowsBottom = r.bottom > pr.bottom + TOLERANCE;
+      if (overflowsRight || overflowsBottom) {
+        // A horizontally/vertically scrollable container (e.g. a chip
+        // picker row) is SUPPOSED to have content wider/taller than its
+        // visible viewport — that's what makes it scrollable. Only flag
+        // overflow on an axis the parent does NOT scroll.
+        const parentStyle = getComputedStyle(parent);
+        if (overflowsRight && (parentStyle.overflowX === 'auto' || parentStyle.overflowX === 'scroll')) overflowsRight = false;
+        if (overflowsBottom && (parentStyle.overflowY === 'auto' || parentStyle.overflowY === 'scroll')) overflowsBottom = false;
+      }
       if (overflowsRight || overflowsBottom) {
         results.push({
           testId: el.getAttribute('data-testid') || null,
