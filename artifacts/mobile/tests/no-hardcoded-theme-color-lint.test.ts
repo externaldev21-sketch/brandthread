@@ -327,6 +327,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/checkout/PaymentSection.tsx',
   'components/checkout/StripePayment.web.tsx',
   'components/create-post/MediaGrid.tsx',
+  'components/design-studio/AdjustmentsMenu.tsx',
   'components/design-studio/CanvasHost.tsx',
   'components/design-studio/ColorPicker.tsx',
   'components/design-studio/LayersPanel.tsx',

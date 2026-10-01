@@ -265,6 +265,82 @@ export function clampHsb(adj: HsbAdjustment): HsbAdjustment {
   };
 }
 
+// ─── Effects (Blur / Effects / Colour Balance / Gradient Map) ─────────────────
+//
+// Each is applied as a real SVG filter primitive on the layer's own filter
+// chain (see layerRenderer.ts for the kernel/matrix/table builders and
+// design-canvas.tsx's renderLayerInSvg for the chain). None of these is a
+// visual approximation layered on top: they are the same primitives
+// (feGaussianBlur, feConvolveMatrix, feTurbulence, feOffset,
+// feComponentTransfer, feColorMatrix) a browser or react-native-svg's
+// native pipeline executes directly.
+
+/** Per-channel colour balance, each -1..1 (cyan↔red, magenta↔green, yellow↔blue). */
+export interface ColorBalanceAdjustment { cyanRed: number; magentaGreen: number; yellowBlue: number; }
+
+/** Luminance → gradient between two hex colours, blended back by `mix` (0..1). */
+export interface GradientMapAdjustment { from: string; to: string; mix: number; }
+
+/** Directional blur: `amount` is the kernel length in px (0..40), `angle` in degrees (0..180). */
+export interface MotionBlurAdjustment { amount: number; angle: number; }
+
+export interface EffectsAdjustment {
+  colorBalance?: ColorBalanceAdjustment;
+  gradientMap?:  GradientMapAdjustment;
+  gaussianBlur?: number;              // stdDeviation, 0..40
+  motionBlur?:   MotionBlurAdjustment;
+  sharpen?:      number;              // 0..1
+  noise?:        number;              // 0..1
+  bloom?:        number;              // 0..1
+  chromatic?:    number;              // channel offset px, 0..24
+}
+
+export const EFFECT_LIMITS = {
+  gaussianBlur: { min: 0, max: 40 },
+  motionAmount: { min: 0, max: 40 },
+  motionAngle:  { min: 0, max: 180 },
+  unit:         { min: 0, max: 1 },
+  chromatic:    { min: 0, max: 24 },
+  balance:      { min: -1, max: 1 },
+} as const;
+
+export function defaultEffects(): EffectsAdjustment { return {}; }
+
+const near0 = (v: number | undefined) => !v || Math.abs(v) < 1e-9;
+
+/** True when nothing in the effects would change a single pixel — the filter stages are skipped entirely. */
+export function isIdentityEffects(e: EffectsAdjustment | undefined): boolean {
+  if (!e) return true;
+  const cb = e.colorBalance;
+  const cbIdentity = !cb || (near0(cb.cyanRed) && near0(cb.magentaGreen) && near0(cb.yellowBlue));
+  const gmIdentity = !e.gradientMap || near0(e.gradientMap.mix);
+  const mbIdentity = !e.motionBlur || near0(e.motionBlur.amount);
+  return cbIdentity && gmIdentity && mbIdentity
+    && near0(e.gaussianBlur) && near0(e.sharpen) && near0(e.noise) && near0(e.bloom) && near0(e.chromatic);
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+export function clampEffects(e: EffectsAdjustment): EffectsAdjustment {
+  const out: EffectsAdjustment = {};
+  if (e.colorBalance) out.colorBalance = {
+    cyanRed: clamp(e.colorBalance.cyanRed, -1, 1),
+    magentaGreen: clamp(e.colorBalance.magentaGreen, -1, 1),
+    yellowBlue: clamp(e.colorBalance.yellowBlue, -1, 1),
+  };
+  if (e.gradientMap) out.gradientMap = { ...e.gradientMap, mix: clamp(e.gradientMap.mix, 0, 1) };
+  if (e.gaussianBlur !== undefined) out.gaussianBlur = clamp(e.gaussianBlur, 0, EFFECT_LIMITS.gaussianBlur.max);
+  if (e.motionBlur) out.motionBlur = {
+    amount: clamp(e.motionBlur.amount, 0, EFFECT_LIMITS.motionAmount.max),
+    angle: clamp(e.motionBlur.angle, 0, 180),
+  };
+  if (e.sharpen !== undefined) out.sharpen = clamp(e.sharpen, 0, 1);
+  if (e.noise !== undefined) out.noise = clamp(e.noise, 0, 1);
+  if (e.bloom !== undefined) out.bloom = clamp(e.bloom, 0, 1);
+  if (e.chromatic !== undefined) out.chromatic = clamp(e.chromatic, 0, EFFECT_LIMITS.chromatic.max);
+  return out;
+}
+
 // ─── DesignLayerAdjustments ───────────────────────────────────────────────────
 
 /** Persisted adjustments attached to a layer (stored in layer.adjustments). */
@@ -272,4 +348,5 @@ export interface DesignLayerAdjustments {
   curves?:  CurvesAdjustment;
   liquify?: LiquifyAdjustment;
   hsb?:     HsbAdjustment;
+  effects?: EffectsAdjustment;
 }

@@ -81,15 +81,11 @@ async function openAdjustmentsHsb(page: import('@playwright/test').Page) {
   await page.locator('[data-testid="btn-adjustments"]').first().click();
   await page.waitForTimeout(300);
 
-  // btn-adjustments both selects the tool AND immediately opens the
-  // Adjustments sheet (defaulting to Curves) — its own full-screen overlay
-  // Pressable then sits on top of the sub-mode bar (adj-mode-hsb lives
-  // there, not inside the sheet), blocking any click on it. The real flow
-  // is: close the sheet first, THEN tap the HSB chip, which re-opens the
-  // sheet already on HSB.
-  await page.locator('[data-testid="adjustments-sheet-done"]').click();
-  await page.waitForTimeout(300);
-  await page.locator('[data-testid="adj-mode-hsb"]').click();
+  // The sheet opens on Procreate's category grid; HSB lives under
+  // Colour Adjustment.
+  await page.locator('[data-testid="adj-cat-colour"]').click();
+  await page.waitForTimeout(250);
+  await page.locator('[data-testid="adj-tool-hsb"]').click();
   await page.waitForTimeout(300);
 }
 

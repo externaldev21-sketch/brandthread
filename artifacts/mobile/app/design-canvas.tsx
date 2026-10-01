@@ -35,6 +35,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 import Svg, {
   Path, Rect, Circle, G, Line, Text as SvgText,
   Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
+  FeGaussianBlur, FeConvolveMatrix, FeTurbulence, FeOffset, FeComponentTransfer, FeFuncR, FeFuncG, FeFuncB,
 } from 'react-native-svg';
 import { File, Paths, EncodingType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -84,11 +85,16 @@ import {
   computeHistogramFromColors, HISTOGRAM_UNAVAILABLE,
   netLiquifyDisplacement, DesignLayerAdjustments,
   HsbAdjustment, defaultHsbAdjustment, isIdentityHsb, clampHsb,
+  type EffectsAdjustment, isIdentityEffects, clampEffects,
 } from '@/lib/adjustmentsModel';
 import {
   buildLayerTransform, curvesToColorMatrixString, isIdentityCurves,
   hsbToColorMatrixString,
+  motionBlurKernel, sharpenKernel, colorBalanceMatrixString, gradientMapTables,
+  bloomStdDeviation, NOISE_BASE_FREQUENCY,
 } from '@/lib/layerRenderer';
+import { ADJ_CATEGORIES, ADJ_TOOL_LABELS, type AdjCategory, type AdjTool } from '@/lib/adjustmentsCatalog';
+import { AdjCategoryGrid, AdjToolList, AdjEffectPanel } from '@/components/design-studio/AdjustmentsMenu';
 import {
   DesignPreferences, QuickMenuAction, PressurePoint, DesignTimerState,
   defaultPreferences, samplePressureCurve, formatDuration,
@@ -411,7 +417,11 @@ export default function DesignCanvasScreen() {
   const pendingExtHandleRef = useRef<ExtHandleKind>('move');
 
   // ── Adjustments tool state ──────────────────────────────────────────────────
-  const [adjustmentsSubMode, setAdjustmentsSubMode] = useState<'hsb' | 'curves' | 'liquify'>('curves');
+  // Procreate's Adjustments sheet navigation: category grid → that
+  // category's tool list → the tool's panel. Liquify is a tool that closes
+  // the sheet and hands the canvas gesture to its push responder.
+  const [adjCategory, setAdjCategory] = useState<AdjCategory | null>(null);
+  const [adjTool, setAdjTool] = useState<AdjTool | null>(null);
   const [adjustmentsCurveChannel, setAdjustmentsCurveChannel] = useState<CurveChannel>('gamma');
   // Liquify brush settings
   const [liquifySize, setLiquifySize] = useState(40);
@@ -1956,6 +1966,16 @@ export default function DesignCanvasScreen() {
     markDirty();
   }
 
+  // ─── Adjustments: effects mutations (blur / sharpen / noise / balance / …) ──
+  function updateLayerEffects(layerId: string, effects: EffectsAdjustment) {
+    const clamped = clampEffects(effects);
+    mutateLayer(prev => prev.map(l => {
+      if (l.id !== layerId) return l;
+      return { ...l, adjustments: { ...l.adjustments, effects: clamped } };
+    }));
+    markDirty();
+  }
+
   function resetLayerAdjustments(layerId: string) {
     mutateLayer(prev => prev.map(l => {
       if (l.id !== layerId) return l;
@@ -2836,22 +2856,107 @@ export default function DesignCanvasScreen() {
     // drawn below it in the same <Svg> tree, which is exactly the real
     // backdrop compositing a CSS mix-blend-mode would use — this is real
     // compositing, not a visual no-op. ──
-    const needsFilter = hasRealHsb || hasRealCurves || hasBlend;
+    // ── Effects: each enabled one is a real SVG primitive stage (see
+    // lib/layerRenderer.ts for the kernel/matrix/table builders). ──
+    const fxRaw = layer.adjustments?.effects;
+    const fx = fxRaw && !isIdentityEffects(fxRaw) ? fxRaw : null;
+
+    const needsFilter = hasRealHsb || hasRealCurves || !!fx || hasBlend;
     const filterId = needsFilter ? `lf_${safeSvgId(layer.id)}` : null;
     const filterRef: string | undefined = filterId ? `url(#${filterId})` : undefined;
-    const hsbResult = (hasRealCurves || hasBlend) ? 'hsbd' : undefined;
-    const curvesIn = hasRealHsb ? 'hsbd' : 'SourceGraphic';
-    const curvesResult = hasBlend ? 'curved' : undefined;
-    const blendIn = hasRealCurves ? 'curved' : (hasRealHsb ? 'hsbd' : 'SourceGraphic');
+
+    // Generic stage threading: every stage reads the previous stage's result
+    // (`prev`) and names its own, so adding a stage never means re-wiring
+    // the in/result plumbing of the ones around it.
+    const stages: React.ReactNode[] = [];
+    let prev = 'SourceGraphic';
+    const chain = (resultName: string) => { const inName = prev; prev = resultName; return inName; };
+
+    if (hasRealHsb) {
+      stages.push(<FeColorMatrix key="hsb" type="matrix" in={chain('hsbd')} values={hsbMatrixValues!} result="hsbd" />);
+    }
+    if (hasRealCurves) {
+      stages.push(<FeColorMatrix key="curves" type="matrix" in={chain('curved')} values={matrixValues!} result="curved" />);
+    }
+    if (fx) {
+      const cb = fx.colorBalance;
+      if (cb && (cb.cyanRed || cb.magentaGreen || cb.yellowBlue)) {
+        stages.push(<FeColorMatrix key="cbal" type="matrix" in={chain('cbal')} values={colorBalanceMatrixString(cb)} result="cbal" />);
+      }
+      const gm = fx.gradientMap;
+      const gmTables = gm && gm.mix > 0 ? gradientMapTables(gm.from, gm.to) : null;
+      if (gm && gmTables) {
+        const i = chain('gmap');
+        stages.push(
+          <React.Fragment key="gmap">
+            <FeColorMatrix type="saturate" in={i} values="0" result="gm_gray" />
+            <FeComponentTransfer in="gm_gray" result="gm_ramp">
+              <FeFuncR type="table" tableValues={gmTables.r} />
+              <FeFuncG type="table" tableValues={gmTables.g} />
+              <FeFuncB type="table" tableValues={gmTables.b} />
+            </FeComponentTransfer>
+            <FeComposite in="gm_ramp" in2={i} operator="arithmetic" k1={0} k2={gm.mix} k3={1 - gm.mix} k4={0} result="gmap" />
+          </React.Fragment>,
+        );
+      }
+      if (fx.gaussianBlur) {
+        stages.push(<FeGaussianBlur key="gblur" in={chain('gblur')} stdDeviation={fx.gaussianBlur * xScale} result="gblur" />);
+      }
+      const mb = fx.motionBlur;
+      if (mb && mb.amount > 0) {
+        const k = motionBlurKernel(mb.amount, mb.angle);
+        stages.push(
+          <FeConvolveMatrix key="mblur" in={chain('mblur')} order={k.order} kernelMatrix={k.kernel} divisor={k.divisor} edgeMode="duplicate" preserveAlpha result="mblur" />,
+        );
+      }
+      if (fx.sharpen) {
+        stages.push(
+          <FeConvolveMatrix key="sharp" in={chain('sharp')} order={3} kernelMatrix={sharpenKernel(fx.sharpen)} edgeMode="duplicate" preserveAlpha result="sharp" />,
+        );
+      }
+      if (fx.noise) {
+        const i = chain('noised');
+        stages.push(
+          <React.Fragment key="noise">
+            <FeTurbulence type="fractalNoise" baseFrequency={NOISE_BASE_FREQUENCY} numOctaves={2} seed={7} result="nz_raw" />
+            <FeColorMatrix type="saturate" in="nz_raw" values="0" result="nz_gray" />
+            <FeComposite in="nz_gray" in2={i} operator="arithmetic" k1={0} k2={fx.noise} k3={1 - fx.noise} k4={0} result="nz_mix" />
+            {/* operator="in" clips the grain to the layer's own alpha, so transparent areas stay transparent. */}
+            <FeComposite in="nz_mix" in2={i} operator="in" result="noised" />
+          </React.Fragment>,
+        );
+      }
+      if (fx.chromatic) {
+        const d = fx.chromatic * xScale;
+        const i = chain('chrom');
+        stages.push(
+          <React.Fragment key="chrom">
+            {/* Split R / G / B, push red right and blue left, add them back. */}
+            <FeColorMatrix type="matrix" in={i} values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="ca_r" />
+            <FeOffset in="ca_r" dx={d} dy={0} result="ca_r_off" />
+            <FeColorMatrix type="matrix" in={i} values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="ca_g" />
+            <FeColorMatrix type="matrix" in={i} values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="ca_b" />
+            <FeOffset in="ca_b" dx={-d} dy={0} result="ca_b_off" />
+            <FeComposite in="ca_r_off" in2="ca_g" operator="arithmetic" k1={0} k2={1} k3={1} k4={0} result="ca_rg" />
+            <FeComposite in="ca_rg" in2="ca_b_off" operator="arithmetic" k1={0} k2={1} k3={1} k4={0} result="chrom" />
+          </React.Fragment>,
+        );
+      }
+      if (fx.bloom) {
+        const i = chain('bloom');
+        stages.push(
+          <React.Fragment key="bloom">
+            <FeGaussianBlur in={i} stdDeviation={bloomStdDeviation(fx.bloom) * xScale} result="bl_blur" />
+            <FeBlend in={i} in2="bl_blur" mode="screen" result="bloom" />
+          </React.Fragment>,
+        );
+      }
+    }
+    const blendIn = prev;
     const filterDefs = needsFilter ? (
       <Defs>
         <Filter id={filterId!} x="-20%" y="-20%" width="140%" height="140%">
-          {hasRealHsb && (
-            <FeColorMatrix type="matrix" values={hsbMatrixValues!} result={hsbResult} />
-          )}
-          {hasRealCurves && (
-            <FeColorMatrix type="matrix" in={curvesIn} values={matrixValues!} result={curvesResult} />
-          )}
+          {stages}
           {hasBlend && blendMode === 'overlay' && (
             <>
               <FeBlend in={blendIn} in2="BackgroundImage" mode="multiply" result="ov_mul" />
@@ -3827,27 +3932,26 @@ export default function DesignCanvasScreen() {
           {/* ── ADJUSTMENTS MODE BAR ── */}
           {activeTopTool === 'adjustments' && (
             <View style={styles.subModeBar} testID="adjustments-mode-bar">
+              {/* Procreate shows the current adjustment's name under the top
+                  bar while it's active; the full menu (category grid) lives
+                  in the sheet. */}
               <TouchableOpacity
-                style={[styles.subModeChip, adjustmentsSubMode === 'hsb' && styles.subModeChipActive]}
-                onPress={() => { setAdjustmentsSubMode('hsb'); openSheet('adjustments'); }}
-                testID="adj-mode-hsb"
+                style={[styles.subModeChip, adjTool === null && styles.subModeChipActive]}
+                onPress={() => { setAdjCategory(null); setAdjTool(null); openSheet('adjustments'); }}
+                testID="adj-open-menu"
               >
-                <Text style={[styles.subModeLabel, adjustmentsSubMode === 'hsb' && styles.subModeLabelActive]}>HSB</Text>
+                <Feather name="grid" size={12} color={adjTool === null ? FG : MUTED} />
+                <Text style={[styles.subModeLabel, adjTool === null && styles.subModeLabelActive]}>Adjustments</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.subModeChip, adjustmentsSubMode === 'curves' && styles.subModeChipActive]}
-                onPress={() => { setAdjustmentsSubMode('curves'); openSheet('adjustments'); }}
-                testID="adj-mode-curves"
-              >
-                <Text style={[styles.subModeLabel, adjustmentsSubMode === 'curves' && styles.subModeLabelActive]}>Curves</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.subModeChip, adjustmentsSubMode === 'liquify' && styles.subModeChipActive]}
-                onPress={() => { setAdjustmentsSubMode('liquify'); closeSheet(); }}
-                testID="adj-mode-liquify"
-              >
-                <Text style={[styles.subModeLabel, adjustmentsSubMode === 'liquify' && styles.subModeLabelActive]}>Liquify</Text>
-              </TouchableOpacity>
+              {adjTool !== null && (
+                <TouchableOpacity
+                  style={[styles.subModeChip, styles.subModeChipActive]}
+                  onPress={() => { if (adjTool !== 'liquify') openSheet('adjustments'); }}
+                  testID="adj-current-tool"
+                >
+                  <Text style={[styles.subModeLabel, styles.subModeLabelActive]}>{ADJ_TOOL_LABELS[adjTool]}</Text>
+                </TouchableOpacity>
+              )}
               {selectedLayer && (
                 <TouchableOpacity
                   style={[styles.subModeChip, { marginLeft: SP.sm }]}
@@ -4584,16 +4688,41 @@ export default function DesignCanvasScreen() {
           <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>{adjustmentsSubMode === 'hsb' ? 'HSB' : 'Curves'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1 }}>
+                {adjCategory !== null && (
+                  <TouchableOpacity
+                    onPress={() => { if (adjTool !== null) setAdjTool(null); else setAdjCategory(null); }}
+                    testID="adjustments-sheet-back"
+                    accessibilityLabel="Back"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Feather name="chevron-left" size={ICON.md} color={FG} />
+                  </TouchableOpacity>
+                )}
+                <Text style={styles.sheetTitle} numberOfLines={1} testID="adjustments-sheet-title">
+                  {adjTool !== null
+                    ? ADJ_TOOL_LABELS[adjTool]
+                    : adjCategory !== null
+                      ? ADJ_CATEGORIES.find(c => c.key === adjCategory)!.label
+                      : 'Adjustments'}
+                </Text>
+              </View>
               <TouchableOpacity onPress={closeSheet} testID="adjustments-sheet-done">
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
               </TouchableOpacity>
             </View>
-            {!selectedLayer ? (
+            {adjCategory === null ? (
+              <AdjCategoryGrid onPick={c => { setAdjCategory(c); setAdjTool(null); }} />
+            ) : adjTool === null ? (
+              <AdjToolList
+                category={adjCategory}
+                onPick={t => { setAdjTool(t); if (t === 'liquify') closeSheet(); }}
+              />
+            ) : !selectedLayer ? (
               <Text style={{ fontSize: FS.sm, color: MUTED, fontFamily: FONT.regular, marginBottom: SP.md }}>
-                Select a layer to edit its {adjustmentsSubMode === 'hsb' ? 'HSB' : 'curves'}.
+                Select a layer to apply {ADJ_TOOL_LABELS[adjTool]}.
               </Text>
-            ) : adjustmentsSubMode === 'hsb' ? (
+            ) : adjTool === 'hsb' ? (
               <View testID="adjustments-hsb-panel">
                 {(() => {
                   const hsb = selectedLayer.adjustments?.hsb ?? defaultHsbAdjustment();
@@ -4643,7 +4772,7 @@ export default function DesignCanvasScreen() {
                   );
                 })()}
               </View>
-            ) : (
+            ) : adjTool === 'curves' ? (
               <>
                 {/* Channel tabs */}
                 <View style={{ flexDirection: 'row', gap: SP.xs, marginBottom: SP.sm }}>
@@ -4764,6 +4893,21 @@ export default function DesignCanvasScreen() {
                   );
                 })()}
               </>
+            ) : (
+              <AdjEffectPanel
+                tool={adjTool}
+                effects={selectedLayer.adjustments?.effects}
+                layerOpacity={selectedLayer.opacity}
+                onChangeEffects={next => updateLayerEffects(selectedLayer.id, next)}
+                onChangeOpacity={v => { handleSetLayerOpacity(selectedLayer.id, v); markDirty(); }}
+                onReset={() => {
+                  if (adjTool === 'opacity') { handleSetLayerOpacity(selectedLayer.id, 1); markDirty(); return; }
+                  // Every effect tool's field is keyed by the tool id itself.
+                  const rest: EffectsAdjustment = { ...(selectedLayer.adjustments?.effects ?? {}) };
+                  delete (rest as Record<string, unknown>)[adjTool];
+                  updateLayerEffects(selectedLayer.id, rest);
+                }}
+              />
             )}
           </SheetRise>
         </View>
