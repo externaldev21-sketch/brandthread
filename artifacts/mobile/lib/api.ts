@@ -19,6 +19,8 @@ import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
+import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
+import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
@@ -440,8 +442,11 @@ async function doRequest<T = any>(
     throw error;
   }
   if (!res.ok) {
-    if (res.status === 429) noteRateLimited(retryAfterSecondsFrom(res));
     const body = await res.text();
+    // AI credit gate refusals (402/429/503 with a credits code) are not generic rate limiting.
+    const aiCreditsKind = classifyAiCreditsError(res.status, body);
+    if (res.status === 429 && !aiCreditsKind) noteRateLimited(retryAfterSecondsFrom(res));
+    if (aiCreditsKind) surfaceAiCreditsError(aiCreditsKind);
     const error = new ApiError(res.status, body);
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
@@ -2967,6 +2972,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
     },
     /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
+    /** AI credits: balance, history and pack purchases (web checkout; native uses store billing). */
+    aiCredits: {
+      get: () => get<AiCreditsOverview>('/api/ai/credits'),
+      history: (limit = 30, before?: string) =>
+        get<AiCreditHistoryPage>(`/api/ai/credits/history?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+      checkout: (packId: string, returnUrl: string) =>
+        post<{ sessionId: string; url: string | null }>(`/api/ai/credits/packs/${encodeURIComponent(packId)}/checkout`, { returnUrl }),
+      verify: (sessionId: string) =>
+        post<{ credited: boolean; newlyGranted: boolean; credits: number; balance: number }>('/api/ai/credits/purchases/verify', { sessionId }),
+    },
     threadCash: {
       get: () =>
         get<ThreadCashStatus>('/api/thread-cash'),

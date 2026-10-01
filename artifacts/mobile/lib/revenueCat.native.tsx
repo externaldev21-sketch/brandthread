@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import Purchases, { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
+import Purchases, { CustomerInfo, PRODUCT_CATEGORY, PurchasesPackage } from 'react-native-purchases';
 import { useAuth, useUser } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
@@ -20,6 +20,10 @@ type RevenueCatContextValue = {
   purchase: (pkg: RevenueCatPackage) => Promise<CustomerInfo>;
   restore: () => Promise<CustomerInfo>;
   refresh: () => Promise<void>;
+  /** Store prices for the AI credit packs (consumables), keyed by store product id. */
+  creditPackPrices: (productIds: string[]) => Promise<Record<string, string>>;
+  /** Buys one AI credit pack consumable; the server credits it from RevenueCat's webhook. */
+  purchaseCreditPack: (productId: string) => Promise<void>;
 };
 
 const RevenueCatContext = createContext<RevenueCatContextValue | null>(null);
@@ -131,10 +135,23 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     );
   }, [available, sync, sessionGuard]);
 
+  const creditPackPrices = useCallback(async (productIds: string[]) => {
+    if (!available || !isSignedIn) return {};
+    const products = await Purchases.getProducts(productIds, PRODUCT_CATEGORY.NON_SUBSCRIPTION);
+    return Object.fromEntries(products.map((p) => [p.identifier.split(':')[0]!, p.priceString]));
+  }, [available, isSignedIn]);
+
+  const purchaseCreditPack = useCallback(async (productId: string) => {
+    if (!available) throw new Error('RevenueCat is not configured for this build.');
+    const [product] = await Purchases.getProducts([productId], PRODUCT_CATEGORY.NON_SUBSCRIPTION);
+    if (!product) throw new Error('This credit pack is not available in the store yet.');
+    await Purchases.purchaseStoreProduct(product);
+  }, [available]);
+
   const value = useMemo(() => ({
     available, packages, customerInfo, managementURL: customerInfo?.managementURL ?? null,
-    purchase, restore, refresh,
-  }), [available, packages, customerInfo, purchase, restore, refresh]);
+    purchase, restore, refresh, creditPackPrices, purchaseCreditPack,
+  }), [available, packages, customerInfo, purchase, restore, refresh, creditPackPrices, purchaseCreditPack]);
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;
 }
