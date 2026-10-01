@@ -46,7 +46,7 @@ discounts one Stripe session).
 - `pnpm --filter @workspace/mobile exec vitest run lib/checkoutPayment.test.ts lib/checkoutReadiness.test.ts`:
   passes, including new cases for per-store codes and per-store totals.
 - `pnpm --filter @workspace/api-server exec vitest run src/lib/__tests__/discounts.test.ts`:
-  27 + new rule cases pass.
+  27 cases pass (existing rules plus first order, collection scope, per-customer limit, minimum quantity, minimum spend wording).
 - `src/lib/money/__tests__/onePageCheckout.integration.test.ts` (one intent for
   the whole cart, one order per seller, each seller's share transferred once,
   single-seller refund reverses only that transfer) is DB-backed. It was not
