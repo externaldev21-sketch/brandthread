@@ -43,6 +43,7 @@ import {
 } from '@/lib/orderBadgeStore';
 import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 
@@ -246,6 +247,8 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
         if (count > 0) {
           void requestContextualPushPermission(userId, api);
         }
+        // A seller's first sale is a good moment for an App Store review ask.
+        if (count > 0 && countRealOrders(rows) === 1) void maybeRequestStoreReview(userId, 'first_sale');
         setBadgeCount(userId, count, pollStartMs);
         consecutiveFailuresRef.current = 0;
       } catch {
