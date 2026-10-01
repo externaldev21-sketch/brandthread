@@ -31,6 +31,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, gte, sql, desc, ne, isNotNull } from "drizzle-orm";
 import { logger } from "../logger";
+import { privateAuthorVisibleTo } from "../privateAccount";
 import {
   DEFAULT_EVENT_WEIGHTS, DEFAULT_RANKING_CONFIG, getRankingConfig, getRankingConfigSync,
   type RankingConfig,
@@ -315,7 +316,11 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
     db
       .select({ id: posts.id, userId: posts.userId, createdAt: posts.createdAt, styleTags: posts.styleTags })
       .from(posts)
-      .where(and(eq(posts.postStatus, "published"), gte(posts.createdAt, freshSince)))
+      .where(and(
+        eq(posts.postStatus, "published"),
+        gte(posts.createdAt, freshSince),
+        privateAuthorVisibleTo(userId, posts.userId),
+      ))
       .orderBy(desc(posts.createdAt))
       .limit(200),
     db
@@ -343,6 +348,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
     .where(and(
       inArray(posts.userId, [...new Set(trendingSellerIds)].slice(0, 30)),
       eq(posts.postStatus, "published"),
+      privateAuthorVisibleTo(userId, posts.userId),
       gte(posts.createdAt, similarSince),
     ))
     .orderBy(desc(posts.createdAt))

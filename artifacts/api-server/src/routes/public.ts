@@ -670,7 +670,7 @@ router.get("/search", async (req, res): Promise<void> => {
         .having(and(
           minPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) >= ${minPriceCents}`,
           maxPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) <= ${maxPriceCents}`,
-        ))
+        )),
         // Same ordering the JS sort below applies, pushed into SQL so a common
         // term can't pull every matching product into memory. Past the cap a
         // result is unreachable from the search UI anyway.
@@ -700,7 +700,7 @@ router.get("/search", async (req, res): Promise<void> => {
           createdAt: posts.createdAt,
           relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
         }).from(posts)
-          .where(and(eq(posts.mediaType, "video"), publicPostCondition(), notBlockedWith(viewerId, posts.userId), match))
+          .where(and(eq(posts.mediaType, "video"), publicPostCondition(new Date(), viewerId), notBlockedWith(viewerId, posts.userId), match))
           .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
           .limit(VIDEO_SEARCH_PAGE);
         const exact = await videoQuery(sql`${ilike(posts.caption, pattern)}`);

@@ -1,13 +1,16 @@
 import { and, count, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { db, interactions, postComments, posts } from "@workspace/db";
 import { authorInGoodStanding } from "./safety";
+import { privateAuthorVisibleTo } from "./privateAccount";
 
 /**
  * A post is publicly visible when it is published (or its schedule is due),
  * marked public, not held/removed by moderation, and its author is neither
  * suspended nor deleted. Every public feed and single-post read uses this.
+ * Private accounts' posts are hidden unless `viewerId` is the author or
+ * follows them (signed-out / omitted viewer: private authors excluded).
  */
-export function publicPostCondition(now = new Date()) {
+export function publicPostCondition(now = new Date(), viewerId?: string | null) {
   return and(
     sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
     or(
@@ -16,6 +19,7 @@ export function publicPostCondition(now = new Date()) {
     ),
     eq(posts.moderationStatus, "visible"),
     authorInGoodStanding(posts.userId),
+    privateAuthorVisibleTo(viewerId, posts.userId),
   );
 }
 

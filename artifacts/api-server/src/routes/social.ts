@@ -14,7 +14,7 @@
 import { Router } from "express";
 import { attachQuoteData } from "../lib/quotedPosts";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -40,6 +40,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
+import { viewerCanSeeContent } from "../lib/privateAccount";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -120,6 +121,12 @@ async function followerCount(userId: string): Promise<number> {
     .select({ n: sql<number>`cast(count(*) as int)` })
     .from(follows)
     .where(eq(follows.followingId, userId));
+  return row?.n ?? 0;
+}
+
+async function followerCountIn(tx: any, userId: string): Promise<number> {
+  const [row] = await tx.select({ n: sql<number>`cast(count(*) as int)` })
+    .from(follows).where(eq(follows.followingId, userId));
   return row?.n ?? 0;
 }
 
@@ -243,7 +250,7 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
   if (userId === myId) {
     res.status(400).json({ error: "Cannot follow yourself" }); return;
   }
-  const [target] = await db.select({ clerkId: users.clerkId })
+  const [target] = await db.select({ clerkId: users.clerkId, isPrivate: users.isPrivate })
     .from(users).where(eq(users.clerkId, userId)).limit(1);
   if (!target) { res.status(404).json({ error: "User not found" }); return; }
 
@@ -258,7 +265,21 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
         and(eq(blocks.blockerId, userId), eq(blocks.blockedId, myId)),
         and(eq(blocks.blockerId, myId), eq(blocks.blockedId, userId)),
       )).limit(1);
-    if (blockRow) return { blocked: true as const, inserted: [], followersCount: 0 };
+    if (blockRow) return { blocked: true as const, requested: false as const, inserted: [], followersCount: 0 };
+
+    // Private account: anyone not already following sends a request instead
+    // (deduped by the PK; already-following stays a no-op follow below).
+    if (target.isPrivate) {
+      const [already] = await tx.select({ f: follows.followerId }).from(follows)
+        .where(and(eq(follows.followerId, myId), eq(follows.followingId, userId))).limit(1);
+      if (!already) {
+        const requestRows = await tx.insert(followRequests)
+          .values({ requesterId: myId, targetId: userId })
+          .onConflictDoNothing()
+          .returning();
+        return { blocked: false as const, requested: true as const, inserted: requestRows, followersCount: await followerCountIn(tx, userId) };
+      }
+    }
 
     const inserted = await tx.insert(follows)
       .values({ followerId: myId, followingId: userId })
@@ -268,10 +289,30 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
       .select({ n: sql<number>`cast(count(*) as int)` })
       .from(follows)
       .where(eq(follows.followingId, userId));
-    return { blocked: false as const, inserted, followersCount: countRow?.n ?? 0 };
+    return { blocked: false as const, requested: false as const, inserted, followersCount: countRow?.n ?? 0 };
   });
   if (result.blocked) {
     res.status(403).json({ error: "Unable to follow this user.", code: "BLOCKED" }); return;
+  }
+  if (result.requested) {
+    // Only a genuinely new request notifies the target (retries are deduped).
+    if (result.inserted.length > 0) {
+      (async () => {
+        try {
+          const profile = (await profilesById([myId])).get(myId);
+          if (profile && !profile.deleted && !profile.suspended) {
+            const actor = actorFieldsFromProfile(profile);
+            await publishNotification({
+              userId, category: "social", type: "follow_request",
+              title: `${actor.actorName} requested to follow you`,
+              ...actor, targetId: myId, targetType: "user",
+            });
+          }
+        } catch { /* non-critical */ }
+      })();
+    }
+    res.status(202).json({ ok: true, isFollowing: false, status: "requested", followersCount: result.followersCount });
+    return;
   }
 
   // Only notify when this is a genuinely new follow (not a duplicate/retry)
@@ -323,6 +364,15 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
     `);
     await tx.delete(follows)
       .where(and(eq(follows.followerId, myId), eq(follows.followingId, target)));
+    // Also cancels a pending follow request to a private account.
+    await tx.delete(followRequests)
+      .where(and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, target)));
+    await tx.delete(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, target),
+        eq(notificationsFeed.type, "follow_request"),
+        eq(notificationsFeed.actorId, myId),
+      ));
     // An unfollow right after a follow (or a follow/unfollow bounce) must not
     // leave a stale "started following you" notification in the target's
     // Activity tab for a relationship that no longer exists.
@@ -435,11 +485,16 @@ router.get("/status/:userId", async (req, res) => {
 
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
+  const [reqRow] = isFollowing ? [] : await db.select({ r: followRequests.requesterId }).from(followRequests)
+    .where(and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, other))).limit(1);
+  const [privRow] = await db.select({ p: users.isPrivate }).from(users).where(eq(users.clerkId, other)).limit(1);
   res.json({
     isFollowing,
     isFollowedBy,
     isMutual: isFollowing && isFollowedBy,
     followersCount: await followerCount(other),
+    isPrivate: privRow?.p === true,
+    status: isFollowing ? "following" : reqRow ? "requested" : "none",
   });
 });
 
@@ -499,6 +554,9 @@ router.get("/profile/:userId", async (req, res) => {
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
 
+  const [reqRow] = isFollowing || other === myId ? [] : await db.select({ r: followRequests.requesterId }).from(followRequests)
+    .where(and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, other))).limit(1);
+
   const [postsRow] = await db.select({ n: sql<number>`cast(count(*) as int)` })
     .from(posts)
     .innerJoin(users, and(eq(users.clerkId, posts.userId), eq(users.accountType, "buyer")))
@@ -515,6 +573,10 @@ router.get("/profile/:userId", async (req, res) => {
     isFollowedBy,
     isMutual: isFollowing && isFollowedBy,
     iBlockedThem,
+    // Private accounts: header data stays visible; content is follower-only.
+    isPrivate: user.isPrivate === true,
+    followRequested: !!reqRow,
+    contentHidden: user.isPrivate === true && other !== myId && !isFollowing,
   });
 });
 
@@ -604,6 +666,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
   if (other !== myId && (await blockRelation(myId, other)) !== "none") {
     res.status(404).json({ error: "User not found" }); return;
   }
+  if (other !== myId && !(await viewerCanSeeContent(myId, other))) { res.json([]); return; }
   const { limit, offset } = page.data;
   const window = limit + offset;
   const rows = await db.select({
@@ -621,7 +684,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .innerJoin(users, eq(users.clerkId, posts.userId))
     .where(and(
       eq(postUserTags.taggedUserId, other),
-      publicPostCondition(),
+      publicPostCondition(new Date(), myId),
       notBlockedWith(myId, posts.userId),
     ))
     .orderBy(desc(postUserTags.createdAt))
@@ -716,6 +779,8 @@ async function resolveListOwner(req: any, res: any, myId: string): Promise<strin
   if (owner !== myId && (await blockRelation(myId, owner)) !== "none") {
     res.status(404).json({ error: "User not found" }); return null;
   }
+  // Private account: follower/following lists are for approved followers only.
+  if (owner !== myId && !(await viewerCanSeeContent(myId, owner))) { res.json([]); return null; }
   return owner;
 }
 
@@ -1585,6 +1650,11 @@ router.post("/block", async (req, res) => {
         AND EXISTS (SELECT 1 FROM conversation_participants p1 WHERE p1.conversation_id = c.id AND p1.user_id = ${myId})
         AND EXISTS (SELECT 1 FROM conversation_participants p2 WHERE p2.conversation_id = c.id AND p2.user_id = ${userId})
     `);
+    // Blocks remove pending follow requests in both directions.
+    await tx.delete(followRequests).where(or(
+      and(eq(followRequests.requesterId, myId), eq(followRequests.targetId, userId)),
+      and(eq(followRequests.requesterId, userId), eq(followRequests.targetId, myId)),
+    ));
   });
 
   res.json({ ok: true });

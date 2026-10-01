@@ -52,6 +52,8 @@ export const users = pgTable('users', {
   inviteLastClickedAt: timestamp('invite_last_clicked_at', { withTimezone: true }),
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
+  // Private account (buyers only): new followers need approval (follow_requests).
+  isPrivate:      boolean('is_private').notNull().default(false),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
@@ -1497,6 +1499,16 @@ export const follows = pgTable('follows', {
 }, (t) => ({
   pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
   followingIdx: index('follows_following_idx').on(t.followingId),
+}));
+
+// Pending follow requests to a private account; approval moves the row into follows.
+export const followRequests = pgTable('follow_requests', {
+  requesterId: text('requester_id').notNull(),
+  targetId:    text('target_id').notNull(),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:        primaryKey({ columns: [t.requesterId, t.targetId] }),
+  targetIdx: index('follow_requests_target_idx').on(t.targetId, t.createdAt),
 }));
 
 // Dismissed "Suggested for you" rows on the Activity tab — the X on a

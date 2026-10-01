@@ -14,7 +14,9 @@
 import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const closeFriends = pgTable('close_friends', {
-  userId:    text('user_id').notNull(),
+  // Private-account migration 118 creates the shared table with owner_id;
+  // map the story API's established userId property to that physical column.
+  userId:    text('owner_id').notNull(),
   friendId:  text('friend_id').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({

@@ -50,7 +50,12 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       if (wasFollowing) {
         await api.social.unfollow(userId);
       } else {
-        await api.social.follow(userId);
+        const res = await api.social.follow(userId);
+        if (res?.status === 'requested') {
+          // Private account: request sent, not following yet.
+          setState(state);
+          onChange?.(state, -1);
+        }
       }
     } catch {
       // Roll back on failure.
