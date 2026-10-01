@@ -12,6 +12,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GROWTH_STUDIO_TOOLS } from '@/lib/growthTools';
+import { SELLER_ACTIVITY_ROUTE_LIVE } from '@/lib/sellerActivityRoute';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,10 @@ export const SECTIONS: ControlCenterSection[] = [
     icon: 'trending-up',
     items: [
       { id: 'analytics', label: 'Analytics', icon: 'bar-chart-2', route: '/(tabs)/analytics', description: 'Sales, traffic and insights' },
+      // Gated behind SELLER_ACTIVITY_ROUTE_LIVE — see that file's doc for why.
+      ...(SELLER_ACTIVITY_ROUTE_LIVE
+        ? [{ id: 'activity', label: 'Activity', icon: 'activity', route: '/seller-activity', description: 'Recent orders, messages and updates' }]
+        : []),
       { id: 'content',   label: 'Content',   icon: 'film',        route: '/content', description: 'Posts, drafts and scheduled' },
       { id: 'messages',  label: 'Messages',  icon: 'message-circle', route: '/seller-inbox', description: 'Reply to buyer DMs', badgeKey: 'messages' },
       { id: 'boost',     label: 'Boost',     icon: 'trending-up', route: '/boost', description: 'Promote a post or product' },
