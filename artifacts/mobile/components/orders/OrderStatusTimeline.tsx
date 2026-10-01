@@ -16,7 +16,7 @@ const HAPPY_PATH: OrderStatus[] = ['new', 'processing', 'ready_to_ship', 'shippe
 
 const STAGE_LABEL: Record<OrderStatus, string> = {
   new: 'Placed',
-  processing: 'Processing',
+  processing: 'Packing',
   ready_to_ship: 'Ready',
   shipped: 'Shipped',
   delivered: 'Delivered',

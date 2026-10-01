@@ -408,6 +408,12 @@ const TRACKING_STATUS_OPTIONS: { key: TrackingStatus; label: string }[] = [
   { key: 'returned_to_sender', label: 'Returned to Sender' },
 ];
 
+function chunkPairs<T>(items: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
+}
+
 function trackingStatusLabel(status: TrackingStatus): string {
   return TRACKING_STATUS_OPTIONS.find(option => option.key === status)?.label ?? status;
 }
@@ -830,10 +836,15 @@ export default function OrderDetailScreen() {
       />
 
       {/* Tab bar */}
-      <View style={s.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.tabBar}
+        contentContainerStyle={s.tabBarContent}
+      >
         {TABS.map(t => (
-          <View key={t.key} style={s.tabCell}>
           <PressableScale
+            key={t.key}
             onPress={() => { hapticToggle(); setActiveTab(t.key); }}
             style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
             accessibilityRole="button"
@@ -844,9 +855,8 @@ export default function OrderDetailScreen() {
               {t.key === 'returns' && orderReturns && orderReturns.length > 0 ? `${t.label} (${orderReturns.length})` : t.label}
             </Text>
           </PressableScale>
-          </View>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Cancellation confirmed banner */}
       {updatesPaused && (
@@ -935,7 +945,6 @@ export default function OrderDetailScreen() {
                 onPress={handleCancelOrder}
                 loading={cancelling}
                 colors={[RED, RED]}
-                style={{ flex: 1 }}
               />
             </View>
           </View>
@@ -948,6 +957,10 @@ export default function OrderDetailScreen() {
         items={unshippedItems(order.lineItems).map(li => ({ id: li.id, productName: li.productName, variant: li.variant, quantity: li.quantity }))}
         onClose={() => setShowShipItems(false)}
         onSubmit={handleShipItems}
+        onBuyLabel={(itemIds) => {
+          setShowShipItems(false);
+          router.push(`/fulfill-order?orderId=${id}&itemIds=${itemIds.join(',')}`);
+        }}
       />
 
       {/* Tracking Events Modal */}
@@ -1098,44 +1111,40 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       {/* Action Buttons */}
       <View style={s.actionSection}>
         <SectionHeader title="Actions" />
-        <View style={s.actionRow}>
-          <View style={s.actionCell}><SecondaryButton
+        <View style={s.actionCol}>
+          <SecondaryButton
             label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
             onPress={onMessageBuyer}
             icon="message-circle"
             disabled={messagingBuyer || !order.customer.buyerUserId}
-            style={s.actionFill}
-          /></View>
+          />
           {order.payment.amountPaidCents > order.payment.amountRefundedCents && (
-            <View style={s.actionCell}><SecondaryButton
+            <SecondaryButton
               label="Refund"
               onPress={() => router.push(`/refund-detail?orderId=${order.id}` as never)}
               icon="credit-card"
-              style={s.actionFill}
-            /></View>
+            />
           )}
         </View>
         {order.autoRefundedAt ? (
           <Text style={s.readOnlyNote}>Auto-refunded orders are read-only. Mark shipped and Add tracking are turned off.</Text>
         ) : null}
         {!order.autoRefundedAt && order.status === 'new' && (
-          <View style={s.actionRow}>
-            <View style={s.actionCell}><PrimaryButton label="Start Processing" onPress={onMarkProcessing} icon="play" style={s.actionFill} /></View>
-            <View style={s.actionCell}><SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={s.actionFill} accent={RED} /></View>
+          <View style={s.actionCol}>
+            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" />
+            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'processing' && (
-          <View style={s.actionRow}>
-            <View style={s.actionCell}><PrimaryButton label="Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={s.actionFill} /></View>
-            <View style={s.actionCell}><SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={s.actionFill} /></View>
+          <View style={s.actionCol}>
+            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" />
+            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
-            <View style={s.actionRow}>
-              <View style={s.actionCell}><PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={s.actionFill} /></View>
-              <View style={s.actionCell}><SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={s.actionFill} /></View>
-            </View>
+            <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
+            <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
                 <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
@@ -1278,13 +1287,12 @@ function CustomerTab({ order }: { order: Order }) {
       </View>
 
       {(!!c.id || !!c.buyerUserId) && (
-        <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
+        <View style={[s.actionCol, { marginHorizontal: SP.md }]}>
           {!!c.id && (
             <SecondaryButton
               label="View customer"
               onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
               icon="user"
-              style={{ flex: 1 }}
             />
           )}
           {!!c.buyerUserId && (
@@ -1292,7 +1300,6 @@ function CustomerTab({ order }: { order: Order }) {
               label="View profile"
               onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
               icon="external-link"
-              style={{ flex: 1 }}
             />
           )}
         </View>
@@ -1469,28 +1476,34 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             Keep buyers up to date as this order moves through delivery.
           </Text>
           <View style={s.trackingStatusOptions}>
-            {TRACKING_STATUS_OPTIONS.map(option => {
-              const selected = trackingStatus === option.key;
-              return (
-                <PressableScale
-                  key={option.key}
-                  onPress={() => {
-                    hapticToggle();
-                    setTrackingStatus(option.key);
-                    setTrackingFormDirty(true);
-                  }}
-                  style={[s.trackingStatusOption, selected && s.trackingStatusOptionSelected]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Set tracking status to ${option.label}`}
-                  testID={`tracking-status-${option.key}`}
-                >
-                  <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
-                    {option.label}
-                  </Text>
-                </PressableScale>
-              );
-            })}
+            {chunkPairs(TRACKING_STATUS_OPTIONS).map((pair, rowIndex) => (
+              <View key={rowIndex} style={s.trackingStatusRow}>
+                {pair.map(option => {
+                  const selected = trackingStatus === option.key;
+                  return (
+                    <View key={option.key} style={s.trackingStatusCell}>
+                      <PressableScale
+                      onPress={() => {
+                        hapticToggle();
+                        setTrackingStatus(option.key);
+                        setTrackingFormDirty(true);
+                      }}
+                      style={[s.trackingStatusOption, selected && s.trackingStatusOptionSelected]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`Set tracking status to ${option.label}`}
+                      testID={`tracking-status-${option.key}`}
+                    >
+                      <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
+                        {option.label}
+                      </Text>
+                    </PressableScale>
+                    </View>
+                  );
+                })}
+                {pair.length === 1 ? <View style={s.trackingStatusCell} /> : null}
+              </View>
+            ))}
           </View>
           <Text style={s.estimatedDeliveryLabel}>Estimated delivery (optional)</Text>
           <TextInput
@@ -1567,9 +1580,9 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   </View>
                 )}
 
-                {!readOnly && <View style={s.actionRow}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small style={{ flex: 1 }} />
-                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
+                {!readOnly && <View style={s.actionCol}>
+                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small />
+                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small />
                 </View>}
               </BrandthreadCard>
             )}
@@ -1580,9 +1593,9 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 <Text style={s.inlineFormTitle}>Add Tracking</Text>
                 <TextInput style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
                 <TextInput style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
-                <View style={s.actionRow}>
-                  <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small style={{ flex: 1 }} />
-                  <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small style={{ flex: 1 }} />
+                <View style={s.actionCol}>
+                  <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small />
+                  <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small />
                 </View>
                 {form.tracking.trim().length > 0 && (
                   <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" small style={{ marginTop: SP.sm }} />
@@ -1934,12 +1947,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
 
   // Tab bar
-  // 7 tabs cannot fit on one line at 393px, so they form an equal 4-column grid (no scrolling, nothing clipped).
-  tabBar:           { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE },
-  tabCell:          { width: '23.6%' },
-  tabItem:          { width: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, paddingVertical: SP.sm, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
+  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
+  tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
+  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
   tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
-  tabLabel:         { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
+  tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
 
   // Content
@@ -1963,10 +1975,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Actions
   actionSection:    { gap: SP.sm },
-  actionCell:       { flex: 1, flexBasis: 0, minWidth: 0 },
-  actionFill:       { width: '100%' },
   heroCustomer:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.xs },
-  actionRow:        { flexDirection: 'row', gap: SP.sm },
   actionCol:        { gap: SP.sm },
   readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
@@ -2033,10 +2042,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Fulfillment
   trackingStatusCard: { gap: SP.sm, borderColor: BORDER_ACTIVE },
   trackingStatusHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  trackingStatusOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  trackingStatusOption: { paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
+  trackingStatusOptions: { gap: SP.sm },
+  trackingStatusRow: { flexDirection: 'row', gap: SP.sm },
+  trackingStatusCell: { flex: 1, flexBasis: 0, minWidth: 0 },
+  trackingStatusOption: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
   trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  trackingStatusOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   trackingStatusOptionTextSelected: { color: FG },
   estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
   groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },

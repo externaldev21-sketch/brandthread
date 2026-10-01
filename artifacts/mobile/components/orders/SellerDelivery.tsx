@@ -115,13 +115,15 @@ export interface ShippableItem {
 
 /** "Ship some items": pick the items in this parcel, then carrier + tracking. */
 export function ShipItemsSheet({
-  visible, items, busy, onClose, onSubmit,
+  visible, items, busy, onClose, onSubmit, onBuyLabel,
 }: {
   visible: boolean;
   items: ShippableItem[];
   busy: boolean;
   onClose: () => void;
   onSubmit: (itemIds: string[], trackingNumber: string, carrier: string) => void;
+  /** Buy a carrier label for the chosen items instead of typing tracking. */
+  onBuyLabel?: (itemIds: string[]) => void;
 }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => sheetStyles(theme), [theme]);
@@ -168,13 +170,21 @@ export function ShipItemsSheet({
               <FormInput label="Carrier" value={carrier} onChange={setCarrier} placeholder="USPS, UPS, FedEx…" />
               <FormInput label="Tracking number" value={tracking} onChange={setTracking} placeholder="Tracking number" />
             </View>
+            {onBuyLabel && (
+              <SecondaryButton
+                label="Buy a label for these items"
+                onPress={() => onBuyLabel(picked)}
+                disabled={picked.length === 0 || busy}
+                icon="printer"
+                style={{ marginTop: SP.md }}
+              />
+            )}
             <View style={s.actions}>
-              <SecondaryButton label="Cancel" onPress={onClose} style={{ flex: 1 }} />
+              <SecondaryButton label="Cancel" onPress={onClose} />
               <PrimaryButton
                 label={busy ? 'Saving…' : 'Save tracking'}
                 onPress={() => onSubmit(picked, tracking.trim(), carrier.trim())}
                 disabled={!canSubmit}
-                style={{ flex: 1 }}
               />
             </View>
           </View>
@@ -199,6 +209,6 @@ function sheetStyles(theme: AppThemePreset) {
     },
     itemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
     itemMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
-    actions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.lg },
+    actions: { gap: SP.sm, marginTop: SP.lg },
   });
 }

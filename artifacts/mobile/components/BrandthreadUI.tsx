@@ -732,7 +732,7 @@ export function StatusBadge({ label, variant = 'neutral', small = false }: Statu
   const palette = useColors();
   const c = variant === 'purple' ? { bg: theme.accentDim, fg: theme.accentLight } : variant === 'neutral' ? { bg: palette.accent, fg: palette.mutedForeground } : STATUS_COLORS[variant];
   return (
-    <View style={[stS.root, { backgroundColor: c.bg, paddingHorizontal: small ? 6 : 9, paddingVertical: small ? 2 : 4 }]}>
+    <View style={[stS.root, { backgroundColor: c.bg, paddingHorizontal: small ? 8 : 12, paddingVertical: small ? 2 : 4 }]}>
       <Text style={[stS.label, { color: c.fg, fontSize: FS.xs }]}>{label}</Text>
     </View>
   );
