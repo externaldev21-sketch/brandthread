@@ -68,6 +68,9 @@ export async function deliverDropBroadcast(
       .where(eq(dropAlertSubscriptions.dropId, claimedDrop.id)),
   ]);
   const followerIds = [...new Set([...followerRows, ...alertRows].map((row) => row.userId))];
+  // A per-drop "notify me" subscription is an explicit request for this push;
+  // plain followers only receive it when they opted in to promotional pushes.
+  const alertUserIds = new Set(alertRows.map((row) => row.userId));
 
   if (followerIds.length === 0) {
     return { sent: 0, errors: 0, followers: 0 };
@@ -85,6 +88,8 @@ export async function deliverDropBroadcast(
       cta: "Shop the drop",
       analyticsOwnerId: sellerId,
       pushChannelId: "drops",
+      pushKind: "promotional",
+      pushExplicitRequest: alertUserIds.has(followerId),
     })
   ));
   const sent = results.filter((result) => result.status === "fulfilled").length;

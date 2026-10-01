@@ -7,6 +7,7 @@ import { db, notificationBatchQueue, notificationDeliveries, notificationEvents,
 import { and, eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { withRetry } from "./retry";
+import { isPromotionalPush, promoConsentAllows } from "./pushPolicy";
 import crypto from "node:crypto";
 
 export interface PushPayload {
@@ -22,6 +23,13 @@ export interface PushPayload {
   sound?: string | null;
   /** Android notification channel, which must be configured in the app. */
   channelId?: string;
+  /**
+   * Promotional vs transactional. Normally inferred from `data.type` via
+   * lib/pushPolicy.ts; set explicitly for any new marketing sender.
+   */
+  kind?: "transactional" | "promotional";
+  /** The user asked for this exact push (e.g. a per-drop "notify me"). */
+  explicitRequest?: boolean;
 }
 
 export type NotificationEventType = "receipt" | "open" | "tap";
@@ -209,6 +217,25 @@ export async function sendPushToUser(
     // Master switch: skip push entirely (the in-app feed row still exists —
     // that write happens in publishNotification() before this is called).
     if (recipient?.pushEnabled === false) return false;
+
+    // Guideline 4.5.4: promotional pushes need an explicit opt-in (default
+    // OFF). Transactional pushes are never affected by this check.
+    // Read separately so a deploy that precedes migration 260 (column missing)
+    // only blocks promotional pushes; transactional pushes never depend on it.
+    if (isPromotionalPush(payload) && payload.explicitRequest !== true) {
+      let promoPushOptIn = false;
+      try {
+        const [row] = await db
+          .select({ promoPushOptIn: users.promoPushOptIn })
+          .from(users)
+          .where(eq(users.clerkId, userId))
+          .limit(1);
+        promoPushOptIn = row?.promoPushOptIn === true;
+      } catch (err) {
+        logger.warn({ err }, "Promo push opt-in unreadable; treating as not opted in");
+      }
+      if (!promoConsentAllows(payload, { promoPushOptIn })) return false;
+    }
 
     if (
       isWithinQuietHours(

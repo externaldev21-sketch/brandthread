@@ -13,6 +13,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createThreadFeedCursor,
@@ -2065,6 +2066,8 @@ export default function FeedScreen({
   const buyerBarTopInset = useBuyerTabBarTopInset('compact');
   const router = useRouter();
   const { userId } = useAuth();
+  // Guests browse the feed; like/save/repost/follow prompt sign-in (returnTo).
+  const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
   const { showToast } = useFeedToast();
 
@@ -2634,6 +2637,7 @@ export default function FeedScreen({
   }
 
   const handleLike = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const snapshot = engagements[id] ?? engagementFor(id);
     const willLike = !snapshot.liked;
     // Optimistic update
@@ -2666,9 +2670,10 @@ export default function FeedScreen({
       }
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
-  }, [engagementFor]);
+  }, [engagementFor, requireSignIn]);
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const cur = engagements[id] ?? engagementFor(id);
     const willSave = !cur.saved;
     const snapshot = { saved: cur.saved, saves: cur.saves };
@@ -2698,7 +2703,7 @@ export default function FeedScreen({
         }
       }
     }
-  }, [engagements, engagementFor, itemsById, showToast]);
+  }, [engagements, engagementFor, itemsById, showToast, requireSignIn]);
 
   const showRepostEducationOnce = useCallback(async () => {
     const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
@@ -2713,6 +2718,7 @@ export default function FeedScreen({
   }, [userId]);
 
   const handleRepost = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     if (repostPendingRef.current.has(id)) return;
     repostPendingRef.current.add(id);
     const snapshot = engagements[id] ?? engagementFor(id);
@@ -2745,9 +2751,10 @@ export default function FeedScreen({
       await showRepostEducationOnce();
     }
     repostPendingRef.current.delete(id);
-  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast]);
+  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast, requireSignIn]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const item = sellerFeedPosts.find(post => post.id === id);
     if (!item?.sellerId) return;
     const sellerId = item.sellerId;
@@ -2782,7 +2789,7 @@ export default function FeedScreen({
       ])));
       showToast('Could not update follow. Check your connection.', 'error');
     }
-  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast]);
+  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
 
   // "Not interested" removes the post from this session's feed immediately
   // (a real, visible effect — not just a toast) and records the signal so

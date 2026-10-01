@@ -15,6 +15,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
@@ -413,6 +414,11 @@ async function doRequest<T = any>(
     ? await apiCacheKey(resolvedPath, getCacheScope)
     : null;
   const token = await getCachedToken(getToken);
+  // Guest guard (App Store 5.1.1(v)): a signed-out session never sends
+  // account-scoped or paid requests; it fails locally like the server's 401.
+  if (!token && isSignedInOnlyPath(resolvedPath)) {
+    throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
+  }
   // Build a plain Record so TypeScript is happy with every HeadersInit variant.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -1243,6 +1249,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
           pushEnabled: boolean;
+          promotionalPush?: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs'),
@@ -1250,12 +1257,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         digest?: 'realtime' | 'daily';
         categories?: Record<string, boolean>;
         pushEnabled?: boolean;
+        promotionalPush?: boolean;
         quietHours?: { start: string; end: string; timezone?: string } | null;
       }) =>
         put<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
           pushEnabled: boolean;
+          promotionalPush?: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs', body),
