@@ -8,7 +8,7 @@ import type { DiscoverPost } from '@/lib/discoverFeed';
 export type GridRow =
   | { key: string; type: 'normal'; tiles: DiscoverPost[] }
   | { key: string; type: 'feature'; big: DiscoverPost; small: DiscoverPost[] }
-  | { key: string; type: 'rail'; kind: 'justDropped' | 'highDemand' | 'trendingBrands' | 'shopTheLook' }
+  | { key: string; type: 'rail'; kind: 'justDropped' | 'highDemand' | 'trendingBrands' | 'shopTheLook' | 'trendingProducts' | 'shopByCategory' }
   | { key: string; type: 'people' };
 
 export function buildGridRows(
@@ -19,6 +19,8 @@ export function buildGridRows(
     hasHighDemand: boolean;
     hasTrendingBrands?: boolean;
     hasShopTheLook?: boolean;
+    hasTrendingProducts?: boolean;
+    hasShopCategories?: boolean;
     hasPeople: boolean;
   },
 ): GridRow[] {
@@ -40,6 +42,8 @@ export function buildGridRows(
   let insertedHighDemand = false;
   let insertedTrendingBrands = false;
   let insertedShopTheLook = false;
+  let insertedTrendingProducts = false;
+  let insertedShopCategories = false;
   let tilesSincePeople = 0;
 
   while (i < posts.length) {
@@ -73,9 +77,27 @@ export function buildGridRows(
       rows.push({ key: 'rail-shop-the-look', type: 'rail', kind: 'shopTheLook' });
       insertedShopTheLook = true;
     }
+    if (opts.showRails && !insertedTrendingProducts && rows.length >= 14 && opts.hasTrendingProducts) {
+      rows.push({ key: 'rail-trending-products', type: 'rail', kind: 'trendingProducts' });
+      insertedTrendingProducts = true;
+    }
+    if (opts.showRails && !insertedShopCategories && rows.length >= 17 && opts.hasShopCategories) {
+      rows.push({ key: 'rail-shop-by-category', type: 'rail', kind: 'shopByCategory' });
+      insertedShopCategories = true;
+    }
     if (opts.hasPeople && tilesSincePeople >= 20) {
       rows.push({ key: `people-${i}`, type: 'people' });
       tilesSincePeople = 0;
+    }
+  }
+  // Short feeds never reach the row thresholds above; the discovery shelves
+  // then close the grid, below all existing content.
+  if (opts.showRails && rows.length > 0) {
+    if (!insertedTrendingProducts && opts.hasTrendingProducts) {
+      rows.push({ key: 'rail-trending-products', type: 'rail', kind: 'trendingProducts' });
+    }
+    if (!insertedShopCategories && opts.hasShopCategories) {
+      rows.push({ key: 'rail-shop-by-category', type: 'rail', kind: 'shopByCategory' });
     }
   }
   return rows;

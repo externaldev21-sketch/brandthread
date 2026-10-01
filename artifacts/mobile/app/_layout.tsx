@@ -1464,6 +1464,8 @@ function RootLayoutNav() {
         <Stack.Screen name="quote-post"                options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-category"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-trending"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drops"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
