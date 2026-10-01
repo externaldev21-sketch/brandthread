@@ -10,6 +10,7 @@ import { db, users, referrals } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { awardLoyaltyPointsOnce } from "./loyalty";
+import { redeemAdminInviteCode } from "../lib/admin/inviteCodes";
 
 const router = Router();
 router.use(requireAuth);
@@ -157,7 +158,24 @@ router.post("/apply", async (req, res) => {
     .where(eq(users.inviteCode, normalizedCode))
     .limit(1);
   if (!inviter) {
-    res.status(404).json({ error: "Invite code not found.", code: "INVALID_CODE" });
+    // Not a member's referral code — it may be an admin-issued invite code.
+    // Those grant no referral reward; they're counted against the code's limits.
+    const [me] = await db.select({ referredByCode: users.referredByCode }).from(users).where(eq(users.clerkId, myId)).limit(1);
+    if (me?.referredByCode) {
+      res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" });
+      return;
+    }
+    const outcome = await db.transaction(async (tx) => {
+      const result = await redeemAdminInviteCode(tx, normalizedCode, myId);
+      if (result === "ok") {
+        await tx.update(users).set({ referredByCode: normalizedCode, updatedAt: new Date() }).where(eq(users.clerkId, myId));
+      }
+      return result;
+    });
+    if (outcome === "ok") { res.json({ ok: true, inviterId: null }); return; }
+    if (outcome === "already_used") { res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" }); return; }
+    if (outcome === "invalid") { res.status(404).json({ error: "Invite code not found.", code: "INVALID_CODE" }); return; }
+    res.status(410).json({ error: outcome === "expired" ? "This invite code has expired." : "This invite code has been fully used.", code: "INVALID_CODE" });
     return;
   }
   if (inviter.clerkId === myId) {

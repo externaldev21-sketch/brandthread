@@ -1,4 +1,4 @@
--- ─── Migration 116: structured comment @mentions ─────────────────────────────
+-- ─── Migration 117: structured comment @mentions ─────────────────────────────
 CREATE TABLE IF NOT EXISTS comment_mentions (
   comment_id UUID NOT NULL REFERENCES post_comments(id) ON DELETE CASCADE,
   mentioned_user_id TEXT NOT NULL,

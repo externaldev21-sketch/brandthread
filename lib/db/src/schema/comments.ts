@@ -2,7 +2,7 @@ import { pgTable, uuid, text, timestamp, primaryKey, index } from 'drizzle-orm/p
 import { postComments } from './index';
 
 /**
- * Verified @mentions of a post comment (migration 116): one row per
+ * Verified @mentions of a post comment (migration 117): one row per
  * (comment, mentioned person), resolved server-side from the comment body.
  */
 export const commentMentions = pgTable('comment_mentions', {

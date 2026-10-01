@@ -2,6 +2,7 @@
  * Thread post comments.
  *
  * GET    /api/posts/:postId/comments                       — list (signed-out allowed)
+ * GET    /api/posts/:postId/comments/:commentId/replies    — more replies for a root (`after` cursor)
  * POST   /api/posts/:postId/comments                       — add a comment or reply
  * DELETE /api/posts/:postId/comments/:commentId            — author or post owner
  * POST   /api/posts/:postId/comments/:commentId/like       — { liked: boolean }
@@ -21,14 +22,15 @@
  * who wrote it, never rewritten to a store owner.
  */
 import { Router } from "express";
-import { and, asc, count, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { db, postCommentLikes, postComments, posts } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition } from "../lib/postVisibility";
-import { notifyCommentActivity, notifyCommentPinned } from "../lib/activityEvents";
+import { notifyCommentActivity, notifyCommentLike, notifyCommentPinned } from "../lib/activityEvents";
 import { mentionsForComments, recordCommentMentions, resolveCommentMentions, type CommentMention } from "../lib/commentMentions";
+import { recordPostSignal } from "../lib/ranking/signals";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -46,6 +48,8 @@ const router = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_COMMENT_LENGTH = 1000;
 const PAGE_SIZE = 50;
+/** Replies returned inline per root comment; more via GET .../comments/:commentId/replies. */
+export const REPLIES_PER_ROOT = 50;
 
 type CommentRow = typeof postComments.$inferSelect;
 
@@ -68,6 +72,10 @@ export interface CommentView {
   /** Verified @mentions, resolved server-side. */
   mentions: CommentMention[];
   replies: CommentView[];
+  /** Roots only: true when more replies exist beyond the inline page. */
+  hasMoreReplies?: boolean;
+  /** Roots only: pass as `after` to GET .../comments/:commentId/replies for the next page. */
+  repliesNextCursor?: string | null;
 }
 
 async function loadPost(postId: string, viewerId: string | null) {
@@ -146,17 +154,38 @@ router.get("/:postId/comments", async (req, res) => {
       .limit(1);
     const page = [...pinnedRows, ...rest];
 
-    const replies = page.length === 0 ? [] : await db
-      .select()
+    // At most REPLIES_PER_ROOT + 1 replies per root (the extra row only proves
+    // that more exist), selected with a window so it stays one query.
+    const rankedReplies = page.length === 0 ? null : db
+      .select({
+        id: postComments.id,
+        rn: sql<number>`row_number() over (partition by ${postComments.parentId} order by ${postComments.createdAt} asc, ${postComments.id} asc)`.as("rn"),
+      })
       .from(postComments)
       .where(and(
         inArray(postComments.parentId, page.map((c) => c.id)),
         visibility,
         standing,
       ))
-      .orderBy(asc(postComments.createdAt));
+      .as("ranked_replies");
+    const replies = !rankedReplies ? [] : await db
+      .select({ row: postComments })
+      .from(postComments)
+      .innerJoin(rankedReplies, eq(rankedReplies.id, postComments.id))
+      .where(sql`${rankedReplies.rn} <= ${REPLIES_PER_ROOT + 1}`)
+      .orderBy(asc(postComments.createdAt), asc(postComments.id))
+      .then((rows) => rows.map((r) => r.row));
+    const overflowParents = new Set<string>();
+    const replyCountByParent = new Map<string, number>();
+    const cappedReplies = replies.filter((reply) => {
+      const pid = reply.parentId as string;
+      const n = (replyCountByParent.get(pid) ?? 0) + 1;
+      replyCountByParent.set(pid, n);
+      if (n > REPLIES_PER_ROOT) { overflowParents.add(pid); return false; }
+      return true;
+    });
 
-    const all = [...page, ...replies];
+    const all = [...page, ...cappedReplies];
     let hiddenByMutedWords = 0;
     const shown = all.filter((comment) => {
       if (blocked.has(comment.authorId)) return false;
@@ -177,8 +206,15 @@ router.get("/:postId/comments", async (req, res) => {
         .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, viewerId)))
         : Promise.resolve([]),
       profilesById(shown.map((c) => c.authorId)),
+      // Same rows a signed-in reader can see publicly (visible, good standing,
+      // not from someone they blocked / who blocked them) - matches the post's comment count.
       db.select({ n: count() }).from(postComments)
-        .where(and(eq(postComments.postId, postId), eq(postComments.moderationStatus, "visible"), standing)),
+        .where(and(
+          eq(postComments.postId, postId),
+          eq(postComments.moderationStatus, "visible"),
+          standing,
+          blocked.size > 0 ? notInArray(postComments.authorId, [...blocked]) : undefined,
+        )),
       ids.length ? db.select({ commentId: postCommentLikes.commentId })
         .from(postCommentLikes)
         .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId)))
@@ -218,6 +254,13 @@ router.get("/:postId/comments", async (req, res) => {
       if (comment.parentId) views.get(comment.parentId)?.replies.push(view);
       else roots.push(view);
     }
+    for (const root of roots) {
+      const more = overflowParents.has(root.id);
+      root.hasMoreReplies = more;
+      root.repliesNextCursor = more && root.replies.length > 0
+        ? root.replies[root.replies.length - 1].createdAt
+        : null;
+    }
 
     const commentsDisabled = post.visibility?.allowComments === false;
     return res.json({
@@ -232,6 +275,92 @@ router.get("/:postId/comments", async (req, res) => {
   } catch (err) {
     req.log.error({ err, postId }, "Failed to list comments");
     return res.status(500).json({ error: "Could not load comments." });
+  }
+});
+
+// ─── GET /api/posts/:postId/comments/:commentId/replies ──────────────────────
+// Next page of a root comment's replies: `after` is the `repliesNextCursor`
+// (ISO timestamp of the last reply already shown) returned by the list call.
+router.get("/:postId/comments/:commentId/replies", async (req, res) => {
+  const postId = String(req.params.postId);
+  const rootId = String(req.params.commentId);
+  if (!UUID_RE.test(postId) || !UUID_RE.test(rootId)) return res.status(404).json({ error: "Comment not found" });
+  const viewerId = optionalViewerId(req);
+  const after = typeof req.query.after === "string" ? new Date(req.query.after) : null;
+  if (after && Number.isNaN(after.getTime())) {
+    return res.status(400).json({ error: "after must be an ISO timestamp" });
+  }
+
+  try {
+    const post = await loadPost(postId, viewerId);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (viewerId && viewerId !== post.userId && (await blockRelation(viewerId, post.userId)) !== "none") {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    const [blocked, muted] = await Promise.all([blockedUserIds(viewerId), mutedPhrasesFor(viewerId)]);
+    const visibility = viewerId
+      ? or(
+          eq(postComments.moderationStatus, "visible"),
+          and(eq(postComments.moderationStatus, "held"), eq(postComments.authorId, viewerId)),
+        )
+      : eq(postComments.moderationStatus, "visible");
+    const standing = authorInGoodStanding(postComments.authorId);
+
+    const rows = await db
+      .select()
+      .from(postComments)
+      .where(and(
+        eq(postComments.postId, postId),
+        eq(postComments.parentId, rootId),
+        visibility,
+        standing,
+        after ? gt(postComments.createdAt, after) : undefined,
+      ))
+      .orderBy(asc(postComments.createdAt), asc(postComments.id))
+      .limit(REPLIES_PER_ROOT + 1);
+    const hasMore = rows.length > REPLIES_PER_ROOT;
+    const page = rows.slice(0, REPLIES_PER_ROOT);
+    const shown = page.filter((c) => !blocked.has(c.authorId)
+      && (c.authorId === viewerId || !matchesMutedWords(c.body, muted)));
+
+    const ids = shown.map((c) => c.id);
+    const [likeRows, myLikeRows, profiles] = await Promise.all([
+      ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
+        .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
+        .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
+      ids.length && viewerId ? db.select({ commentId: postCommentLikes.commentId })
+        .from(postCommentLikes)
+        .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, viewerId)))
+        : Promise.resolve([]),
+      profilesById(shown.map((c) => c.authorId)),
+    ]);
+    const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
+    const mine = new Set(myLikeRows.map((row) => row.commentId));
+
+    const replies: CommentView[] = shown.map((comment) => ({
+      id: comment.id,
+      postId: comment.postId,
+      parentId: comment.parentId,
+      body: comment.body,
+      createdAt: comment.createdAt.toISOString(),
+      author: profiles.get(comment.authorId) ?? {
+        userId: comment.authorId, name: "Brandthread member", handle: "", initials: "BM",
+        avatarUrl: null, accountType: null, suspended: false, deleted: false,
+      },
+      likesCount: likes.get(comment.id) ?? 0,
+      likedByMe: mine.has(comment.id),
+      isMine: !!viewerId && comment.authorId === viewerId,
+      canDelete: !!viewerId && (comment.authorId === viewerId || post.userId === viewerId),
+      pendingReview: comment.moderationStatus === "held",
+      replies: [],
+    }));
+    return res.json({
+      replies,
+      repliesNextCursor: hasMore ? page[page.length - 1].createdAt.toISOString() : null,
+    });
+  } catch (err) {
+    req.log.error({ err, postId }, "Failed to list replies");
+    return res.status(500).json({ error: "Could not load replies." });
   }
 });
 
@@ -323,6 +452,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
         postId, commentId: created.id, authorId, body, parentAuthorId,
         mentionedUserIds: mentions.map((m) => m.userId),
       });
+      void recordPostSignal(authorId, postId, "comment");
     }
 
     const profiles = await profilesById([authorId]);
@@ -472,7 +602,11 @@ router.post("/:postId/comments/:commentId/like", requireAuth, async (req, res) =
   }
 
   if (liked) {
-    await db.insert(postCommentLikes).values({ commentId, userId: viewerId }).onConflictDoNothing();
+    const inserted = await db.insert(postCommentLikes).values({ commentId, userId: viewerId })
+      .onConflictDoNothing()
+      .returning({ commentId: postCommentLikes.commentId });
+    // Only a genuinely new like notifies the comment's author.
+    if (inserted.length > 0) void notifyCommentLike({ commentId, likerId: viewerId });
   } else {
     await db.delete(postCommentLikes)
       .where(and(eq(postCommentLikes.commentId, commentId), eq(postCommentLikes.userId, viewerId)));

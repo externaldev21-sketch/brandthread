@@ -1,4 +1,4 @@
--- ─── Migration 115: pinned comments ──────────────────────────────────────────
+-- ─── Migration 116: pinned comments ──────────────────────────────────────────
 -- The post owner can pin one top-level comment per post. Pinning another
 -- replaces it (enforced by the partial unique index).
 ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ;
