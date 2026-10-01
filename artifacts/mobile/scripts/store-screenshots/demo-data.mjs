@@ -659,6 +659,10 @@ export function respond({ method, path, query, role, options = {} }) {
   let match;
 
   if (p === '/config/features') return { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null };
+  // No demo-fixture covers generated (the real job needs a live AI provider
+  // key this harness doesn't have) — an empty manifest exercises exactly the
+  // fallback path every card without a chosen cover already uses.
+  if (p === '/config/studio-cover-art') return { covers: {} };
   // app/boost.tsx (Promote a post) fetches all three of these on load;
   // unseeded, they 404 on every single load of that screen. The demo seller
   // has no video/slideshow posts (only photo posts in the feed fixture, and

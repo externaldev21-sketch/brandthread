@@ -53,7 +53,7 @@ async function detectImageMime(file: string): Promise<{ mime: "image/png" | "ima
 
 export async function generateImageBuffer(
   prompt: string,
-  size: "1024x1024" | "512x512" | "256x256" = "1024x1024",
+  size: "1024x1024" | "512x512" | "256x256" | "1024x1536" | "1536x1024" | "auto" = "1024x1024",
   options?: ImageGenerationOptions,
 ): Promise<Buffer> {
   const response = await openai.images.generate({

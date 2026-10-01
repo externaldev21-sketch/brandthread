@@ -16,7 +16,8 @@
     "benchmark:ai-providers": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts",
     "benchmark:ai-providers:mock": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts --mock",
     "seed:review-accounts": "tsx ./scripts/seedReviewAccounts.ts",
-    "admin:reset-accounts": "tsx ./scripts/reset-accounts.ts"
+    "admin:reset-accounts": "tsx ./scripts/reset-accounts.ts",
+    "studio-cover-art:generate": "tsx ./scripts/generateStudioCoverArt.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.10.0",
@@ -30,6 +31,7 @@
     "@workspace/integrations-openai-ai-server": "workspace:*",
     "@workspace/manufacturer-flow": "workspace:*",
     "agora-access-token": "^2.0.4",
+    "blurhash": "^2.0.5",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

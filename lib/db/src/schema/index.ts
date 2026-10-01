@@ -7,6 +7,7 @@ export * from './money';
 export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
+export * from './studioCoverArt';
 export * from './communities';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
