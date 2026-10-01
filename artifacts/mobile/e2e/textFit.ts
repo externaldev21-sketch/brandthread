@@ -74,7 +74,8 @@ export async function findTextFitIssues(page: Page): Promise<TextFitIssue[]> {
       // Inner padding against the nearest visible box (button, chip, card).
       let box: Element | null = el;
       while (box && box !== document.body && !(hasBox(box) && box !== el && box.getBoundingClientRect().width < vw - 1)) box = box.parentElement;
-      if (box && box !== document.body) {
+      // Numerals in round step dots / badges are centred by shape, not by padding.
+      if (box && box !== document.body && text.length > 2) {
         const br = box.getBoundingClientRect();
         const pressable = box.getAttribute('role') === 'button' || box.getAttribute('tabindex') === '0';
         const min = pressable || br.width < 220 ? 12 : 16;

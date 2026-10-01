@@ -40,9 +40,9 @@ async function prepare(page: Page) {
   await page.route('**/api/v1/buyer/orders/ord-demo-1', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(order) }));
 }
 
-async function open(page: Page, path: string) {
+async function open(page: Page, path: string, extraWait = 0) {
   await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(9000); // first Metro bundle can be slow
+  await page.waitForTimeout(9000 + extraWait); // first Metro bundle can be slow
   await page.getByText('Accept all').first().click({ timeout: 500 }).catch(() => {});
   await page.waitForTimeout(600);
 }
@@ -55,7 +55,7 @@ async function audit(page: Page, name: string) {
   expect(issues, `${name} has text-fit issues`).toEqual([]);
 }
 
-const SCREENS: Array<{ name: string; path: string; before?: (page: Page) => Promise<void> }> = [
+const SCREENS: Array<{ name: string; path: string; extraWait?: number; before?: (page: Page) => Promise<void> }> = [
   { name: 'seller-order-overview', path: '/order-detail?id=ord-demo-1&bt_preview=seller&demo=1' },
   { name: 'seller-order-payment', path: '/order-detail?id=ord-demo-1&tab=payment&bt_preview=seller&demo=1' },
   { name: 'seller-order-fulfillment', path: '/order-detail?id=ord-demo-1&tab=fulfillment&bt_preview=seller&demo=1' },
@@ -68,7 +68,10 @@ const SCREENS: Array<{ name: string; path: string; before?: (page: Page) => Prom
       await page.waitForTimeout(300);
     },
   },
-  { name: 'fulfill-order-package', path: '/fulfill-order?orderId=ord-demo-1&itemIds=item-a&bt_preview=seller&demo=1' },
+  // The signed-out preview never configures services, so fulfill-order waits out the 8s service timeout before it renders.
+  { name: 'fulfill-order-package', path: '/fulfill-order?orderId=ord-demo-1&itemIds=item-a&bt_preview=seller&demo=1', extraWait: 12000 },
+  { name: 'fulfill-order-label', path: '/fulfill-order?orderId=ord-demo-1&step=3&itemIds=item-a&bt_preview=seller&demo=1', extraWait: 12000 },
+  { name: 'fulfill-order-confirm', path: '/fulfill-order?orderId=ord-demo-1&step=4&itemIds=item-a&bt_preview=seller&demo=1', extraWait: 12000 },
   { name: 'buyer-order-detail', path: '/buyer-order-detail?id=ord-demo-1&bt_preview=buyer&demo=1' },
 ];
 
@@ -77,7 +80,7 @@ test.describe('text fit @ 393x852', () => {
   for (const screen of SCREENS) {
     test(screen.name, async ({ page }) => {
       await prepare(page);
-      await open(page, screen.path);
+      await open(page, screen.path, screen.extraWait);
       if (screen.before) await screen.before(page);
       await audit(page, screen.name);
     });
