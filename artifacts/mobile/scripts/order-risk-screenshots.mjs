@@ -125,6 +125,43 @@ async function audit(page, label) {
   return issues;
 }
 
+/** Buyer order screen shares OrderStatusTimeline: confirm it still reads correctly. */
+async function buyerScreen(browser, images, origin) {
+  const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
+  const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images });
+  const row = {
+    id: ORDER_ID, orderNumber: 'BT-00042', ownerId: 'seller', sellerDisplayName: 'Northline Studio', status: 'processing',
+    totalCents: 16000, subtotalCents: 14800, shippingCents: 1200, trackingNumber: null, carrier: null, trackingStatus: null,
+    estimatedDelivery: null, shippedAt: null, paidAt: iso(now - 3 * 60 * 60_000),
+    shippingAddress: { name: 'Jordan Reyes', street: '1120 NW Everett Street', city: 'Portland', state: 'OR', zip: '97209', country: 'US' },
+    stripePaymentIntentId: 'pi_demo', cancellationReason: null, cancellationNotes: null, isCustomerVisible: false,
+    createdAt: iso(now - 3 * 60 * 60_000),
+    items: [{ productId: 'prod_hoodie', productName: 'Ember Heavyweight Hoodie', variantLabel: 'Charcoal / M', quantity: 1, priceCents: 14800, imageUrl: `${IMAGE_HOST}/hoodie-ember.jpg` }],
+  };
+  await context.route(`${API}/**`, (route) => {
+    const req = route.request();
+    const headers = {
+      'access-control-allow-origin': req.headers().origin ?? '*', 'access-control-allow-credentials': 'true',
+      'access-control-allow-headers': 'authorization,content-type,x-store-context', 'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    const p = new URL(req.url()).pathname.replace(/^\/api\/v1\//, '/api/');
+    if (p === `/api/buyer/orders/${ORDER_ID}`) return route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify(row) });
+    if (p.startsWith('/api/returns')) return route.fulfill({ status: 200, headers, contentType: 'application/json', body: '[]' });
+    return route.fallback();
+  });
+  for (let attempt = 0; ; attempt++) {
+    await openScreen(page, activity, origin, 'buyer', `/buyer-order-detail?id=${ORDER_ID}`);
+    try { await page.getByText('Order BT-00042').first().waitFor({ timeout: 15_000 }); break; } catch (e) { if (attempt >= 3) throw e; }
+  }
+  await waitForQuietNetwork(activity).catch(() => {});
+  await waitForImages(page).catch(() => {});
+  await page.waitForTimeout(900);
+  await audit(page, 'buyer');
+  await shot(page, '07-buyer-order-processing');
+  await context.close();
+}
+
 async function run() {
   if (!process.argv.includes('--skip-build') || !existsSync(path.join(DEFAULT_BUILD_DIR, 'index.html'))) buildPreviewWeb(DEFAULT_BUILD_DIR);
   mkdirSync(OUT, { recursive: true });
@@ -162,6 +199,7 @@ async function run() {
         await context.close();
       }
     }
+    await buyerScreen(browser, images, server.origin);
   } finally {
     server.close();
     await browser.close();

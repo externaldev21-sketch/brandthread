@@ -830,15 +830,10 @@ export default function OrderDetailScreen() {
       />
 
       {/* Tab bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={s.tabBar}
-        contentContainerStyle={s.tabBarContent}
-      >
+      <View style={s.tabBar}>
         {TABS.map(t => (
+          <View key={t.key} style={s.tabCell}>
           <PressableScale
-            key={t.key}
             onPress={() => { hapticToggle(); setActiveTab(t.key); }}
             style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
             accessibilityRole="button"
@@ -849,8 +844,9 @@ export default function OrderDetailScreen() {
               {t.key === 'returns' && orderReturns && orderReturns.length > 0 ? `${t.label} (${orderReturns.length})` : t.label}
             </Text>
           </PressableScale>
+          </View>
         ))}
-      </ScrollView>
+      </View>
 
       {/* Cancellation confirmed banner */}
       {updatesPaused && (
@@ -1937,11 +1933,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
 
   // Tab bar
-  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
-  tabBarContent:    { paddingHorizontal: SP.md, paddingRight: SP.lg, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
-  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
+  // 7 tabs cannot fit on one line at 393px, so they form an equal 4-column grid (no scrolling, nothing clipped).
+  tabBar:           { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE },
+  tabCell:          { width: '23.6%' },
+  tabItem:          { width: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, paddingVertical: SP.sm, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
   tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
-  tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  tabLabel:         { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
 
   // Content
