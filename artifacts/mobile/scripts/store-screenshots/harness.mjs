@@ -104,7 +104,7 @@ const HIDE_SCROLLBARS_CSS = `
  * Opens a fresh browser context for one device and role. Returns the context,
  * the page, and `activity.lastApiAt` (when the fake API last answered).
  */
-export async function openContext(browser, { device, role, origin, images, seedOptions = {}, apiOptions = {}, onUnseeded }) {
+export async function openContext(browser, { device, role, origin, images, videos = {}, seedOptions = {}, apiOptions = {}, onUnseeded }) {
   const context = await browser.newContext({
     viewport: device.viewport,
     deviceScaleFactor: device.scale,
@@ -139,6 +139,12 @@ export async function openContext(browser, { device, role, origin, images, seedO
     const request = route.request();
     const url = new URL(request.url());
     if (url.origin === origin) return route.continue();
+    if (url.origin === IMAGE_HOST && url.pathname.endsWith('.mp4')) {
+      const name = url.pathname.split('/').pop().replace(/\.mp4$/, '');
+      const file = videos[name];
+      if (file) return route.fulfill({ status: 200, contentType: 'video/mp4', body: readFileSync(file) });
+      return route.fulfill({ status: 404, body: '' });
+    }
     if (url.origin === IMAGE_HOST) {
       const name = url.pathname.split('/').pop().replace(/\.jpg$/, '');
       const file = images[name];

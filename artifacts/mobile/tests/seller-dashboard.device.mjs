@@ -121,7 +121,9 @@ async function pressAndroidBack() {
 }
 
 // Swipe down anywhere on the Studio page — a full-screen page now (Dev's
-// final layout call), closed by a downward swipe or the close (X) button.
+// final layout call), closed by a downward swipe, Android back, or
+// re-tapping the same Studio tab button (which relabels itself "Close
+// Studio tools" while the page is open — there is no separate close button).
 async function swipeDownToCloseStudio() {
   await find('Close Studio tools');
   const { width, height } = await request(`/session/${sessionId}/window/rect`, undefined, 'GET');

@@ -56,7 +56,7 @@ describe('SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS covers every fullScreenModal route
   it('SellerBarGate keeps SellerGlobalTabBar mounted through a full-screen route (passes `hidden`, doesn\'t unmount it) so it can animate', () => {
     const layout = src('../app/_layout.tsx');
     expect(layout).toMatch(/if \(!showBar\) return null;/);
-    expect(layout).toMatch(/<SellerGlobalTabBar hidden=\{isFullScreenRoute\}/);
+    expect(layout).toMatch(/<SellerGlobalTabBar\s+hidden=\{isFullScreenRoute\}/);
   });
 });
 

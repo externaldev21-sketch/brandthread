@@ -103,7 +103,7 @@ describe('seller bottom navigation layout', () => {
 
   it('places Studio and Brandthread AI in fixed side circles', () => {
     expect(tabBarSource).toContain('testID="seller-bottom-menu"');
-    expect(tabBarSource).toContain('accessibilityLabel="Open Studio tools"');
+    expect(tabBarSource).toContain("accessibilityLabel={isStudioOpen ? 'Close Studio tools' : 'Open Studio tools'}");
     expect(tabBarSource).toContain('testID="seller-bottom-ai"');
     expect(tabBarSource).toContain('accessibilityLabel="Open Brandthread AI"');
   });

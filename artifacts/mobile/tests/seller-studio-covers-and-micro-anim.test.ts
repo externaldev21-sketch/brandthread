@@ -136,30 +136,16 @@ describe('Studio card covers: per-card one-shot signature micro-animations', () 
 });
 
 /**
- * Dev's FINAL layout call: a full-screen page (not a 75% sheet), header
- * with real profile photo/store name, compact View-store, and a close (X);
- * the "Entering page" fill button pinned above the home indicator; small
- * position dots instead of "X / 16" text.
+ * Dev's FINAL layout call: a full-screen page (not a 75% sheet); small
+ * position dots instead of "X / 16" text. See seller-studio-header.test.ts
+ * for the header itself (avatar + name only, per Dev's later "DEV CLARIFIED"
+ * message superseding the header's earlier View-store/close-button shape).
  */
-describe('Studio page: full-screen layout, real profile photo, position dots', () => {
+describe('Studio page: full-screen layout, position dots', () => {
   it('is a genuine full-screen page — pageHeight is the screen height, not a 75%/90% fraction', () => {
     expect(studio).toContain('const pageHeight = screenHeight;');
     expect(studio).not.toContain('screenHeight * 0.75');
     expect(studio).not.toContain('screenHeight * 0.9');
-  });
-
-  it('shows the real profile photo when one exists, with an initials monogram fallback (from the store name, else the account\'s own name/username) — a generic bag icon only in the genuine no-data-at-all edge case', () => {
-    expect(studio).toContain('avatarUrl ? (');
-    expect(studio).toContain('<Image source={{ uri: avatarUrl }} style={styles.avatarImage} />');
-    expect(studio).toContain('headerMonogram ? (');
-    expect(studio).toContain('Feather name="shopping-bag"');
-  });
-
-  it('the header title always shows something real (store name, else the account\'s own name/username) — never a bare "Name your store" placeholder as the title; that\'s a small link instead', () => {
-    expect(studio).toContain("const headerTitle = hasStoreName ? brandName!.trim() : (accountName?.trim() || null);");
-    expect(studio).toContain('{headerTitle ?? \'Your store\'}');
-    expect(studio).toContain('{!hasStoreName && (');
-    expect(studio).toContain('Set store name');
   });
 
   it('replaces the "X / 16" text indicator with a row of small position dots', () => {

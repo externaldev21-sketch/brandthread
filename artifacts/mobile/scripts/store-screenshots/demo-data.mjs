@@ -20,6 +20,7 @@ export const IMAGE_HOST = 'https://cdn.brandthread.test';
 // suite the moment the two drift.
 const DEMO_LEGAL_VERSION = '2026-09-23';
 const img = (name) => `${IMAGE_HOST}/demo/${name}.jpg`;
+export const DEMO_AVATAR_VIDEO_URL = `${IMAGE_HOST}/demo/avatar-video.mp4`;
 
 const HOUR = 36e5;
 const DAY = 24 * HOUR;
@@ -991,13 +992,22 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/seller/profile') {
     const p2 = profileFor('seller');
     return {
-      id: p2.id, clerkId: p2.clerkId, displayName: p2.displayName, brandName: p2.brandName,
+      id: p2.id, clerkId: p2.clerkId,
+      // `options.fresh`: a brand-new seller who hasn't named their store
+      // yet — the header/dashboard fall back to their own (human) display
+      // name/@handle, distinct from the brand name demo data otherwise
+      // shares between the two, so the fallback is visually obvious.
+      displayName: options.fresh ? 'Maya Okafor' : p2.displayName,
+      brandName: options.fresh ? null : p2.brandName,
       bio: p2.bio, website: null, username: p2.username, profileImageUrl: SELLER_USER.imageUrl,
       logoUrl: SELLER_USER.imageUrl, bannerUrl: null, category: null, tags: [], location: null,
       socialLinks: {}, contactEmail: null,
       // Owner-only read: the plan chip comes from here and nowhere public.
       subscriptionPlanId: 'growth', subscriptionStatus: 'active',
     };
+  }
+  if (p === '/profile/avatar-video') {
+    return { avatarVideoUrl: options.avatarVideo ? DEMO_AVATAR_VIDEO_URL : null, avatarPosterUrl: null, avatarVideoUpdatedAt: null };
   }
   // ── Profiles: public seller storefront, social profile card, tagged, videos ──
   if ((match = p.match(/^\/public\/sellers\/([^/]+)$/))) {
