@@ -14,3 +14,9 @@ If Expo Go exits to the iPhone home screen with no JavaScript exception, Replit'
 **Why:** Replit's device preview does not expose iPhone OS crash reports to the workspace. Startup-import guesses can be wrong: some third-party modules have Expo Go fallbacks, while the actual termination happens outside Metro's JavaScript log stream.
 
 **How to apply:** Check the native launch assets and workflow first, then seek a device crash reason through iPhone Analytics Data or Mac Console/Xcode when available. If that evidence is unavailable, use a controlled, reversible isolation test rather than labeling a package as the cause or claiming a web preview proves the phone works.
+
+Expo Doctor's recommended JavaScript dependencies can temporarily differ from the native libraries shipped in an installed Expo Go release. Check the phone's Expo Go version before downgrading Worklets/Reanimated or removing providers.
+
+**Why:** Expo maintainers documented SDK 57 clients with native Worklets 0.10.0/Reanimated 4.5.0 while dependency checks recommended 0.10.1/4.5.1; affected clients could terminate without a JavaScript error even when Doctor passed. The reported correction was an Expo Go binary update, not a project cache repair. See https://github.com/expo/expo/issues/48390.
+
+**How to apply:** Verify the current Expo Go release and device crash evidence against upstream reports; do not assume matching symptoms establish the same cause. Align JavaScript packages with the installed native runtime rather than blindly pinning versions from an older workaround.
