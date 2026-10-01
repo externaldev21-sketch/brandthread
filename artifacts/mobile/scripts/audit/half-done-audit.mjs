@@ -90,7 +90,16 @@ const THREAD_CASH_GREENS = [
   { r: 0x5f, g: 0xdd, b: 0x70 }, // bright
   { r: 0xcf, g: 0xef, b: 0xc8 }, // paper
 ];
-const ALLOWED_ACCENTS = [LIVE_RED, CALL_RED, ...THREAD_CASH_GREENS];
+// BrandthreadUI.tsx: HapticSwitch's SWITCH_TRACK_ON/SWITCH_THUMB_ON — every
+// toggle's ON state, an explicit Dev exception so "on" doesn't read as
+// ambiguous with a screen that's simply always black/white ("it just stays
+// either black or white" otherwise): "you can do green track with green
+// knob... as long as when it's on, do the green with the green knob."
+const SWITCH_ON_GREENS = [
+  { r: 0x34, g: 0xc7, b: 0x59 }, // #34C759 track
+  { r: 0x1e, g: 0x8e, b: 0x3e }, // #1E8E3E knob
+];
+const ALLOWED_ACCENTS = [LIVE_RED, CALL_RED, ...THREAD_CASH_GREENS, ...SWITCH_ON_GREENS];
 const HUE_TOLERANCE_DEG = 18; // anti-aliased/opacity blends of the same hue
 
 // ─── theme.ts tokens (read once, verified against source below) ──────────────

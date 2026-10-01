@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, Pressable, TextInput, Animated, Easing,
+  View, Text, Pressable, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
   Linking, Platform, Share,
 } from 'react-native';
@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import Composer from '@/components/ui/Composer';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
@@ -42,6 +43,11 @@ import type { Story, StoryMedia, MessageAttachment } from '@/services/socialType
 import { useApi } from '@/lib/api';
 import StoryGestureGuide from '@/components/social/StoryGestureGuide';
 import { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
+import {
+  ViewerMentionStickers, ViewerReshareCard, MentionPopover, TaggedPeopleSheet, type MentionTap,
+} from '@/components/StoryMentionViewerParts';
+import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
+import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -138,6 +144,10 @@ export default function BuyerStoryViewer() {
   const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
+  // Mention popover ("View profile") and the tagged-people sheet; playback is held while either is open.
+  const [mentionTap, setMentionTap] = useState<MentionTap | null>(null);
+  const [taggedSheetOpen, setTaggedSheetOpen] = useState(false);
+  const overlayPaused = !!mentionTap || taggedSheetOpen;
   const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; avatarUrl: string | null; viewedAt: string }>>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -168,9 +178,16 @@ export default function BuyerStoryViewer() {
         .map(id => all.find(s => s.id === id))
         .filter((s): s is Story => !!s && s.expiresAt > now);
       // Preview only: seeded stories the Activity rows point at (item 82).
-      const filtered = found.length > 0
+      let filtered = found.length > 0
         ? found
         : ids.map(previewStory).filter((s): s is Story => !!s);
+      // A story that isn't in my own feed cache (e.g. the original behind a
+      // reshare credit, or a story I was tagged in) is fetched by id — signed in only.
+      if (filtered.length === 0 && myUserId) {
+        const fetched = await Promise.all(ids.map((id) => api.social.storyById(id).catch(() => null)));
+        if (loadGeneration.current !== generation) return;
+        filtered = fetched.filter((st): st is Story => !!st && st.expiresAt > now);
+      }
       setStories(filtered);
       if (storyId) {
         const idx = filtered.findIndex(s => s.id === storyId);
@@ -352,7 +369,7 @@ export default function BuyerStoryViewer() {
 
   useEffect(() => {
     progress.setValue(0);
-    if (isPaused || showGestureGuide || !currentSlide) return;
+    if (isPaused || overlayPaused || showGestureGuide || !currentSlide) return;
     const dur = currentSlide.duration * 1000;
     const anim = Animated.timing(progress, {
       toValue: 1,
@@ -362,7 +379,7 @@ export default function BuyerStoryViewer() {
     });
     anim.start(({ finished }) => { if (finished) advanceSlide(); });
     return () => progress.stopAnimation();
-  }, [storyIdx, slideIdx, isPaused, showGestureGuide]);
+  }, [storyIdx, slideIdx, isPaused, overlayPaused, showGestureGuide]);
 
   // Preload the next story's first slide so swiping/advancing to it feels instant.
   useEffect(() => {
@@ -441,6 +458,17 @@ export default function BuyerStoryViewer() {
   const isMyStory = (!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me';
   const seenByCount = serverViewers.length || (currentStory as any).viewsCount || currentStory.viewers.length;
 
+  const slidePeople = taggedPeople(currentSlide.overlays);
+  const openProfile = (p: TaggedPerson) => {
+    setMentionTap(null);
+    setTaggedSheetOpen(false);
+    router.push(mentionProfileHref(p) as never);
+  };
+  const openOriginal = (originalId: string) => {
+    hapticLight();
+    router.push(`/buyer-story-viewer?storyId=${encodeURIComponent(originalId)}&allStoryIds=${encodeURIComponent(originalId)}` as never);
+  };
+
   const openViewersModal = async () => {
     setViewerModalVisible(true);
     if (!currentStory) return;
@@ -464,14 +492,21 @@ export default function BuyerStoryViewer() {
       {/* CONTENT */}
       <View style={StyleSheet.absoluteFill}>
         {/* ── Base slide ── */}
-        {currentSlide.type === 'text' ? (
+        {currentSlide.type === 'text' && (currentSlide.overlays ?? []).some(o => o.type === 'reshare_card') ? (
+          <LinearGradient
+            colors={reshareGradientFromBackground(currentSlide.backgroundColor)}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+        ) : currentSlide.type === 'text' ? (
           <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor }]}>
             <Text style={[styles.slideText, { color: currentSlide.textColor || '#FFFFFF' }]}>
               {currentSlide.textContent}
             </Text>
           </View>
         ) : currentSlide.imageUri && currentSlide.type === 'video' ? (
-          <StorySlideVideo uri={currentSlide.imageUri} paused={isPaused} />
+          <StorySlideVideo uri={currentSlide.imageUri} paused={isPaused || overlayPaused} />
         ) : currentSlide.imageUri ? (
           <CachedImage
             source={{ uri: currentSlide.imageUri }}
@@ -564,6 +599,20 @@ export default function BuyerStoryViewer() {
         </View>
       </View>
 
+      {/* MENTIONS + RESHARE CARD — above the tap zones so a tagged sticker (or the
+          44pt square around a tiny/invisible one) and the reshare credit are tappable. */}
+      <View style={[StyleSheet.absoluteFill, { zIndex: 6 }]} pointerEvents="box-none">
+        <ViewerMentionStickers overlays={currentSlide.overlays ?? []} onTap={(t) => { hapticLight(); setMentionTap(t); }} />
+        {(currentSlide.overlays ?? []).filter(o => o.type === 'reshare_card').map(o => (
+          <ViewerReshareCard
+            key={o.id}
+            overlay={o}
+            original={currentStory.original}
+            onOpenOriginal={openOriginal}
+          />
+        ))}
+      </View>
+
       {/* LEGIBILITY SCRIMS — dark gradients so progress bars, avatar, name,
           time, and the top/bottom icon row read on any photo (a plain white
           product shot included), matching Instagram's own top/bottom fade
@@ -653,6 +702,10 @@ export default function BuyerStoryViewer() {
               setIsPaused(true);
               const author = { userId: currentStory.authorId, name: currentStory.authorName };
               Alert.alert(currentStory.authorName, undefined, [
+                ...(slidePeople.length > 0 ? [{
+                  text: 'Tagged people',
+                  onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
+                }] : []),
                 {
                   text: `Mute ${currentStory.authorName}`,
                   onPress: async () => {
@@ -697,6 +750,21 @@ export default function BuyerStoryViewer() {
           onPress={() => goBackOr(router)}
         />
       </View>
+
+      {/* TAGGED PEOPLE — bottom-left above the reply bar, only when this slide tags someone.
+          Works even when every sticker is invisible. */}
+      {slidePeople.length > 0 && !replyFocused ? (
+        <Pressable
+          style={[styles.taggedChip, { bottom: insets.bottom + SP.md + 44 + SP.md + SP.sm }]}
+          onPress={() => { hapticLight(); setTaggedSheetOpen(true); }}
+          accessibilityRole="button"
+          accessibilityLabel={`Tagged people, ${slidePeople.length}`}
+          testID="story-tagged-chip"
+        >
+          <Feather name="at-sign" size={ICON.sm} color={ON_DARK} />
+          {slidePeople.length > 1 ? <Text style={styles.taggedChipText}>{slidePeople.length}</Text> : null}
+        </Pressable>
+      ) : null}
 
       {/* BOTTOM BAR — Mobbin: Instagram "Viewing your own story" (own) vs
           "Replying to a story" (others). The two are different enough
@@ -750,6 +818,10 @@ export default function BuyerStoryViewer() {
                 hapticLight();
                 setIsPaused(true);
                 Alert.alert('Your story', undefined, [
+                  ...(slidePeople.length > 0 ? [{
+                    text: 'Tagged people',
+                    onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
+                  }] : []),
                   {
                     text: 'Save to device',
                     onPress: async () => {
@@ -796,102 +868,88 @@ export default function BuyerStoryViewer() {
           style={styles.bottomBarWrap}
           keyboardVerticalOffset={0}
         >
-          {!currentStory.repliesDisabled && replyFocused && (
-            <View style={styles.quickReactionRow}>
-              {QUICK_REACTIONS.map(emoji => (
-                <PressableScale
-                  key={emoji}
-                  onPress={() => sendQuickReaction(emoji)}
-                  disabled={sendingReply}
-                  accessibilityRole="button"
-                  accessibilityLabel={`React with ${emoji}`}
-                >
-                  <AppleEmoji emoji={emoji} size={26} />
-                </PressableScale>
-              ))}
-            </View>
-          )}
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-            {!currentStory.repliesDisabled ? (
-              <>
-                <View style={styles.replyInputPill}>
-                  <TextInput
-                    style={styles.replyInput}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder={`Reply to ${currentStory.authorName}…`}
-                    placeholderTextColor="rgba(255,255,255,0.8)"
-                    onFocus={() => {
-                      if (replyBlurTimer.current) { clearTimeout(replyBlurTimer.current); replyBlurTimer.current = null; }
-                      setIsPaused(true);
-                      setReplyFocused(true);
-                    }}
-                    onBlur={() => {
-                      replyBlurTimer.current = setTimeout(() => { setIsPaused(false); setReplyFocused(false); }, 200);
-                    }}
-                    onSubmitEditing={() => handleSendReply()}
-                    returnKeyType="send"
-                    editable={!sendingReply}
-                  />
-                </View>
-                {inputText.trim().length > 0 ? (
-                  // Instagram shows a text "Send" button in place of
-                  // heart+share once there's text to send — not an extra
-                  // icon alongside them.
-                  <PressableScale
-                    onPress={() => handleSendReply()}
-                    style={styles.sendTextBtn}
-                    disabled={sendingReply}
-                    accessibilityRole="button"
-                    accessibilityLabel="Send reply"
-                  >
-                    <Text style={styles.sendTextBtnLabel}>{sendingReply ? 'Sending…' : 'Send'}</Text>
-                  </PressableScale>
-                ) : (
-                  <>
-                    <PressableScale
-                      onPress={() => { hapticLight(); handleLike(); }}
-                      style={styles.likeBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
-                    >
-                      <Animated.View style={{ transform: [{ scale: heartPop }] }}>
-                        {likedSet.has(currentStory.id) ? (
-                          <FontAwesome name="heart" size={ICON.lg} color={ON_DARK} />
-                        ) : (
-                          <Feather name="heart" size={ICON.lg} color={ON_DARK} />
-                        )}
-                      </Animated.View>
-                      {(likesCounts[currentStory.id] ?? 0) > 0 && (
-                        <Text style={styles.likesCountText}>
-                          {likesCounts[currentStory.id]}
-                        </Text>
-                      )}
-                    </PressableScale>
-                    <PressableScale
-                      onPress={() => {
-                        hapticLight();
-                        setIsPaused(true);
-                        Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
-                          .catch(() => {})
-                          .finally(() => setIsPaused(false));
-                      }}
-                      style={styles.likeBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel="Share this story"
-                    >
-                      <Feather name="send" size={ICON.lg} color={ON_DARK} />
-                    </PressableScale>
-                  </>
-                )}
-              </>
-            ) : (
+          {currentStory.repliesDisabled ? (
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
               <Text style={styles.repliesDisabled}>Replies disabled</Text>
-            )}
-          </View>
+            </View>
+          ) : (
+            <Composer
+          overMedia
+              value={inputText}
+              onChangeText={setInputText}
+              onSend={() => handleSendReply()}
+              canSend={inputText.trim().length > 0 && !sendingReply}
+              editable={!sendingReply}
+              placeholder={`Reply to ${currentStory.authorName}…`}
+              hideTabBar={false}
+              onFocus={() => {
+                if (replyBlurTimer.current) { clearTimeout(replyBlurTimer.current); replyBlurTimer.current = null; }
+                setIsPaused(true);
+                setReplyFocused(true);
+              }}
+              onBlur={() => {
+                replyBlurTimer.current = setTimeout(() => { setIsPaused(false); setReplyFocused(false); }, 200);
+              }}
+              topSlot={replyFocused ? (
+                <View style={styles.quickReactionRow}>
+                  {QUICK_REACTIONS.map(emoji => (
+                    <PressableScale
+                      key={emoji}
+                      onPress={() => sendQuickReaction(emoji)}
+                      disabled={sendingReply}
+                      accessibilityRole="button"
+                      accessibilityLabel={`React with ${emoji}`}
+                    >
+                      <AppleEmoji emoji={emoji} size={26} />
+                    </PressableScale>
+                  ))}
+                </View>
+              ) : null}
+              rightAccessory={(
+                <>
+                  <PressableScale
+                    onPress={() => { hapticLight(); handleLike(); }}
+                    style={styles.likeBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
+                  >
+                    <Animated.View style={{ transform: [{ scale: heartPop }] }}>
+                      {likedSet.has(currentStory.id) ? (
+                        <FontAwesome name="heart" size={ICON.lg} color={theme.text} />
+                      ) : (
+                        <Feather name="heart" size={ICON.lg} color={theme.text} />
+                      )}
+                    </Animated.View>
+                    {(likesCounts[currentStory.id] ?? 0) > 0 && (
+                      <Text style={[styles.likesCountText, { color: theme.text }]}>
+                        {likesCounts[currentStory.id]}
+                      </Text>
+                    )}
+                  </PressableScale>
+                  <PressableScale
+                    onPress={() => {
+                      hapticLight();
+                      setIsPaused(true);
+                      Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
+                        .catch(() => {})
+                        .finally(() => setIsPaused(false));
+                    }}
+                    style={styles.likeBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share this story"
+                  >
+                    <Feather name="send" size={ICON.lg} color={theme.text} />
+                  </PressableScale>
+                </>
+              )}
+            />
+          )}
         </KeyboardAvoidingView>
       )}
       </Animated.View>
+
+      <MentionPopover target={mentionTap} onClose={() => setMentionTap(null)} onViewProfile={openProfile} />
+      <TaggedPeopleSheet visible={taggedSheetOpen} people={slidePeople} onClose={() => setTaggedSheetOpen(false)} onOpen={openProfile} />
 
       {/* VIEWER MODAL */}
       <Modal
@@ -1110,35 +1168,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.md,
     paddingBottom: SP.sm,
   },
-  // A plain transparent pill, not the shared frosted <Glass> — Dev's exact
-  // ask after the glass material's blur/specular layers were reading as an
-  // opaque grey blob that hid the typed text underneath it.
-  replyInputPill: {
-    flex: 1,
-    height: 44,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-  },
-  replyInput: {
-    height: 44,
-    paddingHorizontal: SP.md,
-    fontSize: 15,
-    fontFamily: FONT.regular,
-    color: ON_DARK,
-  },
-  sendTextBtn: {
-    paddingHorizontal: SP.sm,
-    height: 44,
-    justifyContent: 'center',
-  },
-  sendTextBtnLabel: {
-    color: ON_DARK,
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-  },
   ownStoryBar: {
     paddingHorizontal: SP.md,
     paddingTop: SP.md,
@@ -1308,5 +1337,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     overflow: 'hidden',
   },
   closeBtnWrap: { position: 'absolute', right: SP.sm },
+  taggedChip: {
+    position: 'absolute', left: SP.md, zIndex: 11, minWidth: 44, height: 44, borderRadius: 22,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: SP.sm,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)',
+  },
+  taggedChipText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
   });
 };

@@ -37,6 +37,8 @@ import {
 } from "../lib/threadCash/wallet";
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
+import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
+import { applyDisputePause, applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -69,6 +71,8 @@ import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { recordPurchaseSignals } from "../lib/ranking/signals";
+import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -914,7 +918,11 @@ export async function handleCheckoutPaid(
       processingFeeCents: chargeModel === "held"
         ? chargeDetails.processingFeeCents
         : chargeModel === "transfer"
-          ? cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total)
+          // A cart-wide charge carries this order's pro-rata share; a hosted
+          // Checkout Session charged on the platform balance is one order.
+          ? (session.cart_amount_total == null
+            ? chargeDetails.processingFeeCents ?? undefined
+            : cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total))
           : undefined,
     });
     const decidedPlatformFee = (chargeModel === "destination" || chargeModel === "transfer") && csRecord.platformFeeCents != null
@@ -1023,6 +1031,12 @@ export async function handleCheckoutPaid(
       })),
     );
 
+    // Delivery guarantee: stamp the 15-day / 60-day deadlines now, in the same
+    // transaction as the order and its items.
+    if (oversoldItems.length === 0) {
+      await stampDeliveryDeadlines(tx, order.id, successfulPaymentAt);
+    }
+
     // Step 6: stock was already reserved (decremented) above — either by the
     // one-page checkout's own hold (stockAlreadyReserved, committed via
     // commitStockReservation) or by reserveStockForOrder — in the same
@@ -1130,6 +1144,11 @@ export async function handleCheckoutPaid(
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
 
+    // For You: a purchase is the strongest taste signal (seller + style of the content that sold it).
+    if (buyerId) {
+      void recordPurchaseSignals({ buyerId, sellerId: ownerId, variantIds: rawItems.map((i) => i.variantId) });
+    }
+
     if (createdOrderId) {
       const [createdOrder] = await db
         .select({
@@ -1182,6 +1201,16 @@ export async function handleCheckoutPaid(
         await sendOrderConfirmationForOrder(createdOrderId);
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
+      }
+
+      // This buyer now has a real paid order with this seller — if a
+      // pending message request from this buyer is sitting in the seller's
+      // Requests, it's exactly the condition that routes it to the
+      // seller's main inbox instead (lib/conversationRouting.ts).
+      try {
+        await promotePendingRequestsOnOrder(buyerId, ownerId);
+      } catch (err) {
+        logger.error({ err, orderId: createdOrderId }, "Pending-request promotion on paid order failed");
       }
 
       // Fulfillment via Shopify (opt-in): forward this paid order to the
@@ -1661,6 +1690,7 @@ async function handleDisputeCreated(dispute: any) {
     })
     .onConflictDoNothing();
 
+  await applyDisputePause(orderId, dispute.status);
   logger.info({ disputeId: dispute.id, sellerId, orderId, reason: dispute.reason }, "Dispute created");
 }
 
@@ -1678,6 +1708,7 @@ async function handleDisputeUpdated(stripeDispute: any) {
       updatedAt:             new Date(),
     })
     .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
 
   logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute updated");
 }
@@ -1690,6 +1721,7 @@ async function handleDisputeClosed(stripeDispute: any) {
       updatedAt: new Date(),
     })
     .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
 
   logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
 }

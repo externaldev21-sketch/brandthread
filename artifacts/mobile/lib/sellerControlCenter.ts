@@ -108,7 +108,7 @@ export const SECTIONS: ControlCenterSection[] = [
     icon: 'shopping-bag',
     items: [
       { id: 'add-product', label: 'Add product', icon: 'plus-square', route: '/add-product', description: 'List a new item' },
-      { id: 'post-video',  label: 'Post video',   icon: 'video',       route: '/create-post', description: 'Share a shoppable post' },
+      { id: 'post-video',  label: 'Create post',  icon: 'video',       route: '/create-post', description: 'Share a shoppable post' },
       { id: 'go-live',     label: 'Go Live',      icon: 'radio',       route: '/seller-go-live', description: 'Start a live shopping stream' },
       { id: 'products',    label: 'Products',     icon: 'grid',        route: '/(tabs)/products', description: 'Your full catalog' },
       { id: 'orders',      label: 'Orders',       icon: 'shopping-bag', route: '/(tabs)/orders', description: 'Fulfill and track orders', badgeKey: 'orders' },
@@ -124,7 +124,7 @@ export const SECTIONS: ControlCenterSection[] = [
       { id: 'content',   label: 'Content',   icon: 'film',        route: '/content', description: 'Posts, drafts and scheduled' },
       { id: 'messages',  label: 'Messages',  icon: 'message-circle', route: '/seller-inbox', description: 'Reply to buyer DMs', badgeKey: 'messages' },
       { id: 'boost',     label: 'Boost',     icon: 'trending-up', route: '/boost', description: 'Promote a post or product' },
-      { id: 'community', label: 'Community', icon: 'briefcase',  route: '/community', description: 'Hire freelance creatives' },
+      { id: 'community', label: 'Community', icon: 'users',      route: '/community', description: 'Join topic group chats' },
     ],
   },
   {

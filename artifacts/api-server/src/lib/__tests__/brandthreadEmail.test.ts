@@ -29,6 +29,9 @@ beforeEach(() => {
   proxyMock.mockReset();
   listConnectionsMock.mockReset();
   listConnectionsMock.mockResolvedValue([]);
+  vi.stubEnv("RESEND_API_KEY", "");
+  vi.stubEnv("MAIL_FROM", "");
+  vi.stubEnv("RESEND_FROM_EMAIL", "");
 });
 
 afterEach(() => {
@@ -85,11 +88,12 @@ describe("Brandthread transactional email", () => {
         }),
       );
       const body = proxyMock.mock.calls[0][2].body;
-      expect(body.from).toBe("Brandthread <hello@brandthread.app>");
+      expect(body.from).toBe("Brandthread <no-reply@brandthread.app>");
     });
 
-    it("prefers RESEND_FROM_EMAIL over the connector's configured sender", async () => {
+    it("prefers MAIL_FROM, then RESEND_FROM_EMAIL, even with a connector", async () => {
       vi.stubEnv("RESEND_FROM_EMAIL", "Brandthread <orders@brandthread.app>");
+      vi.stubEnv("MAIL_FROM", "  Brandthread <news@brandthread.app>  ");
       listConnectionsMock.mockResolvedValue([
         { id: "conn_1", connector_name: "resend", metadata: { from_email: "Brandthread <hello@brandthread.app>" } },
       ]);
@@ -97,16 +101,19 @@ describe("Brandthread transactional email", () => {
 
       await sendBrandthreadEmail({ to: "buyer@example.com", subject: "Welcome", html: "<p>Welcome</p>" });
 
-      expect(proxyMock.mock.calls[0][2].body.from).toBe("Brandthread <orders@brandthread.app>");
+      expect(proxyMock.mock.calls[0][2].body.from).toBe("Brandthread <news@brandthread.app>");
+      vi.stubEnv("MAIL_FROM", " ");
+      await sendBrandthreadEmail({ to: "buyer@example.com", subject: "Welcome", html: "<p>Welcome</p>" });
+      expect(proxyMock.mock.calls[1][2].body.from).toBe("Brandthread <orders@brandthread.app>");
     });
 
-    it("falls back to the default brandthread.app sender when the connector has none configured", async () => {
+    it("uses the verified-domain default when neither sender setting is present", async () => {
       listConnectionsMock.mockResolvedValue([{ id: "conn_1", connector_name: "resend" }]);
       proxyMock.mockResolvedValue({ ok: true, status: 202 });
 
       await sendBrandthreadEmail({ to: "buyer@example.com", subject: "Welcome", html: "<p>Welcome</p>" });
 
-      expect(proxyMock.mock.calls[0][2].body.from).toBe("Brandthread <hello@brandthread.app>");
+      expect(proxyMock.mock.calls[0][2].body.from).toBe("Brandthread <no-reply@brandthread.app>");
     });
 
     it("reports failure without throwing when the connector proxy rejects the request", async () => {

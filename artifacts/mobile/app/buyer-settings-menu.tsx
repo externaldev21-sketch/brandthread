@@ -26,12 +26,15 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { hapticLight, hapticDestructiveConfirm } from '@/lib/haptics';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
+import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 
 type MenuRow = {
   key: string;
   icon: keyof typeof Feather.glyphMap;
   label: string;
   destructive?: boolean;
+  /** Quiet secondary text before the chevron (e.g. "3 joined"). */
+  value?: string;
   onPress: () => void;
 };
 
@@ -46,6 +49,9 @@ export default function BuyerSettingsMenuScreen() {
   const { signOut } = useAuth();
   const [query, setQuery] = useState('');
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  // Readonly (signed-out / fresh preview) resolves to [] without any protected call.
+  const { communities: joinedGroups } = useJoinedCommunities(60_000);
+  const groupsValue = joinedGroups.length > 0 ? `${joinedGroups.length} joined` : undefined;
 
   const handleSignOut = () => {
     Alert.alert('Sign out of Brandthread?', undefined, [
@@ -78,6 +84,7 @@ export default function BuyerSettingsMenuScreen() {
         { key: 'archive', icon: 'archive', label: 'Archive', onPress: () => router.push('/buyer-archive' as any) },
         { key: 'your-activity', icon: 'activity', label: 'Your activity', onPress: () => router.push('/buyer-your-activity' as any) },
         { key: 'close-friends', icon: 'star', label: 'Close friends', onPress: () => router.push('/buyer-close-friends' as any) },
+        { key: 'groups', icon: 'message-square', label: 'Groups', value: groupsValue, onPress: () => router.push('/community' as any) },
         { key: 'friends', icon: 'users', label: 'Friends', onPress: () => router.push('/(buyer)/friends' as any) },
         { key: 'highlights', icon: 'image', label: 'Highlights', onPress: () => router.push('/buyer-highlights-manager' as any) },
       ],
@@ -105,7 +112,7 @@ export default function BuyerSettingsMenuScreen() {
       ],
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [router]);
+  ], [router, groupsValue]);
 
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -151,10 +158,11 @@ export default function BuyerSettingsMenuScreen() {
                 onPress={() => { hapticLight(); row.onPress(); }}
                 style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
                 accessibilityRole="button"
-                accessibilityLabel={row.label}
+                accessibilityLabel={row.value ? `${row.label}, ${row.value}` : row.label}
               >
                 <Feather name={row.icon} size={ROW_ICON_SIZE} color={row.destructive ? theme.error : theme.text} />
                 <Text style={[s.rowLabel, { color: row.destructive ? theme.error : theme.text }]} numberOfLines={1}>{row.label}</Text>
+                {row.value ? <Text style={[s.rowValue, { color: theme.subtle }]} numberOfLines={1}>{row.value}</Text> : null}
                 {!row.destructive && <Feather name="chevron-right" size={16} color={theme.subtle} />}
                 {i < section.rows.length - 1 && (
                   <View style={[s.divider, { backgroundColor: theme.border }]} />
@@ -195,6 +203,7 @@ function styles(theme: ReturnType<typeof useAppTheme>['theme']) {
       height: ROW_HEIGHT, paddingHorizontal: SIDE_INSET,
     },
     rowLabel: { flex: 1, fontSize: 15, fontFamily: FONT.semibold },
+    rowValue: { fontSize: FS.sm, fontFamily: FONT.regular },
     divider: {
       position: 'absolute', left: SIDE_INSET + ROW_ICON_SIZE + ICON_LABEL_GAP, right: 0, bottom: 0,
       height: StyleSheet.hairlineWidth,

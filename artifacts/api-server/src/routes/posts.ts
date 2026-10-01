@@ -15,7 +15,6 @@ import {
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
-import { enqueueBatchedNotification } from "../lib/push";
 import postVideoRouter, {
   mediaUrl as composedMediaUrl,
   setComposedMediaVisibility,
@@ -23,10 +22,13 @@ import postVideoRouter, {
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
+import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import {
+  authorInGoodStanding,
   enqueueAutoFilterReport,
   isBlockedEitherWay,
   mutedPhrasesFor,
@@ -51,6 +53,34 @@ function validObjectPath(value: unknown): value is string {
 /** Published, public, not held/removed by moderation, author in good standing. */
 function visiblePostCondition(now = new Date()) {
   return publicPostCondition(now);
+}
+
+/** Current access rule shared by watch recording and history reads. */
+function watchedPostAccessCondition(viewerId: string) {
+  const mutualBuyerFriend = sql`EXISTS (
+    SELECT 1
+    FROM follows watched_mine
+    JOIN follows watched_theirs
+      ON watched_theirs.follower_id = watched_mine.following_id
+     AND watched_theirs.following_id = ${viewerId}
+    WHERE watched_mine.follower_id = ${viewerId}
+      AND watched_mine.following_id = ${posts.userId}
+  )`;
+
+  return and(
+    eq(posts.mediaType, "video"),
+    eq(posts.postStatus, "published"),
+    eq(posts.moderationStatus, "visible"),
+    authorInGoodStanding(posts.userId),
+    notBlockedWith(viewerId, posts.userId),
+    or(
+      and(eq(users.accountType, "seller"), publicPostCondition()),
+      and(
+        eq(users.accountType, "buyer"),
+        or(eq(posts.userId, viewerId), mutualBuyerFriend),
+      ),
+    ),
+  );
 }
 
 /** Caption + hashtags are what other people read, so both are filtered. */
@@ -1214,6 +1244,115 @@ router.get("/:id/analytics", requireAuth, async (req, res) => {
   }
 });
 
+// ─── Recently watched buyer videos ───────────────────────────────────────────
+// Keep this static route before /:id so "watched-videos" is not treated as an id.
+router.get("/watched-videos", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const cursorValue = req.query.cursor;
+  let cursor: { timestamp: Date; postId: string } | null = null;
+  if (cursorValue !== undefined) {
+    if (typeof cursorValue !== "string" || cursorValue.length === 0 || cursorValue.length > 256) {
+      return res.status(400).json({ error: "Invalid cursor" });
+    }
+    try {
+      const parsed = JSON.parse(Buffer.from(cursorValue, "base64url").toString("utf8")) as {
+        timestamp?: unknown;
+        postId?: unknown;
+      };
+      if (
+        typeof parsed.timestamp !== "string" ||
+        typeof parsed.postId !== "string" ||
+        !UUID_RE.test(parsed.postId)
+      ) {
+        return res.status(400).json({ error: "Invalid cursor" });
+      }
+      const timestamp = new Date(parsed.timestamp);
+      if (Number.isNaN(timestamp.getTime()) || timestamp.toISOString() !== parsed.timestamp) {
+        return res.status(400).json({ error: "Invalid cursor" });
+      }
+      cursor = { timestamp, postId: parsed.postId };
+    } catch {
+      return res.status(400).json({ error: "Invalid cursor" });
+    }
+  }
+
+  // History is always bounded by the server clock, not by a client-supplied
+  // date. Access and visibility are re-evaluated on every page.
+  const cutoff = new Date(Date.now() - 36 * 60 * 60 * 1000);
+  const rows = await db.select({
+    postId: posts.id,
+    authorId: posts.userId,
+    authorName: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, ${users.name}, 'Someone')`,
+    authorAccountType: users.accountType,
+    caption: posts.caption,
+    thumbnailUrl: posts.thumbnailUrl,
+    watchedAt: interactions.createdAt,
+  }).from(interactions)
+    .innerJoin(posts, eq(posts.id, interactions.postId))
+    .innerJoin(users, eq(users.clerkId, posts.userId))
+    .where(and(
+      eq(interactions.userId, viewerId),
+      eq(interactions.type, "video_watched"),
+      gte(interactions.createdAt, cutoff),
+      watchedPostAccessCondition(viewerId),
+      ...(cursor ? [
+        or(
+          lt(interactions.createdAt, cursor.timestamp),
+          and(
+            eq(interactions.createdAt, cursor.timestamp),
+            lt(posts.id, cursor.postId),
+          ),
+        ),
+      ] : []),
+    ))
+    .orderBy(desc(interactions.createdAt), desc(posts.id))
+    .limit(51);
+
+  const hasMore = rows.length > 50;
+  const page = hasMore ? rows.slice(0, 50) : rows;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last
+    ? Buffer.from(JSON.stringify({ timestamp: last.watchedAt.toISOString(), postId: last.postId })).toString("base64url")
+    : null;
+  return res.json({
+    items: page.map((row) => ({
+      ...row,
+      thumbnailUrl: composedMediaPath(row.thumbnailUrl)
+        ? composedMediaUrl(req, composedMediaPath(row.thumbnailUrl)!)
+        : row.thumbnailUrl,
+    })),
+    nextCursor,
+  });
+});
+
+router.post("/:id/watched", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const [post] = await db.select({ id: posts.id }).from(posts)
+    .innerJoin(users, eq(users.clerkId, posts.userId))
+    .where(and(eq(posts.id, id), watchedPostAccessCondition(viewerId)))
+    .limit(1);
+  if (!post) return res.status(404).json({ error: "Post not found" });
+
+  const watchedAt = new Date();
+  await db.insert(interactions).values({
+    userId: viewerId,
+    postId: id,
+    type: "video_watched",
+    clientEventId: `video-watched:${id}`,
+  }).onConflictDoUpdate({
+    target: [interactions.userId, interactions.clientEventId],
+    targetWhere: sql`${interactions.clientEventId} IS NOT NULL`,
+    set: { createdAt: watchedAt },
+  });
+
+  return res.json({ action: "recorded", watchedAt });
+});
+
 // ─── GET /api/posts/:id ──────────────────────────────────────────────────────
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
@@ -1257,7 +1396,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // ─── POST /api/posts/:id/interact ────────────────────────────────────────────
-router.post("/:id/interact", requireAuth, async (req, res) => {
+router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { id } = req.params;
   if (typeof id !== "string" || !UUID_RE.test(id)) {
@@ -1283,12 +1422,28 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     .where(and(eq(posts.id, id), visiblePostCondition()))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
+  // Blocked in either direction: behave exactly like a missing post (same as comments).
+  if (visiblePost.ownerId && visiblePost.ownerId !== clerkId && await isBlockedEitherWay(clerkId, visiblePost.ownerId)) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+  // Owners always see their own count; everyone else gets none when the owner hides like counts.
+  const countFor = (n: number): number | undefined =>
+    visiblePost.visibility?.showLikeCount === false && visiblePost.ownerId !== clerkId ? undefined : n;
   if (type === "repost" && visiblePost.visibility?.allowReposts === false) {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
   }
 
   if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
+    if (type === "not_interested") {
+      // Persist the hide so For You never serves this post again; the taste
+      // penalty applies only for a newly hidden post (retries don't stack).
+      const hidden = await hidePostFromForYou(clerkId, { id, sellerId: visiblePost.ownerId ?? null })
+        .catch(() => false);
+      if (hidden) void recordPostSignal(clerkId, id, "not_interested");
+    } else {
+      void recordPostSignal(clerkId, id, type, value ?? null);
+    }
     return res.json({ action: "recorded" });
   }
 
@@ -1313,8 +1468,12 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
           where: sql`type = 'like' AND post_id IS NOT NULL`,
         })
         .returning({ id: interactions.id });
-      // Only a genuinely new like notifies the owner; retries are silent.
-      if (inserted.length > 0) void notifyPostLike({ postId: id, likerId: clerkId });
+      // Only a genuinely new like notifies the owner (single path: notifyPostLike,
+      // deduped per liker+post) and feeds the taste profile; retries are silent.
+      if (inserted.length > 0) {
+        void notifyPostLike({ postId: id, likerId: clerkId });
+        void recordPostSignal(clerkId, id, "like");
+      }
     }
 
     const [{ count: newCount }] = await db
@@ -1322,24 +1481,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       .from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
 
-    if (!removing && visiblePost.ownerId && visiblePost.ownerId !== clerkId) {
-      const [liker] = await db.select({
-        name: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, 'Someone')`,
-      }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
-      // Likes are bursty and low-priority: collapse them into one notification
-      // instead of pushing on every tap (see jobs/notificationBatchFlush.ts).
-      void enqueueBatchedNotification({
-        userId: visiblePost.ownerId,
-        category: "social",
-        type: "post_liked",
-        targetId: id,
-        targetType: "post",
-        actorName: liker?.name ?? "Someone",
-        cta: "View post",
-      });
-    }
-
-    return res.json({ action: removing ? "removed" : "added", count: newCount });
+    return res.json({ action: removing ? "removed" : "added", count: countFor(newCount) });
   }
 
   // Reposts are explicit and idempotent. Omitted value means add; callers that
@@ -1362,7 +1504,10 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       })
       .returning({ id: interactions.id });
     // Only a genuinely new repost notifies the owner; retries are silent.
-    if (inserted.length > 0) void notifyRepost({ postId: id, reposterId: clerkId });
+    if (inserted.length > 0) {
+      void notifyRepost({ postId: id, reposterId: clerkId });
+      void recordPostSignal(clerkId, id, "repost");
+    }
   }
 
   const [{ count: newCount }] = await db

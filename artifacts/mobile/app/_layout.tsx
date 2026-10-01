@@ -334,6 +334,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // seller tab bar rendered on top of the story camera's shutter row.
   'buyer-story-create',
   'buyer-story-viewer',
+  'story-mention-viewer',
   'buyer-live',
   'live-feed',
 ]);
@@ -579,6 +580,7 @@ function AuthGate() {
   const [threadExplainerSeen, setThreadExplainerSeen] = useState<boolean | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
+  const [pendingCommunityInvite, setPendingCommunityInvite] = useState<string | null>(null);
   const prevSignedInRef = useRef<boolean | null>(null);
 
   // Clear per-account caches on sign-out so a different account gets fresh data.
@@ -605,8 +607,10 @@ function AuthGate() {
   // Pending team invite (stashed by team-invite.tsx before sign-in) — re-check
   // whenever auth state or the top segment changes.
   useEffect(() => {
-    if (!isSignedIn) { setPendingInvite(null); return; }
+    if (!isSignedIn) { setPendingInvite(null); setPendingCommunityInvite(null); return; }
     AsyncStorage.getItem('bt:pendingTeamInvite').then(setPendingInvite).catch(() => {});
+    // Community invite code stashed by community-join.tsx before sign-in.
+    AsyncStorage.getItem('bt:pendingCommunityInvite').then(setPendingCommunityInvite).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, topSegment]);
 
@@ -726,7 +730,8 @@ function AuthGate() {
     // must always be redirected away from once auth state is known.
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     // Team invite links must be viewable signed-out (deep-link entry point)
-    const inInvite        = (segments[0] as string) === 'team-invite';
+    // (community invite links share this: the preview is public, joining needs sign-in)
+    const inInvite        = (segments[0] as string) === 'team-invite' || (segments[0] as string) === 'community-join';
     // Thread explainer is a post-onboarding buyer screen — let authenticated
     // users stay on it; the screen itself handles its own seen-state redirect.
     const inThreadExplainer = (segments[0] as string) === 'thread-explainer';
@@ -821,6 +826,12 @@ function AuthGate() {
       return;
     }
 
+    // Same for a community invite link opened before sign-in (cleared by community-join.tsx on arrival).
+    if (onboardingDone && pendingCommunityInvite && !inInvite) {
+      router.replace(`/community-join?code=${encodeURIComponent(pendingCommunityInvite)}` as never);
+      return;
+    }
+
     if (
       onboardingDone
       && storedRole === 'buyer'
@@ -859,7 +870,7 @@ function AuthGate() {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
+  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key]);
 
   return null;
 }
@@ -1309,6 +1320,8 @@ function RootLayoutNav() {
             it — the floating bar is hidden automatically. */}
         <Stack.Screen name="buyer-search"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="story-mention-viewer"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="story-mentions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1397,6 +1410,9 @@ function RootLayoutNav() {
         <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="community-members"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="community-create"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="community-join"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="freelancer-profile" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="freelancer-apply"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="freelancer-jobs"    options={{ headerShown: false, animation: 'ios_from_right' }} />

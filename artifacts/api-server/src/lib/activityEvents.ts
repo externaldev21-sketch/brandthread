@@ -11,6 +11,7 @@
  *   post_like      — someone liked your post            (actor, post thumbnail)
  *   post_comment   — someone commented on your post     (actor, post thumbnail)
  *   comment_reply  — someone replied to your comment    (actor, post thumbnail)
+ *   comment_like   — someone liked your comment         (actor, post thumbnail)
  *   mention        — someone @mentioned you in a comment (actor, post thumbnail)
  *   new_product    — a brand you follow listed something (brand, product image)
  *
@@ -19,7 +20,7 @@
  * seller-facing low/out-of-stock alert.
  */
 import {
-  db, follows, notificationsFeed, posts, products, stories, users,
+  db, follows, notificationsFeed, postComments, posts, products, stories, users,
 } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { publishNotification } from "../routes/notifications-feed";
@@ -253,6 +254,68 @@ export async function notifyStoryLike(input: { storyId: string; likerId: string 
   }
 }
 
+// ─── Story mentions + reshares ────────────────────────────────────────────────
+
+function firstStoryImage(media: unknown, slide = 0): string | null {
+  const items = Array.isArray(media) ? media : [];
+  const pick = (m: any) => (typeof m?.imageUri === "string" ? m.imageUri : typeof m?.url === "string" ? m.url : null);
+  return pick(items[slide]) ?? items.map(pick).find((u) => !!u) ?? null;
+}
+
+/**
+ * "@name mentioned you in their story" — a push plus an Activity row with the
+ * story thumbnail. Mentions are Activity notifications, never DMs. Idempotent
+ * per (recipient, story); blocked pairs are skipped.
+ */
+export async function notifyStoryMention(input: {
+  storyId: string; taggerId: string; mentionedUserId: string; media: unknown; slide?: number;
+}): Promise<void> {
+  try {
+    if (input.mentionedUserId === input.taggerId) return;
+    if ((await blockedUserIds(input.mentionedUserId)).has(input.taggerId)) return;
+    const actor = await actorFields(input.taggerId);
+    if (!actor) return;
+    const handle = actor.actorHandle ?? actor.actorName;
+    await publishNotification({
+      userId: input.mentionedUserId,
+      category: "social",
+      type: "story_mention",
+      title: `${handle.startsWith("@") ? handle : `@${handle}`} mentioned you in their story`,
+      ...actor,
+      targetId: input.storyId,
+      targetType: "story",
+      targetImageUrl: firstStoryImage(input.media, input.slide ?? 0),
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.storyId }, "Story mention notification failed");
+  }
+}
+
+/** "@name shared your story" — sent to the original author when a tagged person reshares. */
+export async function notifyStoryReshare(input: {
+  reshareStoryId: string; resharerId: string; originalAuthorId: string; media: unknown;
+}): Promise<void> {
+  try {
+    if (input.originalAuthorId === input.resharerId) return;
+    if ((await blockedUserIds(input.originalAuthorId)).has(input.resharerId)) return;
+    const actor = await actorFields(input.resharerId);
+    if (!actor) return;
+    const handle = actor.actorHandle ?? actor.actorName;
+    await publishNotification({
+      userId: input.originalAuthorId,
+      category: "social",
+      type: "story_reshare",
+      title: `${handle.startsWith("@") ? handle : `@${handle}`} shared your story`,
+      ...actor,
+      targetId: input.reshareStoryId,
+      targetType: "story",
+      targetImageUrl: firstStoryImage(input.media),
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.reshareStoryId }, "Story reshare notification failed");
+  }
+}
+
 // ─── Thread Cash ──────────────────────────────────────────────────────────────
 
 /** Tell the recipient someone sent them Thread Cash. Idempotent per transfer. */
@@ -361,6 +424,56 @@ export async function notifyCommentActivity(input: {
     await fanOut(deliveries, (delivery) => publishNotification(delivery));
   } catch (err) {
     logger.warn({ err, postId: input.postId, commentId: input.commentId }, "Comment notification failed");
+  }
+}
+
+// ─── Comment likes ────────────────────────────────────────────────────────────
+
+/**
+ * Tell a comment's author someone liked it. Skips self-likes and blocked pairs;
+ * like -> unlike -> like by the same person on the same comment notifies once.
+ */
+export async function notifyCommentLike(input: { commentId: string; likerId: string }): Promise<void> {
+  try {
+    const [comment] = await db
+      .select({ id: postComments.id, postId: postComments.postId, authorId: postComments.authorId, body: postComments.body })
+      .from(postComments)
+      .where(eq(postComments.id, input.commentId))
+      .limit(1);
+    if (!comment || comment.authorId === input.likerId) return;
+    if ((await blockedUserIds(comment.authorId)).has(input.likerId)) return;
+    const post = await loadPost(comment.postId);
+    if (!post) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, comment.authorId),
+        eq(notificationsFeed.type, "comment_like"),
+        eq(notificationsFeed.actorId, input.likerId),
+        eq(notificationsFeed.commentId, comment.id),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.likerId);
+    if (!actor) return;
+
+    await publishNotification({
+      userId: comment.authorId,
+      category: "social",
+      type: "comment_like",
+      title: `${actor.actorName} liked your comment`,
+      body: excerpt(comment.body),
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+      commentId: comment.id,
+    });
+  } catch (err) {
+    logger.warn({ err, commentId: input.commentId }, "Comment like notification failed");
   }
 }
 

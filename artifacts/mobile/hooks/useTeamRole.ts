@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 import { isTeamRole, type TeamRole } from '@/lib/roleError';
 
 /**
@@ -8,11 +9,18 @@ import { isTeamRole, type TeamRole } from '@/lib/roleError';
  */
 export function useTeamRole() {
   const api = useApi();
+  const { isLoaded, isSignedIn } = useAuth();
   const [currentRole, setCurrentRole] = useState<TeamRole | null>(null);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
 
   useEffect(() => {
     let active = true;
+    // Never call the protected team-context API without a loaded, signed-in session.
+    if (!isLoaded || !isSignedIn) {
+      setCurrentRole(null);
+      setIsLoadingRole(false);
+      return;
+    }
     setIsLoadingRole(true);
 
     api.team.context()
@@ -29,7 +37,7 @@ export function useTeamRole() {
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, isLoaded, isSignedIn]);
 
   return { currentRole, isLoadingRole };
 }

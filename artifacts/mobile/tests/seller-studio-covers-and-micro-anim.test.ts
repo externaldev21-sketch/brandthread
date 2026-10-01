@@ -6,7 +6,7 @@ const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadia
 const cover = readFileSync(resolve(process.cwd(), 'components/StudioCardCover.tsx'), 'utf8');
 
 /**
- * Dev's "cover art" pass: every one of the 16 cards gets its own full-bleed
+ * Dev's "cover art" pass: every one of the 14 cards gets its own full-bleed
  * "album cover" backdrop instead of a plain icon on the sheet's own
  * background — built entirely from gradients/vector shapes in code (no
  * bitmap assets, no licensing risk), sharing one art direction (monochrome
@@ -21,7 +21,7 @@ describe('Studio card covers: one shared "album cover" art direction, built in c
 
   it('the cover backdrop is a diagonal black gradient + a soft silver radial glow — monochrome only', () => {
     expect(cover).toContain("from 'expo-linear-gradient'");
-    expect(cover).toContain("colors={['#050505', '#161616', '#000000']}");
+    expect(cover).toContain("colors={['#000000', '#020202', '#050505', '#020202', '#000000']}");
     expect(cover).toContain('RadialGradient');
     expect(cover).toContain('stopColor="#ffffff"');
     // No bitmap image assets — everything is a gradient/vector composition.
@@ -77,16 +77,14 @@ describe('Studio card covers: zero neighbor peek at rest', () => {
  * dot + sweep) — no bespoke illustration needed per subject.
  */
 describe('Studio card covers: per-card one-shot signature micro-animations', () => {
-  it('maps every one of the 16 cards to its own named motion kind', () => {
+  it('maps every one of the 14 cards to its own named motion kind', () => {
     const expectedKinds: Record<string, string> = {
+      'post-video': 'slide-click',
       'add-product': 'swing',
       'go-live': 'pulse-dot',
       'analytics': 'rise',
       'payouts': 'flip',
       'community': 'pop-in',
-      'taxes': 'rotate-notch',
-      'content': 'slide-click',
-      'finance': 'pie-pop',
       'manufacturer': 'turn-60',
       'customers': 'nudge',
       'design-studio': 'draw-stroke',
@@ -128,12 +126,12 @@ describe('Studio card covers: per-card one-shot signature micro-animations', () 
     expect(reduceBlock).not.toMatch(/micro(Scale|Rotate|TranslateX|TranslateY)\.value\s*=\s*withSequence/);
   });
 
-  it('go-live gets its own extra dot-pulse + sweep, rendered only for that one item', () => {
-    expect(studio).toContain("item.id === 'go-live'");
-    expect(studio).toContain('liveDotScale');
-    expect(studio).toContain('liveSweepProgress');
-    expect(studio).toContain('styles.liveDot');
-    expect(studio).toContain('styles.liveSweep');
+  it('go-live has no separate red dot/sweep overlay — Dev: no red anywhere on that card unless it\'s part of the cover art itself', () => {
+    expect(studio).not.toContain('liveDotScale');
+    expect(studio).not.toContain('liveSweepProgress');
+    expect(studio).not.toContain('styles.liveDot');
+    expect(studio).not.toContain('styles.liveSweep');
+    expect(studio).not.toContain("item.id === 'go-live'");
   });
 });
 
@@ -150,11 +148,18 @@ describe('Studio page: full-screen layout, real profile photo, position dots', (
     expect(studio).not.toContain('screenHeight * 0.9');
   });
 
-  it('shows the real profile photo when one exists, with initials/neutral-icon fallbacks only otherwise', () => {
+  it('shows the real profile photo when one exists, with an initials monogram fallback (from the store name, else the account\'s own name/username) — a generic bag icon only in the genuine no-data-at-all edge case', () => {
     expect(studio).toContain('avatarUrl ? (');
     expect(studio).toContain('<Image source={{ uri: avatarUrl }} style={styles.avatarImage} />');
-    expect(studio).toContain('hasStoreName ? (');
+    expect(studio).toContain('headerMonogram ? (');
     expect(studio).toContain('Feather name="shopping-bag"');
+  });
+
+  it('the header title always shows something real (store name, else the account\'s own name/username) — never a bare "Name your store" placeholder as the title; that\'s a small link instead', () => {
+    expect(studio).toContain("const headerTitle = hasStoreName ? brandName!.trim() : (accountName?.trim() || null);");
+    expect(studio).toContain('{headerTitle ?? \'Your store\'}');
+    expect(studio).toContain('{!hasStoreName && (');
+    expect(studio).toContain('Set store name');
   });
 
   it('replaces the "X / 16" text indicator with a row of small position dots', () => {

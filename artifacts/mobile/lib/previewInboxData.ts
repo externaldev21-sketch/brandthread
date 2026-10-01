@@ -53,6 +53,13 @@ export type PreviewConversationSeed = {
   minutesAgo: number;
   unreadCount: number;
   isRequest: boolean;
+  /** Only meaningful when `isRequest` is true: who started it, relative to
+   *  the viewer this seed set renders for — `'them'` (the seeded
+   *  participant messaged first; the viewer is the recipient who sees the
+   *  Accept/Delete/Block panel) or `'me'` (the viewer sent it first; they
+   *  see a read-only "Sent as a request" indicator instead). Omitted on
+   *  every non-request seed. */
+  requestedBy?: 'me' | 'them';
   contextOrderNumber?: string;
   contextProductName?: string;
   /** Marked ONLY on `BRANDTHREAD_AGENT_SEED` — the inbox screen simulates a
@@ -219,6 +226,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     minutesAgo: 1500,
     unreadCount: 1,
     isRequest: true,
+    requestedBy: 'them',
     messages: [
       { id: 'preview-msg-03-1', fromOfficialOrParticipant: 'them', text: 'Hi! Interested in custom sizing for the tuxedo.', minutesAgo: 1500 },
     ],
@@ -382,6 +390,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     minutesAgo: 4000,
     unreadCount: 1,
     isRequest: true,
+    requestedBy: 'them',
     messages: [
       { id: 'preview-msg-08-1', fromOfficialOrParticipant: 'them', text: 'Would love to know more about the trench!', minutesAgo: 4000 },
     ],
@@ -417,6 +426,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     minutesAgo: 2800,
     unreadCount: 1,
     isRequest: true,
+    requestedBy: 'them',
     messages: [
       { id: 'preview-msg-10-1', fromOfficialOrParticipant: 'them', text: 'Hi! Is the silk gown still available in size S?', minutesAgo: 2800 },
     ],
@@ -544,6 +554,54 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
         },
         minutesAgo: 200,
       },
+    ],
+  },
+  {
+    // New DM/message-request routing (every role pair, not just buyer<->
+    // buyer): a buyer with no real paid order and no follow-back can now
+    // land a seller in Requests too. This demos the SELLER-AS-RECIPIENT
+    // side — the buyer messaged first, so the seller sees the Accept/
+    // Delete/Block panel (see app/seller-conversation.tsx's isRequestMode).
+    id: 'preview-seller-conversation-03',
+    participantUserId: 'preview-buyer-03',
+    participantName: 'Priya Nair',
+    participantHandle: '@priyanair',
+    participantInitials: 'PN',
+    participantColor: pickAvatarColor('preview-buyer-03'),
+    posterIndex: 5,
+    lastMessage: 'Hi! Do you do rush alterations before a wedding?',
+    lastMessageFromMe: false,
+    minutesAgo: 90,
+    unreadCount: 1,
+    isRequest: true,
+    requestedBy: 'them',
+    messages: [
+      { id: 'preview-seller-msg-03-1', fromOfficialOrParticipant: 'them', text: 'Hi! Do you do rush alterations before a wedding?', minutesAgo: 90 },
+    ],
+  },
+  {
+    // The SENDER-side mirror of -03 above: the seller messaged this buyer
+    // first (e.g. from their profile) with no existing follow-back or real
+    // order between them, so it also lands as a request — server-side this
+    // is the exact same `isRequest`/`requestedBy` shape, just with the
+    // seller as `requestedBy`. Demos app/seller-conversation.tsx's "Sent as
+    // a request" indicator (the seller keeps their normal composer; only
+    // the buyer sees the Accept/Delete/Block panel).
+    id: 'preview-seller-conversation-04',
+    participantUserId: 'preview-buyer-04',
+    participantName: 'Jonah Kessler',
+    participantHandle: '@jonahk',
+    participantInitials: 'JK',
+    participantColor: pickAvatarColor('preview-buyer-04'),
+    posterIndex: 6,
+    lastMessage: 'Hi Jonah — following up on the vintage denim you liked!',
+    lastMessageFromMe: true,
+    minutesAgo: 60,
+    unreadCount: 0,
+    isRequest: true,
+    requestedBy: 'me',
+    messages: [
+      { id: 'preview-seller-msg-04-1', fromOfficialOrParticipant: 'me', text: 'Hi Jonah — following up on the vintage denim you liked!', minutesAgo: 60 },
     ],
   },
 ];

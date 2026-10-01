@@ -85,6 +85,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/buyer-search.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
+  'app/story-mention-viewer.tsx',
   'app/c/[collectionId].tsx',
   'app/call-screen.tsx',
   'app/camera-capture.tsx',
@@ -159,7 +160,6 @@ function isRouteFile(full: string, entry: string): boolean {
 // yet reference useSafeAreaInsets/useHeaderTopInset/SafeAreaView anywhere.
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
-  'app/design-ai-photoshoot.tsx',
   'app/design-bg-replace.tsx',
   'app/help.tsx',
   'components/PlanUpsellModal.tsx',

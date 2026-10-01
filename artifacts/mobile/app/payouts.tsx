@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
+import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
@@ -12,7 +13,6 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
-import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
@@ -67,13 +67,14 @@ export default function PayoutsScreen() {
   const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const isPreviewMode = isSellerDevPreview();
+  const isPreview = (isPreviewMode && !userId) || (isPreviewMode && (!authLoaded || !isSignedIn));
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const api    = useApi();
-  const { userId } = useAuth();
   // ?bt_preview=seller with no real signed-in account: no token to fetch
   // real payout data with — resolve straight to the honest empty/no-history
   // state (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
-  const [isPreviewMode] = useState(() => isSellerDevPreview());
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
@@ -98,7 +99,7 @@ export default function PayoutsScreen() {
   }
 
   const refreshConnectStatus = useCallback(async () => {
-    if (isPreviewMode && !userId) {
+    if (isPreview) {
       setConnectStatus(null);
       setConnectLoading(false);
       return;
@@ -119,10 +120,10 @@ export default function PayoutsScreen() {
       connectRequestRef.current = false;
       setConnectLoading(false);
     }
-  }, [api]);
+  }, [api, isPreview]);
 
   const load = useCallback(async () => {
-    if (isPreviewMode && !userId) {
+    if (isPreview) {
       setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
       setPayouts([]);
       setLoadError(false);
@@ -151,7 +152,7 @@ export default function PayoutsScreen() {
     }
     setLoading(false);
     void refreshConnectStatus();
-  }, [api, refreshConnectStatus]);
+  }, [api, isPreview, refreshConnectStatus]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -174,6 +175,7 @@ export default function PayoutsScreen() {
   }, [refreshConnectStatus]);
 
   const openConnectOnboarding = useCallback(async () => {
+    if (isPreview) return;
     if (onboardingOpenRef.current) return;
     onboardingOpenRef.current = true;
     setIsConnecting(true);
@@ -193,7 +195,7 @@ export default function PayoutsScreen() {
       onboardingOpenRef.current = false;
       setIsConnecting(false);
     }
-  }, [api, refreshConnectStatus]);
+  }, [api, isPreview, refreshConnectStatus]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -205,7 +207,7 @@ export default function PayoutsScreen() {
     ? fmtDate(balance.nextPayout.arrivalDate)
     : '—';
 
-  if (isLoadingRole) {
+  if (!isPreview && isLoadingRole) {
     return (
       <View style={styles.root}>
         <ScreenHeader title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
@@ -217,7 +219,7 @@ export default function PayoutsScreen() {
     );
   }
 
-  if (!hasPayoutsAccess(currentRole) && !isReadOnly) {
+  if (!isPreview && !hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={styles.root}>
         <ScreenHeader title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
@@ -272,11 +274,13 @@ export default function PayoutsScreen() {
         </View>
       </View>
 
-       <StripeConnectWarning
-         connectStatus={connectStatus}
-         onConnect={openConnectOnboarding}
-         isConnecting={isConnecting}
-       />
+      {!isPreview && (
+        <StripeConnectWarning
+          connectStatus={connectStatus}
+          onConnect={openConnectOnboarding}
+          isConnecting={isConnecting}
+        />
+      )}
 
       {/* Tabs */}
       <View style={styles.tabRow}>
@@ -303,7 +307,7 @@ export default function PayoutsScreen() {
             payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
           ]}
         >
-          {loading ? (
+          {loading && !isPreview ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
             </View>
@@ -313,12 +317,12 @@ export default function PayoutsScreen() {
             <View style={{ alignItems: 'center' }}>
               <EmptyState
                 icon="inbox"
-                title={balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
+                title={!isPreview && balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
                 message=""
                 compact
               />
               <Text style={styles.payoutsEmptyMessage}>
-                {balance?.connected === false
+                {!isPreview && balance?.connected === false
                   ? 'Add a bank account under Bank account to start receiving payouts.'
                   : 'Payouts show up here once your available balance clears.'}
               </Text>
@@ -351,11 +355,15 @@ export default function PayoutsScreen() {
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
-               <Text style={styles.bankLabel}>
-                 {connectStatus?.bankLast4 ? `Bank account ···${connectStatus.bankLast4}` : 'No bank account connected'}
+                <Text style={styles.bankLabel}>
+                  {isPreview
+                    ? 'Bank account details are not loaded'
+                    : connectStatus?.bankLast4 ? `Bank account ···${connectStatus.bankLast4}` : 'No bank account connected'}
                </Text>
                <Text style={styles.bankSub}>
-                 {connectLoading
+                  {isPreview
+                    ? 'Account information unavailable'
+                    : connectLoading
                    ? 'Checking Stripe account status…'
                    : connectStatus?.verified
                       ? connectStatus.chargesEnabled
@@ -366,7 +374,7 @@ export default function PayoutsScreen() {
                        : 'Connect Stripe to receive payouts'}
                </Text>
             </View>
-             {!connectLoading && connectStatus && (
+              {!isPreview && !connectLoading && connectStatus && (
                <View style={[styles.statusPill, {
                  backgroundColor: connectStatus.verified ? `${theme.success}20` : `${theme.warning}20`,
                }]}>
@@ -389,20 +397,22 @@ export default function PayoutsScreen() {
              <TouchableOpacity
                 testID="seller-payouts-bank-account"
                style={styles.addBankBtn}
-               onPress={() => { haptic(); void openConnectOnboarding(); }}
-               disabled={isConnecting}
+                onPress={() => { haptic(); void openConnectOnboarding(); }}
+               disabled={isConnecting || isPreview}
                accessibilityRole="button"
                accessibilityLabel="Add bank account with Stripe"
              >
                 <Feather name="plus" size={16} color={theme.accent} />
                 <Text style={styles.addBankText}>
-                  {isConnecting ? 'Opening Stripe…' : connectStatus?.connected ? 'Update bank account' : 'Add bank account'}
+                  {isPreview
+                    ? 'Bank setup unavailable'
+                    : isConnecting ? 'Opening Stripe…' : connectStatus?.connected ? 'Update bank account' : 'Add bank account'}
                 </Text>
              </TouchableOpacity>
            )}
 
            {/* Verification status + next steps */}
-           {!connectLoading && connectStatus?.connected && !connectStatus.verified && connectStatus.providerConfigured && (
+            {!isPreview && !connectLoading && connectStatus?.connected && !connectStatus.verified && connectStatus.providerConfigured && (
              <View style={styles.settingsSection} testID="seller-payouts-verification-next-steps">
                <Text style={styles.sectionTitle}>Next steps to get verified</Text>
                {connectStatus.requirementsDue.length === 0 ? (
@@ -438,19 +448,21 @@ export default function PayoutsScreen() {
              <View style={styles.settingsRow}>
                <Text style={styles.settingsLabel}>Method</Text>
                <Text style={styles.settingsValue}>
-                 {connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
+                  {isPreview
+                    ? 'Not loaded'
+                    : connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
                </Text>
              </View>
              <View style={styles.settingsRow}>
                <Text style={styles.settingsLabel}>Schedule</Text>
                <Text style={styles.settingsValue}>
-                 {connectLoading ? 'Loading…' : scheduleLabel(connectStatus?.payoutSchedule ?? null)}
+                  {isPreview ? 'Not loaded' : connectLoading ? 'Loading…' : scheduleLabel(connectStatus?.payoutSchedule ?? null)}
                </Text>
              </View>
            </View>
 
            {/* Tax info status */}
-           {connectStatus?.connected && connectStatus.providerConfigured && (() => {
+            {!isPreview && connectStatus?.connected && connectStatus.providerConfigured && (() => {
              const cfg = taxInfoConfig(connectStatus.taxInfoStatus, theme);
              return (
                <View style={styles.settingsSection} testID="seller-payouts-tax-info">

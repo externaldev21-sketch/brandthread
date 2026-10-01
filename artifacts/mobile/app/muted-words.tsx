@@ -1,7 +1,7 @@
 /**
  * Muted words — hide comments and posts containing words, phrases, #hashtags
- * or @handles. Stored on the server so the filter applies on every device;
- * only the person who muted them is affected and authors aren't notified.
+ * or @handles. Guests save their list on this device; signed-in users sync
+ * their list through the account API.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -10,7 +10,8 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -18,6 +19,9 @@ import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorMessage } from '@/lib/safety';
+import {
+  addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord,
+} from '@/lib/guestMutedWords';
 import type { MutedWord } from '@/lib/safetyTypes';
 
 const MAX_LENGTH = 60;
@@ -27,9 +31,13 @@ export default function MutedWordsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const api = useApi();
   const inputRef = useRef<TextInput>(null);
+  const loadGeneration = useRef(0);
+  const loadedFor = useRef<string | null>(null);
+  const guestMode = authLoaded && !isSignedIn;
+  const canEdit = authLoaded;
 
   const [words, setWords] = useState<MutedWord[]>([]);
   const [limit, setLimit] = useState(200);
@@ -40,34 +48,69 @@ export default function MutedWordsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!authLoaded) return;
+    const generation = ++loadGeneration.current;
     setError(null);
-    try {
-      const result = await api.safety.mutedWords();
-      setWords(result.words);
-      setLimit(result.limit);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t load your muted words.'));
-    } finally {
-      setLoading(false);
+    // Signing in/out swaps the source of truth; never show the other
+    // identity's list while the new one loads.
+    const owner = guestMode ? 'guest' : 'account';
+    if (loadedFor.current !== owner) {
+      loadedFor.current = owner;
+      setWords([]);
+      setLoading(true);
     }
-  }, [api]);
+    try {
+      if (guestMode) {
+        const saved = await readGuestMutedWords();
+        if (loadGeneration.current === generation) {
+          setWords(saved);
+          setLimit(GUEST_MUTED_WORD_LIMIT);
+        }
+        return;
+      }
+      const result = await api.safety.mutedWords();
+      if (loadGeneration.current === generation) {
+        setWords(result.words);
+        setLimit(result.limit);
+      }
+    } catch (err) {
+      if (loadGeneration.current === generation) {
+        setError(guestMode && err instanceof Error ? err.message : apiErrorMessage(err, 'We couldn’t load your muted words.'));
+      }
+    } finally {
+      if (loadGeneration.current === generation) setLoading(false);
+    }
+  }, [api, authLoaded, guestMode]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { loadGeneration.current += 1; };
+  }, [load]));
 
   async function add(raw: string) {
     const phrase = raw.trim();
-    if (!phrase || saving) return;
+    if (!canEdit || !phrase || saving) return;
     setSaving(true);
     setError(null);
+    const generation = loadGeneration.current;
     try {
-      const created = await api.safety.muteWord(phrase);
+      if (guestMode) {
+        const saved = await addGuestMutedWord(phrase);
+        if (loadGeneration.current === generation) setWords(saved);
+      } else {
+        const created = await api.safety.muteWord(phrase);
+        if (loadGeneration.current === generation) {
+          setWords((prev) => prev.some((w) => w.phrase === created.phrase)
+            ? prev
+            : [...prev, { phrase: created.phrase, createdAt: created.createdAt }].sort((a, b) => a.phrase.localeCompare(b.phrase)));
+        }
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setWords((prev) => prev.some((w) => w.phrase === created.phrase)
-        ? prev
-        : [...prev, { phrase: created.phrase, createdAt: created.createdAt }].sort((a, b) => a.phrase.localeCompare(b.phrase)));
-      setDraft('');
+      if (loadGeneration.current === generation) setDraft('');
     } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t mute that word. Try again.'));
+      if (loadGeneration.current === generation) {
+        setError(guestMode && err instanceof Error ? err.message : apiErrorMessage(err, 'We couldn’t mute that word. Try again.'));
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setSaving(false);
@@ -75,14 +118,23 @@ export default function MutedWordsScreen() {
   }
 
   async function remove(phrase: string) {
+    if (!canEdit) return;
     setRemoving(phrase);
     setError(null);
+    const generation = loadGeneration.current;
     try {
-      await api.safety.unmuteWord(phrase);
+      if (guestMode) {
+        const saved = await removeGuestMutedWord(phrase);
+        if (loadGeneration.current === generation) setWords(saved);
+      } else {
+        await api.safety.unmuteWord(phrase);
+        if (loadGeneration.current === generation) setWords((prev) => prev.filter((w) => w.phrase !== phrase));
+      }
       Haptics.selectionAsync();
-      setWords((prev) => prev.filter((w) => w.phrase !== phrase));
     } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t unmute that word. Try again.'));
+      if (loadGeneration.current === generation) {
+        setError(guestMode && err instanceof Error ? err.message : apiErrorMessage(err, 'We couldn’t unmute that word. Try again.'));
+      }
     } finally {
       setRemoving(null);
     }
@@ -97,10 +149,12 @@ export default function MutedWordsScreen() {
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
         <Text style={s.lead}>
-          Comments and posts that contain these words are hidden from you everywhere on Brandthread. Nobody is notified.
+          {guestMode
+            ? 'Posts in your feed and comments with these words are hidden on this device. Nobody is notified.'
+            : 'Comments and posts that contain these words are hidden from you everywhere on Brandthread. Nobody is notified.'}
         </Text>
 
-        <View style={[s.inputShell, atLimit && { opacity: 0.5 }]}>
+        <View style={[s.inputShell, (!canEdit || atLimit) && { opacity: 0.5 }]}>
           <Feather name="plus" size={18} color={theme.muted} />
           <TextInput
             ref={inputRef}
@@ -113,13 +167,13 @@ export default function MutedWordsScreen() {
             autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={() => add(draft)}
-            editable={!atLimit}
+            editable={canEdit && !atLimit}
             accessibilityLabel="Word or phrase to mute"
             maxLength={MAX_LENGTH}
           />
           <PressableScale
             onPress={() => add(draft)}
-            disabled={!draft.trim() || saving || atLimit}
+            disabled={!canEdit || !draft.trim() || saving || atLimit}
             style={[s.addBtn, (!draft.trim() || atLimit) && { opacity: 0.35 }]}
             accessibilityRole="button"
             accessibilityLabel="Mute"
@@ -143,7 +197,7 @@ export default function MutedWordsScreen() {
             <Text style={s.sectionLabel}>SUGGESTIONS</Text>
             <View style={s.chips}>
               {available.map((suggestion) => (
-                <PressableScale key={suggestion} style={s.suggestion} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
+                <PressableScale key={suggestion} style={[s.suggestion, !canEdit && { opacity: 0.5 }]} disabled={!canEdit} onPress={() => add(suggestion)} accessibilityRole="button" accessibilityLabel={`Mute ${suggestion}`}>
                   <Feather name="plus" size={12} color={theme.muted} />
                   <Text style={s.suggestionText}>{suggestion}</Text>
                 </PressableScale>

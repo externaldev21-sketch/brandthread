@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSegments, type Tabs } from 'expo-router';
 import Animated, {
   Easing,
@@ -19,9 +19,9 @@ import {
 } from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
-import { TabBarGlassZone } from './TabBarGlassZone';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
+import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 
 // Smooth ease-out, no bounce/overshoot — this round's explicit spec for the
 // compact <-> regular capsule transition (superseding the earlier SHEET_EASING/
@@ -108,6 +108,7 @@ const BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'create-post',
   'buyer-story-create',
   'buyer-story-viewer',
+  'story-mention-viewer',
   'buyer-live',
   'live-feed',
   'live',
@@ -127,7 +128,6 @@ export function BuyerTabBar({
   const compactMetrics = useBuyerTabBarMetrics(1, 'compact');
   const { theme } = useAppTheme();
   const activityUnread = useActivityUnreadCount();
-  const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
 
   const activeRoute = state.routes[state.index]?.name ?? 'index';
@@ -142,7 +142,9 @@ export function BuyerTabBar({
   // doc above for why this can't be read from `state`/`activeRoute`.
   const segments = useSegments();
   const firstSegment = (segments[0] as string | undefined) ?? '';
-  const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
+  // Also slides away for any screen with a bottom composer (useHideTabBar).
+  const hiddenByScreen = useTabBarHiddenByScreen();
+  const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment) || hiddenByScreen;
 
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the tabPress event and the screen swap — see the hook's doc.
@@ -172,21 +174,6 @@ export function BuyerTabBar({
     },
     [reducedMotion],
   );
-
-  // TabBarGlassZone isn't a Reanimated-aware component (its native path
-  // renders several plain BlurView bands, its web path a CSS mask) — its
-  // `height` prop can only be updated from JS, which used to happen via a
-  // per-frame useAnimatedReaction + runOnJS (~16 React re-renders across the
-  // transition, on the same JS thread mounting the destination screen). Set
-  // once, straight to the target, instead — a same-tick snap rather than a
-  // gradual sync, trading a barely-visible seam on the glass strip's own top
-  // edge for zero per-frame JS work.
-  const [barTopInset, setBarTopInset] = React.useState(
-    isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset,
-  );
-  React.useEffect(() => {
-    setBarTopInset(isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset);
-  }, [isCompact, compactMetrics.barTopInset, regularMetrics.barTopInset]);
 
   // Capsule/circle scale factors, in "regular -> compact" ratio form so the
   // capsule and circle can each be rendered at a FIXED (regular) layout size
@@ -326,30 +313,6 @@ export function BuyerTabBar({
         slideStyle,
       ]}
     >
-      {/* Frosted glass over whatever's actually rendered behind the bar —
-          the feed's full-bleed video, or an ordinary scrolling list on
-          Discover/Inbox/Activity/Profile. `BuyerTabBar` is the one shared
-          tab-bar container mounted for the whole buyer navigator (see
-          app/(buyer)/_layout.tsx's `tabBar` prop), so rendering it here
-          once — instead of each screen wiring its own copy — is what gets
-          every one of those screens the same live-sampled treatment
-          automatically, feed included.
-          `bar`'s own coordinate origin is already offset by
-          `metrics.bottomOffset` from the true screen bottom (see the
-          `bottom` set on `styles.bar` above), so this needs the negative
-          of that same offset to actually reach the screen's bottom edge —
-          a plain `bottom: 0` would stop short by exactly that offset and
-          leave a hard, unblurred edge below the glass. The height is
-          `barTopInset` (not the more generous `occupiedHeight`) so the
-          glass's own top edge lands exactly on the bar's top pixel, with
-          no gap of sharp content between them. */}
-      <TabBarGlassZone
-        height={barTopInset}
-        width={width}
-        tint="dark"
-        style={{ bottom: -metrics.bottomOffset }}
-      />
-
       {/* ── Capsule ─────────────────────────────────────────────────────── */}
       {/* Fixed at its regular layout size always — `capsuleAnimatedStyle`
           resizes it purely via `transform: scale`, so this box (and the

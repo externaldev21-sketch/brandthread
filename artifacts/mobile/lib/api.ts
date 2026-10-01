@@ -20,6 +20,20 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+
+import type {
+  Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
+  CommunityMessage, CommunityMessagesPage, CommunityReaction, CreateCommunityInput, UpdateCommunityInput,
+} from '@/lib/communities/types';
+
+function communityQuery(params: { q?: string; offset?: number }): string {
+  const q = new URLSearchParams();
+  if (params.q?.trim()) q.set('q', params.q.trim());
+  if (params.offset) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return qs ? `?${qs}` : '';
+}
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -761,6 +775,16 @@ export interface ShopifyImportJob {
   createdAt: string;
   updatedAt: string;
 }
+export interface WatchedVideo {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorAccountType: 'buyer' | 'seller';
+  caption: string;
+  thumbnailUrl: string | null;
+  watchedAt: string;
+}
+
 export interface PostAnalyticsResponse {
   post: {
     id: string;
@@ -970,6 +994,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
+      /** Ship part of an order: tracking for just these items (409 AUTO_REFUNDED on a refunded order). */
+      addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
+        patch(`/api/orders/${id}/items-tracking`, body),
       updateTracking: (id: string, body: {
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
@@ -1420,6 +1447,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
         get:    (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
+        /** "I received it": marks the order delivered (idempotent). 409 NOT_SHIPPED | ALREADY_REFUNDED. */
+        confirmReceipt: (id: string) => post<{ delivery: unknown }>(
+          `/api/buyer/orders/${encodeURIComponent(id)}/confirm-receipt`, {}
+        ),
         /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
         cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
@@ -1562,6 +1593,73 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         del<{ ok: boolean }>(
           `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
         ),
+    },
+    /** Topic group chats ("Graphic Design Community"). Use via lib/communities/useCommunityClient. */
+    communities: {
+      /** Signed-out safe: official + public groups, read-only. */
+      publicList: (params: { q?: string; offset?: number } = {}) =>
+        freshGet<{ communities: Community[]; nextOffset: number | null }>(
+          `/api/communities/public${communityQuery(params)}`,
+        ),
+      list: (params: { q?: string; offset?: number } = {}) =>
+        freshGet<{ communities: Community[]; nextOffset: number | null }>(`/api/communities${communityQuery(params)}`),
+      mine: () => quietGet<Community[]>('/api/communities/mine'),
+      get: (id: string) => freshGet<Community>(`/api/communities/${encodeURIComponent(id)}`),
+      create: (body: CreateCommunityInput) => post<Community>('/api/communities', body),
+      update: (id: string, body: UpdateCommunityInput) => patch<Community>(`/api/communities/${encodeURIComponent(id)}`, body),
+      remove: (id: string) => del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}`),
+      join: (id: string) => post<Community>(`/api/communities/${encodeURIComponent(id)}/join`, {}),
+      joinByCode: (code: string) =>
+        post<{ status: 'joined' | 'requested'; community?: Community }>('/api/communities/join-by-code', { code }),
+      invitePreview: (code: string) =>
+        freshGet<CommunityInvitePreview>(`/api/communities/invite/${encodeURIComponent(code)}`),
+      leave: (id: string) => post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/leave`, {}),
+      setMuted: (id: string, muted: boolean) =>
+        patch<{ muted: boolean }>(`/api/communities/${encodeURIComponent(id)}/mute`, { muted }),
+      markRead: (id: string, seq?: number) =>
+        patch<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/read`, seq === undefined ? {} : { seq }),
+      invite: (id: string) => freshGet<{ code: string; url: string }>(`/api/communities/${encodeURIComponent(id)}/invite`),
+      resetInvite: (id: string) => post<{ code: string; url: string }>(`/api/communities/${encodeURIComponent(id)}/invite/reset`, {}),
+      members: (id: string, params: { q?: string; offset?: number } = {}) =>
+        freshGet<{ memberCount: number; members: CommunityMember[]; nextOffset: number | null }>(
+          `/api/communities/${encodeURIComponent(id)}/members${communityQuery(params)}`,
+        ),
+      removeMember: (id: string, userId: string) =>
+        del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`),
+      banMember: (id: string, userId: string) =>
+        post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/ban`, {}),
+      unban: (id: string, userId: string) =>
+        del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/bans/${encodeURIComponent(userId)}`),
+      bans: (id: string) =>
+        freshGet<{ userId: string; name: string; bannedAt: string }[]>(`/api/communities/${encodeURIComponent(id)}/bans`),
+      setRole: (id: string, userId: string, role: 'admin' | 'member' | 'owner') =>
+        patch<{ ok: boolean; role: string }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/role`, { role }),
+      requests: (id: string) => freshGet<CommunityJoinRequest[]>(`/api/communities/${encodeURIComponent(id)}/requests`),
+      approveRequest: (id: string, userId: string) =>
+        post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/requests/${encodeURIComponent(userId)}/approve`, {}),
+      denyRequest: (id: string, userId: string) =>
+        post<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/requests/${encodeURIComponent(userId)}/deny`, {}),
+      messages: (id: string, params: { before?: number; after?: number; limit?: number } = {}) => {
+        const q = new URLSearchParams();
+        if (params.before !== undefined) q.set('before', String(params.before));
+        if (params.after !== undefined) q.set('after', String(params.after));
+        if (params.limit !== undefined) q.set('limit', String(params.limit));
+        const qs = q.toString();
+        return freshGet<CommunityMessagesPage>(`/api/communities/${encodeURIComponent(id)}/messages${qs ? `?${qs}` : ''}`);
+      },
+      send: (id: string, body: { text?: string; attachments?: CommunityAttachment[]; replyToId?: string }) =>
+        post<CommunityMessage>(`/api/communities/${encodeURIComponent(id)}/messages`, body),
+      deleteMessage: (id: string, messageId: string) =>
+        del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`),
+      react: (id: string, messageId: string, reactionType: string) =>
+        put<{ reactions: CommunityReaction[] }>(
+          `/api/communities/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/reactions`, { reactionType }),
+      unreact: (id: string, messageId: string) =>
+        del<{ reactions: CommunityReaction[] }>(
+          `/api/communities/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/reactions`),
+      /** Image moderation runs here (gore/violence/nudity) — a rejected photo throws ApiError(422, code IMAGE_REJECTED). */
+      uploadPhoto: (body: { data: string; mimeType: string }) =>
+        post<{ url: string }>('/api/communities/upload-photo', body),
     },
     /** Brandthread Agent — the official AI friend account's chat backend. */
     brandthreadAgent: {
@@ -2060,6 +2158,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList: (ownerId?: string) =>
         get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),
+      watchedVideos: (cursor?: string) =>
+        freshGet<{ items: WatchedVideo[]; nextCursor: string | null }>(
+          `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+        ),
+      recordWatchedVideo: (id: string) =>
+        post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}),
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
@@ -2134,10 +2238,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           userId: string; name: string; username: string | null;
           displayName: string | null; bio: string | null; avatarUrl: string | null;
           accountType: string; initials: string; color: string; handle: string;
-          followersCount: number; followingCount: number; postsCount: number;
+          followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
+      /** Posts where someone tagged this profile (the profile "Tagged" tab). */
+      tagged: (userId: string, limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/tagged?limit=${limit}&offset=${offset}`),
       profilePosts: (userId: string, limit = 30, offset = 0) =>
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
       friendActivity: (limit = 30, offset = 0) =>
@@ -2179,7 +2286,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         authorColor?: string; authorAccountType?: string;
         media: any[]; repliesDisabled?: boolean;
         privacy?: { visibility?: string; replyPermission?: string };
+        /** Reshare of a story that tagged me ("Add to your story"). */
+        originalStoryId?: string;
       }) => post<any>('/api/social/stories', body),
+      /** People picker for the @mention sticker: people I follow first, then everyone. */
+      mentionSearch: (q: string, limit = 20) =>
+        get<MentionPerson[]>(`/api/social/mention-search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      /** Activity "Story mentions" rail: active (<24h) stories that tagged me, newest first. */
+      storyMentions: () =>
+        freshGet<{ items: StoryMentionItem[]; unseenCount: number }>('/api/social/stories/mentions'),
+      /** One story, if I'm the author, tagged, or a follower. 404 { code: 'STORY_UNAVAILABLE' } otherwise. */
+      storyById: (storyId: string) =>
+        get<Story>(`/api/social/stories/${encodeURIComponent(storyId)}`),
+      /** "Not now" on a story that tagged me. */
+      dismissStoryMention: (storyId: string) =>
+        post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/mention-dismiss`, {}),
+      /**
+       * Find/create the conversation for replying to a mention story. The
+       * server routes it to the main inbox or Requests; send the message into
+       * `conversationId` with the normal messages endpoint.
+       */
+      storyMentionReplyConversation: (storyId: string) =>
+        post<{ conversationId: string; route: 'inbox' | 'requests'; isRequest: boolean; requestedBy: string | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/mention-reply`, {}),
       /** My active stories */
       myStories: () => get<any[]>('/api/social/stories/me'),
       /** Another user's active stories — visible to that author's followers only */

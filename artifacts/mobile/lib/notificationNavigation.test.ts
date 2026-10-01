@@ -132,10 +132,34 @@ describe('notification response navigation', () => {
     ]);
   });
 
+  it('opens a story mention push in the mention viewer and a reshare push in the story viewer', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('sm-1', { targetType: 'story', targetId: 's7', type: 'story_mention' }));
+    handler(targetResponse('sr-1', { targetType: 'story', targetId: 's8', type: 'story_reshare' }));
+    expect(router.push.mock.calls.map((call) => call[0])).toEqual([
+      '/story-mention-viewer?storyId=s7',
+      '/buyer-story-viewer?storyId=s8&allStoryIds=s8',
+    ]);
+  });
+
   it('routes a payout notification to the payouts screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
     handler(targetResponse('payout-1', { targetType: 'payout', targetId: 'po_123' }));
     expect(router.push).toHaveBeenCalledWith('/payouts');
+  });
+
+  it('opens a community message push in the community chat, never a DM', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('c1', { type: 'community_message', targetType: 'community', targetId: 'g1', communityId: 'g1' }));
+    handler(targetResponse('c2', { targetType: 'community', targetId: 'g 2' }));
+    handler(targetResponse('c3', { type: 'community_message', communityId: 'g3' }));
+    expect(router.push.mock.calls.map(([href]) => href)).toEqual([
+      '/community-chat?id=g1',
+      '/community-chat?id=g%202',
+      '/community-chat?id=g3',
+    ]);
   });
 });

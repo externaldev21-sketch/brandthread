@@ -275,8 +275,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm,
   },
   iconBtn: {
-    width: ICON.xl + SP.sm,
-    height: ICON.xl + SP.sm,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

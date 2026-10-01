@@ -15,26 +15,33 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { PressableScale, StatusBadge } from '@/components/BrandthreadUI';
+import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
-import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import {
+  acceptSellerConversationRequest, scheduleDeleteSellerConversationRequest,
+  undoDeleteSellerConversationRequest, blockSellerConversationRequestUser,
+} from '@/lib/sellerRequestActions';
+import { DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import Composer from '@/components/ui/Composer';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
-import { confirmUnblock } from '@/lib/safety';
+import { confirmUnblock, apiErrorMessage, apiErrorCode, BLOCK_EXPLAINER } from '@/lib/safety';
 import {
   BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
@@ -89,6 +96,14 @@ interface ConvView {
    *  GET /api/conversations/:id (see PATCH .../typing). Undefined for a
    *  seeded preview thread (no real backend to poll). */
   otherTyping?: boolean;
+  /** New every-role-pair DM/message-request routing — true while this
+   *  thread is a pending request (see app/(buyer)/inbox.tsx's identical
+   *  field and artifacts/api-server/src/routes/conversations.ts). */
+  isRequest?: boolean;
+  /** Who started the request — same value for both participants (it's a
+   *  conversation-level column); the CURRENT viewer is the sender iff this
+   *  equals their own id (effectiveMyId). */
+  requestedBy?: string;
 }
 interface MsgAttachment {
   type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system' | 'thread_cash';
@@ -255,6 +270,10 @@ export default function SellerConversationScreen() {
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  // Request mode (Accept/Delete/Block panel) — see isRequestMode below.
+  const [requestActionLoading, setRequestActionLoading] = useState(false);
+  const textInputRef = useRef<TextInput>(null);
+  const { showUndo } = useUndoToast();
   // Item 68 (chat reactions glass) — long-pressed message + its measured
   // on-screen position, feeding the shared ReactionOverlay (see
   // app/buyer-conversation.tsx's identical pattern).
@@ -264,6 +283,9 @@ export default function SellerConversationScreen() {
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
   const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
+  // <Composer/> hides the tab bar itself; keep it hidden while the recording
+  // bar temporarily replaces the composer.
+  useHideTabBar(voiceRecorder.phase !== 'idle');
 
   // Attachment state
   const [pendingAttachment, setPendingAttachment] = useState<MsgAttachment | null>(null);
@@ -358,9 +380,22 @@ export default function SellerConversationScreen() {
         loadMessages(generation),
       ]);
       if (generationRef.current !== generation) return;
-      setConv(c as ConvView);
+      const convView = c as ConvView;
+      setConv(convView);
       const safety = (c as { messaging?: DmMessagingState }).messaging;
       setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
+      // Mark the thread as read once we know it isn't a pending request —
+      // per the Instagram-style request flow (same rule
+      // app/buyer-conversation.tsx already follows), the sender of a
+      // pending request must not see a read receipt until the RECIPIENT
+      // actually accepts it. A seller who is the recipient here still gets
+      // this the moment the thread loads, same as before; only the
+      // isRequest case is now deferred to handleAcceptRequest below.
+      if (!convView.isRequest) {
+        api.conversations.markRead(id).catch(() => {
+          notifyConversationReadFailure(id);
+        });
+      }
     } catch (e) {
       console.error('Failed to load conversation', e);
     } finally {
@@ -371,14 +406,6 @@ export default function SellerConversationScreen() {
   useFocusEffect(useCallback(() => {
     const generation = ++generationRef.current;
     consecutiveFailuresRef.current = 0;
-    // Mark the thread as read as soon as it opens. This is intentionally
-    // independent of loading the conversation/messages so a slow or failed
-    // read request cannot leave the seller's inbox badge stale.
-    if (id && !isSellerPreviewConversationId(id)) {
-      api.conversations.markRead(id).catch(() => {
-        notifyConversationReadFailure(id);
-      });
-    }
     loadAll(generation);
     pollRef.current = setInterval(() => loadMessages(generation), 15_000);
     return () => {
@@ -491,12 +518,21 @@ export default function SellerConversationScreen() {
   const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
-  const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
-  // Whether the composer actually has something to send — drives whether
-  // the send button shows at all (see the input row below), independent of
-  // `canSend`'s isSending/id gating so the button doesn't flicker away
-  // mid-send.
-  const hasComposerContent = text.trim().length > 0 || pendingAttachment != null;
+  // New every-role-pair DM/message-request routing: `conv.isRequest` and
+  // `requestedBy` are the same for every viewer (conversation-level, not
+  // per-viewer) — the current seller is the one who SENT it iff
+  // `requestedBy` equals their own id, same test
+  // app/buyer-conversation.tsx's isRequestMode should also make (see this
+  // screen's isRequestMode/isRequestSender comment below for why only the
+  // recipient sees the Accept/Delete/Block panel).
+  const isRequestMode = conv?.isRequest === true;
+  const isRequestSender = isRequestMode && conv?.requestedBy === effectiveMyId;
+  // The server only blocks the RECIPIENT of a pending request from replying
+  // (POST /api/conversations/:id/messages → 403 REQUEST_NOT_ACCEPTED) — the
+  // sender can keep messaging freely while it's pending, so composer send
+  // is only disabled for the recipient side of isRequestMode.
+  const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id
+    && !(isRequestMode && !isRequestSender);
   // Seen receipt: id of MY (the seller's) most recent message in this
   // thread — "Seen" only ever renders under that one message. See
   // lib/chatGrouping.ts's doc comment on the real, honest granularity this
@@ -613,6 +649,68 @@ export default function SellerConversationScreen() {
     hapticPrimaryAction();
     setShowBuyerContext(true);
     if (buyerOrders === null && !loadingBuyerOrders) void loadBuyerOrders();
+  }
+
+  // ── Request mode: accept / delete / block ───────────────────────────────
+  // Only reachable by the RECIPIENT of a pending request (isRequestMode &&
+  // !isRequestSender) — see app/buyer-conversation.tsx's identical trio,
+  // through lib/sellerRequestActions.ts's preview-aware wrappers instead of
+  // lib/requestActions.ts's buyer ones.
+
+  async function handleAcceptRequest() {
+    if (!id || !conv || requestActionLoading) return;
+    hapticPrimaryAction();
+    setRequestActionLoading(true);
+    const previousConv = conv;
+    try {
+      await acceptSellerConversationRequest(id, api);
+      hapticSuccessAction();
+      setConv({ ...previousConv, isRequest: false });
+      // Composer takes the bottom panel's place the instant isRequestMode
+      // flips false — hand it the keyboard right away, matching
+      // app/buyer-conversation.tsx's identical accept flow.
+      setTimeout(() => textInputRef.current?.focus(), 50);
+    } catch (e) {
+      // Roll back: the panel stays up and Accept is tappable again.
+      setConv(previousConv);
+      Alert.alert('Couldn’t accept request', apiErrorMessage(e, 'Please check your connection and try again.'));
+    } finally {
+      setRequestActionLoading(false);
+    }
+  }
+
+  function handleDeleteRequest() {
+    if (!id) return;
+    hapticDestructiveConfirm();
+    const conversationId = id;
+    const name = displayName;
+    scheduleDeleteSellerConversationRequest(conversationId, api);
+    showUndo({
+      message: `Deleted request from ${name}`,
+      undo: () => undoDeleteSellerConversationRequest(conversationId),
+      // Match the toast's own visible window to the real undo grace period
+      // — see the same fix (and its doc comment) in
+      // app/(buyer)/inbox.tsx's deleteRequestConversation.
+      durationMs: DELETE_GRACE_MS,
+    });
+    goBackOr(router);
+  }
+
+  async function handleBlockRequest() {
+    if (!id || !other) return;
+    const confirmed = await confirmDestructiveActionSheet({
+      title: `Block ${other.name}?`,
+      message: BLOCK_EXPLAINER,
+      confirmLabel: 'Block',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockSellerConversationRequestUser(id, other);
+      goBackOr(router);
+    } catch (e) {
+      Alert.alert('Couldn’t block', apiErrorMessage(e, 'Please check your connection and try again.'));
+    }
   }
 
   // Theme system line's "Change" — reopens the picker directly.
@@ -978,14 +1076,22 @@ export default function SellerConversationScreen() {
       });
       setMessages((prev) => [...prev, msg as Msg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-    } catch (e: any) {
-      const raw = String(e?.message ?? '');
-      const friendly = raw.includes('MODERATED')
-        ? 'This message was flagged by safety filters and was not sent.'
-        : raw.includes('BLOCKED')
-          ? "You can't message this buyer."
-          : 'Message not sent. Tap to retry.';
-      Alert.alert('Not sent', friendly);
+    } catch (e) {
+      // REQUEST_NOT_ACCEPTED (403): the buyer's request was actually still
+      // pending server-side even though this screen's own `conv.isRequest`
+      // said otherwise — e.g. accepted from another device mid-race, or a
+      // stale load right after the request landed. Same structured-error
+      // presentation every other guard on this screen uses (BLOCKED,
+      // BLOCKED_BY_ME, SELLER_ON_VACATION, …): the server's own message is
+      // already a short, honest sentence, so it's surfaced as-is via
+      // apiErrorMessage rather than a raw/ugly fallback — and the local
+      // isRequest flag is corrected so the composer swaps to the real
+      // Accept/Delete/Block panel instead of staying live to 403 again on
+      // retry.
+      if (apiErrorCode(e) === 'REQUEST_NOT_ACCEPTED') {
+        setConv((prev) => (prev ? { ...prev, isRequest: true } : prev));
+      }
+      Alert.alert('Not sent', apiErrorMessage(e, 'Message not sent. Tap to retry.'));
       setText(t);
       setPendingAttachment(att);
       setReplyTo(replyingTo);
@@ -1361,6 +1467,57 @@ export default function SellerConversationScreen() {
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
+  const pendingAttachmentChip = pendingAttachment && (() => {
+        const uploadingMedia = pendingAttachment.meta?.uploading === 'true';
+        const isMedia = pendingAttachment.type === 'image' || pendingAttachment.type === 'video';
+        return (
+        <View style={s.pendingAttachRow} testID="seller-conversation-selected-attachment">
+          {isMedia ? (
+            <MediaUploadThumb
+              type={pendingAttachment.type as 'image' | 'video'}
+              uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
+              uploading={uploadingMedia}
+              size={40}
+              ringColor={PURPLE}
+              iconColor={MUTED}
+              trackColor={BORDER}
+            />
+          ) : isUploading ? (
+            <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
+          ) : (
+            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+          )}
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.pendingAttachTitle} numberOfLines={1}>
+              {uploadingMedia ? 'Uploading…' : pendingAttachment.title}
+            </Text>
+            {pendingAttachment.subtitle ? (
+              <Text style={s.pendingAttachSub} numberOfLines={1}>{pendingAttachment.subtitle}</Text>
+            ) : null}
+          </View>
+          <PressableScale
+            onPress={() => { mediaUploadTokenRef.current++; setPendingAttachment(null); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
+            testID="seller-conversation-selected-attachment-remove"
+          >
+            <Feather name="x" size={ICON.sm} color={MUTED} />
+          </PressableScale>
+        </View>
+        );
+      })();
+
+  const replyBanner = replyTo && !messagingBlocked && !(isRequestMode && !isRequestSender) && (
+        <ReplyBanner
+          testID="seller-conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
+      );
+
   return (
     <KeyboardAvoidingView
       style={s.root}
@@ -1480,6 +1637,42 @@ export default function SellerConversationScreen() {
         </View>
       </View>
 
+      {/* Request-mode profile header — RECIPIENT view only (a seller who
+          sent the request keeps the ordinary composer plus the "Sent as a
+          request" indicator below; only whoever is reviewing an incoming
+          request gets this bigger lead-in). Mirrors
+          app/buyer-conversation.tsx's identical requestProfileHeader. */}
+      {isRequestMode && !isRequestSender && other && (
+        <View style={s.requestProfileHeader} testID="seller-conversation-request-profile-header">
+          <View style={[s.requestProfileAvatar, { backgroundColor: other.color || PURPLE }]}>
+            <Text style={s.requestProfileAvatarInitials}>
+              {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+            </Text>
+          </View>
+          <Text style={s.requestProfileName} numberOfLines={1}>{other.name}</Text>
+          {!!other.handle && (
+            <Text style={s.requestProfileHandle} numberOfLines={1}>{other.handle}</Text>
+          )}
+          <PressableScale
+            style={s.requestProfilePill}
+            onPress={() => {
+              hapticPrimaryAction();
+              const qs = new URLSearchParams({
+                userId: other.userId, name: other.name,
+                handle: other.handle ?? '', initials: other.initials ?? '',
+                color: other.color ?? PURPLE,
+              });
+              router.push(('/buyer-other-profile?' + qs.toString()) as never);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${other.name}'s profile`}
+            testID="seller-conversation-request-view-profile"
+          >
+            <Text style={s.requestProfilePillText}>View profile</Text>
+          </PressableScale>
+        </View>
+      )}
+
       {/* Order context card */}
       {conv?.contextOrderNumber ? (
         <View style={s.orderCard}>
@@ -1529,63 +1722,36 @@ export default function SellerConversationScreen() {
         />
       )}
 
-      {/* Pending attachment preview */}
-      {pendingAttachment && (() => {
-        const uploadingMedia = pendingAttachment.meta?.uploading === 'true';
-        const isMedia = pendingAttachment.type === 'image' || pendingAttachment.type === 'video';
-        return (
-        <View style={s.pendingAttachRow} testID="seller-conversation-selected-attachment">
-          {isMedia ? (
-            <MediaUploadThumb
-              type={pendingAttachment.type as 'image' | 'video'}
-              uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
-              uploading={uploadingMedia}
-              size={40}
-              ringColor={PURPLE}
-              iconColor={MUTED}
-              trackColor={BORDER}
-            />
-          ) : isUploading ? (
-            <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
-          ) : (
-            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
-          )}
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.pendingAttachTitle} numberOfLines={1}>
-              {uploadingMedia ? 'Uploading…' : pendingAttachment.title}
-            </Text>
-            {pendingAttachment.subtitle ? (
-              <Text style={s.pendingAttachSub} numberOfLines={1}>{pendingAttachment.subtitle}</Text>
-            ) : null}
-          </View>
-          <PressableScale
-            onPress={() => { mediaUploadTokenRef.current++; setPendingAttachment(null); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
-            testID="seller-conversation-selected-attachment-remove"
-          >
-            <Feather name="x" size={ICON.sm} color={MUTED} />
-          </PressableScale>
-        </View>
-        );
-      })()}
 
-      {/* Reply preview — mirrors app/buyer-conversation.tsx's own
-          ReplyBanner (Mobbin: Instagram "Replying to a message",
-          mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). */}
-      {replyTo && !messagingBlocked && (
-        <ReplyBanner
-          testID="seller-conversation-reply-banner"
-          theme={theme}
-          fromName={replyTo.fromName}
-          previewText={messagePreviewText(replyTo)}
-          onCancel={() => setReplyTo(null)}
-        />
+
+      {/* "Sent as a request" — the SENDER's own view of a pending request
+          thread (Dev's rule 3): the seller keeps the ordinary composer (the
+          server only blocks the recipient from replying), but sees this
+          short indicator instead of the Accept/Delete/Block panel below,
+          which only the recipient gets. */}
+      {isRequestSender && !messagingBlocked && (
+        <View style={s.sentRequestBanner} testID="seller-conversation-sent-request-banner">
+          <Feather name="clock" size={ICON.sm} color={MUTED} />
+          <Text style={s.sentRequestBannerText}>
+            Sent as a message request — {displayName} hasn't accepted it yet
+          </Text>
+        </View>
       )}
 
-      {/* Input row */}
-      {messagingBlocked && other ? (
+      {/* Input row — request mode replaces the composer entirely with the
+          accept/block/delete bottom panel for the RECIPIENT only (see
+          SellerRequestActionPanel below); the sender keeps the ordinary
+          composer plus the "Sent as a request" banner above. */}
+      {isRequestMode && !isRequestSender && other ? (
+        <SellerRequestActionPanel
+          name={other.name}
+          bottomInset={insets.bottom}
+          loading={requestActionLoading}
+          onAccept={handleAcceptRequest}
+          onDelete={handleDeleteRequest}
+          onBlock={handleBlockRequest}
+        />
+      ) : messagingBlocked && other ? (
         <BlockedComposer
           counterpartName={other.name}
           messaging={messaging}
@@ -1597,8 +1763,9 @@ export default function SellerConversationScreen() {
           }}
         />
       ) : (
-      <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
-        {voiceRecorder.phase !== 'idle' ? (
+      voiceRecorder.phase !== 'idle' ? (
+        <View style={[s.voiceBarWrap, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+          {pendingAttachmentChip}
           <VoiceRecordingBar
             theme={theme}
             phase={voiceRecorder.phase}
@@ -1615,56 +1782,62 @@ export default function SellerConversationScreen() {
             onLock={voiceRecorder.lock}
             onSend={() => { void voiceRecorder.finish(); }}
           />
-        ) : (<>
-        {/* Attach button */}
-        <PressableScale
-          style={s.attachBtn}
-          onPress={() => { hapticPrimaryAction(); openAttachPicker(); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Attach"
-        >
-          <Feather name="paperclip" size={ICON.md} color={pendingAttachment ? PURPLE : MUTED} />
-        </PressableScale>
-
-        {/* Media — IG-style camera-circle trigger (Mobbin: Instagram DM
-            composer, mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7),
-            same treatment as app/buyer-conversation.tsx's camera-circle
-            attach button: a solid white circle with a black camera glyph.
-            Same action as before (opens the Photo/Video sheet), just a new
-            visual. */}
-        <PressableScale
-          style={s.cameraCircleBtn}
-          onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
-          disabled={isUploading || isSending}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Photo or video"
-        >
-          {isUploading
-            ? <ActivityIndicator size="small" color={ON_DARK} />
-            : <Feather name="camera" size={20} color={ON_DARK} />
+        </View>
+      ) : (
+        <Composer
+          testID="seller-conversation"
+          value={text}
+          onChangeText={handleChangeText}
+          onSend={() => { hapticPrimaryAction(); handleSend(); }}
+          canSend={canSend}
+          placeholder="Message…"
+          inputRef={textInputRef}
+          topSlot={<>{replyBanner}{pendingAttachmentChip}</>}
+          leftAccessory={
+            <PressableScale
+              style={s.cameraCircleBtn}
+              onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
+              disabled={isUploading || isSending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-attach"
+              accessibilityRole="button"
+              accessibilityLabel="Photo or video"
+            >
+              {isUploading
+                ? <ActivityIndicator size="small" color="#000000" />
+                : <Feather name="camera" size={18} color="#000000" />
+              }
+            </PressableScale>
           }
-        </PressableScale>
+          rightAccessory={<>
+            {/* Products / posts / files picker */}
+            <PressableScale
+              style={s.accBtn}
+              onPress={() => { hapticPrimaryAction(); openAttachPicker(); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-attach-picker"
+              accessibilityRole="button"
+              accessibilityLabel="Attach"
+            >
+              <Feather name="paperclip" size={20} color={pendingAttachment ? PURPLE : MUTED} />
+            </PressableScale>
 
-        {/* Voice */}
-        <PressableScale
-          style={s.attachBtn}
-          onPress={() => { void voiceRecorder.startWeb(); }}
-          disabled={isUploading || isSending}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="seller-conversation-mic"
-          accessibilityRole="button"
-          accessibilityLabel="Record voice message"
-        >
-          <Feather name="mic" size={ICON.md} color={MUTED} />
-        </PressableScale>
+            {/* Voice — tap-to-toggle on every platform (see docs/dm-flows.md) */}
+            <PressableScale
+              style={s.accBtn}
+              onPress={() => { void voiceRecorder.startWeb(); }}
+              disabled={isUploading || isSending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-mic"
+              accessibilityRole="button"
+              accessibilityLabel="Record voice message"
+            >
+              <Feather name="mic" size={20} color={MUTED} />
+            </PressableScale>
 
-        {/* Item 72 — same Thread Cash entry point as
-            app/buyer-conversation.tsx, works identically from the seller
-            side of a thread. Always rendered once the feature flag is on;
-            disabled with an explanation rather than hidden until mutual
-            follow is confirmed. */}
+            {/* Item 72 — same Thread Cash entry point as
+                app/buyer-conversation.tsx; disabled with an explanation
+                rather than hidden until mutual follow is confirmed. */}
         {threadCashSendEnabled && other?.userId ? (
           <ThreadCashAttachButton
             recipientId={other.userId}
@@ -1675,7 +1848,7 @@ export default function SellerConversationScreen() {
             disabledReason={threadCashDisabledReason}
             renderTrigger={(open) => (
               <PressableScale
-                style={s.attachBtn}
+                style={s.accBtn}
                 onPress={() => {
                   // Still checking mutual-follow status — silent no-op,
                   // never a "checking…" string (see the disabled state's
@@ -1693,7 +1866,7 @@ export default function SellerConversationScreen() {
                 accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
                 accessibilityState={{ disabled: threadCashMutual !== true }}
               >
-                <ThreadCashBillMark size={ICON.md} color={FG} accent={PURPLE} disabled={threadCashMutual !== true} />
+                <ThreadCashBillMark size={20} color={FG} accent={PURPLE} disabled={threadCashMutual !== true} />
               </PressableScale>
             )}
             onSent={async ({ transferId, amountCents, note }) => {
@@ -1739,50 +1912,9 @@ export default function SellerConversationScreen() {
             }}
           />
         ) : null}
-
-        <TextInput
-          style={[s.textInput, WEB_INPUT_RESET]}
-          value={text}
-          onChangeText={handleChangeText}
-          placeholder="Message…"
-          placeholderTextColor={SUBTLE}
-          multiline
-          returnKeyType="default"
-          onKeyPress={Platform.OS === 'web' ? (e: any) => {
-            // Web hardware-keyboard Enter sends; Shift+Enter still inserts
-            // a newline (native platforms use their own return-key
-            // handling and never see this multiline <textarea> key event,
-            // so this is web-only).
-            if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-              e.preventDefault();
-              hapticPrimaryAction();
-              handleSend();
-            }
-          } : undefined}
+          </>}
         />
-        {/* Send only appears once there's actually something to send —
-            matches app/buyer-conversation.tsx's mic⇄send morph condition
-            (showSendButton), instead of always showing a disabled send
-            button next to an empty input. */}
-        {hasComposerContent ? (
-          <PressableScale
-            style={[
-              s.sendBtn,
-              canSend
-                ? { backgroundColor: PURPLE, borderColor: PURPLE }
-                : { backgroundColor: CARD, borderColor: BORDER },
-            ]}
-            onPress={() => { hapticPrimaryAction(); handleSend(); }}
-            disabled={!canSend}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            activeOpacity={0.8}
-          >
-            <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
-          </PressableScale>
-        ) : null}
-        </>)}
-      </View>
+      )
       )}
 
       {/* ── Media picker sheet ─────────────────────────────────────────────── */}
@@ -2105,6 +2237,91 @@ export default function SellerConversationScreen() {
   );
 }
 
+// ─── Request-mode bottom panel ─────────────────────────────────────────────────
+// Seller-side mirror of app/buyer-conversation.tsx's RequestActionPanel —
+// same three-way row (Block / Delete / Accept, Accept the sole filled/
+// primary action), only reachable by the RECIPIENT of a pending request.
+function SellerRequestActionPanel({
+  name, bottomInset, loading, onAccept, onDelete, onBlock,
+}: {
+  name: string;
+  bottomInset: number;
+  loading: boolean;
+  onAccept: () => void;
+  onDelete: () => void;
+  onBlock: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const rs = requestPanelStyles;
+  return (
+    <View
+      style={[rs.wrap, { borderTopColor: theme.border, backgroundColor: theme.surface, paddingBottom: Math.max(bottomInset, SP.md) }]}
+      testID="seller-conversation-request-panel"
+    >
+      <Text style={[rs.title, { color: theme.text }]}>{name} wants to send you a message</Text>
+      <Text style={[rs.subline, { color: theme.muted }]}>
+        Accepting lets them see when you’ve read their messages and message you freely.
+      </Text>
+      <View style={rs.actionsRow}>
+        <PressableScale
+          style={rs.actionBtn}
+          onPress={onBlock}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Block ${name}`}
+          testID="seller-conversation-request-block"
+        >
+          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+        </PressableScale>
+        <PressableScale
+          style={rs.actionBtn}
+          onPress={onDelete}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete request from ${name}`}
+          testID="seller-conversation-request-delete"
+        >
+          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+        </PressableScale>
+        <PressableScale
+          style={[rs.actionBtn, { backgroundColor: theme.accent }]}
+          onPress={onAccept}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept message request from ${name}`}
+          testID="seller-conversation-request-accept"
+        >
+          {loading ? (
+            <ActivityIndicator color={theme.onAccent} size="small" />
+          ) : (
+            <Text style={[rs.actionText, { color: theme.onAccent }]}>Accept</Text>
+          )}
+        </PressableScale>
+      </View>
+    </View>
+  );
+}
+
+const requestPanelStyles = StyleSheet.create({
+  wrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    gap: SP.xs,
+  },
+  title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
+  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  actionsRow: { flexDirection: 'row', gap: SP.sm },
+  actionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+});
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
@@ -2161,6 +2378,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerCenter: { flex: 1, minWidth: 0 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flexShrink: 1, minWidth: 0 },
   headerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
+
+  // Request-mode profile header (avatar / name / @handle / "View profile") —
+  // same shape as app/buyer-conversation.tsx's identical styles, RECIPIENT
+  // view only (see the JSX's own comment).
+  requestProfileHeader: { alignItems: 'center', paddingVertical: SP.lg, paddingHorizontal: SP.lg, gap: 4 },
+  requestProfileAvatar: {
+    width: 88, height: 88, borderRadius: 44,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: SP.sm,
+  },
+  requestProfileAvatarInitials: { fontSize: FS.xl, fontFamily: FONT.bold, color: '#FFFFFF' },
+  requestProfileName: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  requestProfileHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
+  requestProfilePill: {
+    height: 34, paddingHorizontal: SP.md, borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  requestProfilePillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+
+  // "Sent as a request" indicator — the SENDER's own view of a pending
+  // request thread (see the JSX's own comment).
+  sentRequestBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+    marginHorizontal: SP.md, marginBottom: SP.xs, paddingVertical: SP.sm, paddingHorizontal: SP.md,
+    backgroundColor: CARD, borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  },
+  sentRequestBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
 
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -2262,50 +2507,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pendingAttachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   pendingAttachSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
-  inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm,
-    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG,
-  },
-  // Matches buyer-conversation.tsx's COMPOSER_CONTROL — one consistent size
-  // across every circular control in the row (previously 40/40/40/44).
-  attachBtn: {
-    width: 36, height: 36,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 2,
-  },
-  // IG-style camera-circle attach trigger — same visual as
-  // app/buyer-conversation.tsx's cameraCircleBtn: a solid accent-filled
-  // circle with an onAccent camera glyph, 36pt diameter (Mobbin:
-  // mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7), themed like
-  // every other filled control in this composer (e.g. sendBtn) instead of
-  // a fixed white/black pair.
+  // Attach trigger left of the pill — solid white circle, black glyph.
   cameraCircleBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 2,
-    backgroundColor: PURPLE,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PURPLE,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
   },
-  textInput: {
-    flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
-    // ~44pt at rest for a single line (matches buyer-conversation.tsx's
-    // pill height) — only grows past that as the user types more lines,
-    // never fixed-tall. Symmetric vertical padding keeps the placeholder
-    // centered within that height on every platform (textAlignVertical is
-    // Android-only).
-    minHeight: 44,
-    maxHeight: 120,
-    textAlignVertical: 'center',
-  },
-  sendBtn: {
-    width: 36, height: 36, borderRadius: 18,
+  // Inside-the-pill controls (attach picker, mic, Thread Cash coin).
+  accBtn: {
+    width: 32, height: 32,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, marginBottom: 2,
+  },
+  voiceBarWrap: {
+    paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG,
   },
 
   // Attach picker sheet

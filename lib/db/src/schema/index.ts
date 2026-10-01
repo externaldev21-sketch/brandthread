@@ -7,6 +7,8 @@ export * from './money';
 export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
+export * from './communities';
+export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -159,6 +161,9 @@ export const users = pgTable('users', {
   // verification for sellers. A system account is excluded from seller
   // search/ranking and cannot be reported (see reports.ts).
   isSystemAccount: boolean('is_system_account').notNull().default(false),
+  // Internal App Review demo account (migration 240). Never purged by the
+  // test-data tooling; seeded by scripts/seedReviewAccounts.ts.
+  isReviewAccount: boolean('is_review_account').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -447,6 +452,25 @@ export const orders = pgTable('orders', {
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
   stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
+  // ── Delivery guarantee (see api-server lib/delivery, migration 110) ───────
+  // deliverBy is stamped at purchase: paid_at + 15 days (60 for a pre-order).
+  // NULL on orders that predate the guarantee.
+  deliverBy: timestamp('deliver_by', { withTimezone: true }),
+  isPreorder: boolean('is_preorder').notNull().default(false),
+  promisedShipDate: timestamp('promised_ship_date', { withTimezone: true }),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  deliveryConfirmedBy: text('delivery_confirmed_by'), // 'carrier' | 'buyer'
+  // Hold-until-delivered: the seller's transfer is released at/after this.
+  payoutReleaseAt: timestamp('payout_release_at', { withTimezone: true }),
+  // An open chargeback pauses the auto-refund.
+  disputePausedAt: timestamp('dispute_paused_at', { withTimezone: true }),
+  autoRefundedAt: timestamp('auto_refunded_at', { withTimezone: true }),
+  autoRefundAttempts: integer('auto_refund_attempts').notNull().default(0),
+  autoRefundNextAttemptAt: timestamp('auto_refund_next_attempt_at', { withTimezone: true }),
+  autoRefundLastError: text('auto_refund_last_error'),
+  // 0 none, 1 = 5 days, 2 = 2 days, 3 = 12 hours warning already sent.
+  deadlineWarningLevel: integer('deadline_warning_level').notNull().default(0),
+  trackingPolledAt: timestamp('tracking_polled_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -464,9 +488,35 @@ export const orderItems = pgTable('order_items', {
   variantLabel: text('variant_label'),
   quantity: integer('quantity').notNull(),
   priceCents: integer('price_cents').notNull(), // server-resolved price at time of order
+  // Delivery guarantee, per item so a partial shipment refunds only what
+  // never arrived. Item-level tracking is set when the seller ships part of
+  // an order separately; otherwise the order-level tracking covers the item.
+  isPreorder: boolean('is_preorder').notNull().default(false),
+  deliverBy: timestamp('deliver_by', { withTimezone: true }),
+  shippedAt: timestamp('shipped_at', { withTimezone: true }),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  trackingNumber: text('tracking_number'),
+  carrier: text('carrier'),
+  trackingStatus: text('tracking_status'),
+  refundedAt: timestamp('refunded_at', { withTimezone: true }),
+  refundedCents: integer('refunded_cents').notNull().default(0),
 }, (table) => ({
   orderIdx: index('order_items_order_id_idx').on(table.orderId),
   variantIdx: index('order_items_variant_id_idx').on(table.variantId),
+}));
+
+export const orderTrackingEvents = pgTable('order_tracking_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  trackingNumber: text('tracking_number').notNull(),
+  status: text('status').notNull(),
+  description: text('description').notNull().default(''),
+  location: text('location'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  orderIdx: index('order_tracking_events_order_idx').on(table.orderId, table.occurredAt),
+  uniq: unique('order_tracking_events_unique').on(table.orderId, table.trackingNumber, table.status, table.occurredAt),
 }));
 
 export const shippingLabelQuotes = pgTable('shipping_label_quotes', {
@@ -1139,6 +1189,9 @@ export const notificationsFeed = pgTable('notifications_feed', {
   newProductUnique: uniqueIndex('notifications_feed_new_product_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'new_product' AND ${table.targetId} IS NOT NULL`),
+  storyMentionUnique: uniqueIndex('notifications_feed_story_mention_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} IN ('story_mention', 'story_reshare') AND ${table.targetId} IS NOT NULL`),
   dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
@@ -1216,6 +1269,19 @@ export const postTaggedProducts = pgTable('post_tagged_products', {
   productIdx: index('ptp_product_id_idx').on(table.productId),
 }));
 
+// ─── People tags ("Tagged" tab) ───────────────────────────────────────────────
+// A post author tagging another account. The tagged account's profile "Tagged"
+// tab lists these posts. `source_type` leaves room for story tags.
+export const postUserTags = pgTable('post_user_tags', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+  taggedUserId: text('tagged_user_id').notNull(), // Clerk user ID of the tagged account
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
+  uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
+}));
+
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
 
 export const stories = pgTable('stories', {
@@ -1236,11 +1302,36 @@ export const stories = pgTable('stories', {
   moderatedAt:       timestamp('moderated_at'),
   likesCount:        integer('likes_count').notNull().default(0),
   viewsCount:        integer('views_count').notNull().default(0),
+  // Reshare ("Add to your story") of a story that tagged the resharer. Plain
+  // columns, no FK: when the original expires or is deleted the reshare keeps
+  // its credit and renders "Story unavailable" (migration 110).
+  originalStoryId:   uuid('original_story_id'),
+  originalAuthorId:  text('original_author_id'),
   createdAt:         timestamp('created_at').defaultNow().notNull(),
   expiresAt:         timestamp('expires_at').notNull(),
 }, (t) => ({
   expiresAtIdx: index('stories_expires_at_idx').on(t.expiresAt),
   authorIdx:    index('stories_author_idx').on(t.authorId),
+}));
+
+/**
+ * One row per (story, tagged person): the @mention sticker's placement plus
+ * the tagged person's handling state. `sticker` holds
+ * { overlayId, slide, x, y, scale, rotation, style } so a future product-tag
+ * sticker can share the same shape. `handledAt` is set when the tagged person
+ * reshares or taps "Not now" (migration 110).
+ */
+export const storyMentions = pgTable('story_mentions', {
+  storyId:         uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
+  mentionedUserId: text('mentioned_user_id').notNull(),
+  taggerId:        text('tagger_id').notNull(),
+  sticker:         jsonb('sticker').$type<Record<string, unknown>>().notNull().default({}),
+  handledAt:       timestamp('handled_at'),
+  handledAction:   text('handled_action'), // 'reshared' | 'dismissed'
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:           primaryKey({ columns: [t.storyId, t.mentionedUserId] }),
+  mentionedIdx: index('story_mentions_mentioned_idx').on(t.mentionedUserId, t.createdAt),
 }));
 
 export const storyLikes = pgTable('story_likes', {
@@ -2196,3 +2287,4 @@ export const adCampaigns = pgTable('ad_campaigns', {
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
+export * from './ranking';

@@ -27,6 +27,7 @@ import { stripe as defaultStripe } from "../stripe";
 import { logger } from "../logger";
 import { orderHeldCents, postLedgerTransaction } from "./ledger";
 import { orderFundsMachine } from "./stateMachines";
+import { payoutMayRelease, payoutReleasableSql } from "../delivery/payoutGate";
 import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
@@ -38,7 +39,7 @@ export type TransferSettlement = "transferred" | "already" | "not_transfer_order
 
 export async function settleTransferOrder(
   orderId: string,
-  options: { stripe?: StripeTransfers | null } = {},
+  options: { stripe?: StripeTransfers | null; now?: Date } = {},
 ): Promise<TransferSettlement> {
   const stripeClient = options.stripe === undefined ? defaultStripe : options.stripe;
   const [order] = await db.select({
@@ -50,12 +51,19 @@ export async function settleTransferOrder(
     sellerNetCents: orders.sellerNetCents,
     stripeChargeId: orders.stripeChargeId,
     stripeTransferId: orders.stripeTransferId,
+    deliverBy: orders.deliverBy,
+    deliveredAt: orders.deliveredAt,
+    payoutReleaseAt: orders.payoutReleaseAt,
+    disputePausedAt: orders.disputePausedAt,
   }).from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order || order.chargeModel !== "transfer") return "not_transfer_order";
   if (order.stripeTransferId || order.fundsState === "released") return "already";
   // Refunded / cancelled before the transfer: nothing is owed to the seller.
   if (order.fundsState !== "held" || order.status === "refund_pending" || order.status === "cancelled") return "not_ready";
   if (!stripeClient) return "not_ready";
+  // Hold-until-delivered (lib/delivery/payoutGate.ts): the seller is paid
+  // only after delivery + the buffer, with no dispute or return open.
+  if (!(await payoutMayRelease(db, { ...order, id: orderId }, options.now ?? new Date()))) return "not_ready";
 
   const [seller] = await db.select({ stripeAccountId: users.stripeAccountId })
     .from(users).where(eq(users.clerkId, order.ownerId)).limit(1);
@@ -122,16 +130,18 @@ export async function settleTransferOrder(
 }
 
 /** Retries transfers that didn't go through (Stripe down, seller account not ready). */
-export async function sweepTransferOrders(options: { stripe?: StripeTransfers | null; limit?: number } = {}): Promise<number> {
+export async function sweepTransferOrders(options: { stripe?: StripeTransfers | null; limit?: number; now?: Date } = {}): Promise<number> {
+  const now = options.now ?? new Date();
   const due = ((await db.execute(sql`
-    SELECT id FROM orders
-    WHERE charge_model = 'transfer' AND funds_state = 'held' AND stripe_transfer_id IS NULL
-      AND status NOT IN ('refund_pending', 'cancelled')
-    ORDER BY created_at LIMIT ${options.limit ?? 100}
+    SELECT o.id FROM orders o
+    WHERE o.charge_model = 'transfer' AND o.funds_state = 'held' AND o.stripe_transfer_id IS NULL
+      AND o.status NOT IN ('refund_pending', 'cancelled')
+      AND ${payoutReleasableSql(now)}
+    ORDER BY o.created_at LIMIT ${options.limit ?? 100}
   `)) as unknown as { rows?: Array<{ id: string }> }).rows ?? [];
   let count = 0;
   for (const row of due) {
-    if (await settleTransferOrder(row.id, { stripe: options.stripe }) === "transferred") count++;
+    if (await settleTransferOrder(row.id, { stripe: options.stripe, now }) === "transferred") count++;
   }
   return count;
 }
