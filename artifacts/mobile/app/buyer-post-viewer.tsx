@@ -36,6 +36,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { CaptionSpans } from '@/components/social/CaptionText';
 
 function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -104,6 +105,25 @@ function previewPost(postId: string | undefined): BuyerPost | null {
   };
 }
 
+/** Public /api/posts/:id payload to the viewer's BuyerPost shape (display only). */
+function publicPostToBuyerPost(raw: any): BuyerPost | null {
+  if (!raw?.id) return null;
+  const name = raw.seller?.brandName || raw.seller?.displayName || 'Brandthread member';
+  const parts = String(name).trim().split(/\s+/);
+  const isVideo = raw.mediaType === 'video';
+  return {
+    id: raw.id, authorId: raw.userId, authorName: name, authorHandle: '',
+    authorInitials: (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : String(name).slice(0, 2)).toUpperCase(),
+    authorColor: MY_COLOR, authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'public',
+    type: isVideo ? 'video' : raw.mediaType === 'slideshow' ? 'slideshow' : 'photo',
+    caption: raw.caption ?? '', hashtags: raw.hashtags ?? [], mediaColors: [],
+    mediaUrl: isVideo ? raw.mediaUrl : (raw.mediaUrls?.[0] || raw.mediaUrl || undefined),
+    likesCount: Number(raw.likeCount ?? 0), commentsCount: 0, repostsCount: Number(raw.repostCount ?? 0),
+    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+    createdAt: raw.createdAt, updatedAt: raw.updatedAt ?? raw.createdAt,
+  };
+}
+
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
   const api = useApi();
@@ -154,6 +174,11 @@ export default function BuyerPostViewer() {
       // A failed lookup leaves the placeholder, as before — or, in the
       // preview, falls through to the seeded post below.
     }
+    // Public posts opened from a hashtag page belong to people I may not be
+    // friends with, so the friends-only lookups above return nothing.
+    if (!found && params.postId && !params.postId.startsWith('preview-') && !getPreviewActivityPost(params.postId)) {
+      try { found = publicPostToBuyerPost(await api.posts.get(params.postId)); } catch { /* keep placeholder */ }
+    }
     found = found ?? previewPost(params.postId);
     if (found) {
       setPost(found);
@@ -163,7 +188,7 @@ export default function BuyerPostViewer() {
       setSaved(found.savedByMe ?? false);
       setEditCaption(found.caption);
     }
-  }, [params.postId]);
+  }, [params.postId, api]);
 
   useEffect(() => {
     loadPost();
@@ -272,7 +297,7 @@ export default function BuyerPostViewer() {
 
         {/* Caption */}
         {caption ? (
-          <Text style={s.caption}>{caption}</Text>
+          <Text style={s.caption}><CaptionSpans text={caption} /></Text>
         ) : null}
 
         {/* Timestamp */}

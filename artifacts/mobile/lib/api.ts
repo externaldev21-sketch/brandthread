@@ -2219,6 +2219,25 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           { liked },
         ),
     },
+    /** Hashtag pages, trending and follows (public reads; follow needs auth). */
+    hashtags: {
+      trending: (limit = 10) =>
+        get<{ tags: HashtagTrendingTag[] }>(`/api/hashtags/trending?limit=${limit}`),
+      search: (q: string, limit = 12) =>
+        get<{ tags: Array<{ tag: string; postCount: number }> }>(
+          `/api/hashtags/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      page: (tag: string, sort: 'top' | 'recent' = 'top') =>
+        get<HashtagPage>(`/api/hashtags/${encodeURIComponent(tag)}?sort=${sort}`),
+      posts: (tag: string, sort: 'top' | 'recent', cursor?: string | null) =>
+        get<HashtagPostsPage>(
+          `/api/hashtags/${encodeURIComponent(tag)}/posts?sort=${sort}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+      follow: (tag: string) =>
+        post<{ tag: string; isFollowing: boolean }>(`/api/hashtags/${encodeURIComponent(tag)}/follow`, {}),
+      unfollow: (tag: string) =>
+        del<{ tag: string; isFollowing: boolean }>(`/api/hashtags/${encodeURIComponent(tag)}/follow`),
+      following: () =>
+        get<{ tags: Array<{ tag: string; postCount: number; followedAt: string }> }>('/api/hashtags/following'),
+    },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {
       /** Follow another buyer */
@@ -3107,6 +3126,19 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
  * Memoised per user. Clerk may return a new getToken function between renders,
  * so the client reads it through a ref instead of rebuilding on function identity.
  */
+export interface HashtagTrendingTag { tag: string; rank: number; postCount: number; recentPostCount: number; score: number }
+export interface HashtagPostItem {
+  id: string; mediaType: string; mediaUrl: string; mediaUrls: string[]; thumbnailUrl: string | null;
+  aspectRatio: string; caption: string | null; hashtags: string[]; createdAt: string;
+  likesCount: number | null; commentsCount: number;
+  author: { userId: string; name: string; handle: string; avatarUrl: string | null; accountType: string | null };
+}
+export interface HashtagPostsPage { items: HashtagPostItem[]; nextCursor: string | null }
+export interface HashtagPage {
+  tag: string; postCount: number; followerCount: number; isFollowing: boolean;
+  sort: 'top' | 'recent'; posts: HashtagPostsPage;
+}
+
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
   const getTokenRef = useRef(getToken);
