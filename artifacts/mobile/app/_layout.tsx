@@ -1458,6 +1458,7 @@ function RootLayoutNav() {
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payout-setup" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payouts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="thread-cash-history" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="thread-cash-ledger" options={{ headerShown: false, animation: 'ios_from_right' }} />

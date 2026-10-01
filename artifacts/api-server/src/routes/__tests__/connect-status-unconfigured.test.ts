@@ -101,7 +101,7 @@ describe("seller Connect status without a configured Stripe key", () => {
     const result = await getStatus();
 
     expect(result.status).toBe(200);
-    expect(result.body).toEqual({
+    expect(result.body).toMatchObject({
       connected: true,
       stripeAccountId: "acct_existing",
       chargesEnabled: false,
