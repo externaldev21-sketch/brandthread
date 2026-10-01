@@ -11,6 +11,7 @@
  *   post_like      — someone liked your post            (actor, post thumbnail)
  *   post_comment   — someone commented on your post     (actor, post thumbnail)
  *   comment_reply  — someone replied to your comment    (actor, post thumbnail)
+ *   comment_like   — someone liked your comment         (actor, post thumbnail)
  *   mention        — someone @mentioned you in a comment (actor, post thumbnail)
  *   new_product    — a brand you follow listed something (brand, product image)
  *
@@ -19,7 +20,7 @@
  * seller-facing low/out-of-stock alert.
  */
 import {
-  db, follows, notificationsFeed, posts, products, stories, users,
+  db, follows, notificationsFeed, postComments, posts, products, stories, users,
 } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { publishNotification } from "../routes/notifications-feed";
@@ -489,6 +490,56 @@ export async function notifyCommentActivity(input: {
     await fanOut(deliveries, (delivery) => publishNotification(delivery));
   } catch (err) {
     logger.warn({ err, postId: input.postId, commentId: input.commentId }, "Comment notification failed");
+  }
+}
+
+// ─── Comment likes ────────────────────────────────────────────────────────────
+
+/**
+ * Tell a comment's author someone liked it. Skips self-likes and blocked pairs;
+ * like -> unlike -> like by the same person on the same comment notifies once.
+ */
+export async function notifyCommentLike(input: { commentId: string; likerId: string }): Promise<void> {
+  try {
+    const [comment] = await db
+      .select({ id: postComments.id, postId: postComments.postId, authorId: postComments.authorId, body: postComments.body })
+      .from(postComments)
+      .where(eq(postComments.id, input.commentId))
+      .limit(1);
+    if (!comment || comment.authorId === input.likerId) return;
+    if ((await blockedUserIds(comment.authorId)).has(input.likerId)) return;
+    const post = await loadPost(comment.postId);
+    if (!post) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, comment.authorId),
+        eq(notificationsFeed.type, "comment_like"),
+        eq(notificationsFeed.actorId, input.likerId),
+        eq(notificationsFeed.commentId, comment.id),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.likerId);
+    if (!actor) return;
+
+    await publishNotification({
+      userId: comment.authorId,
+      category: "social",
+      type: "comment_like",
+      title: `${actor.actorName} liked your comment`,
+      body: excerpt(comment.body),
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+      commentId: comment.id,
+    });
+  } catch (err) {
+    logger.warn({ err, commentId: input.commentId }, "Comment like notification failed");
   }
 }
 

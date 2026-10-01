@@ -312,7 +312,7 @@ export function activityDetail(row: ActivityRow): string | null {
     || row.type === 'post_share' || row.type === 'post_tag') return null;
   const body = row.body?.trim();
   if (!body) return null;
-  if (row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention') {
+  if (row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention' || row.type === 'comment_like') {
     return `“${body}”`;
   }
   return body;
@@ -376,7 +376,7 @@ export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
 ];
 
 const FOLLOW_TYPES = new Set(['new_follower']);
-const LIKE_TYPES = new Set(['post_like', 'story_like']);
+const LIKE_TYPES = new Set(['post_like', 'story_like', 'comment_like']);
 const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention', 'story_mention']);
 const THREAD_CASH_TYPES = new Set(['thread_cash_received']);
 
@@ -447,6 +447,7 @@ export function activityChipEmpty(chip: ActivityChip, role: 'buyer' | 'seller' |
 export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): string {
   switch (item.type) {
     case 'post_like':
+    case 'comment_like':
     case 'story_like': return 'heart';
     case 'post_comment':
     case 'comment_reply': return 'message-circle';
@@ -600,7 +601,7 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       if (!id) return null;
       // Comment rows land on that exact comment (scrolled to + highlighted,
       // its reply thread opened) when the row carries one.
-      return row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention'
+      return row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention' || row.type === 'comment_like'
         ? `/buyer-post-comments?postId=${q(id)}${row.commentId ? `&commentId=${q(row.commentId)}` : ''}`
         : `/buyer-post-viewer?postId=${q(id)}`;
     case 'story':
