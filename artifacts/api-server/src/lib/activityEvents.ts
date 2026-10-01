@@ -168,23 +168,28 @@ export async function notifyPostLike(input: { postId: string; likerId: string })
 // ─── Reposts ──────────────────────────────────────────────────────────────────
 
 /** Tell a post's owner someone reposted it. Idempotent per (owner, reposter, post). */
-export async function notifyRepost(input: { postId: string; reposterId: string }): Promise<void> {
+export async function notifyRepost(input: { postId: string; reposterId: string; variant?: "repost" | "quote" }): Promise<void> {
+  const isQuote = input.variant === "quote";
   try {
     const post = await loadPost(input.postId);
     if (!post || post.userId === input.reposterId) return;
     if ((await blockedUserIds(post.userId)).has(input.reposterId)) return;
 
-    const [existing] = await db
-      .select({ id: notificationsFeed.id })
-      .from(notificationsFeed)
-      .where(and(
-        eq(notificationsFeed.userId, post.userId),
-        eq(notificationsFeed.type, "repost"),
-        eq(notificationsFeed.targetId, post.id),
-        eq(notificationsFeed.actorId, input.reposterId),
-      ))
-      .limit(1);
-    if (existing) return;
+    // A plain repost is a toggle, so one notification per reposter is enough.
+    // Every quote is its own new post, so quotes are never deduped.
+    if (!isQuote) {
+      const [existing] = await db
+        .select({ id: notificationsFeed.id })
+        .from(notificationsFeed)
+        .where(and(
+          eq(notificationsFeed.userId, post.userId),
+          eq(notificationsFeed.type, "repost"),
+          eq(notificationsFeed.targetId, post.id),
+          eq(notificationsFeed.actorId, input.reposterId),
+        ))
+        .limit(1);
+      if (existing) return;
+    }
 
     const actor = await actorFields(input.reposterId);
     if (!actor) return;
@@ -193,7 +198,7 @@ export async function notifyRepost(input: { postId: string; reposterId: string }
       userId: post.userId,
       category: "social",
       type: "repost",
-      title: `${actor.actorName} reposted your post`,
+      title: isQuote ? `${actor.actorName} quoted your post` : `${actor.actorName} reposted your post`,
       ...actor,
       targetId: post.id,
       targetType: "post",

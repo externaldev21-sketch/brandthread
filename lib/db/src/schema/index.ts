@@ -580,9 +580,16 @@ export const posts = pgTable('posts', {
   moderatedAt: timestamp('moderated_at', { withTimezone: true }),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  // Quote repost (migration 118): the direct original this post quotes. Set
+  // to NULL (not cascaded) if the original is ever hard-deleted; `repostKind`
+  // stays 'quote' so readers can tell "original gone" from "not a quote".
+  quotedPostId: uuid('quoted_post_id'),
+  repostKind: text('repost_kind'), // null | 'quote'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
+  quotedPostFk: foreignKey({ columns: [table.quotedPostId], foreignColumns: [table.id], name: 'posts_quoted_post_id_fkey' }).onDelete('set null'),
+  quotedPostIdx: index('posts_quoted_post_idx').on(table.quotedPostId).where(sql`${table.quotedPostId} IS NOT NULL`),
   userCreatedPublishedIdx: index('posts_user_created_published_idx')
     .on(table.userId, table.createdAt)
     .where(sql`${table.postStatus} = 'published'`),

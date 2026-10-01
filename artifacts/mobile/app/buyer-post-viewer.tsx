@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { QuotedPostCard } from '@/components/social/QuotedPostCard';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Share, Animated, useWindowDimensions,
@@ -273,6 +274,16 @@ export default function BuyerPostViewer() {
         {/* Caption */}
         {caption ? (
           <Text style={s.caption}>{caption}</Text>
+        ) : null}
+
+        {/* Quoted original (only present on quote reposts — no layout change otherwise) */}
+        {post?.quotedPost ? (
+          <View style={{ paddingHorizontal: SP.md, paddingTop: SP.sm }}>
+            <QuotedPostCard
+              quotedPost={post.quotedPost}
+              onPress={(id) => router.push(`/buyer-post-viewer?postId=${encodeURIComponent(id)}` as never)}
+            />
+          </View>
         ) : null}
 
         {/* Timestamp */}

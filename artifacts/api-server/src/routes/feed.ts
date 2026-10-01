@@ -10,6 +10,7 @@
  * only for the behavioral signals that have nowhere else to land: view,
  * watch_time, rewatch, shop taps, add-to-bag, skip, and not-interested.
  */
+import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -170,7 +171,7 @@ router.get("/for-you", requireAuth, async (req, res) => {
     // Blocked-seller filtering already happened during candidate generation
     // in computeForYouRankingForUser (via the `blocks` table), so this page
     // hydration doesn't need to re-check it.
-    const items = slice.map((item) => {
+    const rawItems = slice.map((item) => {
       if (item.isLive) {
         const stream = liveById.get(item.liveStreamId!);
         if (!stream) return null;
@@ -217,6 +218,13 @@ router.get("/for-you", requireAuth, async (req, res) => {
         score: item.score,
       };
     }).filter((i): i is NonNullable<typeof i> => i !== null);
+
+    // One batched lookup for every post item on the page (quotedPost + quotesCount).
+    const quoteById = new Map(
+      (await attachQuoteData(rawItems.filter((i) => i.type === "post").map((i) => ({ id: (i as { id: string }).id })), userId))
+        .map((q) => [q.id, { quotedPost: q.quotedPost, quotesCount: q.quotesCount }]),
+    );
+    const items = rawItems.map((i) => (i.type === "post" ? { ...i, ...quoteById.get((i as { id: string }).id) } : i));
 
     res.json({
       items,
