@@ -1,15 +1,16 @@
 /**
  * Guards for the Seller Studio full-screen page's dismiss behavior — Dev's
- * final call: a full-screen page (not a partial sheet), with NO close (X)
- * button and no "View store" pill in the header at all (header content is
- * ONLY the avatar + name — see seller-studio-header.test.ts). Closing works
- * three ways: swiping down anywhere, Android back / web Escape (the Modal's
- * own onRequestClose), or tapping the Studio tab button again (see
+ * final call: a full-screen page (not a partial sheet), no "View store" pill
+ * in the header (header content is the avatar + name + a close (X) — see
+ * seller-studio-header.test.ts; Dev initially cut the X, then reversed:
+ * "Dev changed his mind — X stays"). Closing works four ways: swiping down
+ * anywhere, the X itself, Android back / web Escape (the Modal's own
+ * onRequestClose), or tapping the Studio tab button again (see
  * seller-studio-tab-toggle.test.ts) — all on the same fast Reanimated
  * timeline (never a spring — a spring's overshoot reads as a bounce, not
  * the "swift and fast" slide Dev asked for). There is no backdrop anymore —
  * the page itself covers the whole screen, so there's no "tap outside"
- * affordance distinct from these three.
+ * affordance distinct from these.
  *  - dragging up past the resting position rubber-bands instead of
  *    hard-clamping;
  *  - a fast flick's release velocity shortens the close duration;
@@ -23,10 +24,12 @@ import { describe, expect, it } from 'vitest';
 
 const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadialMenu.tsx'), 'utf8');
 
-describe('Seller Studio page has no close (X) button — Dev\'s final layout call', () => {
-  it('there is no close button anywhere — swipe-down, Android back, and the tab toggle are the only ways to close', () => {
-    expect(studio).not.toContain('testID="seller-studio-menu-close"');
-    expect(studio).not.toContain('accessibilityLabel="Close Studio tools"');
+describe('Seller Studio page close affordances — swipe, the X, Android back, and the tab toggle', () => {
+  it('the close (X) button closes via the same cancelEnter/hapticDismiss/collapse path as the other close affordances', () => {
+    expect(studio).toContain('testID="seller-studio-menu-close"');
+    expect(studio).toContain('accessibilityLabel="Close Studio tools"');
+    const closeBlock = studio.slice(studio.indexOf('testID="seller-studio-menu-close"') - 200, studio.indexOf('testID="seller-studio-menu-close"'));
+    expect(closeBlock).toContain('onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}');
   });
 
   it('there is no separate backdrop layer anymore — the page itself fully covers the screen behind it', () => {

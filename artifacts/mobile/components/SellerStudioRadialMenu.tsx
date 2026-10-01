@@ -14,18 +14,20 @@
  * ones that have NO other way into them — see MENU_EXCLUDED_IDS below for
  * the removed items and where each one's real entry point now lives.
  *
- * Layout, top to bottom:
- *  - Header (below the notch): the seller's real profile photo + store name
- *    on the left (an initials circle, matching the store name's own first
- *    letter, only when there's no photo yet; a neutral store icon — never a
- *    random letter — when there's no store name either), a compact
- *    unfilled "View store" button, and a close (X) button.
- *  - The card area: the current card's full-bleed cover fills the entire
- *    remaining width/height, edge to edge — a neighbor is visible ONLY
- *    mid-transition (the ~90ms slide between cards), never at rest, per
- *    Dev's own screenshot ("no slivers, no half-words").
- *  - A thin white edge-trace that draws clockwise around the card on lock
- *    (see AUTO_ENTER_MS) and a row of small position dots.
+ * Layout: the current card's full-bleed cover fills the ENTIRE screen, edge
+ * to edge, top to bottom — no bars, no letterboxing above/below it. The
+ * header and the row of position dots FLOAT on top of that cover as two
+ * absolutely-positioned overlays (no background of their own — legibility
+ * comes from the cover's own dark vignette, same as the icon/name already
+ * relied on). Header: the seller's real profile photo + store name on the
+ * left (an initials circle, matching the store name's own first letter,
+ * only when there's no photo yet; a neutral store icon — never a random
+ * letter — when there's no store name either) and a close (X) button on the
+ * right. A neighbor card is visible ONLY mid-transition (the ~90ms slide
+ * between cards), never at rest, per Dev's own screenshot ("no slivers, no
+ * half-words"). A thin white edge-trace draws clockwise around the WHOLE
+ * SCREEN on lock (see AUTO_ENTER_MS) — inset from the physical screen edges
+ * on every side, header and dots included, not just the area between them.
  *
  * Interaction:
  *  - A horizontal drag anywhere on the card area SCRUBS through the list —
@@ -1210,48 +1212,20 @@ export default function SellerStudioRadialMenu({
             area are SIBLING GestureDetectors, each with its own single
             Gesture.Pan (dismissGesture, cardAreaGesture) — see the block
             comment above cardAreaGesture's definition for why neither is
-            ever combined with another Pan via Gesture.Race. */}
+            ever combined with another Pan via Gesture.Race.
+            Dev: the card cover must fill the ENTIRE screen edge to edge —
+            no black bars above/below it — with the header and position
+            dots floating ON TOP as overlays, not sharing flex space with
+            the cover. So `page` itself carries no top/bottom padding
+            anymore (that's what carved out the bars): the card area below
+            is sized to the full page, and the header/dots are positioned
+            absolutely over it instead. */}
         <Animated.View
-          style={[
-            styles.page,
-            {
-              height: pageHeight,
-              paddingTop: headerTopInset,
-              paddingBottom: Math.max(insets.bottom, 16),
-            },
-            pageAnimatedStyle,
-          ]}
+          style={[styles.page, { height: pageHeight }, pageAnimatedStyle]}
         >
-          <GestureDetector gesture={dismissGesture}>
-            {/* ── Store header ──
-                Dev's final call: ONLY the seller's real profile picture
-                (animated if they set one, muted + looped) and their real
-                name (store name, else display name/@handle — never blank,
-                never a generic bag icon once any identity exists) — no
-                subtitle of any kind, no "View store" pill, no close (X).
-                Closing is swipe-down (dismissGesture, this same
-                GestureDetector) or Android back (Modal's onRequestClose)
-                or tapping the Studio tab button again (openRequestKey
-                toggling, see the effect near the top of this component). */}
-            <View style={styles.header} testID="seller-studio-header">
-              <View style={styles.avatar}>
-                {avatarVideoUrl ? (
-                  <HeaderAvatarVideo uri={avatarVideoUrl} />
-                ) : avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : headerMonogram ? (
-                  <Text style={styles.avatarLetter}>{headerMonogram}</Text>
-                ) : (
-                  <Feather name="shopping-bag" size={18} color={theme.text} />
-                )}
-              </View>
-              <View style={styles.headerTextBlock}>
-                <Text style={styles.storeName} numberOfLines={1}>{headerTitle ?? 'Your store'}</Text>
-              </View>
-            </View>
-          </GestureDetector>
-
-          {/* ── Card carousel ── */}
+          {/* ── Card carousel — now the page's own full-bleed content,
+              edge to edge, top to bottom. Rendered FIRST so the header and
+              dots overlays below paint on top of it. ── */}
           <GestureDetector gesture={cardAreaGesture}>
             <View
               style={styles.cardArea}
@@ -1316,8 +1290,58 @@ export default function SellerStudioRadialMenu({
             </View>
           </GestureDetector>
 
-          {/* Small position dots — replaces the old "X / 16" text. */}
-          <View style={styles.dotsRow} testID="seller-studio-position-dots">
+          {/* ── Store header — floats on top of the full-bleed cover below,
+              no background of its own (Dev: "legibility via the cover's
+              existing dark vignette only, no translucent bars" — the
+              cover's own gradient is already darkest at its top/bottom
+              extremes, exactly where this sits). Dev's final call: the
+              seller's real profile picture (animated if they set one,
+              muted + looped) and their real name (store name, else display
+              name/@handle — never blank, never a generic bag icon once any
+              identity exists) on the left, no subtitle of any kind, and a
+              close (X) on the right. Closing is swipe-down (dismissGesture,
+              this same GestureDetector), the X itself, Android back
+              (Modal's onRequestClose), or tapping the Studio tab button
+              again (openRequestKey toggling, see the effect near the top of
+              this component). */}
+          <GestureDetector gesture={dismissGesture}>
+            <View
+              style={[styles.header, { position: 'absolute', top: headerTopInset, left: 0, right: 0 }]}
+              testID="seller-studio-header"
+            >
+              <View style={styles.avatar}>
+                {avatarVideoUrl ? (
+                  <HeaderAvatarVideo uri={avatarVideoUrl} />
+                ) : avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : headerMonogram ? (
+                  <Text style={styles.avatarLetter}>{headerMonogram}</Text>
+                ) : (
+                  <Feather name="shopping-bag" size={18} color={theme.text} />
+                )}
+              </View>
+              <View style={styles.headerTextBlock}>
+                <Text style={styles.storeName} numberOfLines={1}>{headerTitle ?? 'Your store'}</Text>
+              </View>
+              <Pressable
+                onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}
+                accessibilityRole="button"
+                accessibilityLabel="Close Studio tools"
+                testID="seller-studio-menu-close"
+                style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
+              >
+                <Feather name="x" size={20} color={theme.text} />
+              </Pressable>
+            </View>
+          </GestureDetector>
+
+          {/* Small position dots — replaces the old "X / 16" text. Floats
+              on top of the cover too, same no-background rule as the
+              header above. */}
+          <View
+            style={[styles.dotsRow, { position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }]}
+            testID="seller-studio-position-dots"
+          >
             {CARD_ITEMS.map((item, i) => (
               <View key={item.id} style={[styles.dot, i === cardIndexJS && styles.dotActive]} />
             ))}
@@ -1417,6 +1441,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // shorter than its row siblings.
   headerTextBlock: { flex: 1, justifyContent: 'center', gap: 4 },
   storeName: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
+  // Dev: the X stays — the header's one action, on the right.
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // ── Card carousel — one destination at a time, its own full-bleed cover
   // (StudioCoverBackdrop) filling the ENTIRE card area edge to edge, behind
@@ -1424,7 +1456,17 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // animated translateX/opacity in CarouselCard's own style — this View
   // itself never scrolls.
   cardArea: {
-    flex: 1,
+    // Dev: fills the ENTIRE screen now, edge to edge — the header and
+    // position dots are separate absolutely-positioned overlays on top of
+    // this (see the render below), not flex siblings carving space out of
+    // it. That also means the edge-trace (sized to this View's own
+    // measured bounds) now outlines the whole screen, header and dots
+    // included, not just the space between them.
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

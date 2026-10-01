@@ -6,19 +6,20 @@ const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadia
 
 /**
  * Dev, "DEV CLARIFIED — supersedes my previous message about the menu
- * header": header content is ONLY the seller's profile picture (including
- * animated, muted + looped) and their real name (store name, else display
- * name/@handle) — no subtitle of any kind, no "View store" pill, no close
- * (X) button. Closing is swipe-down / Android back / the tab bar toggle —
- * see seller-studio-tab-toggle.test.ts and
- * seller-studio-menu-swipe-dismiss.test.ts.
+ * header", then later reversed on the close button specifically ("Dev
+ * changed his mind — X stays"): header content is the seller's profile
+ * picture (including animated, muted + looped) and their real name (store
+ * name, else display name/@handle), plus a close (X) on the right — no
+ * subtitle of any kind, no "View store" pill. Closing is swipe-down /
+ * Android back / the tab bar toggle / the X itself — see
+ * seller-studio-tab-toggle.test.ts and seller-studio-menu-swipe-dismiss.test.ts.
  */
-describe('Studio header: avatar + name only, nothing else', () => {
-  it('has no View-store pill and no close (X) button', () => {
+describe('Studio header: avatar + name + close (X), nothing else', () => {
+  it('has no View-store pill, but does have the close (X) button', () => {
     expect(studio).not.toContain('accessibilityLabel="View store"');
     expect(studio).not.toContain("router.push('/store-preview'");
-    expect(studio).not.toContain('accessibilityLabel="Close Studio tools"');
-    expect(studio).not.toContain('testID="seller-studio-menu-close"');
+    expect(studio).toContain('accessibilityLabel="Close Studio tools"');
+    expect(studio).toContain('testID="seller-studio-menu-close"');
   });
 
   it('has no subtitle of any kind — no "Set store name" link, no setup progress bar', () => {
@@ -31,16 +32,25 @@ describe('Studio header: avatar + name only, nothing else', () => {
     expect(studio).toContain('testID="seller-studio-header"');
   });
 
-  it('the header row is exactly avatar + a single name Text, nothing else', () => {
+  it('the header row is avatar + a single name Text + the close button, nothing else', () => {
     const headerBlock = studio.slice(studio.indexOf('testID="seller-studio-header"'), studio.indexOf('</GestureDetector>', studio.indexOf('testID="seller-studio-header"')));
     expect(headerBlock).toContain('<View style={styles.avatar}>');
     expect(headerBlock).toContain('<View style={styles.headerTextBlock}>');
     expect(headerBlock).toContain('styles.storeName');
+    expect(headerBlock).toContain('testID="seller-studio-menu-close"');
     // Only the avatar's own monogram fallback and the name itself — nothing
     // else in the whole header block.
-    const textBlock = headerBlock.slice(headerBlock.indexOf('<View style={styles.headerTextBlock}>'));
+    const textBlock = headerBlock.slice(headerBlock.indexOf('<View style={styles.headerTextBlock}>'), headerBlock.indexOf('testID="seller-studio-menu-close"'));
     const textCount = (textBlock.match(/<Text\b/g) ?? []).length;
     expect(textCount).toBe(1);
+  });
+
+  it('the header floats on top of the full-bleed cover — absolutely positioned, no background of its own', () => {
+    const headerBlock = studio.slice(studio.indexOf('testID="seller-studio-header"'), studio.indexOf('</GestureDetector>', studio.indexOf('testID="seller-studio-header"')));
+    expect(studio.slice(Math.max(0, studio.indexOf('testID="seller-studio-header"') - 400), studio.indexOf('testID="seller-studio-header"'))).toContain("position: 'absolute'");
+    const headerStyleBlock = studio.slice(studio.indexOf('header: {', studio.indexOf('const makeStyles')), studio.indexOf('avatar: {', studio.indexOf('const makeStyles')));
+    expect(headerStyleBlock).not.toContain('backgroundColor');
+    expect(headerBlock).toBeTruthy();
   });
 
   it('prioritizes an animated (muted, looped) avatar over the static photo, monogram, or generic icon fallback', () => {
@@ -94,5 +104,42 @@ describe('Studio page: seamless black background under the status bar/notch', ()
     const pageStyleBlock = studio.slice(studio.indexOf('page: {', studio.indexOf('const makeStyles')), studio.indexOf('header: {', studio.indexOf('const makeStyles')));
     expect(pageStyleBlock).toContain("backgroundColor: '#000000'");
     expect(pageStyleBlock).toContain('top: 0');
+  });
+
+  it("the page itself carries no top/bottom padding — that's what used to carve out the black bars", () => {
+    const pageJsxBlock = studio.slice(studio.indexOf('<Animated.View\n          style={[styles.page'), studio.indexOf('{/* ── Card carousel'));
+    expect(pageJsxBlock).not.toContain('paddingTop: headerTopInset');
+    expect(pageJsxBlock).not.toContain('paddingBottom: Math.max(insets.bottom');
+  });
+});
+
+/**
+ * Dev: "right now there's a black band at the TOP (header area) and a black
+ * band at the BOTTOM (page-dots area). The card cover must fill the ENTIRE
+ * screen edge to edge, top to bottom, with the header and the page dots
+ * floating ON TOP of the cover (no solid background behind them...)."
+ */
+describe('Studio card area: full-bleed, edge to edge — header/dots float on top, not flex siblings', () => {
+  it('cardArea is absolutely positioned to fill the whole page, not a flex:1 sibling boxed in by the header/dots', () => {
+    const cardAreaStyleBlock = studio.slice(studio.indexOf('cardArea: {', studio.indexOf('const makeStyles')), studio.indexOf('},', studio.indexOf('cardArea: {', studio.indexOf('const makeStyles'))));
+    expect(cardAreaStyleBlock).toContain("position: 'absolute'");
+    expect(cardAreaStyleBlock).toContain('top: 0');
+    expect(cardAreaStyleBlock).toContain('bottom: 0');
+    expect(cardAreaStyleBlock).not.toContain('flex: 1');
+  });
+
+  it('the header and dots overlays are absolutely positioned on top of the card area, not flex siblings', () => {
+    const renderBlock = studio.slice(studio.indexOf('{/* ── Card carousel'), studio.indexOf('</Animated.View>\n      </Modal>'));
+    expect(renderBlock).toContain("[styles.header, { position: 'absolute', top: headerTopInset, left: 0, right: 0 }]");
+    expect(renderBlock).toContain("[styles.dotsRow, { position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }]");
+  });
+
+  it('the edge-trace Svg is sized to cardArea\'s own measured bounds, which now span the full screen', () => {
+    // cardAreaSize comes from cardArea's own onLayout — now that cardArea
+    // fills the whole page (see above), the trace (sized to cardAreaSize)
+    // automatically outlines the whole screen, header and dots included.
+    expect(studio).toContain('onLayout={(e) => setCardAreaSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}');
+    expect(studio).toContain('width={cardAreaSize.width}');
+    expect(studio).toContain('height={cardAreaSize.height}');
   });
 });

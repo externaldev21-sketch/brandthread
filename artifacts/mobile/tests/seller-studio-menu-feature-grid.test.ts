@@ -24,11 +24,11 @@ describe('Seller Studio page: search bar, pinned shortcuts and grouped sections 
     expect(studio).not.toContain("gridCell: { width: '25%'");
   });
 
-  it('the store header row is now ONLY the avatar/photo + store name — no View store, no close, no subtitle', () => {
+  it('the store header row is the avatar/photo + store name + close (X) — no View store, no subtitle', () => {
     expect(studio).toContain('styles.header');
     expect(studio).toContain('styles.storeName');
     expect(studio).not.toContain('accessibilityLabel="View store"');
-    expect(studio).not.toContain('accessibilityLabel="Close Studio tools"');
+    expect(studio).toContain('accessibilityLabel="Close Studio tools"');
     expect(studio).not.toContain('setupBarTrack');
   });
 

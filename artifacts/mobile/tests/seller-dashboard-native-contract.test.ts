@@ -22,10 +22,10 @@ describe('seller dashboard native interaction contract', () => {
   it('keeps the Studio full-screen page, swipe dismiss, navigation, and gating in the device contract', () => {
     expect(studio).toContain('justifyContent: \'center\'');
     // Dev's final layout call: a full-screen page, not a sheet with a
-    // backdrop — closed by swipe-down, Android back, or the tab toggle,
-    // never a close (X) button.
+    // backdrop — closed by swipe-down, the close (X), Android back, or the
+    // tab toggle.
     expect(studio).not.toContain('testID="seller-studio-menu-backdrop"');
-    expect(studio).not.toContain('testID="seller-studio-menu-close"');
+    expect(studio).toContain('testID="seller-studio-menu-close"');
     expect(studio).toContain('GestureDetector');
     expect(studio).toContain('GROWTH_PLAN_ENFORCEMENT_ENABLED');
     expect(studio).toContain("!hasPlan('growth')");
