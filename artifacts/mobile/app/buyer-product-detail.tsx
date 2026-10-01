@@ -48,6 +48,7 @@ import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
+import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -156,6 +157,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     isActive:           true,
     tags:               row.tags ?? [],
     sizeChartImageUrl:  row.sizeChartImageUrl ?? null,
+    sizeChart:          row.sizeChart && typeof row.sizeChart === 'object' ? row.sizeChart : null,
   };
 }
 
@@ -375,7 +377,9 @@ function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accen
 
 // ─── Option Picker ────────────────────────────────────────────────────────────
 
-function OptionPicker({ product, option, selections, onSelect }: {
+function OptionPicker({ product, option, selections, onSelect, recommendedLabel }: {
+  /** Size chip to mark (never select) from the buyer's saved sizes. */
+  recommendedLabel?: string | null;
   product: BuyerProduct;
   option: BuyerProduct['options'][0];
   selections: Record<string, string>;
@@ -421,7 +425,7 @@ function OptionPicker({ product, option, selections, onSelect }: {
             );
           }
 
-          return (
+          const chipEl = (
             <Chip
               key={val.id}
               label={val.label}
@@ -439,6 +443,9 @@ function OptionPicker({ product, option, selections, onSelect }: {
               testID={`option-${option.id}-${val.id}`}
             />
           );
+          return recommendedLabel && recommendedLabel === val.label
+            ? <View key={val.id} style={{ alignItems: 'center' }}>{chipEl}<RecommendedTag /></View>
+            : chipEl;
         })}
       </View>
     </View>
@@ -504,6 +511,7 @@ export default function BuyerProductDetailScreen() {
   const { isSignedIn } = useAuth();
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
+  const sizeBadgeModel = useSizeBadgeModel(product);
   const [loading, setLoading] = useState(true);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
@@ -1089,7 +1097,9 @@ export default function BuyerProductDetailScreen() {
             const isUnselected = optionsTouched && !selections[option.id];
             return (
               <View key={option.id}>
+                {option.name.toLowerCase() === 'size' && <SizeRecommendationBadge model={sizeBadgeModel} />}
                 <OptionPicker
+                  recommendedLabel={option.name.toLowerCase() === 'size' && sizeBadgeModel?.kind === 'recommend' ? sizeBadgeModel.size : null}
                   product={product}
                   option={option}
                   selections={selections}

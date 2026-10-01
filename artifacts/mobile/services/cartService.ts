@@ -147,6 +147,7 @@ function adaptApiProduct(row: any): BuyerProduct {
     variants,
     isActive: row.status ? row.status === 'active' : true,
     tags: Array.isArray(row.tags) ? row.tags : [],
+    sizeChart: row.sizeChart && typeof row.sizeChart === 'object' ? row.sizeChart : null,
   };
 }
 
