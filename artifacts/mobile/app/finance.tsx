@@ -136,6 +136,7 @@ export default function FinanceScreen() {
 
   const documents = [
     ...(!isReadOnly && !isSignedOutSellerPreview ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
+    ...(!isSignedOutSellerPreview ? [{ label: 'Monthly Statements (PDF / CSV)', icon: 'calendar' as const, onPress: () => router.push('/statements' as any) }] : []),
     ...(!isSignedOutSellerPreview ? [{ label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) }] : []),
   ];
 
