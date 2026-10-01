@@ -101,6 +101,7 @@ import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
+import accessRouter from "./access";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
@@ -114,6 +115,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/access",          accessRouter); // invite-only launch: validate/waitlist public, status/redeem authed
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
