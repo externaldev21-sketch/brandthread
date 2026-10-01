@@ -19,6 +19,8 @@ import { PressableScale, StatusBadge, useUndoToast } from '@/components/Brandthr
 import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
+import MediaViewer from '@/components/chat/MediaViewer';
+import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -266,6 +268,8 @@ export default function SellerConversationScreen() {
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [viewerUri, setViewerUri]               = useState<string | null>(null);
+  const [viewerVideoUri, setViewerVideoUri]     = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
@@ -891,23 +895,28 @@ export default function SellerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <View key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}>
+            <PressableScale rippleEnabled={false} key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]} activeOpacity={0.9} onPress={() => setViewerUri(uri)}>
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
               )}
-            </View>
+            </PressableScale>
           ))}
         </View>
       );
     }
     if (att.type === 'video') {
       return (
-        <View style={s.videoThumb}>
+        <PressableScale rippleEnabled={false}
+          style={s.videoThumb}
+          activeOpacity={0.9}
+          accessibilityLabel="Play video"
+          onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
+        >
           {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
           <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
-        </View>
+        </PressableScale>
       );
     }
     if (att.type === 'voice') {
@@ -1374,6 +1383,9 @@ export default function SellerConversationScreen() {
             // standalone product/order branch. See buyer-conversation.tsx.
             accessibilityRole={
               msg.attachment?.type === 'voice'
+              || msg.attachment?.type === 'image'
+              || msg.attachment?.type === 'video'
+              || msg.attachment?.type === 'post'
                 ? 'none' : undefined
             }
           >
@@ -2233,6 +2245,8 @@ export default function SellerConversationScreen() {
         }}
         onDismiss={() => setThreadCashNotice(null)}
       />
+      <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
+      <VideoMessageViewer uri={viewerVideoUri} onClose={() => setViewerVideoUri(null)} />
     </KeyboardAvoidingView>
   );
 }
