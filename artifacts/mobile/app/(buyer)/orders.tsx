@@ -26,6 +26,8 @@ import {
 } from '@/components/BrandthreadUI';
 import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { useReorderFlow } from '@/components/orders/ReorderFlow';
+import { canReorderStatus } from '@/lib/reorderSummary';
 import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -94,7 +96,7 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
 // Visual, tracker-forward card: seller + order meta up top, a live compact
 // status tracker as the centerpiece, then item preview / total / actions.
 
-const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { order: BuyerOrderView; onOpen: (orderId: string) => void }) {
+const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReorder, reordering }: { order: BuyerOrderView; onOpen: (orderId: string) => void; onReorder?: (orderId: string) => void; reordering?: boolean }) {
   const onPress = () => onOpen(order.id);
   const { theme } = useAppTheme();
   const styles = useMemo(() => cardStyles(theme), [theme]);
@@ -221,6 +223,19 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
           </TouchableOpacity>
         )}
+        {onReorder && canReorderStatus(order.status) && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.reorderBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent, opacity: reordering ? 0.5 : 1 }]}
+            activeOpacity={0.8}
+            disabled={reordering}
+            accessibilityRole="button"
+            accessibilityLabel="Reorder"
+            onPress={() => onReorder(order.id)}
+          >
+            <Feather name="repeat" size={12} color={theme.accentLight} />
+            <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>{reordering ? 'Adding…' : 'Reorder'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -274,6 +289,7 @@ export default function BuyerOrdersScreen() {
     router.push(('/buyer-order-detail?id=' + orderId) as never);
   }, [router]);
   const { userId } = useAuth();
+  const { reorder, busyOrderId, element: reorderElement } = useReorderFlow({ aboveTabBar: true });
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
   const [ordersOwnerId, setOrdersOwnerId] = useState<string | null | undefined>(userId);
@@ -459,12 +475,14 @@ export default function BuyerOrdersScreen() {
                 paddingTop: SP.sm,
                 paddingBottom: barInset + SP.md,
               }}
+              extraData={busyOrderId}
               ItemSeparatorComponent={OrderCardGap}
-              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} />}
+              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} onReorder={reorder} reordering={busyOrderId === item.id} />}
             />
           )}
         </>
       )}
+      {reorderElement}
     </BrandthreadScreen>
   );
 }
@@ -636,6 +654,11 @@ function cardStyles(theme: AppThemePreset) {
       borderColor: theme.border,
       flexDirection: 'row',
       gap: 4,
+    },
+    // Own line under View / Track so those two keep their existing width.
+    reorderBtn: {
+      flexBasis: '100%',
+      paddingHorizontal: SP.sm,
     },
     actionBtnSecondary: {
       backgroundColor: theme.secondaryDim,

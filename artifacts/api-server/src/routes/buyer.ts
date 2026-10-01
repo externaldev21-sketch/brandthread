@@ -7,7 +7,7 @@ import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, buyerAddresses,
   drops, shippingZones, shippingZoneWeightTiers,
 } from "@workspace/db";
-import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, sql, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   requireStripe,
@@ -21,6 +21,7 @@ import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneW
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
 import { withItemProductIds } from "../lib/orderItemProducts";
+import { resolveReorder } from "../lib/reorderResolver";
 import {
   bindLoyaltyRedemptionToCheckout,
   LoyaltyRedemptionError,
@@ -1437,6 +1438,79 @@ router.get("/orders/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to fetch buyer order");
     res.status(500).json({ error: "Failed to fetch order" });
+  }
+});
+
+// ─── Buyer Reorder ───────────────────────────────────────────────────────────
+/**
+ * POST /api/buyer/orders/:id/reorder
+ * Re-resolves every line of one of the buyer's own past orders against the
+ * CURRENT catalogue (price, stock, variant, product status). Read-only: the
+ * client adds the `addable` lines to the cart itself. See lib/reorderResolver.
+ */
+router.post("/orders/:id/reorder", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
+  const id = req.params.id as string;
+  try {
+    const buyerId = (req as any).clerkUserId as string;
+    const [order] = await db
+      .select({ id: orders.id, ownerId: orders.ownerId })
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.buyerId, buyerId)))
+      .limit(1);
+    if (!order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+
+    const items = await withItemProductIds(await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, order.id)));
+
+    const productIds = new Set(items.map((i) => i.productId).filter((p): p is string => !!p));
+    // Lines whose variant was deleted have no product id: look the product up
+    // by title within the same seller so the line can still be re-matched.
+    const orphanNames = [...new Set(items.filter((i) => !i.productId).map((i) => i.productName))];
+    const filters = [];
+    if (productIds.size > 0) filters.push(inArray(products.id, [...productIds]));
+    if (orphanNames.length > 0) filters.push(and(eq(products.ownerId, order.ownerId), inArray(products.name, orphanNames)));
+    const productFilter = filters.length > 0 ? or(...filters) : sql`false`;
+    const productRows = await db
+      .select({
+        id: products.id, name: products.name, status: products.status,
+        deletedAt: products.deletedAt, isPreOrder: products.isPreOrder,
+      })
+      .from(products)
+      .where(productFilter);
+    const variantRows = productRows.length > 0
+      ? await db
+          .select({
+            id: productVariants.id, productId: productVariants.productId, size: productVariants.size,
+            color: productVariants.color, sku: productVariants.sku,
+            priceCents: productVariants.priceCents, stock: productVariants.stock,
+          })
+          .from(productVariants)
+          .where(inArray(productVariants.productId, productRows.map((p) => p.id)))
+      : [];
+
+    const catalog = productRows.map((p) => ({
+      ...p,
+      variants: variantRows.filter((v) => v.productId === p.id),
+    }));
+    const result = resolveReorder(
+      items.map((i) => ({
+        variantId: i.variantId,
+        productName: i.productName,
+        variantLabel: i.variantLabel,
+        quantity: i.quantity,
+        priceCents: i.priceCents,
+      })),
+      catalog,
+    );
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err, orderId: id }, "Failed to resolve reorder");
+    res.status(500).json({ error: "Failed to prepare reorder" });
   }
 });
 
