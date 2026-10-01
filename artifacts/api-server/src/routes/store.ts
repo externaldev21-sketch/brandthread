@@ -2,12 +2,13 @@ import dns from "dns/promises";
 import { Router } from "express";
 import {
   db, storefronts, storefrontVersions, storefrontCustomDomains,
-  products, productVariants,
+  products, productVariants, storePixels,
 } from "@workspace/db";
 import { eq, and, desc, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getWebOrigin } from "../lib/webOrigin";
 import crypto from "crypto";
+import { ATTRIBUTION_SCRIPT, buildPixelInjection, requestOptsOutOfTracking } from "../lib/growth/pixels";
 
 const router = Router();
 
@@ -258,10 +259,24 @@ async function getStoreProducts(ownerId: string, limit = 8): Promise<Array<{
 // /preview/:token, and the public /site/:slug route). `isPreview` only
 // changes the banner shown at the top of the page; the rendering, catalog,
 // cart, and checkout wiring are identical to what a real customer sees.
-async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; sf?: any }): Promise<string> {
+async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; sf?: any; optOutTracking?: boolean }): Promise<string> {
   const isPreview = opts?.isPreview ?? true;
   const sf = opts?.sf ?? await getOrCreateStorefront(ownerId);
   const storeProducts = await getStoreProducts(ownerId);
+  // Growth: first-party attribution capture + (validated-ID-only) Meta/TikTok pixels.
+  // Only the public site gets these, never the private preview.
+  let growthHead = "";
+  if (!isPreview) {
+    let pixelIds: { metaPixelId: string | null; tiktokPixelId: string | null } | undefined;
+    try {
+      [pixelIds] = await db.select({ metaPixelId: storePixels.metaPixelId, tiktokPixelId: storePixels.tiktokPixelId })
+        .from(storePixels).where(eq(storePixels.sellerId, ownerId)).limit(1);
+    } catch { /* pixels are optional; never break the store page */ }
+    growthHead = ATTRIBUTION_SCRIPT + buildPixelInjection({
+      metaPixelId: pixelIds?.metaPixelId, tiktokPixelId: pixelIds?.tiktokPixelId,
+      cartKey: `bt_cart_${String(sf.id ?? "")}`, optOut: opts?.optOutTracking === true,
+    }).head;
+  }
   const theme    = (sf.theme    as any) ?? {};
   const branding = (sf.branding as any) ?? {};
   const seo      = (sf.seo     as any) ?? {};
@@ -437,6 +452,7 @@ async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; s
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${metaTitle}</title>
 <meta name="description" content="${metaDesc}">
+${growthHead}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -627,6 +643,7 @@ ${hasVisibleSectionContent ? sectionHtml : sections.length > 0 ? fallbackSection
         phone: form.contactPhone.value,
       },
       clientIdempotencyKey: idempotencyKey,
+      attribution: window.__btAttribution || undefined,
     };
     fetch(CHECKOUT_URL, {
       method: "POST",
@@ -736,7 +753,11 @@ router.get("/site/:slug", async (req, res): Promise<void> => {
     res.status(404).send(NOT_FOUND_PAGE);
     return;
   }
-  const html = await buildPreviewHtml(sf.ownerId, { isPreview: false, sf });
+  const html = await buildPreviewHtml(sf.ownerId, {
+    isPreview: false, sf, optOutTracking: requestOptsOutOfTracking(req.headers),
+  });
+  // The page differs for visitors who send Global Privacy Control / Do Not Track.
+  res.set("Vary", "Sec-GPC, DNT");
   res.set("Content-Type", "text/html");
   res.send(html);
 });

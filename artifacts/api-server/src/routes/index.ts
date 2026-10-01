@@ -130,6 +130,7 @@ import sharePreviewRouter from "./share-preview";
 import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
+import growthRouter from "./growth";
 
 const router = Router();
 
@@ -322,5 +323,7 @@ router.use("/seller/away-message",      tc, awayMessageRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
+// Seller growth tools: tracked UTM links, link-in-bio, store pixels.
+router.use("/growth",              tc, growthRouter);
 
 export default router;
