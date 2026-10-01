@@ -21,8 +21,10 @@ import { pathToFileURL } from 'node:url';
  * parent/viewport overflow, and insufficient padding inside a bordered or
  * filled container. React Native Web renders <Text> elements as divs.
  */
-export async function checkTextFit(page, { minPad = 12 } = {}) {
-  return page.evaluate((minPadding) => {
+export async function checkTextFit(page, options = {}) {
+  const minPad = typeof options === 'number' ? options : typeof options === 'object' ? options.minPad ?? 12 : 12;
+  const label = typeof options === 'string' ? options : typeof options === 'object' ? options.label : undefined;
+  const problems = await page.evaluate((minPadding) => {
     const problems = [];
     const vw = document.documentElement.clientWidth;
     const hasBox = (cs) =>
@@ -68,6 +70,13 @@ export async function checkTextFit(page, { minPad = 12 } = {}) {
     }
     return problems;
   }, minPad);
+  return label ? problems.map((problem) => ({ ...problem, label })) : problems;
+}
+
+export async function assertTextFit(page, label, options = {}) {
+  const issues = await checkTextFit(page, { ...options, label });
+  if (issues.length) throw new Error(`Text-fit check failed on ${label}: ${issues.length} issue(s)`);
+  return issues;
 }
 
 /** Legacy shared-preview scan retained for multi-route screenshot audits. */

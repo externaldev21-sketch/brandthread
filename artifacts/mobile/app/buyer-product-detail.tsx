@@ -55,6 +55,7 @@ import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
 import { ProductVideo } from '@/components/products/ProductVideo';
+import { ProductQuestionsSection } from '@/components/ProductQuestionsSection';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -1277,6 +1278,9 @@ export default function BuyerProductDetailScreen() {
           {/* Reviews — shared with the Shop sheet so review UI never drifts
               between the two surfaces. Renders nothing when there are none. */}
           <ProductReviewsSection productId={product.id} productName={product.name} />
+
+          {/* Questions — public Q&A, answered by the seller. */}
+          <ProductQuestionsSection productId={product.id} productName={product.name} />
 
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />

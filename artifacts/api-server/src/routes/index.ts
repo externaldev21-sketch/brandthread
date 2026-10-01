@@ -50,6 +50,7 @@ import connectRouter, { connectRedirectRouter } from "./connect";
 import subscriptionRouter from "./subscription";
 import webhooksRouter from "./webhooks";
 import reviewsRouter from "./reviews";
+import productQaRouter from "./product-qa";
 import sellerProfileRouter from "./seller-profile";
 import conversationsRouter from "./conversations";
 import communitiesRouter from "./communities";
@@ -288,6 +289,7 @@ router.use("/seller/verification",       tc, sellerVerificationRouter);
 router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
+router.use("/product-qa",                tc, productQaRouter);
 // Comments are attributed to the person writing them, so they are mounted
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
