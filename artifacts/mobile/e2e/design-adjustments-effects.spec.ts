@@ -91,8 +91,22 @@ async function openTool(page: import('@playwright/test').Page, category: string,
   await page.waitForTimeout(300);
 }
 
+/**
+ * The layer's own filter (`lf_<layerId>`) on the DISPLAY canvas. The page
+ * mounts every layer twice — the visible canvas and the always-mounted
+ * off-screen export <Svg> (opacity 0, used for toDataURL) — so a page-wide
+ * `svg feOffset` count is exactly double the real stage count. Scoping to
+ * the first `lf_` filter (document order = the display canvas) gives the
+ * real per-layer primitive count.
+ */
+function layerFilter(page: import('@playwright/test').Page) {
+  return page.locator('svg filter[id^="lf_"]').first();
+}
+
 async function svgCount(page: import('@playwright/test').Page, tag: string) {
-  return page.locator(`svg ${tag}`).count();
+  const f = layerFilter(page);
+  if (await f.count() === 0) return 0;
+  return f.locator(tag).count();
 }
 
 test('Adjustments opens on Procreate\'s 2×2 category grid; every category lists its real tools; deferred tools are absent; no overflow', async () => {
@@ -148,11 +162,11 @@ test('Gaussian Blur attaches a real feGaussianBlur to the layer, scales with the
   await page.waitForTimeout(200);
   await expect(page.locator('[data-testid="adj-gaussianBlur-value-value"]')).toHaveText('2 px');
   expect(await svgCount(page, 'feGaussianBlur')).toBeGreaterThan(0);
-  const std1 = await page.locator('svg feGaussianBlur').first().getAttribute('stdDeviation');
+  const std1 = await layerFilter(page).locator('feGaussianBlur').first().getAttribute('stdDeviation');
 
   await page.locator('[data-testid="adj-gaussianBlur-value-inc"]').click();
   await page.waitForTimeout(200);
-  const std2 = await page.locator('svg feGaussianBlur').first().getAttribute('stdDeviation');
+  const std2 = await layerFilter(page).locator('feGaussianBlur').first().getAttribute('stdDeviation');
   expect(parseFloat(std2!)).toBeGreaterThan(parseFloat(std1!)); // the primitive's own attribute tracks the slider
 
   await assertNoTextOrBoxOverflow(page, '[data-testid="adj-panel-gaussianBlur"]');
@@ -174,7 +188,7 @@ test('Motion Blur is a real 7-tap feOffset box blur whose span grows with amount
   await page.waitForTimeout(200);
   await expect(page.locator('[data-testid="adj-motionBlur-amount-value"]')).toHaveText('2 px');
   expect(await svgCount(page, 'feOffset')).toBe(7);
-  const outerDx = async () => Math.abs(parseFloat((await page.locator('svg feOffset').first().getAttribute('dx')) ?? '0'));
+  const outerDx = async () => Math.abs(parseFloat((await layerFilter(page).locator('feOffset').first().getAttribute('dx')) ?? '0'));
   const span1 = await outerDx();
   expect(span1).toBeGreaterThan(0);
   for (let i = 0; i < 3; i++) await page.locator('[data-testid="adj-motionBlur-amount-inc"]').click(); // 8 px
