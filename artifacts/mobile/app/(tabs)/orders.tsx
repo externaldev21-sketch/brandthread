@@ -613,8 +613,7 @@ const OrderListRow = React.memo(function OrderListRow({
     <SwipeActionRow
       label={swipeAction.label}
       icon={swipeAction.icon}
-      color={theme.border}
-      textColor={theme.text}
+      color={theme.muted}
       onAction={swipeAction.run}
       disabled={selectionMode}
       accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}

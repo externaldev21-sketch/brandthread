@@ -14,8 +14,6 @@ interface SwipeActionRowProps {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   color: string;
-  /** Label/icon colour on the action background (default: the theme's on-accent). */
-  textColor?: string;
   onAction: () => void | Promise<void>;
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -26,7 +24,6 @@ export default function SwipeActionRow({
   label,
   icon,
   color,
-  textColor,
   onAction,
   disabled = false,
   accessibilityLabel,
@@ -87,8 +84,8 @@ export default function SwipeActionRow({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
       >
-        <Feather name={icon} size={18} color={textColor ?? theme.onAccent} />
-        <Text style={[styles.actionText, { color: textColor ?? theme.onAccent }]}>{label}</Text>
+        <Feather name={icon} size={18} color={theme.onAccent} />
+        <Text style={[styles.actionText, { color: theme.onAccent }]}>{label}</Text>
       </AnimatedPressable>
       <Animated.View
         style={{ transform: [{ translateX }] }}
