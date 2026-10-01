@@ -243,12 +243,15 @@
       "favicon": "./assets/images/icon.png",
       "output": "single"
     },
-    "androidNavigationBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#0A0A0B"
-    },
     "plugins": [
       "./plugins/with-verify-app-identity",
+      [
+        "expo-navigation-bar",
+        {
+          "style": "dark",
+          "enforceContrast": false
+        }
+      ],
       [
         "expo-runtime-app-icon",
         {

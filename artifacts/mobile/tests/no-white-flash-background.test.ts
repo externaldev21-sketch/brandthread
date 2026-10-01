@@ -28,12 +28,21 @@ describe('no white-flash background regressions', () => {
     expect(layout).toContain("NavigationBar.setStyle('light')");
   });
 
-  it('configures a themed (non-white) default Android navigation bar in app.json', () => {
+  it('configures the Android navigation bar through the supported plugin over the dark native background', () => {
     const appJson = JSON.parse(read('app.json'));
-    const navBar = appJson.expo?.androidNavigationBar;
-    expect(navBar, 'expo.androidNavigationBar must be configured').toBeTruthy();
-    expect(navBar.backgroundColor).toMatch(/^#[0-9A-Fa-f]{6,8}$/);
-    expect(navBar.backgroundColor.toUpperCase()).not.toBe('#FFFFFF');
+    const plugins = appJson.expo?.plugins ?? [];
+    const navBarPlugin = plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === 'expo-navigation-bar',
+    );
+    expect(navBarPlugin, 'expo-navigation-bar plugin config not found').toBeTruthy();
+    expect(navBarPlugin[1]).toEqual({
+      style: 'dark',
+      enforceContrast: false,
+    });
+    // The SDK 57 plugin controls icon style and contrast; the transparent
+    // edge-to-edge navigation area shows the app's explicitly dark window
+    // background instead of relying on the removed androidNavigationBar field.
+    expect(appJson.expo?.userInterfaceStyle).toBe('dark');
   });
 
   it('keeps the splash background dark, matching the native module-load default', () => {
