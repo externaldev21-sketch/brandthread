@@ -16,7 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { PrimaryButton } from '@/components/BrandthreadUI';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { Header } from '@/components/layout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
@@ -138,10 +138,10 @@ export default function ProductPairingsScreen() {
   if (picking) {
     return (
       <View style={s.root}>
-        <ScreenHeader
+        <Header dividerVariant="none"
           title="Add products"
           onBack={() => setPicking(false)}
-          rightElement={<PrimaryButton label="Done" onPress={applyPicker} small style={{ minWidth: 72 }} />}
+          rightElement={<PrimaryButton label="Done" onPress={applyPicker} small style={{ minWidth: 72, paddingHorizontal: 16 }} />}
         />
         <View style={s.searchWrap}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
@@ -170,7 +170,7 @@ export default function ProductPairingsScreen() {
                 accessibilityLabel={c.name}
               >
                 <Thumb uri={c.image} s={s} colors={colors} />
-                <Text style={s.name} numberOfLines={2}>{c.name}</Text>
+                <Text style={s.name}>{c.name}</Text>
                 <View style={[s.checkbox, checked && s.checkboxOn]}>
                   {checked ? <Feather name="check" size={14} color={colors.primaryForeground} /> : null}
                 </View>
@@ -187,10 +187,10 @@ export default function ProductPairingsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader
+      <Header dividerVariant="none"
         title="Complete the fit"
         onBack={() => goBackOr(router)}
-        rightElement={<PrimaryButton label={saving ? 'Saving...' : 'Save'} onPress={save} loading={saving} disabled={!dirty} small style={{ minWidth: 72 }} />}
+        rightElement={<PrimaryButton label={saving ? 'Saving...' : 'Save'} onPress={save} loading={saving} disabled={!dirty} small style={{ minWidth: 72, paddingHorizontal: 16 }} />}
       />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
@@ -209,7 +209,7 @@ export default function ProductPairingsScreen() {
             <View key={p.id} style={s.row}>
               <Thumb uri={p.image} s={s} colors={colors} />
               <View style={{ flex: 1 }}>
-                <Text style={s.name} numberOfLines={2}>{p.name}</Text>
+                <Text style={s.name}>{p.name}</Text>
                 {!p.active ? <Text style={s.hidden}>Hidden from shoppers</Text> : null}
               </View>
               <IconBtn name="chevron-up" disabled={index === 0} onPress={() => move(index, -1)} label={`Move ${p.name} up`} colors={colors} s={s} />

@@ -7,6 +7,7 @@
  *   node scripts/product-fit-screenshots.mjs [--skip-build]
  */
 import { existsSync, mkdirSync } from 'node:fs';
+import { reportTextFit } from './lib/textFitCheck.mjs';
 import { PUBLIC_PRODUCTS } from './store-screenshots/demo-data.mjs';
 import { ensureDemoImages } from './store-screenshots/demo-images.mjs';
 import path from 'node:path';
@@ -81,6 +82,19 @@ async function shot(page, name) {
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
   console.log(`  ok ${name}`);
+  await reportTextFit(page, name);
+}
+
+/** Zoomed 2x crop of a region (text-fit evidence). */
+async function clip(page, name, y, height) {
+  await page.screenshot({ path: path.join(OUT, `${name}.png`), clip: { x: 0, y, width: 393, height } });
+  console.log(`  ok ${name}`);
+}
+
+async function clipFrom(page, name, text, height, above = 12) {
+  const box = await page.getByText(text, { exact: true }).first().boundingBox();
+  const y = Math.max(0, box.y - above);
+  await clip(page, name, y, Math.min(height, 852 - y));
 }
 
 async function scrollTo(page, text) {
@@ -99,25 +113,30 @@ async function run() {
       await nav(page, `/buyer-product-detail?productId=${MAIN.id}&bt_preview=buyer`, 'Complete the fit');
       await scrollTo(page, 'Complete the fit');
       await shot(page, '01-complete-the-fit-pdp');
+      await clipFrom(page, 'zoom-complete-the-fit-rail', 'Complete the fit', 330);
       await scrollTo(page, 'Product video');
       await shot(page, '03-product-video-pdp');
+      await clipFrom(page, 'zoom-product-video-section', 'Product video', 330);
       await context.close();
     }
     {
       const { context, page } = await session(browser, origin, 'seller', true);
       await nav(page, `/product-pairings?productId=${PID}&bt_preview=seller`, 'Paired products');
       await shot(page, '02-pairings-manager');
+      await clipFrom(page, 'zoom-pairings-rows', 'Paired products', 330);
       await page.getByLabel('Add product').first().click();
       await page.waitForTimeout(800);
       await shot(page, '02b-pairings-picker');
       await nav(page, `/product-video?productId=${PID}&bt_preview=seller`, 'Replace');
       await shot(page, '05-video-manager-uploaded');
+      await clipFrom(page, 'zoom-video-actions', 'Replace', 90, 20);
       await context.close();
     }
     {
       const { context, page } = await session(browser, origin, 'seller', false);
       await nav(page, `/product-video?productId=${PID}&bt_preview=seller`, 'Add video');
       await shot(page, '04-video-manager-empty');
+      await clipFrom(page, 'zoom-video-empty-tile', 'Add video', 120, 60);
       await context.close();
     }
   } finally {

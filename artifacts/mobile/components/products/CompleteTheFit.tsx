@@ -181,7 +181,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
                   <Feather name={added ? 'check' : 'plus'} size={16} color={added ? colors.primaryForeground : colors.foreground} />
                 </TouchableOpacity>
               ) : null}
-              <Text style={s.name} numberOfLines={1}>{item.name}</Text>
+              <Text style={s.name} numberOfLines={2}>{item.name}</Text>
               <Text style={s.price}>{item.product ? formatCents(item.priceCents) : 'Sold out'}</Text>
             </View>
           );
@@ -191,7 +191,7 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
       <BottomSheet visible={!!picking} onClose={() => setPicking(null)}>
         <View style={{ padding: SP.md }}>
-          <Text style={s.sheetTitle} numberOfLines={1}>{picking?.name}</Text>
+          <Text style={s.sheetTitle}>{picking?.name}</Text>
           {pickVariants.map((v) => (
             <TouchableOpacity
               key={v.id}
@@ -224,7 +224,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   addBtnDone: { backgroundColor: c.primary, borderColor: c.primary },
-  name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.foreground },
+  name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.foreground, lineHeight: 18, minHeight: 36 },
   price: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.foreground, marginTop: 2 },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.mutedForeground, marginTop: SP.sm },
   sheetTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: c.foreground, marginBottom: SP.sm },

@@ -15,7 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { Header } from '@/components/layout';
 import { formatVideoLength } from '@/components/products/ProductVideo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useRouter } from 'expo-router';
@@ -130,7 +130,7 @@ export default function ProductVideoScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Product video" onBack={() => goBackOr(router)} />
+      <Header dividerVariant="none" title="Product video" onBack={() => goBackOr(router)} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       ) : error ? (
