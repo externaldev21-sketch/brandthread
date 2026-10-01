@@ -6,6 +6,7 @@ import type { Request, RequestHandler } from "express";
 export type RateLimitPolicyName =
   | "authentication"
   | "asset-upload"
+  | "upload"
   | "checkout"
   | "webhook"
   | "expensive"
@@ -25,6 +26,14 @@ export type RateLimitPolicy = {
   limit: number;
   windowMs: number;
   message: string;
+  /**
+   * Extra ceiling shared by every signed-in account behind one IP address.
+   * The per-user bucket stops one account from hammering an endpoint; this one
+   * stops a single machine from rotating through many accounts (sign-up
+   * sweeps, credential stuffing, scripted AI spend). Unsigned requests are
+   * already keyed by IP, so it only applies to signed-in traffic.
+   */
+  ipLimit?: number;
 };
 
 // Dev/preview traffic (Replit web preview, local `pnpm dev`) reloads far more
@@ -50,13 +59,25 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     id: "authentication",
     limit: scaled(30),
     windowMs: 10 * 60_000,
+    ipLimit: scaled(120),
     message: "Too many authentication requests. Please wait before trying again.",
   },
   "asset-upload": {
     id: "asset-upload",
     limit: scaled(6),
     windowMs: 60_000,
+    ipLimit: scaled(30),
     message: "Too many asset uploads. Please wait a minute and try again.",
+  },
+  upload: {
+    id: "upload",
+    // Photos, videos and attachments sent to any route. A person posting a
+    // carousel sends a handful in a burst, so this is generous per account but
+    // still far below what a script uploading to fill storage would send.
+    limit: scaled(30),
+    windowMs: 60_000,
+    ipLimit: scaled(150),
+    message: "Too many uploads. Please wait a minute and try again.",
   },
   checkout: {
     id: "checkout",
@@ -74,6 +95,7 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     id: "expensive",
     limit: scaled(30),
     windowMs: 60_000,
+    ipLimit: scaled(150),
     message: "Too many generation requests. Please wait a minute and try again.",
   },
   mutation: {
@@ -98,6 +120,7 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     id: "messaging",
     limit: scaled(30),
     windowMs: 60_000,
+    ipLimit: scaled(150),
     message: "Too many messages sent. Please wait a moment and try again.",
   },
   "community-create": {
@@ -112,6 +135,7 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     id: "agent-chat",
     limit: scaled(20),
     windowMs: 60_000,
+    ipLimit: scaled(100),
     message: "You're chatting with the Brandthread Agent a lot — give it a minute and try again.",
   },
   comment: {
@@ -143,7 +167,11 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
 };
 
 const EXPENSIVE_PATH =
-  /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai)(\/|$)/;
+  /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai|support-chat\/message)(\/|$)/;
+// Binary uploads are recognised by what they carry, not only by route name, so
+// a new upload endpoint is covered the day it ships.
+const UPLOAD_PATH = /\/(?:upload|upload-media|upload-photo|images\/upload|avatar\/upload|logo\/upload|banner\/upload|media)(?:\/|$)/;
+const UPLOAD_CONTENT_TYPE = /^(?:image|video|audio)\/|^application\/(?:pdf|octet-stream)\b/i;
 const AUTH_PATH = /\/auth(?:\/|$)/;
 const CHECKOUT_PATH = /\/(?:guest\/checkout|buyer\/checkout|checkout)(?:\/|$)/;
 const WEBHOOK_PATH = /\/webhooks(?:\/|$)/;
@@ -175,15 +203,28 @@ export function rateLimitIdentity(req: Request, policy: RateLimitPolicy): string
   return `ip:${ip}`;
 }
 
+/** Bucket shared by all signed-in accounts on one IP for `policy.ipLimit`. */
+export function ipCeilingKey(req: Request, policy: RateLimitPolicy): string {
+  const ip = normalizeClientIp(req.ip || req.socket.remoteAddress);
+  return `${policy.id}:ipcap:ip:${ip}`;
+}
+
 export function rateLimitPolicyFor(
   method: string,
   path: string,
   authenticated: boolean,
+  contentType?: string,
 ): RateLimitPolicy | null {
   if (WEBHOOK_PATH.test(path)) return RATE_LIMIT_POLICIES.webhook;
   if (AUTH_PATH.test(path)) return RATE_LIMIT_POLICIES.authentication;
   if (CHECKOUT_PATH.test(path)) return RATE_LIMIT_POLICIES.checkout;
   if (EXPENSIVE_PATH.test(path)) return RATE_LIMIT_POLICIES.expensive;
+  if (
+    (method === "POST" || method === "PUT") &&
+    (UPLOAD_PATH.test(path) || (contentType && UPLOAD_CONTENT_TYPE.test(contentType)))
+  ) {
+    return RATE_LIMIT_POLICIES.upload;
+  }
   if (MUTATION_METHODS.has(method)) return RATE_LIMIT_POLICIES.mutation;
   if (authenticated && (method === "GET" || method === "HEAD")) {
     return RATE_LIMIT_POLICIES["authenticated-read"];
@@ -251,7 +292,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
     const userId = authenticatedUserId(req);
     const policy = explicitPolicy
       ? RATE_LIMIT_POLICIES[explicitPolicy]
-      : rateLimitPolicyFor(req.method, req.path, Boolean(userId));
+      : rateLimitPolicyFor(req.method, req.path, Boolean(userId), req.headers["content-type"]);
     if (!policy) {
       next();
       return;
@@ -279,6 +320,26 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
           retryAfterSeconds,
         });
         return;
+      }
+      if (userId && policy.ipLimit) {
+        const ipCounter = await consumeRateLimitBucket(ipCeilingKey(req, policy), {
+          ...policy,
+          limit: policy.ipLimit,
+        });
+        if (ipCounter.count > policy.ipLimit) {
+          const ipRetry = Math.max(
+            1,
+            Math.ceil((ipCounter.resetAt.getTime() - Date.now()) / 1000),
+          );
+          res.setHeader("Retry-After", String(ipRetry));
+          res.status(429).json({
+            error: "Rate limit exceeded",
+            code: "RATE_LIMITED",
+            message: policy.message,
+            retryAfterSeconds: ipRetry,
+          });
+          return;
+        }
       }
       if (explicitPolicy) {
         (req as Request & { rateLimitApplied?: boolean }).rateLimitApplied = true;
