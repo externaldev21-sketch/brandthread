@@ -3,6 +3,8 @@
  *
  * POST /api/feed/events   — batched, idempotent ranking-signal ingestion (requireAuth)
  * GET  /api/feed/for-you  — buyer's personalized ranked feed, cursor-paginated (requireAuth)
+ * DELETE /api/feed/not-interested/:postId — undo a "Not interested" hide (requireAuth)
+ * GET/PUT /api/feed/ranking-config — read / update tunable ranking weights (moderators only)
  *
  * Likes/saves/reposts/comments/follows/purchases already have their own
  * write paths elsewhere (posts.ts /:id/interact, saved.ts, orders) and are
@@ -14,11 +16,13 @@ import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import { z } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requireModerator } from "../middlewares/requireAuth";
 import { validateRequest } from "../middlewares/validateRequest";
 import { rateLimit } from "../middlewares/rateLimit";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
+import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
+import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
@@ -81,6 +85,11 @@ router.post(
       for (const row of inserted) {
         const post = postById.get(row.postId);
         if (!post) continue;
+        if (row.type === "not_interested") {
+          // Persist the hide too (same as POST /posts/:id/interact) so the post leaves For You.
+          await hidePostFromForYou(userId, { id: row.postId, sellerId: post.userId })
+            .catch((err) => req.log.error({ err, userId }, "Failed to persist not-interested hide"));
+        }
         await applyEventToProfile(userId, {
           type: row.type,
           value: row.value,
@@ -225,6 +234,39 @@ router.get("/for-you", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err, userId }, "Failed to build For You feed");
     res.status(500).json({ error: "Failed to load feed" });
+  }
+});
+
+// ─── DELETE /api/feed/not-interested/:postId ──────────────────────────────────
+router.delete("/not-interested/:postId", requireAuth, async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const postId = String(req.params.postId);
+  if (!z.string().uuid().safeParse(postId).success) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  try {
+    const removed = await unhidePostFromForYou(userId, postId);
+    res.json({ ok: true, removed });
+  } catch (err) {
+    req.log.error({ err, userId }, "Failed to undo not-interested");
+    res.status(500).json({ error: "Failed to update feed preferences" });
+  }
+});
+
+// ─── GET/PUT /api/feed/ranking-config (moderators) ────────────────────────────
+router.get("/ranking-config", requireAuth, requireModerator, async (_req, res) => {
+  res.json({ config: await getRankingConfig(), defaults: DEFAULT_RANKING_CONFIG });
+});
+
+router.put("/ranking-config", requireAuth, requireModerator, async (req, res) => {
+  try {
+    // Unknown keys are ignored and numbers clamped; the merged, validated config is returned.
+    const config = await saveRankingConfig(req.body);
+    res.json({ config });
+  } catch (err) {
+    req.log.error({ err }, "Failed to save ranking config");
+    res.status(500).json({ error: "Failed to save ranking config" });
   }
 });
 
