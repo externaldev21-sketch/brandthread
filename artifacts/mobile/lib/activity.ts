@@ -620,6 +620,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return '/thread-cash';
     case 'referral':
       return '/buyer-invite';
+    case 'live_cohost':
+      // "Invited you to co-host their live" — opens the accept / decline screen.
+      return id ? `/live-cohost-invite?streamId=${q(id)}` : '/live-cohost-invite';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
     case 'user': {

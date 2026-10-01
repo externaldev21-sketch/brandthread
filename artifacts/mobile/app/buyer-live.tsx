@@ -35,6 +35,8 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import Composer from '@/components/ui/Composer';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+import { useLiveModeration } from '@/lib/live/useLiveModeration';
+import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -94,6 +96,9 @@ function BuyerLiveNativeScreen() {
   const [region, setRegion]               = useState('');
   const [postalCode, setPostalCode]       = useState('');
   const lastHighlightedRef = useRef<string | null>(null);
+  // Moderation + co-host: pinned comment above chat, co-host tiles, removal.
+  const mod = useLiveModeration(params.streamId);
+  const hostUidRef = useRef<number | null>(null);
 
   const engineRef       = useRef<any>(null);
   const scrollRef       = useRef<ScrollView>(null);
@@ -132,10 +137,19 @@ function BuyerLiveNativeScreen() {
         lastHighlightedRef.current = highlighted.productId;
         void openPurchase(highlighted);
       }
+    } else if (event.type === 'comment_removed') {
+      setComments(prev => prev.filter(c => c.id !== event.commentId));
+      mod.handleEvent(event);
+    } else if (event.type === 'comment_pinned' || event.type === 'cohosts') {
+      mod.handleEvent(event);
+    } else if (event.type === 'removed' || (event.type === 'user_banned' && event.userId === user?.id)) {
+      // The host banned this viewer: off the stream, no rejoin.
+      Alert.alert('Removed from the live', 'The host removed you from this live.');
+      handleLeave(true);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
     }
-  }, []);
+  }, [user?.id, mod.handleEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -154,7 +168,7 @@ function BuyerLiveNativeScreen() {
     streamId: params.streamId,
     enabled: !loading && !ended && !!params.streamId,
     onEvent: handleLiveEvent,
-    onConnected: () => { void poll(); },
+    onConnected: () => { void poll(); mod.refresh(); },
     onFallback: startFallbackPolling,
   });
 
@@ -165,6 +179,7 @@ function BuyerLiveNativeScreen() {
       const s = streamData.stream;
       if (!s || s.status !== 'live') { setEnded(true); setLoading(false); return; }
       setStream(s);
+      hostUidRef.current = typeof s.agora_uid === 'number' ? s.agora_uid : null;
       setViewerCount(s.viewer_count ?? 0);
       setProductTags(Array.isArray(s.product_tags) ? s.product_tags : []);
 
@@ -184,8 +199,17 @@ function BuyerLiveNativeScreen() {
           engine.setClientRole(ClientRoleType.ClientRoleAudience);
           engine.enableVideo();
           engine.registerEventHandler({
-            onUserJoined: (uid: number) => { setBroadcastUid(uid); setAgoraReady(true); },
-            onUserOffline: () => { setEnded(true); },
+            // react-native-agora v6 passes (connection, remoteUid); accept either shape.
+            // With co-hosts there can be several publishers: only the host's uid is the
+            // main video, and only the host going offline ends the stream.
+            onUserJoined: (a: any, b?: number) => {
+              const uid: number = typeof a === 'number' ? a : (b as number);
+              if (hostUidRef.current == null || uid === hostUidRef.current) { setBroadcastUid(uid); setAgoraReady(true); }
+            },
+            onUserOffline: (a: any, b?: number) => {
+              const uid: number = typeof a === 'number' ? a : (b as number);
+              if (hostUidRef.current == null || uid === hostUidRef.current) setEnded(true);
+            },
             onJoinChannelSuccess: () => {},
             onError: (err: any) => console.warn('[Agora viewer]', err),
           });
@@ -201,7 +225,8 @@ function BuyerLiveNativeScreen() {
         }
       }
     } catch (e: any) {
-      Alert.alert('Couldn’t join the live', 'Try again.');
+      Alert.alert('Couldn’t join the live', apiErrorMessage(e, 'Try again.'));
+      if (e?.status === 403) { goBackOr(router); }
     } finally {
       setLoading(false);
     }
@@ -456,6 +481,9 @@ function BuyerLiveNativeScreen() {
         </View>
       )}
 
+      {/* Co-host tiles */}
+      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={RemoteVideoView} top={headerTopInset + 96} />
+
       {/* Dark overlay */}
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
@@ -531,6 +559,7 @@ function BuyerLiveNativeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={s.bottom}
       >
+        <PinnedCommentBar comment={mod.pinned} />
         <ScrollView
           ref={scrollRef}
           style={s.commentScroll}

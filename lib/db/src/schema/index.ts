@@ -2137,6 +2137,8 @@ export const liveComments = pgTable('live_comments', {
   avatarUrl:    text('avatar_url'),
   message:      text('message').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  /** Set when the host removes the comment (migration 125). */
+  removedAt:    timestamp('removed_at', { withTimezone: true }),
 }, (table) => ({
   streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
 }));
@@ -2424,6 +2426,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
 export * from './sellerPaymentSettings';
 export * from './sellerMessaging';
 export * from './aiCredits';
+export * from './liveModeration';
 
 // ─── Automatic media screening results (migration 115) ───────────────────────
 // Held / rejected uploads only. No raw images are stored.

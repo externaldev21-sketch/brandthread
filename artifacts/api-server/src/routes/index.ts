@@ -307,7 +307,13 @@ import liveRouter from "./live";
 import liveCommerceRouter from "./live-commerce";
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
-router.use("/live",                      tc, liveCommerceRouter); // pin / live codes / scheduled — before liveRouter so /scheduled/* never hits /:id
+// Moderation + co-host routers MUST be mounted before liveRouter: they own
+// literal paths (/moderation-defaults, /cohost-*) that liveRouter's GET /:id would otherwise swallow.
+import liveModerationRouter from "./live-moderation";
+import liveCohostRouter from "./live-cohost";
+router.use("/live",                      tc, liveModerationRouter);
+router.use("/live",                      tc, liveCohostRouter);
+router.use("/live",                      tc, liveCommerceRouter); // Pin / live codes / scheduled — before liveRouter so /scheduled/* never hits /:id
 router.use("/live",                      tc, liveRouter);
 import liveReplaysRouter from "./live-replays";
 import liveTipsRouter from "./live-tips";

@@ -39,6 +39,8 @@ import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
 import { markScheduledLiveStarted } from "../lib/scheduledLives";
 import { broadcastToRoom } from "../ws/liveHub";
+import { canJoinStream, checkCommentAllowed } from "../lib/liveModeration";
+import { loadEffectiveSettings, loadLastCommentAt, loadRestriction } from "../lib/liveModerationState";
 
 const router = Router();
 
@@ -47,7 +49,7 @@ const hostPlan = requirePlan("pro");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateToken(
+export function generateToken(
   appId: string,
   appCert: string,
   channelName: string,
@@ -71,7 +73,7 @@ function generateToken(
   }
 }
 
-function uidFromClerkId(clerkId: string): number {
+export function uidFromClerkId(clerkId: string): number {
   let h = 0;
   for (let i = 0; i < clerkId.length; i++) {
     h = (Math.imul(31, h) + clerkId.charCodeAt(i)) | 0;
@@ -277,6 +279,12 @@ router.post("/:id/join", requireAuth, async (req, res) => {
       return res.status(410).json({ error: "Stream has ended" });
     }
 
+    // Moderation: a viewer the host banned can't rejoin this stream. (See
+    // routes/live-moderation.ts.) Streams with no moderation rows are unaffected.
+    if (!canJoinStream(await loadRestriction(String(id), viewerId), viewerId === stream.seller_id)) {
+      return res.status(403).json({ error: "You can't join this live.", code: "BANNED" });
+    }
+
     // Presence: mark this viewer live right away so the count feels instant
     // even before the periodic recompute job's next tick. The WebSocket
     // connection (or the /heartbeat fallback) keeps this row fresh from
@@ -442,12 +450,41 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
   }
 
   try {
-    const hostRow = await db.execute(sql`SELECT seller_id FROM live_streams WHERE id = ${req.params.id}::uuid LIMIT 1`);
-    const hostId = (hostRow.rows[0] as any)?.seller_id as string | undefined;
-    if (!hostId) return res.status(404).json({ error: "Stream not found" });
+    // Check the host/block boundary before moderation so blocked viewers don't
+    // learn whether a stream's moderation state or chat restrictions exist.
+    const [modStream] = await db.execute(sql`
+      SELECT seller_id FROM live_streams WHERE id = ${req.params.id}::uuid LIMIT 1
+    `).then((r) => r.rows as any[]);
+    if (!modStream) return res.status(404).json({ error: "Stream not found" });
+    const hostId = String(modStream.seller_id);
     if (hostId !== userId && await isBlockedEitherWay(userId, hostId)) {
       return res.status(403).json({ error: "You can't comment on this live.", code: "BLOCKED" });
     }
+
+    // Moderation (banned words / slow mode / mute / ban). No-op for a stream
+    // with no settings. The host is never restricted.
+    const [settings, restriction] = await Promise.all([
+      loadEffectiveSettings(String(req.params.id), hostId),
+      loadRestriction(String(req.params.id), userId),
+    ]);
+    const lastCommentAt = settings.slowModeSeconds > 0
+      ? await loadLastCommentAt(String(req.params.id), userId)
+      : null;
+    const verdict = checkCommentAllowed({
+      isHost: userId === hostId,
+      restriction,
+      bannedWords: settings.bannedWords,
+      slowModeSeconds: settings.slowModeSeconds,
+      lastCommentAt,
+      now: Date.now(),
+      message,
+    });
+    if (!verdict.ok) {
+      return res.status(verdict.status).json({
+        error: verdict.error, code: verdict.code, retryAfterSeconds: verdict.retryAfterSeconds,
+      });
+    }
+
     const result = await db.execute(sql`
       INSERT INTO live_comments (stream_id, user_id, display_name, avatar_url, message)
       VALUES (${req.params.id}::uuid, ${userId}, ${displayName ?? "Viewer"}, ${avatarUrl ?? null}, ${message.trim()})
@@ -470,6 +507,7 @@ router.get("/:id/comments", async (req, res) => {
       SELECT id, user_id, display_name, avatar_url, message, created_at
       FROM live_comments lc
       WHERE stream_id = ${req.params.id}::uuid
+        AND removed_at IS NULL
         ${since ? sql`AND created_at > ${since}::timestamptz` : sql``}
         AND NOT EXISTS (
           SELECT 1 FROM users su WHERE su.clerk_id = lc.user_id AND su.suspended_at IS NOT NULL

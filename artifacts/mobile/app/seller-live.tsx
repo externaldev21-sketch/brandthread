@@ -22,6 +22,9 @@ import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { LiveCodesHostSheet } from '@/components/live/LiveCodesHostSheet';
+import { useLiveModeration } from '@/lib/live/useLiveModeration';
+import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
+import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -31,7 +34,7 @@ try {
   AgoraModule = require('react-native-agora');
 } catch {}
 
-interface Comment { id: string; display_name: string; message: string; created_at: string; }
+interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 
 export default function SellerLiveScreen() {
   if (Platform.OS === 'web') {
@@ -92,6 +95,10 @@ function SellerLiveNativeScreen() {
     const timer = setInterval(load, 8000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [api, liveTipsEnabled, params.streamId]);
+
+  // Moderation + co-host (pinned comment, co-host tiles, comment actions sheet).
+  const mod = useLiveModeration(params.streamId);
+  const [actionComment, setActionComment] = useState<CommentActionTarget | null>(null);
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
@@ -175,8 +182,13 @@ function SellerLiveNativeScreen() {
       setProductTags(event.productTags);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
+    } else if (event.type === 'comment_removed') {
+      setComments(prev => prev.filter(c => c.id !== event.commentId));
+      mod.handleEvent(event);
+    } else {
+      mod.handleEvent(event);
     }
-  }, []);
+  }, [mod.handleEvent]);
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -189,7 +201,7 @@ function SellerLiveNativeScreen() {
     enabled: !!params.streamId,
     asHost: true,
     onEvent: handleLiveEvent,
-    onConnected: () => { void pollComments(generationRef.current); },
+    onConnected: () => { void pollComments(generationRef.current); mod.refresh(); },
     onFallback: startFallbackPolling,
   });
 
@@ -275,6 +287,21 @@ function SellerLiveNativeScreen() {
       await (api as any).live.pin(params.streamId, alreadyPinned ? null : productId);
     } catch {
       Alert.alert('Could not feature product', 'The product highlight did not reach viewers. Please try again.');
+    }
+  }
+
+  async function runCommentAction(action: CommentAction, c: CommentActionTarget) {
+    const id = params.streamId;
+    try {
+      if (action === 'pin') await (api as any).liveMod.pin(id, c.id);
+      else if (action === 'unpin') await (api as any).liveMod.pin(id, null);
+      else if (action === 'remove') await (api as any).liveMod.removeComment(id, c.id);
+      else if (action === 'mute' && c.user_id) await (api as any).liveMod.mute(id, c.user_id);
+      else if (action === 'ban' && c.user_id) await (api as any).liveMod.ban(id, c.user_id);
+      if (action === 'ban' && c.user_id) setComments(prev => prev.filter(x => x.user_id !== c.user_id));
+      if (action === 'remove') setComments(prev => prev.filter(x => x.id !== c.id));
+    } catch {
+      Alert.alert('Couldn’t update', 'That action did not go through. Try again.');
     }
   }
 
@@ -372,7 +399,30 @@ function SellerLiveNativeScreen() {
         >
           <Feather name="refresh-cw" size={20} color="#fff" />
         </TouchableOpacity>
+        {/* Moderation */}
+        <TouchableOpacity
+          style={s.railBtn}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Moderation"
+          onPress={() => router.push({ pathname: '/live-moderation', params: { streamId: params.streamId } } as any)}
+        >
+          <Feather name="shield" size={20} color="#fff" />
+        </TouchableOpacity>
+        {/* Co-host */}
+        <TouchableOpacity
+          style={s.railBtn}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Invite a co-host"
+          onPress={() => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any)}
+        >
+          <Feather name="user-plus" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
+
+      {/* Co-host tiles */}
+      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={headerTopInset + 86} />
 
       {/* Tagged products strip */}
       {productTags.length > 0 && (
@@ -403,19 +453,30 @@ function SellerLiveNativeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={s.bottomSection}
       >
-        {/* Comments scroll */}
+        {/* Pinned comment */}
+        <PinnedCommentBar comment={mod.pinned} />
+
+        {/* Comments scroll — tap or long-press a viewer comment for Pin / Remove / Mute / Ban */}
         <ScrollView
           ref={commentsRef}
           style={s.commentScroll}
           contentContainerStyle={s.commentContent}
           showsVerticalScrollIndicator={false}
-          pointerEvents="none"
         >
           {comments.map(c => (
-            <View key={c.id} style={s.commentBubble}>
+            <TouchableOpacity
+              key={c.id}
+              activeOpacity={0.8}
+              disabled={!c.user_id || c.user_id === user?.id}
+              onPress={() => setActionComment(c)}
+              onLongPress={() => setActionComment(c)}
+              accessibilityRole="button"
+              accessibilityHint="Opens moderation actions"
+              style={s.commentBubble}
+            >
               <Text style={s.commentAuthor}>{c.display_name} </Text>
               <Text style={s.commentText}>{c.message}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
 
@@ -432,6 +493,12 @@ function SellerLiveNativeScreen() {
       </KeyboardAvoidingView>
 
       {showLiveCodes && <LiveCodesHostSheet streamId={params.streamId} onClose={() => setShowLiveCodes(false)} />}
+      <LiveCommentActionsSheet
+        comment={actionComment}
+        pinned={!!actionComment && mod.pinned?.id === actionComment.id}
+        onClose={() => setActionComment(null)}
+        onAction={(action, c) => { void runCommentAction(action, c); }}
+      />
 
       {/* Product picker modal */}
       {showProductPicker && (
