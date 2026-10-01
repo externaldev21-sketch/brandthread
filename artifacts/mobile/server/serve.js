@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreviewHtml } = require('./sharePreview');
+const { landingPathFor, shouldServeLanding } = require('./landing');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -141,6 +142,28 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
+  // Signed-out visits to "/" (and "/welcome") get the static marketing page.
+  // Everything else, including any session cookie or query string, falls
+  // through to the unchanged app handling below.
+  if (shouldServeLanding({
+    method: req.method,
+    pathname: requestedPath,
+    searchParams: requestUrl.searchParams,
+    headers: req.headers,
+    staticRoot: STATIC_ROOT,
+  })) {
+    const landingHtml = fs.readFileSync(landingPathFor(STATIC_ROOT), 'utf8');
+    const gzip = /\bgzip\b/.test(acceptEncoding);
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-cache',
+      // "/" differs by session cookie, so shared caches must not mix them up.
+      'vary': 'Cookie, Accept-Encoding',
+      ...(gzip ? { 'content-encoding': 'gzip' } : {}),
+    });
+    res.end(gzip ? zlib.gzipSync(landingHtml) : landingHtml);
+    return;
+  }
   if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
 
   // This server only ever serves the exported browser app — real /api/*

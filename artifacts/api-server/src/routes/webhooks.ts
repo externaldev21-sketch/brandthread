@@ -37,6 +37,8 @@ import {
 } from "../lib/threadCash/wallet";
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
+import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
+import { applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -914,7 +916,11 @@ export async function handleCheckoutPaid(
       processingFeeCents: chargeModel === "held"
         ? chargeDetails.processingFeeCents
         : chargeModel === "transfer"
-          ? cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total)
+          // A cart-wide charge carries this order's pro-rata share; a hosted
+          // Checkout Session charged on the platform balance is one order.
+          ? (session.cart_amount_total == null
+            ? chargeDetails.processingFeeCents ?? undefined
+            : cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total))
           : undefined,
     });
     const decidedPlatformFee = (chargeModel === "destination" || chargeModel === "transfer") && csRecord.platformFeeCents != null
@@ -1022,6 +1028,12 @@ export async function handleCheckoutPaid(
         priceCents:   item.priceCents,
       })),
     );
+
+    // Delivery guarantee: stamp the 15-day / 60-day deadlines now, in the same
+    // transaction as the order and its items.
+    if (oversoldItems.length === 0) {
+      await stampDeliveryDeadlines(tx, order.id, successfulPaymentAt);
+    }
 
     // Step 6: stock was already reserved (decremented) above — either by the
     // one-page checkout's own hold (stockAlreadyReserved, committed via
@@ -1601,6 +1613,10 @@ async function handleIdentityFailed(session: any) {
 
 async function handleDisputeEvent(event: { id: string; type: string; created?: number; data: { object: any } }) {
   await processDisputeEvent(event, buildDisputeDeps(publishNotification));
+  // Delivery-guarantee hold: pause/resume the order's payout while a dispute is open.
+  if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"].includes(event.type)) {
+    await applyDisputePauseByDisputeId(event.data.object.id, event.data.object.status);
+  }
 }
 
 /**

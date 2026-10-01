@@ -20,6 +20,7 @@ const screen = read('app/ai-brain.tsx');
 const rootLayout = read('app/_layout.tsx');
 const aurora = read('components/ai/AuroraGlow.tsx');
 const composer = read('components/ai/AiComposer.tsx');
+const sharedComposer = read('components/ui/Composer.tsx');
 
 // ─── Bug fix: composer/content must clear the tab bar + home indicator ───────
 
@@ -32,9 +33,9 @@ describe('ai-brain input is never behind the seller tab bar', () => {
     expect(setBlock![1]).toContain("'ai-brain'");
   });
 
-  it('the composer pins its own bottom padding to the safe-area inset, not a hardcoded value', () => {
-    expect(screen).toContain('insets.bottom');
-    expect(screen).toContain('composerBottomInset');
+  it('the shared Composer owns safe-area/keyboard bottom padding', () => {
+    expect(screen).not.toContain('composerBottomInset');
+    expect(sharedComposer).toContain('useSafeAreaInsets');
   });
 
   it('uses KeyboardAvoidingView so the composer rises with the keyboard', () => {
@@ -42,9 +43,10 @@ describe('ai-brain input is never behind the seller tab bar', () => {
     expect(screen).toContain("Platform.OS === 'ios' ? 'padding' : 'height'");
   });
 
-  it('renders the composer through the shared AiComposer component, not an inline input row', () => {
-    expect(screen).toContain('<AiComposer');
-    expect(screen).toContain("from '@/components/ai/AiComposer'");
+  it('renders the composer through the shared slim Composer, not an inline input row', () => {
+    expect(screen).toContain('<Composer');
+    expect(screen).toContain("from '@/components/ui/Composer'");
+    expect(screen).toContain('testID="ai-composer"');
   });
 });
 

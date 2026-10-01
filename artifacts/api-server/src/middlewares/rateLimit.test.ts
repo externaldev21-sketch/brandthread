@@ -12,6 +12,8 @@ vi.mock("@clerk/express", () => ({
 import {
   appRateLimiter,
   consumeRateLimitBucket,
+  ipCeilingKey,
+  rateLimit,
   normalizeClientIp,
   RATE_LIMIT_POLICIES,
   rateLimitIdentity,
@@ -175,6 +177,63 @@ describe("appRateLimiter", () => {
       const response = await fetch(`${baseUrl}/api/v1/healthz`);
       expect(response.status).toBe(200);
       expect(response.headers.get("ratelimit-limit")).toBeNull();
+    });
+  });
+});
+
+describe("upload, AI and per-IP ceilings", () => {
+  it("classifies uploads by route name or by what the request carries", () => {
+    expect(rateLimitPolicyFor("POST", "/api/v1/conversations/c1/upload-media", true)?.id).toBe("upload");
+    expect(rateLimitPolicyFor("POST", "/api/v1/seller/profile/avatar/upload", true)?.id).toBe("upload");
+    expect(rateLimitPolicyFor("POST", "/api/v1/products/p1/images", true, "image/jpeg")?.id).toBe("upload");
+    expect(rateLimitPolicyFor("PUT", "/api/v1/posts/video", true, "video/mp4")?.id).toBe("upload");
+    expect(rateLimitPolicyFor("POST", "/api/v1/products", true, "application/json")?.id).toBe("mutation");
+    // A GET that happens to be called "media" is a read, not an upload.
+    expect(rateLimitPolicyFor("GET", "/api/v1/ad-campaigns/1/media", true)?.id).toBe("authenticated-read");
+  });
+
+  it("treats the AI support chat and generation routes as expensive", () => {
+    expect(rateLimitPolicyFor("POST", "/api/v1/support-chat/message", false)?.id).toBe("expensive");
+    expect(rateLimitPolicyFor("POST", "/api/v1/ai/chat", true)?.id).toBe("expensive");
+    expect(rateLimitPolicyFor("POST", "/api/v1/store/ai/logo", true)?.id).toBe("expensive");
+  });
+
+  it("gives abuse-prone policies an IP ceiling above the per-user limit", () => {
+    for (const id of ["authentication", "upload", "asset-upload", "expensive", "messaging", "agent-chat"] as const) {
+      const policy = RATE_LIMIT_POLICIES[id];
+      expect(policy.ipLimit, id).toBeGreaterThan(policy.limit);
+    }
+    expect(RATE_LIMIT_POLICIES["public-read"].ipLimit).toBeUndefined();
+  });
+
+  it("names the IP bucket separately from the user bucket", () => {
+    const req = { ip: "192.0.2.44", socket: {} } as any;
+    expect(ipCeilingKey(req, RATE_LIMIT_POLICIES.upload)).toBe("upload:ipcap:ip:192.0.2.44");
+  });
+
+  it("blocks many accounts behind one IP once the shared ceiling is spent", async () => {
+    const ip = uniqueClientAddress();
+    const app = express();
+    app.set("trust proxy", 1);
+    app.use((req, _res, next) => {
+      (req as any).clerkUserId = String(req.headers["x-test-user"]);
+      next();
+    });
+    app.post("/api/v1/conversations/c1/messages", rateLimit("messaging"), (_req, res) => res.json({ ok: true }));
+
+    const ceiling = RATE_LIMIT_POLICIES.messaging.ipLimit!;
+    await withServer(app, async (baseUrl) => {
+      let lastStatus = 0;
+      // A fresh account every request: no per-user bucket ever fills.
+      for (let i = 0; i <= ceiling; i += 1) {
+        const response = await fetch(`${baseUrl}/api/v1/conversations/c1/messages`, {
+          method: "POST",
+          headers: { "x-forwarded-for": ip, "x-test-user": `user_${crypto.randomUUID()}` },
+        });
+        lastStatus = response.status;
+        if (i < ceiling) expect(response.status).toBe(200);
+      }
+      expect(lastStatus).toBe(429);
     });
   });
 });
