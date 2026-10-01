@@ -34,6 +34,7 @@ import { useColors } from '@/hooks/useColors';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE, type TypeRoleName } from '@/constants/typography';
 import { flooredFontSize, MIN_FONT_SIZE } from '@/lib/textCrispness';
+import { maxFontMultiplierForRole } from '@/lib/dynamicType';
 
 export { flooredFontSize, MIN_FONT_SIZE };
 
@@ -80,7 +81,7 @@ export function AppText({ typeRole, tone = 'default', weight, fontSize, style, c
   };
 
   return (
-    <RNText {...rest} style={[composed, style]}>
+    <RNText maxFontSizeMultiplier={maxFontMultiplierForRole(typeRole)} {...rest} style={[composed, style]}>
       {children}
     </RNText>
   );

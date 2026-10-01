@@ -406,7 +406,7 @@ export default function SignInScreen() {
 
             <View style={s.fieldWrap}>
               <Text style={s.label}>Code</Text>
-              <TextInput
+              <TextInput accessibilityLabel="Verification code"
                 style={s.input}
                 placeholder="000000"
                 placeholderTextColor={theme.subtle}
@@ -562,7 +562,7 @@ export default function SignInScreen() {
                 </PressableScale>
               </View>
               <View style={s.pwRow}>
-                <TextInput
+                <TextInput accessibilityLabel="Password"
                   ref={passwordRef}
                   style={[s.input, s.pwInput]}
                   placeholder="••••••••"
@@ -709,7 +709,7 @@ export default function SignInScreen() {
           {/* ── Identifier ─────────────────────────────────────────────────────── */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>{phoneSupported ? 'Email or phone number' : 'Email address'}</Text>
-            <TextInput
+            <TextInput accessibilityLabel={phoneSupported ? 'Email or phone number' : 'Email'}
               style={s.input}
               placeholder={phoneSupported ? 'you@yourbrand.com or phone number' : 'you@yourbrand.com'}
               placeholderTextColor={theme.subtle}

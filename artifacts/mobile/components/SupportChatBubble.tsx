@@ -229,7 +229,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
                 }
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Feather name="x" size={20} color={MUTED} />
             </TouchableOpacity>
           </View>
@@ -305,7 +305,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
               onSubmitEditing={() => sendMessage(input)}
               blurOnSubmit={false}
             />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Send message" accessibilityRole="button"
               style={[s.sendBtn, { backgroundColor: accent }, (!input.trim() || loading) && s.sendBtnDisabled]}
               onPress={() => sendMessage(input)}
               disabled={!input.trim() || loading}
@@ -370,7 +370,7 @@ export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: S
         ]}
         pointerEvents="box-none"
       >
-        <Pressable onPress={handlePress} style={[s.fabInner, { backgroundColor: theme.secondary, shadowColor: theme.secondary }]}>
+        <Pressable accessibilityLabel="Contact support" accessibilityRole="button" onPress={handlePress} style={[s.fabInner, { backgroundColor: theme.secondary, shadowColor: theme.secondary }]}>
           <Feather name="headphones" size={22} color="#000" />
         </Pressable>
       </Animated.View>

@@ -287,7 +287,7 @@ export default function ProductDetailScreen() {
       </ScrollView>
 
       {/* ── Floating Action Button ── */}
-      <PressableScale
+      <PressableScale accessibilityLabel="Edit product"
         style={[s.fab, { bottom: insets.bottom + SP.lg }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
       >

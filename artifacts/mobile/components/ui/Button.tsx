@@ -27,6 +27,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
 /**
@@ -169,7 +170,7 @@ export function Button({
             {/* An icon-only button passes label="" (with an accessibilityLabel)
                 — no empty Text, so the icon sits dead centre. */}
             {label ? (
-              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1}>
+              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
                 {label}
               </Text>
             ) : null}

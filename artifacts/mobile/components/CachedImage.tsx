@@ -18,8 +18,15 @@ export function CachedImage({
   contentFit = 'cover',
   ...props
 }: ImageProps) {
+  // Accessibility: an image with a description (`alt` / `accessibilityLabel`,
+  // e.g. the product name) is exposed to screen readers; one without is
+  // decorative and skipped, so a card's own label is not read twice and a
+  // bare "image" is never announced. Callers can still force either way by
+  // passing `accessible` explicitly.
+  const described = Boolean(props.alt || props.accessibilityLabel);
   return (
     <Image
+      accessible={described}
       {...props}
       contentFit={contentFit}
       cachePolicy={cachePolicy}

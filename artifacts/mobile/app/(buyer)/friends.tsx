@@ -111,7 +111,7 @@ function PostCard({
       </View>
 
       {/* Media */}
-      <PressableScale onPress={() => onOpenComments(post)} style={s.mediaPress}>
+      <PressableScale accessibilityLabel="Open comments" onPress={() => onOpenComments(post)} style={s.mediaPress}>
         {post.mediaUrl ? (
           <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />
         ) : (
