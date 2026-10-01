@@ -313,9 +313,11 @@ export default function BuyerSearchScreen() {
     const wasFollowing = person.isFollowing;
     setFollowPending((prev) => ({ ...prev, [person.userId]: true }));
     try {
+      let requested = false;
       if (wasFollowing) await api.social.unfollow(person.userId);
-      else await api.social.follow(person.userId);
-      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing } : p)));
+      else requested = (await api.social.follow(person.userId))?.status === 'requested';
+      // A private account only received a follow request — not following yet.
+      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing && !requested } : p)));
       hapticPrimaryAction();
     } catch {
       // Keep previous state on failure.

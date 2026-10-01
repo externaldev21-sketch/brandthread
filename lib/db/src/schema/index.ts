@@ -38,6 +38,8 @@ export const users = pgTable('users', {
   referredByCode: text('referred_by_code'),       // code used when this user signed up
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
+  // Private account (buyers only): new followers need approval (follow_requests).
+  isPrivate:      boolean('is_private').notNull().default(false),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
@@ -1331,6 +1333,26 @@ export const follows = pgTable('follows', {
 }, (t) => ({
   pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
   followingIdx: index('follows_following_idx').on(t.followingId),
+}));
+
+// Pending follow requests to a private account; approval moves the row into follows.
+export const followRequests = pgTable('follow_requests', {
+  requesterId: text('requester_id').notNull(),
+  targetId:    text('target_id').notNull(),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:        primaryKey({ columns: [t.requesterId, t.targetId] }),
+  targetIdx: index('follow_requests_target_idx').on(t.targetId, t.createdAt),
+}));
+
+// An owner's Close Friends list (audience for close-friends stories later).
+export const closeFriends = pgTable('close_friends', {
+  ownerId:   text('owner_id').notNull(),
+  friendId:  text('friend_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:        primaryKey({ columns: [t.ownerId, t.friendId] }),
+  friendIdx: index('close_friends_friend_idx').on(t.friendId),
 }));
 
 // Dismissed "Suggested for you" rows on the Activity tab — the X on a

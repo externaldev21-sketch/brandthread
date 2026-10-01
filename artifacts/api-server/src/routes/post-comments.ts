@@ -65,7 +65,7 @@ async function loadPost(postId: string, viewerId: string | null) {
   const [post] = await db
     .select({ id: posts.id, userId: posts.userId, visibility: posts.visibility })
     .from(posts)
-    .where(and(eq(posts.id, postId), publicPostCondition()))
+    .where(and(eq(posts.id, postId), publicPostCondition(new Date(), viewerId)))
     .limit(1);
   if (post) return post;
   // Authors can always open comments on their own post, including while a

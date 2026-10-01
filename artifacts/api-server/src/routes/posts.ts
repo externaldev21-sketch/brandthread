@@ -50,8 +50,8 @@ function validObjectPath(value: unknown): value is string {
 }
 
 /** Published, public, not held/removed by moderation, author in good standing. */
-function visiblePostCondition(now = new Date()) {
-  return publicPostCondition(now);
+function visiblePostCondition(now = new Date(), viewerId?: string | null) {
+  return publicPostCondition(now, viewerId);
 }
 
 /** Current access rule shared by watch recording and history reads. */
@@ -1358,7 +1358,7 @@ router.get("/:id", async (req, res) => {
   if (!UUID_RE.test(id)) return res.status(404).json({ error: "Post not found" });
 
   const [post] = await db.select().from(posts)
-    .where(and(eq(posts.id, id), visiblePostCondition()))
+    .where(and(eq(posts.id, id), visiblePostCondition(new Date(), optionalViewerId(req))))
     .limit(1);
   if (!post) return res.status(404).json({ error: "Post not found" });
   const viewerId = optionalViewerId(req);
@@ -1418,7 +1418,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, share, or not_interested" });
   }
   const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
-    .where(and(eq(posts.id, id), visiblePostCondition()))
+    .where(and(eq(posts.id, id), visiblePostCondition(new Date(), clerkId)))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
   if (type === "repost" && visiblePost.visibility?.allowReposts === false) {

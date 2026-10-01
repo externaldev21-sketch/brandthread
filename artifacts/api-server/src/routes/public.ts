@@ -642,7 +642,7 @@ router.get("/search", async (req, res): Promise<void> => {
       }).from(posts)
         .where(and(
           eq(posts.mediaType, "video"),
-          publicPostCondition(),
+          publicPostCondition(new Date(), viewerId),
           or(
             fuzzyMatch(posts.caption, term, pattern),
             sql`EXISTS (
