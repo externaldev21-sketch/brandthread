@@ -778,6 +778,28 @@ export async function updateSellerPost(
   return merged;
 }
 
+/** Draft or scheduled -> published now. Server: POST /api/posts/:id/publish-now. */
+export async function publishSellerPostNow(id: string): Promise<SellerThreadPost> {
+  return applyOwnedPostAction(id, 'publish-now');
+}
+
+/** Scheduled -> draft. Server: POST /api/posts/:id/unschedule. */
+export async function unscheduleSellerPost(id: string): Promise<SellerThreadPost> {
+  return applyOwnedPostAction(id, 'unschedule');
+}
+
+async function applyOwnedPostAction(id: string, action: 'publish-now' | 'unschedule'): Promise<SellerThreadPost> {
+  const k = K();
+  const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({}) });
+  const canonical = mapOwnedApiPost(updated, k.userId);
+  const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
+  const idx = posts.findIndex(p => p.id === id);
+  if (idx >= 0) posts[idx] = { ...posts[idx], ...canonical };
+  if (_socialUserId === k.userId && idx >= 0) await save(k.sellerPosts, posts);
+  notify();
+  return canonical;
+}
+
 export async function archiveSellerPost(id: string): Promise<void> {
   await updateSellerPost(id, { isArchived: true, postStatus: 'archived' });
 }
