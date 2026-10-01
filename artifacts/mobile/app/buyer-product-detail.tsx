@@ -47,6 +47,8 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+import { LaunchCountdown } from '@/components/products/LaunchCountdown';
+import { PreOrderShipBy } from '@/components/products/PreOrderShipBy';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import { CompleteTheFit } from '@/components/products/CompleteTheFit';
 import { ProductVideo } from '@/components/products/ProductVideo';
@@ -59,6 +61,7 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
+import { StockCounter } from '@/components/products/StockCounter';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
   shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
@@ -527,6 +530,7 @@ export default function BuyerProductDetailScreen() {
   const addedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Waitlist & pre-order reservation state
+  const [launching, setLaunching] = useState(false);
   const [waitlistJoined,  setWaitlistJoined]  = useState(false);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [reserved,        setReserved]        = useState(false);
@@ -1016,6 +1020,9 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
 
+          <LaunchCountdown productId={product.id} onLaunchingChange={setLaunching} />
+
+          <StockCounter productId={product.id} />
           {/* ── Buyer demand signals (server-supplied values only) ── */}
           {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
             (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
@@ -1083,6 +1090,8 @@ export default function BuyerProductDetailScreen() {
               </Text>
             </View>
           )}
+
+          <PreOrderShipBy productId={product.id} isPreOrder={product.isPreOrder} />
 
           <View style={s.divider} />
 
@@ -1391,7 +1400,7 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             onPress={handleAddToCart}
             loading={addingToCart}
-            disabled={addingToCart || (allSelected && !inStock)}
+            disabled={addingToCart || launching || (allSelected && !inStock)}
             accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
             style={s.buyNowBtn}
             testID="product-add-to-cart"
@@ -1404,7 +1413,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleReserve}
             variant={reserved ? 'secondary' : 'primary'}
             loading={reserveLoading}
-            disabled={reserveLoading || reserved}
+            disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
             style={s.buyNowBtn}
           />
@@ -1420,7 +1429,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleBuyNow}
             variant="primary"
             loading={buyingNow}
-            disabled={buyingNow || !inStock || !allSelected || paymentUnavailable}
+            disabled={buyingNow || launching || !inStock || !allSelected || paymentUnavailable}
             style={s.buyNowBtn}
           />
         )}

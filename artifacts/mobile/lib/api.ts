@@ -20,6 +20,7 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
 import type {
@@ -2604,6 +2605,35 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sellerNotify:  (variantId: string) =>
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
     },
+    /** Scheduled product launches + "Notify me". */
+    productLaunches: {
+      /** Public: is this product waiting on a launch time? */
+      state:       (productId: string) =>
+        get<{ launching: boolean; launchAt: string | null; serverNow: string }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+      alertStatus: (productId: string) =>
+        get<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      alertOn:     (productId: string) =>
+        post<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`, {}),
+      alertOff:    (productId: string) =>
+        del<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      /** Seller. */
+      list:        () => get<Array<{
+        productId: string; name: string; imageUrl: string | null; status: string;
+        launchAt: string; launchedAt: string | null; notifyFollowers: boolean; alertCount: number;
+      }>>('/api/product-launches'),
+      schedule:    (productId: string, data: { launchAt: string; notifyFollowers?: boolean }) =>
+        put<any>(`/api/product-launches/${encodeURIComponent(productId)}`, data),
+      cancel:      (productId: string) =>
+        del<{ cancelled: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+    },
+    /** Pre-order ship-by terms (60-day refund window). */
+    preorderTerms: {
+      get: (productId: string) =>
+        get<{ shipBy: string; daysLeft: number; closingDate: string | null; refundWindowDays: number; refundCopy: string; note: string | null }>(
+          `/api/preorder-terms/${encodeURIComponent(productId)}`),
+      set: (productId: string, data: { shipBy: string; note?: string | null }) =>
+        put<any>(`/api/preorder-terms/${encodeURIComponent(productId)}`, data),
+    },
     /** Product bundles — seller CRUD. */
     bundles: {
       list:       () => get<any[]>('/api/bundles'),
@@ -2642,6 +2672,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Public (works signed out). */
       publicGet: (productId: string) =>
         get<{ video: ProductVideoInfo | null }>(`/api/product-videos/public/${encodeURIComponent(productId)}`),
+    },
+    /** Variant option axes, matrix generation, bulk variant edits and stock rules. */
+    productVariants: {
+      get:      (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}`),
+      putAxes:  (productId: string, axes: Array<{ name: string; values: string[] }>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/axes`, { axes }),
+      generate: (productId: string, data: { priceCents?: number; stock?: number; lowStockThreshold?: number; baseSku?: string }) =>
+        post<any>(`/api/product-variants/${encodeURIComponent(productId)}/generate`, data),
+      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number }>) =>
+        patch<any>(`/api/product-variants/${encodeURIComponent(productId)}/variants/bulk`, { updates }),
+      getStockRules: (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`),
+      putStockRules: (productId: string, data: Record<string, unknown>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`, data),
     },
     // (buyer key defined earlier in this object — no duplicate)
     /** Team members — invite flow, roles, and activity log */
@@ -2729,6 +2772,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       latest: () => get<ShopifyImportJob | null>('/api/shopify-imports/latest'),
       get: (id: string) => get<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}`),
       continue: (id: string) => post<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}/continue`, {}),
+    },
+    /** CSV (Shopify / Etsy / Brandthread layouts) and Etsy product import. */
+    productImport: {
+      providers: () => get<ImportProviders>('/api/product-import/providers'),
+      runs: () => get<{ runs: ImportRun[] }>('/api/product-import/runs'),
+      previewCsv: (csv: string) => request<ImportPreview>(
+        '/api/product-import/csv/preview', { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      commitCsv: (csv: string, filename?: string) => request<ImportCommitResult>(
+        `/api/product-import/csv/commit${filename ? `?filename=${encodeURIComponent(filename)}` : ''}`,
+        { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyConnect: () => post<{ authorizeUrl: string }>('/api/product-import/etsy/connect/start', {}),
+      etsyDisconnect: () => post<{ ok: boolean }>('/api/product-import/etsy/disconnect', {}),
+      etsyPreview: () => request<ImportPreview>('/api/product-import/etsy/preview', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyCommit: () => request<ImportCommitResult>('/api/product-import/etsy/commit', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {

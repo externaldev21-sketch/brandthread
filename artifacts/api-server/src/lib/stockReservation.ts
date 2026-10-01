@@ -36,6 +36,16 @@ export interface SqlExecutor {
   execute: (query: string | SQLWrapper) => Promise<unknown>;
 }
 
+/**
+ * Hands committed-later stock changes to the shared follow-up (seller alerts +
+ * per-product sold-out behaviour, see lib/stockRules.ts). Loaded lazily and
+ * fully guarded: it can never affect the reservation itself.
+ */
+function notifyStockChanged(changes: Array<{ variantId: string; previousStock: number; newStock: number }>): void {
+  if (changes.length === 0) return;
+  void import("./stockRules").then((m) => m.queueStockChanges(changes)).catch(() => undefined);
+}
+
 function rowsOf(result: unknown): any[] {
   return (result as any)?.rows ?? [];
 }
@@ -103,6 +113,10 @@ export async function reserveStockForOrder(
       sql`UPDATE product_variants SET stock = stock - ${quantity} WHERE id = ${variantId}::uuid`,
     );
   }
+  notifyStockChanged([...aggregated].map(([variantId, quantity]) => {
+    const previousStock = stockMap.get(variantId) ?? 0;
+    return { variantId, previousStock, newStock: previousStock - quantity };
+  }));
   return { ok: true, oversoldVariantIds: [] };
 }
 
@@ -122,9 +136,12 @@ export async function reserveStockAtomic(
 ): Promise<boolean> {
   if (!variantId || !Number.isFinite(quantity) || quantity <= 0) return true;
   const result = await tx.execute(
-    sql`UPDATE product_variants SET stock = stock - ${quantity} WHERE id = ${variantId}::uuid AND stock >= ${quantity}`,
+    sql`UPDATE product_variants SET stock = stock - ${quantity} WHERE id = ${variantId}::uuid AND stock >= ${quantity} RETURNING stock`,
   );
-  return ((result as any)?.rowCount ?? 0) > 0;
+  const ok = ((result as any)?.rowCount ?? 0) > 0;
+  const newStock = rowsOf(result)[0]?.stock;
+  if (ok && typeof newStock === "number") notifyStockChanged([{ variantId, previousStock: newStock + quantity, newStock }]);
+  return ok;
 }
 
 /**
@@ -137,9 +154,13 @@ export async function reserveStockAtomic(
  */
 export async function restoreStockForOrder(tx: SqlExecutor, lineItems: StockLineItem[]): Promise<void> {
   const aggregated = aggregateByVariant(lineItems);
+  const changes: Array<{ variantId: string; previousStock: number; newStock: number }> = [];
   for (const [variantId, quantity] of aggregated) {
-    await tx.execute(
-      sql`UPDATE product_variants SET stock = stock + ${quantity} WHERE id = ${variantId}::uuid`,
+    const result = await tx.execute(
+      sql`UPDATE product_variants SET stock = stock + ${quantity} WHERE id = ${variantId}::uuid RETURNING stock`,
     );
+    const newStock = rowsOf(result)[0]?.stock;
+    if (typeof newStock === "number") changes.push({ variantId, previousStock: newStock - quantity, newStock });
   }
+  notifyStockChanged(changes);
 }
