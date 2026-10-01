@@ -95,6 +95,7 @@ export const users = pgTable('users', {
   // by a later Clerk sync.
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
+  storeAccentColor: text('store_accent_color'),
   // Profile cover video (all account types) — a short, always-muted looping
   // clip shown in the profile hero. Separate from the avatar. Server-rendered
   // compressed rendition + poster frame, both public object paths served via
@@ -125,6 +126,10 @@ export const users = pgTable('users', {
   // Storefront visit counter — incremented by a public endpoint each time a buyer
   // views this seller's storefront. Drives the real conversion rate stat.
   storefrontVisitCount: integer('storefront_visit_count').notNull().default(0),
+  // Seller launch checklist (migration 112): first "preview as buyer" and
+  // the dismissal of the dashboard card. Published state lives on storefronts.
+  storePreviewedAt: timestamp('store_previewed_at', { withTimezone: true }),
+  launchChecklistDismissedAt: timestamp('launch_checklist_dismissed_at', { withTimezone: true }),
   // Vacation / away mode
   vacationMode:    boolean('vacation_mode').notNull().default(false),
   vacationMessage: text('vacation_message'),

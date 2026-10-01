@@ -34,6 +34,7 @@ import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
 import SetupCelebration from '@/components/SetupCelebration';
+import LaunchChecklistCard from '@/components/LaunchChecklistCard';
 import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/layout';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -882,6 +883,8 @@ export default function SellerHomeCommerceDashboard({
               />
             </View>
           )}
+
+          <LaunchChecklistCard />
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
