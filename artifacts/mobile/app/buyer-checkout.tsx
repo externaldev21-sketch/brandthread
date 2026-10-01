@@ -698,9 +698,10 @@ export default function BuyerCheckoutScreen() {
               ...(current.threadCashRedemption && current.deliveryGroups.length === 1
                 ? { threadCashToken: current.threadCashRedemption.token }
                 : {}),
-              ...(current.deliveryGroups.length === 1 && current.discounts.find(d => d.isValid)
-                ? { discountCode: current.discounts.find(d => d.isValid)!.code }
-                : {}),
+              ...(() => {
+                const groupCode = current.discounts.find(d => d.isValid && (current.deliveryGroups.length === 1 || d.sellerId === group.sellerId));
+                return groupCode ? { discountCode: groupCode.code } : {};
+              })(),
             },
           );
         } else {
@@ -1042,9 +1043,35 @@ export default function BuyerCheckoutScreen() {
             sellerCount={current.deliveryGroups.length}
           />
 
-          <PromoCodeSection
+          {/* Multi-store: each store's code is its own section and only discounts that store's items. */}
+          {multiSeller && current.deliveryGroups.map(group => (
+            <PromoCodeSection
+              key={group.sellerId}
+              title={`Promo code · ${group.sellerName}`}
+              idSuffix={`-${group.sellerId}`}
+              discounts={current.discounts.filter(d => d.sellerId === group.sellerId)}
+              onApply={async (code): Promise<CheckoutDiscount> => {
+                const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts, group.sellerId);
+                if (discount.isValid) {
+                  await persist({
+                    ...current,
+                    discounts: [...current.discounts.filter(d => d.sellerId !== group.sellerId), discount],
+                    idempotencyKey: `ck_${randomUUID()}`,
+                  });
+                }
+                return discount;
+              }}
+              onRemove={code =>
+                void persist({
+                  ...current,
+                  discounts: current.discounts.filter(d => !(d.code === code && d.sellerId === group.sellerId)),
+                  idempotencyKey: `ck_${randomUUID()}`,
+                })
+              }
+            />
+          ))}
+          {!multiSeller && <PromoCodeSection
             discounts={current.discounts}
-            unavailableReason={multiSeller ? 'Promo codes apply to single-seller orders. Check out each seller separately to use a code.' : undefined}
             onApply={async (code): Promise<CheckoutDiscount> => {
               const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
               // Only a server-validated code is kept (the server takes one code per order).
@@ -1058,7 +1085,7 @@ export default function BuyerCheckoutScreen() {
                 persist({ ...current, discounts, idempotencyKey: `ck_${randomUUID()}` }),
               )
             }
-          />
+          />}
 
           {/* Thread Cash (item 109): hidden while the flag is off, for guests
               and for multi-seller orders. */}

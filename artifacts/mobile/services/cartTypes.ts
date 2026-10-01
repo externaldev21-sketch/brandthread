@@ -119,6 +119,8 @@ export interface CheckoutDiscount {
   description: string;
   isValid: boolean;
   errorMessage?: string;
+  /** Multi-store carts: the seller whose group this code applies to. Absent on single-seller orders. */
+  sellerId?: string;
 }
 
 export interface CheckoutTax {

@@ -140,4 +140,15 @@ describe('checkout redesign helpers', () => {
     const invalid = getCheckoutDisplayTotals({ summary, discounts: [{ code: 'X', isValid: false, appliedAmountCents: 500 }], deliveryGroups: [{}] } as any);
     expect(invalid.totalCents).toBe(11200);
   });
+
+  it('adds up one store-scoped promo per store on a multi-store order', () => {
+    const summary = { subtotalCents: 10000, shippingTotalCents: 1200, taxTotalCents: 0, discountTotalCents: 0, totalCents: 11200, currency: 'USD' };
+    const discounts = [
+      { code: 'A', isValid: true, appliedAmountCents: 1000, sellerId: 's1' },
+      { code: 'B', isValid: true, appliedAmountCents: 300, sellerId: 's2' },
+    ] as any;
+    const multi = getCheckoutDisplayTotals({ summary, discounts, deliveryGroups: [{}, {}] } as any);
+    expect(multi.promoCents).toBe(1300);
+    expect(multi.totalCents).toBe(9900);
+  });
 });
