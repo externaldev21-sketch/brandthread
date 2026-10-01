@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -31,6 +32,8 @@ import {
   type SetupState, type SetupTask,
 } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { middleTruncate } from '@/lib/middleTruncate';
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
 import SetupCelebration from '@/components/SetupCelebration';
@@ -220,6 +223,37 @@ export default function SellerHomeCommerceDashboard({
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
   const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number; toShip: number } | null>(null);
   const [secondaryError, setSecondaryError] = useState(false);
+
+  // The seller's own public store URL, shown next to the "Dashboard" title
+  // and copied to the clipboard on tap — real even before the store is
+  // published (Dev: "it's where the store will eventually live"). Uses the
+  // one existing public-store-URL builder (lib/shareProfile.ts), not a new
+  // one — same as app/meta-ads-setup.tsx's own storeUrl fetch.
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  const [storeUrlCopied, setStoreUrlCopied] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    api.seller.getProfile().then((profile) => {
+      if (cancelled) return;
+      setStoreUrl(buildCanonicalProfileUrl(profile.username));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [api]);
+
+  const handleCopyStoreUrl = useCallback(() => {
+    if (!storeUrl) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    (async () => {
+      if (Platform.OS === 'web') {
+        await navigator?.clipboard?.writeText?.(storeUrl);
+      } else {
+        const Clipboard = await import('expo-clipboard');
+        await Clipboard.setStringAsync(storeUrl);
+      }
+    })();
+    setStoreUrlCopied(true);
+    setTimeout(() => setStoreUrlCopied(false), 1200);
+  }, [storeUrl]);
 
   useEffect(() => subscribeStoreContext(() => {
     // Drop the previous store's numbers immediately rather than leaving them
@@ -671,8 +705,23 @@ export default function SellerHomeCommerceDashboard({
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
           {/* ── Top bar ─────────────────────────────────────────────────── */}
           <View style={styles.topBar}>
-            <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible>
+            <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible style={styles.titleRow}>
               <Text style={[styles.screenTitle, { color: theme.text ?? FG }]}>Dashboard</Text>
+              {storeUrl && (
+                <TouchableOpacity
+                  onPress={handleCopyStoreUrl}
+                  style={styles.storeUrlRow}
+                  hitSlop={{ top: 10, bottom: 10, left: 4, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy store link"
+                  testID="seller-dashboard-store-url"
+                >
+                  <Text style={[styles.storeUrlText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="middle">
+                    {middleTruncate(storeUrl.replace(/^https?:\/\//, ''))}
+                  </Text>
+                  <Feather name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
+                </TouchableOpacity>
+              )}
             </View>
             <ActivityBellButton
               testID="seller-dashboard-activity"
@@ -925,7 +974,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
+  // flex: 1 so the store-url row below has room to shrink/truncate instead
+  // of pushing the fixed-size activity bell off the right edge; the
+  // ActivityBellButton itself keeps its own fixed width, unaffected.
+  titleRow: { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: SP.sm, marginRight: SP.sm },
   screenTitle: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.4 },
+  // The seller's public store URL, baseline-aligned with the title, never
+  // wrapping — flexShrink lets IT truncate (middle-ellipsis) before the row
+  // itself would ever wrap. No background/border — a plain silver link, per
+  // Dev's "no toast, no wording" instinct for this whole affordance.
+  storeUrlRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  storeUrlText: { flexShrink: 1, fontFamily: FONT.regular, fontSize: 13 },
 
   heroSkeleton: { paddingTop: SP.md },
 

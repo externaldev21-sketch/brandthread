@@ -172,7 +172,14 @@ function getActiveTab(segments: string[]): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface SellerGlobalTabBarProps {
+  /** Tapping the Studio button always calls this — the caller decides
+   *  whether that means opening or closing based on `isStudioOpen`. */
   onOpenStudio: () => void;
+  /** Whether the Studio page is currently open, so this same button can
+   *  toggle it closed on a second tap (Dev: tapping the Studio tab button
+   *  again closes the menu) — reflected in the button's own accessibility
+   *  label rather than a silent double duty. */
+  isStudioOpen?: boolean;
   /** True on a full-screen creation/camera/live flow (see
    *  SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS in app/_layout.tsx) — the bar
    *  stays mounted but slides fully off the bottom of the screen instead of
@@ -182,7 +189,7 @@ interface SellerGlobalTabBarProps {
   hidden?: boolean;
 }
 
-export function SellerGlobalTabBar({ onOpenStudio, hidden: hiddenProp = false }: SellerGlobalTabBarProps) {
+export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden: hiddenProp = false }: SellerGlobalTabBarProps) {
   // Also slides away for any screen with a bottom composer (useHideTabBar).
   const hiddenByScreen = useTabBarHiddenByScreen();
   const hidden = hiddenProp || hiddenByScreen;
@@ -333,7 +340,7 @@ export function SellerGlobalTabBar({ onOpenStudio, hidden: hiddenProp = false }:
         theme={theme}
         size={metrics.circleSize}
         testID="seller-bottom-menu"
-        accessibilityLabel="Open Studio tools"
+        accessibilityLabel={isStudioOpen ? 'Close Studio tools' : 'Open Studio tools'}
         onPress={openStudio}
       >
         <BuyerNavIcon name="studio" color={theme.text} size={metrics.iconSize} />
