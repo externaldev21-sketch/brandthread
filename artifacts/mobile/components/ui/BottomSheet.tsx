@@ -23,6 +23,7 @@
  * Layout/interaction reference only: UNIQLO "Added to cart" sheet.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { a11yModalProps } from '@/lib/a11y/modal';
 import { Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -219,6 +220,7 @@ export function BottomSheet({ visible, onClose, children, testID, reduceMotion }
         </Animated.View>
         <GestureDetector gesture={panGesture}>
           <Animated.View
+            {...a11yModalProps()}
             onLayout={onSheetLayout}
             style={[
               styles.sheet,

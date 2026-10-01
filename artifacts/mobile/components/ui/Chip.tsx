@@ -18,6 +18,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface ChipProps {
   label: string;
@@ -85,12 +86,12 @@ export function Chip({
         ]}
       >
         {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
-        <Text style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
+        <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
           {label}
         </Text>
         {count !== undefined && (
           <View style={[styles.count, { backgroundColor: selected ? `${theme.onAccent}26` : theme.borderSubtle }]}>
-            <Text style={[TYPE_SCALE.caption, { color: contentColor }]}>{count}</Text>
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.caption, { color: contentColor }]}>{count}</Text>
           </View>
         )}
         {onRemove && (

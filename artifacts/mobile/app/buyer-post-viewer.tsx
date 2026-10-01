@@ -376,7 +376,7 @@ export default function BuyerPostViewer() {
             <Feather name="message-circle" size={22} color={FG} />
             <Text style={s.engageCount}>{comments.length}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Repost" accessibilityRole="button"
             style={s.engageBtn}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -387,7 +387,7 @@ export default function BuyerPostViewer() {
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Save post" accessibilityRole="button"
             style={s.engageBtn}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -416,7 +416,7 @@ export default function BuyerPostViewer() {
           ) : null}
           <View style={{ flex: 1 }} />
           {!isOwner && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Report post" accessibilityRole="button"
               style={s.engageBtn}
               onPress={() => {
                 Haptics.selectionAsync();
@@ -426,7 +426,7 @@ export default function BuyerPostViewer() {
               <Feather name="flag" size={22} color={FG} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.engageBtn} onPress={handleShare}>
+          <TouchableOpacity accessibilityLabel="Share post" accessibilityRole="button" style={s.engageBtn} onPress={handleShare}>
             <Feather name="share-2" size={22} color={FG} />
           </TouchableOpacity>
         </View>

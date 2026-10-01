@@ -13,11 +13,14 @@ import { COMP, FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
+import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface IconButtonProps {
   name: keyof typeof Feather.glyphMap;
   onPress: () => void;
-  accessibilityLabel: string;
+  /** Optional: when omitted (or empty) a default is derived from the icon `name` (see lib/a11y/iconLabels.ts). */
+  accessibilityLabel?: string;
   accessibilityHint?: string;
   color?: string;
   size?: number;
@@ -51,7 +54,7 @@ export function IconButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={iconAccessibilityLabel(name, accessibilityLabel)}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       disabled={disabled}
@@ -79,7 +82,7 @@ export function IconButton({
         <Feather name={name} size={size} color={resolvedColor} />
         {typeof badge === 'number' && badge > 0 && (
           <View style={[styles.badge, { backgroundColor: palette.primary, borderColor: variant === 'glass' ? '#0A0A0B' : palette.background }]}>
-            <Animated.Text style={[styles.badgeText, { color: palette.primaryForeground }]}>
+            <Animated.Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]}>
               {badge > 99 ? '99+' : badge}
             </Animated.Text>
           </View>

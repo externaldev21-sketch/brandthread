@@ -18,6 +18,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_DURATION_MS } from '@/constants/motion';
+import { BODY_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface ListRowProps {
   icon?: keyof typeof Feather.glyphMap;
@@ -62,12 +63,12 @@ export function ListRow({
         </View>
       )}
       <View style={styles.body}>
-        <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={1}>{title}</Text>
-        {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines}>{subtitle}</Text>}
+        <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{title}</Text>
+        {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{subtitle}</Text>}
       </View>
       {right}
-      {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1}>{value}</Text>}
-      {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} />}
+      {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{value}</Text>}
+      {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} accessibilityLabel={title} />}
       {!right && chevron && !toggle && <Feather name="chevron-right" size={18} color={palette.mutedForeground} />}
     </>
   );

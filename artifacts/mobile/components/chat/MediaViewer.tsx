@@ -122,14 +122,14 @@ export default function MediaViewer({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <Animated.View style={[s.backdrop, { opacity: backdropOpacity }]}>
         <View style={[s.topBar, { paddingTop: headerTopInset + 12 }]}>
-          <TouchableOpacity style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="x" size={22} color="#fff" />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity style={s.iconBtn} onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityLabel="Share" accessibilityRole="button" style={s.iconBtn} onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="share" size={20} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={s.iconBtn} onPress={handleSave} disabled={isSaving} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity accessibilityLabel="Save to device" accessibilityRole="button" style={s.iconBtn} onPress={handleSave} disabled={isSaving} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Feather name="download" size={20} color="#fff" />
             </TouchableOpacity>
           </View>

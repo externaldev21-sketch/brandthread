@@ -36,6 +36,8 @@ import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { useSettled } from '@/lib/animationUtils';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
+import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
@@ -178,6 +180,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
     <Pressable
       {...rest}
       accessibilityRole={rest.accessibilityRole ?? 'button'}
+      accessibilityState={disabled ? { disabled: true, ...rest.accessibilityState } : rest.accessibilityState}
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop ?? autoHitSlop}
@@ -335,6 +338,7 @@ export function BrandthreadHeader({
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onBack(); }}
             style={[hdrS.back, { backgroundColor: colors.card, borderColor: colors.border }]}
+            accessibilityLabel="Back"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
@@ -343,10 +347,10 @@ export function BrandthreadHeader({
         <View>
           {gradient ? (
             <LinearGradient colors={[theme.accent, theme.accentLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={hdrS.gradTitleWrap}>
-              <Text style={[hdrS.gradTitle, { color: theme.accent }]}>{title}</Text>
+              <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[hdrS.gradTitle, { color: theme.accent }]}>{title}</Text>
             </LinearGradient>
           ) : (
-            <Text style={[hdrS.title, { color: colors.foreground }]}>{title}</Text>
+            <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[hdrS.title, { color: colors.foreground }]}>{title}</Text>
           )}
           {subtitle && <Text style={[hdrS.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
         </View>
@@ -482,7 +486,7 @@ export function PrimaryButton({
         ) : (
           <>
             {icon && <Feather name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
-            <Text style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]}>{label}</Text>
+            <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -523,7 +527,7 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]}>{label}</Text>
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]}>{label}</Text>
     </PressableScale>
   );
 }
@@ -562,7 +566,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
       style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, opacity: disabled ? 0.4 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }}>{label}</Text>
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }}>{label}</Text>
     </PressableScale>
   );
 }
@@ -584,7 +588,7 @@ interface IconButtonProps {
 export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, badgeCount, accessibilityLabel, accessibilityHint, style }: IconButtonProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
-  const label = accessibilityLabel ?? `${name.replace(/-/g, ' ')}${badgeCount ? `, ${badgeCount} notifications` : ''}`;
+  const label = accessibilityLabel ?? `${iconAccessibilityLabel(name)}${badgeCount ? `, ${badgeCount} notifications` : ''}`;
   return (
     <PressableScale
       onPress={() => { hapticLight(); onPress(); }}
@@ -597,7 +601,7 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
       {badge && (
         <View style={[ibS.badge, { backgroundColor: theme.accent }]}>
           {badgeCount !== undefined && badgeCount > 0
-            ? <Text style={[ibS.badgeText, { color: theme.onAccent }]}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+            ? <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[ibS.badgeText, { color: theme.onAccent }]}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
             : null}
         </View>
       )}
@@ -686,7 +690,7 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
       accessibilityState={{ selected: active }}
       style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
     >
-      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
+      <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
       {count !== undefined && (
         <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: `${theme.onAccent}26` }]]}>
           <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
@@ -844,7 +848,7 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   return (
     <View style={[shS.root, style]}>
       <View style={shS.titleWrap}>
-        <Text style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[shS.title, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       </View>
       {action && (
         <PressableScale
@@ -1483,7 +1487,7 @@ export function Toast({ message, visible, variant = 'success' }: ToastProps) {
   const statusColors = { success: palette.success, error: palette.destructive, info: palette.info };
   const color = statusColors[variant];
   return (
-    <Animated.View style={[toS.root, { opacity, backgroundColor: palette.card, borderColor: color + '44' }]}>
+    <Animated.View accessibilityLiveRegion={variant === 'error' ? 'assertive' : 'polite'} style={[toS.root, { opacity, backgroundColor: palette.card, borderColor: color + '44' }]}>
       <Feather name={variant === 'success' ? 'check-circle' : variant === 'error' ? 'alert-circle' : 'info'} size={ICON.sm} color={color} />
       <Text style={[toS.text, { color }]}>{message}</Text>
     </Animated.View>
