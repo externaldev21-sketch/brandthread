@@ -343,6 +343,10 @@ type PublishInput = {
   pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
+  /** Promotional vs transactional override (see lib/pushPolicy.ts). */
+  pushKind?: "transactional" | "promotional";
+  /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
+  pushExplicitRequest?: boolean;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -373,6 +377,8 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
     },
     sound: n.pushSound,
     channelId: n.pushChannelId,
+    kind: n.pushKind,
+    explicitRequest: n.pushExplicitRequest,
   }, pushCategory, n.analyticsOwnerId);
 }
 
@@ -446,6 +452,8 @@ export async function publishNotification(n: PublishInput): Promise<void> {
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
+      kind: n.pushKind,
+      explicitRequest: n.pushExplicitRequest,
     }, pushCategory, n.analyticsOwnerId);
   }
 }

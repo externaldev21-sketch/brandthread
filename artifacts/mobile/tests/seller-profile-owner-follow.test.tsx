@@ -160,6 +160,8 @@ vi.mock("react-native-reanimated", () => {
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
   useLocalSearchParams: () => searchParamsMock(),
+  useGlobalSearchParams: () => ({}),
+  usePathname: () => "/seller-profile",
   useFocusEffect: (callback: () => void) => {
     const ReactActual = require("react") as typeof import("react");
     ReactActual.useEffect(callback, [callback]);

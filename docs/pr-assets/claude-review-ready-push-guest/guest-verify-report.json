@@ -1,0 +1,49 @@
+{
+  "requests": [
+    "GET /api/v1/config/features",
+    "GET /api/v1/social/suggested",
+    "GET /api/v1/public/trending",
+    "GET /api/v1/public/products",
+    "GET /api/v1/public/products/high-demand",
+    "GET /api/v1/public/trending",
+    "GET /api/v1/config/features",
+    "GET /api/v1/config/features",
+    "GET /api/v1/config/features",
+    "GET /api/v1/public/posts",
+    "GET /api/v1/auth/feed-gestures-tip",
+    "GET /api/v1/social/following",
+    "GET /api/v1/public/drops",
+    "GET /api/v1/social/status/user_northline",
+    "GET /api/v1/social/status/user_ember",
+    "GET /api/v1/social/status/user_field",
+    "GET /api/v1/social/status/user_quiet",
+    "GET /api/v1/live/feed",
+    "GET /api/v1/config/features"
+  ],
+  "violations": [],
+  "textFit": {
+    "01-guest-welcome": [],
+    "02-guest-discover": [
+      "Drop 04 is live. Ember hoodies restocked [110x42]"
+    ],
+    "03-guest-product": [],
+    "04-guest-home-feed": [
+      "$220.00 +1 [62x16]",
+      "$220.00 +1 [62x16]",
+      "$220.00 +1 [62x16]",
+      "$220.00 +1 [62x16]",
+      "$220.00 +1 [62x16]",
+      "$220.00 +1 [62x16]"
+    ],
+    "05-sign-in-with-guest-link": [],
+    "06-notifications-settings-promo": [],
+    "07-notifications-settings-promo-scrolled": []
+  },
+  "steps": [
+    "01-guest-welcome: /onboarding",
+    "02-guest-discover: /discover",
+    "03-guest-product: /buyer-product-detail",
+    "04-guest-home-feed: /",
+    "05-sign-in-with-guest-link: /sign-in"
+  ]
+}
