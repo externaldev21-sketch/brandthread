@@ -32,7 +32,7 @@ import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
-import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 /** Server story highlight (GET /api/social/highlights/*). */
@@ -2755,6 +2755,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<ServerHighlight>(`/api/social/highlights/${encodeURIComponent(id)}/items`, { storyId }),
       removeHighlightItem: (id: string, itemId: string) =>
         del<{ id: string; deleted: boolean }>(`/api/social/highlights/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
+      // ── Interactive story stickers ─────────────────────────────────────────
+      /** Vote on a poll sticker. 409 ALREADY_VOTED carries the current stickerState. */
+      pollVote: (storyId: string, overlayId: string, optionIndex: number) =>
+        post<{ ok: boolean; stickerState: StoryStickerState | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/poll-vote`, { overlayId, optionIndex }),
+      /** Answer a question sticker (one answer per person). */
+      questionAnswer: (storyId: string, overlayId: string, answer: string) =>
+        post<{ ok: boolean; stickerState: StoryStickerState | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/question-answer`, { overlayId, answer }),
+      /** Author only: every answer to the story's question stickers. */
+      questionAnswers: (storyId: string) =>
+        get<{ storyId: string; questions: Array<{ overlayId: string; prompt: string; answers: Array<{
+          userId: string; name: string; handle: string; initials: string; avatarUrl: string | null; answer: string; createdAt: number;
+        }> }> }>(`/api/social/stories/${encodeURIComponent(storyId)}/question-answers`),
+      /** Author only: the DM to reply to someone's answer in (send the message with the normal messages endpoint). */
+      questionReplyConversation: (storyId: string, userId: string) =>
+        post<{ conversationId: string; route: 'inbox' | 'requests'; isRequest: boolean }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/question-reply-conversation`, { userId }),
       /** Block a user — removes mutual follows, prevents messaging/following */
       block: (userId: string) =>
         post<{ ok: boolean }>('/api/social/block', { userId }),

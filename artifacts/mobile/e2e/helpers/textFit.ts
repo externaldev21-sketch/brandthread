@@ -5,12 +5,33 @@
  * specs. textFitReport adds painted-edge padding and equal-size group checks;
  * findTextFitIssues handles visible-screen checks with horizontal scrollers.
  * Plain, type-light TypeScript for reuse by Playwright specs and scripts.
+ *
+ * textFitReport flags truncation, overflow, tight painted-edge padding, and
+ * mismatched dimensions in groups such as sticker tiles.
  */
 export interface TextFitIssue {
   kind: 'truncated' | 'overflows-parent' | 'offscreen' | 'off-screen' | 'overflowing' | 'tight' | 'ragged';
   text: string;
   detail: string;
 }
+
+/*
+ * Text-fit & alignment check for the web preview (react-native-web DOM).
+ *
+ *  - truncated: a text element whose content is wider than its box and is
+ *    clipped / ellipsised (scrollWidth > clientWidth with overflow hidden or
+ *    text-overflow: ellipsis). Labels, buttons, tabs and steps must never do this.
+ *  - overflowing: a text run whose rendered box sticks out of its parent's box
+ *    (left/right by more than 1px) or out of the viewport.
+ *  - tight: text closer than `minPad` px to the edge of a parent that draws its
+ *    own background or border (a button/chip/card) — inner padding too small.
+ *  - ragged: elements matched by `groupSelectors` whose width or height differ
+ *    from their siblings (equal-size grids).
+ *
+ * Usage (Playwright Page, or anything exposing `evaluate`):
+ *   const report = await textFitReport(page, { groupSelectors: ['[data-testid^="sticker-tile"]'] });
+ *   if (report.issues.length) throw new Error(JSON.stringify(report.issues, null, 2));
+ */
 
 interface PageLike {
   evaluate<R, A>(fn: (arg: A) => R, arg: A): Promise<R>;
@@ -95,6 +116,7 @@ export async function textFitReport(page: EvaluatingPage, options: TextFitOption
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
       const el = node.parentElement;
+      // icon-font glyphs (Feather etc.) live in the private-use area: not copy
       if ((opts.ignoreText ?? []).includes(text)) continue;
       if (!text || /^[\uE000-\uF8FF\s]+$/.test(text) || !el || seen.has(el) || ignored(el)) continue;
       const cs = getComputedStyle(el);
@@ -118,6 +140,7 @@ export async function textFitReport(page: EvaluatingPage, options: TextFitOption
       if (box.left < -1 || box.right > vw + 1) {
         issues.push({ kind: 'overflowing', text: label, detail: `text box ${Math.round(box.left)}..${Math.round(box.right)} outside viewport ${vw}` });
       }
+      // nearest ancestor (including the element itself) that paints a box
       let host: Element | null = el;
       while (host && host !== document.body && !painted(host)) host = host.parentElement;
       if (host && host !== document.body) {
@@ -125,6 +148,7 @@ export async function textFitReport(page: EvaluatingPage, options: TextFitOption
         if (box.left < hb.left - 1 || box.right > hb.right + 1) {
           issues.push({ kind: 'overflowing', text: label, detail: `text ${Math.round(box.left)}..${Math.round(box.right)} vs box ${Math.round(hb.left)}..${Math.round(hb.right)}` });
         } else if (box.left - hb.left < minPad || hb.right - box.right < minPad) {
+          // centred short labels in wide boxes are fine; only flag when the text nearly fills the box
           issues.push({ kind: 'tight', text: label, detail: `padding L ${Math.round(box.left - hb.left)} R ${Math.round(hb.right - box.right)} (< ${minPad})` });
         }
       }
@@ -147,7 +171,6 @@ export async function textFitReport(page: EvaluatingPage, options: TextFitOption
     return { checked, issues };
   }, options);
 }
-
 /** Text-fit scan for the visible screen, allowing intentional horizontal scrollers. */
 export async function findTextFitIssues(
   page: { evaluate: <R>(fn: () => R) => Promise<R> },

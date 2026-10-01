@@ -75,6 +75,7 @@ import storyHighlightsRouter from "./story-highlights";
 import hashtagsRouter from "./hashtags";
 import followRequestsRouter from "./follow-requests";
 import placesRouter from "./places";
+import storyStickersRouter from "./story-stickers";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
 import shippingZonesRouter from "./shipping-zones";
@@ -301,6 +302,7 @@ router.use("/social",                    storyHighlightsRouter);
 router.use("/hashtags",                  hashtagsRouter); // public reads (optional viewer); follow endpoints require auth
 router.use("/social",                    followRequestsRouter);
 router.use("/places",                    placesRouter); // public reads (optional viewer); POST requires auth
+router.use("/social",                    storyStickersRouter);
 router.use("/referrals",                 referralsRouter);
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc

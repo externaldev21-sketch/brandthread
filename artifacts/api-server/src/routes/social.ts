@@ -33,6 +33,7 @@ import {
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
 import { viewerRelations, audienceAllows, viewerMayOpenAudience } from "../lib/storyAccess";
+import { sanitizeStoryOverlays, withStickerState, StickerValidationError } from "../lib/storyStickers";
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
 import { storyListedFor } from "../lib/storyVisibility";
@@ -1173,7 +1174,17 @@ router.post("/stories", async (req, res) => {
 
   // Mention stickers (and "@name" typed into text) are verified server-side:
   // untaggable people (self, blocked either way, deleted/suspended) are dropped silently.
-  const { media, mentions } = await sanitizeStoryMentions(rawMedia, myId);
+  // Stickers are whitelisted first (unknown types / fields dropped, ids validated, counts capped).
+  let cleanMedia: any[];
+  try {
+    cleanMedia = await sanitizeStoryOverlays(rawMedia, { authorId: myId, accountType: me.accountType });
+  } catch (err) {
+    if (err instanceof StickerValidationError) {
+      res.status(err.status).json({ error: err.message, code: err.code }); return;
+    }
+    throw err;
+  }
+  const { media, mentions } = await sanitizeStoryMentions(cleanMedia, myId);
 
   // Automatic media screening (off when the AI integration env is missing).
   const storyUrls = (media as any[]).map((item) => ({
@@ -1251,7 +1262,7 @@ router.post("/stories", async (req, res) => {
     });
   }
 
-  const [view] = await withOriginalInfo([buildStoryView(row, false)]);
+  const [view] = await withStickerState(await withOriginalInfo([buildStoryView(row, false)]), myId);
   res.status(201).json(storyHeld ? { ...view, moderation: { status: "held", message: MEDIA_HELD_MESSAGE } } : view);
 });
 
@@ -1272,7 +1283,7 @@ router.get("/stories/me", async (req, res) => {
       )
     : new Set<string>();
 
-  res.json(await withOriginalInfo(rows.map(r => buildStoryView(r, likedSet.has(r.id)))));
+  res.json(await withStickerState(await withOriginalInfo(rows.map(r => buildStoryView(r, likedSet.has(r.id)))), myId));
 });
 
 // ─── GET /api/social/stories/user/:userId — another user's active stories ────
@@ -1307,7 +1318,7 @@ router.get("/stories/user/:userId", async (req, res) => {
     .map(r => r.storyId)
   );
 
-  res.json(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))));
+  res.json(await withStickerState(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))), myId));
 });
 
 // ─── GET /api/social/stories/following — stories tray ────────────────────────

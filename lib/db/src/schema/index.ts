@@ -2533,6 +2533,7 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
 }));
 
 export * from './storyHighlights';
+export * from './storyStickers';
 export * from './ranking';
 export * from './comments';
 export * from './hashtags';
