@@ -887,7 +887,9 @@ export async function handleCheckoutPaid(
         buyerId: buyerId ?? null,
         ...(guestEmail ? { guestEmail } : {}),
         orderNumber,
-        status:                  oversoldItems.length > 0 ? "refund_pending" : "pending",
+        // Orders are automatic: a paid order goes straight to "processing"
+        // (the seller app shows it as "To ship"); there is no accept step.
+        status:                  oversoldItems.length > 0 ? "refund_pending" : "processing",
         totalCents,
         subtotalCents,
         shippingCents,
