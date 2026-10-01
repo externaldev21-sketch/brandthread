@@ -2208,6 +2208,7 @@ export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   stripeAccountId: text('stripe_account_id'),
   bankDestinationId: text('bank_destination_id'),
   status: text('status').notNull().default('processing'), // processing|succeeded|failed
+  method: text('method').notNull().default('standard'), // standard|instant
   stripePayoutId: text('stripe_payout_id'),
   responseStatus: text('response_status'),
   responseArrivalDate: timestamp('response_arrival_date', { withTimezone: true }),

@@ -6,7 +6,11 @@
  * GET  /payouts                 payout history list
  * GET  /transactions            balance transaction list (for finance P&L view)
  * GET  /statement.csv           download CSV of transactions
- * POST /payout                  manually trigger a payout (if manual schedule)
+ * POST /payout                  manually trigger a payout (if manual schedule);
+ *                               body.method 'standard' (default) | 'instant'
+ * GET  /payout-schedule         current schedule, instant eligibility + fee quote, next payout
+ * PATCH /payout-schedule        set daily | weekly(+anchor) | manual
+ * GET  /payouts/:id             per-payout breakdown (sales, fees, refunds, holds)
  * GET  /summary                 held vs releasing vs available vs paid out
  */
 import { Router } from "express";
@@ -21,6 +25,16 @@ import { requirePermission, requirePayoutsRead, teamContext } from "../middlewar
 import { stripe } from "../lib/stripe";
 import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
 import { publishNotification } from "./notifications-feed";
+import {
+  computeHeldFunds, estimateNextPayout, instantPayoutFeeCents, maxInstantPayoutCents,
+  payoutPolicySnapshot, type HoldableOrder, type NextPayoutEstimate, type PayoutScheduleInterval,
+  type WeeklyAnchor,
+} from "../lib/money/payoutPolicy";
+import {
+  currentScheduleOf, findInstantDestination, scheduleMatches, stripeScheduleParams,
+  validateScheduleInput,
+} from "../lib/money/payoutSchedule";
+import { assertBreakdownReconciles, buildPayoutBreakdown } from "../lib/money/payoutBreakdown";
 
 const router = Router();
 router.use(requireAuth);
@@ -58,6 +72,44 @@ function findEligibleBankAccount(accounts: any[]): any | undefined {
   );
 }
 
+function formatNextPayout(estimate: NextPayoutEstimate) {
+  return {
+    kind: estimate.kind,
+    date: estimate.date ? estimate.date.toISOString() : null,
+    amount: estimate.amountCents,
+    formatted: formatCents(estimate.amountCents),
+    payoutId: estimate.kind === "existing" ? estimate.payoutId : null,
+  };
+}
+
+/**
+ * Orders still inside their payout-policy hold window, from the orders table.
+ * Preorder escrow is excluded: Brandthread already holds that money itself
+ * (see /summary "held"), it is not in the seller's Stripe balance.
+ */
+async function loadHoldableOrders(sellerId: string, now: Date): Promise<HoldableOrder[]> {
+  const since = new Date(now.valueOf() - 31 * 86_400_000);
+  const rows = await db.select({
+    gross: orders.grossChargedCents,
+    platformFee: orders.platformFeeCents,
+    processingFee: orders.processingFeeChargedCents,
+    refunded: orders.refundedCents,
+    paidAt: orders.paidAt,
+    shippingAddress: orders.shippingAddress,
+  }).from(orders)
+    .where(and(
+      eq(orders.ownerId, sellerId),
+      sql`${orders.chargeModel} IS NOT NULL`,
+      sql`${orders.paidAt} >= ${since}`,
+      sql`(${orders.fundsState} IS NULL OR ${orders.fundsState} = 'released')`,
+    ));
+  return rows.flatMap((row) => {
+    if (!row.paidAt) return [];
+    const net = Math.max(0, row.gross - (row.platformFee ?? 0) - (row.processingFee ?? 0) - (row.refunded ?? 0));
+    return [{ netCents: net, paidAt: row.paidAt, country: row.shippingAddress?.country ?? null }];
+  });
+}
+
 type CashoutResult =
   | { kind: "continue" }
   | {
@@ -78,6 +130,51 @@ type CashoutResult =
         arrivalDate: Date;
       };
     };
+
+// Additive /balance fields: policy holds and the next payout estimate. Never
+// throws; a failure only omits the new fields.
+async function balanceExtras(input: {
+  sellerId: string;
+  account: any;
+  available: number;
+  existing: any | null;
+  log: { warn: (...args: any[]) => void };
+}) {
+  try {
+    const now = new Date();
+    const holdable = await loadHoldableOrders(input.sellerId, now);
+    const held = computeHeldFunds(holdable, now);
+    const policy = payoutPolicySnapshot();
+    const schedule = currentScheduleOf(input.account);
+    const heldCents = Math.min(held.heldCents, input.available);
+    const estimate = estimateNextPayout({
+      now,
+      interval: (schedule?.interval ?? null) as PayoutScheduleInterval | null,
+      weeklyAnchor: (schedule?.weeklyAnchor ?? null) as WeeklyAnchor | null,
+      monthlyAnchor: schedule?.monthlyAnchor ?? null,
+      availableCents: input.available,
+      heldCents: policy.enforced ? heldCents : 0,
+      existing: input.existing
+        ? { id: input.existing.id, amountCents: input.existing.amount, arrivalDate: new Date(input.existing.arrival_date * 1000) }
+        : null,
+    });
+    return {
+      held: {
+        amount: heldCents,
+        formatted: formatCents(heldCents),
+        count: held.count,
+        nextReleaseAt: held.nextReleaseAt ? held.nextReleaseAt.toISOString() : null,
+        mode: held.mode,
+        enforced: policy.enforced,
+      },
+      nextPayoutEstimate: formatNextPayout(estimate),
+      payoutSchedule: schedule,
+    };
+  } catch (err) {
+    input.log.warn({ err }, "Payout policy extras unavailable for balance");
+    return {};
+  }
+}
 
 // ─── GET /api/finance/balance ─────────────────────────────────────────────────
 
@@ -170,6 +267,10 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
       connected: true,
       payoutsEnabled: account.payouts_enabled === true,
       bankConnected: Boolean(findEligibleBankAccount(externalAccounts.data)),
+      ...(await balanceExtras({
+        sellerId, account, available: availableAfterReservations, existing: nextP,
+        log: req.log,
+      })),
       processingCashout: processingCashout ? {
         idempotencyKey: processingCashout.idempotencyKey,
         amount: processingCashout.amountCents,
@@ -371,7 +472,7 @@ router.get("/payouts", requirePayoutsRead(), async (req, res) => {
     }
 
     const result = await stripe.payouts.list(
-      { limit },
+      { limit, expand: ["data.destination"] },
       { stripeAccount: accountId },
     );
 
@@ -387,6 +488,7 @@ router.get("/payouts", requirePayoutsRead(), async (req, res) => {
         description: p.description,
         failureCode: (p as any).failure_code ?? null,
         failureMessage: (p as any).failure_message ?? null,
+        method:      (p as any).method ?? null,
         // Bank last4 comes from destination
         destination: (p as any).destination
           ? { last4: (p as any).destination?.last4 ?? null, brand: (p as any).destination?.brand ?? null }
@@ -493,6 +595,7 @@ router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
 router.post("/payout", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   const { amount, currency, idempotencyKey } = req.body;
+  const methodInput = req.body?.method;
 
   try {
     if (!isValidPayoutIdempotencyKey(idempotencyKey)) {
@@ -509,6 +612,14 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
       });
       return;
     }
+    if (methodInput !== undefined && methodInput !== "standard" && methodInput !== "instant") {
+      res.status(400).json({
+        error: "method must be standard or instant",
+        code: "INVALID_PAYOUT_METHOD",
+      });
+      return;
+    }
+    const method: "standard" | "instant" = methodInput === "instant" ? "instant" : "standard";
     const currentAccountId = await getStripeAccount(sellerId);
     if (!stripe) {
       res.status(503).json({ error: "Stripe is unavailable" }); return;
@@ -526,7 +637,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
         .limit(1);
 
       if (existing) {
-        if (existing.amountCents !== amount || existing.currency !== currency) {
+        if (existing.amountCents !== amount || existing.currency !== currency || existing.method !== method) {
           return {
             kind: "error" as const,
             httpStatus: 409,
@@ -568,7 +679,9 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
         const [account, externalAccounts, balance, reservationRows, processingRows] = await Promise.all([
           stripeClient.accounts.retrieve(currentAccountId),
           stripeClient.accounts.listExternalAccounts(currentAccountId, {
-            object: "bank_account",
+            // Instant Payouts go to a debit card (or instant-capable bank), so
+            // the standard bank-only filter must not apply to them.
+            ...(method === "standard" ? { object: "bank_account" as const } : {}),
             limit: 100,
           }),
           stripeClient.balance.retrieve({}, { stripeAccount: currentAccountId }),
@@ -590,7 +703,19 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
               eq(sellerCashoutAttempts.currency, PAYOUT_CURRENCY),
             )),
         ]);
-        const bankAccount = findEligibleBankAccount(externalAccounts.data);
+        let bankAccount = findEligibleBankAccount(externalAccounts.data);
+        if (method === "instant") {
+          const instant = findInstantDestination(externalAccounts.data, PAYOUT_CURRENCY);
+          if (!instant.eligible) {
+            return {
+              kind: "error" as const,
+              httpStatus: 409,
+              code: "INSTANT_PAYOUT_UNAVAILABLE",
+              message: "Instant payouts need a debit card that Stripe has enabled for instant payouts",
+            };
+          }
+          bankAccount = { id: instant.destination.id };
+        }
         if (account.payouts_enabled !== true || !bankAccount) {
           return {
             kind: "error" as const,
@@ -602,7 +727,10 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
         const providerAvailable = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
         const reserved = Number(reservationRows[0]?.reserved ?? 0);
         const processingReserved = processingRows.reduce((sum, row) => sum + row.amountCents, 0);
-        const availableAfterReservations = cashOutableAmount(providerAvailable, reserved + processingReserved);
+        const spendable = cashOutableAmount(providerAvailable, reserved + processingReserved);
+        // An instant payout's fee comes out of the same balance, so "cash out
+        // everything" is the largest amount whose amount + fee still fits.
+        const availableAfterReservations = method === "instant" ? maxInstantPayoutCents(spendable) : spendable;
         if (amount !== availableAfterReservations) {
           return {
             kind: "error" as const,
@@ -619,6 +747,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
           currency,
           stripeAccountId: currentAccountId,
           bankDestinationId: bankAccount.id,
+          method,
           status: "processing",
         });
         return { kind: "continue" as const };
@@ -644,7 +773,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
             message: "The cash-out attempt could not be loaded",
           };
         }
-        if (current.amountCents !== amount || current.currency !== currency) {
+        if (current.amountCents !== amount || current.currency !== currency || current.method !== method) {
           return {
             kind: "error",
             httpStatus: 409,
@@ -739,7 +868,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
           {
             amount: current.amountCents,
             currency: current.currency,
-            method: "standard",
+            method: current.method === "instant" ? "instant" : "standard",
             destination: current.bankDestinationId,
             metadata: { brandthread_cashout_attempt: current.id },
           },
@@ -845,6 +974,247 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
       ...(err.code && { code: err.code }),
       ...(err.availableAfterReservations !== undefined && { availableAfterReservations: err.availableAfterReservations }),
     });
+  }
+});
+
+// ─── GET / PATCH /api/finance/payout-schedule ─────────────────────────────────
+// "Instant" is the manual schedule plus on-demand instant payouts, available
+// only when Stripe reports an instant-capable debit card on the account.
+
+const INSTANT_INFO = {
+  feeBps: payoutPolicySnapshot().instantFeeBps,
+  minFeeCents: payoutPolicySnapshot().instantMinFeeCents,
+};
+
+function scheduleView(account: any) {
+  const schedule = currentScheduleOf(account);
+  return schedule
+    ? { interval: schedule.interval, weeklyAnchor: schedule.weeklyAnchor, delayDays: schedule.delayDays }
+    : null;
+}
+
+router.get("/payout-schedule", requirePayoutsRead(), async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const accountId = await getStripeAccount(sellerId);
+    if (!stripe || !accountId) {
+      res.json({
+        connected: false,
+        providerConfigured: Boolean(stripe),
+        payoutsEnabled: false,
+        schedule: null,
+        instant: { eligible: false, reason: "not_connected", destination: null, ...INSTANT_INFO, maxAmount: null, quote: null },
+        nextPayoutEstimate: null,
+        policy: payoutPolicySnapshot(),
+      });
+      return;
+    }
+    const [account, externalAccounts, balance, pendingPayouts, reservationRows, processingRows] = await Promise.all([
+      stripe.accounts.retrieve(accountId),
+      stripe.accounts.listExternalAccounts(accountId, { limit: 100 }),
+      stripe.balance.retrieve({}, { stripeAccount: accountId }),
+      stripe.payouts.list({ limit: 1, status: "pending" }, { stripeAccount: accountId }),
+      db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
+        .from(orderFundReservations)
+        .where(and(eq(orderFundReservations.ownerId, sellerId), eq(orderFundReservations.status, "reserved"))),
+      db.select({ amountCents: sellerCashoutAttempts.amountCents })
+        .from(sellerCashoutAttempts)
+        .where(and(
+          eq(sellerCashoutAttempts.ownerId, sellerId),
+          eq(sellerCashoutAttempts.status, "processing"),
+          eq(sellerCashoutAttempts.currency, PAYOUT_CURRENCY),
+        )),
+    ]);
+    const providerAvailable = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
+    const spendable = cashOutableAmount(
+      providerAvailable,
+      Number(reservationRows[0]?.reserved ?? 0) + processingRows.reduce((sum, row) => sum + row.amountCents, 0),
+    );
+    const eligibility = findInstantDestination(externalAccounts.data, PAYOUT_CURRENCY);
+    const maxInstant = maxInstantPayoutCents(spendable);
+    const requested = req.query.amount === undefined ? null : Number(req.query.amount);
+    if (requested !== null && (!Number.isSafeInteger(requested) || requested <= 0)) {
+      res.status(400).json({ error: "amount must be a positive integer number of cents", code: "INVALID_PAYOUT_AMOUNT" });
+      return;
+    }
+    const quoteAmount = requested ?? maxInstant;
+    const fee = quoteAmount > 0 ? instantPayoutFeeCents(quoteAmount) : 0;
+    const extras = await balanceExtras({
+      sellerId, account, available: spendable, existing: pendingPayouts.data[0] ?? null, log: req.log,
+    });
+    res.json({
+      connected: true,
+      providerConfigured: true,
+      payoutsEnabled: account.payouts_enabled === true,
+      schedule: scheduleView(account),
+      instant: {
+        eligible: account.payouts_enabled === true && eligibility.eligible,
+        reason: !account.payouts_enabled ? "payouts_disabled" : eligibility.eligible ? null : eligibility.reason,
+        destination: eligibility.eligible ? eligibility.destination : null,
+        ...INSTANT_INFO,
+        maxAmount: { amount: maxInstant, formatted: formatCents(maxInstant) },
+        quote: quoteAmount > 0
+          ? {
+              amount: quoteAmount,
+              fee: fee,
+              feeFormatted: formatCents(fee),
+              total: quoteAmount + fee,
+              withinBalance: quoteAmount + fee <= spendable,
+            }
+          : null,
+      },
+      nextPayoutEstimate: "nextPayoutEstimate" in extras ? extras.nextPayoutEstimate : null,
+      held: "held" in extras ? extras.held : null,
+      policy: payoutPolicySnapshot(),
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to load payout schedule");
+    res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load payout schedule" });
+  }
+});
+
+router.patch("/payout-schedule", requirePermission("payouts"), async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const parsed = validateScheduleInput(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.message, code: parsed.code });
+      return;
+    }
+    if (!stripe) {
+      res.status(503).json({ error: "Stripe is unavailable", code: "STRIPE_UNAVAILABLE" });
+      return;
+    }
+    const accountId = await getStripeAccount(sellerId);
+    if (!accountId) {
+      res.status(409).json({ error: "Connect Stripe before choosing a payout schedule", code: "PAYOUTS_NOT_ENABLED" });
+      return;
+    }
+    const account = await stripe.accounts.retrieve(accountId);
+    if (scheduleMatches(currentScheduleOf(account), parsed.update)) {
+      res.json({ changed: false, schedule: scheduleView(account) });
+      return;
+    }
+    let updated: any;
+    try {
+      updated = await stripe.accounts.update(accountId, {
+        settings: { payouts: { schedule: stripeScheduleParams(parsed.update) } },
+      });
+    } catch (providerError: any) {
+      const status = Number(providerError?.statusCode ?? providerError?.status);
+      if (Number.isInteger(status) && status >= 400 && status < 500) {
+        res.status(409).json({
+          error: providerError?.message ?? "Stripe did not accept this payout schedule",
+          code: "SCHEDULE_REJECTED",
+        });
+        return;
+      }
+      throw providerError;
+    }
+    res.json({ changed: true, schedule: scheduleView(updated) });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to update payout schedule");
+    res.status(err.status ?? 500).json({ error: "Failed to update payout schedule" });
+  }
+});
+
+// ─── GET /api/finance/payouts/:id — per-payout breakdown ─────────────────────
+
+const PAYOUT_ID = /^po_[A-Za-z0-9]{6,64}$/;
+const BREAKDOWN_PAGE_LIMIT = 5; // x100 balance transactions per payout
+
+router.get("/payouts/:id", requirePayoutsRead(), async (req, res) => {
+  const sellerId = getSellerId(req);
+  const payoutId = String(req.params.id);
+  try {
+    if (!PAYOUT_ID.test(payoutId)) {
+      res.status(400).json({ error: "Invalid payout id", code: "INVALID_PAYOUT_ID" });
+      return;
+    }
+    const accountId = await getStripeAccount(sellerId);
+    if (!stripe || !accountId) {
+      res.json({ connected: false, payout: null, breakdown: null });
+      return;
+    }
+    // Retrieving with the connected-account header means a payout that does
+    // not belong to this seller simply does not exist for them.
+    let payout: any;
+    try {
+      payout = await stripe.payouts.retrieve(
+        payoutId,
+        { expand: ["destination", "balance_transaction"] },
+        { stripeAccount: accountId },
+      );
+    } catch (providerError: any) {
+      if (Number(providerError?.statusCode ?? providerError?.status) === 404) {
+        res.status(404).json({ error: "Payout not found", code: "PAYOUT_NOT_FOUND" });
+        return;
+      }
+      throw providerError;
+    }
+
+    // Stripe only attributes balance transactions to automatic payouts.
+    const automatic = payout.automatic === true;
+    const transactions: any[] = [];
+    let truncated = false;
+    if (automatic) {
+      let startingAfter: string | undefined;
+      for (let page = 0; page < BREAKDOWN_PAGE_LIMIT; page += 1) {
+        const result = await stripe.balanceTransactions.list(
+          { payout: payoutId, limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) },
+          { stripeAccount: accountId },
+        );
+        transactions.push(...result.data);
+        if (!result.has_more) break;
+        startingAfter = result.data[result.data.length - 1]?.id;
+        if (page === BREAKDOWN_PAGE_LIMIT - 1) truncated = true;
+      }
+    }
+    const breakdown = automatic
+      ? buildPayoutBreakdown({ payoutAmountCents: payout.amount, transactions })
+      : null;
+    if (breakdown) assertBreakdownReconciles(breakdown);
+
+    const instantFee = payout.method === "instant" && typeof payout.balance_transaction === "object"
+      ? Math.max(0, Number(payout.balance_transaction?.fee ?? 0))
+      : 0;
+    const destination = typeof payout.destination === "object" && payout.destination ? payout.destination : null;
+    const money = (cents: number) => ({ amount: cents, formatted: formatCents(cents, payout.currency) });
+    res.json({
+      connected: true,
+      payout: {
+        id: payout.id,
+        amount: payout.amount,
+        currency: payout.currency,
+        formatted: formatCents(payout.amount, payout.currency),
+        status: payout.status,
+        method: payout.method ?? "standard",
+        automatic,
+        arrivalDate: new Date(payout.arrival_date * 1000).toISOString(),
+        created: new Date(payout.created * 1000).toISOString(),
+        failureCode: payout.failure_code ?? null,
+        failureMessage: payout.failure_message ?? null,
+        destination: destination
+          ? { last4: destination.last4 ?? null, brand: destination.brand ?? destination.bank_name ?? null }
+          : null,
+        instantFee: instantFee > 0 ? money(instantFee) : null,
+      },
+      breakdown: breakdown
+        ? {
+            lines: Object.fromEntries(
+              Object.entries(breakdown.lines).map(([key, cents]) => [key, money(cents)]),
+            ),
+            net: money(breakdown.payoutCents),
+            reconciled: breakdown.reconciled,
+            remainder: money(breakdown.remainderCents),
+            transactionCount: breakdown.transactionCount,
+            truncated,
+          }
+        : null,
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to load payout breakdown");
+    res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load payout" });
   }
 });
 
