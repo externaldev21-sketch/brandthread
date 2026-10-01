@@ -38,8 +38,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { DEMO_CAPTION_SEGMENTS, DEMO_VIDEO_POST_ID, useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -68,19 +67,13 @@ function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () =
   );
 }
 
-/** `&demo=1` previews only: steps through the sample captions so the overlay is visible without a real video. */
-function DemoCaptionsClock({ segments }: { segments: CaptionSegment[] }) {
-  return <CaptionsOverlay segments={segments} currentTime={1} bottomOffset={SP.md} />;
-}
-
 function PostMedia({
-  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched, captions, demoCaptions,
+  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched, captions,
 }: {
   mediaUrl?: string; type: BuyerPost['type'];
   mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
   onWatched?: () => void;
   captions?: CaptionSegment[];
-  demoCaptions?: CaptionSegment[];
 }) {
   if (mediaUrl && type === 'video') {
     return <PostVideo uri={mediaUrl} onWatched={onWatched} captions={captions} />;
@@ -101,7 +94,6 @@ function PostMedia({
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Feather name={typeIcon} size={ICON.xl} color={MUTED} />
       </View>
-      {demoCaptions ? <DemoCaptionsClock segments={demoCaptions} /> : null}
     </LinearGradient>
   );
 }
@@ -112,18 +104,6 @@ function PostMedia({
  * than a blank placeholder. `null` for every id outside the preview seed.
  */
 function previewPost(postId: string | undefined): BuyerPost | null {
-  if (postId === DEMO_VIDEO_POST_ID && isPreviewDemoMode()) {
-    const now = new Date().toISOString();
-    return {
-      id: DEMO_VIDEO_POST_ID, authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE,
-      authorInitials: MY_INITIALS, authorColor: MY_COLOR, authorAccountType: 'buyer',
-      feedEligibility: 'profile_only', profileVisibility: 'public', type: 'video',
-      caption: 'Packable shell, recycled nylon', hashtags: [], mediaColors: [],
-      likesCount: 12, commentsCount: 0, repostsCount: 1,
-      likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-      createdAt: now, updatedAt: now,
-    };
-  }
   const seed = postId ? getPreviewActivityPost(postId) : undefined;
   if (!seed) return null;
   return {
@@ -253,7 +233,6 @@ export default function BuyerPostViewer() {
 
   const captionTrack = useReadyCaptionTrack(params.postId, postType === 'video', captionsFlag, fetchCaptionTracks);
   const overlaySegments = captionTrack && captionsOn ? captionTrack.segments : undefined;
-  const demoCaptionsActive = isPreviewDemoMode() && params.postId === DEMO_VIDEO_POST_ID && !post?.mediaUrl;
 
   // Media is a full-width square right under the header — a stable enough
   // target rect to grow the tapped grid tile into without needing to
@@ -289,7 +268,6 @@ export default function BuyerPostViewer() {
             typeIcon={typeIcon}
             onWatched={post?.type === 'video' ? handleVideoWatched : undefined}
             captions={overlaySegments}
-            demoCaptions={demoCaptionsActive && overlaySegments ? DEMO_CAPTION_SEGMENTS : undefined}
           />
         </View>
 

@@ -13,8 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { isPreviewDemoMode } from '@/lib/devPreview';
-import { DEMO_VIDEO_POST_ID, demoCaptionTrack, type CaptionTrack } from '@/lib/captions';
+import type { CaptionTrack } from '@/lib/captions';
 import { RADII } from '@/constants/radii';
 import { FONT, FS, SP } from '@/lib/theme';
 
@@ -38,7 +37,6 @@ export default function PostCaptionsEditScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const demo = isPreviewDemoMode() && postId === DEMO_VIDEO_POST_ID;
 
   const applyTrack = useCallback((next: CaptionTrack) => {
     setTrack(next);
@@ -48,7 +46,6 @@ export default function PostCaptionsEditScreen() {
 
   const load = useCallback(async () => {
     if (!postId) return;
-    if (demo) { applyTrack(demoCaptionTrack()); return; }
     try {
       const res = await api.posts.captions(postId);
       const ready = res.tracks.find((t) => t.status === 'ready');
@@ -58,7 +55,7 @@ export default function PostCaptionsEditScreen() {
     } catch (e: any) {
       setPhase(e?.status === 503 || e?.code === 'CAPTIONS_UNAVAILABLE' ? 'unavailable' : 'none');
     }
-  }, [api, postId, demo, applyTrack]);
+  }, [api, postId, applyTrack]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -86,7 +83,6 @@ export default function PostCaptionsEditScreen() {
     setSaving(true);
     setError(null);
     try {
-      if (demo) { goBackOr(router); return; }
       const updated = await api.posts.updateCaptions(postId, track.language, texts);
       applyTrack(updated);
       goBackOr(router);
@@ -134,7 +130,7 @@ export default function PostCaptionsEditScreen() {
               {error ? <Text style={[styles.message, { color: theme.text }]}>{error}</Text> : null}
             </ScrollView>
             <View style={[styles.footer, { paddingBottom: insets.bottom + SP.sm, borderTopColor: theme.border }]}>
-              <Button label="Save" onPress={save} loading={saving} disabled={!dirty && !demo} fullWidth testID="save-captions" />
+              <Button label="Save" onPress={save} loading={saving} disabled={!dirty} fullWidth testID="save-captions" />
             </View>
           </>
         ) : phase === 'unavailable' ? (
@@ -175,7 +171,7 @@ const styles = StyleSheet.create({
   time: { width: 40, paddingTop: 12, fontFamily: FONT.medium, fontSize: FS.xs },
   input: {
     flex: 1, borderWidth: 1, borderRadius: RADII.input, paddingHorizontal: SP.sm, paddingVertical: SP.sm,
-    fontFamily: FONT.regular, fontSize: FS.base, minHeight: 44,
+    fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, minHeight: 56,
   },
   footer: { paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: StyleSheet.hairlineWidth },
 });
