@@ -1,0 +1,5 @@
+text-fit ok [01-caption-input.png]
+text-fit ok [02-caption-results.png]
+text-fit ok [03-description-results.png]
+text-fit ok [04-size-chart-input.png]
+text-fit ok [05-size-chart-results.png]

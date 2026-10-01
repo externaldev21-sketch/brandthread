@@ -18,7 +18,7 @@ describe("AI tool rules", () => {
   });
 
   it("makes text free on every plan", () => {
-    for (const path of ["/ai/chat", "/ai/chat/stream", "/ai/brand-memory/rebuild", "/brandthread-agent/chat", "/store/ai/improve-copy"]) {
+    for (const path of ["/ai/chat", "/ai/chat/stream", "/ai/brand-memory/rebuild", "/brandthread-agent/chat", "/store/ai/improve-copy", "/ai-helpers/caption", "/ai-helpers/product-description", "/ai-helpers/size-chart"]) {
       const rule = findToolRule("POST", path);
       expect(rule, path).toMatchObject({ kind: "text", cost: 0 });
     }

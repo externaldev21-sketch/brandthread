@@ -1043,6 +1043,15 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           messages?: { conversations: unknown[]; messages: unknown[] };
         }>('/api/auth/data-export', { include }),
     },
+    aiHelpers: {
+      caption: (body: { draft?: string; description?: string; imagePath?: string; tone?: string }) =>
+        postExpensive<{ captions: string[]; hashtags: string[] }>('/api/ai-helpers/caption', body),
+      productDescription: (body: { productId?: string; imagePaths?: string[]; name?: string; details?: string; tone?: string }) =>
+        postExpensive<{ title: string; description: string; bullets: string[] }>('/api/ai-helpers/product-description', body),
+      sizeChart: (body: unknown) =>
+        postExpensive<{ unit: 'cm' | 'in'; note: string; rows: Record<string, string | number>[]; sizeChart: { columns: string[]; rows: { size: string; values: string[] }[]; unit: 'inches' | 'cm'; notes?: string } }>('/api/ai-helpers/size-chart', body),
+      save: (body: unknown) => post<{ saved: true }>('/api/ai-helpers/save', body),
+    },
     products: {
       list:           ()                       => get('/api/products'),
       publicList:     (ownerId?: string)       =>

@@ -181,6 +181,10 @@ export default function ContentScreen() {
         },
       }] : []),
       {
+        text: 'Write caption with AI',
+        onPress: () => router.push(('/ai-helper?mode=caption&postId=' + encodeURIComponent(post.id) + (post.caption ? '&draft=' + encodeURIComponent(post.caption) : '')) as never),
+      },
+      {
         text: post.status === 'archived' ? 'Restore' : 'Archive',
         onPress: async () => {
           setDeletingPostId(post.id);

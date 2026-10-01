@@ -74,6 +74,9 @@ export const AI_TOOL_RULES: AiToolRule[] = [
   text(/^\/ai\/brand-memory\/rebuild$/,           "brand_memory", "Brand memory"),
   text(/^\/brandthread-agent\/(chat|message)s?$/, "agent_chat",   "Brandthread agent"),
   text(/^\/store\/ai\//,                          "store_ai",     "Store AI"),
+  text(/^\/ai-helpers\/caption$/,                 "ai_caption",   "Caption and hashtags"),
+  text(/^\/ai-helpers\/product-description$/,     "ai_product_description", "Product description"),
+  text(/^\/ai-helpers\/size-chart$/,              "ai_size_chart", "Size chart"),
 
   // ── Image generation ──────────────────────────────────────────────────────
   gen(/^\/bg-removal\/remove$/,                   "bg_remove",    "Remove background",     2),
