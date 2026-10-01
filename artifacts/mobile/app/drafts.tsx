@@ -29,6 +29,7 @@ import { useColors } from '@/hooks/useColors';
 import { EmptyState, SearchBar } from '@/components/BrandthreadUI';
 import { deleteDraft, listDrafts } from '@/services/productService';
 import { ProductDraft } from '@/services/productTypes';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 type DraftSort = 'lastSaved' | 'name';
 
@@ -110,8 +111,8 @@ export default function DraftsScreen() {
   const [filterQuery, setFilterQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const loadDrafts = useCallback(async () => {
-    setLoading(true);
+  const loadDrafts = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const rows = await listDrafts();
       setDrafts(Array.isArray(rows) ? rows : []);
@@ -119,6 +120,8 @@ export default function DraftsScreen() {
       setLoading(false);
     }
   }, []);
+
+  const pull = usePullToRefresh(() => loadDrafts(true));
 
   useFocusEffect(useCallback(() => {
     loadDrafts();
@@ -219,6 +222,7 @@ export default function DraftsScreen() {
         data={visibleDrafts}
         keyExtractor={item => item.id}
         renderItem={renderDraft}
+        refreshControl={pull.refreshControl}
         contentContainerStyle={[
           styles.listContent,
           visibleDrafts.length === 0 && styles.emptyListContent,

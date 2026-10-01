@@ -25,6 +25,7 @@ import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -38,33 +39,37 @@ export default function BuyerCloseFriends() {
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    Promise.all([
+  const loadFriends = useCallback(async () => {
+    const [list, localIds, followers, following, remote] = await Promise.all([
       getAcceptedFriends(),
       getCloseFriendIds(),
       api.social.followers().catch(() => []),
       api.social.following().catch(() => []),
       api.closeFriends.get().catch(() => null),
-    ]).then(([list, localIds, followers, following, remote]) => {
-      // Candidates: the existing friends list plus the real people I follow / who follow me.
-      const byId = new Map<string, Friendship>(list.map(f => [f.userId, f]));
-      const addPerson = (p: { userId: string; name: string; handle: string }) => {
-        if (byId.has(p.userId)) return;
-        byId.set(p.userId, {
-          id: p.userId, userId: p.userId, name: p.name, handle: p.handle,
-          initials: '', color: '', status: 'accepted', mutualFriendsCount: 0, updatedAt: '',
-        });
-      };
-      (Array.isArray(followers) ? followers : []).forEach(addPerson);
-      (Array.isArray(following) ? following : []).forEach(addPerson);
-      (remote?.friends ?? []).forEach(addPerson);
-      setFriends(Array.from(byId.values()));
-      // The server list is the source of truth when reachable; refresh the local cache from it.
-      const ids = remote ? remote.friendIds : localIds;
-      setCloseFriends(new Set(ids));
-      if (remote) void saveCloseFriendIds(ids).catch(() => {});
-    });
-  }, [api]));
+    ]);
+    // Candidates: the existing friends list plus the real people I follow / who follow me.
+    const byId = new Map<string, Friendship>(list.map(f => [f.userId, f]));
+    const addPerson = (p: { userId: string; name: string; handle: string }) => {
+      if (byId.has(p.userId)) return;
+      byId.set(p.userId, {
+        id: p.userId, userId: p.userId, name: p.name, handle: p.handle,
+        initials: '', color: '', status: 'accepted', mutualFriendsCount: 0, updatedAt: '',
+      });
+    };
+    (Array.isArray(followers) ? followers : []).forEach(addPerson);
+    (Array.isArray(following) ? following : []).forEach(addPerson);
+    (remote?.friends ?? []).forEach(addPerson);
+    setFriends(Array.from(byId.values()));
+    // The server list is the source of truth when reachable; refresh the local cache from it.
+    const ids = remote ? remote.friendIds : localIds;
+    setCloseFriends(new Set(ids));
+    if (remote) void saveCloseFriendIds(ids).catch(() => {});
+  }, [api]);
+  const pull = usePullToRefresh(loadFriends);
+
+  useFocusEffect(useCallback(() => {
+    void loadFriends();
+  }, [loadFriends]));
 
   const filtered = friends.filter(f =>
     f.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -158,6 +163,7 @@ export default function BuyerCloseFriends() {
         data={filtered}
         keyExtractor={f => f.id}
         renderItem={renderFriend}
+        refreshControl={pull.refreshControl}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 120 }}
         ListEmptyComponent={
           <EmptyState

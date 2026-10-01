@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { canSyncSocialServer } from '@/services/socialService';
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
 
@@ -180,6 +181,8 @@ export default function BuyerHighlightsManager() {
   const params = useLocalSearchParams<{ create?: string; edit?: string }>();
   // Deep-link intents from the profile's highlights row run once per mount.
   const intentHandled = useRef(false);
+
+  const pull = usePullToRefresh(() => loadHighlights().then(setHighlights));
 
   useFocusEffect(useCallback(() => {
     loadHighlights().then((items) => {
@@ -344,9 +347,12 @@ export default function BuyerHighlightsManager() {
         actions={[{ icon: 'plus', onPress: openCreate, accessibilityLabel: 'New highlight' }]}
       />
 
+      {/* Card chrome lives on a wrapper: on web, RN's RefreshControl wrapper would otherwise apply the list `style` twice (double border). */}
+      <View style={{ flexGrow: 1, flexShrink: 1, backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
       <FlatList
         data={highlights}
         keyExtractor={h => h.id}
+        refreshControl={pull.refreshControl}
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
           <EmptyState
@@ -358,8 +364,8 @@ export default function BuyerHighlightsManager() {
         }
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
-        style={{ backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}
       />
+      </View>
 
       <HLFormModal
         visible={creating}

@@ -26,6 +26,8 @@ import {
 } from '@/components/BrandthreadUI';
 import { getPages, createPage, updatePage, duplicatePage, deletePage } from '@/services/storeService';
 import { StorePage, PageType, PageStatus } from '@/services/storeTypes';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 type Mode = 'list' | 'edit' | 'new';
 
@@ -98,6 +100,8 @@ export default function StorePagesScreen() {
   const [selectedPage, setSelectedPage] = useState<StorePage | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm());
   const [saving, setSaving] = useState(false);
+  const [pagesFailed, setPagesFailed] = useState(false);
+  const pull = usePullToRefresh(() => loadPages());
 
   useFocusEffect(
     useCallback(() => {
@@ -109,8 +113,10 @@ export default function StorePagesScreen() {
     try {
       const result = await getPages();
       setPages(result);
+      setPagesFailed(false);
     } catch {
       setPages([]);
+      setPagesFailed(true);
     }
   }
 
@@ -216,7 +222,9 @@ export default function StorePagesScreen() {
           actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'Create page' }]}
         />
 
-        {pages.length === 0 ? (
+        {pages.length === 0 && pagesFailed ? (
+          <ErrorState message="Couldn't load pages." onRetry={() => { void loadPages(); }} style={{ flex: 1 }} />
+        ) : pages.length === 0 ? (
           <View style={styles.emptyWrap}>
             <EmptyState
               icon="file-text"
@@ -229,6 +237,7 @@ export default function StorePagesScreen() {
           <FlatList
             data={pages}
             keyExtractor={(item) => item.id}
+            refreshControl={pull.refreshControl}
             contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + SP.xl }]}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (

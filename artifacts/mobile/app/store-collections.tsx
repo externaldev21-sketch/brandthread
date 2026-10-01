@@ -31,6 +31,8 @@ import {
   getStorefront,
 } from '@/services/storeService';
 import { useApi } from '@/lib/api';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   StoreCollection, CollectionType, CollectionStatus,
   CollectionCondition, CollectionConditionField, CollectionConditionOperator,
@@ -123,6 +125,8 @@ export default function StoreCollectionsScreen() {
   const [form, setForm] = useState<FormState>(defaultForm());
   const [saving, setSaving] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [collectionsFailed, setCollectionsFailed] = useState(false);
+  const pull = usePullToRefresh(() => loadCollections());
   const api = useApi();
 
   useFocusEffect(
@@ -135,8 +139,10 @@ export default function StoreCollectionsScreen() {
     try {
       const cols = await getCollections();
       setCollections(cols);
+      setCollectionsFailed(false);
     } catch {
       setCollections([]);
+      setCollectionsFailed(true);
     }
   }
 
@@ -260,7 +266,9 @@ export default function StoreCollectionsScreen() {
           actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'Create collection' }]}
         />
 
-        {collections.length === 0 ? (
+        {collections.length === 0 && collectionsFailed ? (
+          <ErrorState message="Couldn't load collections." onRetry={() => { void loadCollections(); }} style={{ flex: 1 }} />
+        ) : collections.length === 0 ? (
           <View style={styles.emptyWrap}>
             <EmptyState
               icon="grid"
@@ -274,6 +282,7 @@ export default function StoreCollectionsScreen() {
           <FlatList
             data={collections}
             keyExtractor={(item) => item.id}
+            refreshControl={pull.refreshControl}
             contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + SP.xl }]}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (

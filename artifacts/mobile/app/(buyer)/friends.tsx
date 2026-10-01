@@ -31,6 +31,7 @@ import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -282,6 +283,7 @@ export default function FriendsScreen() {
   }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
+  const pull = usePullToRefresh(loadData);
 
   useEffect(() => {
     const unsub = subscribeSocial(() => { loadData(); });
@@ -586,6 +588,7 @@ export default function FriendsScreen() {
           ref={scrollResetRef}
           data={feedPosts}
           keyExtractor={p => p.id}
+          refreshControl={pull.refreshControl}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: barInset + SPACING.md }}
           ListEmptyComponent={loading ? <FeedSkeleton /> : null}

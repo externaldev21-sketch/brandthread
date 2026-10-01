@@ -18,6 +18,7 @@ import { useStoryMentions } from '@/hooks/useStoryMentions';
 import { relativeTime } from '@/lib/activity';
 import { atHandle, handledLabel, orderMentions, storyMentionViewerHref } from '@/lib/storyMentionsRail';
 import type { StoryMentionItem } from '@/services/socialTypes';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const AVATAR = 44;
 
@@ -71,7 +72,8 @@ export default function StoryMentionsScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const screenPadding = useScreenPadding({ withTabBarInset: false });
   const router = useRouter();
-  const { items, loading } = useStoryMentions();
+  const { items, loading, reload } = useStoryMentions();
+  const pull = usePullToRefresh(reload);
   const ordered = useMemo(() => orderMentions(items), [items]);
   const now = useMemo(() => Date.now(), [items]);
 
@@ -98,6 +100,7 @@ export default function StoryMentionsScreen() {
       ) : (
         <FlatList
           data={ordered}
+          refreshControl={pull.refreshControl}
           keyExtractor={(item) => item.storyId}
           renderItem={({ item }) => <MentionRow item={item} now={now} styles={styles} onOpen={open} />}
           showsVerticalScrollIndicator={false}

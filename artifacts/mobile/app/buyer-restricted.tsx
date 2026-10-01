@@ -24,6 +24,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function RestrictedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -34,9 +35,12 @@ export default function RestrictedAccountsScreen() {
   const [query, setQuery] = useState('');
   const [confirmUser, setConfirmUser] = useState<RestrictRecord | null>(null);
 
+  const loadRestricted = useCallback(() => getRestrictedUsers().then(setRestricted), []);
+  const pull = usePullToRefresh(loadRestricted);
+
   useFocusEffect(useCallback(() => {
-    getRestrictedUsers().then(setRestricted);
-  }, []));
+    void loadRestricted();
+  }, [loadRestricted]));
 
   const handleUnrestrict = async (user: RestrictRecord) => {
     hapticDestructiveConfirm();
@@ -75,6 +79,7 @@ export default function RestrictedAccountsScreen() {
 
       <FlatList
         data={filtered}
+        refreshControl={pull.refreshControl}
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={

@@ -15,6 +15,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { hapticDestructiveConfirm, hapticSelection } from '@/lib/haptics';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 export default function BuyerSearchHistoryScreen() {
   const router = useRouter();
@@ -23,13 +25,16 @@ export default function BuyerSearchHistoryScreen() {
 
   const [terms, setTerms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const { recent } = await api.public.recent(30);
       setTerms(recent.map((r) => r.query));
+      setFailed(false);
     } catch {
       setTerms([]);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -37,6 +42,7 @@ export default function BuyerSearchHistoryScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  const pull = usePullToRefresh(load);
 
   function submitTerm(term: string) {
     router.push({ pathname: '/buyer-search', params: { q: term } } as never);
@@ -87,11 +93,14 @@ export default function BuyerSearchHistoryScreen() {
           </PressableScale>
         }
       />
-      {!loading && !hasTerms ? (
+      {!loading && !hasTerms && failed ? (
+        <ErrorState message="Couldn't load your searches." onRetry={() => { void load(); }} style={{ flex: 1 }} />
+      ) : !loading && !hasTerms ? (
         <EmptyState icon="clock" title="No search history" description="Searches you make will show up here." />
       ) : (
         <FlatList
           data={terms}
+          refreshControl={pull.refreshControl}
           keyExtractor={(term) => term}
           renderItem={({ item }) => (
             <RecentSearchRow term={item} onPress={() => submitTerm(item)} onRemove={() => removeTerm(item)} />

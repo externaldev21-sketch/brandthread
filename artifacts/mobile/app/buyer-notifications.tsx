@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   View, Text, FlatList, ScrollView,
   Alert, StyleSheet,
@@ -262,6 +264,7 @@ export default function BuyerNotifications() {
   }, []);
   const [notifLoading, setNotifLoading] = useState(true);
   const [optionsFor, setOptionsFor] = useState<Notification | null>(null);
+  const [notifFailed, setNotifFailed] = useState(false);
 
   // Only the very first load shows the full-screen loader. Focus refocuses and
   // realtime socket events after that refresh the list silently so the loader
@@ -273,13 +276,17 @@ export default function BuyerNotifications() {
     try {
       const data = await getNotifications();
       setNotifs(data);
+      setNotifFailed(false);
       void syncNotificationBadge(data);
     } catch (_) {
+      setNotifFailed(true);
     } finally {
       hasLoadedOnce.current = true;
       setNotifLoading(false);
     }
   }, []);
+
+  const pull = usePullToRefresh(loadNotifs);
 
   useFocusEffect(useCallback(() => { loadNotifs(); }, [loadNotifs]));
 
@@ -549,7 +556,9 @@ export default function BuyerNotifications() {
           style={{ position: 'absolute', top: 80, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
       )}
-      {!notifLoading && listData.length === 0 ? (
+      {!notifLoading && listData.length === 0 && notifFailed ? (
+        <ErrorState message="Couldn't load notifications." onRetry={() => { void loadNotifs(); }} style={{ flex: 1 }} />
+      ) : !notifLoading && listData.length === 0 ? (
         <EmptyState
           icon="bell"
           title="Quiet looks good on you."
@@ -563,6 +572,7 @@ export default function BuyerNotifications() {
             item.type === 'header' ? `header-${item.title}` : item.notif.id
           }
           renderItem={renderItem}
+          refreshControl={pull.refreshControl}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
         />
