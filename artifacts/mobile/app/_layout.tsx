@@ -74,6 +74,7 @@ import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
 import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
 import { ReportSheetProvider } from '@/components/safety/ReportSheet';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
+import { SaveHeartHost } from '@/components/SaveHeartHost';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
@@ -1626,6 +1627,7 @@ function RootLayout() {
                                       <RootLayoutNav />
                                     </ReportSheetProvider>
                                     <GlobalCallOverlay />
+                                    <SaveHeartHost />
                                   </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>

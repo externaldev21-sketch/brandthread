@@ -9,6 +9,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
+import { SaveHeart } from '@/components/SaveHeart';
 import { SkeletonBlock } from '@/components/layout';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, GUTTER } from '@/lib/theme';
@@ -42,6 +43,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
   const { push } = useThreadPull();
   const countdownLabel = formatTimeRemaining(item.endsAt);
   return (
+    <View style={{ width: TILE_WIDTH }}>
     <Pressable
       onPress={() => {
         hapticLight();
@@ -84,6 +86,15 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
         </Text>
       )}
     </Pressable>
+    {/* Sibling of the tile Pressable (never nested): bottom-right of the photo. */}
+    <SaveHeart
+      productId={item.productId}
+      title={item.name}
+      brand={item.brand}
+      priceCents={item.priceCents}
+      style={{ position: 'absolute', right: 8, top: TILE_IMAGE_HEIGHT - 30 - 8 }}
+    />
+    </View>
   );
 });
 
@@ -105,7 +116,7 @@ const tile = StyleSheet.create({
   countdownBadge: {
     position: 'absolute', top: 8, left: 8,
     backgroundColor: 'rgba(0,0,0,0.72)', borderRadius: RADII.pill,
-    paddingHorizontal: 8, paddingVertical: 3,
+    paddingHorizontal: 12, paddingVertical: 3,
   },
   countdownText: { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 6 },
