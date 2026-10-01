@@ -14,7 +14,9 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { useRouter } from 'expo-router';
+import { Header } from '@/components/layout';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
 
 type Row = {
@@ -28,6 +30,7 @@ type Row = {
 
 export default function WaitlistDemandScreen() {
   const api = useApi();
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<Row[]>([]);
@@ -75,7 +78,7 @@ export default function WaitlistDemandScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Waitlist demand" />
+      <Header title="Waitlist demand" dividerVariant="none" onBack={() => goBackOr(router)} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.accentForeground} /></View>
       ) : rows.length === 0 ? (
@@ -102,8 +105,8 @@ export default function WaitlistDemandScreen() {
             return (
               <View key={key} style={[s.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={[s.name, { color: colors.foreground }]} numberOfLines={1}>{r.productName}</Text>
-                  <Text style={[s.meta, { color: colors.mutedForeground }]} numberOfLines={1}>{r.variantLabel || 'Any size'}</Text>
+                  <Text style={[s.name, { color: colors.foreground }]} numberOfLines={2}>{r.productName}</Text>
+                  <Text style={[s.meta, { color: colors.mutedForeground }]}>{r.variantLabel || 'Any size'}</Text>
                   <Text style={[s.meta, { color: colors.foreground }]}>
                     {waiting > 0 ? `${waiting} waiting` : 'Everyone notified'}
                     {r.notifiedCount > 0 && waiting > 0 ? ` · ${r.notifiedCount} notified` : ''}

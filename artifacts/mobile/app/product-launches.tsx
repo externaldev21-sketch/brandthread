@@ -14,10 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { EmptyState, HapticSwitch, IconButton, PrimaryButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
+import { goBackOr } from '@/lib/navigation/goBackOr';
+import { EmptyState, HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
 import { LaunchTimePicker, parseWallClock } from '@/components/products/LaunchTimePicker';
 import { listSupportedTimeZones, zonedTimeToUtc } from '@/lib/dropSchedule';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -44,7 +44,6 @@ export default function ProductLaunchesScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const topInset = useHeaderTopInset();
   const { productId: paramProductId } = useLocalSearchParams<{ productId?: string }>();
 
   const [launches, setLaunches] = useState<Launch[]>([]);
@@ -90,9 +89,11 @@ export default function ProductLaunchesScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader
+      <Header
         title="Product launches"
-        rightElement={<IconButton name="plus" onPress={() => setPicking(true)} />}
+        dividerVariant="none"
+        onBack={() => goBackOr(router)}
+        actions={[{ icon: 'plus', onPress: () => setPicking(true), accessibilityLabel: 'Schedule a launch' }]}
       />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.accentForeground} /></View>
@@ -122,7 +123,7 @@ export default function ProductLaunchesScreen() {
 
       <Modal visible={picking} animationType="slide" onRequestClose={() => setPicking(false)}>
         <View style={[s.root, { backgroundColor: colors.background }]}>
-          <ScreenHeader title="Choose a product" variant="modal" onBack={() => setPicking(false)} />
+          <Header title="Choose a product" dividerVariant="none" onBack={() => setPicking(false)} />
           <ScrollView contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 24 }]}>
             {available.length === 0 && (
               <Text style={[s.empty, { color: colors.mutedForeground }]}>Every product already has a launch.</Text>
@@ -147,7 +148,6 @@ export default function ProductLaunchesScreen() {
           <LaunchEditor
             key={editing.productId}
             target={editing}
-            topInset={topInset}
             onClose={() => setEditing(null)}
             onSaved={() => { setEditing(null); load(true); }}
           />
@@ -175,7 +175,7 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
     >
       <Thumb uri={launch.imageUrl} colors={colors} />
       <View style={{ flex: 1, gap: 3 }}>
-        <Text style={[s.name, { color: colors.foreground }]} numberOfLines={1}>{launch.name}</Text>
+        <Text style={[s.name, { color: colors.foreground }]} numberOfLines={2}>{launch.name}</Text>
         <Text style={[s.meta, { color: colors.mutedForeground }]}>{done ? 'Launched' : 'Launches'} {whenLabel(launch.launchAt)}</Text>
         <View style={s.metaRow}>
           <Feather name="bell" size={12} color={colors.mutedForeground} />
@@ -190,10 +190,9 @@ function LaunchRow({ launch, onPress }: { launch: Launch; onPress: () => void })
 }
 
 function LaunchEditor({
-  target, topInset, onClose, onSaved,
+  target, onClose, onSaved,
 }: {
   target: { productId: string; name: string; existing: Launch | null };
-  topInset: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -248,7 +247,7 @@ function LaunchEditor({
   if (zoneOpen) {
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader title="Timezone" variant="modal" onBack={() => setZoneOpen(false)} />
+        <Header title="Timezone" dividerVariant="none" onBack={() => setZoneOpen(false)} />
         <TextInput
           style={[s.filter, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }, WEB_INPUT_RESET]}
           value={zoneFilter}
@@ -270,7 +269,7 @@ function LaunchEditor({
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader title={existing ? 'Edit launch' : 'Schedule launch'} variant="modal" onBack={onClose} />
+      <Header title={existing ? 'Edit launch' : 'Schedule launch'} dividerVariant="none" onBack={onClose} />
       <ScrollView contentContainerStyle={[s.form, { paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
         <Text style={[s.productName, { color: colors.foreground }]} numberOfLines={2}>{target.name}</Text>
 
@@ -282,7 +281,7 @@ function LaunchEditor({
           accessibilityLabel={`Timezone ${zone}`}
         >
           <Feather name="globe" size={14} color={colors.mutedForeground} />
-          <Text style={[s.name, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{zone}</Text>
+          <Text style={[s.name, { color: colors.foreground, flex: 1 }]}>{zone}</Text>
           <Feather name="chevron-down" size={14} color={colors.mutedForeground} />
         </TouchableOpacity>
 

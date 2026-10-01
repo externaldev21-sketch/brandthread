@@ -138,7 +138,7 @@ export function LaunchCountdown({
           <ActivityIndicator size="small" color={subscribed ? colors.foreground : colors.primaryForeground} />
         ) : (
           <>
-            <Feather name={subscribed ? 'bell-off' : 'bell'} size={ICON.sm} color={subscribed ? colors.foreground : colors.primaryForeground} />
+            <Feather name={subscribed ? 'check' : 'bell'} size={ICON.sm} color={subscribed ? colors.foreground : colors.primaryForeground} />
             <Text style={[s.btnText, { color: subscribed ? colors.foreground : colors.primaryForeground }]}>
               {subscribed ? "You'll be notified" : 'Notify me'}
             </Text>

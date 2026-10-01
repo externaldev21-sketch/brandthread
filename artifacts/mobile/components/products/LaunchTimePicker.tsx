@@ -69,10 +69,10 @@ export function LaunchTimePicker({
 
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.chipRow}>
         {DAY_CHIPS.map((c) => chip(c.label, dateValue === c.value, () => onDateChange(c.value), c.value))}
       </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.chipRow, { marginTop: 8 }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.bleed, { marginTop: 8 }]} contentContainerStyle={s.chipRow}>
         {TIME_CHIPS.map((c) => chip(c.label, timeValue === c.value, () => onTimeChange(c.value), c.value))}
       </ScrollView>
       <TouchableOpacity onPress={() => setCustomOpen((v) => !v)} style={s.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -102,10 +102,12 @@ export function LaunchTimePicker({
 }
 
 const s = StyleSheet.create({
-  chipRow: { flexDirection: 'row', gap: 8, paddingRight: SP.md },
+  // Rows run edge to edge (the parent has a SP.md gutter) so chips scroll off the screen edge, not a padded box.
+  bleed: { marginHorizontal: -SP.md },
+  chipRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SP.md },
   chip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   customToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
   customText: { fontFamily: FONT.medium, fontSize: FS.xs },
-  input: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
+  input: { minWidth: 0, borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, fontSize: FS.sm, fontFamily: FONT.medium },
 });
