@@ -14,6 +14,8 @@ interface SwipeActionRowProps {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   color: string;
+  /** Label/icon colour on the action background (default: the theme's on-accent). */
+  textColor?: string;
   onAction: () => void | Promise<void>;
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -24,6 +26,7 @@ export default function SwipeActionRow({
   label,
   icon,
   color,
+  textColor,
   onAction,
   disabled = false,
   accessibilityLabel,
@@ -77,15 +80,16 @@ export default function SwipeActionRow({
 
   return (
     <View style={styles.clip}>
-      <Pressable
-        style={[styles.action, { backgroundColor: color }]}
+      <AnimatedPressable
+        // Only visible while the row is actually swiped: at rest it would show as a coloured sliver in the card's margin.
+        style={[styles.action, { backgroundColor: color, opacity: translateX.interpolate({ inputRange: [-ACTION_WIDTH, -1, 0], outputRange: [1, 1, 0], extrapolate: 'clamp' }) }]}
         onPress={() => { void runAction(); }}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
       >
-        <Feather name={icon} size={18} color={theme.onAccent} />
-        <Text style={[styles.actionText, { color: theme.onAccent }]}>{label}</Text>
-      </Pressable>
+        <Feather name={icon} size={18} color={textColor ?? theme.onAccent} />
+        <Text style={[styles.actionText, { color: textColor ?? theme.onAccent }]}>{label}</Text>
+      </AnimatedPressable>
       <Animated.View
         style={{ transform: [{ translateX }] }}
         {...panResponder.panHandlers}
@@ -95,6 +99,8 @@ export default function SwipeActionRow({
     </View>
   );
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const styles = StyleSheet.create({
   clip: {
