@@ -91,3 +91,11 @@ for Thread Cash.
 - Confirm accounting is fine tracking `thread_cash_liability` as an actual
   balance-sheet liability (Thread Cash awarded but not yet spent) rather than
   an expense recognized at award time.
+
+## Earn, spend and expiry rules (migration 116)
+
+- Rules live in `api-server/src/lib/threadCash/rules.ts` (earn sources, expiry policy, per-order cap) and are published on `GET /api/thread-cash` as `rules`.
+- Expiry: a credit expires `earned_at + thread_cash_config.expiry_days` (null = never, the default). `lib/threadCash/lots.ts` replays the ledger into FIFO lots; spending consumes the soonest-expiring lot first. `jobs/threadCashExpiry.ts` (hourly) appends `expiry` entries keyed `expiry:<credit entry id>` (once only) and notifies buyers 7 days ahead (`thread_cash_expiry_warnings`, once per buyer per day). Redeeming also posts any due expiry first, so lapsed credit can never be spent.
+- Enabling `expiry_days` applies to existing credits by their original earn date; credit older than the window expires on the next run.
+- `max_redemption_per_order_cents` is enforced at redeem and again when the token is reserved at checkout.
+- `GET /api/thread-cash/ledger?kind=earned|spent|expired` feeds the Ledger screen (`app/thread-cash-ledger.tsx`).
