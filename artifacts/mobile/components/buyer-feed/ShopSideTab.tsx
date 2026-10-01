@@ -268,6 +268,18 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
     backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
   },
-  name: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
+  // `minWidth: 0` is the standard flexbox hardening for a `flexShrink: 1`
+  // item next to a `flexShrink: 0` sibling (`price`, below): without it, a
+  // flex item's default min-width is its own content size, so this name
+  // text would refuse to shrink past its longest word and could squeeze
+  // price's box ("$220.00 +1") into an ellipsis-truncated one if the row
+  // ever gets a longer product name or less available width than today's
+  // fixture. The half-done-audit's new text-fit check (truncated-label)
+  // did flag this pair's price text, in the pill's collapsed (not yet
+  // user-visible) layout slot — turned out to be a measurement-only
+  // false-positive, not a real on-screen truncation (see the ancestor-
+  // opacity fix to the audit's isVisible() in half-done-audit.mjs), but the
+  // flex item still has no min-width safety net, so this hardening stays.
+  name: { flexShrink: 1, minWidth: 0, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
   price: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 });
