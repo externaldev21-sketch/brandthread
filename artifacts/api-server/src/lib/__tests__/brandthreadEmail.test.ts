@@ -18,8 +18,10 @@ import {
   renderBrandthreadEmail,
   sendBrandthreadEmail,
   sendManufacturerSignupEmail,
+  sendAbandonedCartEmail,
   sendOrderConfirmationEmail,
   sendOrderShippingEmail,
+  sendPayoutEmail,
   sendReturnStatusEmail,
   sendTeamInviteEmail,
   sendWelcomeEmail,
@@ -327,5 +329,28 @@ describe("Brandthread transactional email", () => {
       })).resolves.toBe(false);
       expect(fetchMock).not.toHaveBeenCalled();
     });
+  });
+
+  it("sends the payout and abandoned-cart emails through the shared Resend path", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    const fetchMock = vi.fn(async (_url: unknown, _init?: unknown) => ({ ok: true, status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await sendPayoutEmail({ to: "seller@example.com", amountCents: 12345, payoutId: "po_1" })).toBe(true);
+    expect(await sendAbandonedCartEmail({
+      to: "buyer@example.com",
+      items: [{ productName: "Logo <Tee>", variantLabel: "M / Black", quantity: 2, priceCents: 4200 }],
+      idempotencyKey: "abandoned-cart/u/2026-01-01T00",
+    })).toBe(true);
+
+    const [payout, cart] = fetchMock.mock.calls.map(([, init]) => ({
+      body: JSON.parse((init as { body: string }).body),
+      headers: (init as { headers: Record<string, string> }).headers,
+    }));
+    expect(payout.body.subject).toBe("Brandthread payout of $123.45 sent");
+    expect(payout.headers["Idempotency-Key"]).toBe("payout-sent/po_1");
+    expect(cart.body.html).toContain("Logo &lt;Tee&gt;");
+    expect(cart.body.html).toContain("$84.00");
+    expect(cart.body.html).not.toContain("Logo <Tee>");
   });
 });

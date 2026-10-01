@@ -1245,10 +1245,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           pushEnabled: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
+          channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
         }>('/api/notification-prefs'),
       update: (body: {
         digest?: 'realtime' | 'daily';
         categories?: Record<string, boolean>;
+        channels?: { inApp?: Record<string, boolean>; email?: Record<string, boolean> };
         pushEnabled?: boolean;
         quietHours?: { start: string; end: string; timezone?: string } | null;
       }) =>
@@ -1258,6 +1260,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           pushEnabled: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
+          channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
         }>('/api/notification-prefs', body),
     },
     logo: {

@@ -44,7 +44,9 @@ import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
+  sendPayoutEmail,
 } from "../lib/brandthreadEmail";
+import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { publishNotification } from "./notifications-feed";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
@@ -1798,7 +1800,7 @@ async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
 async function handleSellerPayoutPaid(payout: any, connectedAccountId?: string | null) {
   if (!connectedAccountId || typeof payout?.id !== "string") return;
   const [seller] = await db
-    .select({ clerkId: users.clerkId })
+    .select({ clerkId: users.clerkId, email: users.email })
     .from(users)
     .where(eq(users.stripeAccountId, connectedAccountId))
     .limit(1);
@@ -1822,6 +1824,16 @@ async function handleSellerPayoutPaid(payout: any, connectedAccountId?: string |
     });
   } catch (err) {
     logger.error({ err, payoutId: payout.id }, "Seller payout notification failed");
+  }
+
+  // Payout email — Settings → Notifications → Email (Payouts). The Resend
+  // idempotency key makes a retried webhook a no-op.
+  try {
+    if (seller.email && await isChannelEnabledForUser(seller.clerkId, "payout", "email")) {
+      await sendPayoutEmail({ to: seller.email, amountCents: amount, currency, payoutId: payout.id });
+    }
+  } catch (err) {
+    logger.error({ err, payoutId: payout.id }, "Seller payout email failed");
   }
 }
 

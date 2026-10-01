@@ -76,6 +76,13 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/buyer-drop-detail?id=drop-abc');
   });
 
+  it('routes a cart reminder to the cart', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('cart-1', { targetType: 'cart', type: 'cart_reminder' }));
+    expect(router.push).toHaveBeenCalledWith('/(buyer)/cart');
+  });
+
   it('routes a buyer-facing product alert (price drop / back in stock) to the buyer product screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
