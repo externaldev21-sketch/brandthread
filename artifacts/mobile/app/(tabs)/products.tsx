@@ -125,6 +125,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
   const actions: ActionItem[] = [
     { label: 'Edit', icon: 'edit-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id) as never); } },
     { label: 'Quick edit price', icon: 'dollar-sign', onPress: () => { closeSheet(); onQuickEditPrice(p); } },
+    { label: 'Variants & stock', icon: 'layers', onPress: () => { closeSheet(); router.push(('/product-variants?productId=' + p.id) as never); } },
     { label: 'View store page', icon: 'eye', onPress: () => { closeSheet(); router.push(('/product-store?id=' + p.id) as never); } },
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
     { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },

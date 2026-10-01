@@ -74,6 +74,7 @@ const TABS: {
       'product-bundles', 'product-bundle-edit', 'drafts',
       'product-launches',
       'waitlist-demand',
+      'product-variants',
     ],
     destination: '/(tabs)/products',
   },
@@ -122,6 +123,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'product-bundle-edit': 'products',
   'product-launches': 'products',
   'waitlist-demand': 'products',
+  'product-variants': 'products',
   'drafts': 'products',
   // Orders
   'orders': 'orders',
