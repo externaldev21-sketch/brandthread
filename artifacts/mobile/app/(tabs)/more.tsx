@@ -53,6 +53,7 @@ const STORE_ITEMS: NavItem[] = [
   { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: 'accentLight', route: '/store-domain' },
   { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'warning', route: '/discounts' },
   { icon: 'percent', label: 'Sales',         desc: 'Automatic sale prices',        accent: 'warning', route: '/sales' },
+  { icon: 'gift',   label: 'Gift cards',    desc: 'Sell and manage store gift cards', accent: 'accentLight', route: '/gift-cards-manage' },
 ];
 
 const STUDIO_ITEMS: NavItem[] = [

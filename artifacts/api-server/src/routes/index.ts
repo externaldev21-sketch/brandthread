@@ -122,6 +122,7 @@ import vacationRouter  from "./vacation";
 import { quickRepliesRouter, awayMessageRouter } from "./seller-messaging-tools";
 import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
+import giftCardsRouter from "./gift-cards";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
@@ -349,5 +350,6 @@ router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 // Seller growth tools: tracked UTM links, link-in-bio, store pixels.
 router.use("/growth",              tc, growthRouter);
+router.use("/gift-cards",          giftCardsRouter); // buyer + seller (own auth/permission checks); no tc
 
 export default router;
