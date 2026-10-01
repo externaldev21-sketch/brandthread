@@ -12,6 +12,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { notifyNewProduct } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
+import { afterStockChange } from "../lib/stockRules";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -549,6 +550,7 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
     });
   }
 
+  if (stock !== undefined) await afterStockChange(req.params.id);
   res.json(updated);
 });
 

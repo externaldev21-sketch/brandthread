@@ -57,6 +57,7 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
+import { StockCounter } from '@/components/products/StockCounter';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
   shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
@@ -1014,6 +1015,7 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
 
+          <StockCounter productId={product.id} />
           {/* ── Buyer demand signals (server-supplied values only) ── */}
           {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
             (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
