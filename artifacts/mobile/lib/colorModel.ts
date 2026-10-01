@@ -130,6 +130,7 @@ export interface BrandPalette {
   id: string;
   name: string;
   colors: string[]; // hex
+  isDefault?: boolean;
 }
 
 /** Adds a color to a named palette, de-duped, returning a new palette list. */
@@ -152,6 +153,62 @@ export function removeColorFromPalette(palettes: BrandPalette[], paletteId: stri
 export function createPalette(palettes: BrandPalette[], name: string): BrandPalette[] {
   const id = `palette_${Date.now()}_${Math.round(Math.random() * 1e6)}`;
   return [...palettes, { id, name, colors: [] }];
+}
+
+export function renamePalette(palettes: BrandPalette[], paletteId: string, name: string): BrandPalette[] {
+  return palettes.map(p => p.id === paletteId ? { ...p, name } : p);
+}
+
+export function deletePalette(palettes: BrandPalette[], paletteId: string): BrandPalette[] {
+  return palettes.filter(p => p.id !== paletteId);
+}
+
+/** Marks exactly one palette as the default (clearing any other), or clears all if paletteId isn't found. */
+export function setDefaultPalette(palettes: BrandPalette[], paletteId: string): BrandPalette[] {
+  return palettes.map(p => ({ ...p, isDefault: p.id === paletteId }));
+}
+
+// ─── Color harmony (Classic color-theory rules, computed from a base hue) ─────
+
+export type HarmonyRule = 'complementary' | 'analogous' | 'triadic' | 'splitComplementary' | 'monochromatic';
+
+export const HARMONY_RULES: HarmonyRule[] = ['complementary', 'analogous', 'triadic', 'splitComplementary', 'monochromatic'];
+
+export const HARMONY_RULE_LABELS: Record<HarmonyRule, string> = {
+  complementary: 'Complementary',
+  analogous: 'Analogous',
+  triadic: 'Triadic',
+  splitComplementary: 'Split-Complementary',
+  monochromatic: 'Monochromatic',
+};
+
+function normalizeHue(h: number): number {
+  return ((h % 360) + 360) % 360;
+}
+
+/**
+ * computeHarmonyHues — given a base hue (degrees) and a harmony rule, returns
+ * the hue(s) of the related color(s) a real color-theory harmony rule
+ * produces (not including the base hue itself). `monochromatic` has no
+ * second hue (same hue, different shade), so it returns an empty array —
+ * the caller varies value/saturation instead.
+ */
+export function computeHarmonyHues(baseHue: number, rule: HarmonyRule): number[] {
+  const h = normalizeHue(baseHue);
+  switch (rule) {
+    case 'complementary':
+      return [normalizeHue(h + 180)];
+    case 'analogous':
+      return [normalizeHue(h - 30), normalizeHue(h + 30)];
+    case 'triadic':
+      return [normalizeHue(h + 120), normalizeHue(h + 240)];
+    case 'splitComplementary':
+      return [normalizeHue(h + 150), normalizeHue(h + 210)];
+    case 'monochromatic':
+      return [];
+    default:
+      return [];
+  }
 }
 
 // ─── Relative luminance (for contrast-safe UI, e.g. picking cursor color) ─────

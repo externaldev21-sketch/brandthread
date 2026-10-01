@@ -101,20 +101,71 @@ export async function findBoxOverflow(page, rootSelector = 'body') {
 }
 
 /**
+ * findSiblingOverlap — catches a different, real bug class that
+ * findBoxOverflow (parent-vs-child only) misses entirely: a sibling block
+ * — e.g. a sheet's fixed bottom tab bar — visually stacking on top of
+ * another sibling's content because an ANCESTOR's size resolved wrong (a
+ * percentage height with no definite basis, in the bug this check was
+ * added for: a Colours-sheet hex field silently clipped behind its own tab
+ * bar). Flags any two visible, same-stacking-context (non-absolute,
+ * non-fixed) sibling elements whose boxes genuinely intersect, beyond a
+ * small tolerance, on both axes.
+ */
+export async function findSiblingOverlap(page, rootSelector = 'body') {
+  return page.evaluate((rootSel) => {
+    const root = document.querySelector(rootSel);
+    if (!root) return [];
+    const TOLERANCE = 1;
+    const results = [];
+    const parents = new Set();
+    for (const el of root.querySelectorAll('*')) {
+      if (el.children.length > 1) parents.add(el);
+    }
+    for (const parent of parents) {
+      const kids = [...parent.children].filter(el => {
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        if (st.position === 'absolute' || st.position === 'fixed') return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      for (let i = 0; i < kids.length; i++) {
+        for (let j = i + 1; j < kids.length; j++) {
+          const a = kids[i].getBoundingClientRect();
+          const b = kids[j].getBoundingClientRect();
+          const xOverlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const yOverlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (xOverlap > TOLERANCE && yOverlap > TOLERANCE) {
+            results.push({
+              a: { testId: kids[i].getAttribute('data-testid') || null, tag: kids[i].tagName, rect: { x: Math.round(a.x), y: Math.round(a.y), w: Math.round(a.width), h: Math.round(a.height) } },
+              b: { testId: kids[j].getAttribute('data-testid') || null, tag: kids[j].tagName, rect: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) } },
+              overlap: { w: Math.round(xOverlap), h: Math.round(yOverlap) },
+            });
+          }
+        }
+      }
+    }
+    return results;
+  }, rootSelector);
+}
+
+/**
  * assertNoTextOrBoxOverflow — convenience combined check. Throws with a
  * readable message listing every offender if any are found; returns nothing
  * (void) on success, so a spec just does
  * `await assertNoTextOrBoxOverflow(page, '[data-testid="layers-panel"]')`.
  */
 export async function assertNoTextOrBoxOverflow(page, rootSelector = 'body') {
-  const [textOverflows, boxOverflows] = await Promise.all([
+  const [textOverflows, boxOverflows, siblingOverlaps] = await Promise.all([
     findTextOverflow(page, rootSelector),
     findBoxOverflow(page, rootSelector),
+    findSiblingOverlap(page, rootSelector),
   ]);
-  if (textOverflows.length === 0 && boxOverflows.length === 0) return;
+  if (textOverflows.length === 0 && boxOverflows.length === 0 && siblingOverlaps.length === 0) return;
   const lines = [
     ...textOverflows.map(o => `TEXT OVERFLOW in ${o.testId ?? '(no testid)'}: "${o.text}" scroll=${o.scrollWidth}x${o.scrollHeight} client=${o.clientWidth}x${o.clientHeight} at (${o.x},${o.y})`),
     ...boxOverflows.map(o => `BOX OVERFLOW ${o.tag}${o.testId ? `[${o.testId}]` : ''}: rect=${JSON.stringify(o.rect)} exceeds parent=${JSON.stringify(o.parentRect)}`),
+    ...siblingOverlaps.map(o => `SIBLING OVERLAP: ${o.a.tag}[${o.a.testId ?? '?'}] rect=${JSON.stringify(o.a.rect)} overlaps ${o.b.tag}[${o.b.testId ?? '?'}] rect=${JSON.stringify(o.b.rect)} by ${JSON.stringify(o.overlap)}`),
   ];
   throw new Error(`Text-fit/alignment check failed within "${rootSelector}":\n${lines.join('\n')}`);
 }
