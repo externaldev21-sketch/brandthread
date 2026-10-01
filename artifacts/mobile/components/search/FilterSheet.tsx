@@ -1,35 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { Chip } from '@/components/ui';
+import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import type { SearchCategory, SuggestedBrand } from '@/lib/searchData';
+import { swatchFor } from '@/lib/colorSwatches';
+import {
+  countActiveFilters, hasValue, priceBucketsFor, toggleValue,
+  type SearchFacets, type SearchFilters, type SearchSort,
+} from '@/lib/searchFilters';
 
-export type SearchSort = 'relevance' | 'price_asc' | 'price_desc' | 'newest';
-
-export type SearchFilters = {
-  category?: string;
-  size?: string;
-  brand?: string;
-  minPriceCents?: number;
-  maxPriceCents?: number;
-  sort?: SearchSort;
-};
-
-export function countActiveFilters(f: SearchFilters): number {
-  let n = 0;
-  if (f.category) n++;
-  if (f.size) n++;
-  if (f.brand) n++;
-  if (f.minPriceCents !== undefined || f.maxPriceCents !== undefined) n++;
-  if (f.sort && f.sort !== 'relevance') n++;
-  return n;
-}
+export type { SearchFilters, SearchSort } from '@/lib/searchFilters';
+export { countActiveFilters } from '@/lib/searchFilters';
 
 const SORT_OPTIONS: Array<{ key: SearchSort; label: string }> = [
   { key: 'relevance', label: 'Best match' },
@@ -38,30 +25,30 @@ const SORT_OPTIONS: Array<{ key: SearchSort; label: string }> = [
   { key: 'price_desc', label: 'Price: high to low' },
 ];
 
-const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+type Option = { value: string; label: string; count?: number };
 
-const PRICE_BUCKETS: Array<{ key: string; label: string; min?: number; max?: number }> = [
-  { key: 'u50', label: 'Under $50', max: 5000 },
-  { key: '50-100', label: '$50 – $100', min: 5000, max: 10000 },
-  { key: '100-200', label: '$100 – $200', min: 10000, max: 20000 },
-  { key: 'o200', label: '$200+', min: 20000 },
-];
+/** Facet options plus any already-selected value that the current results no longer offer. */
+function withSelected(options: Option[], selected: string[] | undefined): Option[] {
+  const extra = (selected ?? []).filter((s) => !options.some((o) => o.value.toLowerCase() === s.toLowerCase()));
+  return [...options, ...extra.map((value) => ({ value, label: value }))];
+}
 
 /**
- * Filter bottom sheet — size / price / category / brand / sort, wired to the
- * `/api/public/search` query params that already work server-side. Built on
- * the shared `components/ui/BottomSheet` primitive (grabber, spring, dimmed
- * backdrop) matching this codebase's other sheets.
+ * Filter bottom sheet for buyer search (SSENSE / GOAT pattern: sort list,
+ * in-stock switch, equal-width size and price grids, colour swatches, check
+ * rows for category and brand). Options and counts come from the search
+ * endpoint's `facets` (`?facets=1`) for the current query, so only choices
+ * that exist are offered. Multi-select within a group; Clear all resets the
+ * draft; Show results applies it.
  */
 export function FilterSheet({
-  visible, onClose, value, onApply, categories, brands,
+  visible, onClose, value, onApply, facets,
 }: {
   visible: boolean;
   onClose: () => void;
   value: SearchFilters;
   onApply: (next: SearchFilters) => void;
-  categories: SearchCategory[];
-  brands: SuggestedBrand[];
+  facets: SearchFacets | null;
 }) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
@@ -71,22 +58,19 @@ export function FilterSheet({
     if (visible) setDraft(value);
   }, [visible, value]);
 
-  const activePriceBucket = PRICE_BUCKETS.find(
-    (b) => b.min === draft.minPriceCents && b.max === draft.maxPriceCents,
-  )?.key;
+  const buckets = priceBucketsFor(facets?.price ?? null);
+  const activeBucket = buckets.find((b) => b.min === draft.minPriceCents && b.max === draft.maxPriceCents)?.key;
 
-  function toggle<K extends keyof SearchFilters>(key: K, next: SearchFilters[K]) {
+  function toggleList(key: 'sizes' | 'colors' | 'categories' | 'brands', v: string) {
     hapticSelection();
-    setDraft((prev) => ({ ...prev, [key]: prev[key] === next ? undefined : next }));
+    setDraft((prev) => ({ ...prev, [key]: toggleValue(prev[key], v) }));
   }
 
-  function togglePriceBucket(bucket: typeof PRICE_BUCKETS[number]) {
+  function togglePriceBucket(bucket: { min?: number; max?: number }) {
     hapticSelection();
     setDraft((prev) => {
       const isActive = prev.minPriceCents === bucket.min && prev.maxPriceCents === bucket.max;
-      return isActive
-        ? { ...prev, minPriceCents: undefined, maxPriceCents: undefined }
-        : { ...prev, minPriceCents: bucket.min, maxPriceCents: bucket.max };
+      return { ...prev, minPriceCents: isActive ? undefined : bucket.min, maxPriceCents: isActive ? undefined : bucket.max };
     });
   }
 
@@ -103,93 +87,166 @@ export function FilterSheet({
 
   const draftCount = countActiveFilters(draft);
 
+  const sizes = withSelected((facets?.sizes ?? []).map((s) => ({ value: s.value, label: s.value, count: s.count })), draft.sizes);
+  const colors = withSelected((facets?.colors ?? []).map((c) => ({ value: c.value, label: c.value, count: c.count })), draft.colors);
+  const categories = withSelected((facets?.categories ?? []).map((c) => ({ value: c.value, label: c.value, count: c.count })), draft.categories);
+  const brands = withSelected((facets?.brands ?? []).map((b) => ({ value: b.id, label: b.name, count: b.count })), draft.brands);
+
+  /** Equal-width selectable cell, used in grids (4 per row for sizes, 2 for price). */
+  const cell = (key: string, label: string, selected: boolean, onPress: () => void, columns: number, testID?: string) => (
+    <View key={key} style={{ width: `${100 / columns}%`, paddingHorizontal: SPACING.xxs, paddingBottom: SPACING.xs }}>
+      <PressableScale
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={label}
+        testID={testID}
+        style={[
+          styles.cell,
+          { borderColor: selected ? theme.text : theme.border, backgroundColor: selected ? theme.text : theme.surface },
+        ]}
+      >
+        <Text style={[TYPE_SCALE.footnote, { color: selected ? theme.background : theme.text, fontFamily: FONT.medium, textAlign: 'center' }]}>
+          {label}
+        </Text>
+      </PressableScale>
+    </View>
+  );
+
+  /** Full-width list row with a trailing check (radio for sort, checkbox for category and brand). */
+  const row = (key: string, label: string, selected: boolean, onPress: () => void, count?: number, testID?: string) => (
+    <PressableScale
+      key={key}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      testID={testID}
+      style={styles.listRow}
+    >
+      <Text style={[TYPE_SCALE.body, { flex: 1, color: theme.text, fontFamily: selected ? FONT.semibold : FONT.regular }]}>{label}</Text>
+      {count !== undefined ? <Text style={[TYPE_SCALE.footnote, { color: theme.muted, marginRight: SPACING.sm, minWidth: 28, textAlign: 'right' }]}>{count}</Text> : null}
+      <View style={styles.checkSlot}>
+        {selected ? <Feather name="check" size={18} color={theme.text} /> : null}
+      </View>
+    </PressableScale>
+  );
+
   return (
     <BottomSheet visible={visible} onClose={onClose} testID="search-filter-sheet">
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Filters</Text>
-        <TouchableOpacity
+        <PressableScale
           onPress={handleClearAll}
           accessibilityRole="button"
           accessibilityLabel="Clear all filters"
+          noMinHeight
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          testID="search-filter-clear-all"
         >
-          <Text style={[styles.clearAll, { color: theme.muted }]}>Clear all</Text>
-        </TouchableOpacity>
+          <Text style={[styles.clearAll, { color: draftCount > 0 ? theme.text : theme.muted }]}>Clear all</Text>
+        </PressableScale>
       </View>
 
-      <Text style={[styles.sectionLabel, { color: theme.muted }]}>SORT BY</Text>
-      <View style={styles.chipRow}>
-        {SORT_OPTIONS.map((opt) => (
-          <Chip
-            key={opt.key}
-            label={opt.label}
-            selected={(draft.sort ?? 'relevance') === opt.key}
-            onPress={() => setDraft((prev) => ({ ...prev, sort: opt.key }))}
-          />
-        ))}
+      <Text style={[styles.sectionLabel, { color: theme.muted }]}>Sort by</Text>
+      <View style={styles.listWrap}>
+        {SORT_OPTIONS.map((opt) =>
+          row(opt.key, opt.label, (draft.sort ?? 'relevance') === opt.key, () => { hapticSelection(); setDraft((prev) => ({ ...prev, sort: opt.key })); }, undefined, `search-filter-sort-${opt.key}`),
+        )}
       </View>
 
-      <Text style={[styles.sectionLabel, { color: theme.muted }]}>PRICE</Text>
-      <View style={styles.chipRow}>
-        {PRICE_BUCKETS.map((bucket) => (
-          <Chip
-            key={bucket.key}
-            label={bucket.label}
-            selected={activePriceBucket === bucket.key}
-            onPress={() => togglePriceBucket(bucket)}
-          />
-        ))}
+      <View style={[styles.switchRow, { borderColor: theme.border }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[TYPE_SCALE.body, { color: theme.text, fontFamily: FONT.semibold }]}>In stock only</Text>
+          {facets ? (
+            <Text style={[TYPE_SCALE.caption, { color: theme.muted }]}>{facets.inStockCount} available now</Text>
+          ) : null}
+        </View>
+        <HapticSwitch
+          value={!!draft.inStock}
+          onValueChange={(v: boolean) => setDraft((prev) => ({ ...prev, inStock: v || undefined }))}
+          accessibilityLabel="In stock only"
+          testID="search-filter-in-stock"
+        />
       </View>
+
+      {buckets.length > 0 && (
+        <>
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Price</Text>
+          <View style={styles.grid}>
+            {buckets.map((b) => cell(b.key, b.label, activeBucket === b.key, () => togglePriceBucket(b), 2, `search-filter-price-${b.key}`))}
+          </View>
+        </>
+      )}
+
+      {sizes.length > 0 && (
+        <>
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Size</Text>
+          <View style={styles.grid}>
+            {sizes.map((s) => cell(s.value, s.label, hasValue(draft.sizes, s.value), () => toggleList('sizes', s.value), 4, `search-filter-size-${s.value}`))}
+          </View>
+        </>
+      )}
+
+      {colors.length > 0 && (
+        <>
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Colour</Text>
+          <View style={styles.grid}>
+            {colors.map((c) => {
+              const fill = swatchFor(c.value);
+              const selected = hasValue(draft.colors, c.value);
+              if (!fill) return cell(c.value, c.label, selected, () => toggleList('colors', c.value), 4, `search-filter-color-${c.value}`);
+              return (
+                <View key={c.value} style={{ width: '25%', paddingBottom: SPACING.xs }}>
+                  <PressableScale
+                    onPress={() => toggleList('colors', c.value)}
+                    style={styles.swatchItem}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Colour ${c.label}`}
+                    testID={`search-filter-color-${c.value}`}
+                  >
+                    <View style={[styles.swatchRing, { borderColor: selected ? theme.text : 'transparent' }]}>
+                      <View style={[styles.swatch, { backgroundColor: fill, borderColor: theme.border }]} />
+                    </View>
+                    <Text style={[TYPE_SCALE.caption, { color: selected ? theme.text : theme.muted, textAlign: 'center' }]}>{c.label}</Text>
+                  </PressableScale>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       {categories.length > 0 && (
         <>
-          <Text style={[styles.sectionLabel, { color: theme.muted }]}>CATEGORY</Text>
-          <View style={styles.chipRow}>
-            {categories.map((c) => (
-              <Chip
-                key={c.category}
-                label={c.category}
-                selected={draft.category === c.category}
-                onPress={() => toggle('category', c.category)}
-              />
-            ))}
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Category</Text>
+          <View style={styles.listWrap}>
+            {categories.map((c) => row(c.value, c.label, hasValue(draft.categories, c.value), () => toggleList('categories', c.value), c.count))}
           </View>
         </>
       )}
-
-      <Text style={[styles.sectionLabel, { color: theme.muted }]}>SIZE</Text>
-      <View style={styles.chipRow}>
-        {SIZE_OPTIONS.map((s) => (
-          <Chip key={s} label={s} selected={draft.size === s} onPress={() => toggle('size', s)} />
-        ))}
-      </View>
 
       {brands.length > 0 && (
         <>
-          <Text style={[styles.sectionLabel, { color: theme.muted }]}>BRAND</Text>
-          <View style={styles.chipRow}>
-            {brands.map((b) => (
-              <Chip
-                key={b.id}
-                label={b.name}
-                selected={draft.brand === b.sellerId}
-                onPress={() => toggle('brand', b.sellerId)}
-              />
-            ))}
+          <Text style={[styles.sectionLabel, { color: theme.muted }]}>Brand</Text>
+          <View style={styles.listWrap}>
+            {brands.map((b) => row(b.value, b.label, hasValue(draft.brands, b.value), () => toggleList('brands', b.value), b.count))}
           </View>
         </>
       )}
 
-      <TouchableOpacity
+      <PressableScale
         onPress={handleApply}
         style={[styles.applyBtn, { backgroundColor: theme.accent }]}
         accessibilityRole="button"
         accessibilityLabel={draftCount > 0 ? `Show results, ${draftCount} filters active` : 'Show results'}
+        testID="search-filter-apply"
       >
         <Text style={[styles.applyText, { color: theme.onAccent }]}>
           {draftCount > 0 ? `Show results · ${draftCount}` : 'Show results'}
         </Text>
-      </TouchableOpacity>
+      </PressableScale>
     </BottomSheet>
   );
 }
@@ -202,13 +259,28 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   title: { ...TYPE_SCALE.title2, fontFamily: FONT.bold },
   clearAll: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold },
   sectionLabel: {
-    ...TYPE_SCALE.caption, letterSpacing: 0.4,
-    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm, paddingBottom: SPACING.xs,
+    ...TYPE_SCALE.footnote, fontFamily: FONT.semibold,
+    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.md, paddingBottom: SPACING.xs,
   },
-  chipRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs,
-    paddingHorizontal: SCREEN_GUTTER,
+  listWrap: { paddingHorizontal: SCREEN_GUTTER },
+  listRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  checkSlot: { width: 20, alignItems: 'center', justifyContent: 'center' },
+  grid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: SCREEN_GUTTER - SPACING.xxs,
   },
+  cell: {
+    height: 44, borderRadius: RADII.pill, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.sm,
+  },
+  switchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    marginHorizontal: SCREEN_GUTTER, marginTop: SPACING.md, paddingVertical: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  swatchItem: { alignItems: 'center', gap: 4 },
+  swatchRing: { width: 44, height: 44, borderRadius: RADII.pill, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  swatch: { width: 34, height: 34, borderRadius: RADII.pill, borderWidth: 1 },
   applyBtn: {
     marginTop: SPACING.lg, marginHorizontal: SCREEN_GUTTER,
     height: 50, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',

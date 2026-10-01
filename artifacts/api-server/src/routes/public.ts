@@ -15,6 +15,7 @@ import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { buildFacets, parseSearchFilters, type FacetRow } from "../lib/searchFilters";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
@@ -544,16 +545,15 @@ router.get("/search", async (req, res): Promise<void> => {
   try {
     const q = singleQueryValue(req.query.q);
     const sortValue = singleQueryValue(req.query.sort);
-    const category = singleQueryValue(req.query.category);
-    const sizeValue = singleQueryValue(req.query.size);
-    const brandValue = singleQueryValue(req.query.brand);
+    const filters = parseSearchFilters(req.query as Record<string, unknown>);
+    const wantFacets = req.query.facets === "1" || req.query.facets === "true";
     const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 20);
     const parsedOffset = parseNonNegativeInteger(req.query.offset, "offset", 0);
     const minPriceCents = req.query.minPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.minPriceCents, "minPriceCents");
     const maxPriceCents = req.query.maxPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.maxPriceCents, "maxPriceCents");
-    if (q === null || sortValue === null || category === null || sizeValue === null || brandValue === null ||
+    if (q === null || sortValue === null || filters === null ||
         typeof parsedLimit !== "number" || typeof parsedOffset !== "number" ||
         typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
       res.status(400).json({ error: "Invalid search query values" }); return;
@@ -574,6 +574,23 @@ router.get("/search", async (req, res): Promise<void> => {
     const off = parsedOffset;
     const pattern = containsSearchPattern(term);
     const viewerId = optionalViewerId(req);
+
+    // Multi-value filters: values within one facet are OR'd, facets are AND'd.
+    // Size / colour / in-stock apply to the SAME variant (size M in black, in stock).
+    const lowerList = (vals: string[]) => sql.join(vals.map((v) => sql`${v.toLowerCase()}`), sql`, `);
+    const variantConds = [
+      filters.sizes.length ? sql`lower(pv.size) IN (${lowerList(filters.sizes)})` : undefined,
+      filters.colors.length ? sql`lower(pv.color) IN (${lowerList(filters.colors)})` : undefined,
+      filters.inStock ? sql`pv.stock > 0` : undefined,
+    ].filter((c): c is ReturnType<typeof sql> => c !== undefined);
+    const variantFilter = variantConds.length
+      ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND ${sql.join(variantConds, sql` AND `)})`
+      : undefined;
+    const brandFilter = filters.brands.length
+      ? sql`EXISTS (SELECT 1 FROM users bu WHERE bu.clerk_id = ${products.ownerId}
+          AND (${sql.join(filters.brands.map((b) => sql`(bu.clerk_id = ${b} OR bu.brand_name ILIKE ${containsSearchPattern(b)})`), sql` OR `)}))`
+      : undefined;
+    const categoryFilter = filters.categories.length ? inArray(products.category, filters.categories) : undefined;
 
     // Do not SQL-limit joined variants: first collapse each product to its
     // lowest price, then filter/sort products, and only then apply the limit.
@@ -614,13 +631,10 @@ router.get("/search", async (req, res): Promise<void> => {
         .where(and(
           eq(products.status, "active"), isNull(products.deletedAt),
           fuzzyMatch(products.name, term, pattern),
-          category ? eq(products.category, category) : undefined,
+          categoryFilter,
           notBlockedWith(viewerId, products.ownerId),
-          sizeValue ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND pv.size ILIKE ${sizeValue})` : undefined,
-          brandValue ? sql`EXISTS (
-            SELECT 1 FROM users bu WHERE bu.clerk_id = ${products.ownerId}
-              AND (bu.clerk_id = ${brandValue} OR bu.brand_name ILIKE ${containsSearchPattern(normalizeSearchTerm(brandValue))})
-          )` : undefined,
+          variantFilter,
+          brandFilter,
           sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
         .groupBy(products.id)
         .having(and(
@@ -791,9 +805,36 @@ router.get("/search", async (req, res): Promise<void> => {
     const total = results.length;
     const limited = results.slice(off, off + lim);
 
+    // Opt-in facets (?facets=1) for the filter sheet: options + counts for the
+    // current query, computed over the unfiltered product matches so the
+    // sheet keeps offering every choice. Additive; response shape unchanged otherwise.
+    let facets: ReturnType<typeof buildFacets> | undefined;
+    if (wantFacets) {
+      const facetRows = await db.select({
+        productId: products.id,
+        category: products.category,
+        ownerId: products.ownerId,
+        brandName: sql<string | null>`COALESCE(${users.brandName}, ${users.displayName})`,
+        size: productVariants.size,
+        color: productVariants.color,
+        priceCents: productVariants.priceCents,
+        stock: productVariants.stock,
+      }).from(products)
+        .innerJoin(productVariants, eq(productVariants.productId, products.id))
+        .leftJoin(users, eq(users.clerkId, products.ownerId))
+        .where(and(
+          eq(products.status, "active"), isNull(products.deletedAt),
+          fuzzyMatch(products.name, term, pattern),
+          notBlockedWith(viewerId, products.ownerId),
+          sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
+        .limit(3000);
+      facets = buildFacets(facetRows as FacetRow[]);
+    }
+
     res.json({
       results: limited,
       pagination: paginationMetadata({ limit: lim, offset: off }, limited.length, total),
+      ...(facets ? { facets } : {}),
     });
   } catch (err) {
     req.log.error({ err }, "Public search failed");

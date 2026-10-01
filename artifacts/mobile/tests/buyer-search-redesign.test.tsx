@@ -150,6 +150,9 @@ vi.mock('@/components/BrandthreadUI', () => ({
   AnimatedEntrance: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// The filter sheet is covered by its own logic tests; it needs the full RN + reanimated surface.
+vi.mock('@/components/search/FilterSheet', () => ({ FilterSheet: () => null }));
+
 vi.mock('@/contexts/ThreadPullTransitionContext', () => ({
   useThreadPull: () => ({ push: vi.fn() }),
 }));
@@ -364,7 +367,7 @@ describe('buyer full-screen search — Instagram-mimicking rebuild', () => {
       await flushPromises();
     });
 
-    expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30 });
+    expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30, facets: true });
     expect(apiMock.social.search).toHaveBeenCalledWith('vault', 20);
 
     await act(async () => {

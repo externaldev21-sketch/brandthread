@@ -56,12 +56,18 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { FilterSheet } from '@/components/search/FilterSheet';
+import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 type VideoResult = Extract<SearchResult, { kind: 'video' }>;
 
 const DEBOUNCE_MS = 150;
+
+// Filters live for the app session only (module scope): they survive leaving
+// and re-opening Search, and reset on a fresh launch. Never written to storage.
+let sessionFilters: SearchFilters = {};
 const VIDEO_GRID_GAP = 8;
 
 /** Small, clearly-fictional preview accounts so the Users tab is demoable
@@ -167,6 +173,11 @@ export default function BuyerSearchScreen() {
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [filters, setFiltersState] = useState<SearchFilters>(sessionFilters);
+  const [facets, setFacets] = useState<SearchFacets | null>(null);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const activeFilterCount = countActiveFilters(filters);
+  const setFilters = useCallback((next: SearchFilters) => { sessionFilters = next; setFiltersState(next); }, []);
   const trimmedQuery = query.trim();
 
   // Browse grid backing the unfocused entry state — the same "For You"
@@ -219,10 +230,12 @@ export default function BuyerSearchScreen() {
 
   const performSearch = useCallback(async (term: string) => {
     const [productRes, peopleRes] = await Promise.allSettled([
-      api.public.search({ q: term, limit: 30 }),
+      api.public.search({ q: term, limit: 30, facets: true, ...filtersToApiOptions(filters) }),
       api.social.search(term, 20),
     ]);
     setResults(productRes.status === 'fulfilled' ? productRes.value.results ?? [] : []);
+    if (productRes.status === 'fulfilled' && productRes.value.facets) setFacets(productRes.value.facets);
+    else if (productRes.status !== 'fulfilled') setFacets(null);
     let peopleResult = peopleRes.status === 'fulfilled' ? (peopleRes.value as unknown as SearchPerson[]) : [];
     if (peopleResult.length === 0 && previewMode) {
       const q = term.toLowerCase();
@@ -230,7 +243,7 @@ export default function BuyerSearchScreen() {
     }
     setPeople(peopleResult);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode]);
+  }, [previewMode, filters]);
 
   useEffect(() => {
     const q = query.trim();
@@ -257,7 +270,7 @@ export default function BuyerSearchScreen() {
   const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
   const productResults = productResultsRaw.length > 0 ? productResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
+    : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   const tagRows = useMemo(() => deriveTags(videoResults, trimmedQuery), [videoResults, trimmedQuery]);
 
@@ -411,6 +424,18 @@ export default function BuyerSearchScreen() {
   ));
 
   function renderNoResults() {
+    if (activeFilterCount > 0 && activeTab === 'products') {
+      return (
+        <View testID="buyer-search-no-results">
+          <EmptyState
+            icon="sliders"
+            title="No products match these filters"
+            description="Try removing a filter to see more."
+            action={{ label: 'Clear filters', icon: 'x-circle', onPress: () => setFilters({}) }}
+          />
+        </View>
+      );
+    }
     return (
       <View testID="buyer-search-no-results">
         <EmptyState
@@ -521,8 +546,39 @@ export default function BuyerSearchScreen() {
       return <View>{personRows(people)}{brandRowList(brandRows)}</View>;
     }
     if (activeTab === 'products') {
-      if (productResults.length === 0) return renderNoResults();
-      return productGrid(productResults);
+      return (
+        <View>
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => { hapticSelection(); setFilterSheetOpen(true); }}
+              accessibilityRole="button"
+              accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
+              testID="buyer-search-filter-button"
+            >
+              <Feather name="sliders" size={14} color={fg} />
+              <Text style={[TYPE_SCALE.footnote, { color: fg, fontFamily: FONT.medium }]}>Filters</Text>
+              {activeFilterCount > 0 && (
+                <View style={[styles.filterBadge, { backgroundColor: fg }]} testID="buyer-search-filter-badge">
+                  <Text style={[styles.filterBadgeText, { color: bg }]}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {activeFilterCount > 0 && (
+              <TouchableOpacity
+                onPress={() => { hapticSelection(); setFilters({}); }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all filters"
+                hitSlop={12}
+                testID="buyer-search-filter-clear"
+              >
+                <Text style={[TYPE_SCALE.footnote, { color: muted, fontFamily: FONT.semibold }]}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {productResults.length === 0 ? renderNoResults() : productGrid(productResults)}
+        </View>
+      );
     }
     if (activeTab === 'tags') {
       if (tagRows.length === 0) {
@@ -665,6 +721,14 @@ export default function BuyerSearchScreen() {
         </ScrollView>
       )}
 
+      <FilterSheet
+        visible={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        value={filters}
+        onApply={setFilters}
+        facets={facets}
+      />
+
       {viewer && (
         <DiscoverPostViewer
           posts={viewer.posts}
@@ -734,6 +798,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   videoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: VIDEO_GRID_GAP },
   tabsRow: { paddingTop: SPACING.xs },
+  filterRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm, paddingBottom: SPACING.xs,
+  },
+  filterButton: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, height: 34,
+    paddingHorizontal: SPACING.md, borderRadius: RADII.pill,
+    borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface,
+  },
+  filterBadge: { minWidth: 18, height: 18, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  filterBadgeText: { fontSize: 11, fontFamily: FONT.bold },
   suggestionRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xs + 3,
