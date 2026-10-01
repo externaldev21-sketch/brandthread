@@ -830,6 +830,7 @@ export function respond({ method, path, query, role, options = {} }) {
   // distinct from /api/seller/notification-prefs) — unseeded, it 404'd on
   // load. Matches notification-prefs.ts's GET / response shape.
   if (p === '/notification-prefs') {
+    const SELLER_PREF_KEYS = ['new_orders', 'production_milestones', 'payout_confirmations', 'customer_messages', 'disputes', 'subscription_trial', 'inventory_alerts'];
     return {
       digest: 'realtime',
       role: 'seller',
@@ -838,6 +839,11 @@ export function respond({ method, path, query, role, options = {} }) {
       categories: {
         new_orders: true, production_milestones: true, payout_confirmations: true,
         customer_messages: true, disputes: true, subscription_trial: true, inventory_alerts: true,
+      },
+      channels: {
+        push: Object.fromEntries(SELLER_PREF_KEYS.map((k) => [k, true])),
+        inApp: Object.fromEntries(SELLER_PREF_KEYS.map((k) => [k, true])),
+        email: Object.fromEntries(SELLER_PREF_KEYS.map((k) => [k, !['customer_messages', 'inventory_alerts'].includes(k)])),
       },
     };
   }

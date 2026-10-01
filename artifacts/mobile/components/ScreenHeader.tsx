@@ -46,7 +46,7 @@ interface ScreenHeaderProps {
    * itself, only which icon a screen that already has one shows.
    */
   variant?: 'push' | 'modal';
-  /** Hairline under the header (default true); pass false for edge-to-edge canvases or a bare title row. */
+  /** Hairline under the header (default true); pass false for edge-to-edge canvases or a bare header. */
   divider?: boolean;
 }
 

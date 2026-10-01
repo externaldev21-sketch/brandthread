@@ -12,6 +12,7 @@ import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { channelView, parseChannelKey, channelPrefKey } from "../lib/notificationChannels";
 
 const router = Router();
 router.use(requireAuth);
@@ -25,6 +26,7 @@ const BUYER_DEFAULTS = {
   friend_activity: true,
   price_alerts: true,
   return_updates: true,
+  cart_reminders: true,
 };
 const SELLER_DEFAULTS = {
   new_orders: true,
@@ -75,6 +77,7 @@ router.get("/", async (req, res) => {
         timezone: row?.quietHoursTimezone ?? "UTC",
       },
       categories: { ...defaultsFor(row?.accountType), ...(row?.preferences ?? {}) },
+      channels: channelView(row?.accountType, row?.preferences),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch notification preferences");
@@ -85,9 +88,11 @@ router.get("/", async (req, res) => {
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
 router.put("/", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { digest, categories, pushEnabled, quietHours } = req.body as {
+  const { digest, categories, channels, pushEnabled, quietHours } = req.body as {
     digest?: string;
     categories?: Record<string, unknown>;
+    /** { inApp?: { [type]: boolean }, email?: { [type]: boolean } } */
+    channels?: Record<string, unknown>;
     pushEnabled?: unknown;
     quietHours?: { start?: unknown; end?: unknown; timezone?: unknown } | null;
   };
@@ -97,6 +102,9 @@ router.put("/", async (req, res) => {
   }
   if (categories !== undefined && (!categories || typeof categories !== "object" || Array.isArray(categories))) {
     return res.status(400).json({ error: "categories must be an object" });
+  }
+  if (channels !== undefined && (!channels || typeof channels !== "object" || Array.isArray(channels))) {
+    return res.status(400).json({ error: "channels must be an object" });
   }
   if (pushEnabled !== undefined && typeof pushEnabled !== "boolean") {
     return res.status(400).json({ error: "pushEnabled must be a boolean" });
@@ -121,8 +129,8 @@ router.put("/", async (req, res) => {
       };
     }
   }
-  if (digest === undefined && categories === undefined && pushEnabled === undefined && quietHoursPatch === undefined) {
-    return res.status(400).json({ error: "digest, categories, pushEnabled, or quietHours is required" });
+  if (digest === undefined && categories === undefined && channels === undefined && pushEnabled === undefined && quietHoursPatch === undefined) {
+    return res.status(400).json({ error: "digest, categories, channels, pushEnabled, or quietHours is required" });
   }
 
   try {
@@ -141,6 +149,18 @@ router.put("/", async (req, res) => {
         return res.status(400).json({ error: `Invalid notification category: ${key}` });
       }
       patch[key] = value;
+    }
+    for (const [channelName, map] of Object.entries(channels ?? {})) {
+      if ((channelName !== "inApp" && channelName !== "email") || !map || typeof map !== "object" || Array.isArray(map)) {
+        return res.status(400).json({ error: `Invalid notification channel: ${channelName}` });
+      }
+      for (const [typeKey, value] of Object.entries(map as Record<string, unknown>)) {
+        const parsed = parseChannelKey(current.accountType, typeKey);
+        if (!parsed || typeof value !== "boolean") {
+          return res.status(400).json({ error: `Invalid notification type: ${typeKey}` });
+        }
+        patch[channelPrefKey(channelName, parsed.key)] = value;
+      }
     }
     const merged = { ...defaults, ...(current.preferences ?? {}), ...patch };
 
@@ -185,6 +205,7 @@ router.put("/", async (req, res) => {
         timezone: saved?.quietHoursTimezone ?? "UTC",
       },
       categories: merged,
+      channels: channelView(current.accountType, merged),
     });
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to update notification preferences");
