@@ -41,6 +41,8 @@ const REQUIRED_EVENTS = [
   "charge.dispute.created",
   "charge.dispute.updated",
   "charge.dispute.closed",
+  "charge.dispute.funds_withdrawn",
+  "charge.dispute.funds_reinstated",
 ] as const;
 
 const WEBHOOK_PATH = "/api-server/api/webhooks/stripe";
