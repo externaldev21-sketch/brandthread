@@ -79,6 +79,7 @@ const TABS: {
       'waitlist-demand',
       'products-bulk-edit', 'product-seo',
       'product-variants',
+      'size-chart-templates', 'size-chart-template-edit', 'size-chart-template-apply',
     ],
     destination: '/(tabs)/products',
   },
@@ -133,6 +134,9 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'products-bulk-edit': 'products',
   'product-seo': 'products',
   'product-variants': 'products',
+  'size-chart-templates': 'products',
+  'size-chart-template-edit': 'products',
+  'size-chart-template-apply': 'products',
   'drafts': 'products',
   // Orders
   'orders': 'orders',

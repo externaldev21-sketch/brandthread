@@ -760,6 +760,7 @@ export default function ProductsScreen() {
               { text: 'Export products', onPress: () => { void handleExportProducts(); } },
               { text: 'Scheduled launches', onPress: () => router.push('/product-launches' as never) },
               { text: 'Waitlist demand', onPress: () => router.push('/waitlist-demand' as never) },
+              { text: 'Size charts', onPress: () => router.push('/size-chart-templates' as never) },
               { text: 'Cancel', style: 'cancel' },
             ]),
             accessibilityLabel: 'More product actions',
