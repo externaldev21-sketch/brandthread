@@ -736,10 +736,19 @@ importers:
       '@expo-google-fonts/baloo-2':
         specifier: ^0.4.2
         version: 0.4.2
+      '@expo-google-fonts/bebas-neue':
+        specifier: ^0.4.1
+        version: 0.4.1
+      '@expo-google-fonts/caveat':
+        specifier: ^0.4.2
+        version: 0.4.2
       '@expo-google-fonts/courier-prime':
         specifier: ^0.4.1
         version: 0.4.1
       '@expo-google-fonts/dm-serif-display':
+        specifier: ^0.4.2
+        version: 0.4.2
+      '@expo-google-fonts/montserrat':
         specifier: ^0.4.2
         version: 0.4.2
       '@expo-google-fonts/oswald':
@@ -748,7 +757,19 @@ importers:
       '@expo-google-fonts/pacifico':
         specifier: ^0.4.1
         version: 0.4.1
+      '@expo-google-fonts/permanent-marker':
+        specifier: ^0.4.0
+        version: 0.4.0
+      '@expo-google-fonts/playfair-display':
+        specifier: ^0.4.2
+        version: 0.4.2
       '@expo-google-fonts/poiret-one':
+        specifier: ^0.4.1
+        version: 0.4.1
+      '@expo-google-fonts/poppins':
+        specifier: ^0.4.1
+        version: 0.4.1
+      '@expo-google-fonts/space-grotesk':
         specifier: ^0.4.1
         version: 0.4.1
       '@react-navigation/native':
@@ -1852,6 +1873,12 @@ packages:
   '@expo-google-fonts/baloo-2@0.4.2':
     resolution: {integrity: sha512-uvrw1I+sP72PY8xROJQ6CMiGHu9+WJCdi72Q+OiWpQ3sKsIRyIEXimDfgUnkk2vpWVej0JX9fLc87iDmjKE86A==}
 
+  '@expo-google-fonts/bebas-neue@0.4.1':
+    resolution: {integrity: sha512-Ibnf0EQgMUj01tT/ws64RlsMQmOvDP+UDFW93bld0C/WwaOaCGWKgNnqxNkKxmL73y2kpT8EB4dkSNUOyAOEJA==}
+
+  '@expo-google-fonts/caveat@0.4.2':
+    resolution: {integrity: sha512-kCG35tRUX8Wi+u0Jh5ck3K1u7vZkdLnwRTuKMrEnlVmikvxQFXN1KjF5cL2vqRG7Hwm7648Zl8xe1BWAoIsPCA==}
+
   '@expo-google-fonts/courier-prime@0.4.1':
     resolution: {integrity: sha512-92Mb2Qi70yvL4XqA8VzM+Q/uFFxVulZXPU5WNTPeDzo1P1q6/bCTsZzE1BnfhYwcsp+PmrB0Ulq3E6zmZSrI6g==}
 
@@ -1864,14 +1891,29 @@ packages:
   '@expo-google-fonts/material-symbols@0.4.47':
     resolution: {integrity: sha512-5G4ObZlyGvDzx6g/+NC+RAMeeCc3dc0/HLu/llY5dYZUlNDYzaZWQZwPUzoTixf27riT8I7ur9mQKPYCPFDJzQ==}
 
+  '@expo-google-fonts/montserrat@0.4.2':
+    resolution: {integrity: sha512-Xyq7rKJhhZOE1Xk4wKSSVoUeOkFmQEMhtZ3pdFrgYckGZMs115Apmld1AI8Ju+yrl5GzDdfRCCqRr33dvEDYUA==}
+
   '@expo-google-fonts/oswald@0.4.2':
     resolution: {integrity: sha512-ZLB8ou0SmSWThyLDCHQdFnbMrj93hRrpkKMLLoPrIs4QTrPxZyOxHoJ4mFoFCs0efZdV1Yd8mULfaggAblX5Mg==}
 
   '@expo-google-fonts/pacifico@0.4.1':
     resolution: {integrity: sha512-w21ZIeNdwVWPH173HNszX8ML1deogOsHcxhJ0ghpbyBzr7R6PGSJ6yWL5jBixvWV/E34xDk28aNn/cX+gqzf3Q==}
 
+  '@expo-google-fonts/permanent-marker@0.4.0':
+    resolution: {integrity: sha512-yqKSFt3Wu/06XAGFNlT4z5iLmnjtAuSV/vkeumnM/2cgbEv3dQVKDbcdQnowW8N3vNOABGqWxbs4KEiewNOzqA==}
+
+  '@expo-google-fonts/playfair-display@0.4.2':
+    resolution: {integrity: sha512-mWhBV59RUjSS3aYpytUb7UyHHTnXcHh7epAn7gq+M4XAEh5PuMKUrP8eiUfkJLb6UwHZCi7EhQpUzxHu5OL96w==}
+
   '@expo-google-fonts/poiret-one@0.4.1':
     resolution: {integrity: sha512-77QCS2OduJGDAB3RdOk5hb/xXL8BHqZSQzO/6flLYwnR9lu/E0Y/FTYTYShX4XE5jQfnLwA+KaBbJzP3TT85DA==}
+
+  '@expo-google-fonts/poppins@0.4.1':
+    resolution: {integrity: sha512-LiX5oEryJqDt3UmWwr4oqf11hGMz/JEffkkNcZ3UtGwyoMFzXmBmTwcrAWrEttxypxmLNmPykDg+CY2VjKve9A==}
+
+  '@expo-google-fonts/space-grotesk@0.4.1':
+    resolution: {integrity: sha512-ZVQYw4Ok/pgcSJiufP8oRZE3AVxS9xtmKEUfsurbHkHNdMc/GA1gDXP9G4Cr7KL4KqSc0haexR2TuMigotCn4Q==}
 
   '@expo/cli@57.0.26':
     resolution: {integrity: sha512-vm769xuEyHMToi3uY66JLzRA2GGK+3WzdH71HNn67FuVhry82dKTvMUoeHYtHiindyeieiWfEvHT8Kr1VyEVPQ==}
@@ -8833,6 +8875,10 @@ snapshots:
 
   '@expo-google-fonts/baloo-2@0.4.2': {}
 
+  '@expo-google-fonts/bebas-neue@0.4.1': {}
+
+  '@expo-google-fonts/caveat@0.4.2': {}
+
   '@expo-google-fonts/courier-prime@0.4.1': {}
 
   '@expo-google-fonts/dm-serif-display@0.4.2': {}
@@ -8841,11 +8887,21 @@ snapshots:
 
   '@expo-google-fonts/material-symbols@0.4.47': {}
 
+  '@expo-google-fonts/montserrat@0.4.2': {}
+
   '@expo-google-fonts/oswald@0.4.2': {}
 
   '@expo-google-fonts/pacifico@0.4.1': {}
 
+  '@expo-google-fonts/permanent-marker@0.4.0': {}
+
+  '@expo-google-fonts/playfair-display@0.4.2': {}
+
   '@expo-google-fonts/poiret-one@0.4.1': {}
+
+  '@expo-google-fonts/poppins@0.4.1': {}
+
+  '@expo-google-fonts/space-grotesk@0.4.1': {}
 
   '@expo/cli@57.0.26(@expo/metro-runtime@57.0.16)(expo-constants@57.0.19)(expo-font@57.0.4)(expo-router@57.0.22)(expo@57.0.24)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)':
     dependencies:
