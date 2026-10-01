@@ -27,6 +27,7 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import discoveryRouter from "./discovery";
 import featuredPublicRouter from "./featured-public";
 import adminRouter from "./admin";
 import { auditModerationActions } from "../lib/admin/moderationAudit";
@@ -130,6 +131,7 @@ router.use("/products", (req, res, next) => {
   next();
 });
 router.use("/public",          publicRouter);
+router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types

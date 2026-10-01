@@ -42,6 +42,8 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
+import { ShopByCategoryRail } from '@/components/discover/DiscoverShopRails';
+import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
 import { TagRow, type SearchTag } from '@/components/search/TagRow';
@@ -146,6 +148,7 @@ export default function BuyerSearchScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
   const insets = useSafeAreaInsets();
   const { push } = useThreadPull();
+  const shopShelves = useDiscoveryShelves({ categories: true, trending: false });
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const bg = theme.background;
@@ -648,7 +651,10 @@ export default function BuyerSearchScreen() {
           keyboardDismissMode="on-drag"
         >
           {trimmedQuery.length === 0 ? (
-            renderRecent()
+            <>
+              {renderRecent()}
+              <ShopByCategoryRail categories={shopShelves.categories} />
+            </>
           ) : !submitted ? (
             renderSuggestions()
           ) : (

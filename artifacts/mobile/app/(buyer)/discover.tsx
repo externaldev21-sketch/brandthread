@@ -50,6 +50,7 @@ import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
 import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
 import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
@@ -132,7 +133,13 @@ export default function DiscoverScreen() {
   const [brands, setBrands] = useState<BrandCardData[]>([]);
   // Top slice of the same real brand data the Brands filter's own grid
   // shows — the For You rail is deliberately not a separate ranking.
-  const trendingBrands = useMemo(() => brands.slice(0, 8), [brands]);
+  // Real trending ranking (recent orders / follows / saves) leads the rail
+  // once any brand has signals; until then the rail keeps this same slice.
+  const shelves = useDiscoveryShelves();
+  const trendingBrands = useMemo(
+    () => (shelves.trendingBrands.length > 0 ? shelves.trendingBrands.slice(0, 8) : brands.slice(0, 8)),
+    [brands, shelves.trendingBrands],
+  );
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [brandsFetched, setBrandsFetched] = useState(false);
 
@@ -246,12 +253,12 @@ export default function DiscoverScreen() {
     forYouLimit.current = 30;
     fitsLimit.current = 30;
     Promise.all([
-      fetchJustDropped(), fetchHighDemand(), fetchPeople(),
+      fetchJustDropped(), fetchHighDemand(), fetchPeople(), shelves.reload(),
       filter === 'fits' ? fetchFits() : fetchForYou(),
       filter === 'brands' ? fetchBrands() : Promise.resolve(),
       filter === 'drops' ? fetchDrops() : Promise.resolve(),
     ]).finally(() => setRefreshing(false));
-  }, [filter, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
+  }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
 
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
     hapticLight();
@@ -301,6 +308,10 @@ export default function DiscoverScreen() {
           loadingMore={forYouLoadingMore}
           justDroppedItems={justDroppedItems}
           trendingBrands={trendingBrands}
+          trendingProducts={shelves.trendingProducts}
+          shopCategories={shelves.categories}
+          onSeeAllTrendingProducts={() => router.push('/buyer-trending?type=products' as never)}
+          onSeeAllTrendingBrands={shelves.trendingBrands.length > 0 ? () => router.push('/buyer-trending?type=brands' as never) : undefined}
           highDemandItems={highDemandItems}
           shopTheLookPosts={shopTheLookPosts}
           onOpenShopTheLook={openShopTheLook}
