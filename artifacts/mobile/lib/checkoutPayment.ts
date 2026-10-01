@@ -13,6 +13,7 @@
  *  - turning a wallet sheet's contact into the page's address and contact.
  */
 import type { CheckoutAddress, CheckoutContact, CheckoutSession } from '@/services/cartTypes';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 
 /** Stripe's minimum USD card charge (the server enforces it too). */
 export const MIN_CARD_CHARGE_CENTS_CLIENT = 50;
@@ -57,6 +58,8 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** Live the buyer is shopping from — lets a live-only code validate server-side. */
+  liveStreamId?: string;
 };
 
 export type PaymentIntentAddress = {
@@ -96,6 +99,7 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
     const code = single
       ? session.discounts.find(d => d.isValid)?.code
       : session.discounts.find(d => d.isValid && d.sellerId === group.sellerId)?.code;
+    const liveStreamId = code ? getLiveCheckoutContext(group.sellerId ?? null)?.streamId : undefined;
     return {
       items: group.items.map(item => ({
         variantId: String(item.variantId),
@@ -103,6 +107,7 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
         quantity: Number(item.quantity),
       })),
       ...(code ? { discountCode: String(code) } : {}),
+      ...(liveStreamId ? { liveStreamId } : {}),
     };
   });
 }

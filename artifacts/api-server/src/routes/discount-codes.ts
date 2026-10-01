@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { db, discountCodes, discountCodeUses, products, shopifyImportCollections } from "@workspace/db";
+import { db, discountCodes, discountCodeUses, liveStreams, products, shopifyImportCollections } from "@workspace/db";
+import { broadcastToRoom } from "../ws/liveHub";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
@@ -32,6 +33,20 @@ async function validateExtensions(sellerId: string, v: {
     return "minQuantity must be a whole number of 0 or more";
   }
   return null;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** What a viewer may see of a live-only code (shared in the live, so the code itself is public to viewers). */
+export function toLiveCodePublic(code: typeof discountCodes.$inferSelect) {
+  return {
+    id: code.id,
+    code: code.code,
+    type: code.type,
+    value: Number(code.value),
+    minOrderCents: code.minOrderCents,
+    expiresAt: code.expiresAt ? code.expiresAt.toISOString() : null,
+  };
 }
 
 function randomCode(): string {
@@ -107,6 +122,7 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
       collectionIds,
       maxUsesPerCustomer,
       minQuantity,
+      liveStreamId,
     } = req.body as {
       firstOrderOnly?: boolean;
       collectionIds?: string[];
@@ -123,6 +139,7 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
       singleUse?: boolean;
       startsAt?: string | null;
       expiresAt?: string | null;
+      liveStreamId?: string | null;
     };
 
     if (!VALID_TYPES.includes(type as any)) {
@@ -164,6 +181,26 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
     if (extError) {
       res.status(400).json({ error: extError });
       return;
+    }
+
+    // Live-only code: the stream must be this seller's and currently live.
+    // (Seller creates it from the host controls; see routes/live-commerce.ts.)
+    let scopedLiveStreamId: string | null = null;
+    if (liveStreamId) {
+      if (typeof liveStreamId !== "string" || !UUID_RE.test(liveStreamId)) {
+        res.status(400).json({ error: "liveStreamId is invalid" });
+        return;
+      }
+      const [stream] = await db
+        .select({ id: liveStreams.id, status: liveStreams.status })
+        .from(liveStreams)
+        .where(and(eq(liveStreams.id, liveStreamId), eq(liveStreams.sellerId, sellerId)))
+        .limit(1);
+      if (!stream || stream.status !== "live") {
+        res.status(400).json({ error: "Live codes can only be created for your own live stream while it is live" });
+        return;
+      }
+      scopedLiveStreamId = stream.id;
     }
 
     // Auto-generate a code if the seller didn't type one; retry on collision.
@@ -218,9 +255,13 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
         startsAt: startsAt ? new Date(startsAt) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         active: true,
+        liveStreamId: scopedLiveStreamId,
       })
       .returning();
 
+    if (scopedLiveStreamId) {
+      broadcastToRoom(scopedLiveStreamId, { type: "liveCode", code: toLiveCodePublic(created) });
+    }
     res.status(201).json(decorate(created));
   } catch (err) {
     req.log.error({ err }, "Failed to create discount code");
@@ -233,10 +274,11 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
 // GET /validate?code=CODE&sellerId=SELLER_ID&subtotalCents=AMOUNT&productIds=a,b,c
 router.get("/validate", async (req, res) => {
   try {
-    const { code, sellerId, subtotalCents } = req.query as {
+    const { code, sellerId, subtotalCents, liveStreamId } = req.query as {
       code?: string;
       sellerId?: string;
       subtotalCents?: string;
+      liveStreamId?: string;
     };
     const buyerId = (req as any).clerkUserId as string;
 
@@ -269,6 +311,7 @@ router.get("/validate", async (req, res) => {
     try {
       application = await validateDiscountCode({
         sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotal, lines,
+        liveStreamId: typeof liveStreamId === "string" && UUID_RE.test(liveStreamId) ? liveStreamId : null,
       });
     } catch (err) {
       if (err instanceof DiscountValidationError) {
