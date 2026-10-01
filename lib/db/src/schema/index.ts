@@ -3,6 +3,7 @@ export * from './productImports';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
+export * from './productVariantsStock';
 export * from './security';
 export * from './money';
 export * from './threadCash';

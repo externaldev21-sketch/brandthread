@@ -2568,6 +2568,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList: (sellerId: string) =>
         get<any[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
     },
+    /** Variant option axes, matrix generation, bulk variant edits and stock rules. */
+    productVariants: {
+      get:      (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}`),
+      putAxes:  (productId: string, axes: Array<{ name: string; values: string[] }>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/axes`, { axes }),
+      generate: (productId: string, data: { priceCents?: number; stock?: number; lowStockThreshold?: number; baseSku?: string }) =>
+        post<any>(`/api/product-variants/${encodeURIComponent(productId)}/generate`, data),
+      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number }>) =>
+        patch<any>(`/api/product-variants/${encodeURIComponent(productId)}/variants/bulk`, { updates }),
+      getStockRules: (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`),
+      putStockRules: (productId: string, data: Record<string, unknown>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`, data),
+    },
     // (buyer key defined earlier in this object — no duplicate)
     /** Team members — invite flow, roles, and activity log */
     team: {
