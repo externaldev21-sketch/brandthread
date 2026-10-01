@@ -57,6 +57,7 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
+import { ApiError } from '@/lib/networkNotice';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
   shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
@@ -505,6 +506,8 @@ export default function BuyerProductDetailScreen() {
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
@@ -565,6 +568,7 @@ export default function BuyerProductDetailScreen() {
     let cancelled = false;
 
     setLoading(true);
+    setLoadFailed(false);
     setSellerPaymentReady(null);
     setSellerPaymentReason(null);
 
@@ -605,7 +609,11 @@ export default function BuyerProductDetailScreen() {
                   : Promise.resolve(null),
               ]);
             }
-          } catch { /* API unavailable — product will show as not found */ }
+          } catch (loadError) {
+            // A missing product (404) reads as not found; any other failure is a
+            // load problem and gets a retry instead of a misleading dead end.
+            if (!(loadError instanceof ApiError && loadError.status === 404) && !cancelled) setLoadFailed(true);
+          }
         }
         // Dev-web preview only: a seeded `preview-product-*` has no catalog
         // row, so the real request fails. Build the same BuyerProduct from
@@ -630,7 +638,7 @@ export default function BuyerProductDetailScreen() {
     })();
 
     return () => { cancelled = true; };
-  }, [productId]);
+  }, [productId, reloadTick]);
 
   // Real per-source traffic tracking for the seller's own Dashboard — a
   // signed-out shopper's visit still counts, so this never gates on
@@ -728,11 +736,15 @@ export default function BuyerProductDetailScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
           <Feather name="alert-circle" size={ICON.xl} color={RED} />
-          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>Product not found</Text>
+          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'Product not found'}</Text>
           <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
-            This product may be unavailable or the link may have expired.
+            {loadFailed ? 'Check your connection and try again.' : 'This product may be unavailable or the link may have expired.'}
           </Text>
-          <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
+          {loadFailed ? (
+            <Button label="Retry" onPress={() => setReloadTick((n) => n + 1)} variant="secondary" size="small" icon="refresh-cw" />
+          ) : (
+            <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
+          )}
         </View>
         {/* Back button */}
         <View style={{ position: 'absolute', left: SP.md, top: headerTopInset + SP.sm }}>

@@ -36,6 +36,7 @@ import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -417,6 +418,7 @@ export default function ProductsScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const showPreviewOnlyFeedback = useCallback(() => {
@@ -469,9 +471,11 @@ export default function ProductsScreen() {
         return;
       }
       setProducts(Array.isArray(result) ? result : []);
+      setLoadFailed(false);
       await loadStats();
     } catch {
       setProducts([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -714,6 +718,13 @@ export default function ProductsScreen() {
 
   const ListEmpty = useMemo(() => {
     const copy = emptyCopy[filter] ?? emptyCopy.all;
+    if (loadFailed) {
+      return (
+        <View style={s.emptyWrap}>
+          <ErrorState message="Couldn't load products." onRetry={() => { void loadProducts(); }} />
+        </View>
+      );
+    }
     return (
       <View style={s.emptyWrap}>
         <EmptyState
@@ -726,7 +737,7 @@ export default function ProductsScreen() {
         />
       </View>
     );
-  }, [router, filter]);
+  }, [router, filter, loadFailed, loadProducts]);
 
   return (
     <View style={[s.root, { paddingTop: topInset + 12, backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
