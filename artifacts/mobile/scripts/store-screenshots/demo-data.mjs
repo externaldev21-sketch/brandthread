@@ -547,7 +547,7 @@ const SELLER_QUOTE_REQUESTS = [
   { id: 'qr-3', manufacturerId: MANUFACTURERS[1].id, productName: 'Garment-Dyed Hoodie — Moss', status: 'submitted', type: 'bulk', quantity: 400, createdAt: iso(2 * DAY), updatedAt: iso(2 * DAY) },
 ];
 
-const SAMPLE_ORDERS = [
+export const SAMPLE_ORDERS = [
   { id: 'so-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'Heavyweight Hoodie — Bone', status: 'delivered', orderType: 'sample', priceCents: 8500, quantity: 1, revision: 2, threadId: 'th-1', createdAt: iso(21 * DAY), updatedAt: iso(3 * DAY) },
   { id: 'so-2', manufacturerId: MANUFACTURERS[2].id, manufacturerName: 'Harbour Outerwear', title: 'Field Shell Proto', status: 'cut_and_sew', orderType: 'sample', priceCents: 14000, quantity: 1, revision: 1, createdAt: iso(10 * DAY), updatedAt: iso(2 * DAY) },
   { id: 'bo-1', manufacturerId: MANUFACTURERS[0].id, manufacturerName: 'Porto Knit Collective', title: 'FW26 Core Hoodie Run', status: 'cut_and_sew', orderType: 'bulk', priceCents: 1680000, quantity: 300, revision: 3, threadId: 'th-1', createdAt: iso(33 * DAY), updatedAt: iso(4 * DAY) },
