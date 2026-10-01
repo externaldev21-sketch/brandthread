@@ -14,7 +14,8 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { FONT, FS, SP, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED, SCREEN_BG } from '@/lib/theme';
-import type { ReviewItem } from '@/components/ProductReviewsSection';
+import { SellerReplyBlock, type ReviewItem } from '@/components/ProductReviewsSection';
+import { fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -57,12 +58,18 @@ export default function ProductReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={productName || 'Reviews'} subtitle={totalCount > 0 ? `${avgRating.toFixed(1)} · ${totalCount} reviews` : undefined} />
+      <ScreenHeader title="Reviews" />
+      {totalCount > 0 && (
+        <View style={s.summary}>
+          {!!productName && <Text style={s.summaryName} numberOfLines={1}>{productName}</Text>}
+          <Text style={s.summaryMeta}>{avgRating.toFixed(1)} average · {totalCount} reviews</Text>
+        </View>
+      )}
       {loading ? (
         <View style={s.center}><ActivityIndicator /></View>
       ) : (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipsScroll} contentContainerStyle={s.chipsRow}>
             <Chip label="With photos" active={photosOnly} onPress={() => setPhotosOnly(v => !v)} accent={theme.accent} />
             {([5, 4, 3, 2, 1] as const).map(star => (
               <Chip
@@ -102,7 +109,7 @@ export default function ProductReviewsScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={s.nameRow}>
                       <Text style={s.name}>{item.buyerName ?? 'Brandthread buyer'}</Text>
-                      {item.verifiedBuyer && (
+                      {isVerifiedReview(item) && (
                         <View style={s.verifiedBadge}>
                           <Feather name="check-circle" size={11} color={theme.accent} />
                           <Text style={[s.verifiedText, { color: theme.accent }]}>Verified buyer</Text>
@@ -115,13 +122,9 @@ export default function ProductReviewsScreen() {
                     {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </Text>
                 </View>
-                {(item.sizeBought || item.fitNote) && (
+                {fitChipText(item) && (
                   <View style={s.fitChip}>
-                    <Text style={s.fitChipText}>
-                      {item.sizeBought ? `Size bought: ${item.sizeBought}` : ''}
-                      {item.sizeBought && item.fitNote ? ' · ' : ''}
-                      {item.fitNote ? `Fits ${item.fitNote.toLowerCase()}` : ''}
-                    </Text>
+                    <Text style={s.fitChipText}>{fitChipText(item)}</Text>
                   </View>
                 )}
                 {!!item.body && <Text style={s.body}>{item.body}</Text>}
@@ -132,6 +135,7 @@ export default function ProductReviewsScreen() {
                     ))}
                   </View>
                 )}
+                <SellerReplyBlock reply={item.sellerReply} repliedAt={item.sellerRepliedAt} />
               </View>
             )}
           />
@@ -158,6 +162,10 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   muted: { color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.sm },
+  summary: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: 2 },
+  summaryName: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  summaryMeta: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  chipsScroll: { flexGrow: 0 },
   chipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: BORDER_SUBTLE },
   chipText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: MUTED },

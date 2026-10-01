@@ -606,6 +606,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return '/thread-cash';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
+    case 'product_question':
+      return '/seller-questions';
     case 'user': {
       if (!id) return null;
       const params = [`userId=${q(id)}`];
