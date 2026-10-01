@@ -183,6 +183,32 @@ async function run() {
   const photoDir = path.join(WORK_DIR, 'demo-images');
   const photo = path.join(photoDir, readdirSync(photoDir).find((f) => f.endsWith('.jpg')));
   try {
+    if (LABEL === 'demo') {
+      // Signed-out preview with &demo=1: no API, demo rows open a working detail screen.
+      const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, isMobile: true, userAgent: UA });
+      const page = await context.newPage();
+      const apiCalls = [];
+      page.on('request', (r) => { if (r.url().startsWith(API)) apiCalls.push(r.url()); });
+      await page.goto(`${origin}/disputes?bt_preview=seller&demo=1`);
+      await page.getByTestId('dispute-row-demo-1').waitFor({ timeout: 30_000 });
+      await page.getByText('Necessary only').click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      await shot(page, 'demo-list');
+      await page.getByTestId('dispute-row-demo-1').click();
+      await page.getByTestId('dispute-step-outcome').waitFor({ timeout: 15_000 });
+      await page.waitForTimeout(600);
+      await shot(page, 'demo-detail-needs-response');
+      await page.goBack();
+      await page.getByTestId('dispute-row-demo-2').waitFor({ timeout: 15_000 });
+      await page.getByTestId('dispute-row-demo-2').click();
+      await page.getByTestId('dispute-step-outcome').waitFor({ timeout: 15_000 });
+      await page.waitForTimeout(600);
+      await shot(page, 'demo-detail-under-review');
+      console.log('api calls:', apiCalls.filter((u) => /disputes/.test(u)));
+      if (violations.length) { console.log(violations.join('\n')); process.exitCode = 1; } else console.log('Fit check: no violations');
+      await context.close();
+      return;
+    }
     if (LABEL === 'before') {
       for (const id of ['d-needs', 'd-review']) {
         const { context, page } = await open(browser, images, origin, `/dispute-detail?disputeId=${id}`, (p) => p.getByText('Customer Claim').first());
