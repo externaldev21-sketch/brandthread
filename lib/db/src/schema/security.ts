@@ -1,4 +1,4 @@
-import { index, integer, pgTable, text, timestamp, uuid, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, uuid, uniqueIndex, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -142,4 +142,29 @@ export const accountDeletionCodes = pgTable("account_deletion_codes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   clerkIdx: index("account_deletion_codes_clerk_idx").on(table.clerkId, table.createdAt),
+}));
+
+/**
+ * Async "Email me a download link" data exports (migration 117). The raw
+ * download token is never stored — only its SHA-256 hash.
+ * status: queued | running | ready | failed | expired
+ */
+export const dataExportJobs = pgTable("data_export_jobs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clerkId: text("clerk_id").notNull(),
+  status: text("status").notNull().default("queued"),
+  categories: jsonb("categories").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  fileObjectKey: text("file_object_key"),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  readyAt: timestamp("ready_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  downloadTokenHash: text("download_token_hash"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  emailedAt: timestamp("emailed_at", { withTimezone: true }),
+}, (table) => ({
+  clerkIdx: index("data_export_jobs_clerk_idx").on(table.clerkId, table.requestedAt),
+  statusIdx: index("data_export_jobs_status_idx").on(table.status, table.requestedAt),
+  tokenHashUniq: uniqueIndex("data_export_jobs_token_hash_uniq").on(table.downloadTokenHash).where(sql`download_token_hash IS NOT NULL`),
 }));

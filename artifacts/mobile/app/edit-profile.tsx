@@ -24,6 +24,7 @@ import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
+import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -204,6 +205,10 @@ export default function EditProfileScreen() {
     try {
       const result = await api.auth.checkUsername(u);
       if (result.available) { setUsernameStatus('ok'); setUsernameError(''); return true; }
+      if (result.code === 'USERNAME_COOLDOWN' && result.nextChangeAt) {
+        setUsernameStatus('invalid'); setUsernameError(formatHandleCooldown(result.nextChangeAt));
+        return false;
+      }
       setUsernameStatus('taken'); setUsernameError(result.error ?? 'Username already taken');
       return false;
     } catch {

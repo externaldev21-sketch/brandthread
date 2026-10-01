@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Card, StickyBottomCTA } from '@/components/ui';
+import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
 import { hapticSuccess } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -143,6 +143,12 @@ export default function BuyerPersonalDetails() {
             Change your email in Login methods.
           </Text>
         </View>
+
+        <Card style={[s.card, { marginTop: SPACING.md, paddingHorizontal: SPACING.md }]}>
+          <ListRow icon="mail" title="Change email" subtitle="Verify a new email address" chevron onPress={() => router.push('/change-email' as never)} />
+          <View style={s.divider} />
+          <ListRow icon="phone" title="Change phone number" subtitle="Verify a new phone number" chevron onPress={() => router.push('/change-phone' as never)} />
+        </Card>
       </ScrollView>
 
       {hasChanges && (

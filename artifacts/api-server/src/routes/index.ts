@@ -103,6 +103,7 @@ import buyerPaymentsRouter from "./buyer-payments";
 import buyerPreferencesRouter from "./buyer-preferences";
 import supportRouter from "./support";
 import sellerExportRouter from "./seller-export";
+import dataExportJobsRouter from "./data-export-jobs";
 import supportChatRouter from "./support-chat";
 import freelancersRouter from "./freelancers";
 import freelancerConnectRouter from "./freelancer-connect";
@@ -183,6 +184,7 @@ router.use(aiCreditsGate);
 router.use("/ai/credits",      aiCreditsRouter);
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
+router.use("/auth/data-export", dataExportJobsRouter); // async emailed export (/jobs*, /download); instant POST stays in authRouter
 router.use("/auth",            authRouter);
 router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,

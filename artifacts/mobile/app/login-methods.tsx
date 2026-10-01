@@ -19,6 +19,7 @@ import { FONT } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
+import { ListRow } from '@/components/ui/ListRow';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -254,30 +255,9 @@ export default function LoginMethods() {
     }
   }
 
-  async function handleDisable2FA() {
-    if (!user) return;
-    Alert.alert(
-      'Disable two-factor authentication?',
-      'This will make your account less secure. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Disable',
-          style: 'destructive',
-          onPress: async () => {
-            setTwoFaLoading(true);
-            try {
-              await (user as any).disableTOTP();
-              Alert.alert('Two-factor authentication disabled');
-            } catch (e: any) {
-              Alert.alert("Couldn't turn off 2FA", 'Try again.');
-            } finally {
-              setTwoFaLoading(false);
-            }
-          },
-        },
-      ],
-    );
+  // Turning 2FA off needs a current code, so it lives on its own screen.
+  function handleDisable2FA() {
+    router.push('/disable-two-factor' as never);
   }
 
   return (
@@ -383,6 +363,29 @@ export default function LoginMethods() {
             })}
           </View>
 
+          {/* Change email / password — plain rows to their own screens */}
+          <View style={s.card}>
+            <ListRow
+              testID="change-email-row"
+              icon="mail"
+              title="Change email"
+              chevron
+              onPress={() => router.push('/change-email' as never)}
+            />
+            {hasPassword && (
+              <>
+                <View style={s.divider} />
+                <ListRow
+                  testID="change-password-row"
+                  icon="lock"
+                  title="Change password"
+                  chevron
+                  onPress={() => router.push('/change-password' as never)}
+                />
+              </>
+            )}
+          </View>
+
           {/* Two-factor authentication section */}
           <Text style={s.sectionLabel}>Two-Factor Authentication</Text>
           <View style={s.card}>
@@ -407,6 +410,28 @@ export default function LoginMethods() {
                 <Button label="Enable" variant="secondary" size="small" onPress={handleEnable2FA} />
               )}
             </View>
+            {twoFactorEnabled && (
+              <>
+                <View style={s.divider} />
+                <PressableScale
+                  testID="backup-codes-row"
+                  accessibilityRole="button"
+                  accessibilityLabel="Backup codes"
+                  onPress={() => router.push('/backup-codes' as never)}
+                >
+                  <View style={s.row}>
+                    <View style={s.iconWrap}>
+                      <Feather name="key" size={20} color={colors.subtle} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={s.methodLabel}>Backup codes</Text>
+                      <Text style={s.methodSub}>One-time codes for when you can't use your app</Text>
+                    </View>
+                    <Feather name="chevron-right" size={16} color={colors.subtle} />
+                  </View>
+                </PressableScale>
+              </>
+            )}
           </View>
 
           {/* Info note */}

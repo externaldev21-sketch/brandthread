@@ -12,6 +12,7 @@ import { Button, Card, ListRow, StickyBottomCTA } from '@/components/ui';
 import { hapticError, hapticSuccess, hapticToggle } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
+import { EmailExportSection } from '@/components/security/EmailExportSection';
 
 type DataCategory = { key: string; label: string; sub: string; icon: keyof typeof Feather.glyphMap; selected: boolean };
 
@@ -113,6 +114,8 @@ export default function BuyerDownloadData() {
                 Only records your account owns are included.
               </Text>
             </View>
+
+            <EmailExportSection categories={categories.filter(c => c.selected).map(c => c.key)} />
           </>
         )}
       </ScrollView>

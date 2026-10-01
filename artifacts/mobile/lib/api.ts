@@ -943,7 +943,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  Returns { available: true } if free (or already owned by this user),
        *  { available: false, error: string } if taken or invalid format. */
       checkUsername: (username: string) =>
-        get<{ available: boolean; error?: string }>(
+        get<{ available: boolean; error?: string; code?: 'USERNAME_COOLDOWN'; nextChangeAt?: string }>(
           `/api/auth/username/check?username=${encodeURIComponent(username)}`
         ),
       /** Same check, usable before sign-up completes (no session yet) —
@@ -3426,6 +3426,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     ageGate: {
       submit: (dateOfBirth: string) => post<{ ageBand: 'under_13' | '13_17' | '18_plus' }>('/api/auth/age', { dateOfBirth }),
     },
+    /** Account security — emailed "Download my data" jobs. */
+    dataExportJobs: {
+      list: () => freshGet<DataExportJobsResponse>('/api/auth/data-export/jobs'),
+      create: (include: string[]) =>
+        post<{ job: DataExportJob }>('/api/auth/data-export/jobs', { include }),
+      link: (id: string) =>
+        post<{ url: string; expiresAt: string }>(`/api/auth/data-export/jobs/${encodeURIComponent(id)}/link`, {}),
+    },
   };
 }
 
@@ -3451,6 +3459,18 @@ export interface BuyerPreferencesPatch {
   styleInterests?: string[];
   surveyCompleted?: boolean;
 }
+
+export type DataExportJob = {
+  id: string;
+  status: 'queued' | 'running' | 'ready' | 'failed' | 'expired';
+  categories: string[];
+  requestedAt: string;
+  readyAt: string | null;
+  expiresAt: string | null;
+  emailed: boolean;
+  downloadable: boolean;
+};
+export type DataExportJobsResponse = { jobs: DataExportJob[]; nextRequestAt: string | null; emailEnabled: boolean };
 
 export type BrandthreadApi = ReturnType<typeof createApi>;
 
