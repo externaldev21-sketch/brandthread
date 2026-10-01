@@ -21,7 +21,7 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
-import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { notifyPostLike, notifyPostShare, notifyRepost } from "../lib/activityEvents";
 import { MAX_DRAFTS_PER_USER, onPostPublished, scheduleWindowError } from "../lib/postPublish";
 import { scheduleAutoCaptions } from "../lib/captions";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
@@ -1781,6 +1781,7 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req
 
   if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
+    if (type === "share") void notifyPostShare({ postId: id, sharerId: clerkId });
     if (type === "not_interested") {
       // Persist the hide so For You never serves this post again; the taste
       // penalty applies only for a newly hidden post (retries don't stack).

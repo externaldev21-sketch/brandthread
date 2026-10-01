@@ -143,6 +143,7 @@
     { "match": "/push-notifications", "owner": "storeAccount" },
     { "match": "/notifications-settings", "owner": "storeAccount" },
     { "match": "/notification-channels", "owner": "storeAccount" },
+    { "match": "/seller-activity", "owner": "profilesSocial" },
     { "match": "/delete-account", "owner": "storeAccount" },
     { "match": "/team", "owner": "storeAccount" },
     { "match": "/roles", "owner": "storeAccount" },

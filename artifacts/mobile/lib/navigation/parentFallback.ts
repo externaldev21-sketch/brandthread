@@ -28,6 +28,7 @@ export const PARENT_FALLBACK: Record<string, string> = {
   '/buyer-privacy-settings': '/buyer-settings-menu',
   '/buyer-settings-detail': '/buyer-settings-menu',
   '/notifications-settings': '/(tabs)/more',
+  '/seller-activity': '/(tabs)/profile',
   '/general-settings': '/seller-settings',
   '/ai-settings': '/ai-brain',
   '/customer-accounts': '/seller-settings',

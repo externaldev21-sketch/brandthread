@@ -51,6 +51,8 @@ interface ScreenHeaderProps {
   variant?: 'push' | 'modal';
   /** Compatibility alias for divider={false}. */
   hideDivider?: boolean;
+  /** Hairline under the header. Defaults to true; pass false for a bare header. */
+  divider?: boolean;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */

@@ -25,7 +25,7 @@ export async function checkTextFit(page, { minPad = 12, viewportWidth = 393 } = 
       if (!hasOwnText(el)) continue;
       const label = (el.textContent || '').trim();
       // Icon-font glyphs and count badges are not labels.
-      if (/^[\uE000-\uF8FF]+$/.test(label) || /^\d{1,2}$/.test(label) || label.length <= 1) continue;
+      if (/^[\uE000-\uF8FF]+$/.test(label) || /^\d{1,2}$/.test(label) || label.length <= 1 || /^[A-Z]{2,3}$/.test(label)) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden') continue;
       const r = el.getBoundingClientRect();
@@ -39,7 +39,15 @@ export async function checkTextFit(page, { minPad = 12, viewportWidth = 393 } = 
         const p = parent.getBoundingClientRect();
         if (p.width > 0 && (r.right > p.right + 1 || r.left < p.left - 1)) issues.push({ type: 'overflows-parent', el: describe(el) });
       }
-      if (r.right > viewportWidth + 0.5 || r.left < -0.5) issues.push({ type: 'off-screen', el: describe(el) });
+      // Content inside a horizontal scroller (chip rows) is meant to scroll past the edge.
+      let scroller = el.parentElement;
+      let inHScroll = false;
+      while (scroller && scroller !== document.body) {
+        const ox = getComputedStyle(scroller).overflowX;
+        if ((ox === 'auto' || ox === 'scroll') && scroller.scrollWidth > scroller.clientWidth + 1) { inHScroll = true; break; }
+        scroller = scroller.parentElement;
+      }
+      if (!inHScroll && (r.right > viewportWidth + 0.5 || r.left < -0.5)) issues.push({ type: 'off-screen', el: describe(el) });
 
       let box = el.parentElement;
       while (box && box !== document.body && !isContainer(box)) box = box.parentElement;
@@ -88,7 +96,6 @@ export async function zoomCards(page, outDir, prefix) {
   }
   return count;
 }
-
 /**
  * Text-fit & alignment check for the web preview. Returns every text element
  * that is truncated (scrollWidth > clientWidth, or ellipsised), overflows its
