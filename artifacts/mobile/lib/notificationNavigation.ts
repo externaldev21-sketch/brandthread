@@ -115,6 +115,10 @@ export function createNotificationResponseHandler(
       router.push('/seller-questions');
       return;
     }
+    if (data?.targetType === 'giveaway' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/giveaway?code=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'return' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
       return;

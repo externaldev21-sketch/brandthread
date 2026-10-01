@@ -616,6 +616,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
 
     case 'cart':
       return '/(buyer)/cart';
+    case 'giveaway':
+      return id ? `/giveaway?code=${q(id)}` : null;
     case 'thread_cash_transfer':
       return '/thread-cash';
     case 'referral':

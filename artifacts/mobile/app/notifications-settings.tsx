@@ -33,6 +33,7 @@ const SELLER_ROWS: NotifRow[] = [
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'Messages from customers' },
   { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'Disputes and case updates' },
   { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low and out of stock' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
   { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'Before your trial converts' },
 ];
 
@@ -43,6 +44,7 @@ const BUYER_ROWS: NotifRow[] = [
   { key: 'friend_activity', icon: 'users',           label: 'Social',            description: 'Follows, likes, and comments' },
   { key: 'price_alerts',    icon: 'tag',             label: 'Price & stock alerts', description: 'Price drops and restocks' },
   { key: 'return_updates',  icon: 'refresh-ccw',     label: 'Returns',           description: 'Return and refund requests' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
 ];
 
 export default function NotificationsSettingsScreen() {

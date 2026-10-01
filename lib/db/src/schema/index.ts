@@ -24,6 +24,7 @@ export * from './emailMarketing';
 export * from './giftCards';
 export * from './productBulkSeo';
 export * from './promotions';
+export * from './sellerPushGiveaways';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { places } from './places';

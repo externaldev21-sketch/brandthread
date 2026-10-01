@@ -11,6 +11,8 @@ describe("push notification delivery contract", () => {
   it("normalizes plural feed labels to push event categories", () => {
     expect(normalizePushEventCategory("orders")).toBe("order");
     expect(normalizePushEventCategory("messages")).toBe("message");
+    expect(normalizePushEventCategory("announcements")).toBe("announcement");
+    expect(normalizePushEventCategory("giveaways")).toBe("giveaway");
     expect(normalizePushEventCategory("drops")).toBe("drop");
     expect(normalizePushEventCategory("disputes")).toBe("dispute");
   });
@@ -59,6 +61,9 @@ describe("push notification delivery contract", () => {
   it("maps new event categories to their buyer/seller preference keys", () => {
     expect(preferenceKey("buyer", "stock")).toBe("price_alerts");
     expect(preferenceKey("buyer", "return")).toBe("return_updates");
+    expect(preferenceKey("buyer", "announcement")).toBe("seller_announcements");
+    expect(preferenceKey("seller", "announcement")).toBe("seller_announcements");
+    expect(preferenceKey("buyer", "giveaway")).toBeNull();
     expect(preferenceKey("seller", "stock")).toBe("inventory_alerts");
     expect(preferenceKey("seller", "fulfillment")).toBe("new_orders");
     expect(normalizePushEventCategory("returns")).toBe("return");

@@ -30,6 +30,7 @@ const BUYER_DEFAULTS = {
   price_alerts: true,
   return_updates: true,
   cart_reminders: true,
+  seller_announcements: true,
 };
 const SELLER_DEFAULTS = {
   new_orders: true,
@@ -39,6 +40,7 @@ const SELLER_DEFAULTS = {
   disputes: true,
   subscription_trial: true,
   inventory_alerts: true,
+  seller_announcements: true,
 };
 
 function defaultsFor(accountType: string | null | undefined) {

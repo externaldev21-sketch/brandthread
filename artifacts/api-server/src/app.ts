@@ -26,6 +26,7 @@ import { IP_NOTICE_PATHS, ipNoticePage } from "./routes/ipNoticePage";
 import {
   bioLinkRedirect, bioPageHandler, bioProductRedirect, bioShopRedirect, trackedLinkRedirect,
 } from "./routes/growthPublic";
+import { giveawayLanding } from "./routes/giveawayLanding";
 import { aiUsageContext } from "./lib/aiUsage";
 
 const app: Express = express();
@@ -188,6 +189,7 @@ app.get("/bio/:slug", bioPageHandler);
 app.get("/bio/:slug/go/:linkId", bioLinkRedirect);
 app.get("/bio/:slug/shop", bioShopRedirect);
 app.get("/bio/:slug/p/:productId", bioProductRedirect);
+app.get("/g/:code", rateLimit("public-read"), giveawayLanding);
 app.use("/api/v1", (_req, res, next) => {
   res.setHeader("X-Brandthread-API-Version", "1");
   next();

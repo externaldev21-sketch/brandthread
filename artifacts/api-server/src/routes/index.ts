@@ -157,6 +157,8 @@ import affiliatePublicRouter from "./affiliate-public";
 import affiliateCreatorRouter from "./affiliate-creator";
 import sellerAffiliateRouter from "./seller-affiliate";
 import growthRouter from "./growth";
+import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
+import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
 const router = Router();
 
@@ -201,6 +203,7 @@ router.use("/ip-cases",        ipCasesRouter);
 router.use("/release-test-control", releaseTestControlRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
+router.use("/giveaways",       publicGiveawaysRouter); // public reads; per-viewer entry status when signed in
 
 // ─── Authenticated seller + shared routes ─────────────────────────────────────
 // tc (teamContext) is applied to every seller-scoped route so X-Store-Context
@@ -286,6 +289,8 @@ router.use("/seller/affiliate",          tc, sellerAffiliateRouter); // affiliat
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
+router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
+router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
 router.use("/seller/launch-checklist",   tc, sellerLaunchChecklistRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
