@@ -12,6 +12,9 @@
  * POST /api/thread-cash/daily/claim     — claim today's reward once 7 cumulative active
  *                                      minutes (and enough heartbeats) have been recorded
  * GET  /api/thread-cash/history     — paginated ledger
+ * GET  /api/thread-cash/ledger      — full ledger: running balance, kind filter
+ *                                      (?kind=earned|spent|expired), credit expiry
+ *                                      dates, and the expiring-soon summary
  * POST /api/thread-cash/redeem      — reserve balance as a checkout discount token
  *                                      (feature-flagged: 'threadCashCheckoutDiscount')
  * POST /api/thread-cash/redeem/:token/cancel — return an unused, unattached token's
@@ -56,6 +59,11 @@ import {
   cancelThreadCashRedemption,
   listOpenThreadCashRedemptions,
 } from "../lib/threadCash/wallet";
+import { describeRules } from "../lib/threadCash/rules";
+import { getExpirySummary, loadLedgerEntries, loadLots, expireThreadCashForBuyer } from "../lib/threadCash/expiry";
+import { buildLedger, filterLedger, parseLedgerKind } from "../lib/threadCash/ledger";
+import { activeExpiryDays } from "../lib/threadCash/rules";
+import { logger } from "../lib/logger";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
@@ -87,6 +95,8 @@ async function loadStreakState(buyerId: string): Promise<{ state: StreakState; t
 // ─── GET /api/thread-cash ───────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  // Post anything that has lapsed first so the balance never includes it.
+  await expireThreadCashForBuyer(buyerId).catch((err) => logger.warn({ err, buyerId }, "Thread Cash lazy expiry failed"));
   const [balanceCents, config, { state, timezone }, openRedemptions] = await Promise.all([
     getBalanceCents(db, buyerId),
     getThreadCashConfig(),
@@ -94,8 +104,17 @@ router.get("/", async (req, res) => {
     listOpenThreadCashRedemptions(db, buyerId),
   ]);
   const preview = computeCheckIn(state, config, new Date(), timezone);
+  const expiry = await getExpirySummary(buyerId).catch(() => null);
   res.json({
     balanceCents,
+    // Additive: the rules as enforced, and what lapses soon (null if the lookup failed).
+    rules: describeRules(config),
+    expiry: expiry && {
+      expiryDays: expiry.expiryDays,
+      expiringSoonCents: expiry.expiringSoon.totalCents,
+      nextExpiresAt: expiry.expiringSoon.nextExpiresAt?.toISOString() ?? null,
+      buckets: expiry.expiringSoon.buckets.map((b) => ({ expiresAt: b.expiresAt.toISOString(), amountCents: b.amountCents })),
+    },
     // Redeemed at checkout but neither spent nor attached to a payment (see
     // POST /redeem/:token/cancel). Additive field (item 109).
     openRedemptions,
@@ -308,6 +327,34 @@ router.get("/history", async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
   const history = await getHistory(buyerId, limit);
   res.json({ history });
+});
+
+// ─── GET /api/thread-cash/ledger ────────────────────────────────────────────
+router.get("/ledger", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
+  const offset = Math.max(0, parseInt(String(req.query.offset ?? "0"), 10) || 0);
+  const kind = parseLedgerKind(req.query.kind);
+  const now = new Date();
+  await expireThreadCashForBuyer(buyerId, now).catch((err) => logger.warn({ err, buyerId }, "Thread Cash lazy expiry failed"));
+  const config = await getThreadCashConfig();
+  const days = activeExpiryDays(config);
+  const entries = await loadLedgerEntries(db, buyerId);
+  const lots = await loadLots(db, buyerId, days);
+  const all = buildLedger(entries, lots);
+  const filtered = filterLedger(all, kind);
+  const summary = await getExpirySummary(buyerId, now);
+  res.json({
+    balanceCents: all[0]?.balanceAfterCents ?? 0,
+    expiryDays: days,
+    expiringSoon: {
+      totalCents: summary.expiringSoon.totalCents,
+      nextExpiresAt: summary.expiringSoon.nextExpiresAt?.toISOString() ?? null,
+      buckets: summary.expiringSoon.buckets.map((b) => ({ expiresAt: b.expiresAt.toISOString(), amountCents: b.amountCents })),
+    },
+    rows: filtered.slice(offset, offset + limit),
+    hasMore: filtered.length > offset + limit,
+  });
 });
 
 // ─── POST /api/thread-cash/redeem ───────────────────────────────────────────

@@ -29,6 +29,33 @@ export type ThreadCashStatus = {
   openRedemptions?: ThreadCashOpenRedemption[];
   config: ThreadCashConfig;
   streak: ThreadCashStreakState;
+  /** Additive: older servers omit it. What lapses within the warning window. */
+  expiry?: { expiryDays: number | null; expiringSoonCents: number; nextExpiresAt: string | null; buckets: ThreadCashExpiryBucket[] } | null;
+};
+
+export type ThreadCashExpiryBucket = { expiresAt: string; amountCents: number };
+
+export type ThreadCashLedgerKind = 'earned' | 'spent' | 'expired';
+
+export type ThreadCashLedgerRow = {
+  id: string;
+  amountCents: number;
+  source: ThreadCashEntry['source'];
+  note: string | null;
+  createdAt: string;
+  kind: ThreadCashLedgerKind;
+  balanceAfterCents: number;
+  /** Credits only: when what is left of it expires, if ever. */
+  expiresAt: string | null;
+  remainingCents: number | null;
+};
+
+export type ThreadCashLedger = {
+  balanceCents: number;
+  expiryDays: number | null;
+  expiringSoon: { totalCents: number; nextExpiresAt: string | null; buckets: ThreadCashExpiryBucket[] };
+  rows: ThreadCashLedgerRow[];
+  hasMore: boolean;
 };
 
 export type ThreadCashCheckInResult = {

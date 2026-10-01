@@ -199,7 +199,7 @@ export default function ThreadCashScreen() {
 
   return (
     <BrandthreadScreen scrollable noSafeTop>
-      <ScreenHeader title="Thread Cash" onBack={() => goBackOr(router)} />
+      <ScreenHeader hideDivider title="Thread Cash" onBack={() => goBackOr(router)} />
       {loading ? (
         <BalanceSkeleton styles={styles} />
       ) : (
@@ -220,8 +220,8 @@ export default function ThreadCashScreen() {
                   {formatCents(status?.balanceCents ?? 0)}
                 </Text>
               )}
-              <Text style={styles.balanceHint} numberOfLines={2}>
-                Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
+              <Text style={styles.balanceHint}>
+                Not cash. Use it toward purchases in the app.
               </Text>
             </BrandthreadCard>
 
@@ -275,8 +275,8 @@ export default function ThreadCashScreen() {
               })}
             </View>
             <Text style={[styles.streakSub, TABULAR_NUMS, { color: theme.muted }]}>
-              Longest streak: {status?.streak.longestStreak ?? 0} days · Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)}/day,
-              {' '}${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
+              Longest streak: {status?.streak.longestStreak ?? 0} days{'\n'}
+              Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)} a day, ${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
             </Text>
           </BrandthreadCard>
 
@@ -325,6 +325,17 @@ export default function ThreadCashScreen() {
               })}
             </View>
           )}
+
+          <Pressable
+            onPress={() => router.push('/thread-cash-ledger')}
+            accessibilityRole="button"
+            accessibilityLabel="Open full Thread Cash ledger"
+            testID="thread-cash-open-ledger"
+            style={[styles.ledgerRow, { borderColor: theme.borderSubtle }]}
+          >
+            <Text style={[styles.historyLabel, { color: theme.text, flex: 1 }]}>Full ledger</Text>
+            <Feather name="chevron-right" size={ICON.md} color={theme.muted} />
+          </Pressable>
 
           {/* Rules */}
             <Text style={[styles.sectionTitle, { color: theme.text }]}>How it works</Text>
@@ -395,6 +406,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   historyLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
   historyDate: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'right' },
+  ledgerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 0, borderTopWidth: StyleSheet.hairlineWidth },
   rulesCard: { marginBottom: SP.lg, padding: 0, overflow: 'hidden' },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md },
   ruleDot: { width: 5, height: 5, borderRadius: 3, marginTop: 7 },
