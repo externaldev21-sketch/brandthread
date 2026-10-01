@@ -124,7 +124,9 @@ import {
   type GarmentTemplateDef,
 } from '@/lib/garmentTemplates';
 import {
-  pushRecentColor, addColorToPalette, createPalette, type BrandPalette,
+  pushRecentColor, addColorToPalette, createPalette,
+  renamePalette, deletePalette, setDefaultPalette,
+  type BrandPalette,
 } from '@/lib/colorModel';
 import { getColorPickerState, saveColorPickerState } from '@/services/designService';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -2664,6 +2666,38 @@ export default function DesignCanvasScreen() {
     });
   }
 
+  function handleNewPalette() {
+    setColorPalettes(prev => {
+      const next = createPalette(prev, `Palette ${prev.length + 1}`);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleRenamePalette(paletteId: string, name: string) {
+    setColorPalettes(prev => {
+      const next = renamePalette(prev, paletteId, name);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleDeletePalette(paletteId: string) {
+    setColorPalettes(prev => {
+      const next = deletePalette(prev, paletteId);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleSetDefaultPalette(paletteId: string) {
+    setColorPalettes(prev => {
+      const next = setDefaultPalette(prev, paletteId);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
   /**
    * approximateColorAtPoint — SVG-fallback eyedropper: react-native-svg has no
    * surface to read actual composited pixels from, so this approximates by
@@ -4089,17 +4123,24 @@ export default function DesignCanvasScreen() {
         </View>
       </Modal>
 
-      {/* ── COLOR PICKER ── */}
+      {/* ── COLOR PICKER — Procreate's own full-height "Colours" sheet
+          (Disc/Classic/Harmony/Value/Palettes tabs), not a small floating
+          popover. Drops from the top like the Layers sheet. ── */}
       <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
+        <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View>
+          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
             <ColorPickerComponent
               color={drawColor}
+              previousColor={prevColor}
               onChange={applyColor}
               recentColors={colorRecents}
               palettes={colorPalettes}
               onSaveToPalette={handleSaveToPalette}
+              onNewPalette={handleNewPalette}
+              onRenamePalette={handleRenamePalette}
+              onDeletePalette={handleDeletePalette}
+              onSetDefaultPalette={handleSetDefaultPalette}
               onRequestEyedropper={() => { closeSheet(); setEyedropperActive(true); }}
               onClose={closeSheet}
             />
@@ -5524,6 +5565,11 @@ const styles = StyleSheet.create({
   wrenchItemText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
 
   modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  // Full-height sheets (Layers, Colours) drop from the top under the status
+  // bar — Procreate's own placement — rather than sitting at the bottom
+  // like the other sheets.
+  layersModalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-start' },
+  layersModalSheetWrap: { paddingTop: Platform.OS === 'ios' ? 54 : 32 },
   sheet: {
     backgroundColor: SURFACE,
     borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
