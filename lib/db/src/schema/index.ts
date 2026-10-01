@@ -96,6 +96,7 @@ export const users = pgTable('users', {
   // by a later Clerk sync.
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
+  storeAccentColor: text('store_accent_color'),
   // Profile cover video (all account types) — a short, always-muted looping
   // clip shown in the profile hero. Separate from the avatar. Server-rendered
   // compressed rendition + poster frame, both public object paths served via

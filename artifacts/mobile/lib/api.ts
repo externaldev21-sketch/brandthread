@@ -1870,6 +1870,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           profileImageUrl: string | null;
           logoUrl:     string | null;
           bannerUrl:   string | null;
+          storeAccentColor: string | null;
           category:    string | null;
           tags:        string[];
           location:    string | null;
@@ -1897,6 +1898,25 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload the storefront banner / cover image (wide aspect). */
       uploadBanner: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ bannerUrl: string }>('/api/seller/profile/banner/upload', image, getToken, getCacheScope),
+      /** Availability + profanity/reserved screening for a store name and/or @handle. */
+      checkStoreIdentity: (params: { name?: string; handle?: string }) => {
+        const q = new URLSearchParams();
+        if (params.name !== undefined) q.set('name', params.name);
+        if (params.handle !== undefined) q.set('handle', params.handle);
+        return get<{
+          name?:   { available: boolean; error?: string; code?: string };
+          handle?: { available: boolean; error?: string; code?: string };
+        }>(`/api/seller/identity/check?${q.toString()}`);
+      },
+      /** Claim the store name + handle; the server re-runs every check. */
+      saveStoreIdentity: (body: { brandName: string; handle: string }) =>
+        put<{ brandName: string; username: string }>('/api/seller/identity', body),
+      /** Set (or clear with null) the storefront accent, from the monochrome allowlist. */
+      setStoreAccent: (color: string | null) =>
+        put<{ storeAccentColor: string | null }>('/api/seller/profile/accent', { color }),
+      /** Save Instagram / TikTok handles or links; the server returns canonical URLs. */
+      saveSocialLinks: (body: { instagram?: string; tiktok?: string }) =>
+        put<{ socialLinks: Record<string, string> }>('/api/seller/social-links', body),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
