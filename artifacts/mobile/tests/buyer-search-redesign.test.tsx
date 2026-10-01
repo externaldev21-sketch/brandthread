@@ -124,6 +124,9 @@ vi.mock('@/components/discover/DiscoverPostViewer', () => ({
 vi.mock('@/components/discover/DiscoverSafetyMenu', () => ({
   DiscoverSafetyMenu: () => React.createElement('DiscoverSafetyMenu'),
 }));
+vi.mock('@/components/safety/ReportSheet', () => ({
+  useReportSheet: () => ({ openReport: vi.fn() }),
+}));
 vi.mock('@/components/ShopProductSheet', () => ({
   ShopProductSheet: () => React.createElement('ShopProductSheet'),
 }));

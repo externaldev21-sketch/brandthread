@@ -30,6 +30,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, View } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useApi } from '@/hooks/useApi';
 import { SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -99,6 +100,7 @@ export default function DiscoverScreen() {
   const listRef = useScrollReset<FlatList<any>>(true, false);
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const api = useApi();
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
@@ -438,7 +440,13 @@ export default function DiscoverScreen() {
             removePostFromLists(safetyMenuPost.authorId);
           }}
           onReport={() => {
-            api.reports.submit({ targetType: 'post', targetId: safetyMenuPost.id, reason: 'other', note: 'Reported from Discover' }).catch(() => {});
+            openReport({
+              targetType: 'post',
+              targetId: safetyMenuPost.id,
+              label: 'Post',
+              ownerId: safetyMenuPost.authorId,
+              ownerName: safetyMenuPost.authorName,
+            });
           }}
           onClose={() => setSafetyMenuPost(null)}
         />

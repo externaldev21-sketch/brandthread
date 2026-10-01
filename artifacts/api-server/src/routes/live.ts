@@ -31,7 +31,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { evaluateContent } from "../lib/contentModerator";
-import { optionalViewerId, publishingRestriction } from "../lib/safety";
+import { isBlockedEitherWay, optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
@@ -212,6 +212,10 @@ router.get("/:id", async (req, res) => {
 
     const row = rows.rows[0] as any;
     const isOwner = !!viewerId && viewerId === row.seller_id;
+    // Two-way block with the host: the stream does not exist for this viewer.
+    if (viewerId && !isOwner && await isBlockedEitherWay(viewerId, row.seller_id)) {
+      return res.status(404).json({ error: "Not found" });
+    }
 
     // Recording internals (Agora resourceId/sid) are never returned to any
     // client — they're only ever needed server-side. `recording_status` /
@@ -245,11 +249,14 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
   try {
     const rows = await db.execute(sql`
-      SELECT id, channel_name, status, agora_uid
+      SELECT id, seller_id, channel_name, status, agora_uid
       FROM live_streams WHERE id = ${id}::uuid
     `);
     if (!rows.rows.length) return res.status(404).json({ error: "Stream not found" });
     const stream = rows.rows[0] as any;
+    if (stream.seller_id !== viewerId && await isBlockedEitherWay(viewerId, stream.seller_id)) {
+      return res.status(404).json({ error: "Stream not found" });
+    }
     if (stream.status !== "live") {
       return res.status(410).json({ error: "Stream has ended" });
     }
@@ -419,6 +426,12 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
   }
 
   try {
+    const hostRow = await db.execute(sql`SELECT seller_id FROM live_streams WHERE id = ${req.params.id}::uuid LIMIT 1`);
+    const hostId = (hostRow.rows[0] as any)?.seller_id as string | undefined;
+    if (!hostId) return res.status(404).json({ error: "Stream not found" });
+    if (hostId !== userId && await isBlockedEitherWay(userId, hostId)) {
+      return res.status(403).json({ error: "You can't comment on this live.", code: "BLOCKED" });
+    }
     const result = await db.execute(sql`
       INSERT INTO live_comments (stream_id, user_id, display_name, avatar_url, message)
       VALUES (${req.params.id}::uuid, ${userId}, ${displayName ?? "Viewer"}, ${avatarUrl ?? null}, ${message.trim()})

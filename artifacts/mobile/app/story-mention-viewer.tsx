@@ -41,6 +41,7 @@ import { RADII } from '@/constants/radii';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { prefetchImage } from '@/lib/prefetch';
 import { useApi } from '@/lib/api';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { ApiError } from '@/lib/networkNotice';
 import { relativeTime } from '@/lib/activity';
 import { sendMessage } from '@/services/socialService';
@@ -144,6 +145,7 @@ function SlideMedia({ slide, overlays, original, paused }: {
 export default function StoryMentionViewerScreen() {
   const router = useRouter();
   const api = useApi();
+  const { openReport } = useReportSheet();
   const insets = useSafeAreaInsets();
   const topInset = useHeaderTopInset();
   const { storyId } = useLocalSearchParams<{ storyId?: string }>();
@@ -395,6 +397,12 @@ export default function StoryMentionViewerScreen() {
   }
 
   const { tagger } = current;
+  const tagName = tagger.name || atHandle(tagger.handle);
+  // Long-press the header to report the story.
+  const openReportSheet = () => openReport({
+    targetType: 'story', targetId: current.storyId, label: `${tagName}’s story`,
+    ownerId: tagger.userId, ownerName: tagName,
+  });
   const slides = currentUnavailable ? 1 : current.story.media.length;
   const hasText = text.trim().length > 0;
 
@@ -470,10 +478,10 @@ export default function StoryMentionViewerScreen() {
               <Text style={styles.avatarText} allowFontScaling={false}>{tagger.initials}</Text>
             )}
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.name} numberOfLines={1}>{tagger.name || atHandle(tagger.handle)}</Text>
+          <Pressable style={styles.headerText} onLongPress={openReportSheet} delayLongPress={400}>
+            <Text style={styles.name} numberOfLines={1}>{tagName}</Text>
             <Text style={styles.sub} numberOfLines={1}>Mentioned you · {relativeTime(current.mentionedAt)}</Text>
-          </View>
+          </Pressable>
           <IconButton name="x" onPress={close} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
         </View>
 

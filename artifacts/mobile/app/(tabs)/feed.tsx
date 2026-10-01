@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -1455,6 +1456,7 @@ function SpotlightPageImpl({
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const { push } = useThreadPull();
   const commentCountDelta = useCommentCountDelta(item.id);
   // The creator player (no tab bar) always plays edge to edge like Buyer Home.
@@ -1772,7 +1774,13 @@ function SpotlightPageImpl({
         mediaUri={item.mediaUris[0]}
         isVideo={item.contentType === 'video'}
         onClose={() => setShareOpen(false)}
-        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onReport={() => openReport({
+          targetType: item.contentType === 'video' ? 'video' : 'post',
+          targetId: item.id,
+          label: 'Post',
+          ownerId: item.sellerId,
+          ownerName: item.creator,
+        })}
         onNotInterested={() => onNotInterested(item.id)}
         onFeedback={showToast}
       />
@@ -1782,7 +1790,13 @@ function SpotlightPageImpl({
         speedActive={speedActive}
         onToggleSpeed={() => setSpeedActive(v => !v)}
         onNotInterested={() => onNotInterested(item.id)}
-        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onReport={() => openReport({
+          targetType: item.contentType === 'video' ? 'video' : 'post',
+          targetId: item.id,
+          label: 'Post',
+          ownerId: item.sellerId,
+          ownerName: item.creator,
+        })}
         onClose={() => setMenuOpen(false)}
       />
 

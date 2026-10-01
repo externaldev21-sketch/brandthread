@@ -9,14 +9,14 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import {
   db, messages, postComments, posts, products, stories, users,
-  communities, communityMessages,
+  communities, communityMessages, reviews,
 } from "@workspace/db";
 import type { ReportTargetType } from "./safety";
 import { closeCommunityRoom } from "../ws/communityHub";
 
 export const REPORT_TARGET_TYPES: readonly ReportTargetType[] = [
   "post", "video", "live", "live_comment", "comment", "story", "product", "profile", "message",
-  "community_message", "community",
+  "community_message", "community", "review",
 ] as const;
 
 export const REPORT_REASONS = [
@@ -184,6 +184,14 @@ export async function resolveReportTarget(type: ReportTargetType, rawId: string)
       if (!row || row.kind === "official") return null;
       return { targetId: row.id, ownerId: row.ownerId, excerpt: clip([row.name, row.description].filter(Boolean).join(" — ")), label: row.name, mediaUrl: row.coverUrl ?? row.iconUrl };
     }
+    case "review": {
+      if (!UUID_RE.test(id)) return null;
+      const [row] = await db
+        .select({ id: reviews.id, buyerId: reviews.buyerId, body: reviews.body, rating: reviews.rating })
+        .from(reviews).where(eq(reviews.id, id)).limit(1);
+      if (!row) return null;
+      return { targetId: row.id, ownerId: row.buyerId, excerpt: clip(row.body) ?? `${row.rating}-star review`, label: "Product review" };
+    }
     case "live": {
       if (!UUID_RE.test(id)) return null;
       const row = await rawFirstRow(sql`SELECT id, seller_id, title FROM live_streams WHERE id = ${id}::uuid LIMIT 1`);
@@ -257,6 +265,13 @@ export async function removeReportedContent(type: ReportTargetType, id: string, 
         .set({ deletedAt: now, inviteCode: null, updatedAt: now })
         .where(eq(communities.id, id)).returning({ id: communities.id });
       if (rows.length > 0) closeCommunityRoom(id);
+      return rows.length > 0;
+    }
+    case "review": {
+      // The rating stays (it feeds the product average) — only the text goes.
+      const rows = await db.update(reviews)
+        .set({ body: null, updatedAt: now })
+        .where(eq(reviews.id, id)).returning({ id: reviews.id });
       return rows.length > 0;
     }
     case "live": {

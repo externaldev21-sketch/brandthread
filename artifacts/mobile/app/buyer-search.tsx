@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
@@ -143,6 +144,7 @@ function deriveTags(videos: VideoResult[], query: string): SearchTag[] {
 
 export default function BuyerSearchScreen() {
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const params = useLocalSearchParams<{ q?: string }>();
   const insets = useSafeAreaInsets();
   const { push } = useThreadPull();
@@ -689,7 +691,13 @@ export default function BuyerSearchScreen() {
           onNotInterested={() => { removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id); setSafetyMenuPost(null); }}
           onMute={() => { removePostFromLists(safetyMenuPost.authorId); setSafetyMenuPost(null); }}
           onReport={() => {
-            api.reports.submit({ targetType: 'post', targetId: safetyMenuPost.id, reason: 'other', note: 'Reported from Search' }).catch(() => {});
+            openReport({
+              targetType: 'post',
+              targetId: safetyMenuPost.id,
+              label: 'Post',
+              ownerId: safetyMenuPost.authorId,
+              ownerName: safetyMenuPost.authorName,
+            });
             setSafetyMenuPost(null);
           }}
         />

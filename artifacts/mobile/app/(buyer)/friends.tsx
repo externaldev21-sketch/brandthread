@@ -8,6 +8,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth, useUser } from '@clerk/expo';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, FeedSkeleton, EmptyState } from '@/components/BrandthreadUI';
@@ -70,6 +71,7 @@ function PostCard({
   onNotInterested: (post: BuyerPost) => void;
 }) {
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const { theme } = useAppTheme();
   const palette = useColors();
 
@@ -99,9 +101,13 @@ function PostCard({
               {
                 text: 'Report',
                 onPress: () =>
-                  router.push(
-                    `/buyer-report?targetType=post&targetId=${post.id}&targetLabel=Post` as never,
-                  ),
+                  openReport({
+                    targetType: 'post',
+                    targetId: post.id,
+                    label: 'Post',
+                    ownerId: post.authorId,
+                    ownerName: post.authorName,
+                  }),
               },
               { text: 'Not interested', onPress: () => onNotInterested(post) },
               { text: 'Cancel', style: 'cancel' },
