@@ -74,6 +74,8 @@ import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
 import returnsRouter from "./returns";
 import sellerVerificationRouter from "./seller-verification";
+import productLaunchesRouter from "./product-launches";
+import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
 import buyerProductsRouter from "./buyer-products";
@@ -169,6 +171,8 @@ router.use("/ai",              tc, aiRouter);
 // get swallowed by buyerRouter's lack of those handlers.
 // Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
 // scoped to the actual buyer, not the team store owner.
+router.use("/product-launches",          tc, productLaunchesRouter);
+router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
 router.use("/buyer/products",            buyerProductsRouter);

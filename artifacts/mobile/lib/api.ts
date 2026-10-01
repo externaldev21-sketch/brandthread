@@ -2552,6 +2552,35 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sellerNotify:  (variantId: string) =>
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
     },
+    /** Scheduled product launches + "Notify me". */
+    productLaunches: {
+      /** Public: is this product waiting on a launch time? */
+      state:       (productId: string) =>
+        get<{ launching: boolean; launchAt: string | null; serverNow: string }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+      alertStatus: (productId: string) =>
+        get<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      alertOn:     (productId: string) =>
+        post<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`, {}),
+      alertOff:    (productId: string) =>
+        del<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      /** Seller. */
+      list:        () => get<Array<{
+        productId: string; name: string; imageUrl: string | null; status: string;
+        launchAt: string; launchedAt: string | null; notifyFollowers: boolean; alertCount: number;
+      }>>('/api/product-launches'),
+      schedule:    (productId: string, data: { launchAt: string; notifyFollowers?: boolean }) =>
+        put<any>(`/api/product-launches/${encodeURIComponent(productId)}`, data),
+      cancel:      (productId: string) =>
+        del<{ cancelled: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+    },
+    /** Pre-order ship-by terms (60-day refund window). */
+    preorderTerms: {
+      get: (productId: string) =>
+        get<{ shipBy: string; daysLeft: number; closingDate: string | null; refundWindowDays: number; refundCopy: string; note: string | null }>(
+          `/api/preorder-terms/${encodeURIComponent(productId)}`),
+      set: (productId: string, data: { shipBy: string; note?: string | null }) =>
+        put<any>(`/api/preorder-terms/${encodeURIComponent(productId)}`, data),
+    },
     /** Product bundles — seller CRUD. */
     bundles: {
       list:       () => get<any[]>('/api/bundles'),

@@ -129,6 +129,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
     { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
+    { label: 'Schedule launch', icon: 'clock', onPress: () => { closeSheet(); router.push(('/product-launches?productId=' + p.id) as never); } },
     { label: 'Share', icon: 'share', onPress: handleShare },
     {
       label: 'Send to manufacturer', icon: 'tool', accent: theme.warning,
@@ -746,6 +747,8 @@ export default function ProductsScreen() {
               { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
               { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
               { text: 'Export products', onPress: () => { void handleExportProducts(); } },
+              { text: 'Scheduled launches', onPress: () => router.push('/product-launches' as never) },
+              { text: 'Waitlist demand', onPress: () => router.push('/waitlist-demand' as never) },
               { text: 'Cancel', style: 'cancel' },
             ]),
             accessibilityLabel: 'More product actions',
