@@ -205,7 +205,9 @@ export default function PayoutsScreen() {
   const pendFmt    = balance?.pending?.formatted   ?? '$0.00';
   const nextDate   = balance?.nextPayout
     ? fmtDate(balance.nextPayout.arrivalDate)
-    : '—';
+    : balance?.nextPayoutEstimate?.date
+      ? fmtDate(balance.nextPayoutEstimate.date)
+      : '—';
 
   if (!isPreview && isLoadingRole) {
     return (
@@ -331,7 +333,13 @@ export default function PayoutsScreen() {
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
               return (
-                <View key={p.id} style={styles.payoutRow}>
+                <TouchableOpacity
+                  key={p.id}
+                  style={styles.payoutRow}
+                  onPress={() => { haptic(); router.push({ pathname: '/payout-detail', params: { id: p.id } } as never); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Payout ${p.amount}, ${cfg.label}`}
+                >
                   <View style={styles.payoutLeft}>
                     <Text style={styles.payoutDate}>{p.date}</Text>
                     <Text style={styles.payoutSub}>···{p.bankLast4}</Text>
@@ -342,7 +350,7 @@ export default function PayoutsScreen() {
                       <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -453,12 +461,18 @@ export default function PayoutsScreen() {
                     : connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
                </Text>
              </View>
-             <View style={styles.settingsRow}>
+             <TouchableOpacity
+               style={styles.settingsRow}
+               testID="seller-payouts-schedule-row"
+               onPress={() => { haptic(); router.push('/payout-schedule' as never); }}
+               accessibilityRole="button"
+               accessibilityLabel="Payout schedule"
+             >
                <Text style={styles.settingsLabel}>Schedule</Text>
                <Text style={styles.settingsValue}>
                   {isPreview ? 'Not loaded' : connectLoading ? 'Loading…' : scheduleLabel(connectStatus?.payoutSchedule ?? null)}
                </Text>
-             </View>
+             </TouchableOpacity>
            </View>
 
            {/* Tax info status */}
