@@ -221,14 +221,25 @@ const AUTO_ENTER_MS = 1500;
 /** How far the cover slowly pushes in while the trace is drawing (Dev:
  *  "the cover art slowly pushes in"), before the fast zoom-through burst
  *  once the trace closes. One continuous scale value spans both phases. */
-const PUSH_IN_SCALE = 1.08;
+const PUSH_IN_SCALE = 1.14;
 /** How far the cover scales up in the fast zoom-through burst once the
  *  trace closes, alongside enterFade, right before navigating. Skipped
- *  entirely under Reduce Motion (see triggerZoomEnter). */
-const ZOOM_THROUGH_SCALE = 2.2;
+ *  entirely under Reduce Motion (see triggerZoomEnter). Dev: "a bit
+ *  stronger" than the original 2.2 — same 220ms duration (see
+ *  triggerZoomEnter), so the extra distance reads as a snappier burst, not
+ *  a slower one. */
+const ZOOM_THROUGH_SCALE = 2.6;
 /** Corner radius of the edge-trace rectangle — a "rounded screen-edge"
  *  look rather than a hard-cornered box. */
 const TRACE_CORNER_RADIUS = 28;
+/** How far the trace rectangle sits inside the card's measured bounds.
+ *  Dev: live-inspected at 393x852 and found the path drawn exactly ON the
+ *  card edges (x=0 and x=w), so half the stroke fell outside the Svg's own
+ *  viewport and the visible half landed on the physical screen edge, where
+ *  the device frame/rounded corners hid it — only the top/bottom segments
+ *  (mid-screen) ever showed. Must clear strokeWidth/2 plus a margin so the
+ *  full stroke paints on-screen on every edge. */
+const TRACE_INSET = 8;
 
 /** Rubber-band resistance for dragging the page up past its resting
  *  position — a diminishing-returns curve (never a hard clamp) that
@@ -790,21 +801,25 @@ export default function SellerStudioRadialMenu({
   const tracePath = useMemo(() => {
     const { width: w, height: h } = cardAreaSize;
     if (w === 0 || h === 0) return { d: '', length: 0 };
-    const r = Math.min(TRACE_CORNER_RADIUS, w / 2, h / 2);
-    const cx = w / 2;
+    const left = TRACE_INSET;
+    const top = TRACE_INSET;
+    const right = w - TRACE_INSET;
+    const bottom = h - TRACE_INSET;
+    const r = Math.min(TRACE_CORNER_RADIUS, (right - left) / 2, (bottom - top) / 2);
+    const cx = (left + right) / 2;
     const d = [
-      `M ${cx} 0`,
-      `L ${w - r} 0`,
-      `A ${r} ${r} 0 0 1 ${w} ${r}`,
-      `L ${w} ${h - r}`,
-      `A ${r} ${r} 0 0 1 ${w - r} ${h}`,
-      `L ${r} ${h}`,
-      `A ${r} ${r} 0 0 1 0 ${h - r}`,
-      `L 0 ${r}`,
-      `A ${r} ${r} 0 0 1 ${r} 0`,
-      `L ${cx} 0`,
+      `M ${cx} ${top}`,
+      `L ${right - r} ${top}`,
+      `A ${r} ${r} 0 0 1 ${right} ${top + r}`,
+      `L ${right} ${bottom - r}`,
+      `A ${r} ${r} 0 0 1 ${right - r} ${bottom}`,
+      `L ${left + r} ${bottom}`,
+      `A ${r} ${r} 0 0 1 ${left} ${bottom - r}`,
+      `L ${left} ${top + r}`,
+      `A ${r} ${r} 0 0 1 ${left + r} ${top}`,
+      `L ${cx} ${top}`,
     ].join(' ');
-    const length = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r;
+    const length = 2 * (right - left - 2 * r) + 2 * (bottom - top - 2 * r) + 2 * Math.PI * r;
     return { d, length };
   }, [cardAreaSize]);
   // strokeDasharray is the full path length (one dash spanning it exactly);
@@ -879,7 +894,22 @@ export default function SellerStudioRadialMenu({
     const pushBrightenStyle = useAnimatedStyle(() => {
       const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
       return {
-        opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.12], Extrapolation.CLAMP) : 0,
+        opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.22], Extrapolation.CLAMP) : 0,
+      };
+    });
+    // Dev: during the zoom-through burst the title text slid down and got
+    // clipped at the bottom edge — `cardStyle`'s scale transform is centered
+    // on the whole card, so content far from center (the label, pinned near
+    // the bottom) moves the most. Rather than fight transform-origin
+    // (inconsistent between web and native), the label just fades out as
+    // the burst starts, well before it would visibly travel out of bounds —
+    // it's gone from view by ZOOM_THROUGH_SCALE, long before navigation.
+    // Unaffected by (and keeps playing through) the slow push-in — only the
+    // fast final burst past PUSH_IN_SCALE triggers it.
+    const cardLabelFadeStyle = useAnimatedStyle(() => {
+      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+      return {
+        opacity: isCurrent ? interpolate(zoomScale.value, [PUSH_IN_SCALE, ZOOM_THROUGH_SCALE], [1, 0], Extrapolation.CLAMP) : 1,
       };
     });
     // Icon + name only ever show on the card that's actually centered (or
@@ -1071,7 +1101,7 @@ export default function SellerStudioRadialMenu({
             style={styles.cardBottomVignette}
             pointerEvents="none"
           />
-          <Text style={styles.cardLabel} numberOfLines={2}>{item.label}</Text>
+          <Animated.Text style={[styles.cardLabel, cardLabelFadeStyle]} numberOfLines={2}>{item.label}</Animated.Text>
         </Animated.View>
         {/* The edge-trace's slight brighten while it pushes in — see
             pushBrightenStyle above. A sibling of cardContent (not inside
@@ -1221,14 +1251,24 @@ export default function SellerStudioRadialMenu({
                 <Svg
                   width={cardAreaSize.width}
                   height={cardAreaSize.height}
-                  style={StyleSheet.absoluteFill}
+                  // zIndex matters here: without it, this Svg and the
+                  // sibling StudioCoverGrain Svg (also absoluteFill) land in
+                  // the same stacking context and the browser (confirmed on
+                  // web; this governs native stacking too) renders the
+                  // trace's two STRAIGHT vertical edges underneath the
+                  // grain despite this Svg being later in the tree — only
+                  // the arcs/horizontal edges painted on top. An explicit
+                  // zIndex forces its own stacking context above the grain,
+                  // fixing all four edges at once (confirmed live: without
+                  // this, the trace only ever showed top+bottom).
+                  style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
                   pointerEvents="none"
                   testID="seller-studio-entering-trace"
                 >
                   <AnimatedPath
                     d={tracePath.d}
                     stroke="#ffffff"
-                    strokeWidth={2.5}
+                    strokeWidth={3}
                     fill="none"
                     strokeDasharray={tracePath.length}
                     animatedProps={traceAnimatedProps}
