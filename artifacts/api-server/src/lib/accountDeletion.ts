@@ -238,7 +238,7 @@ export async function purgeAccount(clerkUserId: string): Promise<boolean> {
     await tx.execute(sql`DELETE FROM stories WHERE author_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM story_highlights WHERE user_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM story_archive WHERE author_id = ${clerkUserId}`);
-    await tx.execute(sql`DELETE FROM close_friends WHERE user_id = ${clerkUserId} OR friend_id = ${clerkUserId}`);
+    await tx.execute(sql`DELETE FROM close_friends WHERE owner_id = ${clerkUserId} OR friend_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM product_reserves WHERE user_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM waitlist_entries WHERE user_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM drop_alert_subscriptions WHERE user_id = ${clerkUserId}`);

@@ -590,7 +590,7 @@ export default function SignInScreen() {
                 </PressableScale>
               </View>
               <View style={s.pwRow}>
-                <TextInput accessibilityLabel="Password"
+                <TextInput
                   ref={passwordRef}
                   style={[s.input, s.pwInput]}
                   testID="release-check-password"
@@ -739,7 +739,7 @@ export default function SignInScreen() {
           {/* ── Identifier ─────────────────────────────────────────────────────── */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>{phoneSupported ? 'Email or phone number' : 'Email address'}</Text>
-            <TextInput accessibilityLabel={phoneSupported ? 'Email or phone number' : 'Email'}
+            <TextInput
               style={s.input}
               testID="release-check-email"
               accessibilityLabel={phoneSupported ? 'Email or phone number' : 'Email address'}

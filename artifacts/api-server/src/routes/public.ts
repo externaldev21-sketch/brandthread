@@ -685,7 +685,7 @@ router.get("/search", async (req, res): Promise<void> => {
         .having(and(
           minPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) >= ${minPriceCents}`,
           maxPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) <= ${maxPriceCents}`,
-        )),
+        ))
         // Same ordering the JS sort below applies, pushed into SQL so a common
         // term can't pull every matching product into memory. Past the cap a
         // result is unreachable from the search UI anyway.

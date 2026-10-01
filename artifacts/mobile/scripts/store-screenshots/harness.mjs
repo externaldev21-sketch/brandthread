@@ -104,7 +104,6 @@ const HIDE_SCROLLBARS_CSS = `
  * Opens a fresh browser context for one device and role. Returns the context,
  * the page, and `activity.lastApiAt` (when the fake API last answered).
  */
-<<<<<<< HEAD
 export async function openContext(browser, { device, role, origin, images, videos = {}, seedOptions = {}, apiOptions = {}, onUnseeded, contextOptions = {} }) {
   const context = await browser.newContext({
     viewport: device.viewport,

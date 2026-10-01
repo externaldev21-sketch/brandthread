@@ -1,0 +1,287 @@
+{
+  "checked": 530,
+  "routeCount": 265,
+  "failureCount": 20,
+  "failures": [
+    {
+      "route": "/conversation-group-create",
+      "role": "buyer",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-0-depth0.png"
+    },
+    {
+      "route": "/conversation-privacy-safety",
+      "role": "buyer",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-1-depth0.png"
+    },
+    {
+      "route": "/create-post",
+      "role": "buyer",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 12,
+        "y": 58,
+        "width": 40,
+        "height": 40
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-2-depth0.png"
+    },
+    {
+      "route": "/plans",
+      "role": "buyer",
+      "depth": 0,
+      "element": "DIV \"Subscription plans\"",
+      "edge": "top",
+      "box": {
+        "x": 110,
+        "y": 54,
+        "width": 173,
+        "height": 23
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-3-depth0.png"
+    },
+    {
+      "route": "/store-editor",
+      "role": "buyer",
+      "depth": 0,
+      "element": "DIV \"Edit Store\"",
+      "edge": "top",
+      "box": {
+        "x": 60,
+        "y": 58,
+        "width": 48.5,
+        "height": 46
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-4-depth0.png"
+    },
+    {
+      "route": "/feed",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 58,
+        "width": 24,
+        "height": 36
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-5-depth0.png"
+    },
+    {
+      "route": "/feed",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 321,
+        "y": 58,
+        "width": 24,
+        "height": 36
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-6-depth0.png"
+    },
+    {
+      "route": "/feed",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 353,
+        "y": 58,
+        "width": 24,
+        "height": 36
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-7-depth0.png"
+    },
+    {
+      "route": "/buyer-conversation",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 4,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-8-depth0.png"
+    },
+    {
+      "route": "/buyer-conversation",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"Unknown\"",
+      "edge": "top",
+      "box": {
+        "x": 48,
+        "y": 58,
+        "width": 72.609375,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-9-depth0.png"
+    },
+    {
+      "route": "/buyer-conversation",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 341,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-10-depth0.png"
+    },
+    {
+      "route": "/buyer-other-profile",
+      "role": "seller",
+      "depth": 0,
+      "element": "DIV \"?\"",
+      "edge": "top",
+      "box": {
+        "x": 29,
+        "y": 14.5,
+        "width": 6,
+        "height": 14
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-11-depth0.png"
+    },
+    {
+      "route": "/buyer-other-profile",
+      "role": "seller",
+      "depth": 0,
+      "element": "DIV \"Unknown\"",
+      "edge": "top",
+      "box": {
+        "x": 56,
+        "y": 11.5,
+        "width": 76.90625,
+        "height": 20
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-12-depth0.png"
+    },
+    {
+      "route": "/conversation-details",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-13-depth0.png"
+    },
+    {
+      "route": "/conversation-nicknames",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-14-depth0.png"
+    },
+    {
+      "route": "/conversation-search",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 58,
+        "width": 36,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-15-depth0.png"
+    },
+    {
+      "route": "/design",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"←\"",
+      "edge": "top",
+      "box": {
+        "x": 12,
+        "y": 54,
+        "width": 44,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-16-depth0.png"
+    },
+    {
+      "route": "/thread-explainer",
+      "role": "seller",
+      "depth": 0,
+      "element": "DIV \"Dashboard\"",
+      "edge": "top",
+      "box": {
+        "x": 16,
+        "y": 22,
+        "width": 103.40625,
+        "height": 24
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-17-depth0.png"
+    },
+    {
+      "route": "/thread-explainer",
+      "role": "seller",
+      "depth": 0,
+      "element": "BUTTON \"\"",
+      "edge": "top",
+      "box": {
+        "x": 341,
+        "y": 12,
+        "width": 44,
+        "height": 44
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-18-depth0.png"
+    },
+    {
+      "route": "/thread-explainer",
+      "role": "seller",
+      "depth": 0,
+      "element": "DIV \"\"",
+      "edge": "top",
+      "box": {
+        "x": 352,
+        "y": 22,
+        "width": 22,
+        "height": 24
+      },
+      "screenshot": "/home/user/brandthread/artifacts/mobile/.notch-crawl/fail-19-depth0.png"
+    }
+  ]
+}

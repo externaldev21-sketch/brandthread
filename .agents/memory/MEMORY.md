@@ -88,7 +88,7 @@
 - [Git provider vs connector auth](git-provider-vs-connector-auth.md) — a healthy GitHub API integration does not repair expired Git push credentials.
 - [Resend sender domain](resend-sender-domain.md) — brandthread.app was reported verified in Resend; use its domain for default customer mail.
 - [Expo screen layouts and route context](expo-screen-layout-route-context.md) — screenLayout wrappers render outside per-screen route context; pass the route argument explicitly.
-- [Concurrent Git operations](concurrent-git-rebase.md) — shared checkouts can change during a pause; recheck merge ancestry and state before resuming.
+- [Concurrent Git operations](concurrent-git-rebase.md) — verify shared-checkout ancestry; ordered batches must check complete coverage before the designated final merge.
 - [GitHub design merge priority](github-design-merge-priority.md) — reviewed origin/dev UI files take precedence in sync conflicts; retain nonconflicting local runtime fixes.
 - [Swipe action color bleed](swipe-action-color-bleed.md) — colored actions behind Activity rows can appear as thin lines on device even when web looks clean; closed rows must not mount them.
 - [Recently watched semantics](recently-watched-semantics.md) — watch history means actual video playback, not a feed impression; show only the last 36 hours and currently accessible posts.

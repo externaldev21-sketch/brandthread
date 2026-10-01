@@ -14,3 +14,9 @@ An automatic workspace checkpoint can commit a conflict worktree and remove `MER
 **Why:** In a paused merge, a checkpoint preserved only the local side of a conflict as a new single-parent commit; the upstream branch was still absent from HEAD's ancestry.
 
 **How to apply:** After any pause in a shared Git operation, recheck HEAD's parents, upstream ancestry, unmerged entries, and operation metadata before continuing. If the upstream branch is not an ancestor, resume with a merge rather than treating the clean checkpoint as completion.
+
+For explicitly ordered PR batches, drive the sequence from the complete authoritative list, not a numeric range or reconstructed subset. Check complete preceding coverage before starting the designated final merge.
+
+**Why:** A specially designated final PR can have a lower number than preceding entries. An incomplete loop can merge it prematurely; an end-only audit discovers the mistake after the no-history-rewrite constraint prevents same-branch repair.
+
+**How to apply:** Verify the ledger equals the exact requested prefix and confirm each incoming head's ancestry before the final merge. Deduplicate ledger rows before counting coverage. With user approval, recover premature terminal merges on a new branch from the preceding commit while retaining the original branch intact; never disguise a reset.
