@@ -24,6 +24,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import { useApi } from '@/hooks/useApi';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -147,6 +148,7 @@ export default function SellerProfileScreen() {
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
+  const { requireSignIn } = useSignInGate();
   const layout = useProfileLayout();
   // Clears the floating buyer tab bar when this screen is reached from the
   // buyer shell (viewing a brand's public profile); a no-op elsewhere.
@@ -346,6 +348,7 @@ export default function SellerProfileScreen() {
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleFollow = useCallback(async () => {
     if (followPending || !canonicalSellerId) return;
+    if (!requireSignIn()) return;
     const previous = { isFollowing, followers };
     const next = !isFollowing;
     setFollowPending(true);
@@ -362,7 +365,7 @@ export default function SellerProfileScreen() {
     } finally {
       setFollowPending(false);
     }
-  }, [canonicalSellerId, followPending, followers, isFollowing]);
+  }, [canonicalSellerId, followPending, followers, isFollowing, requireSignIn]);
 
   const handleShare = useCallback(() => {
     if (!seller) return;
@@ -393,6 +396,7 @@ export default function SellerProfileScreen() {
       Alert.alert('Seller is away', seller.vacationMessage ?? 'This seller is currently away and is not accepting new messages.');
       return;
     }
+    if (!requireSignIn()) return;
     hapticMedium();
     router.push(messageSellerHref({
       sellerId: seller.sellerId,
@@ -400,7 +404,7 @@ export default function SellerProfileScreen() {
       handle: seller.username,
       initials: seller.initials,
     }) as never);
-  }, [router, seller]);
+  }, [router, seller, requireSignIn]);
 
   const handleOpenInbox = useCallback(() => {
     hapticLight();

@@ -61,6 +61,7 @@ export default function NotificationsSettingsScreen() {
   const s = React.useMemo(() => makeStyles(), []);
   const [role, setRole] = useState<Role>('seller');
   const [pushEnabled, setPushEnabled] = useState(true);
+  const [promotionalPush, setPromotionalPush] = useState(false);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [categories, setCategories] = useState<Record<string, boolean>>({});
 
@@ -77,6 +78,7 @@ export default function NotificationsSettingsScreen() {
         setCategories(data.categories);
         setRole(data.role);
         setPushEnabled(data.pushEnabled ?? true);
+        setPromotionalPush(data.promotionalPush ?? false);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
       })
       .catch(() => {/* fallback to push on, quiet hours off */});
@@ -90,6 +92,18 @@ export default function NotificationsSettingsScreen() {
       await api.notificationPrefs.update({ pushEnabled: value });
     } catch {
       setPushEnabled(prior);
+    }
+  }
+
+  async function handlePromotionalToggle(value: boolean) {
+    hapticToggle();
+    const prior = promotionalPush;
+    setPromotionalPush(value);
+    try {
+      const result = await api.notificationPrefs.update({ promotionalPush: value });
+      setPromotionalPush(result.promotionalPush ?? value);
+    } catch {
+      setPromotionalPush(prior);
     }
   }
 
@@ -160,6 +174,21 @@ export default function NotificationsSettingsScreen() {
                 {i !== rows.length - 1 && <View style={[s.rowDivider, { backgroundColor: colors.border }]} />}
               </React.Fragment>
             ))}
+          </Card>
+        </View>
+
+        <View style={s.divider} />
+
+        {/* ── Promotions (explicit opt-in, off by default; Guideline 4.5.4) ── */}
+        <View style={s.section}>
+          <Card>
+            <ListRow
+              icon="gift"
+              title="Promotions & offers"
+              subtitle="Drop launches, new products, and price or restock alerts"
+              subtitleNumberOfLines={2}
+              toggle={{ value: promotionalPush, onChange: handlePromotionalToggle }}
+            />
           </Card>
         </View>
 
