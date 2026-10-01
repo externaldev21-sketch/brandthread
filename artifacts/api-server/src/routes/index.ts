@@ -69,6 +69,7 @@ import shippingLabelsRouter from "./shipping-labels";
 import disputesRouter from "./disputes";
 import financeRouter from "./finance";
 import financeStatementsRouter from "./finance-statements";
+import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
 import taxesRouter from "./taxes";
 import sellerPaymentSettingsRouter from "./seller-payment-settings";
 import teamRouter from "./team";
@@ -128,6 +129,7 @@ const router = Router();
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
+router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
@@ -255,6 +257,7 @@ router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance/statements",        financeStatementsRouter);
+router.use("/finance/fees",              financeFeesRouter); // before financeRouter: no payout permission needed
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
 router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
