@@ -1,4 +1,4 @@
--- 113: Store-specific gift cards. A card is bought for one seller's store and
+-- 116: Store-specific gift cards. A card is bought for one seller's store and
 -- only redeems against that store's group at checkout. The code is shown once
 -- (email / share) and stored only as a SHA-256 hash + last 4 characters.
 -- gift_card_transactions is an append-only ledger; balance_cents on gift_cards

@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, integer, timestamp, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
-// ─── Store gift cards (migration 113) ───────────────────────────────────────
+// ─── Store gift cards (migration 116) ───────────────────────────────────────
 // A gift card is bought for ONE seller's store and redeems only against that
 // store's group at checkout. The code is generated server-side, shown once,
 // and stored only as a SHA-256 hash plus its last 4 characters.
