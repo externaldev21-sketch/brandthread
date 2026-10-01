@@ -61,5 +61,8 @@ Thumbs.db
 artifacts/mobile/.notch-crawl/
 artifacts/mobile/.audit/
 
+# web export marker written by artifacts/mobile/scripts/build-web.js
+artifacts/mobile/.web-async-routes
+
 # Database dumps
 backups/

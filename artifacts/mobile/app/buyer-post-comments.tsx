@@ -25,6 +25,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import Composer from '@/components/ui/Composer';
 import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -1066,6 +1067,7 @@ export default function BuyerPostCommentsScreen() {
 
           <KeyboardGestureArea style={{ flex: 1 }} textInputNativeID={COMMENT_INPUT_NATIVE_ID}>
           <FlatList
+            {...LONG_LIST_TUNING}
             ref={listRef}
             data={loading ? [] : visibleRows}
             keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}

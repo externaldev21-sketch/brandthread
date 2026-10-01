@@ -3,6 +3,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
+import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -1029,10 +1030,15 @@ function PushRegistrar() {
   useEffect(() => {
     if (!isSignedIn) return;
     if (!userId || registeredUserRef.current === userId) return;
-    registeredUserRef.current = userId;
     // This checks/registers an existing grant only. Native prompting belongs to
     // the contextual value events below, never launch or onboarding.
-    void registerGrantedPushToken(userId, api);
+    // Deferred past first paint: checking/registering a grant is not needed to show a screen.
+    // The ref is set when the work runs, so a cancelled (re-rendered) pass retries.
+    return runAfterFirstPaint(() => {
+      if (registeredUserRef.current === userId) return;
+      registeredUserRef.current = userId;
+      void registerGrantedPushToken(userId, api);
+    });
   }, [api, isSignedIn, userId]);
   return null;
 }
@@ -1077,7 +1083,7 @@ function RootLayoutNav() {
   }, [pathname]);
 
   useEffect(() => {
-    void flushNotificationEvents(api, userId);
+    return runAfterFirstPaint(() => { void flushNotificationEvents(api, userId); });
   }, [api, userId]);
 
   useEffect(() => {
@@ -1496,7 +1502,9 @@ export default function RootLayout() {
     // bitmap that was already resolved before the screen ever mounts. Never
     // gates app-ready — a slow preload just means the first Appearance visit
     // pays the (already-fast, bundled-locally) resolve cost instead.
-    void preloadAppearanceAssets();
+    // Deferred until after the first paint: it is only ever needed when the
+    // user opens Appearance, so it must not compete with the first screen.
+    return runAfterFirstPaint(() => { void preloadAppearanceAssets(); });
   }, []);
 
   useEffect(() => {

@@ -22,6 +22,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -254,6 +255,7 @@ export default function ActivityPeopleScreen() {
         </View>
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={visible}
           keyExtractor={keyExtractor}
           renderItem={renderItem}

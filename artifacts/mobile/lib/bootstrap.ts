@@ -5,6 +5,7 @@
 import { LogBox } from 'react-native';
 import { initMonitoring } from '@/lib/monitoring';
 import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
+import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollbarHideStyles, injectWebTextRenderingStyles } from '@/lib/webTextRendering';
 
 // React's own dev-only console.error warnings (e.g. "Encountered two
@@ -20,7 +21,8 @@ import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollba
 LogBox.ignoreAllLogs(true);
 
 initMonitoring();
-startBackgroundUpdateChecks();
+// Registering the foreground update check is not needed for first paint.
+runAfterFirstPaint(startBackgroundUpdateChecks);
 injectWebTextRenderingStyles();
 injectWebFocusOutlineStyles();
 injectWebScrollbarHideStyles();

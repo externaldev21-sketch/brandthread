@@ -9,6 +9,7 @@ import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
@@ -202,7 +203,8 @@ function createProfileImageUploadHandler(
 
       let objectPath: string | null = null;
       try {
-        objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+        const stored = await normalizeUploadedImage(bytes, contentType);
+        objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
         await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
           owner: clerkId,
           visibility: "private",

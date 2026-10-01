@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -335,6 +336,7 @@ export default function CommunityMembersScreen() {
     }
     return (
       <FlatList
+        {...LONG_LIST_TUNING}
         data={members}
         keyExtractor={(m) => m.userId}
         renderItem={renderMember}
