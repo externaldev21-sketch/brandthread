@@ -14,6 +14,8 @@ import {
   TRANSFORM_MIN_DIM,
   maybeSnap,
   DEFAULT_SNAP_GRID,
+  computeRotationDelta,
+  applyRotateHandle,
 } from '../lib/transformModel';
 import type { DesignTransform } from '../services/designTypes';
 import type { ExtHandleKind, TransformMode, DistortQuad } from '../lib/transformModel';
@@ -504,6 +506,67 @@ describe('composed interaction: distort edge handle', () => {
     expect(newQuad.bl.x).toBe(quad.bl.x - 15);
     expect(newQuad.tr.x).toBe(quad.tr.x); // unchanged
     expect(newQuad.br.x).toBe(quad.br.x); // unchanged
+  });
+});
+
+describe('computeRotationDelta + applyRotateHandle (Transform tool rotate handle)', () => {
+  // A layer centered at (200, 200) in display space, with its rotate handle
+  // starting directly above the center (a quarter-turn's worth of travel
+  // measured the same way design-canvas.tsx measures it).
+  const cx = 200, cy = 200;
+
+  it('is zero when the pointer has not moved', () => {
+    expect(computeRotationDelta(cx, cy, 200, 100, 200, 100)).toBeCloseTo(0, 6);
+  });
+
+  it('is +90 degrees for a quarter turn clockwise (top → right, in screen Y-down coords)', () => {
+    // Start directly above center (200,100); move to directly right of
+    // center (300,200) — a 90° clockwise sweep in a Y-down screen space.
+    const delta = computeRotationDelta(cx, cy, 200, 100, 300, 200);
+    expect(delta).toBeCloseTo(90, 6);
+  });
+
+  it('is -90 degrees for a quarter turn counter-clockwise (top → left)', () => {
+    const delta = computeRotationDelta(cx, cy, 200, 100, 100, 200);
+    expect(delta).toBeCloseTo(-90, 6);
+  });
+
+  it('is +180 degrees for a half turn (top → bottom)', () => {
+    const delta = computeRotationDelta(cx, cy, 200, 100, 200, 300);
+    expect(delta).toBeCloseTo(180, 6);
+  });
+
+  it('applyRotateHandle adds the delta on top of the drag-start rotation, not the current one', () => {
+    const orig = makeTransform({ rotation: 30 });
+    const result = applyRotateHandle(orig, 45);
+    expect(result.rotation).toBe(75);
+  });
+
+  it('applyRotateHandle treats a missing rotation as 0', () => {
+    const orig = makeTransform({ rotation: undefined as any });
+    const result = applyRotateHandle(orig, 10);
+    expect(result.rotation).toBe(10);
+  });
+
+  it('applyRotateHandle only changes rotation — position/size are untouched', () => {
+    const orig = makeTransform({ x: 10, y: 20, width: 300, height: 150, rotation: 0 });
+    const result = applyRotateHandle(orig, 45);
+    expect(result.x).toBe(orig.x);
+    expect(result.y).toBe(orig.y);
+    expect(result.width).toBe(orig.width);
+    expect(result.height).toBe(orig.height);
+  });
+
+  it('repeated moves within one gesture are computed from the SAME drag-start transform, not accumulated (regression guard)', () => {
+    // This mirrors how design-canvas.tsx calls applyRotateHandle on every
+    // pointer-move event: always with the gesture's ORIGINAL transform plus
+    // the delta since the gesture started, never the previous move's result
+    // — otherwise rotation would runaway (double-apply) as the pointer moves.
+    const orig = makeTransform({ rotation: 0 });
+    const afterFirstMove  = applyRotateHandle(orig, 10);   // pointer has swept 10°
+    const afterSecondMove = applyRotateHandle(orig, 25);   // pointer has swept 25° total, same gesture
+    expect(afterFirstMove.rotation).toBe(10);
+    expect(afterSecondMove.rotation).toBe(25); // NOT 10 + 25 = 35
   });
 });
 
