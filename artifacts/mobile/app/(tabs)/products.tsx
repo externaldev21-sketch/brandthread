@@ -83,6 +83,8 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
 
   const p = product as Product;
   const isArchived = p.status === 'archived';
+  // Pairings and video live on the server; only server-backed products (UUID ids) have them.
+  const canManageFit = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(p.id) || p.id.startsWith('preview-product-');
 
   function closeSheet() { onClose(); }
 
@@ -129,6 +131,10 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
     { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
+    ...(canManageFit ? [
+      { label: 'Complete the fit', icon: 'layers' as const, onPress: () => { closeSheet(); router.push(('/product-pairings?productId=' + p.id) as never); } },
+      { label: 'Product video', icon: 'film' as const, onPress: () => { closeSheet(); router.push(('/product-video?productId=' + p.id) as never); } },
+    ] : []),
     { label: 'Share', icon: 'share', onPress: handleShare },
     {
       label: 'Send to manufacturer', icon: 'tool', accent: theme.warning,

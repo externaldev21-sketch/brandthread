@@ -537,6 +537,58 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+
+export interface ProductPairing { id: string; name: string; image: string | null; active: boolean; position: number }
+export interface PublicPairedProduct {
+  id: string;
+  sellerId: string;
+  sellerName: string | null;
+  name: string;
+  image: string | null;
+  images: string[];
+  priceCents: number;
+  isPreOrder: boolean;
+  available: boolean;
+  variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
+}
+export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
+
+/** Like uploadVideo, but reports upload progress (0–1) via XHR. */
+async function uploadVideoWithProgress<T = any>(
+  path: string,
+  video: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+  getCacheScope: GetCacheScope = () => 'anonymous',
+  onProgress?: (fraction: number) => void,
+): Promise<T> {
+  const source = await fetch(video.uri);
+  if (!source.ok) throw new Error("Could not read the selected video.");
+  const videoBlob = await source.blob();
+  const contentType = video.mimeType || videoBlob.type || "video/mp4";
+  const token = await getCachedToken(getToken);
+  const result = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE}${versionApiPath(path)}`);
+    xhr.setRequestHeader("Content-Type", contentType);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    for (const [key, value] of Object.entries(storeContextHeaders())) xhr.setRequestHeader(key, String(value));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(Math.min(1, event.loaded / event.total));
+    };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new Error("Network error while uploading the video."));
+    xhr.send(videoBlob);
+  }).catch((error) => { reportNetworkError(error); throw error; });
+  if (result.status < 200 || result.status >= 300) {
+    const error = new ApiError(result.status, result.text);
+    reportNetworkError(error);
+    throw error;
+  }
+  dismissNetworkNotice();
+  onProgress?.(1);
+  await clearApiCache(await getCacheScope());
+  return JSON.parse(result.text) as T;
+}
 // ─── Ad Campaign Types ────────────────────────────────────────────────────────
 
 export type AdCtaKind =
@@ -2566,6 +2618,30 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         del<any>(`/api/bundles/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
       publicList: (sellerId: string) =>
         get<any[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
+    },
+    /** "Complete the fit" — seller-curated related products for a product page. */
+    productPairings: {
+      get:  (productId: string) =>
+        freshGet<{ pairings: ProductPairing[] }>(`/api/product-pairings/${encodeURIComponent(productId)}`),
+      save: (productId: string, pairedProductIds: string[]) =>
+        put<{ pairings: ProductPairing[] }>(`/api/product-pairings/${encodeURIComponent(productId)}`, { pairedProductIds }),
+      /** Public (works signed out): active products only. */
+      publicList: (productId: string) =>
+        get<PublicPairedProduct[]>(`/api/product-pairings/public/${encodeURIComponent(productId)}`),
+    },
+    /** Product video — one short silent video per product. */
+    productVideos: {
+      get:    (productId: string) =>
+        freshGet<{ video: ProductVideoInfo | null }>(`/api/product-videos/${encodeURIComponent(productId)}`),
+      upload: (productId: string, uri: string, mimeType?: string | null, onProgress?: (fraction: number) => void) =>
+        uploadVideoWithProgress<{ video: ProductVideoInfo }>(
+          `/api/product-videos/${encodeURIComponent(productId)}`, { uri, mimeType }, getToken, getCacheScope, onProgress,
+        ),
+      remove: (productId: string) =>
+        del<{ video: null }>(`/api/product-videos/${encodeURIComponent(productId)}`),
+      /** Public (works signed out). */
+      publicGet: (productId: string) =>
+        get<{ video: ProductVideoInfo | null }>(`/api/product-videos/public/${encodeURIComponent(productId)}`),
     },
     // (buyer key defined earlier in this object — no duplicate)
     /** Team members — invite flow, roles, and activity log */

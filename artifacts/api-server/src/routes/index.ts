@@ -76,6 +76,8 @@ import returnsRouter from "./returns";
 import sellerVerificationRouter from "./seller-verification";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
+import productPairingsRouter from "./product-pairings";
+import productVideosRouter from "./product-videos";
 import buyerProductsRouter from "./buyer-products";
 import recentlyViewedRouter from "./recently-viewed";
 import firstRunTipsRouter from "./first-run-tips";
@@ -171,6 +173,8 @@ router.use("/ai",              tc, aiRouter);
 // scoped to the actual buyer, not the team store owner.
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
+router.use("/product-pairings",          productPairingsRouter);
+router.use("/product-videos",            productVideosRouter);
 router.use("/buyer/products",            buyerProductsRouter);
 router.use("/buyer/recently-viewed",     recentlyViewedRouter);
 router.use("/first-run-tips",            firstRunTipsRouter);

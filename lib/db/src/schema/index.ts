@@ -6,6 +6,7 @@ export * from './security';
 export * from './money';
 export * from './threadCash';
 export * from './shopifyFulfillment';
+export * from './productFit';
 export * from './metaAds';
 export * from './communities';
 import { manufacturers, sellerRfqs } from './manufacturers';
