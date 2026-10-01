@@ -821,7 +821,8 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     // (see lib/guestRoutes.ts — feed, discover, search, stores, products, drops,
     // public profiles; account-only actions are gated inline at the action)
-    const isGuestAllowedRoute = isGuestBrowseRoute(segments as string[]);
+    const isGuestAllowedRoute =
+      isGuestBrowseRoute(segments as string[]) || (segments[0] as string) === 'location';
 
     // Development previews skip onboarding without writing completion flags.
     // PREVIEW_ROLE reads the query only once, while these dev-only web helpers

@@ -43,6 +43,7 @@ import { CaptionSpans } from '@/components/social/CaptionText';
 import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
+import { LocationTag } from '@/components/social/LocationTag';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -336,6 +337,10 @@ export default function BuyerPostViewer() {
               onPress={(id) => router.push(`/buyer-post-viewer?postId=${encodeURIComponent(id)}` as never)}
             />
           </View>
+        ) : null}
+
+        {post?.location ? (
+          <LocationTag location={post.location} style={{ marginHorizontal: SP.md, marginTop: SP.sm }} />
         ) : null}
 
         {/* Timestamp */}

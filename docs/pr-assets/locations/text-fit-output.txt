@@ -1,0 +1,7 @@
+captured 01-location-top-demo.png  text-fit issues: 0
+captured 02-location-recent-demo.png  text-fit issues: 0
+captured 03-location-empty-fresh.png  text-fit issues: 0
+captured 04-location-tag-and-picker-demo.png  text-fit issues: 0
+captured 05-location-picker-results-demo.png  text-fit issues: 0
+captured 06-location-picker-selected-demo.png  text-fit issues: 0
+TOTAL text-fit issues: 0

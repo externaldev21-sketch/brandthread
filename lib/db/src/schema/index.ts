@@ -25,6 +25,7 @@ export * from './giftCards';
 export * from './productBulkSeo';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
+import { places } from './places';
 import { relations, sql } from 'drizzle-orm';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
@@ -624,6 +625,8 @@ export const posts = pgTable('posts', {
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
   caption: text('caption'),
+  /** Optional tagged location (see schema/places.ts). Set null if the place is removed. */
+  placeId: uuid('place_id').references(() => places.id, { onDelete: 'set null' }),
   hashtags: json('hashtags').$type<string[]>().notNull().default([]),
   // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
   // For You style-match candidate generation, which only jsonb supports.
@@ -2531,7 +2534,7 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
 
 export * from './storyHighlights';
 export * from './ranking';
-
 export * from './comments';
 export * from './hashtags';
 export * from './captions';
+export * from './places';

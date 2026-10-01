@@ -2,8 +2,9 @@
  * Reusable Playwright text-fit checks for mobile web previews.
  *
  * collectTextFitIssues preserves the compact TEXT-FIT rule used by existing
- * specs. textFitReport adds painted-edge padding and equal-size group checks
- * for more detailed UI audits.
+ * specs. textFitReport adds painted-edge padding and equal-size group checks;
+ * findTextFitIssues handles visible-screen checks with horizontal scrollers.
+ * Plain, type-light TypeScript for reuse by Playwright specs and scripts.
  */
 export interface TextFitIssue {
   kind: 'truncated' | 'overflows-parent' | 'offscreen' | 'off-screen' | 'overflowing' | 'tight' | 'ragged';
@@ -161,6 +162,9 @@ export async function findTextFitIssues(
       }
       return false;
     };
+    // Only what the user can actually see: the stack keeps earlier screens
+    // mounted underneath, so an element must be the hit-test target at its
+    // own centre (or contain it) to count.
     const visible = (el: Element) => {
       const rect = el.getBoundingClientRect();
       const style = getComputedStyle(el);
@@ -180,7 +184,8 @@ export async function findTextFitIssues(
       const label = ownText.slice(0, 60);
       if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 2) {
         const style = getComputedStyle(el);
-        if (style.overflow !== 'visible' || style.textOverflow === 'ellipsis' || style.webkitLineClamp !== 'none') {
+        const clips = style.overflow !== 'visible' || style.textOverflow === 'ellipsis' || style.webkitLineClamp !== 'none';
+        if (clips) {
           issues.push({ kind: 'truncated', text: label, detail: `scroll ${el.scrollWidth}x${el.scrollHeight} > client ${el.clientWidth}x${el.clientHeight}` });
           continue;
         }

@@ -2581,6 +2581,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       following: () =>
         get<{ tags: Array<{ tag: string; postCount: number; followedAt: string }> }>('/api/hashtags/following'),
     },
+    /** Locations: search/autocomplete, place pages, find-or-create (post location tags). */
+    places: {
+      search: (q: string, coords?: { lat: number; lng: number }) =>
+        get<{ places: PlaceSearchResult[]; providerEnabled: boolean }>(
+          `/api/places/search?q=${encodeURIComponent(q)}${coords ? `&lat=${coords.lat}&lng=${coords.lng}` : ''}`),
+      page: (placeId: string, sort: 'top' | 'recent' = 'top') =>
+        get<PlacePage>(`/api/places/${encodeURIComponent(placeId)}?sort=${sort}`),
+      posts: (placeId: string, sort: 'top' | 'recent', cursor?: string | null) =>
+        get<PlacePostsPage>(
+          `/api/places/${encodeURIComponent(placeId)}/posts?sort=${sort}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+      /** Find-or-create from a name (+ optional coordinates / provider id). */
+      save: (body: { name: string; lat?: number; lng?: number; city?: string; region?: string; country?: string; providerPlaceId?: string }) =>
+        post<{ place: PlaceInfo; created: boolean }>('/api/places', body),
+    },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {
       /** Follow another buyer */
@@ -3913,6 +3927,26 @@ export interface HashtagPage {
   tag: string; postCount: number; followerCount: number; isFollowing: boolean;
   sort: 'top' | 'recent'; posts: HashtagPostsPage;
 }
+export interface PlaceInfo {
+  id: string; name: string; city: string | null; region: string | null; country: string | null;
+  lat: number | null; lng: number | null;
+}
+export interface PlaceSearchResult {
+  /** Absent for provider suggestions that have not been saved yet; call api.places.save with providerPlaceId. */
+  id?: string; name: string; source: 'local' | 'google'; postCount: number;
+  city?: string | null; region?: string | null; country?: string | null; lat?: number | null; lng?: number | null;
+  providerPlaceId?: string; secondary?: string | null;
+}
+export interface PlacePostsPage {
+  items: Array<{
+    id: string; mediaType: string; mediaUrl: string; mediaUrls: string[]; thumbnailUrl: string | null;
+    aspectRatio: string; caption: string | null; hashtags: string[]; createdAt: string;
+    likesCount: number | null; commentsCount: number;
+    author: { userId: string; name: string; handle: string; avatarUrl: string | null; accountType: string | null };
+  }>;
+  nextCursor: string | null;
+}
+export interface PlacePage { place: PlaceInfo; postCount: number; sort: 'top' | 'recent'; posts: PlacePostsPage }
 
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();

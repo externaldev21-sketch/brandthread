@@ -13,6 +13,7 @@
  */
 import { Router } from "express";
 import { attachQuoteData } from "../lib/quotedPosts";
+import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
 import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
@@ -148,6 +149,7 @@ async function buildBuyerPosts(
     mediaUrl: posts.mediaUrl,
     mediaType: posts.mediaType,
     caption: posts.caption,
+    placeId: posts.placeId,
     styleTags: posts.styleTags,
     postStatus: posts.postStatus,
     createdAt: posts.createdAt,
@@ -201,6 +203,7 @@ async function buildBuyerPosts(
   const likes = counts(likeRows);
   const reposts = counts(repostRows);
   const comments = commentRows;
+  const locations = await locationsByPlaceId(rows.map((row) => row.placeId));
   const mine = new Map<string, Set<string>>();
   for (const row of myRows) {
     if (!row.postId) continue;
@@ -223,6 +226,7 @@ async function buildBuyerPosts(
       type: row.mediaType,
       mediaUrl: row.mediaUrl,
       caption: row.caption ?? "",
+      location: row.placeId ? locations.get(row.placeId) ?? null : null,
       hashtags: row.styleTags ?? [],
       mediaColors: [avatarColor(row.userId), "#07070f"],
       likesCount: likes.get(row.id) ?? 0,
