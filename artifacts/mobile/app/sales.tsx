@@ -229,7 +229,7 @@ export default function SalesScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Sales" actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'New sale' }]} />
+      <ScreenHeader hideDivider title="Sales" actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'New sale' }]} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
@@ -280,7 +280,7 @@ export default function SalesScreen() {
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
         <SafeAreaProvider style={s.modal}>
-          <ScreenHeader title={editingId ? 'Edit sale' : 'Create sale'} variant="modal" onBack={() => setShowModal(false)} />
+          <ScreenHeader hideDivider title={editingId ? 'Edit sale' : 'Create sale'} variant="modal" onBack={() => setShowModal(false)} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: SP.md, gap: SP.lg, paddingBottom: 60 }}>
             <View>
               <Text style={s.label}>Sale name</Text>
@@ -349,7 +349,7 @@ export default function SalesScreen() {
 
       <Modal visible={showProductPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProductPicker(false)}>
         <SafeAreaProvider style={s.modal}>
-          <ScreenHeader title="Choose products" variant="modal" onBack={() => setShowProductPicker(false)} actions={[{ icon: 'check', onPress: () => setShowProductPicker(false), accessibilityLabel: 'Done choosing products' }]} />
+          <ScreenHeader hideDivider title="Choose products" variant="modal" onBack={() => setShowProductPicker(false)} actions={[{ icon: 'check', onPress: () => setShowProductPicker(false), accessibilityLabel: 'Done choosing products' }]} />
           <ScrollView contentContainerStyle={{ padding: SP.md, gap: 8 }}>
             {products.length === 0 ? (
               <Text style={{ color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: 30 }}>No products found.</Text>
@@ -368,7 +368,7 @@ export default function SalesScreen() {
 
       <Modal visible={showCollectionPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCollectionPicker(false)}>
         <SafeAreaProvider style={s.modal}>
-          <ScreenHeader title="Choose a collection" variant="modal" onBack={() => setShowCollectionPicker(false)} />
+          <ScreenHeader hideDivider title="Choose a collection" variant="modal" onBack={() => setShowCollectionPicker(false)} />
           <ScrollView contentContainerStyle={{ padding: SP.md, gap: 8 }}>
             {collections.length === 0 ? (
               <Text style={{ color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: 30 }}>No categories or tags on your products yet.</Text>
