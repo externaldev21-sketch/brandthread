@@ -28,6 +28,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View } from 'react-native';
+import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeRow';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
@@ -300,6 +301,7 @@ export default function DiscoverScreen() {
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
       {filter === 'forYou' && <DiscoverFeaturedRail />}
+      {filter === 'forYou' && <BrandsYouMightLikeRow />}
     </>
   );
 

@@ -23,7 +23,8 @@ export type RateLimitPolicyName =
   | "feed-event"
   | "email-subscribe"
   | "post-interact"
-  | "gift-card-lookup";
+  | "gift-card-lookup"
+  | "contact-match";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -191,6 +192,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 15,
     windowMs: 15 * 60_000,
     message: "Too many gift card code attempts. Please wait a few minutes and try again.",
+  },
+  "contact-match": {
+    id: "contact-match",
+    // Contact matching is an enumeration surface (up to 2000 hashes per call),
+    // so it is capped per account well below normal read traffic.
+    limit: 10,
+    windowMs: 60 * 60_000,
+    message: "You've checked contacts a lot. Please try again later.",
   },
 };
 

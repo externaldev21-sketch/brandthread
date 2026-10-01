@@ -1619,6 +1619,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get: () => get<BuyerPreferences>('/api/buyer/preferences'),
         update: (body: BuyerPreferencesPatch) => patch<BuyerPreferences>('/api/buyer/preferences', body),
       },
+      /** "Brands you might like" — ranked by style interests + liked brands + popularity; excludes followed/blocked. */
+      recommendedBrands: (limit = 12) =>
+        get<{ brands: RecommendedBrand[]; followedBrandCount: number }>(`/api/buyer/recommended-brands?limit=${limit}`),
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),
         autocomplete: (query: string, country = 'US') =>
@@ -2649,6 +2652,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {
+      /** Contact sync (privacy-preserving: only SHA-256 hashes leave the device; feature-flagged server-side). */
+      contacts: {
+        status: () => get<{ enabled: boolean; optedIn: boolean }>('/api/social/contacts/status'),
+        match: (hashes: string[]) =>
+          post<{ matches: ContactMatch[] }>('/api/social/contacts/match', { hashes }),
+        /** "Let friends find me": server hashes my account email; phoneHash is optional (hashed on device). */
+        optIn: (phoneHash?: string) =>
+          post<{ optedIn: boolean; kinds: string[] }>('/api/social/contacts/opt-in', phoneHash ? { phoneHash } : {}),
+        revoke: () => del<{ ok: boolean }>('/api/social/contacts'),
+      },
       /** Follow another buyer */
       follow: (userId: string) =>
         trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number; status?: 'requested' }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]]),
@@ -4038,6 +4051,14 @@ export type DataExportJob = {
   downloadable: boolean;
 };
 export type DataExportJobsResponse = { jobs: DataExportJob[]; nextRequestAt: string | null; emailEnabled: boolean };
+export interface RecommendedBrand {
+  id: string; sellerId: string; name: string; brandType: string | null;
+  logoUrl: string | null; verified: boolean; followerCount: number; reason: string;
+}
+export interface ContactMatch {
+  userId: string; name: string; username: string | null; avatarUrl: string | null;
+  initials: string; color: string; handle: string; isFollowing: boolean;
+}
 
 export type BrandthreadApi = ReturnType<typeof createApi>;
 

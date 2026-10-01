@@ -86,11 +86,27 @@ describe("permission purpose strings", () => {
     expect(appConfig.android.blockedPermissions).toContain("android.permission.SYSTEM_ALERT_WINDOW");
   });
 
-  it("does not ship location, contacts, or tracking modules without a purpose", () => {
+  it("does not ship location or tracking modules without a purpose", () => {
     const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-    for (const name of ["expo-location", "expo-contacts", "expo-tracking-transparency"]) {
+    for (const name of ["expo-location", "expo-tracking-transparency"]) {
       expect(deps, `${name} needs a purpose string and privacy-label review before it is added`).not.toHaveProperty(name);
     }
+  });
+
+  it("ships expo-contacts only with a specific purpose string, a privacy-manifest entry and a label row", () => {
+    const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+    expect(deps).toHaveProperty("expo-contacts");
+    const purpose = pluginOptions("expo-contacts").contactsPermission;
+    expect(typeof purpose).toBe("string");
+    expect(purpose).toMatch(/^Brandthread /);
+    expect(purpose).toContain("contacts");
+    expect((purpose as string).length).toBeGreaterThan(60);
+    const types = appConfig.ios.privacyManifests.NSPrivacyCollectedDataTypes.map(
+      (entry: { NSPrivacyCollectedDataType: string }) => entry.NSPrivacyCollectedDataType,
+    );
+    expect(types).toContain("NSPrivacyCollectedDataTypeContacts");
+    const labels = readFileSync(path.resolve(mobileRoot, "../../docs/app-store/privacy-labels.md"), "utf8");
+    expect(labels).toContain("`NSPrivacyCollectedDataTypeContacts`");
   });
 });
 

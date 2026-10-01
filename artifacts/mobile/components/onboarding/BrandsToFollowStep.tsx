@@ -15,7 +15,7 @@ import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { RADIUS, SPACE, TYPE } from './onboardingTokens';
 
-export function BrandsToFollowStep() {
+export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
 
@@ -35,6 +35,13 @@ export function BrandsToFollowStep() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  // Report the brands the buyer picked so onboarding can also save them as
+  // liked_brand_ids (follows above are unchanged).
+  useEffect(() => {
+    if (!onLikedChange) return;
+    onLikedChange(Object.keys(following).filter((id) => following[id]));
+  }, [following, onLikedChange]);
 
   async function toggleFollow(brand: DiscoverBrand) {
     const next = !following[brand.sellerId];

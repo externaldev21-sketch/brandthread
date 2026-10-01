@@ -33,6 +33,7 @@ import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@cle
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
+import { flushPendingBuyerSurvey } from '@/lib/onboardingSurvey';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/AppThemeContext';
@@ -749,6 +750,9 @@ function AuthGate() {
         }
       }
 
+      // Retry a queued onboarding survey (sizes / liked brands) — optional, never throws.
+      if (userId) void flushPendingBuyerSurvey(userId, api);
+
       // Upgrade legitimately completed pre-server-marker installs. This runs
       // only when completion is already bound to the same Clerk user locally.
       if (done && (role === 'buyer' || role === 'seller')) {
@@ -1458,6 +1462,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-my-sizes" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="find-friends-contacts" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'ios_from_right' }} />

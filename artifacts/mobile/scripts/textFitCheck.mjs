@@ -466,3 +466,14 @@ export async function collectTextFitIssues(page, { root = 'body', tolerance = 1 
     return issues;
   }, { root, tolerance });
 }
+
+export async function textFitIssues(page, rootSelector) {
+  return collectTextFitIssues(page, { root: rootSelector ?? 'body' });
+}
+
+export async function assertTextFits(page, name = 'screen', rootSelector) {
+  const issues = await textFitIssues(page, rootSelector);
+  if (issues.length === 0) console.log(`  text-fit OK: ${name}`);
+  else console.log(`  text-fit ISSUES on ${name}:`, JSON.stringify(issues));
+  return issues;
+}
