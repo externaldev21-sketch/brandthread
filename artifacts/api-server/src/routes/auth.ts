@@ -414,6 +414,7 @@ router.delete("/account", requireAuth, async (req, res) => {
         await tx.execute(sql`DELETE FROM post_comment_likes WHERE user_id = ${clerkUserId}`);
         await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ${clerkUserId}`);
         await tx.execute(sql`DELETE FROM muted_words WHERE user_id = ${clerkUserId}`);
+        await tx.execute(sql`DELETE FROM buyer_preferences WHERE user_id = ${clerkUserId}`);
         // Reports the person filed stay in the moderation record without
         // their identity; reports about their content keep the snapshot.
         await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);
