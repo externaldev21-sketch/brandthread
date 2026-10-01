@@ -78,6 +78,7 @@ const TABS: {
       'product-launches',
       'waitlist-demand',
       'products-bulk-edit', 'product-seo',
+      'product-variants',
     ],
     destination: '/(tabs)/products',
   },
@@ -131,6 +132,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'waitlist-demand': 'products',
   'products-bulk-edit': 'products',
   'product-seo': 'products',
+  'product-variants': 'products',
   'drafts': 'products',
   // Orders
   'orders': 'orders',

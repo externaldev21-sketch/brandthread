@@ -3,6 +3,7 @@ import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, pr
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
+export * from './productVariantsStock';
 export * from './security';
 export * from './money';
 export * from './productLaunches';

@@ -5,6 +5,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { notifyBackInStock, notifyStockLevelChanged } from "../lib/stockNotifications";
+import { afterStockChange } from "../lib/stockRules";
 
 const router = Router();
 router.use(requireAuth);
@@ -120,6 +121,8 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
     previousStock: row.stock,
     newStock: updatedStock,
   });
+
+  await afterStockChange(row.productId);
 
   return res.json({
     ...updated,
