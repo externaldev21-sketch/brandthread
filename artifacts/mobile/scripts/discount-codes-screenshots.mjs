@@ -121,6 +121,9 @@ async function sellerFlow(browser, images, origin) {
   await page.waitForTimeout(400);
   await shot(page, `${MODE}-05-form-first-order-min-items`);
   await overflowCheck(page, 'form-usage');
+  await page.getByText('First order only', { exact: true }).first().locator('xpath=../..').screenshot({ path: path.join(OUT, 'zoom-01-usage-switches.png') });
+  await page.getByText('Applies to', { exact: true }).first().scrollIntoViewIfNeeded();
+  await page.getByText('Applies to', { exact: true }).first().locator('xpath=..').screenshot({ path: path.join(OUT, 'zoom-02-applies-to-options.png') });
   await context.close();
 }
 
@@ -208,6 +211,9 @@ async function buyerFlow(browser, images, origin) {
   await page.waitForTimeout(500);
   await shot(page, 'after-09-checkout-summary-per-store');
   await overflowCheck(page, 'checkout-summary');
+  await page.locator('[data-testid^="checkout-promo-user_"]').first().scrollIntoViewIfNeeded();
+  await page.locator('[data-testid^="checkout-promo-user_"]').first().screenshot({ path: path.join(OUT, 'zoom-03-promo-store-1-rejected.png') });
+  await page.locator('[data-testid^="checkout-promo-user_"]').nth(1).screenshot({ path: path.join(OUT, 'zoom-04-promo-store-2-applied.png') });
   console.log('summary:', (await page.getByTestId('checkout-price-breakdown').innerText()).replace(/\s+/g, ' '));
   await context.close();
 }
