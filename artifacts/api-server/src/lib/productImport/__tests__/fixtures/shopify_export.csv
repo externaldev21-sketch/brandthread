@@ -1,0 +1,8 @@
+﻿Handle,Title,Body (HTML),Vendor,Product Category,Type,Tags,Published,Option1 Name,Option1 Value,Option2 Name,Option2 Value,Option3 Name,Option3 Value,Variant SKU,Variant Grams,Variant Inventory Tracker,Variant Inventory Qty,Variant Inventory Policy,Variant Fulfillment Service,Variant Price,Variant Compare At Price,Variant Requires Shipping,Variant Taxable,Variant Barcode,Image Src,Image Position,Image Alt Text,Gift Card,SEO Title,SEO Description,Variant Image,Variant Weight Unit,Cost per item,Status
+boxy-tee,Boxy Tee,"<p>Heavyweight cotton.</p><p>Made in Portugal &amp; cut boxy.</p>",Acme,Apparel & Accessories > Clothing > Shirts & Tops,Tops,"cotton, summer, boxy",true,Size,S,Color,Black,,,BOXY-S-BLK,200,shopify,12,deny,manual,48.00,60.00,true,true,,https://cdn.shopify.com/s/files/1/0001/boxy-front.jpg,1,Front,false,Boxy Tee | Acme,A boxy tee,,g,,active
+boxy-tee,,,,,,,,,M,,Black,,,BOXY-M-BLK,210,shopify,0,deny,manual,48.00,60.00,true,true,,https://cdn.shopify.com/s/files/1/0001/boxy-back.jpg,2,Back,,,,,g,,
+boxy-tee,,,,,,,,,L,,White,,,BOXY-L-WHT,220,shopify,7,deny,manual,48.00,,true,true,,,,,,,,,g,,
+cargo-pant,Cargo Pant,<p>Relaxed cargo.</p>,Acme,,Bottoms,cargo,true,Title,Default Title,,,,,CARGO-1,600,shopify,4,deny,manual,"1,120.50",,true,true,,https://cdn.shopify.com/s/files/1/0001/cargo.jpg,1,,false,,,,g,,draft
+sock-set,Sock Set,"Line one
+Line two",Acme,,Accessories,,true,Material,Wool,,,,,,80,shopify,-3,deny,manual,18.00,,true,true,,,,,,,,,g,,archived
+bad-price,Mystery Item,,Acme,,Other,,true,Title,Default Title,,,,,MYS-1,0,shopify,1,deny,manual,abc,,true,true,,,,,,,,,g,,active

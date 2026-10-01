@@ -1,0 +1,7 @@
+name;description;category;price;sku;images;tags;size;color;stock
+Oversized Hoodie;"Fleece-lined
+heavyweight";Hoodies;89,00;HOOD;https://example.com/h1.jpg|https://example.com/h2.jpg;fleece|winter;S;Grey;4
+Oversized Hoodie;;Hoodies;89,00;HOOD;;;M;Grey;6
+Oversized Hoodie;;Hoodies;89,00;HOOD;;;L;Grey;0
+Beanie;Knit beanie;Accessories;24;BEAN-1;;wool;;Black;15
+;No name row;Hoodies;10;X;;;;;1

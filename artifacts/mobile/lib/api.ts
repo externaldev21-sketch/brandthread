@@ -27,6 +27,7 @@ import type {
 import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
@@ -2944,6 +2945,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       latest: () => get<ShopifyImportJob | null>('/api/shopify-imports/latest'),
       get: (id: string) => get<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}`),
       continue: (id: string) => post<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}/continue`, {}),
+    },
+    /** CSV (Shopify / Etsy / Brandthread layouts) and Etsy product import. */
+    productImport: {
+      providers: () => get<ImportProviders>('/api/product-import/providers'),
+      runs: () => get<{ runs: ImportRun[] }>('/api/product-import/runs'),
+      previewCsv: (csv: string) => request<ImportPreview>(
+        '/api/product-import/csv/preview', { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      commitCsv: (csv: string, filename?: string) => request<ImportCommitResult>(
+        `/api/product-import/csv/commit${filename ? `?filename=${encodeURIComponent(filename)}` : ''}`,
+        { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyConnect: () => post<{ authorizeUrl: string }>('/api/product-import/etsy/connect/start', {}),
+      etsyDisconnect: () => post<{ ok: boolean }>('/api/product-import/etsy/disconnect', {}),
+      etsyPreview: () => request<ImportPreview>('/api/product-import/etsy/preview', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyCommit: () => request<ImportCommitResult>('/api/product-import/etsy/commit', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {
