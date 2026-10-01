@@ -143,6 +143,7 @@ async function run() {
     await s.context.close();
 
     s = await open(browser, origin, 'buyer', '/live', { demo: true });
+    await s.page.getByTestId('live-pinned-product').first().waitFor({ timeout: 20000 }).catch(() => console.log('  pinned card not visible; testids:', 0));
     await check('viewer pager: pinned card', s.page, s.errors, '[data-testid="live-pinned-product"]');
     await zoom(s.page, s.page.getByTestId('live-pinned-product'), 'viewer-pinned-card');
     await s.page.getByRole('button', { name: /Open bag|shop|products/i }).first().click().catch(() => {});
