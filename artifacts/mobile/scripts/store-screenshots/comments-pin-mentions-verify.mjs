@@ -31,6 +31,7 @@ try {
     '/buyer-post-comments?postId=preview-fashion-01&postAuthorName=Forme%2022&postAuthorId=user_jordan&demo=1',
   );
   await waitForQuietNetwork(activity, 500, 10_000);
+  await page.getByText('Pinned', { exact: true }).first().waitFor({ timeout: 30_000 }).catch(() => console.log('Pinned marker not found; url', page.url()));
   await page.waitForTimeout(1200);
   let failed = 0;
   const check = async (name) => {

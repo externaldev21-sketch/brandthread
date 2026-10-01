@@ -324,7 +324,7 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       && (c.authorId === viewerId || !matchesMutedWords(c.body, muted)));
 
     const ids = shown.map((c) => c.id);
-    const [likeRows, myLikeRows, profiles] = await Promise.all([
+    const [likeRows, myLikeRows, profiles, mentionsByComment] = await Promise.all([
       ids.length ? db.select({ commentId: postCommentLikes.commentId, n: count() })
         .from(postCommentLikes).where(inArray(postCommentLikes.commentId, ids))
         .groupBy(postCommentLikes.commentId) : Promise.resolve([]),
@@ -333,9 +333,14 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
         .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, viewerId)))
         : Promise.resolve([]),
       profilesById(shown.map((c) => c.authorId)),
+      mentionsForComments(ids),
     ]);
     const likes = new Map(likeRows.map((row) => [row.commentId, Number(row.n)]));
     const mine = new Set(myLikeRows.map((row) => row.commentId));
+    const creatorLikedRows = ids.length ? await db.select({ commentId: postCommentLikes.commentId })
+      .from(postCommentLikes)
+      .where(and(inArray(postCommentLikes.commentId, ids), eq(postCommentLikes.userId, post.userId))) : [];
+    const creatorLikedIds = new Set(creatorLikedRows.map((row) => row.commentId));
 
     const replies: CommentView[] = shown.map((comment) => ({
       id: comment.id,
@@ -352,6 +357,9 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
       isMine: !!viewerId && comment.authorId === viewerId,
       canDelete: !!viewerId && (comment.authorId === viewerId || post.userId === viewerId),
       pendingReview: comment.moderationStatus === "held",
+      pinned: false,
+      creatorLiked: creatorLikedIds.has(comment.id),
+      mentions: (mentionsByComment.get(comment.id) ?? []).filter((m) => !blocked.has(m.userId)),
       replies: [],
     }));
     return res.json({
