@@ -77,6 +77,7 @@ import storeRouter from "./store";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
 import returnsRouter from "./returns";
+import returnLabelsRouter from "./return-labels";
 import sellerVerificationRouter from "./seller-verification";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
@@ -228,6 +229,7 @@ router.use("/shipping-zones",            shippingZonesRouter); // router mounts 
 router.use("/shipping-labels",           shippingLabelsRouter);
 router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/returns",                   tc, returnsRouter);
+router.use("/return-labels",             returnLabelsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
