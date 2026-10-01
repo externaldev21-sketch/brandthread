@@ -268,12 +268,13 @@ export function clampHsb(adj: HsbAdjustment): HsbAdjustment {
 // ─── Effects (Blur / Effects / Colour Balance / Gradient Map) ─────────────────
 //
 // Each is applied as a real SVG filter primitive on the layer's own filter
-// chain (see layerRenderer.ts for the kernel/matrix/table builders and
+// chain (see layerRenderer.ts for the matrix/tap builders and
 // design-canvas.tsx's renderLayerInSvg for the chain). None of these is a
-// visual approximation layered on top: they are the same primitives
-// (feGaussianBlur, feConvolveMatrix, feTurbulence, feOffset,
-// feComponentTransfer, feColorMatrix) a browser or react-native-svg's
-// native pipeline executes directly.
+// visual approximation layered on top: they use only the primitives
+// react-native-svg 15 actually implements (feGaussianBlur, feOffset,
+// feComposite, feColorMatrix, feBlend, feMerge) — the ones it does NOT
+// implement (feConvolveMatrix, feTurbulence, feComponentTransfer) are
+// avoided on purpose, which is why Noise is deferred (see adjustmentsCatalog).
 
 /** Per-channel colour balance, each -1..1 (cyan↔red, magenta↔green, yellow↔blue). */
 export interface ColorBalanceAdjustment { cyanRed: number; magentaGreen: number; yellowBlue: number; }
@@ -290,7 +291,6 @@ export interface EffectsAdjustment {
   gaussianBlur?: number;              // stdDeviation, 0..40
   motionBlur?:   MotionBlurAdjustment;
   sharpen?:      number;              // 0..1
-  noise?:        number;              // 0..1
   bloom?:        number;              // 0..1
   chromatic?:    number;              // channel offset px, 0..24
 }
@@ -316,7 +316,7 @@ export function isIdentityEffects(e: EffectsAdjustment | undefined): boolean {
   const gmIdentity = !e.gradientMap || near0(e.gradientMap.mix);
   const mbIdentity = !e.motionBlur || near0(e.motionBlur.amount);
   return cbIdentity && gmIdentity && mbIdentity
-    && near0(e.gaussianBlur) && near0(e.sharpen) && near0(e.noise) && near0(e.bloom) && near0(e.chromatic);
+    && near0(e.gaussianBlur) && near0(e.sharpen) && near0(e.bloom) && near0(e.chromatic);
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -335,7 +335,6 @@ export function clampEffects(e: EffectsAdjustment): EffectsAdjustment {
     angle: clamp(e.motionBlur.angle, 0, 180),
   };
   if (e.sharpen !== undefined) out.sharpen = clamp(e.sharpen, 0, 1);
-  if (e.noise !== undefined) out.noise = clamp(e.noise, 0, 1);
   if (e.bloom !== undefined) out.bloom = clamp(e.bloom, 0, 1);
   if (e.chromatic !== undefined) out.chromatic = clamp(e.chromatic, 0, EFFECT_LIMITS.chromatic.max);
   return out;

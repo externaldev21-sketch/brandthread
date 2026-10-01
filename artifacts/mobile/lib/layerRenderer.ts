@@ -252,45 +252,46 @@ export function hsbToColorMatrixString(adj: HsbAdjustment): string {
 // attribute values a real SVG primitive takes — nothing here is rendered,
 // so all of it is unit-testable without react-native.
 
-/** Largest feConvolveMatrix order we emit: a 15×15 kernel is 225 taps per pixel, the practical ceiling for a live canvas. */
-export const MAX_CONVOLVE_ORDER = 15;
+// NOTE on primitive choice: react-native-svg (15.x) implements only
+// feBlend / feColorMatrix / feComposite / feGaussianBlur / feMerge /
+// feOffset / feFlood / feDropShadow — feConvolveMatrix, feTurbulence and
+// feComponentTransfer render null (`warnUnimplementedFilter` in
+// src/elements/filters/*). So every effect below is built ONLY from the
+// implemented set: motion blur as an N-tap feOffset box blur averaged with
+// arithmetic feComposite, sharpen as an unsharp mask (source minus its
+// Gaussian blur), gradient map as an exact luminance-ramp feColorMatrix.
+
+/** Number of offset taps in the motion-blur box filter (odd, so the centre tap is the source itself). */
+export const MOTION_BLUR_TAPS = 7;
 
 /**
- * motionBlurKernel — a directional (line) box kernel: every cell the line
- * through the centre at `angleDeg` passes through is 1, all others 0, and
- * the divisor is the number of lit cells so brightness is preserved.
- * `amount` (px) sets the kernel's side length, clamped to an odd order.
+ * motionBlurTaps — the (dx, dy) offsets for a directional box blur of total
+ * length `amount` px along `angleDeg`, symmetric about the source. Averaging
+ * the taps with equal weight (1/N) preserves brightness.
  */
-export function motionBlurKernel(amount: number, angleDeg: number): { order: number; kernel: number[]; divisor: number } {
-  let order = Math.round(Math.max(1, Math.min(MAX_CONVOLVE_ORDER, amount)));
-  if (order % 2 === 0) order += 1;
-  if (order > MAX_CONVOLVE_ORDER) order = MAX_CONVOLVE_ORDER;
-  const kernel = new Array<number>(order * order).fill(0);
-  const c = (order - 1) / 2;
+export function motionBlurTaps(amount: number, angleDeg: number): { dx: number; dy: number }[] {
+  const a = Math.max(0, amount);
+  if (a === 0) return [{ dx: 0, dy: 0 }];
   const rad = (angleDeg * Math.PI) / 180;
-  const dx = Math.cos(rad), dy = Math.sin(rad);
-  let lit = 0;
-  // Walk the line in sub-pixel steps from -c..c and light each cell it crosses.
-  const steps = order * 4;
-  for (let i = -steps; i <= steps; i++) {
-    const t = (i / steps) * c;
-    const x = Math.round(c + t * dx), y = Math.round(c + t * dy);
-    if (x < 0 || y < 0 || x >= order || y >= order) continue;
-    const idx = y * order + x;
-    if (kernel[idx] === 0) { kernel[idx] = 1; lit++; }
+  const ux = Math.cos(rad), uy = Math.sin(rad);
+  const n = MOTION_BLUR_TAPS, half = (n - 1) / 2;
+  const taps: { dx: number; dy: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = ((i - half) / half) * (a / 2);
+    taps.push({ dx: +(t * ux).toFixed(3), dy: +(t * uy).toFixed(3) });
   }
-  return { order, kernel, divisor: Math.max(1, lit) };
+  return taps;
 }
 
 /**
- * sharpenKernel — the classic 3×3 unsharp kernel scaled by strength 0..1
- * (mapped to 0..2 so 1.0 is a strong but still sane sharpen). Coefficients
- * always sum to 1, so overall brightness is unchanged.
+ * unsharpParams — unsharp mask parameters for strength 0..1: result =
+ * source × (1 + k) − blur × k, i.e. feComposite arithmetic with k2 = 1 + k,
+ * k3 = −k. k scales 0..1.5; the blur radius is fixed at 1.5 px (canvas scale
+ * is applied by the caller).
  */
-export function sharpenKernel(strength: number): number[] {
-  const s = Math.max(0, Math.min(1, strength)) * 2;
-  const e = s === 0 ? 0 : -s; // avoid emitting -0 at identity
-  return [0, e, 0, e, 1 + 4 * s, e, 0, e, 0];
+export function unsharpParams(strength: number): { k: number; stdDeviation: number } {
+  const s = Math.max(0, Math.min(1, strength));
+  return { k: +(s * 1.5).toFixed(4), stdDeviation: 1.5 };
 }
 
 /**
@@ -323,24 +324,28 @@ export function hexToUnitRgb(hex: string): [number, number, number] | null {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
+const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
+
 /**
- * gradientMapTables — per-channel feComponentTransfer `tableValues` for a
- * two-stop gradient map: after a saturate(0) pass turns the layer into
- * luminance, a 2-entry table maps black→`from` and white→`to` with the
- * browser interpolating linearly between (that is what a table transfer
- * function does by definition). Returns null for malformed hex.
+ * gradientMapMatrixValues — a single 20-value feColorMatrix implementing an
+ * exact two-stop gradient map: out_c = from_c + (to_c − from_c) × luma(in),
+ * with luma the Rec.709 weights. Because luma is linear in RGB and the ramp
+ * is linear in luma, the whole map is one affine matrix — no table transfer
+ * needed. Alpha passes through. Returns null for malformed hex.
  */
-export function gradientMapTables(from: string, to: string): { r: string; g: string; b: string } | null {
+export function gradientMapMatrixValues(from: string, to: string): number[] | null {
   const a = hexToUnitRgb(from), b = hexToUnitRgb(to);
   if (!a || !b) return null;
-  const f = (x: number) => x.toFixed(4);
-  return { r: `${f(a[0])} ${f(b[0])}`, g: `${f(a[1])} ${f(b[1])}`, b: `${f(a[2])} ${f(b[2])}` };
+  const row = (c: number) => { const d = b[c] - a[c]; return [d * LUMA_R, d * LUMA_G, d * LUMA_B, 0, a[c]]; };
+  return [...row(0), ...row(1), ...row(2), 0, 0, 0, 1, 0];
+}
+
+export function gradientMapMatrixString(from: string, to: string): string | null {
+  const v = gradientMapMatrixValues(from, to);
+  return v ? v.map(x => x.toFixed(4)).join(' ') : null;
 }
 
 /** Bloom: blur radius grows with strength; the blurred copy is screened back over the source. */
 export function bloomStdDeviation(strength: number): number {
   return Math.max(0, Math.min(1, strength)) * 12;
 }
-
-/** Noise: a fixed fractal base frequency; `amount` only drives how much is composited in. */
-export const NOISE_BASE_FREQUENCY = 0.85;

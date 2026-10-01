@@ -35,7 +35,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 import Svg, {
   Path, Rect, Circle, G, Line, Text as SvgText,
   Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
-  FeGaussianBlur, FeConvolveMatrix, FeTurbulence, FeOffset, FeComponentTransfer, FeFuncR, FeFuncG, FeFuncB,
+  FeGaussianBlur, FeOffset,
 } from 'react-native-svg';
 import { File, Paths, EncodingType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -90,8 +90,8 @@ import {
 import {
   buildLayerTransform, curvesToColorMatrixString, isIdentityCurves,
   hsbToColorMatrixString,
-  motionBlurKernel, sharpenKernel, colorBalanceMatrixString, gradientMapTables,
-  bloomStdDeviation, NOISE_BASE_FREQUENCY,
+  motionBlurTaps, unsharpParams, colorBalanceMatrixString, gradientMapMatrixString,
+  bloomStdDeviation,
 } from '@/lib/layerRenderer';
 import { ADJ_CATEGORIES, ADJ_TOOL_LABELS, type AdjCategory, type AdjTool } from '@/lib/adjustmentsCatalog';
 import { AdjCategoryGrid, AdjToolList, AdjEffectPanel } from '@/components/design-studio/AdjustmentsMenu';
@@ -1966,7 +1966,7 @@ export default function DesignCanvasScreen() {
     markDirty();
   }
 
-  // ─── Adjustments: effects mutations (blur / sharpen / noise / balance / …) ──
+  // ─── Adjustments: effects mutations (blur / sharpen / bloom / balance / …) ──
   function updateLayerEffects(layerId: string, effects: EffectsAdjustment) {
     const clamped = clampEffects(effects);
     mutateLayer(prev => prev.map(l => {
@@ -2857,7 +2857,7 @@ export default function DesignCanvasScreen() {
     // backdrop compositing a CSS mix-blend-mode would use — this is real
     // compositing, not a visual no-op. ──
     // ── Effects: each enabled one is a real SVG primitive stage (see
-    // lib/layerRenderer.ts for the kernel/matrix/table builders). ──
+    // lib/layerRenderer.ts for the matrix/tap builders). ──
     const fxRaw = layer.adjustments?.effects;
     const fx = fxRaw && !isIdentityEffects(fxRaw) ? fxRaw : null;
 
@@ -2883,18 +2883,15 @@ export default function DesignCanvasScreen() {
       if (cb && (cb.cyanRed || cb.magentaGreen || cb.yellowBlue)) {
         stages.push(<FeColorMatrix key="cbal" type="matrix" in={chain('cbal')} values={colorBalanceMatrixString(cb)} result="cbal" />);
       }
+      // Gradient Map: one exact luminance-ramp feColorMatrix (from + (to−from)·luma),
+      // blended back over the source by `mix`.
       const gm = fx.gradientMap;
-      const gmTables = gm && gm.mix > 0 ? gradientMapTables(gm.from, gm.to) : null;
-      if (gm && gmTables) {
+      const gmMatrix = gm && gm.mix > 0 ? gradientMapMatrixString(gm.from, gm.to) : null;
+      if (gm && gmMatrix) {
         const i = chain('gmap');
         stages.push(
           <React.Fragment key="gmap">
-            <FeColorMatrix type="saturate" in={i} values="0" result="gm_gray" />
-            <FeComponentTransfer in="gm_gray" result="gm_ramp">
-              <FeFuncR type="table" tableValues={gmTables.r} />
-              <FeFuncG type="table" tableValues={gmTables.g} />
-              <FeFuncB type="table" tableValues={gmTables.b} />
-            </FeComponentTransfer>
+            <FeColorMatrix type="matrix" in={i} values={gmMatrix} result="gm_ramp" />
             <FeComposite in="gm_ramp" in2={i} operator="arithmetic" k1={0} k2={gm.mix} k3={1 - gm.mix} k4={0} result="gmap" />
           </React.Fragment>,
         );
@@ -2902,27 +2899,33 @@ export default function DesignCanvasScreen() {
       if (fx.gaussianBlur) {
         stages.push(<FeGaussianBlur key="gblur" in={chain('gblur')} stdDeviation={fx.gaussianBlur * xScale} result="gblur" />);
       }
+      // Motion Blur: a directional box blur built from N feOffset taps averaged
+      // with equal weight via arithmetic feComposite (react-native-svg has no
+      // feConvolveMatrix — see layerRenderer.ts).
       const mb = fx.motionBlur;
       if (mb && mb.amount > 0) {
-        const k = motionBlurKernel(mb.amount, mb.angle);
-        stages.push(
-          <FeConvolveMatrix key="mblur" in={chain('mblur')} order={k.order} kernelMatrix={k.kernel} divisor={k.divisor} edgeMode="duplicate" preserveAlpha result="mblur" />,
-        );
+        const i = chain('mblur');
+        const taps = motionBlurTaps(mb.amount * xScale, mb.angle);
+        const w = 1 / taps.length;
+        const nodes: React.ReactNode[] = [];
+        taps.forEach((t, idx) => {
+          nodes.push(<FeOffset key={`mb_t${idx}`} in={i} dx={t.dx} dy={t.dy} result={`mb_t${idx}`} />);
+          nodes.push(
+            idx === 0
+              ? <FeComposite key="mb_a0" in="mb_t0" in2="mb_t0" operator="arithmetic" k1={0} k2={w} k3={0} k4={0} result="mb_a0" />
+              : <FeComposite key={`mb_a${idx}`} in={`mb_a${idx - 1}`} in2={`mb_t${idx}`} operator="arithmetic" k1={0} k2={1} k3={w} k4={0} result={idx === taps.length - 1 ? 'mblur' : `mb_a${idx}`} />,
+          );
+        });
+        stages.push(<React.Fragment key="mblur">{nodes}</React.Fragment>);
       }
+      // Sharpen: unsharp mask — source × (1 + k) − blur × k.
       if (fx.sharpen) {
+        const i = chain('sharp');
+        const u = unsharpParams(fx.sharpen);
         stages.push(
-          <FeConvolveMatrix key="sharp" in={chain('sharp')} order={3} kernelMatrix={sharpenKernel(fx.sharpen)} edgeMode="duplicate" preserveAlpha result="sharp" />,
-        );
-      }
-      if (fx.noise) {
-        const i = chain('noised');
-        stages.push(
-          <React.Fragment key="noise">
-            <FeTurbulence type="fractalNoise" baseFrequency={NOISE_BASE_FREQUENCY} numOctaves={2} seed={7} result="nz_raw" />
-            <FeColorMatrix type="saturate" in="nz_raw" values="0" result="nz_gray" />
-            <FeComposite in="nz_gray" in2={i} operator="arithmetic" k1={0} k2={fx.noise} k3={1 - fx.noise} k4={0} result="nz_mix" />
-            {/* operator="in" clips the grain to the layer's own alpha, so transparent areas stay transparent. */}
-            <FeComposite in="nz_mix" in2={i} operator="in" result="noised" />
+          <React.Fragment key="sharp">
+            <FeGaussianBlur in={i} stdDeviation={u.stdDeviation * xScale} result="sh_blur" />
+            <FeComposite in={i} in2="sh_blur" operator="arithmetic" k1={0} k2={1 + u.k} k3={-u.k} k4={0} result="sharp" />
           </React.Fragment>,
         );
       }

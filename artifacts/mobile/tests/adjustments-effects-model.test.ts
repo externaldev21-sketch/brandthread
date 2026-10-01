@@ -5,8 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { defaultEffects, isIdentityEffects, clampEffects, type EffectsAdjustment } from '../lib/adjustmentsModel';
 import {
-  motionBlurKernel, sharpenKernel, colorBalanceMatrixValues, gradientMapTables, hexToUnitRgb,
-  bloomStdDeviation, MAX_CONVOLVE_ORDER,
+  motionBlurTaps, unsharpParams, colorBalanceMatrixValues, gradientMapMatrixValues, hexToUnitRgb,
+  bloomStdDeviation, MOTION_BLUR_TAPS,
 } from '../lib/layerRenderer';
 import {
   ADJ_CATEGORIES, ADJ_TOOL_LABELS, ADJ_DEFERRED, EFFECT_SLIDERS, categoryOfTool,
@@ -20,7 +20,7 @@ describe('EffectsAdjustment identity / clamp', () => {
   });
 
   it('any live value makes it non-identity, zeros do not', () => {
-    expect(isIdentityEffects({ gaussianBlur: 0, sharpen: 0, noise: 0 })).toBe(true);
+    expect(isIdentityEffects({ gaussianBlur: 0, sharpen: 0, bloom: 0 })).toBe(true);
     expect(isIdentityEffects({ gaussianBlur: 3 })).toBe(false);
     expect(isIdentityEffects({ motionBlur: { amount: 0, angle: 90 } })).toBe(true);
     expect(isIdentityEffects({ motionBlur: { amount: 6, angle: 90 } })).toBe(false);
@@ -32,7 +32,7 @@ describe('EffectsAdjustment identity / clamp', () => {
 
   it('clamps every field to its range and never mutates the input', () => {
     const input: EffectsAdjustment = {
-      gaussianBlur: 999, sharpen: 5, noise: -1, bloom: 2, chromatic: 100,
+      gaussianBlur: 999, sharpen: 5, bloom: 2, chromatic: 100,
       motionBlur: { amount: 500, angle: 400 },
       colorBalance: { cyanRed: 9, magentaGreen: -9, yellowBlue: 0.3 },
       gradientMap: { from: '#000000', to: '#ffffff', mix: 3 },
@@ -41,7 +41,6 @@ describe('EffectsAdjustment identity / clamp', () => {
     const c = clampEffects(input);
     expect(c.gaussianBlur).toBe(40);
     expect(c.sharpen).toBe(1);
-    expect(c.noise).toBe(0);
     expect(c.bloom).toBe(1);
     expect(c.chromatic).toBe(24);
     expect(c.motionBlur).toEqual({ amount: 40, angle: 180 });
@@ -51,52 +50,41 @@ describe('EffectsAdjustment identity / clamp', () => {
   });
 });
 
-describe('motionBlurKernel', () => {
-  it('amount 0 degenerates to a 1×1 identity kernel', () => {
-    const k = motionBlurKernel(0, 0);
-    expect(k.order).toBe(1);
-    expect(k.kernel).toEqual([1]);
-    expect(k.divisor).toBe(1);
+describe('motionBlurTaps', () => {
+  it('amount 0 degenerates to a single zero tap (the source itself)', () => {
+    expect(motionBlurTaps(0, 0)).toEqual([{ dx: 0, dy: 0 }]);
+    expect(motionBlurTaps(-3, 45)).toEqual([{ dx: 0, dy: 0 }]);
   });
 
-  it('is always an odd order and never exceeds the convolve ceiling', () => {
-    expect(motionBlurKernel(6, 0).order).toBe(7);
-    expect(motionBlurKernel(40, 0).order).toBe(MAX_CONVOLVE_ORDER);
-    expect(MAX_CONVOLVE_ORDER % 2).toBe(1);
+  it('emits MOTION_BLUR_TAPS symmetric taps spanning ±amount/2, centred on zero', () => {
+    expect(MOTION_BLUR_TAPS % 2).toBe(1);
+    const taps = motionBlurTaps(12, 0);
+    expect(taps).toHaveLength(MOTION_BLUR_TAPS);
+    expect(taps[0]).toEqual({ dx: -6, dy: 0 });
+    expect(taps[taps.length - 1]).toEqual({ dx: 6, dy: 0 });
+    expect(taps[(MOTION_BLUR_TAPS - 1) / 2]).toEqual({ dx: 0, dy: 0 });
+    expect(taps.reduce((s, t) => s + t.dx, 0)).toBeCloseTo(0, 9);
   });
 
-  it('a horizontal (0°) kernel lights exactly the centre row; vertical (90°) exactly the centre column', () => {
-    const h = motionBlurKernel(5, 0);
-    const n = h.order, c = (n - 1) / 2;
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-      expect(h.kernel[y * n + x]).toBe(y === c ? 1 : 0);
-    }
-    expect(h.divisor).toBe(n);
-    const v = motionBlurKernel(5, 90);
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-      expect(v.kernel[y * n + x]).toBe(x === c ? 1 : 0);
-    }
-  });
-
-  it('divisor equals the number of lit cells (brightness-preserving)', () => {
-    const k = motionBlurKernel(9, 45);
-    expect(k.divisor).toBe(k.kernel.filter(v => v === 1).length);
-    expect(k.divisor).toBeGreaterThan(1);
+  it('0° taps lie on the x axis; 90° taps lie on the y axis', () => {
+    for (const t of motionBlurTaps(10, 0)) expect(t.dy).toBe(0);
+    const v = motionBlurTaps(10, 90);
+    for (const t of v) expect(Math.abs(t.dx)).toBeLessThan(1e-9);
+    expect(v[0].dy).toBe(-5);
+    expect(v[v.length - 1].dy).toBe(5);
   });
 });
 
-describe('sharpenKernel', () => {
-  it('strength 0 is the identity kernel', () => {
-    expect(sharpenKernel(0)).toEqual([0, 0, 0, 0, 1, 0, 0, 0, 0]);
+describe('unsharpParams', () => {
+  it('strength 0 is a no-op mask (k = 0)', () => {
+    expect(unsharpParams(0).k).toBe(0);
   });
 
-  it('coefficients always sum to 1 (no brightness drift) and clamp strength to 0..1', () => {
-    for (const st of [0.25, 0.5, 1, 7]) {
-      const k = sharpenKernel(st);
-      expect(k.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
-    }
-    expect(sharpenKernel(7)).toEqual(sharpenKernel(1));
-    expect(sharpenKernel(1)[4]).toBe(9);
+  it('k scales linearly to 1.5 and clamps strength to 0..1; blur radius is positive', () => {
+    expect(unsharpParams(0.5).k).toBe(0.75);
+    expect(unsharpParams(1).k).toBe(1.5);
+    expect(unsharpParams(7).k).toBe(1.5);
+    expect(unsharpParams(0.3).stdDeviation).toBeGreaterThan(0);
   });
 });
 
@@ -119,7 +107,13 @@ describe('colorBalanceMatrixValues', () => {
   });
 });
 
-describe('gradientMapTables / hexToUnitRgb', () => {
+describe('gradientMapMatrixValues / hexToUnitRgb', () => {
+  /** Apply a 20-value feColorMatrix to an opaque RGB pixel, returning RGB. */
+  const apply = (m: number[], [r, g, b]: number[]) => [0, 1, 2].map(row => {
+    const o = row * 5;
+    return m[o] * r + m[o + 1] * g + m[o + 2] * b + m[o + 3] * 1 + m[o + 4];
+  });
+
   it('parses hex to 0..1 and rejects malformed input', () => {
     expect(hexToUnitRgb('#FF0000')).toEqual([1, 0, 0]);
     expect(hexToUnitRgb('00ff00')).toEqual([0, 1, 0]);
@@ -127,16 +121,20 @@ describe('gradientMapTables / hexToUnitRgb', () => {
     expect(hexToUnitRgb('not a colour')).toBeNull();
   });
 
-  it('black→white is the identity ramp per channel', () => {
-    expect(gradientMapTables('#000000', '#FFFFFF')).toEqual({ r: '0.0000 1.0000', g: '0.0000 1.0000', b: '0.0000 1.0000' });
+  it('black→white is a luminance ramp: pure red becomes Rec.709 grey, alpha untouched', () => {
+    const m = gradientMapMatrixValues('#000000', '#FFFFFF')!;
+    expect(m).toHaveLength(20);
+    const out = apply(m, [1, 0, 0]);
+    for (const c of out) expect(c).toBeCloseTo(0.2126, 6);
+    expect(m.slice(15)).toEqual([0, 0, 0, 1, 0]);
   });
 
-  it('maps black to `from` and white to `to` per channel, null on bad hex', () => {
-    const t = gradientMapTables('#FF0000', '#0000FF')!;
-    expect(t.r).toBe('1.0000 0.0000');
-    expect(t.g).toBe('0.0000 0.0000');
-    expect(t.b).toBe('0.0000 1.0000');
-    expect(gradientMapTables('#zz', '#000000')).toBeNull();
+  it('maps black to `from`, white to `to`, mid-grey to the midpoint; null on bad hex', () => {
+    const m = gradientMapMatrixValues('#FF0000', '#0000FF')!;
+    expect(apply(m, [0, 0, 0]).map(v => +v.toFixed(6))).toEqual([1, 0, 0]);
+    expect(apply(m, [1, 1, 1]).map(v => +v.toFixed(6))).toEqual([0, 0, 1]);
+    expect(apply(m, [0.5, 0.5, 0.5]).map(v => +v.toFixed(6))).toEqual([0.5, 0, 0.5]);
+    expect(gradientMapMatrixValues('#zz', '#000000')).toBeNull();
   });
 });
 
@@ -161,7 +159,7 @@ describe('adjustments catalog', () => {
   });
 
   it('every slider-driven tool has a slider spec; HSB/Curves/Liquify have their own panels', () => {
-    for (const t of ['colorBalance', 'gradientMap', 'gaussianBlur', 'motionBlur', 'opacity', 'noise', 'sharpen', 'bloom', 'chromatic'] as const) {
+    for (const t of ['colorBalance', 'gradientMap', 'gaussianBlur', 'motionBlur', 'opacity', 'sharpen', 'bloom', 'chromatic'] as const) {
       expect(EFFECT_SLIDERS[t]!.length).toBeGreaterThan(0);
     }
     expect(EFFECT_SLIDERS.hsb).toBeUndefined();
@@ -170,7 +168,7 @@ describe('adjustments catalog', () => {
   });
 
   it('deferred Procreate tools are documented with a reason and are NOT in any category list', () => {
-    expect(ADJ_DEFERRED.map(d => d.label).sort()).toEqual(['Clone', 'Glitch', 'Halftone', 'Perspective Blur']);
+    expect(ADJ_DEFERRED.map(d => d.label).sort()).toEqual(['Clone', 'Glitch', 'Halftone', 'Noise', 'Perspective Blur']);
     for (const d of ADJ_DEFERRED) expect(d.reason.length).toBeGreaterThan(10);
     const labels = Object.values(ADJ_TOOL_LABELS);
     for (const d of ADJ_DEFERRED) expect(labels).not.toContain(d.label);

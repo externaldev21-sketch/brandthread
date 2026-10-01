@@ -16,7 +16,7 @@ export type AdjCategory = 'colour' | 'blur' | 'effects' | 'retouch';
 export type AdjTool =
   | 'hsb' | 'colorBalance' | 'curves' | 'gradientMap'
   | 'gaussianBlur' | 'motionBlur'
-  | 'opacity' | 'noise' | 'sharpen' | 'bloom' | 'chromatic'
+  | 'opacity' | 'sharpen' | 'bloom' | 'chromatic'
   | 'liquify';
 
 export interface AdjCategoryDef { key: AdjCategory; label: string; icon: string; tools: AdjTool[]; }
@@ -25,7 +25,7 @@ export interface AdjCategoryDef { key: AdjCategory; label: string; icon: string;
 export const ADJ_CATEGORIES: AdjCategoryDef[] = [
   { key: 'colour',  label: 'Colour Adjustment', icon: 'droplet',  tools: ['hsb', 'colorBalance', 'curves', 'gradientMap'] },
   { key: 'blur',    label: 'Blur',              icon: 'aperture', tools: ['gaussianBlur', 'motionBlur'] },
-  { key: 'effects', label: 'Effects',           icon: 'zap',      tools: ['opacity', 'noise', 'sharpen', 'bloom', 'chromatic'] },
+  { key: 'effects', label: 'Effects',           icon: 'zap',      tools: ['opacity', 'sharpen', 'bloom', 'chromatic'] },
   { key: 'retouch', label: 'Retouch',           icon: 'edit-3',   tools: ['liquify'] },
 ];
 
@@ -37,7 +37,6 @@ export const ADJ_TOOL_LABELS: Record<AdjTool, string> = {
   gaussianBlur: 'Gaussian Blur',
   motionBlur: 'Motion Blur',
   opacity: 'Opacity',
-  noise: 'Noise',
   sharpen: 'Sharpen',
   bloom: 'Bloom',
   chromatic: 'Chromatic Aberration',
@@ -47,6 +46,7 @@ export const ADJ_TOOL_LABELS: Record<AdjTool, string> = {
 /** Procreate tools intentionally absent, with the reason each would be a stub today. */
 export const ADJ_DEFERRED: { category: AdjCategory; label: string; reason: string }[] = [
   { category: 'blur',    label: 'Perspective Blur',  reason: 'needs a per-pixel radial/vanishing-point blur; no SVG primitive expresses it' },
+  { category: 'effects', label: 'Noise',             reason: 'needs a noise source (feTurbulence), which react-native-svg 15 renders as null (unimplemented); no other primitive generates grain' },
   { category: 'effects', label: 'Glitch',            reason: 'an open-ended stylistic effect with no single real definition to implement' },
   { category: 'effects', label: 'Halftone',          reason: 'needs tiled dot patterns (feTile/pattern per cell); not expressible as a single live filter here' },
   { category: 'retouch', label: 'Clone',             reason: 'needs a sampling brush that reads pixels from another canvas region; no raster read path exists' },
@@ -85,7 +85,6 @@ export const EFFECT_SLIDERS: Partial<Record<AdjTool, SliderSpec[]>> = {
     { key: 'angle',  label: 'Angle',  min: 0, max: 180, step: 15, format: deg },
   ],
   opacity:   [{ key: 'value', label: 'Opacity',  min: 0, max: 1,  step: 0.1, format: pct }],
-  noise:     [{ key: 'value', label: 'Amount',   min: 0, max: 1,  step: 0.1, format: pct }],
   sharpen:   [{ key: 'value', label: 'Amount',   min: 0, max: 1,  step: 0.1, format: pct }],
   bloom:     [{ key: 'value', label: 'Amount',   min: 0, max: 1,  step: 0.1, format: pct }],
   chromatic: [{ key: 'value', label: 'Amount',   min: 0, max: 24, step: 2,   format: px }],
@@ -108,7 +107,6 @@ export function readEffectValue(effects: EffectsAdjustment | undefined, tool: Ad
     case 'gradientMap':  return e.gradientMap?.mix ?? 0;
     case 'gaussianBlur': return e.gaussianBlur ?? 0;
     case 'motionBlur':   return (e.motionBlur as any)?.[key] ?? 0;
-    case 'noise':        return e.noise ?? 0;
     case 'sharpen':      return e.sharpen ?? 0;
     case 'bloom':        return e.bloom ?? 0;
     case 'chromatic':    return e.chromatic ?? 0;
@@ -130,7 +128,6 @@ export function writeEffectValue(effects: EffectsAdjustment | undefined, tool: A
     case 'motionBlur':
       e.motionBlur = { amount: 0, angle: 0, ...(e.motionBlur ?? {}), [key]: value };
       break;
-    case 'noise':     e.noise = value; break;
     case 'sharpen':   e.sharpen = value; break;
     case 'bloom':     e.bloom = value; break;
     case 'chromatic': e.chromatic = value; break;

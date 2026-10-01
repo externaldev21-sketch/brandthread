@@ -6,9 +6,9 @@
  * (lib/layerRenderer.ts builders + design-canvas.tsx's generic stage chain).
  *
  * Every "applies" assertion checks the live SVG tree for the actual
- * primitive element (feGaussianBlur, feConvolveMatrix, feTurbulence,
- * feOffset, feComponentTransfer) — the filter is really attached to the
- * layer, not just a label change.
+ * primitive element (feGaussianBlur, feOffset, feComposite, feColorMatrix —
+ * the set react-native-svg 15 really implements) — the filter is really
+ * attached to the layer, not just a label change.
  *
  * Self-contained: builds + serves its own preview web build in beforeAll,
  * the same harness scripts/store-screenshots/*.mjs use.
@@ -122,14 +122,16 @@ test('Adjustments opens on Procreate\'s 2×2 category grid; every category lists
   await page.waitForTimeout(250);
   await expect(grid).toBeVisible();
 
-  // Effects lists Opacity/Noise/Sharpen/Bloom/Chromatic — and NOT the deferred Glitch/Halftone.
+  // Effects lists Opacity/Sharpen/Bloom/Chromatic — and NOT the deferred
+  // Noise/Glitch/Halftone (no greyed-out stub rows).
   await page.locator('[data-testid="adj-cat-effects"]').click();
   await page.waitForTimeout(250);
-  for (const t of ['opacity', 'noise', 'sharpen', 'bloom', 'chromatic']) {
+  for (const t of ['opacity', 'sharpen', 'bloom', 'chromatic']) {
     await expect(page.locator(`[data-testid="adj-tool-${t}"]`)).toBeVisible();
   }
-  await expect(page.getByText('Glitch', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Halftone', { exact: true })).toHaveCount(0);
+  for (const deferred of ['Noise', 'Glitch', 'Halftone']) {
+    await expect(page.getByText(deferred, { exact: true })).toHaveCount(0);
+  }
   await assertNoTextOrBoxOverflow(page, '[data-testid="adj-tool-list-effects"]');
 
   await context.close();
@@ -163,22 +165,28 @@ test('Gaussian Blur attaches a real feGaussianBlur to the layer, scales with the
   await context.close();
 });
 
-test('Motion Blur and Sharpen attach real feConvolveMatrix kernels; Motion Blur\'s order grows with amount', async () => {
+test('Motion Blur is a real 7-tap feOffset box blur whose span grows with amount; Sharpen adds a real unsharp-mask blur stage', async () => {
   const { context, page } = await openAdjustmentsGrid();
   await openTool(page, 'blur', 'motionBlur');
 
-  expect(await svgCount(page, 'feConvolveMatrix')).toBe(0);
-  await page.locator('[data-testid="adj-motionBlur-amount-inc"]').click(); // 2 px → order 3
+  expect(await svgCount(page, 'feOffset')).toBe(0);
+  await page.locator('[data-testid="adj-motionBlur-amount-inc"]').click(); // 2 px
   await page.waitForTimeout(200);
-  expect(await svgCount(page, 'feConvolveMatrix')).toBe(1);
-  const order1 = await page.locator('svg feConvolveMatrix').first().getAttribute('order');
-  for (let i = 0; i < 3; i++) await page.locator('[data-testid="adj-motionBlur-amount-inc"]').click(); // 8 px → order 9
+  await expect(page.locator('[data-testid="adj-motionBlur-amount-value"]')).toHaveText('2 px');
+  expect(await svgCount(page, 'feOffset')).toBe(7);
+  const outerDx = async () => Math.abs(parseFloat((await page.locator('svg feOffset').first().getAttribute('dx')) ?? '0'));
+  const span1 = await outerDx();
+  expect(span1).toBeGreaterThan(0);
+  for (let i = 0; i < 3; i++) await page.locator('[data-testid="adj-motionBlur-amount-inc"]').click(); // 8 px
   await page.waitForTimeout(200);
-  const order2 = await page.locator('svg feConvolveMatrix').first().getAttribute('order');
-  expect(parseInt(order2!, 10)).toBeGreaterThan(parseInt(order1!, 10));
+  const span2 = await outerDx();
+  expect(span2).toBeGreaterThan(span1); // the outermost tap's own offset tracks the slider
   await assertNoTextOrBoxOverflow(page, '[data-testid="adj-panel-motionBlur"]');
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '04-motion-blur.png') });
 
-  // Back out to the Effects category and add Sharpen on top — two convolve stages now.
+  // Back out to Effects → Sharpen on top: unsharp mask adds one feGaussianBlur
+  // (source minus its blur) while the 7 motion-blur offsets remain.
+  const blursBefore = await svgCount(page, 'feGaussianBlur');
   await page.locator('[data-testid="adjustments-sheet-back"]').click();
   await page.waitForTimeout(200);
   await page.locator('[data-testid="adjustments-sheet-back"]').click();
@@ -186,43 +194,37 @@ test('Motion Blur and Sharpen attach real feConvolveMatrix kernels; Motion Blur\
   await openTool(page, 'effects', 'sharpen');
   await page.locator('[data-testid="adj-sharpen-value-inc"]').click();
   await page.waitForTimeout(200);
-  expect(await svgCount(page, 'feConvolveMatrix')).toBe(2);
+  expect(await svgCount(page, 'feGaussianBlur')).toBe(blursBefore + 1);
+  expect(await svgCount(page, 'feOffset')).toBe(7);
 
   await context.close();
 });
 
-test('Noise, Chromatic Aberration and Gradient Map each attach their own real primitive', async () => {
+test('Chromatic Aberration and Gradient Map each attach their own real primitive', async () => {
   const { context, page } = await openAdjustmentsGrid();
 
-  await openTool(page, 'effects', 'noise');
-  expect(await svgCount(page, 'feTurbulence')).toBe(0);
-  await page.locator('[data-testid="adj-noise-value-inc"]').click();
-  await page.waitForTimeout(200);
-  expect(await svgCount(page, 'feTurbulence')).toBe(1);
-
-  await page.locator('[data-testid="adjustments-sheet-back"]').click();
-  await page.waitForTimeout(200);
-  await page.locator('[data-testid="adj-tool-chromatic"]').click();
-  await page.waitForTimeout(250);
+  await openTool(page, 'effects', 'chromatic');
   expect(await svgCount(page, 'feOffset')).toBe(0);
   await page.locator('[data-testid="adj-chromatic-value-inc"]').click();
   await page.waitForTimeout(200);
   expect(await svgCount(page, 'feOffset')).toBe(2); // red pushed one way, blue the other
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '04-chromatic.png') });
+  await assertNoTextOrBoxOverflow(page, '[data-testid="adj-panel-chromatic"]');
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '05-chromatic.png') });
 
-  // Gradient Map: picking a preset starts mix at 100% and installs the ramp.
+  // Gradient Map: picking a preset starts mix at 100% and installs the
+  // luminance-ramp feColorMatrix (one more than whatever is already there).
   await page.locator('[data-testid="adjustments-sheet-back"]').click();
   await page.waitForTimeout(200);
   await page.locator('[data-testid="adjustments-sheet-back"]').click();
   await page.waitForTimeout(200);
   await openTool(page, 'colour', 'gradientMap');
-  expect(await svgCount(page, 'feComponentTransfer')).toBe(0);
+  const matricesBefore = await svgCount(page, 'feColorMatrix');
   await page.locator('[data-testid="adj-gradient-preset-sepia"]').click();
   await page.waitForTimeout(200);
   await expect(page.locator('[data-testid="adj-gradientMap-mix-value"]')).toHaveText('100%');
-  expect(await svgCount(page, 'feComponentTransfer')).toBe(1);
+  expect(await svgCount(page, 'feColorMatrix')).toBe(matricesBefore + 1);
   await assertNoTextOrBoxOverflow(page, '[data-testid="adj-panel-gradientMap"]');
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '05-gradient-map.png') });
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, '06-gradient-map.png') });
 
   await context.close();
 });
