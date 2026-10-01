@@ -21,7 +21,9 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -538,6 +540,58 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+
+export interface ProductPairing { id: string; name: string; image: string | null; active: boolean; position: number }
+export interface PublicPairedProduct {
+  id: string;
+  sellerId: string;
+  sellerName: string | null;
+  name: string;
+  image: string | null;
+  images: string[];
+  priceCents: number;
+  isPreOrder: boolean;
+  available: boolean;
+  variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
+}
+export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
+
+/** Like uploadVideo, but reports upload progress (0–1) via XHR. */
+async function uploadVideoWithProgress<T = any>(
+  path: string,
+  video: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+  getCacheScope: GetCacheScope = () => 'anonymous',
+  onProgress?: (fraction: number) => void,
+): Promise<T> {
+  const source = await fetch(video.uri);
+  if (!source.ok) throw new Error("Could not read the selected video.");
+  const videoBlob = await source.blob();
+  const contentType = video.mimeType || videoBlob.type || "video/mp4";
+  const token = await getCachedToken(getToken);
+  const result = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE}${versionApiPath(path)}`);
+    xhr.setRequestHeader("Content-Type", contentType);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    for (const [key, value] of Object.entries(storeContextHeaders())) xhr.setRequestHeader(key, String(value));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(Math.min(1, event.loaded / event.total));
+    };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new Error("Network error while uploading the video."));
+    xhr.send(videoBlob);
+  }).catch((error) => { reportNetworkError(error); throw error; });
+  if (result.status < 200 || result.status >= 300) {
+    const error = new ApiError(result.status, result.text);
+    reportNetworkError(error);
+    throw error;
+  }
+  dismissNetworkNotice();
+  onProgress?.(1);
+  await clearApiCache(await getCacheScope());
+  return JSON.parse(result.text) as T;
+}
 // ─── Ad Campaign Types ────────────────────────────────────────────────────────
 
 export type AdCtaKind =
@@ -976,6 +1030,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload one product photo and return the URL to store in `images`. */
       uploadImage: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ objectPath: string }>('/api/products/images', image, getToken, getCacheScope),
+    },
+    /** Bulk product actions ("Select products") and per-product search listing (SEO). */
+    productBulk: {
+      list: (params: { q?: string; status?: string } = {}) => {
+        const qs = new URLSearchParams();
+        if (params.q) qs.set('q', params.q);
+        if (params.status && params.status !== 'all') qs.set('status', params.status);
+        const s = qs.toString();
+        return get<BulkProductList>(`/api/product-bulk/products${s ? `?${s}` : ''}`);
+      },
+      price: (body: BulkPriceRequest) => post<BulkPriceResult>('/api/product-bulk/price', body),
+      status: (body: { productIds: string[]; status: 'active' | 'draft' | 'archived' }) =>
+        post<{ status: string; updated: string[]; unchanged: string[] }>('/api/product-bulk/status', body),
+      duplicate: (body: { productIds: string[]; copyInventory?: boolean }) =>
+        post<{ created: Array<{ sourceId: string; id: string; name: string }> }>('/api/product-bulk/duplicate', body),
+    },
+    productSeo: {
+      get: (productId: string) => get<ProductSeoDetail>(`/api/product-seo/${encodeURIComponent(productId)}`),
+      save: (productId: string, body: ProductSeoInput) =>
+        put<ProductSeoDetail>(`/api/product-seo/${encodeURIComponent(productId)}`, body),
     },
     ipCases: {
       create: (body: { listingProductId: string; claimantName: string; claimantEmail: string; rightsType: string; description: string; evidenceReferences: string[] }) =>
@@ -2566,6 +2640,35 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ applied: number }>(`/api/size-chart-templates/${encodeURIComponent(id)}/apply`, { productIds }),
       sync:   (id: string) => post<{ synced: number }>(`/api/size-chart-templates/${encodeURIComponent(id)}/sync`, {}),
     },
+    /** Scheduled product launches + "Notify me". */
+    productLaunches: {
+      /** Public: is this product waiting on a launch time? */
+      state:       (productId: string) =>
+        get<{ launching: boolean; launchAt: string | null; serverNow: string }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+      alertStatus: (productId: string) =>
+        get<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      alertOn:     (productId: string) =>
+        post<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`, {}),
+      alertOff:    (productId: string) =>
+        del<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      /** Seller. */
+      list:        () => get<Array<{
+        productId: string; name: string; imageUrl: string | null; status: string;
+        launchAt: string; launchedAt: string | null; notifyFollowers: boolean; alertCount: number;
+      }>>('/api/product-launches'),
+      schedule:    (productId: string, data: { launchAt: string; notifyFollowers?: boolean }) =>
+        put<any>(`/api/product-launches/${encodeURIComponent(productId)}`, data),
+      cancel:      (productId: string) =>
+        del<{ cancelled: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+    },
+    /** Pre-order ship-by terms (60-day refund window). */
+    preorderTerms: {
+      get: (productId: string) =>
+        get<{ shipBy: string; daysLeft: number; closingDate: string | null; refundWindowDays: number; refundCopy: string; note: string | null }>(
+          `/api/preorder-terms/${encodeURIComponent(productId)}`),
+      set: (productId: string, data: { shipBy: string; note?: string | null }) =>
+        put<any>(`/api/preorder-terms/${encodeURIComponent(productId)}`, data),
+    },
     /** Product bundles — seller CRUD. */
     bundles: {
       list:       () => get<any[]>('/api/bundles'),
@@ -2580,6 +2683,43 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         del<any>(`/api/bundles/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
       publicList: (sellerId: string) =>
         get<any[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
+    },
+    /** "Complete the fit" — seller-curated related products for a product page. */
+    productPairings: {
+      get:  (productId: string) =>
+        freshGet<{ pairings: ProductPairing[] }>(`/api/product-pairings/${encodeURIComponent(productId)}`),
+      save: (productId: string, pairedProductIds: string[]) =>
+        put<{ pairings: ProductPairing[] }>(`/api/product-pairings/${encodeURIComponent(productId)}`, { pairedProductIds }),
+      /** Public (works signed out): active products only. */
+      publicList: (productId: string) =>
+        get<PublicPairedProduct[]>(`/api/product-pairings/public/${encodeURIComponent(productId)}`),
+    },
+    /** Product video — one short silent video per product. */
+    productVideos: {
+      get:    (productId: string) =>
+        freshGet<{ video: ProductVideoInfo | null }>(`/api/product-videos/${encodeURIComponent(productId)}`),
+      upload: (productId: string, uri: string, mimeType?: string | null, onProgress?: (fraction: number) => void) =>
+        uploadVideoWithProgress<{ video: ProductVideoInfo }>(
+          `/api/product-videos/${encodeURIComponent(productId)}`, { uri, mimeType }, getToken, getCacheScope, onProgress,
+        ),
+      remove: (productId: string) =>
+        del<{ video: null }>(`/api/product-videos/${encodeURIComponent(productId)}`),
+      /** Public (works signed out). */
+      publicGet: (productId: string) =>
+        get<{ video: ProductVideoInfo | null }>(`/api/product-videos/public/${encodeURIComponent(productId)}`),
+    },
+    /** Variant option axes, matrix generation, bulk variant edits and stock rules. */
+    productVariants: {
+      get:      (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}`),
+      putAxes:  (productId: string, axes: Array<{ name: string; values: string[] }>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/axes`, { axes }),
+      generate: (productId: string, data: { priceCents?: number; stock?: number; lowStockThreshold?: number; baseSku?: string }) =>
+        post<any>(`/api/product-variants/${encodeURIComponent(productId)}/generate`, data),
+      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number }>) =>
+        patch<any>(`/api/product-variants/${encodeURIComponent(productId)}/variants/bulk`, { updates }),
+      getStockRules: (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`),
+      putStockRules: (productId: string, data: Record<string, unknown>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`, data),
     },
     // (buyer key defined earlier in this object — no duplicate)
     /** Team members — invite flow, roles, and activity log */
@@ -2667,6 +2807,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       latest: () => get<ShopifyImportJob | null>('/api/shopify-imports/latest'),
       get: (id: string) => get<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}`),
       continue: (id: string) => post<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}/continue`, {}),
+    },
+    /** CSV (Shopify / Etsy / Brandthread layouts) and Etsy product import. */
+    productImport: {
+      providers: () => get<ImportProviders>('/api/product-import/providers'),
+      runs: () => get<{ runs: ImportRun[] }>('/api/product-import/runs'),
+      previewCsv: (csv: string) => request<ImportPreview>(
+        '/api/product-import/csv/preview', { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      commitCsv: (csv: string, filename?: string) => request<ImportCommitResult>(
+        `/api/product-import/csv/commit${filename ? `?filename=${encodeURIComponent(filename)}` : ''}`,
+        { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyConnect: () => post<{ authorizeUrl: string }>('/api/product-import/etsy/connect/start', {}),
+      etsyDisconnect: () => post<{ ok: boolean }>('/api/product-import/etsy/disconnect', {}),
+      etsyPreview: () => request<ImportPreview>('/api/product-import/etsy/preview', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyCommit: () => request<ImportCommitResult>('/api/product-import/etsy/commit', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {

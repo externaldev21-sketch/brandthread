@@ -1,14 +1,19 @@
 import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+export * from './productImports';
 export * from './manufacturers';
 export * from './sizeCharts';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
+export * from './productVariantsStock';
 export * from './security';
 export * from './money';
+export * from './productLaunches';
 export * from './threadCash';
 export * from './shopifyFulfillment';
+export * from './productFit';
 export * from './metaAds';
 export * from './communities';
+export * from './productBulkSeo';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 

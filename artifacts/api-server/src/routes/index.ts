@@ -21,6 +21,8 @@ import manufacturerFlowRouter from "./manufacturer-flow";
 import sampleOrdersRouter from "./sample-orders";
 import dropWalletRouter from "./drop-wallet";
 import inventoryRouter from "./inventory";
+import productVariantsRouter from "./product-variants";
+import catalogPublicRouter from "./catalog-public";
 import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
 import aiRouter from "./ai";
@@ -42,6 +44,8 @@ import communitiesRouter from "./communities";
 import brandthreadAgentRouter from "./brandthread-agent";
 import savedRouter from "./saved";
 import collectionsRouter from "./collections";
+import productBulkRouter from "./product-bulk";
+import productSeoRouter from "./product-seo";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
@@ -74,8 +78,12 @@ import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
 import returnsRouter from "./returns";
 import sellerVerificationRouter from "./seller-verification";
+import productLaunchesRouter from "./product-launches";
+import preorderTermsRouter from "./preorder-terms";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
+import productPairingsRouter from "./product-pairings";
+import productVideosRouter from "./product-videos";
 import buyerProductsRouter from "./buyer-products";
 import sizeChartTemplatesRouter from "./size-chart-templates";
 import recentlyViewedRouter from "./recently-viewed";
@@ -100,6 +108,7 @@ import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
+import productImportRouter, { etsyCallbackRouter as etsyImportCallbackRouter } from "./product-import";
 import designStudioRouter from "./design-studio";
 import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
@@ -160,6 +169,8 @@ router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 router.use("/manufacturers",   tc, manufacturerFlowRouter);
 router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
+router.use("/product-variants", tc, productVariantsRouter);
+router.use("/catalog-public",   catalogPublicRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
 router.use("/notification-prefs", notificationPrefsRouter);
@@ -170,14 +181,20 @@ router.use("/ai",              tc, aiRouter);
 // get swallowed by buyerRouter's lack of those handlers.
 // Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
 // scoped to the actual buyer, not the team store owner.
+router.use("/product-launches",          tc, productLaunchesRouter);
+router.use("/preorder-terms",            tc, preorderTermsRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
+router.use("/product-pairings",          productPairingsRouter);
+router.use("/product-videos",            productVideosRouter);
 router.use("/buyer/products",            buyerProductsRouter);
 router.use("/size-chart-templates",      tc, sizeChartTemplatesRouter);
 router.use("/buyer/recently-viewed",     recentlyViewedRouter);
 router.use("/first-run-tips",            firstRunTipsRouter);
 router.use("/buyer/saved",               savedRouter);
 router.use("/buyer/collections",         collectionsRouter);
+router.use("/product-bulk",              productBulkRouter);
+router.use("/product-seo",               productSeoRouter);
 router.use("/buyer/cart",                cartDbRouter);
 // One-page checkout (one PaymentIntent per cart). Before /buyer so its card-data guard runs first.
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
@@ -222,6 +239,9 @@ router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
+// Etsy redirects the browser to the callback with no session; it is mounted before the authenticated group.
+router.use("/product-import/etsy/callback", etsyImportCallbackRouter);
+router.use("/product-import",             tc, productImportRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────
 // Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't

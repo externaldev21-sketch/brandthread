@@ -1412,6 +1412,13 @@ function RootLayoutNav() {
         <Stack.Screen name="size-chart-templates" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="size-chart-template-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="size-chart-template-apply" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="products-bulk-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-seo" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-pairings" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-video" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-launches" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="waitlist-demand" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-variants" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-members"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-create"   options={{ headerShown: false, animation: 'ios_from_right' }} />
