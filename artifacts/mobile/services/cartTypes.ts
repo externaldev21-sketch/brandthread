@@ -435,6 +435,8 @@ export interface BuyerProduct {
   /** A photo of the seller's own size chart. Absent means no "Size guide"
    *  link shows — never a placeholder. */
   sizeChartImageUrl?: string | null;
+  /** The seller's structured size chart ({columns, rows, unit}); drives size recommendations. */
+  sizeChart?: import('@/lib/sizeRecommendation').SizeChartLike | null;
 }
 
 export interface BuyerProductOption {

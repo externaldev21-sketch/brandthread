@@ -1278,6 +1278,23 @@ export const postUserTags = pgTable('post_user_tags', {
   uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
 }));
 
+// ─── Buyer saved sizes / preferences ──────────────────────────────────────────
+// One row per Clerk user. `sizes` = {tops, bottoms, outerwear, shoes,
+// measurements:{heightCm, weightKg, chestCm, waistCm, hipsCm}}. styleInterests
+// mirrors users.buyer_style_interests (which stays the source for ranking).
+export type BuyerSizesJson = {
+  tops?: string; bottoms?: string; outerwear?: string; shoes?: string;
+  measurements?: { heightCm?: number; weightKg?: number; chestCm?: number; waistCm?: number; hipsCm?: number };
+};
+export const buyerPreferences = pgTable('buyer_preferences', {
+  userId:            text('user_id').primaryKey(), // Clerk user ID
+  sizes:             jsonb('sizes').$type<BuyerSizesJson>().notNull().default({}),
+  likedBrandIds:     jsonb('liked_brand_ids').$type<string[]>().notNull().default([]),
+  styleInterests:    jsonb('style_interests').$type<string[]>().notNull().default([]),
+  surveyCompletedAt: timestamp('survey_completed_at'),
+  updatedAt:         timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
 
 export const stories = pgTable('stories', {

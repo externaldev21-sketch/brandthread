@@ -38,6 +38,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { profileHref } from '@/lib/profileNavigation';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
+import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 import {
   ON_DARK, OVERLAY,
   FONT, FS, SP, RADIUS, ICON, COMP,
@@ -207,25 +208,29 @@ function OptionChip({
   available,
   onPress,
   accentColor,
+  recommended,
 }: {
   label: string;
   selected: boolean;
   available: boolean;
   onPress: () => void;
   accentColor: string;
+  /** Marks (never selects) the size the buyer's saved sizes point at. */
+  recommended?: boolean;
 }) {
   const { theme } = useAppTheme();
   const chipS = useMemo(() => makeChipStyles(theme), [theme]);
-  return (
+  const chip = (
     <TouchableOpacity
       onPress={onPress}
       disabled={!available}
       activeOpacity={0.75}
       accessibilityRole="radio"
-      accessibilityLabel={label + (available ? '' : ', unavailable')}
+      accessibilityLabel={label + (recommended ? ', recommended for you' : '') + (available ? '' : ', unavailable')}
       accessibilityState={{ selected, disabled: !available }}
       style={[
         chipS.chip,
+        recommended && !selected && available && { borderColor: theme.text, borderWidth: 1.5 },
         selected && { borderColor: accentColor, borderWidth: 2, backgroundColor: `${accentColor}1A` },
         !available && chipS.unavail,
       ]}
@@ -241,6 +246,8 @@ function OptionChip({
       </Text>
     </TouchableOpacity>
   );
+  if (!recommended) return chip;
+  return <View style={{ alignItems: 'center' }}>{chip}<RecommendedTag /></View>;
 }
 
 const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
@@ -435,6 +442,7 @@ export function ShopProductSheet({
   }, [hasMultipleTags]);
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
+  const sizeBadgeModel = useSizeBadgeModel(product);
   const [phase, setPhase] = useState<SheetPhase>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [selections, setSelections] = useState<Record<string, string>>({});
@@ -918,6 +926,7 @@ export function ShopProductSheet({
                 selected={selections[option.id] === val.id}
                 available={available}
                 accentColor={accent}
+                recommended={option === sizeOption && sizeBadgeModel?.kind === 'recommend' && sizeBadgeModel.size === val.label}
                 onPress={() => {
                   Haptics.selectionAsync();
                   setSelections(prev => {
@@ -1161,6 +1170,9 @@ export function ShopProductSheet({
                 strike-through + dashed border (OptionChip). */}
             {sizeOption && (
               <View onLayout={e => { optionsSectionY.current = e.nativeEvent.layout.y; }}>
+                <View style={{ paddingHorizontal: 16 }}>
+                  <SizeRecommendationBadge model={sizeBadgeModel} onBeforeNavigate={handleClose} />
+                </View>
                 {renderOptionChips(sizeOption)}
               </View>
             )}
