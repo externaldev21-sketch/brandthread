@@ -154,7 +154,7 @@ export default function QuickRepliesScreen() {
 
           {error ? <Text style={[styles.error, { color: colors.foreground }]}>{error}</Text> : null}
 
-          <View style={styles.actions}>
+          <View style={styles.actions} testID="quick-reply-actions">
             <Button label="Save" onPress={save} loading={saving} disabled={saving} fullWidth testID="quick-reply-save" />
             {draft.id ? (
               <Button label="Delete" variant="destructive" onPress={remove} disabled={saving} fullWidth testID="quick-reply-delete" />
@@ -198,10 +198,10 @@ export default function QuickRepliesScreen() {
               testID={`quick-reply-row-${r.id}`}
             >
               <View style={styles.rowHead}>
-                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{r.title}</Text>
+                <Text style={[styles.rowTitle, { color: colors.foreground }]}>{r.title}</Text>
                 {r.shortcut ? <Text style={[styles.rowShortcut, { color: colors.mutedForeground }]}>{r.shortcut}</Text> : null}
               </View>
-              <Text style={[styles.rowBody, { color: colors.mutedForeground }]} numberOfLines={2}>{r.body}</Text>
+              <Text style={[styles.rowBody, { color: colors.mutedForeground }]}>{r.body}</Text>
             </PressableScale>
           ))}
           {error ? <Text style={[styles.error, { color: colors.foreground }]}>{error}</Text> : null}
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   emptyCta: { marginTop: SP.md },
   list: { padding: SP.md, gap: SP.sm, paddingBottom: 140 },
-  row: { borderWidth: 1, borderRadius: RADIUS.md, padding: 14, gap: 4 },
+  row: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 16, paddingVertical: 14, gap: 4 },
   rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rowTitle: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold },
   rowShortcut: { fontSize: FS.sm, fontFamily: FONT.medium },

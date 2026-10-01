@@ -15,9 +15,8 @@ import { useApi, type SellerAwaySettings } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { HapticSwitch } from '@/components/BrandthreadUI';
+import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
-import { Chip } from '@/components/ui/Chip';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -26,7 +25,8 @@ import { formatMinute, parseMinute } from '@/lib/awayHours';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const MESSAGE_MAX = 1000;
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function deviceTimezone(): string {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
@@ -111,7 +111,7 @@ export default function AwayMessageScreen() {
         <View style={styles.center}><ActivityIndicator color={colors.foreground} /></View>
       ) : (
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]} testID="away-message-toggle">
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]}>Send away message</Text>
               <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>Buyers get it once when they message you</Text>
@@ -148,18 +148,26 @@ export default function AwayMessageScreen() {
           {form.mode === 'outside_hours' ? (
             <View>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>Open days</Text>
-              <View style={styles.chips}>
-                {DAY_LABELS.map((label, i) => (
-                  <Chip
-                    key={label}
-                    label={label}
-                    selected={(form.openDays & (1 << i)) !== 0}
-                    onPress={() => { hapticLight(); patch({ openDays: form.openDays ^ (1 << i) }); }}
-                  />
-                ))}
+              <View style={styles.chips} testID="away-message-days">
+                {DAY_LABELS.map((label, i) => {
+                  const on = (form.openDays & (1 << i)) !== 0;
+                  return (
+                  <View key={label} style={styles.chipCell}>
+                    <PressableScale
+                      onPress={() => { hapticLight(); patch({ openDays: form.openDays ^ (1 << i) }); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={DAY_NAMES[i]}
+                      accessibilityState={{ selected: on }}
+                      style={[styles.dayBtn, { backgroundColor: on ? colors.primary : colors.card, borderColor: on ? colors.primary : colors.border }]}
+                    >
+                      <Text style={[styles.dayText, { color: on ? colors.primaryForeground : colors.mutedForeground }]}>{label}</Text>
+                    </PressableScale>
+                  </View>
+                  );
+                })}
               </View>
 
-              <View style={styles.hoursRow}>
+              <View style={styles.hoursRow} testID="away-message-hours">
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>Opens</Text>
                   <TextInput
@@ -215,7 +223,10 @@ const styles = StyleSheet.create({
   label: { fontSize: FS.xs, fontFamily: FONT.semibold, marginTop: SP.md, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular, minHeight: 48 },
   messageInput: { minHeight: 120 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', gap: 6 },
+  chipCell: { flex: 1 },
+  dayBtn: { height: 40, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dayText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   hoursRow: { flexDirection: 'row', gap: 12 },
   tzRow: { justifyContent: 'center' },
   tzText: { fontSize: FS.base, fontFamily: FONT.regular },

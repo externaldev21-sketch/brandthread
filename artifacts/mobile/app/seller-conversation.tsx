@@ -2095,10 +2095,10 @@ export default function SellerConversationScreen() {
                   testID={`seller-conversation-quick-reply-${reply.id}`}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={s.productName} numberOfLines={1}>
+                    <Text style={s.productName}>
                       {reply.title}{reply.shortcut ? `  ${reply.shortcut}` : ''}
                     </Text>
-                    <Text style={s.productPrice} numberOfLines={2}>{reply.body}</Text>
+                    <Text style={s.productPrice}>{reply.body}</Text>
                   </View>
                 </PressableScale>
               ))}
