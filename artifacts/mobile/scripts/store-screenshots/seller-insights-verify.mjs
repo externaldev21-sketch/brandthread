@@ -32,10 +32,13 @@ async function main() {
     for (const [route, name, marker, scrollEnd] of SCREENS) {
       const { context, page, activity } = await openContext(browser, { device: DEVICE, role: 'seller', origin, images: {} });
       page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
-      await openScreen(page, activity, origin, 'seller', `${route}?demo=1`, {
-        beforeNavigate: () => page.evaluate(() => localStorage.setItem('bt_preview_demo', '1')),
-      });
-      await page.getByText(marker, { exact: true }).first().waitFor({ timeout: 15_000 });
+      for (let attempt = 1; ; attempt += 1) {
+        await openScreen(page, activity, origin, 'seller', `${route}?demo=1`, {
+          beforeNavigate: () => page.evaluate(() => localStorage.setItem('bt_preview_demo', '1')),
+        });
+        try { await page.getByText(marker, { exact: true }).first().waitFor({ timeout: 8_000 }); break; }
+        catch (e) { if (attempt >= 4) { console.log(page.url()); throw e; } }
+      }
       await waitForQuietNetwork(activity, 600, 10_000);
       await page.waitForTimeout(1500);
       if (scrollEnd) {
