@@ -280,6 +280,37 @@ export default function MarketingScreen() {
         </View>
         <Feather name="chevron-right" size={16} color={colors.primary} />
       </TouchableOpacity>
+
+      {/* Follower push + giveaways */}
+      <SectionHeader title="Reach your followers" />
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-push-broadcast' as never); }}
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Follower push"
+      >
+        <Feather name="bell" size={24} color={colors.foreground} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Follower push</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>One push to your followers per day</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-giveaways' as never); }}
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Giveaways"
+      >
+        <Feather name="gift" size={24} color={colors.foreground} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Giveaways</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>Follow and comment to enter</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
     </ScrollView>
     </View>
   );
