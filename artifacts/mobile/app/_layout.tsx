@@ -1239,6 +1239,7 @@ function RootLayoutNav() {
         <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
         <Stack.Screen name="content" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        <Stack.Screen name="ai-helper" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
