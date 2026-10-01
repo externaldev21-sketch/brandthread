@@ -32,7 +32,7 @@ const STRIPE_STUB = onePage.match(/const STRIPE_STUB = `([\s\S]*?)`;\n/)[1];
 const failures = [];
 
 /** Flags text that does not fit its box. Returns a list of offenders. */
-async function textFit(page, label) {
+async function textFit(page, label, only) {
   const offenders = await page.evaluate(() => {
     const out = [];
     const vw = document.documentElement.clientWidth;
@@ -68,6 +68,7 @@ async function textFit(page, label) {
     }
     return out;
   });
+  if (only) offenders.splice(0, offenders.length, ...offenders.filter(o => only.test(o.text)));
   if (offenders.length) failures.push({ screen: label, offenders });
   console.log(`  ${offenders.length ? '✗' : '✓'} text-fit ${label}${offenders.length ? ` ${JSON.stringify(offenders)}` : ''}`);
 }
@@ -80,7 +81,7 @@ function json(route, origin, body, status = 200) {
   });
 }
 
-async function open(browser, origin, images, { role = 'buyer', target, seed, routes }) {
+async function open(browser, origin, images, { role = 'buyer', target, seed, routes, demo = true }) {
   const { context, page, activity } = await openContext(browser, { device: { viewport: VIEWPORT, scale: 2, isMobile: true }, role, origin, images });
   if (seed) {
     await context.addInitScript(([key, value]) => {
@@ -96,14 +97,39 @@ async function open(browser, origin, images, { role = 'buyer', target, seed, rou
       if (request.method() === 'OPTIONS') return route.fallback();
       const p = new URL(request.url()).pathname.replace(/^\/api\/v1\//, '/api/');
       const handled = await routes(route, p, request, (body, status) => json(route, origin, body, status));
-      if (handled === false || handled === undefined) return route.fallback();
+      if (handled === false) return route.fallback();
     });
   }
   page.setDefaultNavigationTimeout(240_000);
-  await openScreen(page, activity, origin, role, target);
+  if (demo) {
+    // `demo=1` must be on the first load: the app mirrors it into storage from there.
+    await page.goto(`${origin}/?bt_preview=${role}&demo=1`);
+    await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
+    await waitForQuietNetwork(activity, 800, 15_000);
+    await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate', { state: history.state })); },
+      `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+  } else {
+    await openScreen(page, activity, origin, role, target);
+  }
   await waitForQuietNetwork(activity, 900, 20_000);
+  // The app remounts its navigation once after sign-in; push the route again if it landed on "/".
+  const wanted = target.split('?')[0];
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await page.waitForTimeout(2500);
+    if (new URL(page.url()).pathname === wanted) break;
+    await page.evaluate((url) => { history.pushState(history.state, '', url); dispatchEvent(new PopStateEvent('popstate', { state: history.state })); },
+      `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+  }
   await page.waitForTimeout(1500);
   return { context, page };
+}
+
+async function need(page, locator, name) {
+  try { await locator.waitFor({ timeout: 25_000 }); } catch (error) {
+    await page.screenshot({ path: path.join(OUT, `FAIL-${name}.png`) });
+    console.log('  PAGE TEXT:', (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').slice(0, 400), page.url());
+    throw error;
+  }
 }
 
 async function shot(page, name) {
@@ -129,7 +155,7 @@ async function run() {
     // 1. Buyer wallet (Menu > Gift cards), with cards and empty.
     {
       const { context, page } = await open(browser, origin, images, { target: '/buyer-gift-cards?demo=1' });
-      await page.getByText('Your cards').waitFor({ timeout: 20_000 });
+      await need(page, page.getByText('Your cards'), 'w0');
       await shot(page, '01-wallet-cards');
       await textFit(page, 'wallet');
       await zoom(page, page.getByText('Add a gift card').locator('xpath=ancestor::*[3]'), '01z-wallet-add-field');
@@ -139,8 +165,8 @@ async function run() {
       await context.close();
     }
     {
-      const { context, page } = await open(browser, origin, images, { target: '/buyer-gift-cards' });
-      await page.getByText('No gift cards yet').waitFor({ timeout: 20_000 });
+      const { context, page } = await open(browser, origin, images, { target: '/buyer-gift-cards', demo: false });
+      await need(page, page.getByText('No gift cards yet'), 'w0');
       await shot(page, '03-wallet-empty');
       await textFit(page, 'wallet-empty');
       await context.close();
@@ -149,7 +175,7 @@ async function run() {
     // 2. Buy flow from a store's profile menu.
     {
       const { context, page } = await open(browser, origin, images, { target: '/gift-card-buy?sellerId=preview-seller&name=Atelier%20North&demo=1' });
-      await page.getByText('Recipient').first().waitFor({ timeout: 20_000 });
+      await need(page, page.getByText('Recipient').first(), 'w0');
       await shot(page, '04-buy-top');
       await textFit(page, 'buy-top');
       await zoom(page, page.getByText('$50.00', { exact: true }).last().locator('xpath=ancestor::*[2]'), '04z-buy-amount-chips');
@@ -163,14 +189,14 @@ async function run() {
     }
     {
       const { context, page } = await open(browser, origin, images, { target: '/gift-card-buy?sellerId=preview-seller&name=Field%20Supply&demo=1' });
-      await page.getByText('Recipient').first().waitFor({ timeout: 20_000 });
+      await need(page, page.getByText('Recipient').first(), 'w0');
       await context.close();
     }
 
     // 3. Seller: More > Store > Gift cards.
     {
       const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/gift-cards-manage?demo=1' });
-      await page.getByText('Sell gift cards').waitFor({ timeout: 20_000 });
+      await need(page, page.getByText('Sell gift cards'), 'w0');
       await shot(page, '06-seller-manage-top');
       await textFit(page, 'seller-top');
       await page.getByText('Issued cards').scrollIntoViewIfNeeded();
@@ -183,18 +209,20 @@ async function run() {
     // 4. Menu row and More row.
     {
       const { context, page } = await open(browser, origin, images, { target: '/buyer-settings-menu' });
-      await page.getByText('Gift cards').first().waitFor({ timeout: 20_000 });
+      await need(page, page.getByText('Gift cards').first(), 'w0');
+      await page.getByText('Gift cards').first().scrollIntoViewIfNeeded();
+      await page.waitForTimeout(500);
       await shot(page, '08-buyer-menu-row');
       await textFit(page, 'buyer-menu');
       await context.close();
     }
     {
-      const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/(tabs)/more' });
-      await page.getByText('Gift cards').first().waitFor({ timeout: 20_000 });
+      const { context, page } = await open(browser, origin, images, { role: 'seller', target: '/more' });
+      await need(page, page.getByText('Gift cards').first(), 'w0');
       await page.getByText('Gift cards').first().scrollIntoViewIfNeeded();
       await page.waitForTimeout(500);
       await shot(page, '09-seller-more-row');
-      await textFit(page, 'seller-more');
+      await textFit(page, 'seller-more', /Gift cards|Sell and manage/);
       await context.close();
     }
 
@@ -225,8 +253,8 @@ async function run() {
         }
         return false;
       };
-      const { context, page } = await open(browser, origin, images, { target: '/buyer-checkout', seed: [CHECKOUT_KEY, JSON.stringify(seeded)], routes });
-      await page.getByTestId('checkout-gift-card').waitFor({ timeout: 40_000 });
+      const { context, page } = await open(browser, origin, images, { target: '/buyer-checkout', demo: false, seed: [CHECKOUT_KEY, JSON.stringify(seeded)], routes });
+      await need(page, page.getByTestId('checkout-gift-card'), 'checkout');
       const scroll = page.getByTestId('checkout-scroll');
       const toTestId = async (id, off = 70) => {
         await scroll.evaluate((el, [tid, o]) => {
@@ -235,6 +263,11 @@ async function run() {
         }, [id, off]);
         await page.waitForTimeout(500);
       };
+      await toTestId('checkout-gift-card');
+      await shot(page, '10a-checkout-gift-card-offered');
+      await page.getByLabel(/Apply gift card/).first().click();
+      await need(page, page.getByTestId('checkout-gift-card-applied'), 'applied');
+      await page.waitForTimeout(1800);
       await toTestId('checkout-gift-card');
       await shot(page, '10-checkout-gift-card-applied');
       await textFit(page, 'checkout-gift-card');

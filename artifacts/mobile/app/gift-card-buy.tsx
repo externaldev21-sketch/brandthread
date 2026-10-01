@@ -59,12 +59,10 @@ export default function GiftCardBuyScreen() {
       : <BuyForm info={{ ...info, storeName: info.storeName || String(params.name ?? '') }} signedIn={!!isSignedIn || preview} preview={preview} />;
 
   return (
-    <StripePaymentProvider amountCents={0}>
-      <BrandthreadScreen scrollable noSafeTop>
-        <ScreenHeader title="Gift card" />
-        {body}
-      </BrandthreadScreen>
-    </StripePaymentProvider>
+    <BrandthreadScreen scrollable noSafeTop>
+      <ScreenHeader title="Gift card" />
+      {body}
+    </BrandthreadScreen>
   );
 }
 
@@ -137,7 +135,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
 
   if (done) {
     return (
-      <View style={{ paddingHorizontal: GUTTER }}>
+      <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
         <GiftCardFace storeName={done.storeName} amountText={formatCents(done.amountCents)} />
         <Text style={s.doneTitle}>Gift card sent</Text>
         <Text style={s.plain}>We emailed it to {done.email}. They can add it under Menu, Gift cards, or enter the code at checkout.</Text>
@@ -159,7 +157,8 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
   }
 
   return (
-    <View style={{ paddingHorizontal: GUTTER }}>
+    <StripePaymentProvider amountCents={amountCents ?? info.minCents}>
+    <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
       <GiftCardFace storeName={info.storeName} amountText={amountCents ? formatCents(amountCents) : '$0'} />
 
       <CheckoutSection title="Amount" first style={s.section}>
@@ -229,6 +228,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
         testID="gift-card-pay"
       />
     </View>
+    </StripePaymentProvider>
   );
 }
 

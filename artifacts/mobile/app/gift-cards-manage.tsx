@@ -123,7 +123,7 @@ export default function GiftCardsManageScreen() {
   return (
     <BrandthreadScreen scrollable noSafeTop>
       <ScreenHeader title="Gift cards" onBack={() => goBackOr(router)} />
-      <View style={{ paddingHorizontal: GUTTER }}>
+      <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
         {loading ? (
           <View style={s.center}><ActivityIndicator /></View>
         ) : failed || !settings ? (

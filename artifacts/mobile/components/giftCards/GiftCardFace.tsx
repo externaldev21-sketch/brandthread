@@ -23,7 +23,7 @@ export function GiftCardFace({
 }) {
   return (
     <View
-      style={[styles.card, compact && styles.cardCompact]}
+      style={[styles.card, compact ? styles.cardCompact : styles.cardFull]}
       accessible
       accessibilityLabel={`${storeName} gift card, ${amountText}${caption ? `, ${caption}` : ''}`}
     >
@@ -41,10 +41,11 @@ export function GiftCardFace({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: CARD_BG, borderRadius: 20, padding: SP.lg, aspectRatio: 1.6,
+    backgroundColor: CARD_BG, borderRadius: 20, padding: SP.lg,
     justifyContent: 'space-between', borderWidth: 1, borderColor: '#2A2A2A',
   },
-  cardCompact: { aspectRatio: undefined, minHeight: 112, padding: SP.md, borderRadius: 16 },
+  cardFull: { aspectRatio: 1.6 },
+  cardCompact: { minHeight: 112, gap: SP.md, padding: SP.md, borderRadius: 16 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
   store: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.md, color: CARD_FG },
   amount: { fontFamily: FONT.bold, fontSize: 44, lineHeight: 50, color: CARD_FG, ...TABULAR_NUMS },
