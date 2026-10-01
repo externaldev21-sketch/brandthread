@@ -165,7 +165,13 @@ export type QuoteGroup = {
   processingDays: number | null;
 };
 
-export type CartQuote = { amountCents: number; groups: QuoteGroup[] };
+/** paymentMethodTypes: what the server will offer for this cart (card, plus klarna / afterpay_clearpay when every seller opted in). */
+export type CartQuote = { amountCents: number; groups: QuoteGroup[]; paymentMethodTypes?: string[] };
+
+/** Whether the quote offers Buy now, pay later (web Payment Element only; native keeps card / wallets). */
+export function quoteOffersBnpl(quote: CartQuote | null | undefined): boolean {
+  return !!quote?.paymentMethodTypes?.some(type => type === 'klarna' || type === 'afterpay_clearpay');
+}
 
 export type PaymentIntentStart = CartQuote & {
   paymentIntentId: string;

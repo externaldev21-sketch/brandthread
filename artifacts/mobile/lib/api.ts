@@ -2681,6 +2681,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       payout: (data: { idempotencyKey: string; amount: number; currency: string }) =>
         post<any>('/api/finance/payout', data),
     },
+    /** Seller payment settings (Buy now, pay later opt-in). */
+    sellerPaymentSettings: {
+      get: () => get<{ bnplEnabled: boolean; bnplAvailable: boolean }>('/api/seller/payment-settings'),
+      setBnpl: (bnplEnabled: boolean) =>
+        patch<{ bnplEnabled: boolean; bnplAvailable: boolean }>('/api/seller/payment-settings', { bnplEnabled }),
+    },
     /** Taxes & Duties — Stripe Tax integration */
     taxes: {
       status:    () => get<{

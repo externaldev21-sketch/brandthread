@@ -70,7 +70,7 @@ import {
 } from '@/lib/checkoutReadiness';
 import {
   buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
-  isCartQuote, quoteKey, quoteTotals, recipientName, walletContactToCheckout,
+  isCartQuote, quoteKey, quoteOffersBnpl, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
 import { ApiError } from '@/lib/networkNotice';
@@ -83,7 +83,7 @@ import { CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from 
 import { ContactSection } from '@/components/checkout/ContactSection';
 import { ShippingSection, type CheckoutAddressDraft, type SavedAddress } from '@/components/checkout/ShippingSection';
 import {
-  ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
+  BNPL, ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
 } from '@/components/checkout/PaymentSection';
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
@@ -543,7 +543,7 @@ export default function BuyerCheckoutScreen() {
     const getClientSecret = () => startPaymentIntent(current, who);
     let outcome: ConfirmOutcome | null;
     try {
-      outcome = selectedCard === NEW_CARD || !savedCards.some(card => card.id === selectedCard)
+      outcome = selectedCard === NEW_CARD || selectedCard === BNPL || !savedCards.some(card => card.id === selectedCard)
         ? await controller.confirmCard(getClientSecret, billing)
         : await controller.confirmSaved(getClientSecret, selectedCard);
     } catch {
@@ -1040,6 +1040,7 @@ export default function BuyerCheckoutScreen() {
             onSelectCard={setSelectedCard}
             onCardComplete={setCardComplete}
             sellerCount={current.deliveryGroups.length}
+            bnplAvailable={Platform.OS === 'web' && quoteOffersBnpl(quote?.value)}
           />
 
           <PromoCodeSection
@@ -1145,7 +1146,7 @@ export default function BuyerCheckoutScreen() {
   );
   // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.
   return inApp
-    ? <StripePaymentProvider amountCents={totals.totalCents} onUnavailable={() => setStripeLoadFailed(true)}>{page}</StripePaymentProvider>
+    ? <StripePaymentProvider amountCents={totals.totalCents} paymentMethodTypes={quote?.value.paymentMethodTypes} onUnavailable={() => setStripeLoadFailed(true)}>{page}</StripePaymentProvider>
     : page;
 }
 
