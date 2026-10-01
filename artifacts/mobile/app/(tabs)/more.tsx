@@ -77,6 +77,8 @@ const GROWTH_ITEMS: NavItem[] = [
   { icon: 'bar-chart-2', label: 'Analytics', desc: 'Sales, traffic and insights', accent: 'accentLight', route: '/(tabs)/analytics' },
   { icon: 'video', label: 'Content', desc: 'Posts, drafts and scheduled', accent: 'secondary', route: '/content' },
   { icon: 'users', label: 'Community', desc: 'Join topic group chats', accent: 'secondary', route: '/community' },
+  { icon: 'star', label: 'Reviews', desc: 'Read and reply to buyer reviews', accent: 'warning', route: '/seller-reviews' },
+  { icon: 'help-circle', label: 'Questions', desc: 'Answer buyer questions on products', accent: 'accentLight', route: '/seller-questions' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [

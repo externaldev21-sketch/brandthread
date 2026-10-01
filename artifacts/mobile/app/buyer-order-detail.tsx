@@ -28,6 +28,8 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { FIT_OPTIONS, MAX_REVIEW_PHOTOS, addReviewPhotos, type FitOption } from '@/lib/reviewDisplay';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
 import { mapDelivery, safeTrackingUrl } from '@/lib/deliveryGuarantee';
 import { DeliveryTrackerCard, AutoRefundCard } from '@/components/orders/DeliveryTracker';
@@ -40,7 +42,7 @@ import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadCard,
-  GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
+  GradientCard, StatusBadge, PrimaryButton, SecondaryButton, PressableScale,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -238,24 +240,49 @@ function StarRating({ rating, size = 36, interactive = true, onRate }: {
   );
 }
 
+export interface ReviewExtras { photoUris: string[]; fitNote: FitOption | null }
+
 // ─── Inline review rating sheet (Depop-pattern) ───────────────────────────────
 
 function ReviewSheet({
   visible, sellerName, onClose, onSubmit, submitting,
 }: {
   visible: boolean; sellerName: string;
-  onClose: () => void; onSubmit: (rating: number, body: string) => void;
+  onClose: () => void; onSubmit: (rating: number, body: string, extras: ReviewExtras) => void;
   submitting: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [fit, setFit] = useState<FitOption | null>(null);
+  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
 
   // Reset when sheet opens
   useEffect(() => {
-    if (visible) { setRating(0); setBody(''); }
+    if (visible) { setRating(0); setBody(''); setPhotos([]); setFit(null); setPhotoNotice(null); }
   }, [visible]);
+
+  async function pickPhotos() {
+    setPhotoNotice(null);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setPhotoNotice('Allow photo access in Settings to add photos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.7,
+        selectionLimit: MAX_REVIEW_PHOTOS - photos.length,
+      });
+      if (!result.canceled) setPhotos(prev => addReviewPhotos(prev, result.assets.map(a => a.uri)));
+    } catch {
+      setPhotoNotice('Couldn’t open your photos. Try again.');
+    }
+  }
 
   const canSubmit = rating > 0 && !submitting;
   const ratingLabel = rating === 0 ? 'Tap to rate your experience'
@@ -310,6 +337,58 @@ function ReviewSheet({
         />
         <Text style={[rvs.charCount, { color: theme.subtle }]}>{body.length}/500</Text>
 
+        {/* Fit */}
+        <View style={rvs.chipRow} accessibilityLabel="How did it fit">
+          {FIT_OPTIONS.map(option => {
+            const active = fit === option;
+            return (
+              <PressableScale
+                key={option}
+                onPress={() => setFit(active ? null : option)}
+                style={[rvs.chip, { borderColor: active ? theme.text : theme.border, backgroundColor: active ? theme.text : 'transparent' }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={option}
+              >
+                <Text style={[rvs.chipText, { color: active ? theme.background : theme.muted }]}>{option}</Text>
+              </PressableScale>
+            );
+          })}
+        </View>
+
+        {/* Add photos */}
+        <View style={rvs.photoRow}>
+          {photos.map(uri => (
+            <View key={uri} style={rvs.photoWrap}>
+              <Image source={{ uri }} style={[rvs.photo, { backgroundColor: theme.cardElevated }]} />
+              <View style={rvs.photoRemoveSlot} pointerEvents="box-none">
+                <PressableScale
+                  onPress={() => setPhotos(prev => prev.filter(u => u !== uri))}
+                  style={[rvs.photoRemove, { backgroundColor: theme.text }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove photo"
+                  hitSlop={12}
+                  noMinHeight
+                >
+                  <Feather name="x" size={11} color={theme.background} />
+                </PressableScale>
+              </View>
+            </View>
+          ))}
+          {photos.length < MAX_REVIEW_PHOTOS && (
+            <PressableScale
+              onPress={pickPhotos}
+              style={[rvs.addPhoto, { borderColor: theme.border }]}
+              accessibilityRole="button"
+              accessibilityLabel="Add photos"
+            >
+              <Feather name="camera" size={16} color={theme.text} />
+              <Text style={[rvs.addPhotoText, { color: theme.text }]}>Add photos</Text>
+            </PressableScale>
+          )}
+        </View>
+        {!!photoNotice && <Text style={[rvs.charCount, { color: theme.muted, textAlign: 'left' }]}>{photoNotice}</Text>}
+
         {/* Actions */}
         <View style={rvs.actions}>
           <TouchableOpacity
@@ -322,7 +401,7 @@ function ReviewSheet({
           </TouchableOpacity>
           <TouchableOpacity
             style={[rvs.submitBtn, { backgroundColor: theme.accent }, !canSubmit && rvs.submitBtnDisabled]}
-            onPress={canSubmit ? () => onSubmit(rating, body) : undefined}
+            onPress={canSubmit ? () => onSubmit(rating, body, { photoUris: photos, fitNote: fit }) : undefined}
             disabled={!canSubmit}
             activeOpacity={0.8}
             accessibilityRole="button"
@@ -361,6 +440,16 @@ const rvs = StyleSheet.create({
     marginBottom: 4,
   },
   charCount: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md },
+  chipRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, flexWrap: 'wrap' },
+  chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chipText: { fontFamily: FONT.semibold, fontSize: FS.meta },
+  photoRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, alignItems: 'center', flexWrap: 'wrap' },
+  photoWrap: { width: 56, height: 56 },
+  photo: { width: 56, height: 56, borderRadius: 8 },
+  photoRemoveSlot: { position: 'absolute', top: -6, right: -6 },
+  photoRemove: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  addPhoto: { height: 56, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  addPhotoText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   actions: { flexDirection: 'row', gap: SP.sm },
   cancelBtn: { flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
@@ -711,7 +800,7 @@ export default function BuyerOrderDetailScreen() {
     router.push(('/buyer-report?targetType=seller&targetId=' + encodeURIComponent(order.sellerId) + '&targetLabel=' + encodeURIComponent(order.sellerName)) as never);
   }
 
-  async function handleSubmitReview(rating: number, body: string) {
+  async function handleSubmitReview(rating: number, body: string, extras: ReviewExtras) {
     if (!order) return;
     // Gate: only allow reviews on real API orders to prevent demo/local data contamination
     if (!isRealOrderId(order.id)) {
@@ -720,11 +809,19 @@ export default function BuyerOrderDetailScreen() {
     }
     setSubmittingReview(true);
     try {
+      // Photos upload first; the review carries only the returned private paths.
+      const photos: string[] = [];
+      for (const uri of extras.photoUris) {
+        const { objectPath } = await api.reviews.uploadPhoto({ uri });
+        photos.push(objectPath);
+      }
       await api.reviews.create({
         orderId:  order.id,
         sellerId: order.sellerId,
         rating,
         body: body.trim() || undefined,
+        ...(photos.length ? { photos } : {}),
+        ...(extras.fitNote ? { fitNote: extras.fitNote } : {}),
       });
       setReviewSubmitted(true);
       setShowReviewSheet(false);

@@ -462,6 +462,25 @@ async function doRequest<T = any>(
   return data;
 }
 
+export interface ProductQuestion {
+  id: string;
+  productId: string;
+  body: string;
+  askerName: string;
+  createdAt: string;
+  mine: boolean;
+  answer: { id: string; body: string; createdAt: string; updatedAt?: string } | null;
+}
+export interface SellerProductQuestion {
+  id: string;
+  productId: string;
+  productName: string;
+  body: string;
+  askerName: string;
+  createdAt: string;
+  answer: { id: string; body: string; createdAt: string } | null;
+}
+
 async function uploadImage<T = any>(
   path: string,
   image: { uri: string; mimeType?: string | null },
@@ -1824,6 +1843,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           categories: Array<{ category: string; productCount: number; imageUri: string | null; color: string }>;
         }>(`/api/public/search/categories?limit=${encodeURIComponent(String(limit))}`),
     },
+    /** Product Q&A — public read, signed-in ask, seller answers. */
+    productQa: {
+      list: (productId: string, limit = 30, offset = 0) =>
+        get<{ questions: ProductQuestion[]; totalCount: number }>(
+          `/api/product-qa/product/${encodeURIComponent(productId)}?limit=${limit}&offset=${offset}`,
+        ),
+      ask: (productId: string, body: string) =>
+        post<ProductQuestion>(`/api/product-qa/product/${encodeURIComponent(productId)}`, { body }),
+      remove: (questionId: string) => del<{ ok: boolean }>(`/api/product-qa/questions/${encodeURIComponent(questionId)}`),
+      /** Seller inbox — questions on my products, unanswered first. */
+      sellerInbox: () =>
+        quietGet<{ unansweredCount: number; questions: SellerProductQuestion[] }>('/api/product-qa/seller'),
+      answer: (questionId: string, body: string) =>
+        post<{ id: string; body: string; createdAt: string }>(`/api/product-qa/questions/${encodeURIComponent(questionId)}/answer`, { body }),
+    },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */
       forProduct: (productId: string) =>
@@ -1842,7 +1876,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         productId?: string;
         rating:     number;
         body?:      string;
+        /** Object paths returned by `uploadPhoto`. */
+        photos?:    string[];
+        fitNote?:   'Runs small' | 'True to size' | 'Runs large';
       }) => post<any>('/api/reviews', body),
+      /** Upload one review photo (buyer); send the returned objectPath in `photos`. */
+      uploadPhoto: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ objectPath: string }>('/api/reviews/photos', image, getToken, getCacheScope),
+      /** Mark a review helpful (idempotent, signed-in). */
+      markHelpful: (reviewId: string) =>
+        put<{ helpfulCount: number; viewerHelpful: boolean }>(`/api/reviews/${encodeURIComponent(reviewId)}/helpful`, {}),
+      unmarkHelpful: (reviewId: string) =>
+        del<{ helpfulCount: number; viewerHelpful: boolean }>(`/api/reviews/${encodeURIComponent(reviewId)}/helpful`),
       /** Seller — all received reviews with buyer + product info (authenticated as seller). */
       mine:  () => quietGet<any[]>('/api/reviews/mine'),
       /** Seller — post a public reply to a received review. */

@@ -102,6 +102,11 @@ export function createNotificationResponseHandler(
       }
       return;
     }
+    // A buyer asked a question on the seller's product: open the seller's answer inbox.
+    if (data?.targetType === 'product_question') {
+      router.push('/seller-questions');
+      return;
+    }
     if (data?.targetType === 'return' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
       return;
