@@ -76,8 +76,16 @@ async function run() {
       return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(body) });
     });
     await openScreen(page, activity, origin, 'seller', '/product-import');
-    await page.waitForTimeout(7000);
-    await page.getByText('Import Products').first().waitFor({ timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(6000);
+    // The app remounts its navigation tree once after the stubbed auth settles; retry until the screen is up.
+    for (let i = 0; i < 6; i += 1) {
+      if (await page.getByText('Import Products').first().isVisible().catch(() => false)) break;
+      await page.evaluate(() => {
+        history.pushState(history.state, '', '/product-import?bt_preview=seller');
+        window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+      });
+      await page.waitForTimeout(2500);
+    }
     await shot(page, '01-chooser');
     if (prefix === 'before') { await context.close(); return; }
     await page.getByText('CSV File').first().click();
