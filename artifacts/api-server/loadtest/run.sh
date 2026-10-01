@@ -10,7 +10,7 @@ K6=${K6:-k6}; mkdir -p loadtest/results
 export K6_NO_USAGE_REPORT=true
 
 [ -f loadtest/results/.apipid ] && kill "$(cat loadtest/results/.apipid)" 2>/dev/null || true; sleep 1
-node ${NODE_FLAGS:-} dist-loadtest/index.mjs > loadtest/results/$label.api.log 2>&1 &
+node ${NODE_FLAGS:-} ${LT_OUT:-dist-loadtest}/index.mjs > loadtest/results/$label.api.log 2>&1 &
 api=$!; echo $api > loadtest/results/.apipid
 for _ in $(seq 40); do curl -sf localhost:$PORT/api/healthz >/dev/null && break; sleep 0.5; done
 

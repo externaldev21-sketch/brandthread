@@ -9,11 +9,11 @@ Nothing in this plan changes UI. Nothing here migrates hosting without Dev's OK.
 
 | What | Result |
 | --- | --- |
-| Realistic traffic mix | Averaged only **~60 requests/s** over a 25-to-800 ramp (p50 3-24 s, 15.5k dropped arrivals). Postgres is pinned at ~3 cores. |
-| Search | Dies at **under 10 req/s** (p50 19 s, 10% timeouts). |
-| Video playback lookup | p95 5 s above 100 req/s; Postgres at 3 cores. |
-| For You / Following feed | p50 1.5-2.3 s, p95 10-15 s above ~100 req/s. |
-| DM thread read | p95 1.9 s above ~100 req/s (a DELETE runs on every read). |
+| Realistic traffic mix | Averaged only **~54 requests/s** over a 25-to-800 ramp (p50 5-24 s, 16k dropped arrivals). Postgres is pinned at ~3 cores. |
+| Search | Dies at **under 10 req/s** (59% of requests time out at 60 s). |
+| Video playback lookup | p95 4.6 s above ~100 req/s; Postgres at 3.3 cores. |
+| For You / Following feed | p50 1.5-3.7 s, p95 10-14 s above ~100 req/s (one saturated Node core). |
+| DM thread read | p95 1.6 s above ~100 req/s (one saturated Node core). |
 | Profile, product, DM list, DM send | Fine. One Node core served ~800 req/s with p95 under 45 ms. |
 
 The cheap endpoints are not the problem. Four things are, and they are all fixable without a rewrite:
@@ -29,7 +29,7 @@ Other findings: uploads are buffered in API memory (`/api/posts/video-clips` tak
 
 Harness: `artifacts/api-server/loadtest/` (see its README). It builds the **real API** with Clerk swapped for a header-based stub (a separate bundle, never part of `pnpm build`), seeds a throwaway local Postgres 16 with 20k users, 60k posts, 8k products, 380k follows, 500k messages, 200k interactions, and drives it with k6 using an open-model ramping arrival rate, so the load does not slow down when the server does. Every request carries a distinct client IP, so the per-IP limiter behaves like production. Nothing touches Stripe, OpenAI, GCS or any real database.
 
-Caveats, stated plainly: one machine shared by k6, Node and Postgres (4 cores), no network latency, no real bucket (media 404s at the storage step, so the DB lookup is what is measured). Absolute numbers are a floor for a dedicated setup; the **ratios and the shape of the failures** are what matter. Full tables: [`baseline-results.md`](./baseline-results.md).
+Caveats, stated plainly: one machine shared by k6, Node and Postgres (4 cores), no network latency, no real bucket (media 404s at the storage step, so the DB lookup is what is measured). Absolute numbers are a floor for a dedicated setup; the **ratios and the shape of the failures** are what matter. Full tables: [`baseline-results.md`](./baseline-results.md). The seed gives captions and product names varied vocabulary; an earlier run with identical captions overstated search cost and was discarded.
 
 ## 3. Target architecture
 
