@@ -16,6 +16,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { ReorderResolution } from '@/lib/reorderSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -1447,6 +1448,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
         cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
+        ),
+        /** Re-resolves a past order against today's catalogue (price, stock, variants). Read-only; the client adds the addable lines to the cart. */
+        reorder: (id: string) => post<ReorderResolution>(
+          `/api/buyer/orders/${encodeURIComponent(id)}/reorder`, {}
         ),
       },
       /** Recently viewed products — recorded on product detail view, shown on Discover and in the bag. */

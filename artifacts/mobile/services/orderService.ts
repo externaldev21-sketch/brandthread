@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { centsAtPercent, formatCents } from '@/lib/money';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewBuyerOrderRows } from '@/lib/previewOrders';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
   HeldFundsRecord, PayoutMilestone, Fulfillment, FulfillmentGroup,
@@ -685,6 +687,10 @@ function buyerOrdersCacheKey(userId: string): string {
 export async function getBuyerOrdersWithStatus(
   userId: string | null | undefined,
 ): Promise<BuyerOrdersLoadResult> {
+  // Signed-out dev-web preview with demo=1: seeded rows, no protected request.
+  if (!userId && isPreviewDemoMode()) {
+    return { orders: getPreviewBuyerOrderRows().map(mapApiBuyerOrder), fromCache: false };
+  }
   try {
     const apiOrders = await serviceRequest('/api/buyer/orders') as unknown;
     if (!Array.isArray(apiOrders)) {

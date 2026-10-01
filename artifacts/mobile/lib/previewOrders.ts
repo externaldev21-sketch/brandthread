@@ -72,6 +72,7 @@ export function getPreviewBuyerOrder(id: string | null | undefined): Record<stri
   // is part of the demo cast, not a fresh account's real history — only
   // shown under the explicit demo=1 opt-in. An order actually PLACED this
   // session (the `placed` map above) always shows regardless.
+  if (id === 'preview-order-02') return getDemoDeliveredOrder();
   if (!isPreviewDemoMode() || id !== 'preview-order-01') return null;
   const product = previewCatalogProduct('preview-product-01');
   if (!product) return null;
@@ -107,4 +108,46 @@ export function getPreviewBuyerOrder(id: string | null | undefined): Record<stri
     isCustomerVisible: true,
     createdAt: iso(2 * DAY),
   };
+}
+
+/**
+ * A delivered demo order for reviewing "Reorder" (demo=1 only): two items that
+ * are still sold and one whose product no longer exists.
+ */
+function getDemoDeliveredOrder(): Record<string, unknown> | null {
+  if (!__DEV__ || !isPreviewDemoMode()) return null;
+  const a = previewCatalogProduct('preview-product-02');
+  const b = previewCatalogProduct('preview-product-03');
+  if (!a || !b) return null;
+  const now = Date.now();
+  const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
+  const line = (p: PreviewCatalogProduct, variantLabel: string, quantity: number) => ({
+    productId: p.productId, productName: p.name, variantLabel, quantity,
+    priceCents: p.currentPriceCents, imageUrl: p.images[0],
+  });
+  const items = [
+    line(a, a.sizes[1] ?? 'S', 1),
+    line(b, b.sizes[1] ?? 'M', 1),
+    { productId: 'preview-product-gone', productName: 'Wool Scarf', variantLabel: 'One size', quantity: 1, priceCents: 9500 },
+  ];
+  const subtotalCents = items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
+  return {
+    id: 'preview-order-02',
+    orderNumber: 'BT-10377',
+    ownerId: a.sellerId,
+    sellerDisplayName: a.sellerDisplayName,
+    status: 'delivered',
+    stripePaymentIntentId: 'pi_preview_order_02',
+    items,
+    shippingAddress: { name: 'Jordan Reyes', street: '148 Mercer Street', city: 'New York', state: 'NY', zip: '10012', country: 'US' },
+    subtotalCents, shippingCents: 0, totalCents: subtotalCents,
+    trackingNumber: '1Z999AA10123456701', carrier: 'UPS', trackingStatus: 'delivered',
+    shippedAt: iso(9 * DAY), paidAt: iso(10 * DAY), isCustomerVisible: true, createdAt: iso(10 * DAY),
+  };
+}
+
+/** GET /api/buyer/orders rows for the signed-out demo=1 preview (empty otherwise). */
+export function getPreviewBuyerOrderRows(): Record<string, unknown>[] {
+  const demo = getDemoDeliveredOrder();
+  return demo ? [demo] : [];
 }

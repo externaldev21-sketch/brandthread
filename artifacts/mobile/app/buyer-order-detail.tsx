@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
+import { useReorderFlow } from '@/components/orders/ReorderFlow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
@@ -493,6 +494,7 @@ export default function BuyerOrderDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { reorder, busyOrderId: reorderBusyId, element: reorderElement } = useReorderFlow();
   const { userId } = useAuth();
 
   // The real order, or — only when that request fails in the dev-web
@@ -743,19 +745,11 @@ export default function BuyerOrderDetailScreen() {
     }
   }
 
+  // Extends the old "Buy Again" alert (which only pointed at Discover): one
+  // tap now re-checks price/stock and adds every available line to the cart.
   function handleBuyAgain() {
     if (!order) return;
-    const firstItem = order.lineItems[0];
-    if (!firstItem) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Buy Again',
-      `Looking for ${firstItem.productName}? Browse Discover to find it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Discover', onPress: () => router.navigate('/(buyer)/discover' as never) },
-      ]
-    );
+    void reorder(order.id);
   }
 
   // ── Render states ────────────────────────────────────────────────────────────
@@ -1108,7 +1102,7 @@ export default function BuyerOrderDetailScreen() {
           <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
           <SecondaryButton label="Report Seller" icon="flag" onPress={handleReportSeller} accent={theme.error} />
           {order.status === 'delivered' && (
-            <SecondaryButton label="Buy Again" icon="repeat" onPress={handleBuyAgain} />
+            <SecondaryButton label={reorderBusyId === order.id ? 'Adding…' : 'Reorder'} icon="repeat" onPress={handleBuyAgain} disabled={reorderBusyId === order.id} />
           )}
         </View>
 
@@ -1191,6 +1185,7 @@ export default function BuyerOrderDetailScreen() {
         onSubmit={handleSubmitReview}
         submitting={submittingReview}
       />
+      {reorderElement}
     </BrandthreadScreen>
   );
 }
