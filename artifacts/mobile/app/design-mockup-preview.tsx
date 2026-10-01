@@ -169,7 +169,7 @@ export default function DesignMockupPreviewScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* View tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow} testID="mockup-view-tabs">
           {VIEWS.map(v => (
             <TouchableOpacity
               key={v}
@@ -203,7 +203,7 @@ export default function DesignMockupPreviewScreen() {
               </View>
             )}
           </View>
-          <View style={styles.overlayLabels}>
+          <View style={styles.overlayLabels} testID="mockup-overlay-labels">
             <Text style={[styles.overlayName, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#000' : FG }]}>
               {project.name}
             </Text>

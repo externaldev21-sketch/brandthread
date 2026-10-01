@@ -88,7 +88,10 @@ test('a saved project survives a cold URL load of the mockup preview and the can
   // The real preview panel: "<garment> · Front" overlay label, never the fallback.
   await expect(page.getByText(/· Front$/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(FALLBACK, { exact: true })).toHaveCount(0);
-  await assertNoTextOrBoxOverflow(page, 'body');
+  // Guard the page's text regions (the tab bar's Feather glyphs are built
+  // from intentionally overlapping paths, so `body` is not a text root).
+  await assertNoTextOrBoxOverflow(page, '[data-testid="mockup-view-tabs"]');
+  await assertNoTextOrBoxOverflow(page, '[data-testid="mockup-overlay-labels"]');
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, '01-mockup-preview-cold-load.png') });
 
   // ── Cold load #2: the canvas itself by URL.
