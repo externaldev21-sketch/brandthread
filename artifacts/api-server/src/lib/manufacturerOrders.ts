@@ -5,6 +5,9 @@
  * live order snapshot attached to order cards in chat.
  */
 import { db } from "@workspace/db";
+import { ObjectStorageService } from "./objectStorage";
+
+const objectStorage = new ObjectStorageService();
 import {
   manufacturerActivityEvents,
   manufacturerMessages,
@@ -48,6 +51,7 @@ export async function recordOrderEvent(
     carrier?: string | null;
     trackingNumber?: string | null;
     note?: string | null;
+    imageUrls?: string[];
   },
 ) {
   const [event] = await executor.insert(manufacturerOrderEvents).values({
@@ -60,6 +64,7 @@ export async function recordOrderEvent(
     carrier: input.carrier ?? null,
     trackingNumber: input.trackingNumber ?? null,
     note: input.note ?? null,
+    imageUrls: input.imageUrls ?? [],
   }).returning();
   return event;
 }
@@ -240,13 +245,23 @@ export async function loadOrderTimeline(order: SampleOrderRow, viewerRole: "sell
       timeZone: manufacturer.timeZone,
     } : undefined,
     steps: buildTimeline({ status: order.status, paidAt, shippedAt: order.shippedAt, deliveredAt: order.deliveredAt }, events),
-    events: events.map((event) => ({
-      id: event.id,
-      actorRole: event.actorRole,
-      fromStatus: event.fromStatus,
-      toStatus: event.toStatus,
-      note: event.note,
-      createdAt: event.createdAt.toISOString(),
+    events: await Promise.all(events.map(async (event) => {
+      // Stored as object paths (never signed URLs, which expire) — resolve
+      // to short-lived download URLs on every read, same as the sample-
+      // order photo gallery.
+      const paths = Array.isArray(event.imageUrls) ? event.imageUrls as string[] : [];
+      const imageUrls = paths.length === 0 ? [] : (await Promise.all(
+        paths.map((p) => objectStorage.getObjectEntityDownloadURL(p).catch(() => null)),
+      )).filter((u): u is string => !!u);
+      return {
+        id: event.id,
+        actorRole: event.actorRole,
+        fromStatus: event.fromStatus,
+        toStatus: event.toStatus,
+        note: event.note,
+        imageUrls,
+        createdAt: event.createdAt.toISOString(),
+      };
     })),
     createdAt: order.createdAt.toISOString(),
     paidAt: paidAt?.toISOString() ?? null,

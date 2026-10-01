@@ -303,6 +303,10 @@ export const manufacturerOrderEvents = pgTable('manufacturer_order_events', {
   carrier:        text('carrier'),
   trackingNumber: text('tracking_number'),
   note:           text('note'),
+  // Production-milestone photo updates: a manufacturer can post progress
+  // photos against the order's current stage without a status change
+  // (fromStatus === toStatus for these "same-stage" events).
+  imageUrls:      json('image_urls').$type<string[]>().notNull().default([]),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   orderCreatedIdx: index('manufacturer_order_events_order_created_idx').on(t.sampleOrderId, t.createdAt),

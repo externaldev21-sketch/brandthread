@@ -8,7 +8,7 @@
  * Manufacturers own production-stage transitions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -244,6 +244,27 @@ export default function ProductionDetailScreen() {
           <Text style={styles.small}>Times shown in your time zone.{localTime ? ` It's ${localTime} for the factory.` : ''}</Text>
         </View>
 
+        {data.events.some((event) => (event.imageUrls?.length ?? 0) > 0 || (event.fromStatus === event.toStatus && event.note)) && (
+          <View style={styles.card} testID="tracker-updates">
+            <Text style={styles.section}>Updates from the factory</Text>
+            {data.events
+              .filter((event) => (event.imageUrls?.length ?? 0) > 0 || (event.fromStatus === event.toStatus && event.note))
+              .map((event, index) => (
+                <View key={event.id} style={[styles.updateRow, index > 0 && styles.updateRowDivider]}>
+                  <Text style={styles.muted}>{formatTimestamp(event.createdAt)}</Text>
+                  {event.note ? <Text style={styles.updateNote}>{event.note}</Text> : null}
+                  {(event.imageUrls?.length ?? 0) > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.xs }}>
+                      {event.imageUrls!.map((url, i) => (
+                        <Image key={`${event.id}-${i}`} source={{ uri: url }} style={styles.updatePhoto} testID="tracker-update-photo" />
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              ))}
+          </View>
+        )}
+
         {delivered && order.orderType === 'sample' && (
           <SecondaryButton label="Review the sample" icon="star" onPress={() => router.push({ pathname: '/sample-detail', params: { id: order.id } } as never)} />
         )}
@@ -279,4 +300,8 @@ const styles = StyleSheet.create({
   walletLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   textBtn: { alignSelf: 'center', paddingVertical: SP.sm, paddingHorizontal: SP.md },
   textBtnLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  updateRow: { gap: SP.xs },
+  updateRowDivider: { borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm, marginTop: SP.xs },
+  updateNote: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 19 },
+  updatePhoto: { width: 96, height: 96, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED },
 });
