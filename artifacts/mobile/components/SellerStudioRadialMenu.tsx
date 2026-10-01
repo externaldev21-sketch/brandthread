@@ -83,6 +83,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withSequence,
+  withSpring,
   withTiming,
   Easing,
   type SharedValue,
@@ -260,14 +261,20 @@ function retractEnter(
   traceProgress: SharedValue<number>,
   zoomScale: SharedValue<number>,
   enterFade: SharedValue<number>,
+  labelPunchScale: SharedValue<number>,
+  labelFlash: SharedValue<number>,
 ) {
   'worklet';
   cancelAnimation(traceProgress);
   cancelAnimation(zoomScale);
   cancelAnimation(enterFade);
+  cancelAnimation(labelPunchScale);
+  cancelAnimation(labelFlash);
   traceProgress.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
   zoomScale.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) });
   enterFade.value = 0;
+  labelPunchScale.value = 1;
+  labelFlash.value = 0;
 }
 
 // ─── Per-card signature micro-animations ───────────────────────────────────────
@@ -426,6 +433,13 @@ export default function SellerStudioRadialMenu({
   const traceProgress = useSharedValue(0);
   const zoomScale = useSharedValue(1);
   const enterFade = useSharedValue(0);
+  // The title's own "snap" the instant the zoom-through burst fires (see
+  // triggerZoomEnter) — Dev: a quick scale punch plus a brief letter-
+  // spacing tighten/brightness flash, in sync with the burst, now that the
+  // label itself is rendered outside the card's scaled layer (see
+  // CarouselCard below) and no longer needs to fade to avoid clipping.
+  const labelPunchScale = useSharedValue(1);
+  const labelFlash = useSharedValue(0);
   const [entering, setEntering] = useState(false);
 
   // ── Per-card micro-animation trigger (see MICRO_KIND above) ─────────────────
@@ -448,6 +462,8 @@ export default function SellerStudioRadialMenu({
       traceProgress.value = 0;
       zoomScale.value = 1;
       enterFade.value = 0;
+      labelPunchScale.value = 1;
+      labelFlash.value = 0;
       microTriggerIndex.value = -1;
       microTriggerSeq.value = 0;
       setEntering(false);
@@ -640,7 +656,19 @@ export default function SellerStudioRadialMenu({
     enterFade.value = withTiming(1, { duration: 220, easing: Easing.linear }, (finished) => {
       if (finished) runOnJS(openCurrentItem)({ skipHaptic: true });
     });
-  }, [reduceMotion, fireEnterHaptic, zoomScale, enterFade, openCurrentItem]);
+    // The title's own snap, fired in the same instant as the burst above —
+    // a quick punch up then a spring settle (~180ms total), plus a brief
+    // letter-spacing tighten/brightness flash (labelFlash 0→1→0) that the
+    // label's own animated style below maps to letterSpacing/textShadow.
+    labelPunchScale.value = withSequence(
+      withTiming(1.12, { duration: 70, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 10, stiffness: 180, mass: 0.4 }),
+    );
+    labelFlash.value = withSequence(
+      withTiming(1, { duration: 70, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 110, easing: Easing.in(Easing.quad) }),
+    );
+  }, [reduceMotion, fireEnterHaptic, zoomScale, enterFade, labelPunchScale, labelFlash, openCurrentItem]);
 
   /** How far (in either single-axis direction) a drag must travel before its
    *  axis locks in — matches the "decide within the first ~10px" spec. */
@@ -679,7 +707,7 @@ export default function SellerStudioRadialMenu({
       // A swipe starting on the header should cancel any in-flight
       // edge-trace on the card area below, same as touching the card area
       // itself would (spec: "cancel and close, never navigates").
-      retractEnter(traceProgress, zoomScale, enterFade);
+      retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash);
       runOnJS(setEntering)(false);
     })
     .onUpdate((e) => {
@@ -688,7 +716,7 @@ export default function SellerStudioRadialMenu({
     })
     .onEnd((e) => {
       runDismissEnd(e);
-    }), [translateY, dragStartY, traceProgress, zoomScale, enterFade, runDismissEnd]);
+    }), [translateY, dragStartY, traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, runDismissEnd]);
 
   // Card area: scrub (horizontal) or dismiss (vertical) — a single combined
   // Pan that locks its own axis, per constraint 1 above.
@@ -704,7 +732,7 @@ export default function SellerStudioRadialMenu({
       // screen anywhere... cancels" — the trace retracts and the carousel
       // continues from that card).
       landedPulse.value = 0;
-      retractEnter(traceProgress, zoomScale, enterFade);
+      retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash);
       runOnJS(setEntering)(false);
     })
     .onUpdate((e) => {
@@ -773,7 +801,7 @@ export default function SellerStudioRadialMenu({
       // all before release — too small a movement for this Pan to have
       // even activated (see constraint 2), so it never reaches onEnd for
       // that case; the Race'd tapGesture below handles it instead.
-    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, traceProgress, zoomScale, enterFade, reduceMotion, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, triggerZoomEnter, fireLandedHaptic]);
+    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, reduceMotion, microFast, microTriggerIndex, microTriggerSeq, runDismissEnd, openCurrentItem, triggerZoomEnter, fireLandedHaptic]);
 
   // A genuine tap (near-zero movement) — see constraint 2 above for why
   // this can't just be "the Pan's onEnd when its axis never locked".
@@ -897,19 +925,40 @@ export default function SellerStudioRadialMenu({
         opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.22], Extrapolation.CLAMP) : 0,
       };
     });
-    // Dev: during the zoom-through burst the title text slid down and got
-    // clipped at the bottom edge — `cardStyle`'s scale transform is centered
-    // on the whole card, so content far from center (the label, pinned near
-    // the bottom) moves the most. Rather than fight transform-origin
-    // (inconsistent between web and native), the label just fades out as
-    // the burst starts, well before it would visibly travel out of bounds —
-    // it's gone from view by ZOOM_THROUGH_SCALE, long before navigation.
-    // Unaffected by (and keeps playing through) the slow push-in — only the
-    // fast final burst past PUSH_IN_SCALE triggers it.
-    const cardLabelFadeStyle = useAnimatedStyle(() => {
-      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+    // Dev (superseding #675's fade-out): the title must stay fully visible
+    // and readable through the whole zoom-through burst, all the way to
+    // navigation — never fade, never slide. `cardStyle`'s scale transform
+    // is centered on the whole card, so content far from center (the label,
+    // pinned near the bottom) would otherwise move the most as the burst
+    // scales up. Fighting that with an inverse scale on a child of the
+    // scaled view only cancels the SIZE change, not the position shift the
+    // parent's scale imposes on an off-center child — so instead the label
+    // is rendered as its own sibling layer entirely outside the scaled
+    // `card` View (see the render below), tracking only the carousel's own
+    // horizontal translateX, never cardStyle's scale. It is anchored to a
+    // fixed spot above the bottom and genuinely never moves during the
+    // burst. labelAnchorStyle below reuses `contentStyle`'s own
+    // distance-based fade so a neighboring card's label still disappears
+    // the same way during an ordinary scrub.
+    const labelAnchorStyle = useAnimatedStyle(() => {
+      const distance = itemIndex - cardIndex.value;
       return {
-        opacity: isCurrent ? interpolate(zoomScale.value, [PUSH_IN_SCALE, ZOOM_THROUGH_SCALE], [1, 0], Extrapolation.CLAMP) : 1,
+        transform: [{ translateX: distance * cardSpacing }],
+        opacity: interpolate(Math.abs(distance), [0.32, 0.48], [1, 0], Extrapolation.CLAMP),
+      };
+    });
+    // The title's own "snap" in sync with the zoom-through burst (see
+    // triggerZoomEnter): a quick scale punch (1 → 1.12 → spring back to 1)
+    // plus a brief letter-spacing tighten + brightness (glow) flash. Only
+    // the entering card's own label ever plays it.
+    const labelPunchStyle = useAnimatedStyle(() => {
+      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+      const punch = isCurrent ? labelPunchScale.value : 1;
+      const flash = isCurrent ? labelFlash.value : 0;
+      return {
+        transform: [{ scale: punch }],
+        letterSpacing: interpolate(flash, [0, 1], [0.2, -0.3]),
+        textShadowRadius: interpolate(flash, [0, 1], [0, 10]),
       };
     });
     // Icon + name only ever show on the card that's actually centered (or
@@ -1070,44 +1119,60 @@ export default function SellerStudioRadialMenu({
     // non-center card doesn't select it the way the old grid's individual
     // pressable tiles did.
     return (
-      <Animated.View
-        key={item.id}
-        style={[styles.card, { width: cardAreaSize.width, height: cardAreaSize.height }, cardStyle]}
-        pointerEvents="none"
-        accessibilityLabel={item.label}
-        testID={`seller-control-center-item-${item.id}`}
-      >
-        <StudioCoverBackdrop />
-        <Animated.View style={[styles.cardContent, contentStyle]}>
-          <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
-            {/* Interim look until this card has real hero-art cover art
-                (see PR adding StudioCoverHeroArt's bitmap manifest): a
-                large, light-weight glyph sitting directly on the cover's own
-                lighting — never a ring around it. Dev, explicitly: "Never
-                the ring + box combo" (the old always-on medallion ring is
-                already gone; the interactive "landed" ring that used to
-                appear once a card locked is removed too, since the glyph
-                alone is what needs to read clean right now — landedPulse
-                still drives the card's own subtle scale-up on lock). */}
-            <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />
-            {locked && (
-              <View style={styles.cardLock}>
-                <Feather name="lock" size={14} color={theme.text} />
-              </View>
-            )}
+      <React.Fragment>
+        <Animated.View
+          style={[styles.card, { width: cardAreaSize.width, height: cardAreaSize.height }, cardStyle]}
+          pointerEvents="none"
+          accessibilityLabel={item.label}
+          testID={`seller-control-center-item-${item.id}`}
+        >
+          <StudioCoverBackdrop />
+          <Animated.View style={[styles.cardContent, contentStyle]}>
+            <Animated.View style={[styles.cardIconWrap, microIconStyle]}>
+              {/* Interim look until this card has real hero-art cover art
+                  (see PR adding StudioCoverHeroArt's bitmap manifest): a
+                  large, light-weight glyph sitting directly on the cover's own
+                  lighting — never a ring around it. Dev, explicitly: "Never
+                  the ring + box combo" (the old always-on medallion ring is
+                  already gone; the interactive "landed" ring that used to
+                  appear once a card locked is removed too, since the glyph
+                  alone is what needs to read clean right now — landedPulse
+                  still drives the card's own subtle scale-up on lock). */}
+              <Feather name={item.icon as any} size={108} color={theme.text} style={styles.cardIconGlyph} />
+              {locked && (
+                <View style={styles.cardLock}>
+                  <Feather name="lock" size={14} color={theme.text} />
+                </View>
+              )}
+            </Animated.View>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.85)']}
+              style={styles.cardBottomVignette}
+              pointerEvents="none"
+            />
           </Animated.View>
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.85)']}
-            style={styles.cardBottomVignette}
-            pointerEvents="none"
-          />
-          <Animated.Text style={[styles.cardLabel, cardLabelFadeStyle]} numberOfLines={2}>{item.label}</Animated.Text>
+          {/* The edge-trace's slight brighten while it pushes in — see
+              pushBrightenStyle above. A sibling of cardContent (not inside
+              it), so it washes the whole cover, not just the icon/name. */}
+          <Animated.View style={[styles.cardBrightenWash, pushBrightenStyle]} pointerEvents="none" />
         </Animated.View>
-        {/* The edge-trace's slight brighten while it pushes in — see
-            pushBrightenStyle above. A sibling of cardContent (not inside
-            it), so it washes the whole cover, not just the icon/name. */}
-        <Animated.View style={[styles.cardBrightenWash, pushBrightenStyle]} pointerEvents="none" />
-      </Animated.View>
+        {/* The title, deliberately NOT inside the scaled `card` View above —
+            see labelAnchorStyle's comment: this is what keeps it fully
+            visible and pinned in place through the whole zoom-through
+            burst, with its own independent punch/flash on top
+            (labelPunchStyle). Same box/size as the card so it lines up with
+            the old bottom-anchored position exactly. */}
+        <Animated.View
+          style={[
+            styles.cardLabelLayer,
+            { width: cardAreaSize.width, height: cardAreaSize.height },
+            labelAnchorStyle,
+          ]}
+          pointerEvents="none"
+        >
+          <Animated.Text style={[styles.cardLabel, labelPunchStyle]} numberOfLines={2}>{item.label}</Animated.Text>
+        </Animated.View>
+      </React.Fragment>
     );
   }
 
@@ -1462,6 +1527,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // The edge-trace's own slight brighten while it pushes in — see
   // pushBrightenStyle; a plain white wash, opacity-only.
   cardBrightenWash: { ...StyleSheet.absoluteFill, backgroundColor: '#ffffff' },
+  // The title's own layer, a sibling of `card` (not a child) so the card's
+  // zoom-through scale never touches it — see labelAnchorStyle's comment on
+  // CarouselCard. Same box, same bottom-anchored position cardLabel always
+  // had inside the old cardContent (flex-end + the same paddingBottom).
+  cardLabelLayer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: SP.xl,
+  },
   cardLabel: {
     // Dropped from 24/bold — Dev: with the fill pill now the only visible
     // action, the big bottom title was reading like a second button.
@@ -1472,6 +1547,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.2,
     wordWrap: 'normal',
+    // textShadowRadius is animated (labelPunchStyle, the burst-sync
+    // brightness flash) — color/offset stay fixed so only the radius pulse
+    // reads as a glow.
+    textShadowColor: '#ffffff',
+    textShadowOffset: { width: 0, height: 0 },
   },
   // Sits directly behind cardLabel (painted first, in the same paddingBottom
   // footprint) so the poster-style caption stays legible over busy cover art.
