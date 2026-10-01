@@ -85,17 +85,26 @@ export type QuoteBody = {
 
 type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
 
-/** One group per seller. A promo code applies to single-seller orders, as before. */
+/**
+ * One group per seller. A single-seller order takes the one valid code; a
+ * multi-store order takes each seller's own code (a discount tagged with that
+ * seller's id), so a code never crosses stores.
+ */
 export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
-  const code = session.deliveryGroups.length === 1 ? session.discounts.find(d => d.isValid)?.code : undefined;
-  return session.deliveryGroups.map(group => ({
-    items: group.items.map(item => ({
-      variantId: String(item.variantId),
-      productId: String(item.productId),
-      quantity: Number(item.quantity),
-    })),
-    ...(code ? { discountCode: String(code) } : {}),
-  }));
+  const single = session.deliveryGroups.length === 1;
+  return session.deliveryGroups.map(group => {
+    const code = single
+      ? session.discounts.find(d => d.isValid)?.code
+      : session.discounts.find(d => d.isValid && d.sellerId === group.sellerId)?.code;
+    return {
+      items: group.items.map(item => ({
+        variantId: String(item.variantId),
+        productId: String(item.productId),
+        quantity: Number(item.quantity),
+      })),
+      ...(code ? { discountCode: String(code) } : {}),
+    };
+  });
 }
 
 export function recipientName(address: Partial<CheckoutAddress>): string {

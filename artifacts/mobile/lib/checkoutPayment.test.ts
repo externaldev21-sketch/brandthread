@@ -45,6 +45,16 @@ describe('payment-intent request bodies (PCI SAQ-A: card data never reaches our 
     expect(single.groups[0].discountCode).toBe('TENOFF');
   });
 
+  it('sends each store its own code on a multi-store order and never crosses stores', () => {
+    const multi = {
+      ...session,
+      discounts: [{ code: 'S2ONLY', isValid: true, sellerId: 's2', appliedAmountCents: 500 }],
+    };
+    const body = buildCreatePaymentIntentBody({ session: multi, contact: {}, address: {}, idempotencyKey: 'k1234567', saveCard: false });
+    expect(body.groups[0]).not.toHaveProperty('discountCode');
+    expect(body.groups[1].discountCode).toBe('S2ONLY');
+  });
+
   it('quotes with only the parts of the address that price the order', () => {
     expect(canQuote({ postalCode: '1' })).toBe(false);
     expect(canQuote({ postalCode: '10012', country: 'US' })).toBe(true);

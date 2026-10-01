@@ -4,7 +4,7 @@ import {
   View, Text, ScrollView, TextInput,
   StyleSheet, Alert,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -58,6 +58,7 @@ function langLabel(code: string): string {
 }
 
 export default function StoreSettingsScreen() {
+  const router = useRouter();
   const colors = useColors();
   const ss = React.useMemo(() => makeStyles(colors), [colors]);
   const [form, setForm] = useState<StoreSettings>({
@@ -295,6 +296,14 @@ export default function StoreSettingsScreen() {
             description="Enable analytics tracking"
             value={form.analyticsEnabled}
             onValueChange={v => patch({ analyticsEnabled: v })}
+          />
+          <View style={ss.divider} />
+          <ListRow
+            title="Discounts"
+            subtitle="Discount codes for your store"
+            chevron
+            onPress={() => router.push('/discounts')}
+            style={{ minHeight: 48 }}
           />
         </BrandthreadCard>
 

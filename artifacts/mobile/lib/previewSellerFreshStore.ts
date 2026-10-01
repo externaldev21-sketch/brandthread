@@ -34,8 +34,11 @@ export interface PreviewDiscount {
   type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
   value: number;
   minOrderCents: number;
-  appliesTo: 'entire_store' | 'specific_products';
+  appliesTo: 'entire_store' | 'specific_products' | 'collections';
   productIds: string[];
+  firstOrderOnly?: boolean;
+  collectionIds?: string[];
+  minQuantity?: number;
   maxUses: number | null;
   usesCount: number;
   oneUsePerCustomer: boolean;
