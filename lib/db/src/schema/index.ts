@@ -11,6 +11,7 @@ export * from './metaAds';
 export * from './communities';
 export * from './iapPromotions';
 export * from './sales';
+export * from './sellerAnalytics';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
