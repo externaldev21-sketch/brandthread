@@ -1,4 +1,4 @@
--- 112: AI credits ledger, daily spend counters, spend alerts and credit-pack
+-- 119: AI credits ledger, daily spend counters, spend alerts and credit-pack
 -- purchases. Additive only. See lib/db/src/schema/aiCredits.ts.
 
 CREATE TABLE IF NOT EXISTS ai_credit_accounts (
