@@ -57,6 +57,7 @@ import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
 import socialRouter from "./social";
 import storyMentionsRouter from "./story-mentions";
+import placesRouter from "./places";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
 import shippingZonesRouter from "./shipping-zones";
@@ -222,6 +223,7 @@ router.use("/admin",                     adminRouter); // platform admin dashboa
 router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
+router.use("/places",                    placesRouter); // public reads (optional viewer); POST requires auth
 router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint

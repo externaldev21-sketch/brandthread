@@ -31,6 +31,7 @@ import {
   isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs, signedUrlForObjectPath,
 } from "../lib/mediaModerationStore";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { locationsByPlaceId, resolvePostLocation, withLocation } from "../lib/places";
 import { decodeCursor, encodeCursor } from "../lib/cursor";
 import {
   authorInGoodStanding,
@@ -319,6 +320,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
       .groupBy(savedItems.targetId),
     visibleCommentCounts(postIds),
   ]);
+  const locationById = await locationsByPlaceId(postRows.map((post) => post.placeId));
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
   const tagsByPost: Record<string, typeof tagRows> = {};
   for (const tag of tagRows) (tagsByPost[tag.postId] ??= []).push(tag);
@@ -336,7 +338,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
     const isDue = post.postStatus === "scheduled" &&
       !!post.scheduledAt && post.scheduledAt.getTime() <= Date.now();
     return {
-      ...post,
+      ...withLocation(post, locationById),
       postStatus: isDue ? "published" : post.postStatus,
       seller: seller ? {
         displayName: seller.displayName,
@@ -395,6 +397,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         aspectRatio: posts.aspectRatio,
         caption:     posts.caption,
         hashtags:    posts.hashtags,
+        placeId:     posts.placeId,
         styleTags:   posts.styleTags,
         sound:       posts.sound,
         visibility:  posts.visibility,
@@ -522,6 +525,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         .catch(() => {});
     }
 
+    const feedLocations = await locationsByPlaceId(rows.map((p) => p.placeId));
     const result = rows.map((p) => ({
       id:        p.id,
       userId:    p.userId,
@@ -531,6 +535,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       mediaType: p.mediaType,
       aspectRatio: p.aspectRatio,
       caption:   p.caption,
+      location:  p.placeId ? feedLocations.get(p.placeId) ?? null : null,
       hashtags:  p.hashtags,
       styleTags: p.styleTags,
       sound:     p.sound,
@@ -740,6 +745,11 @@ router.post("/", requireAuth, async (req, res) => {
   }
   const safeSlideOverlays = slideOverlaysResult.records;
 
+  // Optional location: `placeId`, or `location: {placeId?, name, lat?, lng?}`.
+  const locationResult = await resolvePostLocation(clerkId, req.body as Record<string, unknown>);
+  if (!locationResult.ok) {
+    return res.status(locationResult.status).json({ error: locationResult.error, ...(locationResult.code ? { code: locationResult.code } : {}) });
+  }
   // Automatic media screening (off when the AI integration env is missing).
   // Clear violations are rejected; anything flagged or unverifiable is held
   // for a moderator and stays visible to its author only.
@@ -778,6 +788,7 @@ router.post("/", requireAuth, async (req, res) => {
   const postHeld = captionHeld || screenHeld;
 
   const [post] = await db.insert(posts).values({
+    placeId: locationResult.placeId ?? null,
     userId:    clerkId,
     mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
@@ -865,8 +876,10 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
 
+  const createdLocation = (await locationsByPlaceId([post.placeId])).get(post.placeId ?? "") ?? null;
   return res.status(201).json({
     ...post,
+    location: createdLocation,
     taggedProducts,
     moderation: postHeld
       ? {
@@ -1040,6 +1053,11 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }
     updates.hashtags = body.hashtags as string[];
   }
+  const patchLocation = await resolvePostLocation(clerkId, body);
+  if (!patchLocation.ok) {
+    return res.status(patchLocation.status).json({ error: patchLocation.error, ...(patchLocation.code ? { code: patchLocation.code } : {}) });
+  }
+  if (patchLocation.placeId !== undefined) updates.placeId = patchLocation.placeId;
   if (body.styleTags !== undefined) {
     if (!Array.isArray(body.styleTags) || body.styleTags.some((tag) => typeof tag !== "string")) {
       return res.status(400).json({ error: "styleTags must be an array of strings" });
@@ -1458,8 +1476,9 @@ router.get("/:id", async (req, res) => {
   ]);
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
+  const singleLocation = await locationsByPlaceId([post.placeId]);
   return res.json({
-    ...post,
+    ...withLocation(post, singleLocation),
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,

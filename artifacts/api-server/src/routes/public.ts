@@ -3,6 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
+import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
 import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
@@ -1642,6 +1643,7 @@ router.get("/posts", async (req, res) => {
         mediaType:   posts.mediaType,
         aspectRatio: posts.aspectRatio,
         caption:     posts.caption,
+        placeId:     posts.placeId,
         hashtags:    posts.hashtags,
         styleTags:   posts.styleTags,
         sound:       posts.sound,
@@ -1736,7 +1738,9 @@ router.get("/posts", async (req, res) => {
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
+    const locationById = await locationsByPlaceId(rows.map((p) => p.placeId));
     const result = rows.map((p) => ({
+      location:       p.placeId ? locationById.get(p.placeId) ?? null : null,
       id:             p.id,
       userId:         p.userId,
       mediaUrl:       p.mediaUrl,
