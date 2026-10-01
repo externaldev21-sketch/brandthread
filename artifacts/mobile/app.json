@@ -86,6 +86,14 @@
             ]
           },
           {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeContacts",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhoneNumber",
             "NSPrivacyCollectedDataTypeLinked": true,
             "NSPrivacyCollectedDataTypeTracking": false,
@@ -401,6 +409,12 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Brandthread uses Face ID to unlock the app when App Lock is turned on."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Brandthread uses your contacts only when you choose Find friends, to check which people you know are already on Brandthread. Contacts are turned into scrambled codes on your phone and your contact list is never uploaded or stored."
         }
       ],
       "expo-updates",

@@ -73,7 +73,7 @@ function initials(name: string): string {
 }
 
 type UserRow = typeof users.$inferSelect;
-function formatUser(u: UserRow) {
+export function formatUser(u: UserRow) {
   const nm = u.displayName || u.name || "Unknown";
   return {
     userId:      u.clerkId,

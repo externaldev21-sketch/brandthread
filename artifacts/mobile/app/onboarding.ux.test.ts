@@ -76,8 +76,8 @@ describe("v7 step order: Welcome opener, then AccountType, then path-specific au
     expect(source).toContain("step === SELLER_STEP_INDEX.BRAND_NAME");
   });
 
-  it("draft version is 7 and onboarding.tsx defers migration to lib/onboardingFlow.ts", () => {
-    expect(DRAFT_VERSION).toBe(7);
+  it("draft version is 8 and onboarding.tsx defers migration to lib/onboardingFlow.ts", () => {
+    expect(DRAFT_VERSION).toBe(8);
     expect(source).toContain("restoreDraftStep(draft.flow, draft.step ?? 0, draft.version)");
     expect(source).toContain("from '@/lib/onboardingFlow'");
   });

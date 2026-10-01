@@ -26,7 +26,7 @@
  */
 import {
   db, posts, users, follows, interactions, boosts, blocks,
-  buyerTasteProfiles, sellerRankingCache, forYouFeedCache, liveStreams,
+  buyerTasteProfiles, sellerRankingCache, forYouFeedCache, liveStreams, buyerPreferences,
   feedNotInterested, savedItems, postComments, postTaggedProducts, productVariants, orderItems, orders,
 } from "@workspace/db";
 import { eq, and, inArray, gte, sql, desc, ne, isNotNull } from "drizzle-orm";
@@ -37,6 +37,11 @@ import {
 } from "./config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Seller affinity boost for brands the buyer picked in the onboarding survey (brands they like). */
+export const W_LIKED_BRAND = 1.2;
+/** Prior weight per survey-picked style interest (mirrors the onboarding cold-start seed). */
+export const PREFERENCE_STYLE_SEED = 1.5;
 
 /** Default event weights; the live values come from the tunable ranking config (./config). */
 export const EVENT_WEIGHTS: Record<string, number> = DEFAULT_EVENT_WEIGHTS;
@@ -157,6 +162,28 @@ export function engagementQuality(
   return Math.min(1, Math.max(0, 0.65 * rateScore + 0.35 * completion * confidence));
 }
 
+/**
+ * Layers the buyer's saved survey style interests (buyer_preferences) UNDER the
+ * learned style affinity: a survey pick only fills in / lifts a tag the buyer's
+ * behavior has not yet outgrown (never lowers a learned score, never overrides
+ * a negative one caused by skips). Pure + unit-tested.
+ */
+export function mergePreferenceStyleAffinity(
+  learned: AffinityMap,
+  styleInterests: string[],
+  seed: number = PREFERENCE_STYLE_SEED,
+): AffinityMap {
+  const keys = [...new Set(styleInterests.map((s) => s.trim().toLowerCase()).filter(Boolean))];
+  if (keys.length === 0) return learned;
+  const next = { ...learned };
+  for (const key of keys) {
+    const current = next[key];
+    if (current !== undefined && current < 0) continue;
+    next[key] = Math.max(current ?? 0, seed);
+  }
+  return next;
+}
+
 export type ScoredCandidate = RankingCandidate & { score: number };
 
 /** Combines every signal into one score. Exported so tests can assert weighting behavior directly. */
@@ -167,6 +194,7 @@ export function scoreCandidate(
   sellerAffinity: AffinityMap,
   now: number,
   cfg: RankingConfig = getRankingConfigSync(),
+  likedBrandIds?: ReadonlySet<string>,
 ): number {
   const affinity = affinityMatchScore(styleTagAffinity, candidate.styleTags)
     + affinityMatchScore(categoryAffinity, candidate.category ? [candidate.category] : []);
@@ -183,6 +211,7 @@ export function scoreCandidate(
     (candidate.isFollowed ? sw.followed : 0) +
     (candidate.isBoosted ? sw.boosted : 0) +
     engagementQuality(candidate.engagement, cfg.eventWeights) * sw.engagement +
+    (likedBrandIds?.has(candidate.sellerId) ? W_LIKED_BRAND : 0) +
     penalty
   );
 }
@@ -257,7 +286,41 @@ export type ForYouResultItem = {
   score: number;
 };
 
-async function loadOrSeedProfile(userId: string): Promise<{
+type SeededProfile = {
+  categoryAffinity: AffinityMap;
+  styleTagAffinity: AffinityMap;
+  sellerAffinity: AffinityMap;
+  likedBrandIds: Set<string>;
+};
+
+/** Survey picks saved in buyer_preferences (empty when none / table unavailable). */
+async function loadSurveyPreferences(userId: string): Promise<{ styleInterests: string[]; likedBrandIds: string[] }> {
+  try {
+    const [row] = await db
+      .select({ styleInterests: buyerPreferences.styleInterests, likedBrandIds: buyerPreferences.likedBrandIds })
+      .from(buyerPreferences)
+      .where(eq(buyerPreferences.userId, userId))
+      .limit(1);
+    return {
+      styleInterests: Array.isArray(row?.styleInterests) ? (row!.styleInterests as string[]) : [],
+      likedBrandIds: Array.isArray(row?.likedBrandIds) ? (row!.likedBrandIds as string[]) : [],
+    };
+  } catch (err) {
+    logger.warn({ err, userId }, "For You survey preferences read failed; ranking without them");
+    return { styleInterests: [], likedBrandIds: [] };
+  }
+}
+
+async function loadOrSeedProfile(userId: string): Promise<SeededProfile> {
+  const [survey, profile] = await Promise.all([loadSurveyPreferences(userId), loadOrSeedBaseProfile(userId)]);
+  return {
+    ...profile,
+    styleTagAffinity: mergePreferenceStyleAffinity(profile.styleTagAffinity, survey.styleInterests),
+    likedBrandIds: new Set(survey.likedBrandIds),
+  };
+}
+
+async function loadOrSeedBaseProfile(userId: string): Promise<{
   categoryAffinity: AffinityMap;
   styleTagAffinity: AffinityMap;
   sellerAffinity: AffinityMap;
@@ -523,7 +586,7 @@ export async function computeForYouRankingForUser(userId: string): Promise<ForYo
   const scored: ScoredCandidate[] = eligible.map((c) => ({
     ...c,
     engagement: engagement.get(c.id),
-    score: scoreCandidate(c, profile.categoryAffinity, profile.styleTagAffinity, profile.sellerAffinity, now, cfg),
+    score: scoreCandidate(c, profile.categoryAffinity, profile.styleTagAffinity, profile.sellerAffinity, now, cfg, profile.likedBrandIds),
   }));
 
   scored.sort((a, b) => b.score - a.score);

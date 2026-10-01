@@ -28,6 +28,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View } from 'react-native';
+import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeRow';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
@@ -288,6 +289,7 @@ export default function DiscoverScreen() {
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
+      {filter === 'forYou' && <BrandsYouMightLikeRow />}
     </>
   );
 
