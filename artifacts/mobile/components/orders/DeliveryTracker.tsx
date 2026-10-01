@@ -8,7 +8,7 @@ import type { BuyerDelivery, DeliveryStep } from '@/services/orderTypes';
 import {
   autoRefundSummary, formatCalendarDate, formatLocalDate, formatLocalDateTime, guaranteeLine,
 } from '@/lib/deliveryGuarantee';
-import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 
 /**
  * Buyer delivery tracker (Amazon / Shop pattern): headline date, a five-step
@@ -17,6 +17,20 @@ import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
  * the quiet guarantee line. Monochrome like OrderProgressTimeline: done and
  * current steps use the theme text colour, nothing is tinted.
  */
+
+/** One-line labels that fit five equal columns at 393px without wrapping or ellipsis. */
+const SHORT_STEP_LABEL: Partial<Record<DeliveryStep['key'], string>> = { out_for_delivery: 'Delivering' };
+
+function ActionButton({ label, icon, onPress }: { label: string; icon: keyof typeof Feather.glyphMap; onPress: () => void }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => styles(theme), [theme]);
+  return (
+    <TouchableOpacity style={s.actionBtn} onPress={onPress} accessibilityRole="button" accessibilityLabel={label} activeOpacity={0.8}>
+      <Feather name={icon} size={ICON.sm} color={theme.text} />
+      <Text style={s.actionBtnText}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 function StepBar({ steps }: { steps: DeliveryStep[] }) {
   const { theme } = useAppTheme();
@@ -37,8 +51,8 @@ function StepBar({ steps }: { steps: DeliveryStep[] }) {
               </View>
               <View style={[s.line, i === steps.length - 1 && s.lineHidden, done && steps[i + 1]?.state !== 'upcoming' && { backgroundColor: theme.text }]} />
             </View>
-            <Text style={[s.stepLabel, reached && { color: theme.text, fontFamily: FONT.semibold }]} numberOfLines={2}>
-              {step.label}
+            <Text style={[s.stepLabel, reached && { color: theme.text, fontFamily: FONT.semibold }]}>
+              {SHORT_STEP_LABEL[step.key] ?? step.label}
             </Text>
           </View>
         );
@@ -48,10 +62,12 @@ function StepBar({ steps }: { steps: DeliveryStep[] }) {
 }
 
 export function DeliveryTrackerCard({
-  delivery, status, onCopyTracking, trackingCopied, onOpenTracking, onConfirmReceipt,
+  delivery, status, storeName, onCopyTracking, trackingCopied, onOpenTracking, onConfirmReceipt,
 }: {
   delivery: BuyerDelivery;
   status: string;
+  /** Shown above the headline now that the screen header carries the title only. */
+  storeName?: string;
   onCopyTracking: () => void;
   trackingCopied: boolean;
   onOpenTracking: () => void;
@@ -78,6 +94,7 @@ export function DeliveryTrackerCard({
 
   return (
     <View style={s.card}>
+      {storeName ? <Text style={s.store} numberOfLines={1}>{storeName}</Text> : null}
       <Text style={s.headline}>{headline}</Text>
       {delivered && delivery.deliveryConfirmedBy ? (
         <Text style={s.sub}>{delivery.deliveryConfirmedBy === 'buyer' ? 'Confirmed by you' : 'Confirmed by the carrier'}</Text>
@@ -105,14 +122,13 @@ export function DeliveryTrackerCard({
       ) : null}
       {delivery.trackingNumber ? (
         <View style={s.btnRow}>
-          <SecondaryButton
+          <ActionButton
             label={trackingCopied ? 'Copied' : 'Copy'}
             icon={trackingCopied ? 'check' : 'copy'}
             onPress={onCopyTracking}
-            small style={{ flex: 1 }}
           />
           {delivery.trackingUrl ? (
-            <SecondaryButton label="Track package" icon="external-link" onPress={onOpenTracking} small style={{ flex: 1 }} />
+            <ActionButton label="Track package" icon="external-link" onPress={onOpenTracking} />
           ) : null}
         </View>
       ) : null}
@@ -174,6 +190,7 @@ function styles(theme: AppThemePreset) {
       padding: SP.md, marginHorizontal: SP.md, marginBottom: SP.md,
     },
     headline: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text, letterSpacing: -0.3 },
+    store: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, marginBottom: 4 },
     sub: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 20 },
     stepRow: { flexDirection: 'row', marginTop: SP.md },
     stepCol: { flex: 1, alignItems: 'center' },
@@ -186,8 +203,8 @@ function styles(theme: AppThemePreset) {
     },
     dotCurrent: { borderWidth: 5, backgroundColor: theme.card, borderColor: theme.text },
     stepLabel: {
-      fontFamily: FONT.medium, fontSize: 10, color: theme.muted, textAlign: 'center',
-      marginTop: 6, paddingHorizontal: 2, minHeight: 26,
+      fontFamily: FONT.medium, fontSize: 12, color: theme.muted, textAlign: 'center',
+      marginTop: 6,
     },
     note: {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md,
@@ -201,6 +218,11 @@ function styles(theme: AppThemePreset) {
     trackCarrier: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.muted },
     trackNumber: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text, marginTop: 2 },
     btnRow: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm },
+    actionBtn: {
+      flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
+      paddingHorizontal: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    },
+    actionBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
     events: { marginTop: SP.md, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: theme.border },
     eventsTitle: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text, marginBottom: SP.sm },
     eventRow: { flexDirection: 'row', gap: SP.sm },

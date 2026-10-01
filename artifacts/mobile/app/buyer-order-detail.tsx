@@ -75,17 +75,6 @@ function carrierTrackingUrl(carrier: string | undefined, trackingNumber: string)
   return `https://www.google.com/search?q=${encoded}+tracking`;
 }
 
-function formatRelativeUpdate(timestamp: number): string {
-  const elapsed = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (elapsed < 5) return 'just now';
-  if (elapsed < 60) return `${elapsed}s ago`;
-  const mins = Math.floor(elapsed / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 // Monochrome (item 107): every normal order state is the neutral badge;
 // only real problems keep the error treatment.
 function statusBadgeVariant(status: OrderStatus): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
@@ -517,7 +506,6 @@ export default function BuyerOrderDetailScreen() {
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [showReviewSheet, setShowReviewSheet] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -541,7 +529,6 @@ export default function BuyerOrderDetailScreen() {
     setFetchError(false);
     setRefreshing(false);
     setIsFetching(false);
-    setLastUpdatedAt(null);
     setLoading(true);
     setShowReviewSheet(false);
     setShowCancelModal(false);
@@ -562,7 +549,6 @@ export default function BuyerOrderDetailScreen() {
           setFetchError(false);
           setLoading(false);
           setIsFetching(false);
-          setLastUpdatedAt(Date.now());
           consecutiveFailuresRef.current = 0;
         }
       }).catch(() => {
@@ -612,7 +598,6 @@ export default function BuyerOrderDetailScreen() {
       setFetchError(false);
       setRefreshing(false);
       setIsFetching(false);
-      setLastUpdatedAt(Date.now());
     }).catch(() => {
       if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(null);
@@ -848,24 +833,9 @@ export default function BuyerOrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={`Order ${order.orderNumber}`}
-        subtitle={order.sellerName}
+        divider={false}
         onBack={() => goBackOr(router, '/(buyer)/orders')}
       />
-
-      {/* Live-updating status indicator */}
-      <View style={styles.refreshStatus} accessibilityLiveRegion="polite">
-        {isFetching ? (
-          <>
-            <ActivityIndicator color={theme.accent} size="small" />
-            <Text style={styles.refreshStatusText}>Updating order status…</Text>
-          </>
-        ) : lastUpdatedAt !== null ? (
-          <>
-            <Feather name="check-circle" size={ICON.xs} color={theme.subtle} />
-            <Text style={styles.refreshStatusText}>Last updated {formatRelativeUpdate(lastUpdatedAt)}</Text>
-          </>
-        ) : null}
-      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -928,6 +898,7 @@ export default function BuyerOrderDetailScreen() {
               <DeliveryTrackerCard
                 delivery={order.delivery}
                 status={order.status}
+                storeName={order.sellerName}
                 onCopyTracking={handleCopyTracking}
                 trackingCopied={trackingCopied}
                 onOpenTracking={handleTrackOnCarrier}
@@ -1286,8 +1257,6 @@ export default function BuyerOrderDetailScreen() {
 const makeStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
     fulfillmentStatus: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-    refreshStatus: { minHeight: 28, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-    refreshStatusText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
     preOrderInfoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },
     preOrderInfoText: { fontSize: FS.sm, fontFamily: FONT.medium },
     trackingInfoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm, flexWrap: 'wrap' },
