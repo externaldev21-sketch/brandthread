@@ -221,6 +221,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },
+      { label: 'Invites and waitlist', description: 'Invite-only launch switch, access codes and waitlist', aliases: ['invite', 'invites', 'access code', 'waitlist', 'launch', 'admin'], icon: 'user-plus', route: '/admin-invites', audience: 'seller', requiresModerator: true },
     ],
   },
   {

@@ -823,6 +823,15 @@ export interface PostAnalyticsResponse {
     };
   };
 }
+export interface AccessStatus { inviteOnly: boolean; redeemed: boolean; required: boolean }
+export interface AccessInviteCode {
+  id: string; code: string; label: string | null; maxUses: number | null; uses: number;
+  expiresAt: string | null; disabled: boolean; status: 'active' | 'disabled' | 'expired' | 'used up'; createdAt: string;
+}
+export interface AccessWaitlist {
+  items: { id: string; email: string; createdAt: string; invitedAt: string | null; code: string | null }[];
+  counts: { total: number; invited: number; pending: number };
+}
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
@@ -839,6 +848,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     config: {
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
+    },
+    /** Invite-only launch mode (feature flag `inviteOnlySignup`). */
+    access: {
+      status: () => freshGet<AccessStatus>('/api/access/status'),
+      validate: (code: string) => post<{ valid: boolean }>('/api/access/validate', { code }),
+      redeem: (code: string) => post<{ ok: true }>('/api/access/redeem', { code }),
+      joinWaitlist: (email: string) => post<{ ok: true }>('/api/access/waitlist', { email }),
+      /** Moderators only. */
+      admin: {
+        invites: () => freshGet<{ items: AccessInviteCode[] }>('/api/admin/invites'),
+        createInvites: (body: { count: number; maxUses?: number; label?: string; expiresAt?: string }) =>
+          post<{ codes: string[] }>('/api/admin/invites', body),
+        revokeInvite: (id: string) => post<{ ok: true }>(`/api/admin/invites/${encodeURIComponent(id)}/disable`, {}),
+        waitlist: (status: 'all' | 'pending' | 'invited' = 'all') =>
+          freshGet<AccessWaitlist>(`/api/admin/access/waitlist?status=${status}`),
+        inviteFromWaitlist: (id: string) =>
+          post<{ code: string; invitedAt: string; reused: boolean }>(`/api/admin/access/waitlist/${encodeURIComponent(id)}/invite`, {}),
+        setInviteOnly: (enabled: boolean) =>
+          put<{ key: string; enabled: boolean }>('/api/config/features/inviteOnlySignup', { enabled }),
+      },
     },
     auth: {
       /** Create the matching local user record after Clerk authentication.

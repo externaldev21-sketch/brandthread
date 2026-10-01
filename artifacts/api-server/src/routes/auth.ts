@@ -22,6 +22,7 @@ import {
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
+import { hasRedeemedAccessCode, isInviteOnlyEnabled } from "../lib/access/inviteOnly";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -718,6 +719,23 @@ router.post(
           body: {
             error: "Required onboarding profile fields are incomplete.",
             code: "ONBOARDING_PROFILE_INCOMPLETE",
+          },
+        } as const;
+      }
+
+      // Invite-only launch mode (feature flag `inviteOnlySignup`, off by
+      // default). Accounts that already finished onboarding returned above
+      // (grandfathered); platform staff bypass.
+      if (
+        existing.role !== "admin" &&
+        (await isInviteOnlyEnabled(tx)) &&
+        !(await hasRedeemedAccessCode(clerkUserId, tx))
+      ) {
+        return {
+          status: 403,
+          body: {
+            error: "An invite code is required to finish creating your account.",
+            code: "INVITE_REQUIRED",
           },
         } as const;
       }
