@@ -26,6 +26,10 @@ export interface ProfileGridItem {
   viewsCount?: number;
   likesCount?: number;
   productCount: number;
+  /** 'profile' = a POST (opens the 3:4 carousel viewer); 'thread' = a Threads video (opens the feed player). */
+  surface?: 'thread' | 'profile';
+  /** Number of slides in a POST carousel (shows the carousel badge when > 1). */
+  slideCount?: number;
   /** Owner-only lifecycle label, e.g. Draft / Scheduled. */
   statusLabel?: string;
 }
@@ -50,6 +54,8 @@ export function gridItemFromThreadPost(post: SellerThreadPost): ProfileGridItem 
     viewsCount: post.viewsCount,
     likesCount: post.likesCount,
     productCount: post.productTags?.length ?? 0,
+    slideCount: post.slides?.length ?? (post.mediaUris?.length > 1 ? post.mediaUris.length : undefined),
+    surface: post.surface,
     statusLabel,
   };
 }
@@ -59,8 +65,9 @@ export function gridItemFromBuyerPost(post: BuyerPost): ProfileGridItem {
   return {
     id: post.id,
     kind,
-    // A buyer video's mediaUrl is the clip itself, not an image.
-    posterUri: kind === 'video' ? null : post.mediaUrl ?? null,
+    // A buyer video's mediaUrl is the clip itself, not an image — carousel posts carry a poster per slide.
+    posterUri: post.slides?.[0]?.thumbnailUrl ?? (kind === 'video' ? null : post.mediaUrl ?? null),
+    slideCount: post.slides?.length ?? (post.mediaUrls && post.mediaUrls.length > 1 ? post.mediaUrls.length : undefined),
     caption: post.caption ?? '',
     likesCount: post.likesCount,
     productCount: 0,
@@ -122,7 +129,7 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
               <CachedImage
                 source={{ uri: item.posterUri }}
                 style={StyleSheet.absoluteFill}
-                contentFit={item.kind === 'video' ? 'cover' : 'contain'}
+                contentFit="cover"
                 cachePolicy="memory-disk"
                 transition={150}
               />
@@ -139,9 +146,9 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
               colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']} // theme-exempt: legibility scrim over media
               style={styles.scrim}
             />
-            {item.kind !== 'video' ? (
+            {(item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
               <View style={styles.kindBadge} pointerEvents="none">
-                <Feather name={item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
+                <Feather name={(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
             ) : null}
             {item.productCount > 0 ? (

@@ -626,6 +626,13 @@ export const posts = pgTable('posts', {
   }>>().notNull().default([]),
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
+  /** 'thread' = public Threads feed (sellers only); 'profile' = the author's own profile grid. */
+  surface: text('surface').notNull().default('thread'),
+  /** Ordered carousel slides (photos and/or videos) for POST carousels; empty for legacy posts. */
+  slides: jsonb('slides').$type<Array<{
+    kind: 'photo' | 'video'; path: string; url: string;
+    thumbnailPath: string; thumbnailUrl: string; duration?: number;
+  }>>().notNull().default([]),
   caption: text('caption'),
   /** Optional tagged location (see schema/places.ts). Set null if the place is removed. */
   placeId: uuid('place_id').references(() => places.id, { onDelete: 'set null' }),

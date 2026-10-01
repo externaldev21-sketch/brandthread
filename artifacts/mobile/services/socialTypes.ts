@@ -54,6 +54,14 @@ export type QuotedPostSummary =
     }
   | { unavailable: true };
 
+/** One slide of a POST carousel — a photo or a (muted-autoplay) video. */
+export interface PostSlide {
+  kind: 'photo' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+  duration?: number;
+}
+
 export interface BuyerPost {
   id: string;
   authorId: string;
@@ -69,6 +77,10 @@ export interface BuyerPost {
   hashtags: string[];
   mediaColors: string[];             // Demo gradient colors (real URIs in production)
   mediaUrl?: string;
+  /** Ordered carousel media (POST). */
+  slides?: PostSlide[];
+  mediaUrls?: string[];
+  aspectRatio?: string;
   likesCount: number;
   commentsCount: number;
   repostsCount: number;

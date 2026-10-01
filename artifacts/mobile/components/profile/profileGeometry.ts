@@ -32,6 +32,8 @@ export interface ProfileLayout {
 /** Grid tile shapes: height ÷ width. 9:16 video wall (default) or Instagram's 4:5 own-profile grid. */
 export const TILE_ASPECT_9_16 = 16 / 9;
 export const TILE_ASPECT_4_5 = 5 / 4;
+/** POST is always 3:4 — the profile grid shows it uncropped. */
+export const TILE_ASPECT_3_4 = 4 / 3;
 
 export function computeProfileLayout(
   width: number,

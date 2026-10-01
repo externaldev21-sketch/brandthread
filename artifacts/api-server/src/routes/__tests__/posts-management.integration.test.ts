@@ -42,7 +42,10 @@ vi.mock("../../lib/objectStorage", () => ({
       if (!object) throw new Error("not found");
       return {
         getMetadata: async () => [{ size: String(object.bytes.length), contentType: object.contentType }],
-        download: async () => [object.bytes],
+        download: async (opts?: { destination?: string }) => {
+          if (opts?.destination) await (await import("node:fs/promises")).writeFile(opts.destination, object.bytes);
+          return [object.bytes];
+        },
         createReadStream: ({ start = 0, end = object.bytes.length - 1 } = {}) =>
           Readable.from(object.bytes.subarray(start, end + 1)),
         __path: path,

@@ -44,7 +44,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SkeletonBlock } from '@/components/layout';
 import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { a11yHidden } from '@/lib/a11yHidden';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
@@ -133,7 +133,7 @@ function PublicProfileLanding({
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const headerTopInset = useHeaderTopInset();
-  const layout = useProfileLayout();
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   const initials = getInitials(profile.displayName, profile.username);
   const displayName = profile.displayName || `@${profile.username}`;
   const accountLabel =

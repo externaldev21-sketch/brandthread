@@ -233,11 +233,11 @@ describe("POST /api/posts — mediaPaths validation", () => {
     expect(body.error).toMatch(/mediaPaths must be an array/i);
   });
 
-  it("rejects mediaPaths with more than 10 entries", async () => {
-    const paths = Array.from({ length: 11 }, (_, i) => `/objects/uploads/s/slide-${i}.jpg`);
+  it("rejects mediaPaths with more than 30 entries", async () => {
+    const paths = Array.from({ length: 31 }, (_, i) => `/objects/uploads/s/slide-${i}.jpg`);
     const { status, body } = await postPost({ mediaPaths: paths });
     expect(status).toBe(400);
-    expect(body.error).toMatch(/max 10/i);
+    expect(body.error).toMatch(/max 30/i);
   });
 
   it("rejects mediaPaths with duplicate entries", async () => {
@@ -285,11 +285,11 @@ describe("POST /api/posts — slideOverlays strict validation", () => {
     expect(body.error).toMatch(/slideOverlays must be an array/i);
   });
 
-  it("rejects slideOverlays with more than 10 entries", async () => {
-    const oversized = Array.from({ length: 11 }, (_, i) => ({ slideIndex: i, overlays: [] }));
+  it("rejects slideOverlays with more than 30 entries", async () => {
+    const oversized = Array.from({ length: 31 }, (_, i) => ({ slideIndex: i, overlays: [] }));
     const { status, body } = await postPost(oversized);
     expect(status).toBe(400);
-    expect(body.error).toMatch(/max 10/i);
+    expect(body.error).toMatch(/max 30/i);
   });
 
   it("rejects duplicate slideIndex values", async () => {
@@ -307,10 +307,10 @@ describe("POST /api/posts — slideOverlays strict validation", () => {
     expect(body.error).toMatch(/integer/i);
   });
 
-  it("rejects slideIndex >= MAX_SLIDES (10)", async () => {
-    const { status, body } = await postPost([{ slideIndex: 10, overlays: [] }]);
+  it("rejects slideIndex >= MAX_SLIDES (30)", async () => {
+    const { status, body } = await postPost([{ slideIndex: 30, overlays: [] }]);
     expect(status).toBe(400);
-    expect(body.error).toMatch(/0–9/);
+    expect(body.error).toMatch(/0–29/);
   });
 
   it("rejects unknown fields on entry object", async () => {
@@ -437,7 +437,7 @@ describe("PATCH /api/posts/:id — slideOverlays strict validation", () => {
   });
 
   it("PATCH mediaPaths over limit is rejected", async () => {
-    const paths = Array.from({ length: 11 }, (_, i) => `/objects/uploads/s/slide-${i}.jpg`);
+    const paths = Array.from({ length: 31 }, (_, i) => `/objects/uploads/s/slide-${i}.jpg`);
     const res = await fetch(`${baseUrl}/api/posts/${TEST_POST_ID}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -445,7 +445,7 @@ describe("PATCH /api/posts/:id — slideOverlays strict validation", () => {
     });
     const body = (await res.json()) as ApiBody;
     expect(res.status).toBe(400);
-    expect(body.error).toMatch(/max 10/i);
+    expect(body.error).toMatch(/max 30/i);
   });
 
   it("PATCH mediaPaths with duplicates is rejected", async () => {
