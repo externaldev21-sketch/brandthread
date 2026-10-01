@@ -115,7 +115,11 @@ import CanvasHost, { type CanvasHostHandle } from '@/components/design-studio/Ca
 import CanvasGestureLayer from '@/components/design-studio/CanvasGestureLayer';
 import LayersPanelComponent from '@/components/design-studio/LayersPanel';
 import ColorPickerComponent from '@/components/design-studio/ColorPicker';
+import BrushLibraryComponent from '@/components/design-studio/BrushLibrary';
 import type { BrushKind as EngineBrushKind } from '@/lib/brushEngine';
+import {
+  type BrushDef, duplicateBrush, deleteBrush, nextActiveBrushAfterDelete,
+} from '@/lib/brushLibraryModel';
 import {
   UndoModel, type UndoCommand,
 } from '@/lib/undoModel';
@@ -133,37 +137,32 @@ import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 const FONT_FAMILIES = ['System', 'serif', 'monospace', 'Inter_400Regular', 'Georgia'];
 
-interface BrushDef {
-  name: string;
-  category: string;
-  widthMult: number;
-  opacityMult: number;
-  linecap: 'round' | 'square' | 'butt';
-}
-
-const BRUSH_LIBRARY: BrushDef[] = [
-  { name: 'HB Pencil',  category: 'Sketching', widthMult: 0.6,  opacityMult: 0.85, linecap: 'round' },
-  { name: '6B Pencil',  category: 'Sketching', widthMult: 1.2,  opacityMult: 0.75, linecap: 'round' },
-  { name: 'Technical',  category: 'Sketching', widthMult: 0.4,  opacityMult: 1.0,  linecap: 'round' },
-  { name: 'Studio Pen', category: 'Inking',    widthMult: 1.0,  opacityMult: 1.0,  linecap: 'round' },
-  { name: 'Dry Ink',    category: 'Inking',    widthMult: 1.4,  opacityMult: 0.9,  linecap: 'square' },
-  { name: 'Syrup',      category: 'Inking',    widthMult: 2.5,  opacityMult: 0.95, linecap: 'round' },
-  { name: 'Flat Brush', category: 'Painting',  widthMult: 3.0,  opacityMult: 0.7,  linecap: 'square' },
-  { name: 'Soft Brush', category: 'Painting',  widthMult: 4.0,  opacityMult: 0.4,  linecap: 'round' },
-  { name: 'Old Brush',  category: 'Painting',  widthMult: 2.0,  opacityMult: 0.6,  linecap: 'butt'   },
-  { name: 'Soft Air',   category: 'Airbrushing', widthMult: 5.0, opacityMult: 0.25, linecap: 'round' },
-  { name: 'Hard Air',   category: 'Airbrushing', widthMult: 3.5, opacityMult: 0.45, linecap: 'round' },
-  { name: 'Marker',     category: 'Marker',    widthMult: 2.8,  opacityMult: 0.88, linecap: 'square' },
-  { name: 'Neon',       category: 'Marker',    widthMult: 3.2,  opacityMult: 0.7,  linecap: 'round' },
+// BrushDef/duplicateBrush/deleteBrush/nextActiveBrushAfterDelete now live in
+// lib/brushLibraryModel.ts (dependency-free, so they're unit-testable under
+// vitest) — the Brush Library sheet needs real add/duplicate/delete, not
+// just this fixed read-only list.
+const DEFAULT_BRUSHES: BrushDef[] = [
+  { id: 'b1',  name: 'HB Pencil',  category: 'Sketching', widthMult: 0.6,  opacityMult: 0.85, linecap: 'round' },
+  { id: 'b2',  name: '6B Pencil',  category: 'Sketching', widthMult: 1.2,  opacityMult: 0.75, linecap: 'round' },
+  { id: 'b3',  name: 'Technical',  category: 'Sketching', widthMult: 0.4,  opacityMult: 1.0,  linecap: 'round' },
+  { id: 'b4',  name: 'Studio Pen', category: 'Inking',    widthMult: 1.0,  opacityMult: 1.0,  linecap: 'round' },
+  { id: 'b5',  name: 'Dry Ink',    category: 'Inking',    widthMult: 1.4,  opacityMult: 0.9,  linecap: 'square' },
+  { id: 'b6',  name: 'Syrup',      category: 'Inking',    widthMult: 2.5,  opacityMult: 0.95, linecap: 'round' },
+  { id: 'b7',  name: 'Flat Brush', category: 'Painting',  widthMult: 3.0,  opacityMult: 0.7,  linecap: 'square' },
+  { id: 'b8',  name: 'Soft Brush', category: 'Painting',  widthMult: 4.0,  opacityMult: 0.4,  linecap: 'round' },
+  { id: 'b9',  name: 'Old Brush',  category: 'Painting',  widthMult: 2.0,  opacityMult: 0.6,  linecap: 'butt'   },
+  { id: 'b10', name: 'Soft Air',   category: 'Airbrushing', widthMult: 5.0, opacityMult: 0.25, linecap: 'round' },
+  { id: 'b11', name: 'Hard Air',   category: 'Airbrushing', widthMult: 3.5, opacityMult: 0.45, linecap: 'round' },
+  { id: 'b12', name: 'Marker',     category: 'Marker',    widthMult: 2.8,  opacityMult: 0.88, linecap: 'square' },
+  { id: 'b13', name: 'Neon',       category: 'Marker',    widthMult: 3.2,  opacityMult: 0.7,  linecap: 'round' },
 ];
 
-const BRUSH_CATEGORIES = [...new Set(BRUSH_LIBRARY.map(b => b.category))];
-
 const SMUDGE_BRUSH: BrushDef = {
+  id: 'smudge',
   name: 'Smudge', category: 'Smudge', widthMult: 3.0, opacityMult: 0.3, linecap: 'round',
 };
 const ERASER_BRUSH: BrushDef = {
-  name: 'Eraser', category: 'Eraser', widthMult: 3.0, opacityMult: 1.0, linecap: 'round',
+  id: 'eraser', name: 'Eraser', category: 'Eraser', widthMult: 3.0, opacityMult: 1.0, linecap: 'round',
 };
 
 // react-native-svg supported blend modes
@@ -482,7 +481,8 @@ export default function DesignCanvasScreen() {
   canvasSizeRef.current  = canvasSize;
 
   // ── Brush state ────────────────────────────────────────────────────────────
-  const [brushIdx, setBrushIdx]         = useState(3);
+  const [brushes, setBrushes]           = useState<BrushDef[]>(DEFAULT_BRUSHES);
+  const [activeBrushId, setActiveBrushId] = useState('b4'); // Studio Pen, matches the old default index 3
   const [brushSize, setBrushSize]       = useState(10);
   const [brushOpacity, setBrushOpacity] = useState(1.0);
   const [drawColor, setDrawColor]       = useState('#FFFFFF');
@@ -494,14 +494,16 @@ export default function DesignCanvasScreen() {
   const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
   const sizeSliderHeightRef = useRef(200);
 
-  const brushIdxRef     = useRef(brushIdx);
+  const brushesRef       = useRef(brushes);
+  const activeBrushIdRef = useRef(activeBrushId);
   const brushSizeRef    = useRef(brushSize);
   const brushOpacityRef = useRef(brushOpacity);
   const drawColorRef    = useRef(drawColor);
   const eraserSizeRef   = useRef(eraserSize);
   const smudgeSizeRef   = useRef(smudgeSize);
 
-  brushIdxRef.current     = brushIdx;
+  brushesRef.current       = brushes;
+  activeBrushIdRef.current = activeBrushId;
   brushSizeRef.current    = brushSize;
   brushOpacityRef.current = brushOpacity;
   drawColorRef.current    = drawColor;
@@ -916,7 +918,7 @@ export default function DesignCanvasScreen() {
   function resolveActiveBrush(): BrushDef {
     if (activeTopToolRef.current === 'eraser') return ERASER_BRUSH;
     if (activeTopToolRef.current === 'smudge') return SMUDGE_BRUSH;
-    return BRUSH_LIBRARY[brushIdxRef.current] ?? BRUSH_LIBRARY[3];
+    return brushesRef.current.find(b => b.id === activeBrushIdRef.current) ?? brushesRef.current[0];
   }
 
   function resolveActiveSize(): number {
@@ -2731,7 +2733,25 @@ export default function DesignCanvasScreen() {
   const layerOptionsLayer = useMemo(() =>
     layers.find(l => l.id === layerOptionsTarget) ?? null, [layers, layerOptionsTarget]);
 
-  const activeBrush = BRUSH_LIBRARY[brushIdx] ?? BRUSH_LIBRARY[3];
+  const activeBrush = brushes.find(b => b.id === activeBrushId) ?? brushes[0];
+
+  function handleSelectBrush(id: string) {
+    setActiveBrushId(id);
+  }
+  function handleDuplicateBrush(id: string) {
+    const { brushes: next, newId } = duplicateBrush(brushesRef.current, id);
+    setBrushes(next);
+    if (newId) setActiveBrushId(newId); // select the new copy, matching Procreate's own duplicate behaviour
+  }
+  function handleDeleteBrush(id: string) {
+    const before = brushesRef.current;
+    const { brushes: next, deleted } = deleteBrush(before, id);
+    if (!deleted) return; // refused (would have emptied the whole library) — leave state untouched
+    setBrushes(next);
+    if (id === activeBrushIdRef.current) {
+      setActiveBrushId(nextActiveBrushAfterDelete(before, id, next));
+    }
+  }
   const activeSize  = activeTopTool === 'eraser' ? eraserSize : activeTopTool === 'smudge' ? smudgeSize : brushSize;
 
   // Logical → display scale
@@ -3988,106 +4008,64 @@ export default function DesignCanvasScreen() {
         onQuickMenuEditSlot={setQuickMenuEditSlot}
       />
 
-      {/* ── BRUSH LIBRARY ── */}
-      <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, { maxHeight: '72%' }]}>
-            <SheetHandle />
-            <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>
-                {activeTopTool === 'eraser' ? 'Eraser' : activeTopTool === 'smudge' ? 'Smudge' : 'Brush Library'}
-              </Text>
-              <TouchableOpacity onPress={closeSheet}>
-                <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.brushSliders}>
-              <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>Size</Text>
-                <TouchableOpacity onPress={() => {
-                  if (activeTopTool === 'eraser') setEraserSize(v => Math.max(2, v - 2));
-                  else setBrushSize(v => Math.max(1, v - 2));
-                }}>
-                  <Feather name="minus" size={14} color={MUTED} />
+      {/* ── BRUSH LIBRARY — Procreate's own full-screen "Brushes" picker
+          (left sidebar of brush-set categories, right pane of that set's
+          brushes, swipe-left for Share/Duplicate/Delete) when the active
+          tool is the brush itself. Eraser/Smudge keep the small Size-only
+          sheet below — they were never a "Brush Library" sheet, just a
+          quick size control, so that part is unchanged. ── */}
+      {activeTopTool === 'brush' ? (
+        <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
+          <View style={styles.modalOverlay}>
+            <BrushLibraryComponent
+              brushes={brushes}
+              activeBrushId={activeBrushId}
+              strokeColor={drawColor}
+              onSelectBrush={id => { handleSelectBrush(id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              onDuplicateBrush={handleDuplicateBrush}
+              onDeleteBrush={handleDeleteBrush}
+              onClose={closeSheet}
+            />
+          </View>
+        </Modal>
+      ) : (
+        <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
+          <View style={styles.modalOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
+            <SheetRise style={[styles.sheet, { maxHeight: '40%' }]}>
+              <SheetHandle />
+              <View style={styles.sheetHeaderRow}>
+                <Text style={styles.sheetTitle}>{activeTopTool === 'eraser' ? 'Eraser' : 'Smudge'}</Text>
+                <TouchableOpacity onPress={closeSheet}>
+                  <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
                 </TouchableOpacity>
-                <View style={styles.sliderTrack}>
-                  <View style={[styles.sliderFill, { width: `${(activeSize / 80) * 100}%` }]} />
-                </View>
-                <TouchableOpacity onPress={() => {
-                  if (activeTopTool === 'eraser') setEraserSize(v => Math.min(80, v + 2));
-                  else setBrushSize(v => Math.min(80, v + 2));
-                }}>
-                  <Feather name="plus" size={14} color={MUTED} />
-                </TouchableOpacity>
-                <Text style={styles.sliderValue}>{activeSize}</Text>
               </View>
-              {activeTopTool === 'brush' && (
+
+              <View style={styles.brushSliders}>
                 <View style={styles.sliderRow}>
-                  <Text style={styles.sliderLabel}>Opacity</Text>
-                  <TouchableOpacity onPress={() => setBrushOpacity(v => Math.max(0.05, +(v - 0.05).toFixed(2)))}>
+                  <Text style={styles.sliderLabel}>Size</Text>
+                  <TouchableOpacity onPress={() => {
+                    if (activeTopTool === 'eraser') setEraserSize(v => Math.max(2, v - 2));
+                    else setBrushSize(v => Math.max(1, v - 2));
+                  }}>
                     <Feather name="minus" size={14} color={MUTED} />
                   </TouchableOpacity>
                   <View style={styles.sliderTrack}>
-                    <View style={[styles.sliderFill, { width: `${brushOpacity * 100}%` }]} />
+                    <View style={[styles.sliderFill, { width: `${(activeSize / 80) * 100}%` }]} />
                   </View>
-                  <TouchableOpacity onPress={() => setBrushOpacity(v => Math.min(1, +(v + 0.05).toFixed(2)))}>
+                  <TouchableOpacity onPress={() => {
+                    if (activeTopTool === 'eraser') setEraserSize(v => Math.min(80, v + 2));
+                    else setBrushSize(v => Math.min(80, v + 2));
+                  }}>
                     <Feather name="plus" size={14} color={MUTED} />
                   </TouchableOpacity>
-                  <Text style={styles.sliderValue}>{Math.round(brushOpacity * 100)}%</Text>
+                  <Text style={styles.sliderValue}>{activeSize}</Text>
                 </View>
-              )}
-            </View>
-
-            {activeTopTool === 'brush' && (
-              <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollView}>
-                  {BRUSH_CATEGORIES.map(cat => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.catChip, BRUSH_LIBRARY[brushIdx]?.category === cat && styles.catChipActive]}
-                      onPress={() => {
-                        const idx = BRUSH_LIBRARY.findIndex(b => b.category === cat);
-                        if (idx >= 0) setBrushIdx(idx);
-                      }}
-                    >
-                      <Text style={[styles.catChipText, BRUSH_LIBRARY[brushIdx]?.category === cat && { color: PURPLE_LIGHT }]}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <ScrollView showsVerticalScrollIndicator={false} style={styles.brushList}>
-                  {BRUSH_LIBRARY.map((b, i) => (
-                    <TouchableOpacity
-                      key={b.name}
-                      style={[styles.brushRow, brushIdx === i && styles.brushRowActive]}
-                      onPress={() => { setBrushIdx(i); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-                    >
-                      <View style={styles.brushStrokePreview}>
-                        <Svg width={80} height={24}>
-                          <Path
-                            d="M8,16 Q20,4 40,12 Q60,20 72,8"
-                            stroke={drawColor} strokeWidth={Math.min(10, b.widthMult * 3)}
-                            fill="none" strokeLinecap={b.linecap} strokeLinejoin="round"
-                            opacity={b.opacityMult}
-                          />
-                        </Svg>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.brushName, brushIdx === i && { color: PURPLE_LIGHT }]}>{b.name}</Text>
-                        <Text style={styles.brushCategory}>{b.category}</Text>
-                      </View>
-                      {brushIdx === i && <Feather name="check" size={14} color={PURPLE_LIGHT} />}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-          </SheetRise>
-        </View>
-      </Modal>
+              </View>
+            </SheetRise>
+          </View>
+        </Modal>
+      )}
 
       {/* ── COLOR PICKER ── */}
       <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
