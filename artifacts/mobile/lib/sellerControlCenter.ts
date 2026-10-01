@@ -124,7 +124,10 @@ export const SECTIONS: ControlCenterSection[] = [
       { id: 'content',   label: 'Content',   icon: 'film',        route: '/content', description: 'Posts, drafts and scheduled' },
       { id: 'messages',  label: 'Messages',  icon: 'message-circle', route: '/seller-inbox', description: 'Reply to buyer DMs', badgeKey: 'messages' },
       { id: 'boost',     label: 'Boost',     icon: 'trending-up', route: '/boost', description: 'Promote a post or product' },
-      { id: 'community', label: 'Community', icon: 'users',      route: '/community', description: 'Join topic group chats' },
+      // Dev: no two Studio cards may share an icon — 'users' is Customers'
+      // own icon (see the 'customers' entry below); Community gets a
+      // distinct one.
+      { id: 'community', label: 'Community', icon: 'hash',       route: '/community', description: 'Join topic group chats' },
     ],
   },
   {

@@ -223,11 +223,14 @@ const AUTO_ENTER_MS = 1500;
 /** How far the cover slowly pushes in while the trace is drawing (Dev:
  *  "the cover art slowly pushes in"), before the fast zoom-through burst
  *  once the trace closes. One continuous scale value spans both phases. */
-const PUSH_IN_SCALE = 1.08;
+const PUSH_IN_SCALE = 1.14;
 /** How far the cover scales up in the fast zoom-through burst once the
  *  trace closes, alongside enterFade, right before navigating. Skipped
- *  entirely under Reduce Motion (see triggerZoomEnter). */
-const ZOOM_THROUGH_SCALE = 2.2;
+ *  entirely under Reduce Motion (see triggerZoomEnter). Dev: "a bit
+ *  stronger" than the original 2.2 — same 220ms duration (see
+ *  triggerZoomEnter), so the extra distance reads as a snappier burst, not
+ *  a slower one. */
+const ZOOM_THROUGH_SCALE = 2.6;
 /** Corner radius of the edge-trace rectangle — a "rounded screen-edge"
  *  look rather than a hard-cornered box. */
 const TRACE_CORNER_RADIUS = 28;
@@ -894,7 +897,22 @@ export default function SellerStudioRadialMenu({
     const pushBrightenStyle = useAnimatedStyle(() => {
       const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
       return {
-        opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.12], Extrapolation.CLAMP) : 0,
+        opacity: isCurrent ? interpolate(zoomScale.value, [1, PUSH_IN_SCALE], [0, 0.22], Extrapolation.CLAMP) : 0,
+      };
+    });
+    // Dev: during the zoom-through burst the title text slid down and got
+    // clipped at the bottom edge — `cardStyle`'s scale transform is centered
+    // on the whole card, so content far from center (the label, pinned near
+    // the bottom) moves the most. Rather than fight transform-origin
+    // (inconsistent between web and native), the label just fades out as
+    // the burst starts, well before it would visibly travel out of bounds —
+    // it's gone from view by ZOOM_THROUGH_SCALE, long before navigation.
+    // Unaffected by (and keeps playing through) the slow push-in — only the
+    // fast final burst past PUSH_IN_SCALE triggers it.
+    const cardLabelFadeStyle = useAnimatedStyle(() => {
+      const isCurrent = Math.abs(itemIndex - cardIndex.value) < 0.01;
+      return {
+        opacity: isCurrent ? interpolate(zoomScale.value, [PUSH_IN_SCALE, ZOOM_THROUGH_SCALE], [1, 0], Extrapolation.CLAMP) : 1,
       };
     });
     // Icon + name only ever show on the card that's actually centered (or
@@ -1098,7 +1116,7 @@ export default function SellerStudioRadialMenu({
             style={styles.cardBottomVignette}
             pointerEvents="none"
           />
-          <Text style={styles.cardLabel} numberOfLines={2}>{item.label}</Text>
+          <Animated.Text style={[styles.cardLabel, cardLabelFadeStyle]} numberOfLines={2}>{item.label}</Animated.Text>
         </Animated.View>
         {/* The edge-trace's slight brighten while it pushes in — see
             pushBrightenStyle above. A sibling of cardContent (not inside
@@ -1248,7 +1266,17 @@ export default function SellerStudioRadialMenu({
                 <Svg
                   width={cardAreaSize.width}
                   height={cardAreaSize.height}
-                  style={StyleSheet.absoluteFill}
+                  // zIndex matters here: without it, this Svg and the
+                  // sibling StudioCoverGrain Svg (also absoluteFill) land in
+                  // the same stacking context and the browser (confirmed on
+                  // web; this governs native stacking too) renders the
+                  // trace's two STRAIGHT vertical edges underneath the
+                  // grain despite this Svg being later in the tree — only
+                  // the arcs/horizontal edges painted on top. An explicit
+                  // zIndex forces its own stacking context above the grain,
+                  // fixing all four edges at once (confirmed live: without
+                  // this, the trace only ever showed top+bottom).
+                  style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
                   pointerEvents="none"
                   testID="seller-studio-entering-trace"
                 >

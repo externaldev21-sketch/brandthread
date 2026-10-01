@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import healthRouter from "./health";
+import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
 import authRouter from "./auth";
 import productsRouter from "./products";
 import ordersRouter from "./orders";
@@ -116,6 +117,20 @@ const router = Router();
 router.use("/config/features", featureFlagsRouter);
 router.use("/config/studio-cover-art", studioCoverArtRouter);
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
+// Shared response cache for the public read paths that dominate traffic. A no-op
+// unless REDIS_URL is set. Registered before the routers so a hit never reaches
+// them. See docs/scale/CACHE.md for keys, TTLs and invalidation.
+router.get("/public/search", responseCache({ name: "search", ttlSeconds: 30, scope: "viewer-blocks" }));
+router.get("/public/profiles/:username", responseCache({ name: "profile", ttlSeconds: 20, scope: "viewer-blocks" }));
+router.get("/public/products/:id", responseCache({ name: "product", ttlSeconds: 15, scope: "anon", idKey: (req) => String(req.params.id) }));
+// A seller edit or delete drops the cached product page immediately.
+router.use("/products", (req, res, next) => {
+  const id = /^\/([0-9a-f-]{36})(\/|$)/i.exec(req.path)?.[1];
+  if (id && req.method !== "GET" && req.method !== "HEAD") {
+    res.once("finish", () => { if (res.statusCode < 400) void invalidateResponseCache("product", id); });
+  }
+  next();
+});
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
