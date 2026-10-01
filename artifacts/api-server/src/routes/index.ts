@@ -70,6 +70,9 @@ import notificationEventsRouter from "./notification-events";
  *  is a safe no-op on the second call. */
 const tc = teamContext();
 import storeRouter from "./store";
+import emailMarketingRouter from "./email-marketing";
+import emailMarketingPublicRouter from "./email-marketing-public";
+import emailMarketingWebhookRouter from "./email-marketing-webhook";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
 import returnsRouter from "./returns";
@@ -110,11 +113,13 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
 router.use("/guest/checkout",  guestCheckoutRouter);
+router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/webhooks/shopify", webhooksShopifyRouter);
@@ -218,6 +223,7 @@ router.use("/taxes",                     tc, taxesRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
+router.use("/marketing/email",           tc, emailMarketingRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
 

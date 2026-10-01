@@ -97,3 +97,59 @@ export async function sendVerifyEmailEmail(options: { to: string; code: string }
   });
   return send({ to: options.to, subject: "Verify your email for Brandthread", html });
 }
+
+export type RawEmailResult =
+  | { ok: true; id: string | null }
+  | { ok: false; error: string; retryable: boolean };
+
+/** The bare address inside MAIL_FROM ("Name <a@b.com>" -> "a@b.com"). */
+export function mailFromAddress(): string {
+  const from = fromAddress();
+  const match = from.match(/<([^>]+)>/);
+  return (match ? match[1] : from).trim();
+}
+
+/**
+ * Generic send used by seller email marketing: same Resend client and
+ * MAIL_FROM as the auth mail above, but with caller-supplied sender name,
+ * reply-to, text part and headers (List-Unsubscribe). Returns the provider's
+ * message id so delivery events can be matched back to a recipient.
+ */
+export async function sendRawEmail(options: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  fromName?: string | null;
+  replyTo?: string | null;
+  headers?: Record<string, string>;
+}): Promise<RawEmailResult> {
+  const client = resendClient();
+  if (!client) return { ok: false, error: "RESEND_API_KEY is not set", retryable: false };
+  const from = options.fromName ? `${options.fromName} <${mailFromAddress()}>` : fromAddress();
+  try {
+    const { data, error } = await client.emails.send({
+      from,
+      to: [options.to],
+      subject: options.subject,
+      html: options.html,
+      ...(options.text ? { text: options.text } : {}),
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.headers ? { headers: options.headers } : {}),
+    });
+    if (error) {
+      const status = (error as { statusCode?: number | null }).statusCode ?? 0;
+      const name = String((error as { name?: string }).name ?? "");
+      logger.error({ err: error }, "Resend marketing email send failed");
+      return {
+        ok: false,
+        error: String((error as { message?: string }).message ?? name ?? "send failed").slice(0, 300),
+        retryable: status === 429 || status >= 500 || name === "rate_limit_exceeded",
+      };
+    }
+    return { ok: true, id: data?.id ?? null };
+  } catch (err) {
+    logger.error({ err }, "Resend marketing email request failed");
+    return { ok: false, error: "Email provider request failed", retryable: true };
+  }
+}

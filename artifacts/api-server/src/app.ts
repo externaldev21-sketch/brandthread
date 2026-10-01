@@ -92,6 +92,16 @@ app.use(
   express.raw({ type: "application/json" }),
 );
 
+// Resend (seller email marketing) delivery events are Svix-signed over the raw body.
+app.use(
+  "/api/webhooks/resend-marketing",
+  express.raw({ type: "application/json" }),
+);
+app.use(
+  "/api/v1/webhooks/resend-marketing",
+  express.raw({ type: "application/json" }),
+);
+
 // Shopify webhooks are HMAC-signed over the raw body too.
 app.use(
   "/api/webhooks/shopify",

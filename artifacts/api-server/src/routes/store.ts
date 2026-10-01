@@ -328,7 +328,13 @@ async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; s
       return `<section class="story"><p class="eyebrow">The label</p><h2>${h}</h2><p>${d}</p></section>`;
     }
     if (t === "newsletter") {
-      return `<section class="newsletter"><h2>${h}</h2><p>${d}</p><form><input aria-label="Email address" placeholder="Email address"><button type="button">${escapeHtml(s.settings?.buttonLabel ?? "Join")}</button></form></section>`;
+      const joinLabel = escapeHtml(s.settings?.buttonLabel ?? "Join");
+      // On the live site the form really subscribes (POST /api/public/stores/:slug/subscribe);
+      // the seller's private preview keeps the inert form so nothing is ever saved from it.
+      if (!isPreview) {
+        return `<section class="newsletter"><h2>${h}</h2><p>${d}</p><form class="bt-subscribe" novalidate><input type="email" name="email" aria-label="Email address" placeholder="Email address" autocomplete="email" required><input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"><button type="submit">${joinLabel}</button></form><p class="bt-subscribe-msg" role="status" aria-live="polite"></p></section>`;
+      }
+      return `<section class="newsletter"><h2>${h}</h2><p>${d}</p><form><input aria-label="Email address" placeholder="Email address"><button type="button">${joinLabel}</button></form></section>`;
     }
     if (t === "faq") {
       const faqs: Array<{ q?: string; a?: string }> = Array.isArray(s.settings?.faqs) ? s.settings.faqs : [];
@@ -427,6 +433,7 @@ async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; s
   const origin       = getWebOrigin();
   const pageUrl       = isPreview ? `${origin}/api/store/preview` : `${origin}/api/store/site/${escapeAttr(String(sf.slug ?? ""))}`;
   const checkoutUrl   = `${origin}/api/guest/checkout/session`;
+  const subscribeUrl  = `${origin}/api/public/stores/${encodeURIComponent(String(sf.slug ?? ""))}/subscribe`;
   const storeIdSafe   = escapeAttr(String(sf.id ?? ""));
   const bannerText    = isPreview ? "Private Preview link · Not yet published" : "";
 
@@ -472,6 +479,8 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:22px c
 .newsletter form{display:flex;max-width:560px;border-bottom:1px solid ${txt};}
 .newsletter input{flex:1;background:transparent;border:0;padding:14px 0;color:${txt};font:inherit;outline:0;}
 .newsletter button{background:transparent;border:0;color:${txt};text-transform:uppercase;letter-spacing:.12em;font-size:.68rem;}
+.newsletter .bt-subscribe-msg{margin:12px 0 0;font-size:.8rem;min-height:1.2em;}
+.newsletter form{position:relative;}
 .announcement{background:${txt};color:${bg};padding:10px 24px;text-align:center;font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;}
 .product-image img{width:100%;height:100%;object-fit:cover;filter:grayscale(1);}
 .product-image-placeholder{width:100%;height:100%;background:${primary};}
@@ -544,6 +553,7 @@ ${hasVisibleSectionContent ? sectionHtml : sections.length > 0 ? fallbackSection
   var CART_KEY = "bt_cart_${storeIdSafe}";
   var CHECKOUT_URL = ${JSON.stringify(checkoutUrl)};
   var PAGE_URL = ${JSON.stringify(pageUrl)};
+  var SUBSCRIBE_URL = ${JSON.stringify(subscribeUrl)};
 
   function readCart() {
     try {
@@ -646,6 +656,31 @@ ${hasVisibleSectionContent ? sectionHtml : sections.length > 0 ? fallbackSection
       submitBtn.textContent = "Pay now";
     });
   });
+
+  var subForm = document.querySelector("form.bt-subscribe");
+  if (subForm) {
+    subForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var msg = document.querySelector(".bt-subscribe-msg");
+      var btn = subForm.querySelector("button");
+      var email = subForm.email.value.trim();
+      if (!email) { msg.textContent = "Enter your email address."; return; }
+      btn.disabled = true;
+      fetch(SUBSCRIBE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, website: subForm.website.value }),
+      }).then(function (res) {
+        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+      }).then(function (r) {
+        if (!r.ok) throw new Error((r.data && r.data.error) || "Could not sign you up.");
+        subForm.email.value = "";
+        msg.textContent = r.data.status === "pending" ? "Check your inbox to confirm your subscription." : "You're on the list.";
+      }).catch(function (err) {
+        msg.textContent = err.message || "Could not sign you up. Please try again.";
+      }).then(function () { btn.disabled = false; });
+    });
+  }
 
   renderCartBar();
 })();
