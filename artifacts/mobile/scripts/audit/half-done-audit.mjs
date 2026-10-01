@@ -12,6 +12,11 @@
  *   - console errors / pageerrors / error-boundary fallback UI
  *   - broken images
  *   - clipped or overlapping text
+ *   - text-fit & alignment: ellipsis-truncated UI-chrome labels
+ *     (truncated-label), text overflowing its own button/chip/card
+ *     container (container-overflow), insufficient inner padding
+ *     (insufficient-padding), and inconsistent height/width across a row of
+ *     sibling buttons/chips (button-row-inconsistent)
  *   - color-rule violations (non-monochrome outside the 3 allowed accents)
  *   - "clarity standard": font family, type scale, min sizes, contrast,
  *     hit-target size, and primary/secondary button-system outliers
@@ -289,6 +294,32 @@ const PAGE_SCAN_FN = () => {
     if (r.bottom <= 0 || r.right <= 0 || r.top >= window.innerHeight || r.left >= window.innerWidth) return false;
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false;
+    // Walk ancestors for the same three properties. CSS opacity/visibility
+    // are NOT inherited computed values — a child's own `opacity` reads `1`
+    // even while an ancestor's `opacity: 0` makes it fully invisible on
+    // screen — so checking only `el`'s own style missed a real, common
+    // pattern in this app: a cross-fade pair (e.g.
+    // components/buyer-feed/ShopSideTab.tsx's collapsed/expanded pill
+    // strips, both permanently mounted, swapped via animated opacity rather
+    // than conditional rendering) where the hidden member is still laid out
+    // at its own (often smaller, mid-transition) box size. Before this fix,
+    // the text-fit checks below flagged the hidden member's content against
+    // its transitional box as a false-positive truncation/overflow —
+    // because real text in a 78px-wide collapsed-pill container, which
+    // never gets shown that cramped, is not an actual user-facing bug. The
+    // first-run-tip components (GestureHintTip/SpotlightTip/
+    // AnchoredCardTip/FullScreenGuideTip) don't hit this: they conditionally
+    // render (`if (!visible) return null`), not opacity-cross-fade, so this
+    // only matters for other already-existing animated UI, but it's a
+    // correctness fix for every check in this file, not just the new ones.
+    let node = el.parentElement;
+    let hops = 0;
+    while (node && node !== document.body && hops < 12) {
+      const pcs = getComputedStyle(node);
+      if (pcs.display === 'none' || pcs.visibility === 'hidden' || Number(pcs.opacity) === 0) return false;
+      node = node.parentElement;
+      hops += 1;
+    }
     return true;
   }
   const ICON_FONT_RE = /feather|material|ionicons?|fontawesome|font awesome|glyphicons?|antdesign|octicons|entypo|evilicons|simplelineicons|zocial|foundation/i;
@@ -318,6 +349,49 @@ const PAGE_SCAN_FN = () => {
     }
     return 'rgb(10,10,11)'; // app BG fallback
   }
+  // Nearest ancestor that looks like a real "container" (button/chip/card) —
+  // has a visible fill or a border — used for the container-overflow and
+  // insufficient-padding checks below. Same idea as nearestBg() above but
+  // returns the element itself (for its rect/padding), not just a color.
+  function nearestContainerEl(el) {
+    let node = el.parentElement;
+    let hops = 0;
+    while (node && node !== document.body && hops < 8) {
+      const cs = getComputedStyle(node);
+      const bgm = cs.backgroundColor && cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
+      const bgAlpha = bgm ? parseFloat(bgm[1].split(',')[3] ?? '1') : 0;
+      const hasBg = bgAlpha > 0.05;
+      const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(cs[`border${side}Width`]) > 0);
+      if (hasBg || hasBorder) return node;
+      node = node.parentElement;
+      hops += 1;
+    }
+    return null;
+  }
+  // Heuristic for "this text node is small UI chrome (a button/chip/tab/step
+  // label), not a prose paragraph" — per Dev's rule, ellipsis truncation is
+  // only ever a bug on the former. A role climbed within a few hops covers a
+  // label nested inside its own Text/View inside the pressable; the
+  // length+punctuation fallback covers a label with no ARIA role at all
+  // (RN Web doesn't always propagate one), the same way a body sentence
+  // reads differently from "Processing" or "Fulfillment".
+  function isChromeLabelLike(el, text) {
+    const trimmed = text.trim();
+    // A literal "..." already in the source copy (not the CSS-added ellipsis
+    // this check is about) marks an intentional preview/snippet of
+    // free-form content — e.g. a small "Notes"-style bubble previewing
+    // arbitrary user text — which is prose being clipped on purpose, the
+    // same carve-out Dev's rule gives a long caption/body paragraph. Treat
+    // it like prose regardless of which role it's nested in.
+    if (/\.\.\.$/.test(trimmed) || /…$/.test(trimmed)) return false;
+    let node = el;
+    for (let i = 0; i < 4 && node; i += 1) {
+      const role = node.getAttribute && node.getAttribute('role');
+      if (role && ['button', 'tab', 'link'].includes(role)) return true;
+      node = node.parentElement;
+    }
+    return trimmed.length > 0 && trimmed.length <= 24 && !/[.!?]$/.test(trimmed);
+  }
   const results = { texts: [], images: [], clickables: [] };
   const all = document.querySelectorAll('body *');
   for (const el of all) {
@@ -327,18 +401,51 @@ const PAGE_SCAN_FN = () => {
       const cs = getComputedStyle(el);
       if (ICON_FONT_RE.test(cs.fontFamily)) continue; // vector-icon glyph, not real copy
       const r = el.getBoundingClientRect();
+      const text = el.textContent.trim().slice(0, 200);
+      const container = nearestContainerEl(el);
+      let containerInfo = null;
+      if (container) {
+        const cr = container.getBoundingClientRect();
+        const ccs = getComputedStyle(container);
+        const padL = parseFloat(ccs.paddingLeft) || 0;
+        const padR = parseFloat(ccs.paddingRight) || 0;
+        const padT = parseFloat(ccs.paddingTop) || 0;
+        const padB = parseFloat(ccs.paddingBottom) || 0;
+        containerInfo = {
+          rect: { x: cr.x, y: cr.y, w: cr.width, h: cr.height },
+          declaredPad: { l: padL, r: padR, t: padT, b: padB },
+          // Actual measured clearance between the text's own box and the
+          // container's box, each edge — this is what a viewer actually
+          // sees, independent of whether it comes from CSS padding, a
+          // sibling gap, or the text's own line-height inset.
+          measuredPad: {
+            l: r.x - cr.x,
+            r: cr.x + cr.width - (r.x + r.width),
+            t: r.y - cr.y,
+            b: cr.y + cr.height - (r.y + r.height),
+          },
+        };
+      }
+      const lineClamp = cs.getPropertyValue('-webkit-line-clamp');
+      const isLineClamped = lineClamp && lineClamp !== 'none' && Number(lineClamp) > 0;
       results.texts.push({
-        text: el.textContent.trim().slice(0, 200),
+        text,
         color: cs.color,
         bg: nearestBg(el),
         fontFamily: cs.fontFamily,
         fontSize: parseFloat(cs.fontSize),
         fontWeight: cs.fontWeight,
         overflow: cs.overflow,
+        textOverflow: cs.textOverflow,
         scrollWidth: el.scrollWidth,
         clientWidth: el.clientWidth,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        lineClamp: isLineClamped ? Number(lineClamp) : null,
         whiteSpace: cs.whiteSpace,
         rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+        chromeLabel: isChromeLabelLike(el, text),
+        container: containerInfo,
       });
     }
   }
@@ -358,6 +465,7 @@ const PAGE_SCAN_FN = () => {
       text: el.textContent.trim().slice(0, 80),
       rect: { x: r.x, y: r.y, w: r.width, h: r.height },
       hitSlopHint: el.getAttribute('aria-hit-slop') || cs.padding,
+      borderRadius: cs.borderRadius,
     });
   }
   return results;
@@ -501,10 +609,87 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
         findings.push({ type: 'broken-image', severity: 'hard', detail: `Image failed to decode: ${img.src}`, text: img.src });
       }
     }
-    // clipped single-line text
+    // clipped single-line text — split into a hard-tier "truncated-label"
+    // (ellipsis truncation on small UI chrome — a button/chip/tab/step
+    // label: Dev's explicit "never ellipsis a label" rule) vs. the
+    // pre-existing warn-tier "clipped-text" (generic overflow:hidden
+    // clipping, or ellipsis truncation on a genuinely long prose
+    // caption/body paragraph, which the rule explicitly allows). See
+    // docs/audit/README.md's "Text-fit & alignment" section for why these
+    // are two different tiers rather than one.
     for (const t of scan.texts) {
-      if (t.overflow === 'hidden' && t.whiteSpace === 'nowrap' && t.scrollWidth > t.clientWidth + 2) {
+      const singleLineClipped = t.overflow === 'hidden' && t.whiteSpace === 'nowrap' && t.scrollWidth > t.clientWidth + 2;
+      const ellipsisClamped = t.lineClamp === 1 && t.scrollHeight > t.clientHeight + 2;
+      const isTruncated = singleLineClipped || ellipsisClamped;
+      if (!isTruncated) continue;
+      const isEllipsis = t.textOverflow === 'ellipsis' || ellipsisClamped;
+      if (isEllipsis && t.chromeLabel) {
+        findings.push({
+          type: 'truncated-label',
+          severity: 'hard',
+          detail: `Ellipsis-truncated UI label (${t.scrollWidth || t.scrollHeight}px content into ${t.clientWidth || t.clientHeight}px box): "${t.text}"`,
+          text: t.text,
+        });
+      } else {
         findings.push({ type: 'clipped-text', severity: 'warn', detail: `Text clipped (${t.scrollWidth}px into ${t.clientWidth}px): "${t.text}"`, text: t.text });
+      }
+    }
+    // container-overflow (hard): text's own box extends past the border box
+    // of its nearest button/chip/card-style ancestor — "text touches or
+    // overflows its container" is unambiguous once measured, no design
+    // judgment call involved, so this is gated immediately rather than
+    // tracked as debt like the padding-degree check below.
+    //
+    // Capped at MAX_PLAUSIBLE_OVERFLOW_PX: nearestContainerEl() (above) is a
+    // DOM-climbing heuristic, not real layout attribution — on a screen
+    // where the real visual "container" has no fill/border of its own (text
+    // sitting directly over a photo/video, no card chrome), it can climb
+    // past the right element onto some unrelated, much bigger bordered
+    // ancestor several hops up. That produces a huge, physically-implausible
+    // "overflow" (seen in practice: hundreds of px, next to the font-size-
+    // scale handful-of-px a real clipped/overflowing label produces) — a
+    // mismeasurement, not a real bug, and at hard tier's zero-tolerance gate
+    // (see docs/audit/README.md) a single one of these would permanently
+    // fail CI app-wide. A real "text touches/overflows its box" bug is on
+    // the order of single-digit-to-a-few-dozen px, matching how far text
+    // naturally spills past a slightly-too-small padding — not hundreds.
+    const MAX_PLAUSIBLE_OVERFLOW_PX = 48;
+    for (const t of scan.texts) {
+      if (!t.container) continue;
+      const { measuredPad } = t.container;
+      const overflows = [measuredPad.l, measuredPad.r, measuredPad.t, measuredPad.b].filter((v) => v < -0.5);
+      const overflowing = overflows.length > 0 && overflows.every((v) => v >= -MAX_PLAUSIBLE_OVERFLOW_PX);
+      if (overflowing) {
+        findings.push({
+          type: 'container-overflow',
+          severity: 'hard',
+          detail: `Text box overflows its container by (l${measuredPad.l.toFixed(1)},r${measuredPad.r.toFixed(1)},t${measuredPad.t.toFixed(1)},b${measuredPad.b.toFixed(1)})px: "${t.text}"`,
+          text: t.text,
+        });
+      }
+    }
+    // insufficient inner padding (warn): text sits inside its container but
+    // closer to the edge than the stated minimums — 12px horizontal for a
+    // button/chip-sized container (height <= 56px, the rough ceiling for a
+    // single-line control), 16px horizontal for a larger card-style
+    // container. This is a measured heuristic (guessing "button vs. card"
+    // from height alone, like the existing button-clustering heuristic
+    // below), not a hard binary rule, so it stays warn-tier — see
+    // docs/audit/README.md.
+    for (const t of scan.texts) {
+      if (!t.container) continue;
+      const { measuredPad, rect: cRect } = t.container;
+      if (measuredPad.l < -0.5 || measuredPad.r < -0.5) continue; // already a container-overflow finding
+      const isButtonSized = cRect.h <= 56;
+      const minH = isButtonSized ? 12 : 16;
+      const worstH = Math.min(measuredPad.l, measuredPad.r);
+      if (worstH >= 0 && worstH < minH) {
+        findings.push({
+          type: 'insufficient-padding',
+          severity: 'warn',
+          detail: `Only ${worstH.toFixed(1)}px horizontal clearance to its ${isButtonSized ? 'button/chip' : 'card'} container (need >=${minH}px): "${t.text}"`,
+          text: t.text,
+        });
       }
     }
     // overlapping text (bounding box overlap > 30% of smaller area)
@@ -570,6 +755,48 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
     for (const c of scan.clickables) {
       if (c.rect.w < 44 || c.rect.h < 44) {
         findings.push({ type: 'hit-target-too-small', severity: 'warn', detail: `${c.rect.w.toFixed(0)}x${c.rect.h.toFixed(0)}px control "${c.text || c.role}" under 44x44 (hitSlop not verifiable from DOM)` });
+      }
+    }
+    // button-row-inconsistent (warn): cluster clickables that sit in the same
+    // visual row (same vertical band, roughly the app's own row-gap apart
+    // horizontally) and flag the group if its members' heights or widths
+    // vary too much to read as a real grid — Dev's explicit "equal height
+    // AND equal width, no ragged 2-wide-+-2-different-width layout" rule.
+    // Same clustering approach as the pre-existing button/type-scale
+    // outlier-from-the-mode heuristics elsewhere in this file: groups, not a
+    // hard per-element binary, so this stays warn-tier like the other
+    // clustering-based checks (see docs/audit/README.md).
+    {
+      const rowByBand = {};
+      for (const c of scan.clickables) {
+        // A real "grid of buttons" is short controls (chips/segmented
+        // buttons/step actions), not e.g. a tall card that also happens to
+        // be a pressable — cap out generously above the tallest real
+        // button in this app's scale.
+        if (c.rect.h > 72 || c.rect.h <= 0 || c.rect.w <= 0) continue;
+        const key = Math.round(c.rect.y / 6);
+        (rowByBand[key] ??= []).push(c);
+      }
+      for (const [, row] of Object.entries(rowByBand)) {
+        if (row.length < 2) continue;
+        const sorted = [...row].sort((a, b) => a.rect.x - b.rect.x);
+        const heights = sorted.map((c) => c.rect.h);
+        const widths = sorted.map((c) => c.rect.w);
+        const maxH = Math.max(...heights), minH = Math.min(...heights);
+        const maxW = Math.max(...widths), minW = Math.min(...widths);
+        const avgW = widths.reduce((a, b) => a + b, 0) / widths.length;
+        // >6px height mismatch, or >25% width mismatch relative to the
+        // row's average width, in a row of 2+ button-like controls.
+        const heightMismatch = maxH - minH > 6;
+        const widthMismatch = avgW > 0 && (maxW - minW) / avgW > 0.25;
+        if (heightMismatch || widthMismatch) {
+          const label = sorted.map((c) => `"${c.text || c.role}" ${c.rect.w.toFixed(0)}x${c.rect.h.toFixed(0)}`).join(', ');
+          findings.push({
+            type: 'button-row-inconsistent',
+            severity: 'warn',
+            detail: `${sorted.length} controls in one row have mismatched ${heightMismatch ? 'heights' : ''}${heightMismatch && widthMismatch ? '/' : ''}${widthMismatch ? 'widths' : ''}: ${label}`,
+          });
+        }
       }
     }
 
@@ -672,11 +899,14 @@ function parseArgs(argv) {
 
 function classifyTier(finding) {
   // hard-fail tier: console errors, dead controls, placeholder copy, broken
-  // images, repeated-labels, error boundaries — things that should never
-  // regress and are cheap to keep at zero-new.
+  // images, repeated-labels, error boundaries, truncated-label,
+  // container-overflow — things that should never regress and are cheap to
+  // keep at zero-new (the last two added for the text-fit & alignment audit;
+  // see docs/audit/README.md).
   // warn tier: color/type-scale/contrast/hit-target/clipped/overlap/button-
-  // consistency — pervasive pre-existing debt, out of scope to fix in the
-  // audit-infra PR; tracked but non-blocking for now.
+  // row-inconsistent/insufficient-padding — pervasive pre-existing debt or a
+  // clustering/degree-based heuristic, out of scope to hard-gate; tracked
+  // but non-blocking for now.
   return finding.severity === 'hard' ? 'hard' : 'warn';
 }
 
