@@ -13,8 +13,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import LegalMarkdown from '@/components/legal/LegalMarkdown';
 import {
-  EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_VERSION,
+  EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_ALL_DOCUMENT_ORDER, LEGAL_VERSION,
   type LegalDocId,
 } from '@/content/legal';
 
@@ -36,6 +37,10 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
   const topInset = useHeaderTopInset();
   const bottomInset = insets.bottom;
   const doc = LEGAL_DOCUMENTS[docId];
+  // The original three documents keep their three-pill switcher exactly as it
+  // was; the seller agreement and refund policy show all five (scrollable).
+  const inOriginalSet = LEGAL_DOCUMENT_ORDER.includes(docId);
+  const switcherIds = inOriginalSet ? LEGAL_DOCUMENT_ORDER : LEGAL_ALL_DOCUMENT_ORDER;
 
   function leaveDocument() {
     if (router.canGoBack()) {
@@ -44,6 +49,26 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
     }
     router.replace('/');
   }
+
+  const switcher = (
+    <View style={styles.switcher} accessibilityRole="tablist">
+      {switcherIds.map((id) => {
+        const item = LEGAL_DOCUMENTS[id];
+        const active = id === docId;
+        return (
+          <Pressable
+            key={id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            onPress={() => { if (!active) router.replace(item.route); }}
+            style={({ pressed }) => [styles.switchItem, active && styles.switchItemActive, pressed && styles.pressed]}
+          >
+            <Text style={[styles.switchText, active && styles.switchTextActive]}>{item.shortTitle}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 
   return (
     <View style={styles.root}>
@@ -68,23 +93,16 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
           </Pressable>
         </View>
 
-        <View style={styles.switcher} accessibilityRole="tablist">
-          {LEGAL_DOCUMENT_ORDER.map((id) => {
-            const item = LEGAL_DOCUMENTS[id];
-            const active = id === docId;
-            return (
-              <Pressable
-                key={id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                onPress={() => { if (!active) router.replace(item.route); }}
-                style={({ pressed }) => [styles.switchItem, active && styles.switchItemActive, pressed && styles.pressed]}
-              >
-                <Text style={[styles.switchText, active && styles.switchTextActive]}>{item.shortTitle}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        {inOriginalSet ? switcher : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.switcherScroll}
+            contentContainerStyle={styles.switcherScrollContent}
+          >
+            {switcher}
+          </ScrollView>
+        )}
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>{doc.eyebrow}</Text>
@@ -104,15 +122,21 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
                   {section.title}
                 </Text>
               </View>
-              {section.paragraphs?.map((paragraph) => (
-                <Text key={paragraph} style={styles.paragraph}>{paragraph}</Text>
-              ))}
-              {section.bullets?.map((bullet) => (
-                <View key={bullet} style={styles.bulletRow}>
-                  <View style={styles.bullet} />
-                  <Text style={styles.bulletText}>{bullet}</Text>
-                </View>
-              ))}
+              {section.blocks ? (
+                <LegalMarkdown blocks={section.blocks} styles={styles} />
+              ) : (
+                <>
+                  {section.paragraphs?.map((paragraph) => (
+                    <Text key={paragraph} style={styles.paragraph}>{paragraph}</Text>
+                  ))}
+                  {section.bullets?.map((bullet) => (
+                    <View key={bullet} style={styles.bulletRow}>
+                      <View style={styles.bullet} />
+                      <Text style={styles.bulletText}>{bullet}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
             </View>
           ))}
         </View>
@@ -186,6 +210,13 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderColor: theme.border,
     backgroundColor: theme.card,
     alignSelf: 'flex-start',
+  },
+  switcherScroll: {
+    flexGrow: 0,
+    marginHorizontal: -22,
+  },
+  switcherScrollContent: {
+    paddingHorizontal: 22,
   },
   switchItem: {
     paddingHorizontal: 16,
@@ -291,6 +322,29 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
     lineHeight: 24,
+  },
+  numberText: {
+    minWidth: 18,
+    color: theme.accentLight,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  heading: {
+    color: theme.text,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 6,
+  },
+  bold: {
+    color: theme.text,
+    fontFamily: 'Inter_700Bold',
+  },
+  link: {
+    color: theme.text,
+    fontFamily: 'Inter_600SemiBold',
+    textDecorationLine: 'underline',
   },
   footer: {
     color: theme.subtle,

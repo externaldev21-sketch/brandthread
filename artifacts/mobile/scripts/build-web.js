@@ -33,8 +33,16 @@ const ROUTE_METADATA = {
     title: 'Community Guidelines | Brandthread',
     description: 'The rules for posting, selling, commenting, live shopping and messaging on Brandthread, and how we enforce them.',
   },
+  '/seller-agreement': {
+    title: 'Seller Agreement | Brandthread',
+    description: 'The Brandthread Seller Agreement: the 5% platform fee, Stripe payouts, preorder and drop funds, prohibited items, intellectual property and account termination.',
+  },
+  '/refund-policy': {
+    title: 'Refund Policy | Brandthread',
+    description: 'Brandthread’s refund policy: cancelling orders, requesting returns, automatic refunds for failed drops, and payment disputes.',
+  },
 };
-const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines'];
+const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines', '/seller-agreement', '/refund-policy'];
 
 function domainFromEnvironment() {
   const isPublishedBuild =

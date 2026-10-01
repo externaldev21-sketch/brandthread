@@ -12,6 +12,7 @@
  */
 import { LegalConsent } from '@/components/legal/LegalConsent';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
+import { LegalContinueNotice } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
 import { AgeDobField } from '@/components/age/AgeNotices';
 import { checkDobInput, formatDobInput, setPendingDob, submitPendingAge } from '@/lib/ageGate';
@@ -675,13 +676,16 @@ function BuyerAuthStep({
     return true;
   }
   const [consentError, setConsentError] = useState(false);
+  function recordConsent() {
+    void rememberPendingConsent();
+  }
   function requireConsent(): boolean {
     if (!agreedToTerms) {
       setConsentError(true);
       setError('Please agree to the Terms of Service and Community Guidelines to continue.');
       return false;
     }
-    void rememberPendingConsent();
+    recordConsent();
     return true;
   }
   function updateConsent(value: boolean) {
@@ -1000,6 +1004,8 @@ function BuyerAuthStep({
 
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
 
+          <LegalContinueNotice style={{ marginTop: 14 }} />
+
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -1086,6 +1092,8 @@ function BuyerAuthStep({
           <Feather name="chevron-right" size={16} color={MUTED2} />
         </TouchableOpacity>
 
+        <LegalContinueNotice style={{ marginTop: 12 }} />
+
         {error ? <Text style={[sba.error, { textAlign: 'center', marginTop: 8 }]}>{error}</Text> : null}
 
         <TouchableOpacity style={sba.signInLink} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.8}>
@@ -1163,13 +1171,16 @@ function SharedAuthStep({
     return true;
   }
   const [consentError, setConsentError] = useState(false);
+  function recordConsent() {
+    void rememberPendingConsent();
+  }
   function requireConsent(): boolean {
     if (!agreedToTerms) {
       setConsentError(true);
       setError('Please agree to the Terms of Service and Community Guidelines to continue.');
       return false;
     }
-    void rememberPendingConsent();
+    recordConsent();
     return true;
   }
   function updateConsent(value: boolean) {
@@ -1551,6 +1562,7 @@ function SharedAuthStep({
         <Reveal index={10}>
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
           {!canSubmit && missingFieldsHint ? <Text style={[ssa.hint, ssa.hintCentered]}>{missingFieldsHint}</Text> : null}
+          <LegalContinueNotice style={{ marginTop: SPACE.sm }} />
         </Reveal>
 
         {/* OAuth options below the main CTA */}

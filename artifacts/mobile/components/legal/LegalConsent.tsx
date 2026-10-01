@@ -5,7 +5,7 @@
  * is recorded on the account once it exists (see lib/legalConsent.ts).
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -67,7 +67,35 @@ export function LegalConsent({
   );
 }
 
+/**
+ * Sign-up: one line of linked text under the account-creation buttons.
+ * Continuing is the agreement (no checkbox, no pop-up); the sign-up handlers
+ * call rememberPendingConsent() when someone continues, and
+ * LegalAcceptanceGate records the version and time once the account exists.
+ * The checkbox above remains only for the existing "updated terms" gate.
+ */
+export function LegalContinueNotice({ style }: { style?: StyleProp<TextStyle> }) {
+  const { theme } = useAppTheme();
+  const router = useRouter();
+  const link = (label: string, route: string) => (
+    <Text
+      style={[styles.link, { color: theme.text }]}
+      onPress={() => router.push(route as never)}
+      accessibilityRole="link"
+      suppressHighlighting
+    >
+      {label}
+    </Text>
+  );
+  return (
+    <Text style={[styles.notice, { color: theme.muted }, style]} testID="legal-consent-line">
+      By continuing you agree to our {link('Terms', '/terms')}, {link('Privacy Policy', '/privacy')} and {link('Community Guidelines', '/community-guidelines')}.
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
+  notice: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 4 },
   box: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
