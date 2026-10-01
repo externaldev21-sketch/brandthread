@@ -259,10 +259,24 @@ export default function ColorPicker(props: ColorPickerProps) {
               >
                 <View style={[s.discKnob, { left: knobX - 8, top: knobY - 8, backgroundColor: color, borderColor: knobColor }]} />
                 {harmonyHues.map((h, i) => {
-                  const hp = hsToDiscPoint(h, hsv.s);
+                  // Markers sit at a fixed outer radius, independent of the
+                  // CURRENT colour's saturation: at s=0 (e.g. the picker's
+                  // default black) every hue maps to the disc's centre, so
+                  // tying marker position to hsv.s stacks all of them on top
+                  // of each other — invisible and unclickable. A fixed
+                  // radius keeps them spread around the wheel at the right
+                  // hue angle no matter how desaturated the base colour is.
+                  const hp = hsToDiscPoint(h, 0.85);
                   const hx = DISC_RADIUS + hp.x * DISC_RADIUS;
                   const hy = DISC_RADIUS + hp.y * DISC_RADIUS;
-                  const hHex = hsvToHex({ h, s: hsv.s, v: hsv.v });
+                  // Same reasoning as the marker position: at s=0 (grayscale
+                  // base colours, e.g. the default black) every harmony hue
+                  // would render — and apply — as the exact same grey,
+                  // making the tab a no-op. Floor s/v so a harmony swatch is
+                  // always a real, distinguishable colour to pick, while
+                  // still respecting the user's own s/v once they're
+                  // non-degenerate.
+                  const hHex = hsvToHex({ h, s: Math.max(hsv.s, 0.6), v: Math.max(hsv.v, 0.6) });
                   return (
                     <TouchableOpacity
                       key={i}

@@ -81,12 +81,17 @@ test('Colours sheet renders as a full-height sheet with all 5 real tabs, no over
   expect(box!.width).toBeGreaterThan(300);
   expect(box!.height).toBeGreaterThan(400);
 
-  // All 5 real tabs exist and are switchable.
+  // All 5 real tabs exist and are switchable. Checked for overflow/overlap
+  // on EACH tab, not just the one left showing at the end — a per-tab
+  // layout bug (like the hex-row-behind-the-tab-bar clip this check caught
+  // on Classic) only shows up while that specific tab's content is
+  // mounted.
   for (const tab of ['disc', 'classic', 'harmony', 'value', 'palettes']) {
     const tabBtn = page.locator(`[data-testid="color-tab-${tab}"]`);
     await expect(tabBtn).toBeVisible();
     await tabBtn.click();
     await page.waitForTimeout(150);
+    await assertNoTextOrBoxOverflow(page, '[data-testid="color-picker"]');
   }
 
   await page.locator('[data-testid="color-tab-disc"]').click();

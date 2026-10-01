@@ -5569,7 +5569,16 @@ const styles = StyleSheet.create({
   // bar — Procreate's own placement — rather than sitting at the bottom
   // like the other sheets.
   layersModalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-start' },
-  layersModalSheetWrap: { paddingTop: Platform.OS === 'ios' ? 54 : 32 },
+  // flex: 1 here (not just paddingTop) matters on web: a sheet inside this
+  // wrap (e.g. the Colours picker) sizes itself with a percentage height
+  // ('82%'). RNW's flexbox only resolves a percentage height against an
+  // ancestor with a DEFINITE height — without flex: 1 this wrap has none
+  // (justifyContent: 'flex-start' on the parent means it shrinks to content
+  // instead of stretching), so the percentage silently falls back to the
+  // sheet's own content size. That under-sized the Colours sheet enough for
+  // its last scrollable row to render behind the fixed tab bar below it — a
+  // real, user-visible clipping bug this rebuild's zoomed screenshot caught.
+  layersModalSheetWrap: { flex: 1, paddingTop: Platform.OS === 'ios' ? 54 : 32 },
   sheet: {
     backgroundColor: SURFACE,
     borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
