@@ -3095,6 +3095,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
     },
+    /** Report + block helpers shared by ReportSheet and the privacy screens. */
+    trust: {
+      /** Whether I blocked this person / they blocked me. */
+      blockStatus: (userId: string) =>
+        freshGet<{ blockedByMe: boolean; blockedMe: boolean }>(`/api/social/block-status/${encodeURIComponent(userId)}`),
+    },
   };
 }
 

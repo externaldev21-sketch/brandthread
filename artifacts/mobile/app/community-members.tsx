@@ -35,6 +35,8 @@ import { pickAndUploadCommunityPhoto } from '@/lib/communities/pickPhoto';
 import { validateGroupDescription, validateGroupName } from '@/lib/communities/validation';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
+import { useReportSheet } from '@/components/safety/ReportSheet';
+import { useBlockAction } from '@/lib/useBlockAction';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 const CHIP_PAD = { paddingHorizontal: 14 } as const;
@@ -52,6 +54,8 @@ export default function CommunityMembersScreen() {
   const router = useRouter();
   const client = useCommunityClient();
   const myId = useCommunityMyId();
+  const { openReport } = useReportSheet();
+  const blockUser = useBlockAction();
   const barInset = useBuyerTabBarInset();
   const { id: rawId } = useLocalSearchParams<{ id?: string }>();
   const id = (Array.isArray(rawId) ? rawId[0] : rawId) ?? '';
@@ -176,7 +180,8 @@ export default function CommunityMembersScreen() {
 
   const openMemberMenu = (m: CommunityMember) => {
     const buttons = [];
-    if (isOwner) {
+    const manage = canManage(m);
+    if (isOwner && manage) {
       const makeAdmin = m.role !== 'admin';
       buttons.push({
         text: makeAdmin ? 'Make admin' : 'Remove admin',
@@ -186,19 +191,32 @@ export default function CommunityMembersScreen() {
         }); },
       });
     }
-    buttons.push({
+    if (manage) buttons.push({
       text: 'Remove from group',
       onPress: () => confirmAction(`Remove ${m.name}?`, 'They can rejoin if the group is public or they have an invite link.', 'Remove', () => {
         void run(`rm-${m.userId}`, async () => { await client.removeMember(id, m.userId); dropMember(m.userId); });
       }),
     });
-    buttons.push({
+    if (manage) buttons.push({
       text: 'Ban from group',
       style: 'destructive' as const,
       onPress: () => confirmAction(`Ban ${m.name}?`, "They'll be removed and can't rejoin, even with an invite link. You can unban them later.", 'Ban', () => {
         void run(`ban-${m.userId}`, async () => { await client.banMember(id, m.userId); dropMember(m.userId); });
       }),
     });
+    if (m.userId !== myId) {
+      buttons.push({
+        text: 'Report member',
+        onPress: () => openReport({
+          targetType: 'profile', targetId: m.userId, label: m.name, ownerId: m.userId, ownerName: m.name,
+        }),
+      });
+      buttons.push({
+        text: 'Block member',
+        style: 'destructive' as const,
+        onPress: () => { void blockUser({ userId: m.userId, name: m.name }).then((done) => { if (done) dropMember(m.userId); }); },
+      });
+    }
     buttons.push({ text: 'Cancel', style: 'cancel' as const });
     showActionSheet(m.name, undefined, buttons);
   };
@@ -271,7 +289,7 @@ export default function CommunityMembersScreen() {
       .filter(Boolean).join(' · ');
     return (
       <View style={styles.row}>
-        <PressableScale onPress={() => openProfile(m)} style={styles.memberTap} accessibilityRole="button" accessibilityLabel={`Open ${m.name}'s profile`}>
+        <PressableScale onPress={() => openProfile(m)} onLongPress={m.userId === myId ? undefined : () => openMemberMenu(m)} style={styles.memberTap} accessibilityRole="button" accessibilityLabel={`Open ${m.name}'s profile`}>
           <Avatar uri={m.avatarUrl} name={m.name} size={40} />
           <View style={styles.copy}>
             <View style={styles.nameRow}>

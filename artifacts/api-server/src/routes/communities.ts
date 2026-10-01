@@ -49,7 +49,7 @@ import { and, asc, desc, eq, gt, ilike, inArray, isNull, lt, notInArray, or, sql
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
-import { publishingRestriction, profilesById } from "../lib/safety";
+import { publishingRestriction, profilesById, isBlockedEitherWay } from "../lib/safety";
 import {
   IMAGE_REJECTED_MESSAGE, IMAGE_UNAVAILABLE_MESSAGE, moderateImage,
 } from "../lib/imageModeration";
@@ -285,9 +285,17 @@ async function adaptMessages(rows: (typeof communityMessages.$inferSelect)[]) {
   });
 }
 
+/** True when a block exists (either way) between the joiner and the group's owner. */
+async function blockedWithOwner(c: { ownerId: string | null }, userId: string): Promise<boolean> {
+  if (!c.ownerId || c.ownerId === userId) return false;
+  return isBlockedEitherWay(userId, c.ownerId);
+}
+
+/** Everyone with a block in either direction with `userId`. */
 async function blockedByMe(userId: string): Promise<string[]> {
-  const rows = await db.select({ id: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
-  return rows.map((r) => r.id);
+  const rows = await db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  return [...new Set(rows.map((r) => (r.blockerId === userId ? r.blockedId : r.blockerId)))];
 }
 
 // ─── Discovery ────────────────────────────────────────────────────────────────
@@ -475,6 +483,7 @@ router.post("/join-by-code", rateLimit("mutation"), async (req, res) => {
     .where(and(eq(communities.inviteCode, code), isNull(communities.deletedAt))).limit(1);
   if (!c) return res.status(404).json({ error: "This invite link isn't valid anymore.", code: "INVITE_INVALID" });
   if (await isBanned(c.id, userId)) return res.status(403).json({ error: "You can't join this group.", code: "BANNED" });
+  if (await blockedWithOwner(c, userId)) return res.status(403).json({ error: "You can't join this group.", code: "BLOCKED" });
   const existing = await loadMember(c.id, userId);
   if (existing) return res.json({ status: "joined", community: communityView(c, existing) });
   if (c.visibility === "private" && c.requireApproval) {
@@ -552,6 +561,7 @@ router.post("/:id/join", rateLimit("mutation"), async (req, res) => {
   const c = await loadCommunity(String(req.params.id));
   if (!c) return res.status(404).json({ error: "Group not found", code: "NOT_FOUND" });
   if (await isBanned(c.id, userId)) return res.status(403).json({ error: "You can't join this group.", code: "BANNED" });
+  if (await blockedWithOwner(c, userId)) return res.status(403).json({ error: "You can't join this group.", code: "BLOCKED" });
   const existing = await loadMember(c.id, userId);
   if (existing) return res.json(communityView(c, existing));
   if (c.visibility === "private") return res.status(403).json({ error: "This group is invite-only.", code: "PRIVATE" });
@@ -844,8 +854,11 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
 
   let replyTo: string | null = null;
   if (typeof replyToId === "string" && UUID_RE.test(replyToId)) {
-    const [orig] = await db.select({ id: communityMessages.id }).from(communityMessages)
+    const [orig] = await db.select({ id: communityMessages.id, senderId: communityMessages.senderId }).from(communityMessages)
       .where(and(eq(communityMessages.id, replyToId), eq(communityMessages.communityId, community.id))).limit(1);
+    if (orig && orig.senderId !== userId && (await isBlockedEitherWay(userId, orig.senderId))) {
+      return res.status(403).json({ error: "You can't reply to this message.", code: "BLOCKED" });
+    }
     replyTo = orig?.id ?? null;
   }
 

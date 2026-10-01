@@ -874,6 +874,7 @@ export const blocks = pgTable('blocks', {
   createdAt:  timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   pk: primaryKey({ columns: [t.blockerId, t.blockedId] }),
+  blockedIdx: index('blocks_blocked_id_idx').on(t.blockedId),
 }));
 
 // ─── Conversations & Messages (buyer ↔ seller DM) ────────────────────────────

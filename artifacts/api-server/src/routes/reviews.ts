@@ -12,6 +12,7 @@ import { logger } from "../lib/logger";
 import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
 import { resolveToClerkId } from "./public";
 import { toPublicReview } from "../lib/publicProfile";
+import { notBlockedWith, optionalViewerId } from "../lib/safety";
 
 // ─── Startup migration — add seller reply columns ─────────────────────────────
 (async () => {
@@ -30,6 +31,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // ─── Public: reviews for a product ───────────────────────────────────────────
 router.get("/product/:productId", async (req, res) => {
   const { productId } = req.params;
+  const viewerId = optionalViewerId(req);
   if (!UUID_RE.test(productId)) return res.json({ reviews: [], avgRating: 0, totalCount: 0 });
   // Joined with the buyer's display name + avatar so the buyer-facing review
   // card (Shop sheet + PDP) can show "who" alongside the star rating and
@@ -41,6 +43,7 @@ router.get("/product/:productId", async (req, res) => {
     FROM   reviews r
     LEFT JOIN users u ON u.clerk_id = r.buyer_id
     WHERE  r.product_id = ${productId}
+      ${viewerId ? sql`AND ${notBlockedWith(viewerId, sql.raw("r.buyer_id"))}` : sql``}
     ORDER  BY r.created_at DESC
     LIMIT  50
   `)).rows;

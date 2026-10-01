@@ -1514,9 +1514,29 @@ router.post("/block", async (req, res) => {
       and(eq(follows.followerId, myId), eq(follows.followingId, userId)),
       and(eq(follows.followerId, userId), eq(follows.followingId, myId)),
     ));
+    // Cancel any pending DM request between the two, in either direction.
+    // Accepted conversations are untouched - they simply become unreachable
+    // through the two-way block checks on the messaging routes.
+    await tx.execute(sql`
+      DELETE FROM conversations c
+      WHERE c.is_request = true
+        AND EXISTS (SELECT 1 FROM conversation_participants p1 WHERE p1.conversation_id = c.id AND p1.user_id = ${myId})
+        AND EXISTS (SELECT 1 FROM conversation_participants p2 WHERE p2.conversation_id = c.id AND p2.user_id = ${userId})
+    `);
   });
 
   res.json({ ok: true });
+});
+
+// GET /api/social/block-status/:userId - whether I blocked them / they blocked me
+router.get("/block-status/:userId", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const target = (await resolveToClerkId(req.params.userId)) ?? req.params.userId;
+  const relation = await blockRelation(myId, target);
+  res.json({
+    blockedByMe: relation === "blocked_by_me" || relation === "mutual",
+    blockedMe: relation === "blocked_me" || relation === "mutual",
+  });
 });
 
 // DELETE /api/social/block/:userId — unblock

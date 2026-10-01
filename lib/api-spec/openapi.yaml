@@ -1932,7 +1932,7 @@ components:
 
     ReportTargetType:
       type: string
-      enum: [post, video, live, live_comment, comment, story, product, profile, message]
+      enum: [post, video, live, live_comment, comment, story, product, profile, message, community_message, community, review]
 
     ReportReason:
       type: string
