@@ -289,6 +289,10 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // scroll footer — the bar has no business floating over its form/photo
   // pickers (screenshots showed it sitting on top of the last row).
   'edit-profile',
+  // Store identity setup steps — each pins its own Continue/Done button to the bottom.
+  'store-setup-name',
+  'store-setup-brand',
+  'store-setup-socials',
   // Brandthread AI screen — immersive full-screen chat takeover with its own
   // floating composer pinned to the safe-area bottom inset. The floating
   // seller tab bar previously stayed mounted on top of it (this route wasn't
@@ -1230,6 +1234,9 @@ function RootLayoutNav() {
         <Stack.Screen name="website"          options={{ headerShown: false }} />
         <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-setup-name" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-setup-brand" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-setup-socials" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="add-product" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
