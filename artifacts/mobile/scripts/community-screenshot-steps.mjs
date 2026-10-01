@@ -16,7 +16,7 @@ export default {
   async signedOutList({ browser, origin, session, shot, go, zoom }) {
     const { context, page } = await session(browser, origin, 'buyer', false);
     await boot(page);
-    await nav(page, go, '/community?bt_preview=buyer', 'Have an invite link?');
+    await nav(page, go, '/community?bt_preview=buyer', 'Create a group');
     await shot(page, '00-community-signed-out-readonly');
     await page.getByText('Join', { exact: true }).first().click();
     await settle(page, 1000);
@@ -27,7 +27,7 @@ export default {
   async demoFlow({ browser, origin, session, shot, go, zoom }) {
     const { context, page } = await session(browser, origin, 'buyer', true);
     await boot(page);
-    await nav(page, go, '/community?bt_preview=buyer', 'Have an invite link?');
+    await nav(page, go, '/community?bt_preview=buyer', 'Create a group');
     await shot(page, '01-community-list');
     await zoom(page, 'community-cards-and-join-buttons', [0, 395, 393, 457]);
     await zoom(page, 'community-invite-and-create-rows', [0, 195, 393, 175]);

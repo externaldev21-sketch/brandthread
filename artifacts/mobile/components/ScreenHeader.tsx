@@ -91,7 +91,7 @@ export function ScreenHeader({
   const closeOrBack = () => (onBack ? onBack() : goBackOr(router));
 
   return (
-    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, (!divider || hideDivider) && { borderBottomWidth: 0 }]}>
+    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, (!divider || hideDivider) ? styles.noDivider : null]}>
       <View style={styles.container}>
         {variant === 'push' && (
           showBack ? (
@@ -196,6 +196,7 @@ const styles = StyleSheet.create({
   wrap: {
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  noDivider: { borderBottomWidth: 0 },
   container: {
     flexDirection: 'row',
     // Center the title with the back/close button on the same row. The
