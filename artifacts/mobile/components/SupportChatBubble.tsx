@@ -11,7 +11,7 @@ import React, {
   useState, useRef, useCallback, useEffect, memo,
 } from 'react';
 import {
-  View, Text, Modal, FlatList, TextInput, TouchableOpacity,
+  View, Text, Modal, FlatList, TouchableOpacity,
   StyleSheet, Platform, Animated,
   Keyboard, ActivityIndicator, Pressable,
 } from 'react-native';
@@ -21,10 +21,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import {
-  BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, FG, MUTED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import Composer from '@/components/ui/Composer';
 
 const SUCCESS_GRN = '#34D399';
 
@@ -292,28 +293,17 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>
-            <TextInput
-              style={s.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Ask anything about your account…"
-              placeholderTextColor={SUBTLE}
-              multiline
-              maxLength={800}
-              returnKeyType="send"
-              onSubmitEditing={() => sendMessage(input)}
-              blurOnSubmit={false}
-            />
-            <TouchableOpacity accessibilityLabel="Send message" accessibilityRole="button"
-              style={[s.sendBtn, { backgroundColor: accent }, (!input.trim() || loading) && s.sendBtnDisabled]}
-              onPress={() => sendMessage(input)}
-              disabled={!input.trim() || loading}
-              activeOpacity={0.85}
-            >
-              <Feather name="send" size={16} color={input.trim() && !loading ? '#000' : SUBTLE} />
-            </TouchableOpacity>
-          </View>
+          <Composer
+            testID="support-chat"
+            value={input}
+            onChangeText={setInput}
+            onSend={() => sendMessage(input)}
+            canSend={!!input.trim() && !loading}
+            placeholder="Ask anything about your account…"
+            maxLength={800}
+            enterToSend={false}
+            hideTabBar={false}
+          />
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -451,21 +441,4 @@ const s = StyleSheet.create({
   },
   quickChipText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 
-  // Input
-  inputRow:    {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 12, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: BORDER,
-  },
-  input:       {
-    flex: 1, backgroundColor: SURFACE, borderRadius: 20, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
-    maxHeight: 100,
-  },
-  sendBtn:       {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sendBtnDisabled: { backgroundColor: SURFACE },
 });

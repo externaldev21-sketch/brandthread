@@ -21,7 +21,6 @@ import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, 
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
-import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -36,6 +35,8 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import Composer from '@/components/ui/Composer';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
@@ -282,6 +283,9 @@ export default function SellerConversationScreen() {
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
   const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
+  // <Composer/> hides the tab bar itself; keep it hidden while the recording
+  // bar temporarily replaces the composer.
+  useHideTabBar(voiceRecorder.phase !== 'idle');
 
   // Attachment state
   const [pendingAttachment, setPendingAttachment] = useState<MsgAttachment | null>(null);
@@ -529,11 +533,6 @@ export default function SellerConversationScreen() {
   // is only disabled for the recipient side of isRequestMode.
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id
     && !(isRequestMode && !isRequestSender);
-  // Whether the composer actually has something to send — drives whether
-  // the send button shows at all (see the input row below), independent of
-  // `canSend`'s isSending/id gating so the button doesn't flicker away
-  // mid-send.
-  const hasComposerContent = text.trim().length > 0 || pendingAttachment != null;
   // Seen receipt: id of MY (the seller's) most recent message in this
   // thread — "Seen" only ever renders under that one message. See
   // lib/chatGrouping.ts's doc comment on the real, honest granularity this
@@ -1468,6 +1467,57 @@ export default function SellerConversationScreen() {
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
+  const pendingAttachmentChip = pendingAttachment && (() => {
+        const uploadingMedia = pendingAttachment.meta?.uploading === 'true';
+        const isMedia = pendingAttachment.type === 'image' || pendingAttachment.type === 'video';
+        return (
+        <View style={s.pendingAttachRow} testID="seller-conversation-selected-attachment">
+          {isMedia ? (
+            <MediaUploadThumb
+              type={pendingAttachment.type as 'image' | 'video'}
+              uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
+              uploading={uploadingMedia}
+              size={40}
+              ringColor={PURPLE}
+              iconColor={MUTED}
+              trackColor={BORDER}
+            />
+          ) : isUploading ? (
+            <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
+          ) : (
+            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+          )}
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.pendingAttachTitle} numberOfLines={1}>
+              {uploadingMedia ? 'Uploading…' : pendingAttachment.title}
+            </Text>
+            {pendingAttachment.subtitle ? (
+              <Text style={s.pendingAttachSub} numberOfLines={1}>{pendingAttachment.subtitle}</Text>
+            ) : null}
+          </View>
+          <PressableScale
+            onPress={() => { mediaUploadTokenRef.current++; setPendingAttachment(null); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
+            testID="seller-conversation-selected-attachment-remove"
+          >
+            <Feather name="x" size={ICON.sm} color={MUTED} />
+          </PressableScale>
+        </View>
+        );
+      })();
+
+  const replyBanner = replyTo && !messagingBlocked && !(isRequestMode && !isRequestSender) && (
+        <ReplyBanner
+          testID="seller-conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
+      );
+
   return (
     <KeyboardAvoidingView
       style={s.root}
@@ -1672,60 +1722,7 @@ export default function SellerConversationScreen() {
         />
       )}
 
-      {/* Pending attachment preview */}
-      {pendingAttachment && (() => {
-        const uploadingMedia = pendingAttachment.meta?.uploading === 'true';
-        const isMedia = pendingAttachment.type === 'image' || pendingAttachment.type === 'video';
-        return (
-        <View style={s.pendingAttachRow} testID="seller-conversation-selected-attachment">
-          {isMedia ? (
-            <MediaUploadThumb
-              type={pendingAttachment.type as 'image' | 'video'}
-              uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
-              uploading={uploadingMedia}
-              size={40}
-              ringColor={PURPLE}
-              iconColor={MUTED}
-              trackColor={BORDER}
-            />
-          ) : isUploading ? (
-            <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
-          ) : (
-            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
-          )}
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.pendingAttachTitle} numberOfLines={1}>
-              {uploadingMedia ? 'Uploading…' : pendingAttachment.title}
-            </Text>
-            {pendingAttachment.subtitle ? (
-              <Text style={s.pendingAttachSub} numberOfLines={1}>{pendingAttachment.subtitle}</Text>
-            ) : null}
-          </View>
-          <PressableScale
-            onPress={() => { mediaUploadTokenRef.current++; setPendingAttachment(null); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
-            testID="seller-conversation-selected-attachment-remove"
-          >
-            <Feather name="x" size={ICON.sm} color={MUTED} />
-          </PressableScale>
-        </View>
-        );
-      })()}
 
-      {/* Reply preview — mirrors app/buyer-conversation.tsx's own
-          ReplyBanner (Mobbin: Instagram "Replying to a message",
-          mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). */}
-      {replyTo && !messagingBlocked && !(isRequestMode && !isRequestSender) && (
-        <ReplyBanner
-          testID="seller-conversation-reply-banner"
-          theme={theme}
-          fromName={replyTo.fromName}
-          previewText={messagePreviewText(replyTo)}
-          onCancel={() => setReplyTo(null)}
-        />
-      )}
 
       {/* "Sent as a request" — the SENDER's own view of a pending request
           thread (Dev's rule 3): the seller keeps the ordinary composer (the
@@ -1766,8 +1763,9 @@ export default function SellerConversationScreen() {
           }}
         />
       ) : (
-      <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
-        {voiceRecorder.phase !== 'idle' ? (
+      voiceRecorder.phase !== 'idle' ? (
+        <View style={[s.voiceBarWrap, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+          {pendingAttachmentChip}
           <VoiceRecordingBar
             theme={theme}
             phase={voiceRecorder.phase}
@@ -1784,56 +1782,62 @@ export default function SellerConversationScreen() {
             onLock={voiceRecorder.lock}
             onSend={() => { void voiceRecorder.finish(); }}
           />
-        ) : (<>
-        {/* Attach button */}
-        <PressableScale
-          style={s.attachBtn}
-          onPress={() => { hapticPrimaryAction(); openAttachPicker(); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Attach"
-        >
-          <Feather name="paperclip" size={ICON.md} color={pendingAttachment ? PURPLE : MUTED} />
-        </PressableScale>
-
-        {/* Media — IG-style camera-circle trigger (Mobbin: Instagram DM
-            composer, mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7),
-            same treatment as app/buyer-conversation.tsx's camera-circle
-            attach button: a solid white circle with a black camera glyph.
-            Same action as before (opens the Photo/Video sheet), just a new
-            visual. */}
-        <PressableScale
-          style={s.cameraCircleBtn}
-          onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
-          disabled={isUploading || isSending}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Photo or video"
-        >
-          {isUploading
-            ? <ActivityIndicator size="small" color={ON_DARK} />
-            : <Feather name="camera" size={20} color={ON_DARK} />
+        </View>
+      ) : (
+        <Composer
+          testID="seller-conversation"
+          value={text}
+          onChangeText={handleChangeText}
+          onSend={() => { hapticPrimaryAction(); handleSend(); }}
+          canSend={canSend}
+          placeholder="Message…"
+          inputRef={textInputRef}
+          topSlot={<>{replyBanner}{pendingAttachmentChip}</>}
+          leftAccessory={
+            <PressableScale
+              style={s.cameraCircleBtn}
+              onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
+              disabled={isUploading || isSending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-attach"
+              accessibilityRole="button"
+              accessibilityLabel="Photo or video"
+            >
+              {isUploading
+                ? <ActivityIndicator size="small" color="#000000" />
+                : <Feather name="camera" size={18} color="#000000" />
+              }
+            </PressableScale>
           }
-        </PressableScale>
+          rightAccessory={<>
+            {/* Products / posts / files picker */}
+            <PressableScale
+              style={s.accBtn}
+              onPress={() => { hapticPrimaryAction(); openAttachPicker(); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-attach-picker"
+              accessibilityRole="button"
+              accessibilityLabel="Attach"
+            >
+              <Feather name="paperclip" size={20} color={pendingAttachment ? PURPLE : MUTED} />
+            </PressableScale>
 
-        {/* Voice */}
-        <PressableScale
-          style={s.attachBtn}
-          onPress={() => { void voiceRecorder.startWeb(); }}
-          disabled={isUploading || isSending}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="seller-conversation-mic"
-          accessibilityRole="button"
-          accessibilityLabel="Record voice message"
-        >
-          <Feather name="mic" size={ICON.md} color={MUTED} />
-        </PressableScale>
+            {/* Voice — tap-to-toggle on every platform (see docs/dm-flows.md) */}
+            <PressableScale
+              style={s.accBtn}
+              onPress={() => { void voiceRecorder.startWeb(); }}
+              disabled={isUploading || isSending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-mic"
+              accessibilityRole="button"
+              accessibilityLabel="Record voice message"
+            >
+              <Feather name="mic" size={20} color={MUTED} />
+            </PressableScale>
 
-        {/* Item 72 — same Thread Cash entry point as
-            app/buyer-conversation.tsx, works identically from the seller
-            side of a thread. Always rendered once the feature flag is on;
-            disabled with an explanation rather than hidden until mutual
-            follow is confirmed. */}
+            {/* Item 72 — same Thread Cash entry point as
+                app/buyer-conversation.tsx; disabled with an explanation
+                rather than hidden until mutual follow is confirmed. */}
         {threadCashSendEnabled && other?.userId ? (
           <ThreadCashAttachButton
             recipientId={other.userId}
@@ -1844,7 +1848,7 @@ export default function SellerConversationScreen() {
             disabledReason={threadCashDisabledReason}
             renderTrigger={(open) => (
               <PressableScale
-                style={s.attachBtn}
+                style={s.accBtn}
                 onPress={() => {
                   // Still checking mutual-follow status — silent no-op,
                   // never a "checking…" string (see the disabled state's
@@ -1862,7 +1866,7 @@ export default function SellerConversationScreen() {
                 accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
                 accessibilityState={{ disabled: threadCashMutual !== true }}
               >
-                <ThreadCashBillMark size={ICON.md} color={FG} accent={PURPLE} disabled={threadCashMutual !== true} />
+                <ThreadCashBillMark size={20} color={FG} accent={PURPLE} disabled={threadCashMutual !== true} />
               </PressableScale>
             )}
             onSent={async ({ transferId, amountCents, note }) => {
@@ -1908,51 +1912,9 @@ export default function SellerConversationScreen() {
             }}
           />
         ) : null}
-
-        <TextInput
-          ref={textInputRef}
-          style={[s.textInput, WEB_INPUT_RESET]}
-          value={text}
-          onChangeText={handleChangeText}
-          placeholder="Message…"
-          placeholderTextColor={SUBTLE}
-          multiline
-          returnKeyType="default"
-          onKeyPress={Platform.OS === 'web' ? (e: any) => {
-            // Web hardware-keyboard Enter sends; Shift+Enter still inserts
-            // a newline (native platforms use their own return-key
-            // handling and never see this multiline <textarea> key event,
-            // so this is web-only).
-            if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-              e.preventDefault();
-              hapticPrimaryAction();
-              handleSend();
-            }
-          } : undefined}
+          </>}
         />
-        {/* Send only appears once there's actually something to send —
-            matches app/buyer-conversation.tsx's mic⇄send morph condition
-            (showSendButton), instead of always showing a disabled send
-            button next to an empty input. */}
-        {hasComposerContent ? (
-          <PressableScale
-            style={[
-              s.sendBtn,
-              canSend
-                ? { backgroundColor: PURPLE, borderColor: PURPLE }
-                : { backgroundColor: CARD, borderColor: BORDER },
-            ]}
-            onPress={() => { hapticPrimaryAction(); handleSend(); }}
-            disabled={!canSend}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            activeOpacity={0.8}
-          >
-            <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
-          </PressableScale>
-        ) : null}
-        </>)}
-      </View>
+      )
       )}
 
       {/* ── Media picker sheet ─────────────────────────────────────────────── */}
@@ -2545,50 +2507,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pendingAttachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   pendingAttachSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
-  inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm,
-    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG,
-  },
-  // Matches buyer-conversation.tsx's COMPOSER_CONTROL — one consistent size
-  // across every circular control in the row (previously 40/40/40/44).
-  attachBtn: {
-    width: 36, height: 36,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 2,
-  },
-  // IG-style camera-circle attach trigger — same visual as
-  // app/buyer-conversation.tsx's cameraCircleBtn: a solid accent-filled
-  // circle with an onAccent camera glyph, 36pt diameter (Mobbin:
-  // mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7), themed like
-  // every other filled control in this composer (e.g. sendBtn) instead of
-  // a fixed white/black pair.
+  // Attach trigger left of the pill — solid white circle, black glyph.
   cameraCircleBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 2,
-    backgroundColor: PURPLE,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PURPLE,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
   },
-  textInput: {
-    flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
-    // ~44pt at rest for a single line (matches buyer-conversation.tsx's
-    // pill height) — only grows past that as the user types more lines,
-    // never fixed-tall. Symmetric vertical padding keeps the placeholder
-    // centered within that height on every platform (textAlignVertical is
-    // Android-only).
-    minHeight: 44,
-    maxHeight: 120,
-    textAlignVertical: 'center',
-  },
-  sendBtn: {
-    width: 36, height: 36, borderRadius: 18,
+  // Inside-the-pill controls (attach picker, mic, Thread Cash coin).
+  accBtn: {
+    width: 32, height: 32,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, marginBottom: 2,
+  },
+  voiceBarWrap: {
+    paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG,
   },
 
   // Attach picker sheet
