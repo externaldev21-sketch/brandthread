@@ -42,6 +42,18 @@ export interface BuyerSocialProfile {
 export type BuyerPostType = 'photo' | 'slideshow' | 'video';
 export type BuyerPostVisibility = 'public' | 'friends_only';
 
+/** Embedded original of a quote repost (server: lib/quotedPosts.ts). */
+export type QuotedPostSummary =
+  | {
+      id: string;
+      userId: string;
+      author: { displayName: string | null; brandName: string | null; username: string | null };
+      caption: string;
+      thumbnailUrl: string | null;
+      mediaType: string;
+    }
+  | { unavailable: true };
+
 export interface BuyerPost {
   id: string;
   authorId: string;
@@ -65,6 +77,9 @@ export interface BuyerPost {
   repostedByMe: boolean;
   isArchived: boolean;
   isDraft: boolean;
+  /** Set when this post quotes another; null/absent otherwise. */
+  quotedPost?: QuotedPostSummary | null;
+  quotesCount?: number;
   createdAt: string;
   updatedAt: string;
 }

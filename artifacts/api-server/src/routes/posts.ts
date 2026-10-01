@@ -26,6 +26,7 @@ import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { attachQuoteData, postCardImage } from "../lib/quotedPosts";
 import {
   authorInGoodStanding,
   enqueueAutoFilterReport,
@@ -275,7 +276,7 @@ router.get("/repost-context", requireAuth, async (req, res) => {
   }
 });
 
-async function postDetails(postRows: typeof posts.$inferSelect[]) {
+async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: string | null = null) {
   if (postRows.length === 0) return [];
   const postIds = postRows.map((post) => post.id);
   const sellerIds = [...new Set(postRows.map((post) => post.userId))];
@@ -325,7 +326,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   const savesByPost = countByPost(saveRows);
   const commentsByPost = Object.fromEntries(commentRows);
 
-  return postRows.map((post) => {
+  const detailed = postRows.map((post) => {
     const seller = sellerById.get(post.userId);
     const isDue = post.postStatus === "scheduled" &&
       !!post.scheduledAt && post.scheduledAt.getTime() <= Date.now();
@@ -351,6 +352,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
       commentsCount: commentsByPost[post.id] ?? 0,
     };
   });
+  return attachQuoteData(detailed, viewerId);
 }
 
 // ─── GET /api/posts/feed ──────────────────────────────────────────────────────
@@ -505,7 +507,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         .catch(() => {});
     }
 
-    const result = rows.map((p) => ({
+    const baseResult = rows.map((p) => ({
       id:        p.id,
       userId:    p.userId,
       mediaUrl:  p.mediaUrl,
@@ -538,6 +540,8 @@ router.get("/feed", requireAuth, async (req, res) => {
       savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
+
+    const result = await attachQuoteData(baseResult, clerkId);
 
     // Stable-sort: boosted posts surface first, rest preserve createdAt DESC order
     result.sort((a, b) => {
@@ -581,7 +585,7 @@ router.post("/", requireAuth, async (req, res) => {
     mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
     mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
-    sound, visibility, taggedProductIds, isDraft, scheduledAt,
+    sound, visibility, taggedProductIds, isDraft, scheduledAt, quotedPostId,
   } = req.body as {
     mediaUrl?:          string;
     thumbnailUrl?:      string;
@@ -600,6 +604,7 @@ router.post("/", requireAuth, async (req, res) => {
     taggedProductIds?:  string[];
     isDraft?:           boolean;
     scheduledAt?:       string | null;
+    quotedPostId?:      string;
   };
 
   const restriction = await publishingRestriction(clerkId);
@@ -708,7 +713,47 @@ router.post("/", requireAuth, async (req, res) => {
       ? "scheduled"
       : "published";
 
-  const mediaUrl = mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? "");
+  // ── Quote repost ────────────────────────────────────────────────────────────
+  // `quotedPostId` + caption makes a normal post that embeds ONE direct
+  // original. The original must be publicly visible, allow reposts, and have
+  // no block relation with the quoter; a quote whose own original is deleted
+  // cannot be re-quoted. A quote-of-a-quote embeds only the quote itself.
+  let quoteTarget: typeof posts.$inferSelect | null = null;
+  if (quotedPostId !== undefined && quotedPostId !== null) {
+    if (typeof quotedPostId !== "string" || !UUID_RE.test(quotedPostId)) {
+      return res.status(400).json({ error: "quotedPostId must be a post id", code: "VALIDATION_ERROR" });
+    }
+    const unavailable = () => res.status(404).json({ error: "This post is no longer available to quote.", code: "QUOTE_TARGET_UNAVAILABLE" });
+    const [original] = await db.select().from(posts)
+      .where(and(eq(posts.id, quotedPostId), publicPostCondition()))
+      .limit(1);
+    if (!original) return unavailable();
+    if (await isBlockedEitherWay(clerkId, original.userId)) return unavailable();
+    if (original.visibility?.allowReposts === false) {
+      return res.status(403).json({ error: "Reposts are disabled for this post", code: "REPOSTS_DISABLED" });
+    }
+    if (original.repostKind === "quote") {
+      const [inner] = original.quotedPostId
+        ? await db.select({ id: posts.id }).from(posts)
+            .where(and(eq(posts.id, original.quotedPostId), publicPostCondition()))
+            .limit(1)
+        : [];
+      if (!inner) {
+        return res.status(409).json({ error: "The post this quote is about was removed, so it can't be quoted.", code: "QUOTE_OF_UNAVAILABLE" });
+      }
+    }
+    if (typeof caption !== "string" || caption.trim().length === 0) {
+      return res.status(400).json({ error: "A quote needs a caption.", code: "QUOTE_CAPTION_REQUIRED" });
+    }
+    quoteTarget = original;
+  }
+
+  // A quote with no media of its own renders with the original's still image
+  // so every existing post renderer keeps working.
+  const quoteStill = quoteTarget && !requestedMediaUrl && !mediaPath && resolvedMediaPaths.length === 0
+    ? postCardImage(quoteTarget)
+    : null;
+  const mediaUrl = mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? quoteStill ?? "");
   const thumbnailUrl = thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
   const resolvedVisibility = visibility ?? {
     isPublic: true,
@@ -742,8 +787,23 @@ router.post("/", requireAuth, async (req, res) => {
     publishedAt: postStatus === "published" ? now : null,
     moderationStatus: captionHeld ? "held" : "visible",
     moderationReason: captionDecision.action === "hold" ? captionDecision.category : null,
+    quotedPostId: quoteTarget?.id ?? null,
+    repostKind: quoteTarget ? "quote" : null,
     updatedAt: now,
   }).returning();
+
+  // A published, visible quote counts as a repost of the original and tells
+  // its author. Drafts / scheduled / held quotes do neither until public.
+  if (quoteTarget && postStatus === "published" && !captionHeld) {
+    await db.insert(interactions)
+      .values({ userId: clerkId, postId: quoteTarget.id, type: "repost", value: "quote" })
+      .onConflictDoNothing({
+        target: [interactions.userId, interactions.postId],
+        where: sql`type = 'repost' AND post_id IS NOT NULL`,
+      })
+      .catch((err) => req.log.warn({ err, postId: post.id }, "Could not record quote repost interaction"));
+    void notifyRepost({ postId: quoteTarget.id, reposterId: clerkId, variant: "quote" });
+  }
 
   if (captionDecision.action === "hold") {
     await enqueueAutoFilterReport({
@@ -797,8 +857,9 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
 
+  const [withQuote] = await attachQuoteData([post], clerkId);
   return res.status(201).json({
-    ...post,
+    ...withQuote,
     taggedProducts,
     moderation: captionHeld
       ? { status: "held", message: "Your caption is in review. The post stays hidden from others until a moderator approves it." }
@@ -830,7 +891,7 @@ router.get("/mine", requireAuth, async (req, res) => {
       .limit(limit)
       .offset(offset);
     setPaginationHeaders(res, page.data, rows.length);
-    return res.json(await postDetails(rows));
+    return res.json(await postDetails(rows, clerkId));
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch seller posts");
     return res.status(500).json({ error: "Failed to fetch seller posts" });
@@ -1071,7 +1132,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (shouldBePublic) {
       await setComposedMediaVisibility(clerkId, nextMediaPaths, "public");
     }
-    return res.json((await postDetails([updated]))[0]);
+    return res.json((await postDetails([updated], clerkId))[0]);
   } catch (err) {
     req.log.error({ err, clerkId, postId: id }, "Failed to update seller post");
     return res.status(500).json({ error: "Failed to update post" });
@@ -1385,13 +1446,77 @@ router.get("/:id", async (req, res) => {
   ]);
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
-  return res.json({
+  const [detail] = await attachQuoteData([{
     ...post,
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
-  });
+  }], viewerId);
+  return res.json(detail);
+});
+
+// ─── GET /api/posts/:id/quotes ───────────────────────────────────────────────
+// Public, paginated list of quote reposts of a post (newest first). Same
+// visibility as any public post read; viewers never see quotes by people in a
+// block relation with them. The original itself must be publicly visible.
+router.get("/:id/quotes", async (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: "Post not found" });
+  const page = parsePagination(req.query, { limit: 20 });
+  if (!page.success || page.data.limit > 50) {
+    return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  }
+  const { limit, offset } = page.data;
+  const viewerId = optionalViewerId(req);
+  try {
+    const [original] = await db.select({ id: posts.id, userId: posts.userId }).from(posts)
+      .where(and(eq(posts.id, id), publicPostCondition()))
+      .limit(1);
+    if (!original || (viewerId && await isBlockedEitherWay(viewerId, original.userId))) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    const rows = await db.select({
+      id: posts.id,
+      userId: posts.userId,
+      caption: posts.caption,
+      mediaUrl: posts.mediaUrl,
+      thumbnailUrl: posts.thumbnailUrl,
+      mediaType: posts.mediaType,
+      createdAt: posts.createdAt,
+      displayName: users.displayName,
+      brandName: users.brandName,
+      username: users.username,
+      accountType: users.accountType,
+    }).from(posts)
+      .innerJoin(users, eq(users.clerkId, posts.userId))
+      .where(and(
+        eq(posts.quotedPostId, id),
+        eq(posts.repostKind, "quote"),
+        publicPostCondition(),
+        notBlockedWith(viewerId, posts.userId),
+      ))
+      .orderBy(desc(posts.createdAt), posts.id)
+      .limit(limit)
+      .offset(offset);
+    setPaginationHeaders(res, page.data, rows.length);
+    return res.json(rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      caption: row.caption ?? "",
+      thumbnailUrl: postCardImage(row),
+      mediaType: row.mediaType,
+      createdAt: row.createdAt,
+      author: {
+        displayName: row.displayName ?? null,
+        brandName: row.accountType === "seller" ? row.brandName ?? null : null,
+        username: row.username ?? null,
+      },
+    })));
+  } catch (err) {
+    req.log.error({ err, postId: id }, "Failed to fetch quotes");
+    return res.status(500).json({ error: "Failed to fetch quotes" });
+  }
 });
 
 // ─── POST /api/posts/:id/interact ────────────────────────────────────────────

@@ -2094,7 +2094,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         mediaUrls?: string[]; mediaType?: string; aspectRatio?: string; caption?: string;
         hashtags?: string[]; styleTags?: string[]; taggedProductIds?: string[];
         sound?: unknown; visibility?: unknown; isDraft?: boolean; scheduledAt?: string | null;
+        /** Quote repost: embeds this post; requires a caption (server: POST /api/posts). */
+        quotedPostId?: string;
       }) => post<any>('/api/posts', body),
+      /** Public, paginated quote reposts of a post. */
+      quotes: (id: string, query?: { limit?: number; offset?: number }) =>
+        get<any[]>(`/api/posts/${encodeURIComponent(id)}/quotes${query ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString()}` : ''}`),
       patch: (id: string, body: {
         mediaUrl?: string; thumbnailUrl?: string | null; mediaUrls?: string[];
         mediaPaths?: string[]; slideOverlays?: unknown;

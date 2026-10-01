@@ -2,6 +2,7 @@
  * Public (unauthenticated) product browsing endpoints for buyers.
  * Mounted at /api/public — no requireAuth middleware.
  */
+import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
 import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
@@ -1690,7 +1691,7 @@ router.get("/posts", async (req, res) => {
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
-    const result = rows.map((p) => ({
+    const baseResult = rows.map((p) => ({
       id:             p.id,
       userId:         p.userId,
       mediaUrl:       p.mediaUrl,
@@ -1722,7 +1723,7 @@ router.get("/posts", async (req, res) => {
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
 
-    return res.json(result);
+    return res.json(await attachQuoteData(baseResult, viewerId));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public posts");
     return res.status(500).json({ error: "Failed to fetch posts" });
