@@ -77,7 +77,7 @@ const NO_RIPPLE = false;
 type InboxTab = 'inbox' | 'requests';
 
 function InboxPillRow({
-  value, onChange, requestsCount, theme, gutter, onFilterPress, filterActive = false,
+  value, onChange, requestsCount, theme, gutter, onFilterPress,
 }: {
   value: InboxTab;
   onChange: (tab: InboxTab) => void;
@@ -85,7 +85,6 @@ function InboxPillRow({
   theme: ReturnType<typeof useAppTheme>['theme'];
   gutter: number;
   onFilterPress: () => void;
-  filterActive?: boolean;
 }) {
   const pills: { key: InboxTab; label: string; count?: number }[] = [
     { key: 'inbox', label: 'Inbox' },
@@ -94,12 +93,11 @@ function InboxPillRow({
   return (
     <View style={[pillS.row, { paddingHorizontal: gutter }]}>
       <PressableScale
-        style={[pillS.iconPill, { borderColor: filterActive ? theme.text : theme.border }]}
+        style={[pillS.iconPill, { borderColor: theme.border }]}
         onPress={onFilterPress}
         rippleEnabled={NO_RIPPLE}
         accessibilityRole="button"
         accessibilityLabel="Filter messages"
-        accessibilityState={{ selected: filterActive }}
         testID="inbox-filter-pill"
       >
         <Feather name="sliders" size={15} color={theme.text} />
@@ -584,9 +582,6 @@ export default function InboxScreen() {
     return unsub;
   }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]);
 
-  // Filter pill (sliders icon): toggles an unread-only view of the Inbox list.
-  const [unreadOnly, setUnreadOnly] = useState(false);
-
   // ── Filter logic ────────────────────────────────────────────────────────────
 
   const messagesSearchLower = messagesSearchQuery.trim().toLowerCase();
@@ -598,7 +593,6 @@ export default function InboxScreen() {
   const filteredConvs = conversations
     .filter(conv => {
       if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;
-      if (unreadOnly && !(conv.unreadCount > 0)) return false;
       if (messagesSearchLower) {
         const participant = getParticipant(conv);
         const haystack = [
@@ -615,7 +609,7 @@ export default function InboxScreen() {
   const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
   const inboxRows = mergeInboxRows(
     filteredConvs,
-    unreadOnly ? [] : joinedCommunities.filter(c => communityMatchesQuery(c, messagesSearchLower)),
+    joinedCommunities.filter(c => communityMatchesQuery(c, messagesSearchLower)),
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
@@ -1073,7 +1067,12 @@ export default function InboxScreen() {
   }
 
   function openFilterMenu() {
-    setUnreadOnly(v => !v);
+    // Alert.alert() is a silent no-op on web (react-native-web has no
+    // native dialog to defer to), so it left this button dead in the web
+    // preview — no dialog, no honest "not available" state, nothing. Use
+    // the screen's existing snackbar (already the pattern for every other
+    // inbox affordance above) so the tap always gives real feedback.
+    showSnackbar('Message filters — coming soon');
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -1344,9 +1343,6 @@ export default function InboxScreen() {
     // Only reached for the search-no-matches and load-error cases — the
     // true zero-conversations empty state is the hand-rolled Threads-style
     // treatment below (renderInboxEmptyState).
-    if (unreadOnly && !messagesSearchLower && !loadError) {
-      return <EmptyState icon="check-circle" title="No unread messages" />;
-    }
     if (messagesSearchLower && !loadError) {
       return (
         <EmptyState
@@ -1717,7 +1713,6 @@ export default function InboxScreen() {
           theme={theme}
           gutter={gutter}
           onFilterPress={openFilterMenu}
-          filterActive={unreadOnly}
         />
       )}
 
@@ -1736,8 +1731,8 @@ export default function InboxScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View style={{ paddingHorizontal: gutter }}>
-            {messagesSearchLower || unreadOnly || loadError ? renderEmptyState() : renderInboxEmptyState()}
-            {!messagesSearchLower && !unreadOnly && !loadError && renderSuggestedSection()}
+            {messagesSearchLower || loadError ? renderEmptyState() : renderInboxEmptyState()}
+            {!messagesSearchLower && !loadError && renderSuggestedSection()}
           </View>
         </ScrollView>
       ) : (

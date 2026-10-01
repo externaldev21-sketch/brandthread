@@ -11,5 +11,6 @@
   { "kind": "todo", "file": "app/buyer-drop-detail.tsx", "match": "COMING SOON", "reason": "teaser label on a locked upcoming drop (real drop state, not a placeholder)" },
   { "kind": "todo", "file": "components/chat/VoiceMessageBubble.tsx", "reason": "TRANSCRIPTION_STUB is reachable only when hasTranscription is passed; chat screens pass ALLOW_DEV_TOOLS so production never shows it" },
   { "kind": "todo", "file": "app/buyer-story-create.tsx", "match": "Additional tools are coming soon", "reason": "OWNER: create-flow session owns this file; reported in docs/review-readiness/prod-hygiene.md" },
+  { "kind": "todo", "file": "app/(buyer)/inbox.tsx", "match": "Message filters", "reason": "FINDING for Dev: inbox filter pill is a snackbar (pinned by tests/messages-action-sheet-web.test.ts); left unchanged under the additive-only rule" },
   { "kind": "todo", "file": "app/create-post.tsx", "match": "Sound library coming soon", "reason": "OWNER: create-flow session owns this file; reported in docs/review-readiness/prod-hygiene.md" }
 ]

@@ -49,14 +49,25 @@ web (dev or export) keep it; warn/error always kept. New devDependency:
   Flags truncated text, text overflowing its parent, text off the viewport,
   tight button/chip padding, and unequal sibling buttons.
 
-Verification status: vitest guard, growth/navigation/devPreview suites, `tsc`
-typecheck, the dead-UI crawler (`--ci` exit 0) and the babel console-strip
-matrix all ran locally. `text-fit-check.mjs` passes `node --check` but has NOT
-been run: `expo export --platform web` for the preview build did not finish in
-this sandbox (Metro sat idle after "Bundler cache is empty"), so no text-fit
-findings or screenshots exist for existing screens yet. Run
-`pnpm --filter mobile run check:text-fit -- --routes /buyer-inbox,/help,/general-settings`
-on a machine where the preview build completes.
+Verification status (what was and was not run):
+- Ran: vitest guard + suites for touched code, `tsc --noEmit`, dead-UI crawler
+  `--ci` (exit 0), babel console-strip matrix.
+- Ran: `expo export --platform web` of this branch finished; `text-fit-check.mjs`
+  ran at 393x852 on `/inbox` (buyer, demo data) and `/help`, `/general-settings`,
+  `/manufacturer-messages` (seller, demo data). Screenshots are in
+  `docs/pr-assets/claude-review-ready-prod-hygiene/`.
+- Not possible: a screenshot of the manufacturer chat header with call buttons.
+  The demo data has no seeded manufacturer thread, so the screen renders its
+  "Conversation unavailable" state. The call-button change is therefore verified
+  by typecheck/tests only.
+- Full vitest on clean origin/dev: 32 failing files. On this branch: see PR body
+  for the final comparison.
+
+Text-fit findings on existing screens (not touched, other areas): `/help` category
+grid "Feature" text box extends past 393px; `/inbox` Notes bubble "Your thoughts go
+here..." is truncated and overflows; `/inbox` empty-state "Send a message" button
+has 0px text padding (a padding-only fix was tried and rejected: it dropped the
+button's rounded corners); manufacturer-chat error-state "Try again" has 1px padding.
 
 ## Findings and dispositions
 
@@ -80,15 +91,15 @@ on a machine where the preview build completes.
 
 | Finding | Disposition |
 |---|---|
-| Buyer inbox filter button showed "Message filters — coming soon" | FIXED: toggles an unread-only view (existing button; border highlights when on; empty state "No unread messages") |
-| Manufacturer chat: call buttons opened a "calls are coming soon" dialog when calling is unavailable | FIXED: buttons render only when the server reports calling available; dialog removed |
+| Buyer inbox filter pill shows "Message filters — coming soon" | FINDING, left as is: `tests/messages-action-sheet-web.test.ts` pins the snackbar, and Dev's additive-only rule applies. Allowlisted in the crawler. Dev decides what the filter should do |
+| Manufacturer chat: call buttons opened a "calls are coming soon" dialog when calling is unavailable | FIXED: buttons render only when the server reports calling available; dialog removed (touches existing UI) |
 | Settings > Favorites intro "coming soon" | FIXED: copy now "Follow sellers and brands to see more from them in Discover." |
 | Store policy fallback "Content coming soon." | FIXED: "Please contact us for details." |
 | Order detail pre-order manufacturer "TBD" | FIXED: "Not assigned yet" |
-| General Settings "Change log" -> brandthread.app/changelog (no page exists) | FIXED: row removed (invisible dead link). Touches existing UI, listed in PR |
+| General Settings "Change log" -> brandthread.app/changelog (no such page) | FINDING for Dev: row kept unchanged (nothing existing removed). Needs a real page or Dev's decision to drop the row |
 | General Settings "Brandthread Help Center" -> web URL | FIXED: routes to `/help` |
 | General Settings "Hire a Brandthread Partner" -> brandthread.app/partners (no page) | FIXED: routes to `/freelancer-jobs` (Hiring tab) |
-| Help "Live Chat" -> brandthread.app/chat (no page, no live chat exists) | FIXED: scrolls to the existing support message form; label now "Message Us" |
+| Help "Live Chat" -> brandthread.app/chat (no such page; no live chat exists) | FIXED target only: label kept, now scrolls to the existing support message form |
 | Route targets (`router.*`, `href`) | PASS: all resolve to an existing file (2 template routes with a whole dynamic segment in `app/_layout.tsx` are unverifiable statically and are restricted to `/(buyer)/` and `/(tabs)/` prefixes) |
 | `onPress={() => {}}` (8 hits) | PASS: event-swallowing sheet bodies, a disabled progress button, and disabled buyer-preview CTAs. Allowlisted with reasons |
 | `mailto:`/`tel:` | PASS (`support@brandthread.app`; share sheet uses an intentionally empty recipient) |

@@ -144,7 +144,8 @@ function inPageCheck() {
 
     // minimum padding in buttons / chips / cards
     const box = el.closest('button, [role="button"], [role="tab"], a[href]');
-    if (box && isVisible(box)) {
+    // icon-font glyphs (single private-use/symbol chars) are not labels
+    if (box && isVisible(box) && text.replace(/[^\p{L}\p{N}]/gu, '').length >= 2) {
       const b = box.getBoundingClientRect();
       const min = b.height <= 64 ? 12 : 16;
       const left = tr.left - b.left;
@@ -196,7 +197,13 @@ async function main() {
       try {
         const target = `${route}${dataState === 'demo' ? (route.includes('?') ? '&' : '?') + 'demo=1' : ''}`;
         await openScreen(page, activity, origin, role, target);
-        await page.waitForTimeout(1200);
+        await page.waitForTimeout(1500);
+        // The in-app router occasionally settles on the home feed after the
+        // pushState navigation; retry once if the URL is not the target path.
+        if (new URL(page.url()).pathname !== route.split('?')[0]) {
+          await openScreen(page, activity, origin, role, target);
+          await page.waitForTimeout(2500);
+        }
         await waitForQuietNetwork(activity, 600, 8000);
         await waitForImages(page, 6000);
         const found = await page.evaluate(inPageCheck);

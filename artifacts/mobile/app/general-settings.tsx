@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -84,6 +84,7 @@ export default function GeneralSettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Resources</Text>
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ExternalRow icon="git-merge" label="Change log" onPress={() => { haptic(); Linking.openURL('https://brandthread.app/changelog'); }} colors={colors} />
             <ExternalRow icon="help-circle" label="Brandthread Help Center" onPress={() => { haptic(); router.push('/help' as never); }} colors={colors} />
             <ExternalRow icon="code" label="Hire a Brandthread Partner" onPress={() => { haptic(); router.push('/freelancer-jobs' as never); }} colors={colors} last />
           </View>
