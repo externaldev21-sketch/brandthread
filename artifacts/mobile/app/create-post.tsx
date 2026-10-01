@@ -52,6 +52,10 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { MediaGrid, type MediaGridAsset } from '@/components/create-post/MediaGrid';
+// Camera-first opening step (TikTok/Instagram camera). The picker below is
+// unchanged and opens as a sheet over it from the camera-roll thumb.
+import { CreateCamera } from '@/components/create-post/CreateCamera';
+import type { CreateMode } from '@/lib/createCamera';
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import { FADE_MS } from '@/constants/motion';
@@ -66,7 +70,7 @@ let ms: any = {};
 let dps: any = {};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Step = 'media-pick' | 'video-edit' | 'slide-edit' | 'post-details' | 'publishing' | 'done';
+type Step = 'camera' | 'media-pick' | 'video-edit' | 'slide-edit' | 'post-details' | 'publishing' | 'done';
 
 interface VideoClipLocal {
   uri: string; duration: number; id: string;
@@ -478,7 +482,12 @@ export default function CreatePostScreen() {
   }
 
   // ── Step ──
-  const [step, setStep] = useState<Step>('media-pick');
+  // A fresh Thread opens straight into the live camera; editing an existing
+  // post keeps its original entry (media-pick → post-details once loaded).
+  const cameraFirst = !editId;
+  const [step, setStep] = useState<Step>(cameraFirst ? 'camera' : 'media-pick');
+  // What the camera is creating (title dropdown): Thread / Post / Story.
+  const [createMode, setCreateMode] = useState<CreateMode>(isBuyer ? 'post' : 'thread');
 
   // ── Media ──
   const [videoClips,    setVideoClips]   = useState<VideoClipLocal[]>([]);
@@ -1044,6 +1053,64 @@ export default function CreatePostScreen() {
   // device photo/video grid (components/create-post/MediaGrid.tsx), and a
   // floating Thread/Story mode pill at the bottom.
   // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SCREEN 0: CAMERA — camera-first opening step (components/create-post/
+  // CreateCamera.tsx). A snapped photo goes to slide-edit through the same 3:4
+  // crop pass picked photos get; a clip goes to video-edit; the camera-roll
+  // thumb opens SCREEN A below as a sheet; Story hands off to the story
+  // composer exactly like the picker's mode pill does.
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (step === 'camera') {
+    function handleCameraPhoto(uri: string) {
+      const id = `cam_${Date.now()}`;
+      setVideoClips([]);
+      setSlidePhotos([{ uri, id, originalUri: uri }]);
+      setEditableSlides([createPhotoSlide(id, uri, undefined, uri, undefined)]);
+      setCurrentSlideIndex(0);
+      setComposedSlideshow(null);
+      setSlideProcessingPhase('idle');
+      setSlideProcessingError(null);
+      setCropQueue([id]);
+      setCropTargetId(id);
+      setStep('slide-edit');
+    }
+
+    function handleCameraVideo(uri: string, duration: number) {
+      const d = Math.max(0.1, duration);
+      setSlidePhotos([]);
+      setEditableSlides([]);
+      setVideoClips([{ uri, duration: d, id: `cam_${Date.now()}`, speed: 1, filter: 'none' }]);
+      setTrimStart(0); setTrimEnd(d); setScrubTime(0); setPreviewSeekTime(0);
+      setPreviewClipIndex(0); setComposedVideo(null); setProcessingPhase('idle');
+      setProcessingError(null);
+      setStep('video-edit');
+    }
+
+    function handleCreateModeChange(next: CreateMode) {
+      if (next === 'story') {
+        Haptics.selectionAsync();
+        router.replace('/buyer-story-create' as never);
+        return;
+      }
+      setCreateMode(next);
+    }
+
+    return (
+      <View style={[ts.root, { backgroundColor: BG }]}>
+        <StatusBar barStyle="light-content" backgroundColor={BG} />
+        <CreateCamera
+          isBuyer={isBuyer}
+          mode={createMode}
+          onModeChange={handleCreateModeChange}
+          onClose={() => haptic(leaveSetupDestination)}
+          onOpenLibrary={() => haptic(() => setStep('media-pick'))}
+          onPhoto={handleCameraPhoto}
+          onVideo={handleCameraVideo}
+        />
+      </View>
+    );
+  }
+
   if (step === 'media-pick') {
     const selectedVideoUri = videoClips[0]?.uri ?? null;
 
@@ -1087,14 +1154,18 @@ export default function CreatePostScreen() {
       setProcessingError(null); setSlidePhotos([]);
     }
 
+    // Camera-first: the picker rises as a sheet over the camera and its X
+    // returns to the camera instead of leaving the flow.
+    const PickerRoot = cameraFirst ? SheetRise : View;
+
     return (
-      <View style={[ts.root, { backgroundColor: BG }]}>
+      <PickerRoot style={[ts.root, { backgroundColor: BG }]}>
         <StatusBar barStyle="light-content" backgroundColor={BG} />
 
         {/* ── HEADER ──────────────────────────────────────────── */}
         <View style={[ts.pkHeader, { paddingTop: topPad + 4 }]}>
           <TouchableOpacity
-            onPress={() => haptic(leaveSetupDestination)}
+            onPress={() => haptic(cameraFirst ? () => setStep('camera') : leaveSetupDestination)}
             style={ts.pkHeaderBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Close"
@@ -1177,7 +1248,7 @@ export default function CreatePostScreen() {
             onSave={(result) => void handleCropSave(cropTargetId!, result)}
           />
         )}
-      </View>
+      </PickerRoot>
     );
   }
 
@@ -2444,6 +2515,10 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pkHeaderTitle: {
     position: 'absolute', left: 0, right: 0, textAlign: 'center',
     fontSize: FS.md, fontFamily: FONT.bold, color: FG,
+    // Spans the whole header row; without this it sits over the X button
+    // and swallows its taps on web (the picker now opens as a sheet over the
+    // camera, so its X must work there).
+    pointerEvents: 'none',
   },
 
   pkPreviewBox: {
