@@ -6,6 +6,7 @@
  * replacement for the shared client.
  */
 import { versionApiPath, storeContextHeaders } from '@/lib/api';
+import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -29,6 +30,7 @@ export function uploadImageWithProgress<T = any>(
   return new Promise((resolve, reject) => {
     (async () => {
       try {
+        image = await prepareImageForUpload(image);
         const source = await fetch(image.uri);
         if (!source.ok) throw new Error('Could not read the selected image.');
         const blob = await source.blob();

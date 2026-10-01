@@ -39,6 +39,7 @@ import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
 import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
+import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 router.use(requireAuth);
@@ -1278,6 +1279,7 @@ router.post("/upload-media", async (req, res) => {
 
   try {
     const { objectStorageClient } = await import("../lib/objectStorage");
+    const raw = buffer;
 
     // Automatic screening (off when the AI integration env is missing). A DM
     // has no held state, so flagged media is refused; an outage of the
@@ -1293,9 +1295,18 @@ router.post("/upload-media", async (req, res) => {
         return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
       }
     }
+    // Images are downscaled and stripped of EXIF/GPS (after screening, which sees the original bytes);
+    // video and audio are stored as sent.
+    const isImage = normalizedMimeType.startsWith("image/");
+    const stored = isImage ? await normalizeUploadedImage(raw, normalizedMimeType) : { buffer: raw, contentType: normalizedMimeType };
     const bucket = objectStorageClient.bucket(BUCKET_ID);
     const file   = bucket.file(filename);
-    await file.save(buffer, { contentType: normalizedMimeType, resumable: false });
+    // Object keys are random UUIDs and never rewritten, so images can be cached forever.
+    await file.save(stored.buffer, {
+      contentType: stored.contentType,
+      resumable: false,
+      ...(isImage ? { metadata: { cacheControl: IMMUTABLE_PUBLIC_CACHE_CONTROL } } : {}),
+    });
     await file.makePublic();
     const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
     return res.json({ url });

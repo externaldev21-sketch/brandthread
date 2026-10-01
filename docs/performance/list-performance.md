@@ -67,3 +67,42 @@ git worktree add /tmp/base origin/dev && (cd /tmp/base && pnpm install)
 node -e "import('./scripts/store-screenshots/harness.mjs').then(m => m.buildPreviewWeb('/tmp/before', '/tmp/base/artifacts/mobile'))"
 node scripts/store-screenshots/measure-lists.mjs --before /tmp/before --after /tmp/after
 ```
+
+## Audit 2026-09-30
+
+Scope: every `FlatList`, `SectionList` and `FlashList` and every `ScrollView` that maps server data in `app/` and `components/`, minus the areas other work owns (Design Studio and `design*`, the Following tab, the create flows, community group chats). About 100 list components were checked with a script (missing `keyExtractor`, `initialNumToRender`, `windowSize`, `maxToRenderPerBatch`, `removeClippedSubviews`, `getItemLayout`) plus a grep for `.map(` over comments, notifications, people, results, messages, saved items, orders, customers, inventory and reviews inside a `ScrollView`.
+
+Every `FlatList` in the app already has a `keyExtractor` except a few short, bounded ones listed at the end. The gap was tuning and two lists that were not virtualized at all.
+
+New shared helper: `lib/listTuning.ts` (`LONG_LIST_TUNING`: render 12 rows first, batches of 8, window of 9 screens, `removeClippedSubviews` on Android only). Spread it onto a `FlatList`. It changes no row visuals.
+
+| Screen | Finding | Action |
+| --- | --- | --- |
+| `app/content.tsx` (seller content library) | Every post rendered at once in a `ScrollView` | Converted to `FlatList`. Header (stats, create cards, library title, filter tabs) is `ListHeaderComponent`; loading, error and empty states are `ListEmptyComponent`; rows keep the same card, 12 pt separator and 16 pt side padding. Before/after screenshots at 393x852 are byte-identical above the tab bar for 2 and 60 posts, top and scrolled. DOM nodes with 60 posts: 1248 -> 948. |
+| `app/seller-reviews.tsx` | Every review rendered at once in a `ScrollView` | Converted to `FlatList`, same container padding and 12 pt gap. Screenshots identical for 3 and 60 reviews, top and scrolled. DOM nodes with 60 reviews: 1308 -> 633. |
+| `app/buyer-notifications.tsx` | `FlatList`, no tuning | `LONG_LIST_TUNING` added. |
+| `app/buyer-post-comments.tsx` (feed comments) | `FlatList`, no tuning | `LONG_LIST_TUNING` added. |
+| `app/buyer-saved.tsx` (saved items grid) | `FlatList`, two columns, no tuning | `LONG_LIST_TUNING` added. |
+| `app/product-reviews.tsx` | `FlatList`, no tuning | `LONG_LIST_TUNING` added. |
+| `app/connections.tsx` (followers and following) | `FlatList`, no tuning | `LONG_LIST_TUNING` added. |
+| `app/activity-people.tsx` | `FlatList`, no tuning | `LONG_LIST_TUNING` added. |
+| `app/community-members.tsx` (member list only) | `FlatList`, no tuning | `LONG_LIST_TUNING` added to the members list. The banned-members list and join-request rows are short and left alone. |
+| `app/buyer-recently-watched.tsx` | `FlatList`, no tuning | `LONG_LIST_TUNING` added (36-hour window, but unbounded within it). |
+| `app/conversation-search.tsx` | `FlatList`, no tuning | `LONG_LIST_TUNING` added. |
+| `app/(buyer)/inbox.tsx`, `app/seller-inbox.tsx`, `app/(buyer)/orders.tsx`, `app/(tabs)/orders.tsx`, `app/(tabs)/products.tsx`, `components/social/PostGrid.tsx` | Already `FlashList` (earlier audit) | Left alone. FlashList sizes and recycles itself; `getItemLayout` and `windowSize` do not apply. |
+| `app/buyer-conversation.tsx`, `app/seller-conversation.tsx` (message threads) | `FlatList`, `scrollToEnd` on content size change, keyboard-driven | Left alone on purpose. There is no `getItemLayout` (rows vary in height), and a smaller render window changes where `scrollToEnd` lands in a long thread. Needs a device check with a few hundred messages before tuning. |
+| `app/community-chat.tsx` | Community group chats (off limits) | Not touched. |
+| `app/customers.tsx` | Customers render in one bordered card inside a `ScrollView` | Left alone. The card border and rounded corners wrap every row, so a `FlatList` would need per-row border pieces and would risk a visible change. The list is fetched in one request; moving to a paged `FlatList` should be a deliberate design decision. |
+| `app/customer-orders.tsx` | One customer's orders in a bordered card, same shape as Customers | Left alone for the same reason. |
+| `app/buyer-search.tsx` | Result grids are wrapped tiles with entrance animation, limited by the API page | Left alone: a wrapped grid is not a single-column list, and the result sets are page-capped. |
+| `app/(buyer)/discover.tsx` | Sections capped at 6-10 rows (see above) | Left alone. |
+| `app/(buyer)/friends.tsx`, `components/ThreadShareSheet.tsx`, `components/MentionPickerSheet.tsx`, `app/manufacturer-compare.tsx` | Horizontal chip/avatar rows from small server lists | Left alone: short, horizontal, and virtualizing them would clip the leading edge they scroll from. |
+| `app/activity-center.tsx` | Suggested people are a capped block inside a `SectionList` that already virtualizes the feed | Left alone. |
+| `app/order-detail.tsx`, `app/buyer-order-detail.tsx`, `app/(buyer)/cart.tsx`, refund and return screens | `.map` over line items of one order or cart | Left alone: bounded by the order. |
+| `app/fulfill-batch.tsx` | `.map` over the orders the seller just selected | Left alone: bounded by the selection. |
+| `app/buyer-live.tsx`, `app/seller-live.tsx` | Live chat comments mapped in a `ScrollView` | Left alone: the live screens are separate work, and the comment buffer is capped by the live feed. |
+| Settings, analytics and onboarding screens (`.map` over static arrays) | Not server data | Left alone. |
+| `app/design*.tsx`, `components/design*`, `app/(tabs)/following.tsx`, create flow | Forbidden areas | Not touched. |
+| Short, bounded lists without `keyExtractor` (`ai-mockup-chat`, `ai-photography-chat`, `ai-brain`, `live.tsx` rail, `SupportChatBubble`, `DiscoverGrid` first list, `ProfileShell` first list, `buyer-conversation` and `seller-conversation` attachment strips, `community-chat`) | A handful of rows, or in a forbidden area | Left alone. React falls back to the item's `key` or index for these. |
+
+Verified with `scripts/store-screenshots/list-parity-verify.mjs` (before = `dev`, after = this branch, both exported with `buildPreviewWeb()`): all four scenarios report top and scrolled screenshots identical and confirm the scroll moved the screen. The screenshots are in `docs/pr-assets/performance/`. The comparison clips off the floating tab bar because its animated logo glyph differs between any two captures of the same build.

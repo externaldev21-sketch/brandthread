@@ -13,6 +13,7 @@ import { notifyNewProduct } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -92,7 +93,8 @@ router.post(
 
     let objectPath: string | null = null;
     try {
-      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+      const stored = await normalizeUploadedImage(bytes, contentType);
+      objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
       await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
         owner: ownerId,
         visibility: "private",

@@ -11,6 +11,7 @@ import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { notifySellerReturnRequested } from "../lib/orderNotifications";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -69,7 +70,8 @@ router.post(
     }
     let objectPath: string | null = null;
     try {
-      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType, `${evidencePrefix(buyerId)}${crypto.randomUUID()}`);
+      const stored = await normalizeUploadedImage(bytes, contentType);
+      objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType, `${evidencePrefix(buyerId)}${crypto.randomUUID()}`);
       await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: buyerId, visibility: "private" });
       res.status(201).json({ objectPath });
     } catch (err) {

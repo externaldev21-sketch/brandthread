@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -114,6 +115,7 @@ export default function BuyerRecentlyWatched() {
         <ErrorState message="Couldn't load recently watched videos. Try again." onRetry={reload} />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={visible.items}
           keyExtractor={item => item.postId}
           showsVerticalScrollIndicator={false}

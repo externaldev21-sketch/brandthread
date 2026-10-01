@@ -1,3 +1,4 @@
+import { rewriteToCdn } from './cdnUrl';
 import { randomUUID } from 'crypto';
 import { Readable } from 'stream';
 import { File, Storage } from '@google-cloud/storage';
@@ -154,6 +155,7 @@ export class ObjectStorageService {
     contents: Buffer,
     contentType: string,
     objectPath = `/objects/uploads/${randomUUID()}`,
+    options: { cacheControl?: string } = {},
   ): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!objectPath.startsWith('/objects/')) {
@@ -166,7 +168,7 @@ export class ObjectStorageService {
     await file.save(contents, {
       resumable: false,
       contentType,
-      metadata: { cacheControl: 'private, max-age=0' },
+      metadata: { cacheControl: options.cacheControl ?? 'private, max-age=0' },
     });
     return objectPath;
   }
@@ -188,7 +190,7 @@ export class ObjectStorageService {
     const objectFile = await this.getObjectEntityFile(objectPath);
     const bucketName = objectFile.bucket.name;
     const objectName = objectFile.name;
-    return signObjectURL({ bucketName, objectName, method: 'GET', ttlSec });
+    return rewriteToCdn(await signObjectURL({ bucketName, objectName, method: 'GET', ttlSec }));
   }
 
   async getObjectEntityFile(objectPath: string): Promise<File> {
