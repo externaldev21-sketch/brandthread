@@ -1937,6 +1937,8 @@ export default function BuyerConversationScreen() {
             accessibilityRole={
               msg.attachment?.type === 'voice'
               || msg.attachment?.type === 'image'
+              || msg.attachment?.type === 'video'
+              || msg.attachment?.type === 'post'
                 ? 'none' : 'button'
             }
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
@@ -2727,12 +2729,11 @@ export default function BuyerConversationScreen() {
             <View style={s.productPicker}>
               <ScreenHeader
                 title="Attach to message"
-                subtitle={`Choose from ${displayName}'s store`}
                 variant="modal"
                 onBack={() => setShowAttachmentPicker(false)}
               />
               <View style={s.attachmentTabs}>
-              <PressableScale rippleEnabled={false}
+              <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
@@ -2740,8 +2741,8 @@ export default function BuyerConversationScreen() {
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
                   Products
                 </Text>
-              </PressableScale>
-              <PressableScale rippleEnabled={false}
+              </PressableScale></View>
+              <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
@@ -2749,9 +2750,9 @@ export default function BuyerConversationScreen() {
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
                   Posts
                 </Text>
-              </PressableScale>
+              </PressableScale></View>
               {conv?.contextOrderId ? (
-                <PressableScale rippleEnabled={false}
+                <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                   style={[s.attachmentTab, attachmentTab === 'order' && s.attachmentTabActive]}
                   onPress={() => setAttachmentTab('order')}
                   testID="attach-tab-order"
@@ -2760,7 +2761,7 @@ export default function BuyerConversationScreen() {
                   <Text style={[s.attachmentTabText, attachmentTab === 'order' && s.attachmentTabTextActive]}>
                     Order
                   </Text>
-                </PressableScale>
+                </PressableScale></View>
               ) : null}
             </View>
             {attachmentTab === 'order' && conv?.contextOrderId ? (
@@ -3712,13 +3713,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     gap: SP.sm,
   },
+  attachmentTabCell: { flex: 1, minWidth: 0 },
   attachmentTab: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.xs,
     paddingVertical: SP.sm,
+    paddingHorizontal: SP.md,
     borderRadius: RADIUS.md,
     backgroundColor: theme.card,
     borderWidth: 1,
@@ -3754,7 +3756,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SP.sm,
+    padding: SP.md,
     backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,

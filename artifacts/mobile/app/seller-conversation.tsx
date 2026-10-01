@@ -1384,6 +1384,9 @@ export default function SellerConversationScreen() {
             // standalone product/order branch. See buyer-conversation.tsx.
             accessibilityRole={
               msg.attachment?.type === 'voice'
+              || msg.attachment?.type === 'image'
+              || msg.attachment?.type === 'video'
+              || msg.attachment?.type === 'post'
                 ? 'none' : undefined
             }
           >
