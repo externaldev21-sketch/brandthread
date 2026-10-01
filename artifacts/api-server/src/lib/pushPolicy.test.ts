@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   recipient: undefined as Record<string, unknown> | undefined,
   tokenQueries: 0,
+  promoColumnMissing: false,
 }));
 
 vi.mock("@workspace/db", () => {
@@ -21,6 +22,11 @@ vi.mock("@workspace/db", () => {
     select: (fields: Record<string, unknown>) => ({
       from: (table: unknown) => ({
         where: () => {
+          const promoOnly = Object.keys(fields).length === 1 && "promoPushOptIn" in fields;
+          if (promoOnly && state.promoColumnMissing) {
+            const err = new Error('column "promo_push_opt_in" does not exist');
+            return { then: (_res: unknown, rej: (e: Error) => void) => rej(err), limit: async () => { throw err; } };
+          }
           const isTokens = table === pushTokensTable;
           if (isTokens) state.tokenQueries += 1;
           const result = isTokens ? [] : state.recipient ? [state.recipient] : [];
@@ -48,6 +54,7 @@ const base = { accountType: "buyer", preferences: {}, pushEnabled: true, quietHo
 beforeEach(() => {
   state.tokenQueries = 0;
   state.recipient = undefined;
+  state.promoColumnMissing = false;
 });
 
 describe("promotional push classification", () => {
@@ -116,5 +123,15 @@ describe("sendPushToUser promotional chokepoint", () => {
     state.recipient = { ...base, promoPushOptIn: true, preferences: { new_drops: false } };
     await sendPushToUser("u1", { title: "t", body: "b", data: { type: "drop_live" } }, "drop");
     expect(state.tokenQueries).toBe(0);
+  });
+
+  it("missing promo column (migration 260 not applied): blocks promo, still sends transactional", async () => {
+    state.promoColumnMissing = true;
+    state.recipient = { ...base };
+    const promo = await sendPushToUser("u1", { title: "t", body: "b", data: { type: "drop_live" } }, "drop");
+    expect(promo).toBe(false);
+    expect(state.tokenQueries).toBe(0);
+    await sendPushToUser("u1", { title: "t", body: "b", data: { type: "order_confirmed" } }, "order");
+    expect(state.tokenQueries).toBe(1);
   });
 });

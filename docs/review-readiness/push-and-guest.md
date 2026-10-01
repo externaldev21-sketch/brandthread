@@ -77,6 +77,6 @@ See the PR body for what was run at 393x852 and the screenshots under `docs/pr-a
 
 ## Owner actions
 
-1. Apply migration `260_promotional_push_opt_in.sql` before or with the api-server deploy. The server reads `users.promo_push_opt_in`; without the column the recipient lookup in `sendPushToUser` throws and every push, transactional included, is skipped until the column exists.
+1. Apply migration `260_promotional_push_opt_in.sql` before or with the api-server deploy. The server reads `users.promo_push_opt_in`; order is not critical: `sendPushToUser` and the prefs GET read `promo_push_opt_in` in a separate try/catch. If the column is missing, promotional push is blocked (treated as not opted in) and transactional push is unaffected (test in `pushPolicy.test.ts`).
 2. If Klaviyo marketing email is enabled, confirm it has its own consent capture; it is outside this push audit.
 3. App Store Connect review notes: state that the app can be browsed as a guest and that promotional notifications are off until turned on in Settings > Notifications.
