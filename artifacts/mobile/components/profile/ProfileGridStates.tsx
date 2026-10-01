@@ -50,7 +50,7 @@ export function ProfileGridPlaceholder({
   alignTop?: boolean;
 }) {
   const areaHeight = useContext(ProfileEmptyAreaContext);
-  const fill = areaHeight && !alignTop ? { minHeight: areaHeight, justifyContent: 'center' as const } : null;
+  const fill = areaHeight ? { minHeight: areaHeight, justifyContent: alignTop ? ('flex-start' as const) : ('center' as const) } : null;
   if (loading) {
     return (
       <ProfileGridSkeleton columns={layout.gridColumns} width={layout.tileWidth} height={layout.tileHeight} rows={2} />
