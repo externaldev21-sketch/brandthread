@@ -31,6 +31,7 @@ import {
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../shippingZones";
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
+import { effectiveUnitPrice } from "../pricing/salesRuntime";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
 
@@ -156,6 +157,7 @@ export async function priceCartGroup(input: {
     const [row] = await db.select({
       variantId: productVariants.id,
       priceCents: productVariants.priceCents,
+      compareAtPriceCents: productVariants.compareAtPriceCents,
       stock: productVariants.stock,
       size: productVariants.size,
       color: productVariants.color,
@@ -177,11 +179,16 @@ export async function priceCartGroup(input: {
     }
     sellerId = row.sellerId;
     const variantLabel = [row.size, row.color].filter(Boolean).join(" / ");
+    // Automatic sale (lib/pricing/sales.ts): the sale price is the authoritative
+    // charge, and discount codes apply on top of it.
+    const unitCents = (await effectiveUnitPrice({
+      productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents, compareAtPriceCents: row.compareAtPriceCents,
+    })).priceCents;
     items.push({
       variantId: row.variantId, productId: item.productId, productName: row.productName, variantLabel,
-      quantity: item.quantity, priceCents: row.priceCents,
+      quantity: item.quantity, priceCents: unitCents,
     });
-    discountLines.push({ productId: item.productId, priceCents: row.priceCents, quantity: item.quantity });
+    discountLines.push({ productId: item.productId, priceCents: unitCents, quantity: item.quantity });
     weightGrams += (row.weightGrams ?? 0) * item.quantity;
   }
   if (!sellerId) throw new CartCheckoutError(400, "EMPTY_GROUP", "A seller group has no items.");

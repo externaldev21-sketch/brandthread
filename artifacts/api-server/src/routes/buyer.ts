@@ -47,6 +47,7 @@ import {
   buyerCancellationEligibility,
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
+import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 
 const router = Router();
 router.use(requireAuth);
@@ -409,6 +410,8 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       });
       continue;
     }
+    // Automatic sale price (lib/pricing/sales.ts) is what the buyer is charged.
+    row.priceCents = (await effectiveUnitPrice({ productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents })).priceCents;
     sellerIds.add(row.sellerId);
     const quantity = Number(item.quantity);
     if (!Number.isInteger(quantity) || quantity < 1 || row.stock < quantity) {
@@ -609,6 +612,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         return;
       }
 
+      row.priceCents = (await effectiveUnitPrice({ productId: item.productId, sellerId: row.sellerId, priceCents: row.priceCents })).priceCents;
       sellerIds.add(row.sellerId);
       if (sellerIds.size > 1) {
         res.status(400).json({

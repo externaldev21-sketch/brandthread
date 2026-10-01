@@ -27,6 +27,7 @@ import {
   setPaginationHeaders,
 } from "../lib/pagination";
 import { setPublicCacheHeaders } from "../lib/httpCache";
+import { applySalesToVariants } from "../lib/pricing/salesRuntime";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -204,10 +205,10 @@ router.get("/products", async (req, res) => {
         })
         .catch(() => {});
     }
-    const variants = await db
+    const variants = await applySalesToVariants(filtered, await db
       .select()
       .from(productVariants)
-      .where(inArray(productVariants.productId, productIds));
+      .where(inArray(productVariants.productId, productIds)));
 
     const variantsByProduct: Record<string, typeof variants> = {};
     for (const v of variants) {
@@ -260,7 +261,8 @@ router.get("/products/high-demand", async (req, res) => {
     const ownerIds = [...new Set(activeProducts.map((product) => product.ownerId))];
     const dropIds = [...new Set(activeProducts.map((product) => product.dropId).filter((id): id is string => Boolean(id)))];
     const [variantRows, sellerRows, dropRows, paidClaimRows] = await Promise.all([
-      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds))
+        .then((rows) => applySalesToVariants(activeProducts, rows)),
       db.select({
         clerkId: users.clerkId,
         displayName: users.displayName,
@@ -399,7 +401,8 @@ router.get("/products/:id/related", async (req, res) => {
     const productIds = ranked.map((product) => product.id);
     const ownerIds = [...new Set(ranked.map((product) => product.ownerId))];
     const [variants, sellerRows] = await Promise.all([
-      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds))
+        .then((rows) => applySalesToVariants(ranked, rows)),
       db.select({ clerkId: users.clerkId, displayName: users.displayName })
         .from(users).where(inArray(users.clerkId, ownerIds)),
     ]);
@@ -433,10 +436,10 @@ router.get("/products/:id", async (req, res) => {
       return;
     }
 
-    const variants = await db
+    const variants = await applySalesToVariants([product], await db
       .select()
       .from(productVariants)
-      .where(eq(productVariants.productId, product.id));
+      .where(eq(productVariants.productId, product.id)));
 
     // Attach seller display name
     const [seller] = await db
@@ -1279,7 +1282,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
   // real current price instead of guessing from a bare product row.
   const sellerProductIds = sellerProducts.map((p) => p.id);
   const sellerVariants = sellerProductIds.length > 0
-    ? await db.select().from(productVariants).where(inArray(productVariants.productId, sellerProductIds))
+    ? await applySalesToVariants(sellerProducts, await db.select().from(productVariants).where(inArray(productVariants.productId, sellerProductIds)))
     : [];
   const sellerVariantsByProduct: Record<string, typeof sellerVariants> = {};
   for (const v of sellerVariants) {

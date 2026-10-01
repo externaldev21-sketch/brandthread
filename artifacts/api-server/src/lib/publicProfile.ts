@@ -59,6 +59,9 @@ export function toPublicVariant(v: Row): Row {
     size: v.size ?? null,
     color: v.color ?? null,
     priceCents: v.priceCents,
+    compareAtPriceCents: v.compareAtPriceCents ?? null,
+    saleId: v.saleId ?? null,
+    saleName: v.saleName ?? null,
     // Buyers need sold-out state; the exact restock threshold / SKU are the seller's.
     stock: v.stock,
     weightGrams: v.weightGrams,

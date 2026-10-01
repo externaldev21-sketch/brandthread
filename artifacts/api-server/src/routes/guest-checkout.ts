@@ -3,6 +3,7 @@
  * token is an authorization capability for post-redirect status only; the DB
  * stores a SHA-256 digest, never the capability itself.
  */
+import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 import { Router } from "express";
 import crypto from "node:crypto";
 import {
@@ -152,6 +153,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       if (variant.status !== "active" || variant.stock < quantity) return res.status(400).json({ error: `${variant.productName} is unavailable or out of stock` });
       if (sellerId && sellerId !== variant.sellerId) return res.status(400).json({ error: "All items must belong to the same seller" });
       sellerId = variant.sellerId;
+      variant.priceCents = (await effectiveUnitPrice({ productId: variant.productId, sellerId: variant.sellerId, priceCents: variant.priceCents })).priceCents;
       const variantLabel = [variant.size, variant.color].filter(Boolean).join(" / ");
       cartItems.push({ variantId: variant.variantId, productName: variant.productName, variantLabel, quantity, priceCents: variant.priceCents });
       cartWeightGrams += (variant.weightGrams ?? 0) * quantity;

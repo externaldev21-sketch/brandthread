@@ -10,6 +10,7 @@ export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
 export * from './iapPromotions';
+export * from './sales';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
@@ -296,6 +297,8 @@ export const productVariants = pgTable('product_variants', {
   color: text('color'),
   sku: text('sku').notNull().unique(),
   priceCents: integer('price_cents').notNull(),
+  // Seller-set "was" price, shown struck through (migration 120). Null = none.
+  compareAtPriceCents: integer('compare_at_price_cents'),
   stock: integer('stock').notNull().default(0),
   lowStockThreshold: integer('low_stock_threshold').notNull().default(10),
   // Used to resolve weight-tiered shipping zone rates at checkout (see

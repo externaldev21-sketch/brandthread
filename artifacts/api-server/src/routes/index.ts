@@ -80,6 +80,7 @@ const tc = teamContext();
 import storeRouter from "./store";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
+import salesRouter from "./sales";
 import returnsRouter from "./returns";
 import sellerVerificationRouter from "./seller-verification";
 import waitlistRouter from "./waitlist";
@@ -240,6 +241,7 @@ router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
 router.use("/discount-codes",            tc, discountCodesRouter);
+router.use("/sales",                     tc, salesRouter);
 router.use("/returns",                   tc, returnsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
