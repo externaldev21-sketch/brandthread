@@ -28,6 +28,7 @@ import {
   inviteLink,
   normalizeInviteCode,
 } from "../lib/referrals/policy";
+import { redeemAdminInviteCode } from "../lib/admin/inviteCodes";
 
 const router = Router();
 
@@ -215,6 +216,27 @@ router.post("/apply", async (req, res) => {
   const normalizedCode = code.trim().toUpperCase();
 
   const result = await applyReferralCode({ inviteeId: myId, code: normalizedCode });
+  if (!result.ok && result.code === "INVALID_CODE") {
+    // Not a member's referral code: it may be an admin-issued invite code.
+    // Those grant no referral reward or Thread Cash; they count against the code's limits.
+    const [me] = await db.select({ referredByCode: users.referredByCode }).from(users).where(eq(users.clerkId, myId)).limit(1);
+    if (me?.referredByCode) {
+      res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" });
+      return;
+    }
+    const outcome = await db.transaction(async (tx) => {
+      const redeemed = await redeemAdminInviteCode(tx, normalizedCode, myId);
+      if (redeemed === "ok") {
+        await tx.update(users).set({ referredByCode: normalizedCode, updatedAt: new Date() }).where(eq(users.clerkId, myId));
+      }
+      return redeemed;
+    });
+    if (outcome === "ok") { res.json({ ok: true, inviterId: null }); return; }
+    if (outcome === "already_used") { res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" }); return; }
+    if (outcome === "invalid") { res.status(404).json({ error: "Invite code not found.", code: "INVALID_CODE" }); return; }
+    res.status(410).json({ error: outcome === "expired" ? "This invite code has expired." : "This invite code has been fully used.", code: "INVALID_CODE" });
+    return;
+  }
   if (!result.ok) {
     res.status(result.status).json({ error: result.error, code: result.code });
     return;

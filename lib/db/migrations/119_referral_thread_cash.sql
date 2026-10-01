@@ -1,4 +1,4 @@
--- 115: Referral program tracking (give $10 / get $10 Thread Cash)
+-- 119: Referral program tracking (give $10 / get $10 Thread Cash)
 -- Invitee gets Thread Cash when they join with a code; the inviter gets it
 -- when the invitee's first qualifying paid order lands. Additive and
 -- idempotent; existing referral rows are back-filled as 'pending'.
