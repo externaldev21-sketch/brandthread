@@ -1,0 +1,24 @@
+{
+  "scenario": "feed_following",
+  "steps": [
+    50,
+    100,
+    200,
+    400,
+    800
+  ],
+  "stepSeconds": 15,
+  "requests": 11107,
+  "rps": 137.6374230363616,
+  "serverErrorRate": 0,
+  "rateLimitedRate": 0,
+  "dropped": 6506,
+  "endpoints": {
+    "feed_following": {
+      "p50": 1535.056797,
+      "p95": 9769.6547032,
+      "p99": 9808.07205832,
+      "max": 9857.799201
+    }
+  }
+}
