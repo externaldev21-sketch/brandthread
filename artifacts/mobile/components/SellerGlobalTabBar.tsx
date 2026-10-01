@@ -25,6 +25,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTimin
 import { useAuth } from '@clerk/expo';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
+import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticTabChange } from '@/lib/haptics';
@@ -187,7 +188,10 @@ interface SellerGlobalTabBarProps {
   hidden?: boolean;
 }
 
-export function SellerGlobalTabBar({ onOpenStudio, hidden = false }: SellerGlobalTabBarProps) {
+export function SellerGlobalTabBar({ onOpenStudio, hidden: hiddenProp = false }: SellerGlobalTabBarProps) {
+  // Also slides away for any screen with a bottom composer (useHideTabBar).
+  const hiddenByScreen = useTabBarHiddenByScreen();
+  const hidden = hiddenProp || hiddenByScreen;
   const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
