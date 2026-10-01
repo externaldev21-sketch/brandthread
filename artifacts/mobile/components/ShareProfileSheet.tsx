@@ -49,6 +49,7 @@ import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } fr
 import { captureCardAtNaturalSize, saveCardImageToLibrary, triggerWebImageDownload } from '@/lib/shareCard';
 import { LOGO_SOURCE } from '@/constants/branding';
 import { ShareProfileQrScanner } from '@/components/ShareProfileQrScanner';
+import { radius } from '@/constants/radii';
 
 // Lazy: keeps react-native-svg's QR codegen out of every screen that merely
 // imports ShareProfileSheet (mirrors the pattern in ShareCardFrame.tsx).
@@ -507,7 +508,7 @@ const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   pillText: {

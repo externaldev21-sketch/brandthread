@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
+import { radius } from '@/constants/radii';
 
 /**
  * One shared empty/error state used on every list and grid: icon in a thin
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: SP.lg,
     paddingVertical: SP.sm + 2,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     marginTop: SP.xs,
   },
   actionText: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },

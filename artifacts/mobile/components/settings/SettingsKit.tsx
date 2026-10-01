@@ -25,6 +25,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { radius } from '@/constants/radii';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -328,7 +329,7 @@ function makeCardStyles(colors: Colors) {
     profileEyebrow: { fontSize: 11, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4, color: colors.mutedForeground, marginBottom: 2 },
     profileName: { fontSize: 17, fontFamily: FONT.bold, color: colors.foreground, flexShrink: 1 },
     profileSub: { fontSize: 12, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-    profileEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0 },
+    profileEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0 },
     profileEditText: { fontSize: 12, fontFamily: FONT.semibold, color: colors.foreground },
 
     // Search

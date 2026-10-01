@@ -15,6 +15,7 @@ import {
   getManufacturer, saveQuoteRequestDraft, submitQuoteRequest,
 } from '@/services/manufacturerService';
 import type { Manufacturer } from '@/services/manufacturerTypes';
+import { radius } from '@/constants/radii';
 
 const PRODUCT_TYPES = ['T-Shirt', 'Hoodie', 'Sweatpants', 'Shorts', 'Jacket', 'Hat', 'Custom'];
 const QUANTITIES = [1, 3, 5, 10];
@@ -181,7 +182,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   field: { gap: 8 },
   label: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8, justifyContent: 'center' },
+  chip: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 8, justifyContent: 'center' },
   chipText: { color: colors.mutedForeground, fontSize: 13, fontFamily: FONT.medium },
   input: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, color: colors.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: FONT.regular },
   notes: { minHeight: 100, textAlignVertical: 'top' },

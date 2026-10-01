@@ -33,6 +33,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { radius } from '@/constants/radii';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -364,7 +365,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
     paddingVertical: 14,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     minHeight: COMP.buttonH,
     minWidth: 180,
   },
@@ -421,7 +422,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.sm,
     width: '100%',
     minHeight: COMP.buttonH,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
   },
   copyBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 
@@ -432,7 +433,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.sm,
     width: '100%',
     minHeight: COMP.buttonH,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,

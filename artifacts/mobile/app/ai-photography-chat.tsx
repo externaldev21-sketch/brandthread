@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { FONT, FS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 interface UploadedPhoto {
   id: string;
@@ -539,7 +540,7 @@ export default function AIPhotographyChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   modeSwitch: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
-  modeChip: { flex: 1, minHeight: 34, borderRadius: 17, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  modeChip: { flex: 1, minHeight: 34, borderRadius: radius.sm, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   modeChipText: { fontSize: 12, fontFamily: FONT.semibold },
   outfitNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
   outfitNoticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
@@ -561,7 +562,7 @@ const styles = StyleSheet.create({
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
   loadingText: { fontSize: 13, fontFamily: FONT.regular },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 34, marginTop: 10, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1 },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 34, marginTop: 10, paddingHorizontal: 12, borderRadius: radius.sm, borderWidth: 1 },
   retryBtnText: { fontSize: 12, fontFamily: FONT.semibold },
   retryLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   retrySpinner: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },

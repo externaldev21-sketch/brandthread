@@ -22,6 +22,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import Checkerboard from './Checkerboard';
+import { radius, nestedRadius } from '@/constants/radii';
 
 type Tool = 'erase' | 'restore';
 type Mode = 'compare' | 'refine';
@@ -304,7 +305,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: SP.md,
     borderWidth: 1,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     padding: 3,
     gap: 3,
     alignSelf: 'center',
@@ -315,7 +316,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: SP.md,
     paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+    borderRadius: nestedRadius(radius.md, 3),
   },
   modeBtnText: {
     fontFamily: FONT.semibold,
@@ -347,7 +348,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: SP.md,
     paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
   },
   doneBtnText: {
     fontFamily: FONT.semibold,

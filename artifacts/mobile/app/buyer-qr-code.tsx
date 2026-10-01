@@ -14,6 +14,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { radius } from '@/constants/radii';
 
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
@@ -141,7 +142,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   hint: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.lg },
 
   shareBtnWrap: { marginTop: SP.lg, width: '100%', maxWidth: 320 },
-  shareBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SP.sm },
+  shareBtn: { height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SP.sm },
   shareBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 
   infoCard: { width: '100%', maxWidth: 320, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: SP.md },

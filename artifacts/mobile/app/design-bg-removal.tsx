@@ -36,6 +36,7 @@ import Checkerboard from '@/components/design/Checkerboard';
 import BgRemovalGlowSweep from '@/components/ai-tools/BgRemovalGlowSweep';
 import { saveResult } from '@/services/bgRemovalService';
 import { BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -374,7 +375,7 @@ const s = StyleSheet.create({
   stageImage: { width: '100%', height: '100%' },
   changePhotoBtn: {
     position: 'absolute', bottom: SP.sm, right: SP.sm, flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6,
   },
   changePhotoText: { fontFamily: FONT.medium, fontSize: FS.xs, color: '#fff' },
   errorOverlay: {

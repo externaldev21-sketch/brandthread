@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 const BRAND_CHECKLIST_ITEMS = [
   'Brand name finalized',
@@ -325,10 +326,10 @@ const styles = StyleSheet.create({
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, padding: 13 },
   generateText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  namePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  namePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
   namePillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  styleChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  styleChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
   styleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   subLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   logoGrid: { flexDirection: 'row', gap: 10 },

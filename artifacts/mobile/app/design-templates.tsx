@@ -22,6 +22,7 @@ import {
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { radius } from '@/constants/radii';
 
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
@@ -214,7 +215,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   tabsScroll:    { flexGrow: 0 },
   tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
-  tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   tabText:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 

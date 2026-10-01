@@ -9,6 +9,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { describeDashboardDelta } from '@/lib/sellerDashboardStats';
 import type { TrafficSource } from '@/lib/sellerHomeAnalytics';
+import { radius } from '@/constants/radii';
 
 /**
  * Traffic sources — redesigned per Dev's direction (Mobbin references:
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
     gap: 6,
     height: 44,
     paddingHorizontal: SP.lg,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
   },
   shareBtnText: {

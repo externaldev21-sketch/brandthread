@@ -115,6 +115,7 @@ import {
   ALL_ITEMS,
   type ControlCenterItem,
 } from '@/lib/sellerControlCenter';
+import { radius } from '@/constants/radii';
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
 
@@ -1416,7 +1417,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: theme.border,
   },

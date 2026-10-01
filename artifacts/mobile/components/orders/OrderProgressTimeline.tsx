@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import type { OrderStatus, TrackingStatus } from '@/services/orderTypes';
+import { radius } from '@/constants/radii';
 
 /**
  * Detailed, vertical, timestamped order-progress tracker for the buyer order
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', marginTop: SP.xs,
     paddingHorizontal: SP.sm, paddingVertical: 6,
-    borderRadius: RADIUS.pill, borderWidth: 1,
+    borderRadius: radius.sm, borderWidth: 1,
   },
   trackChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, maxWidth: 180 },
   exceptionWrap: {

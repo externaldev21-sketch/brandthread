@@ -13,7 +13,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -176,7 +176,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   emptyDesc: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, textAlign: 'center', maxWidth: 240 },
   findFriendsBtn: {
     marginTop: SPACING.xs, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm,
-    borderRadius: RADII.pill, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border,
   },
   findFriendsBtnText: { fontFamily: FONT.semibold, ...TYPE_SCALE.body, color: colors.foreground },
 });

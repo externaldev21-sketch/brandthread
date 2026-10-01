@@ -83,7 +83,7 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
@@ -3721,7 +3721,7 @@ const styles = StyleSheet.create({
   cartCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
   findFriendsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
-    paddingHorizontal: 18, paddingVertical: 10, borderRadius: RADII.pill,
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.md,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   findFriendsBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
@@ -3731,7 +3731,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   creatorRetry: {
-    minHeight: 44, minWidth: 140, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill,
+    minHeight: 44, minWidth: 140, paddingHorizontal: SP.lg, borderRadius: radius.md,
     borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center',
   },
   creatorRetryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },

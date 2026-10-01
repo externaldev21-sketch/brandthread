@@ -29,6 +29,7 @@ import type {
   ModerationAction, ModerationQueue, ModerationQueueItem, ProfileSummary, ReportTargetType,
 } from '@/lib/safetyTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { radius, nestedRadius } from '@/constants/radii';
 
 type Status = 'open' | 'resolved';
 type TypeFilter = 'all' | ReportTargetType;
@@ -489,14 +490,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   segment: {
     flexDirection: 'row', marginHorizontal: SP.md, marginTop: SP.xs, padding: 4,
-    backgroundColor: theme.card, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
+    backgroundColor: theme.card, borderRadius: radius.md, borderWidth: 1, borderColor: theme.border,
   },
-  segmentItem: { flex: 1, height: 36, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  segmentItem: { flex: 1, height: 36, borderRadius: nestedRadius(radius.md, 4), alignItems: 'center', justifyContent: 'center' },
   segmentItemActive: { backgroundColor: theme.accent },
   segmentText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm },
   segmentTextActive: { color: theme.onAccent },
   filters: { paddingHorizontal: SP.md, paddingVertical: SP.md, gap: SP.sm },
-  filterChip: { height: 32, paddingHorizontal: 14, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, justifyContent: 'center', backgroundColor: theme.card },
+  filterChip: { height: 32, paddingHorizontal: 14, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, justifyContent: 'center', backgroundColor: theme.card },
   filterChipActive: { borderColor: theme.text, backgroundColor: theme.cardElevated },
   filterText: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs + 1 },
   filterTextActive: { color: theme.text, fontFamily: FONT.semibold },

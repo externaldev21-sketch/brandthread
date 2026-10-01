@@ -13,7 +13,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { discoverBrands, type DiscoverBrand } from '@/services/discoverService';
 import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
-import { RADIUS, SPACE, TYPE } from './onboardingTokens';
+import { SPACE, TYPE } from './onboardingTokens';
+import { radius } from '@/constants/radii';
 
 export function BrandsToFollowStep() {
   const { theme } = useAppTheme();
@@ -154,7 +155,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
   followAllBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.pill, paddingHorizontal: 16, minHeight: 40,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
     marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
   followAllText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

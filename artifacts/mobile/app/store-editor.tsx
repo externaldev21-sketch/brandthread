@@ -34,6 +34,7 @@ import {
   SECTION_TYPE_LABELS, StoreThemeSettings, THREAD_THEME_NAME,
   TYPOGRAPHY_STYLES,
 } from '@/services/storeTypes';
+import { radius } from '@/constants/radii';
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
@@ -81,7 +82,7 @@ const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   chip: {
     paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   active: { backgroundColor: theme.accentDim, borderColor: theme.accentLight },

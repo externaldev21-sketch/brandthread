@@ -20,6 +20,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { COMMUNITY_REACTIONS } from '@/lib/communities/types';
 import { reactionChips, type DisplayMessage } from '@/lib/communities/chatMerge';
 import type { ReactionType } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
 
 const AVATAR_SIZE = 28;
 const AVATAR_GAP = SP.sm;
@@ -309,7 +310,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: 4 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3,
   },
   chipCount: { fontSize: FS.xs, fontFamily: FONT.semibold },
 });

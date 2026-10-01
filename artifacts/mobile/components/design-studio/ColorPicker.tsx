@@ -16,6 +16,7 @@ import {
   hsvToHex, hexToHsv, isValidHex, discPointToHs, hsToDiscPoint, contrastingBW,
   BrandPalette,
 } from '@/lib/colorModel';
+import { radius, nestedRadius } from '@/constants/radii';
 
 export type ColorPickerMode = 'disc' | 'classic';
 
@@ -174,8 +175,8 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, padding: SP.md, gap: SP.sm,
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modeToggle: { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: RADIUS.pill, padding: 2 },
-  modeBtn: { paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: RADIUS.pill },
+  modeToggle: { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: radius.sm, padding: 2 },
+  modeBtn: { paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: nestedRadius(radius.sm, 2) },
   modeBtnActive: { backgroundColor: FG },
   modeText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, includeFontPadding: false },
   modeTextActive: { color: BG },

@@ -53,6 +53,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
+import { radius } from '@/constants/radii';
 
 type ContentTab = 'Posts' | 'Tagged';
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
@@ -580,7 +581,7 @@ function makeStyles(theme: AppThemePreset) {
     // deliberately non-interactive.
     chip: {
       flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
-      borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
+      borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 4,
     },
     chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
     followMorphBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },

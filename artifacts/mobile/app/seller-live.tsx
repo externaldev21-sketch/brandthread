@@ -20,6 +20,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+import { radius } from '@/constants/radii';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -465,7 +466,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   railBadgeText:    { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   productStrip:     { position: 'absolute', bottom: 160, left: 0, right: 0, zIndex: 8 },
   productStripContent: { paddingHorizontal: 12, gap: 8 },
-  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
+  productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
   productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
   featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },

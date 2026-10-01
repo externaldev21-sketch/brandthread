@@ -128,6 +128,7 @@ import {
 } from '@/lib/colorModel';
 import { getColorPickerState, saveColorPickerState } from '@/services/designService';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -5537,7 +5538,7 @@ const styles = StyleSheet.create({
 
   brushSliders:   { gap: SP.xs, marginBottom: SP.sm },
   catScrollView:  { marginBottom: SP.sm },
-  catChip:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  catChip:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   catChipActive:  { borderColor: BORDER_ACTIVE },
   catChipText:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   brushList:      { maxHeight: 200 },
@@ -5555,7 +5556,7 @@ const styles = StyleSheet.create({
   hexHash:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   hexInput:  { width: 70, fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   pickerTabRow:   { flexDirection: 'row', gap: SP.xs, marginBottom: SP.sm },
-  pickerTab:      { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER },
+  pickerTab:      { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER },
   pickerTabActive:{ borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
   pickerTabText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   hueDiscContainer: { gap: SP.xs },
@@ -5581,7 +5582,7 @@ const styles = StyleSheet.create({
   layerActionBtn: { padding: 6 },
 
   layerActionsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: SP.md },
-  blendChip:          { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  blendChip:          { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   blendChipActive:    { borderColor: BORDER_ACTIVE },
   blendChipText:      { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 
@@ -5590,7 +5591,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm, paddingVertical: SP.sm, fontFamily: FONT.regular,
     minHeight: 80, textAlignVertical: 'top', marginBottom: SP.sm,
   },
-  fontChip:       { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  fontChip:       { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   fontChipActive: { borderColor: BORDER_ACTIVE },
   fontChipText:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   toggleRow:      { flexDirection: 'row', gap: SP.xs, marginBottom: SP.sm },
@@ -5685,7 +5686,7 @@ const styles = StyleSheet.create({
   guideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
   guideLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   guideSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  togglePill: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, minHeight: 36 },
+  togglePill: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, minHeight: 36 },
   togglePillActive: { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
   togglePillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
   togglePillTextActive: { color: FG },

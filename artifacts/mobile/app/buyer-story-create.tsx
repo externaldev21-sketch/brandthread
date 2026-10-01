@@ -57,6 +57,7 @@ import {
 } from '@/lib/storyMentionSticker';
 import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackground, sampleImageColor } from '@/lib/storyReshare';
 import type { MentionPerson } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -2313,7 +2314,7 @@ const styles = StyleSheet.create({
   changeGridPill: {
     position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 'auto', width: 140,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
   },
   changeGridText: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
   gridDots: { flexDirection: 'row', gap: 4, marginTop: SP.xs, justifyContent: 'center' },
@@ -2382,7 +2383,7 @@ const styles = StyleSheet.create({
   mentionDock: { position: 'absolute', left: SP.md, right: SP.md, zIndex: 22, flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
   taggedChip: {
     minWidth: 44, height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingHorizontal: SP.sm, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: SP.sm, borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.6)',
     borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)',
   },
   taggedChipText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -2391,10 +2392,10 @@ const styles = StyleSheet.create({
   mentionOpacityRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   mentionOpacityValue: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, width: 34, textAlign: 'right' },
 
-  reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md },
+  reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.md, paddingHorizontal: SP.md },
   reshareActionOutline: { borderWidth: 1, borderColor: 'rgba(192,192,192,0.5)' },
   reshareActionLabel: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
-  reshareNotNowWrap: { alignSelf: 'center', minHeight: 40, justifyContent: 'center', paddingHorizontal: SP.lg, marginTop: SP.xs, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.55)' },
+  reshareNotNowWrap: { alignSelf: 'center', minHeight: 40, justifyContent: 'center', paddingHorizontal: SP.lg, marginTop: SP.xs, borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.55)' },
   reshareNotNow: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
   reshareUnavailable: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', padding: SP.md },
   reshareUnavailableTitle: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.semibold },
@@ -2421,7 +2422,7 @@ const styles = StyleSheet.create({
   myAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   myAvatarText: { color: ON_DARK, fontSize: 10, fontFamily: FONT.bold },
   myStoryLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
-  closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
+  closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
   closeFriendsLabel: { color: 'rgba(255,255,255,0.75)', fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: ON_DARK, alignItems: 'center', justifyContent: 'center' },
 
@@ -2440,7 +2441,7 @@ const styles = StyleSheet.create({
   textToolColorRow: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   colorWheelDot: { width: 22, height: 22, borderRadius: 11 },
   fontChipRow: { maxHeight: 34 },
-  fontChip: { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
+  fontChip: { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.12)' },
   fontChipText: { color: ON_DARK, fontSize: FS.sm },
   textAccessoryRow: { flexDirection: 'row', alignItems: 'center', paddingTop: SP.xs },
   textAccessoryItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', paddingVertical: SP.xs },
@@ -2486,7 +2487,7 @@ const styles = StyleSheet.create({
   alsoShareSearchWrap: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.md, paddingHorizontal: SP.sm, marginTop: SP.sm },
   alsoShareSearchInput: { flex: 1, color: ON_DARK, fontSize: FS.base, paddingVertical: SP.sm },
   alsoShareRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
-  alsoShareSendBtn: { paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: ON_DARK, minWidth: 64, alignItems: 'center' },
+  alsoShareSendBtn: { paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: ON_DARK, minWidth: 64, alignItems: 'center' },
   alsoShareSendBtnSent: { backgroundColor: 'rgba(255,255,255,0.15)' },
   alsoShareSendText: { color: '#000', fontFamily: FONT.semibold, fontSize: FS.sm },
   alsoShareHint: { color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: SP.xl },

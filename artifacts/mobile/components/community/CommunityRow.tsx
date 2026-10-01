@@ -7,6 +7,7 @@ import { formatMemberCount, type Community } from '@/lib/communities/types';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CommunityAvatar } from './CommunityAvatar';
 import { VerifiedMark } from './VerifiedMark';
+import { radius } from '@/constants/radii';
 
 export interface CommunityRowProps {
   community: Community;
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
   name: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.base },
   meta: { fontFamily: FONT.regular, fontSize: FS.meta },
   desc: { fontFamily: FONT.regular, fontSize: FS.sm },
-  pill: { minWidth: 72, height: 36, paddingHorizontal: SP.md, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pill: { minWidth: 72, height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   error: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, paddingLeft: 52 + SP.md - 4, paddingBottom: SP.sm },
 });

@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { isAuthError } from '@/lib/networkNotice';
 import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
+import { radius, nestedRadius } from '@/constants/radii';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -262,12 +263,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // Monochrome rule: black/white/silver only — was theme.borderSubtle (a
   // grey fill) with a theme.muted (grey) inactive icon.
   deviceToggle: {
-    flexDirection: 'row', borderRadius: RADIUS.pill,
+    flexDirection: 'row', borderRadius: radius.md,
     backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
     padding: 3, gap: 3,
   },
   deviceBtn: {
-    width: 34, height: 30, borderRadius: RADIUS.pill,
+    width: 34, height: 30, borderRadius: nestedRadius(radius.md, 3),
     alignItems: 'center', justifyContent: 'center',
   },
   deviceBtnActive: { backgroundColor: theme.text },

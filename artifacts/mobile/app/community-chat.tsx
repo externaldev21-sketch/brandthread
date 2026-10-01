@@ -37,6 +37,7 @@ import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { formatMemberCount, type CommunityAttachment } from '@/lib/communities/types';
 import { isNearBottom, myReactionType, newMessagesLabel, type ChatRow, type DisplayMessage } from '@/lib/communities/chatMerge';
 import type { ReactionType } from '@/services/socialTypes';
+import { radius } from '@/constants/radii';
 
 export default function CommunityChatScreen() {
   const { theme } = useAppTheme();
@@ -431,7 +432,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   pillWrap: { position: 'absolute', left: 0, right: 0, bottom: SP.sm, alignItems: 'center' },
   newPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, height: 34,
-    paddingHorizontal: SP.md, borderRadius: RADIUS.pill, backgroundColor: theme.accent,
+    paddingHorizontal: SP.md, borderRadius: radius.sm, backgroundColor: theme.accent,
   },
   newPillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.onAccent },
   overlayText: { fontSize: 15, fontFamily: FONT.regular, lineHeight: 21 },

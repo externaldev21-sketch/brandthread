@@ -20,6 +20,7 @@ import { Glass } from '@/components/ui/Glass';
 import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LIVE_RED } from './LiveAvatarRing';
+import { radius } from '@/constants/radii';
 
 const ND = Platform.OS !== 'web';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
@@ -81,7 +82,7 @@ export function LiveHostPill({
         hitSlop={6}
         testID="live-follow"
       >
-        {following && <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />}
+        {following && <Glass variant="regular" tint="dark" radius={radius.sm} style={StyleSheet.absoluteFill} />}
         {following
           ? <Feather name="check" size={14} color="#fff" />
           : <Text style={styles.followText}>Follow</Text>}
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   followBtn: {
-    minWidth: 58, height: 32, paddingHorizontal: 12, borderRadius: RADIUS.pill,
+    minWidth: 58, height: 32, paddingHorizontal: 12, borderRadius: radius.sm,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
   followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 32 },
@@ -486,7 +487,7 @@ const styles = StyleSheet.create({
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
   pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm },
   pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
-  buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: RADIUS.pill, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
 
   rail: { alignItems: 'center', gap: 14 },

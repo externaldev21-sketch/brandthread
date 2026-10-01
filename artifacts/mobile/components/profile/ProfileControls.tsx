@@ -16,6 +16,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
+import { radius } from '@/constants/radii';
 
 type PressState = { pressed: boolean; hovered?: boolean; focused?: boolean };
 type FeatherName = keyof typeof Feather.glyphMap;
@@ -250,7 +251,7 @@ export function ProfileWalletChip({ balanceLabel, onPress }: { balanceLabel: str
     >
       {(state) => (
         <>
-          <InteractionLayer state={state as PressState} radius={22} theme={theme} />
+          <InteractionLayer state={state as PressState} radius={radius.md} theme={theme} />
           <ThreadCashBillIcon size={20} />
           <Text style={[styles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
         </>
@@ -522,7 +523,7 @@ export function ShopPill({
       >
         {(state) => (
           <>
-            <InteractionLayer state={state as PressState} radius={RADIUS.pill} theme={theme} />
+            <InteractionLayer state={state as PressState} radius={radius.md} theme={theme} />
             <View style={[styles.pillIcon, { backgroundColor: theme.onAccent }]}>
               <Feather name="shopping-bag" size={20} color={theme.accent} />
             </View>
@@ -606,7 +607,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   walletChip: {
-    height: 44, borderRadius: 22, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    height: 44, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
     gap: 6, paddingLeft: 7, paddingRight: 12, overflow: 'hidden',
   },
   walletText: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
@@ -644,7 +645,7 @@ const styles = StyleSheet.create({
   pillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: SP.md },
   pillInline: { alignItems: 'stretch', paddingHorizontal: SP.md },
   pill: {
-    height: SHOP_PILL_HEIGHT, minWidth: 300, maxWidth: 460, borderRadius: RADIUS.pill,
+    height: SHOP_PILL_HEIGHT, minWidth: 300, maxWidth: 460, borderRadius: radius.md,
     flexDirection: 'row', alignItems: 'center', gap: SP.md,
     paddingLeft: 7, paddingRight: 7, overflow: 'hidden',
     shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.5, shadowRadius: 28, elevation: 14,

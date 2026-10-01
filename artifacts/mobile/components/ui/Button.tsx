@@ -25,7 +25,7 @@ import { hapticLight, hapticWarning } from '@/lib/haptics';
 import { COMP, FONT, RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
@@ -141,7 +141,7 @@ export function Button({
       <Animated.View
         style={[
           styles.base,
-          { height, borderRadius: RADII.pill, transform: [{ scale }] },
+          { height, borderRadius: radius.md, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
           isFilled && !isDisabled && styles.raisedShadow,
@@ -150,7 +150,7 @@ export function Button({
           style,
         ]}
       >
-        <View style={[StyleSheet.absoluteFill, { borderRadius: RADII.pill, overflow: 'hidden' }]} pointerEvents="none">
+        <View style={[StyleSheet.absoluteFill, { borderRadius: radius.md, overflow: 'hidden' }]} pointerEvents="none">
           {isFilled && !isDisabled && (
             <LinearGradient
               colors={['#FFFFFF3D', '#FFFFFF00']}

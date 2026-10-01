@@ -26,6 +26,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import { hapticLight } from '@/lib/haptics';
+import { radius } from '@/constants/radii';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   },
   tipDisabled: { opacity: 0.35 },
   tipText: { fontFamily: FONT.bold, fontSize: FS.sm },
-  sendBtn: { height: 46, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });

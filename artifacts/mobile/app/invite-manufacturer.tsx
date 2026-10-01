@@ -24,6 +24,7 @@ import { FormInput, PrimaryButton, SecondaryButton, StatusBadge } from '@/compon
 import { createInvitation, getInvitations } from '@/services/manufacturerService';
 import type { ManufacturerInvitation } from '@/services/manufacturerTypes';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { radius } from '@/constants/radii';
 
 function inviteMessage(companyName: string, link: string) {
   return `Hi${companyName ? ` ${companyName}` : ''} — I'd like to manage our production on Brandthread. It's free for you: sign up with this private link and we'll have one place for messages, samples, orders and payments.\n\n${link}`;
@@ -224,6 +225,6 @@ const s = StyleSheet.create({
   secondaryText: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   inviteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
   inviteName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  resend: { paddingHorizontal: 12, height: 32, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, justifyContent: 'center' },
+  resend: { paddingHorizontal: 12, height: 32, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, justifyContent: 'center' },
   resendText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 });
