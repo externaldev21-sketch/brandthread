@@ -123,7 +123,7 @@ async function buildPreview(ownerId: string, source: ImportSource, mapped: MapRe
   const notes: string[] = [];
   if (mapped.products.some((p) => p.variants.some((v) => v.compareAtCents))) notes.push("Compare-at prices aren't imported.");
   if (mapped.products.some((p) => p.seoTitle || p.seoDescription || p.vendor)) notes.push("Vendor and SEO fields aren't imported.");
-  notes.push("Imported products are saved as drafts. Publish them when you're ready.");
+  notes.push("Products are imported as drafts. Publish when ready.");
 
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
