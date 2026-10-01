@@ -37,7 +37,7 @@ type StoryRow = typeof stories.$inferSelect;
 
 async function loadLiveStory(id: string): Promise<StoryRow | null> {
   const [row] = await db.select().from(stories).where(eq(stories.id, id)).limit(1);
-  if (!row || row.moderationStatus === "removed" || new Date(row.expiresAt).getTime() <= Date.now()) return null;
+  if (!row || row.moderationStatus !== "visible" || new Date(row.expiresAt).getTime() <= Date.now()) return null;
   return row;
 }
 
