@@ -10,7 +10,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { renderSharePreviewHtml } = require('./sharePreview');
+const { renderSharePreview } = require('./sharePreview');
 const { landingPathFor, shouldServeLanding } = require('./landing');
 
 const STATIC_ROOT = path.resolve(
@@ -189,8 +189,8 @@ const server = http.createServer(async (req, res) => {
     const shellPath = path.join(STATIC_ROOT, 'index.html');
     if (fs.existsSync(shellPath)) {
       const shellHtml = fs.readFileSync(shellPath, 'utf8');
-      const preview = await renderSharePreviewHtml(requestedPath, shellHtml).catch(() => null);
-      sendHtml(res, 200, preview || shellHtml, acceptEncoding);
+      const preview = await renderSharePreview(requestedPath, shellHtml).catch(() => null);
+      sendHtml(res, preview ? preview.status : 200, preview ? preview.html : shellHtml, acceptEncoding);
       return;
     }
   }

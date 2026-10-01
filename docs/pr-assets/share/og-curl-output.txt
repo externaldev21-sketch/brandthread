@@ -1,0 +1,75 @@
+# curl -s -i -H 'Accept: text/html' against artifacts/mobile/server/serve.js (stubbed API, filtered to status + meta tags)
+=== GET /p/0f8fad5b-d9cb-469f-a165-70867728950e
+HTTP/1.1 200 OK
+<link rel="canonical" href="https://brandthread.app/p/0f8fad5b-d9cb-469f-a165-70867728950e" />
+<title>Nova Studio on Brandthread</title>
+<meta name="description" content="Fit check &quot;drop 04&quot; &lt;new>" />
+<meta property="og:url" content="https://brandthread.app/p/0f8fad5b-d9cb-469f-a165-70867728950e" />
+<meta property="og:site_name" content="Brandthread" />
+<meta property="og:title" content="Nova Studio on Brandthread" />
+<meta property="og:description" content="Fit check &quot;drop 04&quot; &lt;new>" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://cdn.example/thumb.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Nova Studio on Brandthread" />
+<meta name="twitter:description" content="Fit check &quot;drop 04&quot; &lt;new>" />
+<meta name="twitter:image" content="https://cdn.example/thumb.jpg" />
+
+=== GET /p/11111111-1111-4111-8111-111111111111
+HTTP/1.1 404 Not Found
+<title>Brandthread | Discover what's next</title>
+<meta name="description" content="generic" />
+<meta property="og:title" content="generic" />
+<meta name="robots" content="noindex" />
+
+=== GET /store/novagoods
+HTTP/1.1 200 OK
+<link rel="canonical" href="https://brandthread.app/store/novagoods" />
+<title>Nova Goods on Brandthread</title>
+<meta name="description" content="Handmade goods." />
+<meta property="og:url" content="https://brandthread.app/store/novagoods" />
+<meta property="og:site_name" content="Brandthread" />
+<meta property="og:title" content="Nova Goods on Brandthread" />
+<meta property="og:description" content="Handmade goods." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://cdn.example/logo.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Nova Goods on Brandthread" />
+<meta name="twitter:description" content="Handmade goods." />
+<meta name="twitter:image" content="https://cdn.example/logo.png" />
+
+=== GET /store/ghost
+HTTP/1.1 404 Not Found
+<title>Brandthread | Discover what's next</title>
+<meta name="description" content="generic" />
+<meta property="og:title" content="generic" />
+<meta name="robots" content="noindex" />
+
+=== GET /tag/Streetwear
+HTTP/1.1 200 OK
+<link rel="canonical" href="https://brandthread.app/tag/Streetwear" />
+<title>#streetwear on Brandthread</title>
+<meta name="description" content="Watch the latest posts tagged #streetwear on Brandthread." />
+<meta property="og:url" content="https://brandthread.app/tag/Streetwear" />
+<meta property="og:site_name" content="Brandthread" />
+<meta property="og:title" content="#streetwear on Brandthread" />
+<meta property="og:description" content="Watch the latest posts tagged #streetwear on Brandthread." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://brandthread.app/brandthread-logo.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="#streetwear on Brandthread" />
+<meta name="twitter:description" content="Watch the latest posts tagged #streetwear on Brandthread." />
+<meta name="twitter:image" content="https://brandthread.app/brandthread-logo.png" />
+
+=== GET /place/pl_12345
+HTTP/1.1 200 OK
+<title>Brandthread | Discover what's next</title>
+<meta name="description" content="generic" />
+<meta property="og:title" content="generic" />
+
+=== GET /privacy
+HTTP/1.1 200 OK
+<title>Brandthread | Discover what's next</title>
+<meta name="description" content="generic" />
+<meta property="og:title" content="generic" />
+

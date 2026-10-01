@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -24,6 +24,7 @@ import { useApi } from '@/lib/api';
 import { calcPricing } from '@/lib/productUtils';
 import { formatCents, integerPercent } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { buildProductUrl } from '@/lib/shareLinks';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -182,7 +183,11 @@ export default function ProductStoreScreen() {
 
   const handleShare = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Share.share({ message: `Check out ${product?.name ?? 'this product'} on Brandthread!` });
+    const link = buildProductUrl(product?.id);
+    const message = `Check out ${product?.name ?? 'this product'} on Brandthread!`;
+    await Share.share(link
+      ? { message: Platform.OS === 'ios' ? message : `${message} ${link}`, url: link }
+      : { message });
   }, [product]);
 
   const handleAddToCart = useCallback(() => {
