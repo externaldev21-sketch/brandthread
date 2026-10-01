@@ -44,6 +44,7 @@ import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand }
 import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
 import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
+import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
@@ -314,6 +315,7 @@ export default function DiscoverScreen() {
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
+          ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
         />
       )}
 
