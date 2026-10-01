@@ -50,7 +50,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Orders and returns', description: 'View purchases, returns, and order support', aliases: ['orders', 'purchases', 'refunds', 'returns'], icon: 'package', route: '/(buyer)/orders', audience: 'buyer' },
       { label: 'Shopping preferences', description: 'Sizes, fit, favorite categories, and recommendations', aliases: ['shopping', 'sizes', 'fit', 'recommendations'], icon: 'shopping-bag', route: '/shopping-preferences', audience: 'buyer' },
-      { label: 'My sizes', description: 'Saved sizes and measurements for faster fit', aliases: ['sizes', 'size', 'measurements', 'fit', 'height'], icon: 'maximize-2', route: '/buyer-my-sizes', audience: 'buyer' },
+      { label: 'My sizes', description: 'Sizes and measurements', aliases: ['sizes', 'size', 'measurements', 'fit', 'height'], icon: 'maximize-2', route: '/buyer-my-sizes', audience: 'buyer' },
     ],
   },
   {

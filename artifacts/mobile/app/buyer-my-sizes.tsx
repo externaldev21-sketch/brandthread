@@ -109,7 +109,7 @@ export default function BuyerMySizes() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="My sizes" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="My sizes" hideDivider onBack={() => goBackOr(router)} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: Math.max(insets.bottom, tabInset) + 32 }}
         keyboardShouldPersistTaps="handled"
