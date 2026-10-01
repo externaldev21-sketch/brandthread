@@ -1271,6 +1271,12 @@ function RootLayoutNav() {
         <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="growth-links" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="growth-link-new" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="growth-link-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="link-in-bio" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="link-in-bio-stats" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-pixels" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'ios_from_right' }} />

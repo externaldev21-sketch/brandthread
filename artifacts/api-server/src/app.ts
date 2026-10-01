@@ -22,6 +22,9 @@ import { validateMutationEnvelope } from "./middlewares/validateRequest";
 import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
 import { requireAuth } from "./middlewares/requireAuth";
 import { profileLanding } from "./routes/profileLanding";
+import {
+  bioLinkRedirect, bioPageHandler, bioProductRedirect, bioShopRedirect, trackedLinkRedirect,
+} from "./routes/growthPublic";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -162,6 +165,12 @@ app.use(
 
 app.use(appRateLimiter);
 app.get("/u/:username", rateLimit("public-read"), profileLanding);
+// Growth: tracked short links + server-rendered link-in-bio pages (public, unauthenticated).
+app.get("/l/:code", trackedLinkRedirect);
+app.get("/bio/:slug", bioPageHandler);
+app.get("/bio/:slug/go/:linkId", bioLinkRedirect);
+app.get("/bio/:slug/shop", bioShopRedirect);
+app.get("/bio/:slug/p/:productId", bioProductRedirect);
 app.use("/api/v1", (_req, res, next) => {
   res.setHeader("X-Brandthread-API-Version", "1");
   next();

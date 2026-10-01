@@ -16,6 +16,7 @@ import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { ListRow } from '@/components/ui/ListRow';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -280,6 +281,14 @@ export default function MarketingScreen() {
         </View>
         <Feather name="chevron-right" size={16} color={colors.primary} />
       </TouchableOpacity>
+
+      {/* Growth: tracked links, link in bio, store pixels */}
+      <SectionHeader title="Growth" />
+      <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+        <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
+        <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
+        <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
+      </View>
     </ScrollView>
     </View>
   );
