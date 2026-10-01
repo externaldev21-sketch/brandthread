@@ -165,7 +165,6 @@ export default function ManufacturerMessagesScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
-  const [callsInfoOpen, setCallsInfoOpen] = useState(false);
   const [callingEnabled, setCallingEnabled] = useState(false);
   const [viewer, setViewer] = useState<string | null>(null);
   const [, setClock] = useState(0);
@@ -307,7 +306,7 @@ export default function ManufacturerMessagesScreen() {
   }
 
   function startCall(mode: 'voice' | 'video') {
-    if (!callingEnabled) { setCallsInfoOpen(true); return; }
+    if (!callingEnabled) return;
     if (!threadId) return;
     const initials = mfrName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || '?';
     const query = new URLSearchParams({
@@ -335,12 +334,16 @@ export default function ManufacturerMessagesScreen() {
               <Feather name="info" size={16} color={theme.text} />
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start voice call' : 'Calls coming soon'} testID="manufacturer-voice-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
+          {callingEnabled ? (
+            <>
+          <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={'Start voice call'} testID="manufacturer-voice-call" style={s.headerBtn}>
             <Feather name="phone" size={16} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start video call' : 'Calls coming soon'} testID="manufacturer-video-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
+          <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={'Start video call'} testID="manufacturer-video-call" style={s.headerBtn}>
             <Feather name="video" size={16} color={theme.text} />
           </TouchableOpacity>
+            </>
+          ) : null}
         </View>
       }
     />
@@ -462,23 +465,6 @@ export default function ManufacturerMessagesScreen() {
                 <Feather name="chevron-right" size={16} color={theme.subtle} />
               </TouchableOpacity>
             ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Calls coming soon */}
-      <Modal visible={callsInfoOpen} transparent animationType="fade" onRequestClose={() => setCallsInfoOpen(false)}>
-        <Pressable style={[s.backdrop, { justifyContent: 'center', padding: SP.lg }]} onPress={() => setCallsInfoOpen(false)}>
-          <Pressable style={s.dialog} testID="calls-coming-soon">
-            <View style={s.dialogIcon}><Feather name="video" size={22} color={theme.text} /></View>
-            <Text style={s.dialogTitle}>Voice & video calls are coming soon</Text>
-            <Text style={s.dialogText}>
-              Until then, keep everything in this conversation. Photos, order cards and production updates stay in one place for you and {mfrName}.
-              {localTime ? `\n\nIt's ${localTime} for them right now.` : ''}
-            </Text>
-            <TouchableOpacity style={[s.dialogBtn, { backgroundColor: theme.accent }]} onPress={() => setCallsInfoOpen(false)}>
-              <Text style={[s.dialogBtnText, { color: theme.onAccent }]}>Got it</Text>
-            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>

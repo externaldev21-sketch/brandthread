@@ -26,6 +26,7 @@
  */
 
 import { Platform } from 'react-native';
+import { NAVIGATION_ISOLATION_TEST } from './buildFlags';
 import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
 
 // Use a new session key so the former buyer-first default does not keep an
@@ -59,8 +60,6 @@ export function setDevWebPreviewRole(role: PreviewRole): void {
     // The URL parameter remains a usable fallback without session storage.
   }
 }
-
-const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 /**
  * Hard gate, independent of EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST: the

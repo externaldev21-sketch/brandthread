@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
+import { ENABLE_TEST_SUBSCRIPTION_BYPASS } from '@/lib/buildFlags';
 
 export type PlanId = 'starter' | 'growth' | 'pro';
 
@@ -21,8 +22,7 @@ export type PlanId = 'starter' | 'growth' | 'pro';
  * The API still enforces paid access unless its separate server environment
  * switch is also enabled, so this client value can never grant entitlement.
  */
-export const ALLOW_TEST_SUBSCRIPTION_BYPASS =
-  __DEV__ && process.env.EXPO_PUBLIC_ENABLE_TEST_SUBSCRIPTION_BYPASS === 'true';
+export const ALLOW_TEST_SUBSCRIPTION_BYPASS = ENABLE_TEST_SUBSCRIPTION_BYPASS;
 
 // ─── Module-level state shared across all hook instances ──────────────────────
 

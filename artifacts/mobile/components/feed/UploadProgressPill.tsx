@@ -11,6 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, FS, SP } from '@/lib/theme';
+import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
 import {
   usePostUploadEntry, dismissPostUpload,
   startPostUpload, updatePostUploadProgress, completePostUpload, failPostUpload,
@@ -23,8 +24,7 @@ import {
 // param, which client-side routing can strip from the address bar by the
 // time this effect runs after a navigation; the env/dev-build check alone
 // is enough to stay inert in a real production build.
-const IS_TEST_BUILD = Platform.OS === 'web'
-  && (__DEV__ || process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1');
+const IS_TEST_BUILD = Platform.OS === 'web' && ALLOW_DEV_TOOLS;
 
 export function UploadProgressPill({ topInset }: { topInset: number }) {
   const entry = usePostUploadEntry();

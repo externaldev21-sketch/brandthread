@@ -6,6 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
+// The probe is a test-only route that redirects away in a production native
+// build (lib/buildFlags.ts); this suite exercises the test-enabled build.
+vi.mock('@/lib/buildFlags', () => ({ NAVIGATION_ISOLATION_TEST: true }));
+
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
