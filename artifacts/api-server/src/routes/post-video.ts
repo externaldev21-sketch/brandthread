@@ -625,7 +625,6 @@ router.get("/media/*path", async (req, res) => {
   if (!suffix || suffix.includes("..")) return res.status(404).end();
   try {
     const objectPath = `/objects/${suffix}`;
-    const mediaSuffix = `%/api/posts/media/${suffix}`;
     const [linkedPost] = await db
       .select({
         userId: posts.userId,
@@ -635,8 +634,11 @@ router.get("/media/*path", async (req, res) => {
       })
       .from(posts)
       .where(or(
-        sql`${posts.mediaUrl} LIKE ${mediaSuffix}`,
-        sql`${posts.thumbnailUrl} LIKE ${mediaSuffix}`,
+        // Equality on the path after /api/posts/media/, served by
+        // posts_media_path_expr_idx / posts_thumb_path_expr_idx (migration 112).
+        // The regex literal must match those index expressions exactly.
+        sql`substring(${posts.mediaUrl} from '/api/posts/media/(.+)$') = ${suffix}`,
+        sql`substring(${posts.thumbnailUrl} from '/api/posts/media/(.+)$') = ${suffix}`,
       ))
       .limit(1);
     const due = linkedPost?.postStatus === "scheduled" &&
