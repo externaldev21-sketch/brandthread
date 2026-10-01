@@ -198,6 +198,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Subscription', description: 'Manage your Brandthread seller plan', aliases: ['plan', 'billing', 'membership'], icon: 'star', route: '/subscription', audience: 'seller' },
       { label: 'Compare plans', description: 'See all available Brandthread plans', aliases: ['plans', 'upgrade', 'compare'], icon: 'trending-up', route: '/plans', audience: 'seller' },
+      { label: 'AI credits', description: 'Balance, credit packs and usage history', aliases: ['credits', 'ai', 'top up', 'usage'], icon: 'zap', route: '/ai-credits', audience: 'seller' },
     ],
   },
   {
