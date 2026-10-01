@@ -264,6 +264,15 @@ export interface Conversation {
   isFriendshipActive: boolean;  // buyer_to_buyer: false = new messages disabled
   isArchived: boolean;
   isRequest: boolean;
+  /** Who started this request — the userId of whichever participant's send
+   *  created it (server: conversations.requestedBy). Same value for every
+   *  viewer (this is a conversation-level column, not per-viewer), so the
+   *  CURRENT viewer is the sender iff this equals their own id/MY_USER_ID —
+   *  that's what tells a request-mode screen whether to show the Accept/
+   *  Delete/Block panel (I'm the recipient) or a "Sent as a request"
+   *  indicator (I'm the sender). Undefined once accepted (or for an
+   *  ordinary, never-a-request conversation). */
+  requestedBy?: string;
   contextOrderId?: string;
   contextOrderNumber?: string;
   contextOrderStatus?: string;
@@ -487,6 +496,7 @@ export type NotificationType =
   | 'order_confirmed' | 'order_processing' | 'order_production'
   | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
   | 'order_out_for_delivery' | 'order_exception' | 'order_returned_to_sender'
+  | 'order_preparing' | 'order_auto_refunded' | 'order_refund_warning'
   | 'return_update' | 'refund_update' | 'dispute_update'
   | 'product_restocked' | 'drop_live' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'

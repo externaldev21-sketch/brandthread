@@ -41,6 +41,8 @@ export const TARGET_LABELS: Record<ReportTargetType, string> = {
   product: 'product',
   profile: 'account',
   message: 'message',
+  community_message: 'message',
+  community: 'group',
 };
 
 export const TARGET_ICONS: Record<ReportTargetType, IconName> = {
@@ -53,6 +55,8 @@ export const TARGET_ICONS: Record<ReportTargetType, IconName> = {
   product: 'shopping-bag',
   profile: 'user',
   message: 'message-circle',
+  community_message: 'message-circle',
+  community: 'users',
 };
 
 /** Accept legacy and alias target names used by older routes. */
@@ -65,6 +69,7 @@ export function normalizeReportTarget(raw: string | null | undefined): ReportTar
       return 'message';
     case 'post': case 'video': case 'live': case 'live_comment': case 'comment':
     case 'story': case 'product': case 'profile': case 'message':
+    case 'community_message': case 'community':
       return raw;
     default:
       return 'post';

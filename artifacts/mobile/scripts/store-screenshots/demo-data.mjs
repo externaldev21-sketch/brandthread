@@ -665,6 +665,25 @@ export function respond({ method, path, query, role, options = {} }) {
   // boost only accepts video/2+-image slideshows), so an honest empty state
   // — no eligible posts yet, no active boosts — is the real answer here,
   // not fabricated boost data.
+  // Community discovery (signed-out read-only list): the six launch groups, same shape as
+  // GET /api/communities/public — the real seeded rows from migration 110.
+  if (p === '/communities/public') {
+    const launch = [
+      ['Graphic Design Community', 'graphic-design', 'pen-tool', 'Logos, type, layouts and print-ready files. Share work, get feedback.', 12480],
+      ['Photography & Content', 'photography-content', 'camera', 'Product shots, lookbooks, reels and everything content.', 8915],
+      ['Ads & Marketing', 'ads-marketing', 'trending-up', "What's converting, what's not, and the tactics behind it.", 10342],
+      ['Creative Direction', 'creative-direction', 'compass', 'Concepts, moodboards and building a brand people remember.', 5207],
+      ['Streetwear Founders', 'streetwear-founders', 'shopping-bag', 'Founders talking drops, pricing and growing a label.', 9861],
+      ['Sourcing & Manufacturing', 'sourcing-manufacturing', 'package', 'Factories, fabrics, samples and getting production right.', 6733],
+    ];
+    return {
+      communities: launch.map(([name, slug, iconKey, description, memberCount]) => ({
+        id: `launch-${slug}`, name, slug, description, iconKey, kind: 'official', verified: true, visibility: 'public',
+        requireApproval: false, memberCount, joined: false, role: null, muted: false, unreadCount: 0, createdAt: '2026-01-01T00:00:00.000Z',
+      })),
+      nextOffset: null,
+    };
+  }
   if (p === '/boosts/targets') return [];
   if (p === '/boosts/summary') return { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
   if (p === '/boosts') return [];
@@ -837,7 +856,11 @@ export function respond({ method, path, query, role, options = {} }) {
 
   // Public / buyer
   if (p === '/public/products/high-demand') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 6));
-  if (p === '/public/products') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? PUBLIC_PRODUCTS.length));
+  if (p === '/public/products') {
+    const ownerId = query.get('ownerId');
+    const list = ownerId ? PUBLIC_PRODUCTS.filter((item) => item.sellerId === ownerId) : PUBLIC_PRODUCTS;
+    return list.slice(0, Number(query.get('limit') ?? list.length));
+  }
   if (p === '/public/drops') return DROPS.map(publicDrop);
   if ((match = p.match(/^\/public\/drops\/([^/]+)$/))) return DROPS.map(publicDrop).find((d) => d.id === match[1]);
   if ((match = p.match(/^\/public\/drops\/[^/]+\/notify$/))) return { subscribed: false };
@@ -855,7 +878,7 @@ export function respond({ method, path, query, role, options = {} }) {
   // user's own social profile + posts through these — used only by
   // scripts/share-profile-1to1-screenshots.mjs for the share-profile
   // rebuild's live verification; not part of the shipped app.
-  if ((match = p.match(/^\/social\/profile\/([^/]+)$/))) {
+  if ((match = p.match(/^\/social\/profile\/([^/]+)$/)) && decodeURIComponent(match[1]) === 'me') {
     const user = role === 'seller' ? SELLER_USER : BUYER_USER;
     const p2 = profileFor(role);
     return {
@@ -972,7 +995,50 @@ export function respond({ method, path, query, role, options = {} }) {
       bio: p2.bio, website: null, username: p2.username, profileImageUrl: SELLER_USER.imageUrl,
       logoUrl: SELLER_USER.imageUrl, bannerUrl: null, category: null, tags: [], location: null,
       socialLinks: {}, contactEmail: null,
+      // Owner-only read: the plan chip comes from here and nowhere public.
+      subscriptionPlanId: 'growth', subscriptionStatus: 'active',
     };
+  }
+  // ── Profiles: public seller storefront, social profile card, tagged, videos ──
+  if ((match = p.match(/^\/public\/sellers\/([^/]+)$/))) {
+    const id = decodeURIComponent(match[1]);
+    if (id !== SELLER_USER.id && id !== BRANDS.northline.id) return undefined;
+    const products = PUBLIC_PRODUCTS.filter((item) => item.sellerId === SELLER_USER.id);
+    return {
+      profile: {
+        clerkId: SELLER_USER.id, brandName: 'Northline Studio', displayName: 'Maya Okafor', username: 'northlinestudio',
+        bio: 'Heavyweight basics, cut and sewn in Portland. New drop every season.', website: null,
+        profileImageUrl: SELLER_USER.imageUrl, avatarUrl: SELLER_USER.imageUrl, verified: true, accountType: 'seller',
+        brandType: 'clothing', vacationMode: false, productsCount: products.length, videosCount: 2, likesCount: 30200, followersCount: 24800, followingCount: 312,
+      },
+      products,
+      posts: [],
+    };
+  }
+  if ((match = p.match(/^\/social\/profile\/([^/]+)\/tagged$/))) {
+    const id = decodeURIComponent(match[1]);
+    if (id === SELLER_USER.id) {
+      return [
+        { id: 'tag_demo_1', authorId: BUYER_USER.id, authorName: 'Jordan Reyes', authorUsername: BUYER_USER.username, mediaUrl: img('look-mono'), thumbnailUrl: img('look-mono'), mediaType: 'photo', caption: 'Ember hoodie, finally', source: 'post' },
+        { id: 'tag_demo_2', authorId: BUYER_USER.id, authorName: 'Jordan Reyes', authorUsername: BUYER_USER.username, mediaUrl: img('texture-ember'), thumbnailUrl: img('texture-ember'), mediaType: 'photo', caption: 'Rust jacket weather', source: 'post' },
+        { id: 'tag_demo_story_1', authorId: BUYER_USER.id, authorName: 'Jordan Reyes', authorUsername: BUYER_USER.username, mediaUrl: img('look-mono'), thumbnailUrl: img('look-mono'), mediaType: 'story', caption: null, source: 'story' },
+      ];
+    }
+    return [];
+  }
+  if ((match = p.match(/^\/social\/profile\/([^/]+)$/))) {
+    const id = decodeURIComponent(match[1]);
+    if (id === SELLER_USER.id) {
+      return { userId: SELLER_USER.id, name: 'Northline Studio', username: 'northlinestudio', displayName: 'Maya Okafor', bio: null, avatarUrl: SELLER_USER.imageUrl, accountType: 'seller', initials: 'NS', color: '#2B2B30', handle: '@northlinestudio', followersCount: 24800, followingCount: 312, likesCount: 30200, postsCount: 2, isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false };
+    }
+    if (id === BUYER_USER.id) {
+      return { userId: BUYER_USER.id, name: 'Jordan Reyes', username: BUYER_USER.username, displayName: 'Jordan Reyes', bio: 'Thrift finds, tailoring, and the occasional grail.', avatarUrl: BUYER_USER.imageUrl, accountType: 'buyer', initials: 'JR', color: '#7A7A7A', handle: '@' + BUYER_USER.username, followersCount: 186, followingCount: 94, likesCount: 512, postsCount: 2, isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false };
+    }
+    return undefined;
+  }
+  if ((match = p.match(/^\/public\/users\/([^/]+)\/videos$/)) && decodeURIComponent(match[1]) === SELLER_USER.id) {
+    const videos = feedPosts().filter((post) => post.userId === SELLER_USER.id).map((post) => ({ ...post, authorAccountType: 'seller', viewsCount: 1200 }));
+    return { user: { userId: SELLER_USER.id, accountType: 'seller', displayName: 'Northline Studio', username: 'northlinestudio' }, restricted: null, total: videos.length, hasMore: false, videos };
   }
   if ((match = p.match(/^\/public\/products\/([^/]+)\/related$/))) return PUBLIC_PRODUCTS.filter((item) => item.id !== match[1]).slice(0, 5);
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);

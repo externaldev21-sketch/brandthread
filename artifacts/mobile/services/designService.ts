@@ -25,6 +25,7 @@ import {
   MockupToModelBatchResult,
   AIStyleKind, CampaignFormatKind, CampaignProject, CampaignAsset,
   DesignExport, ExportFormatKind, ExportSizeKind, GarmentType,
+  SceneStyleKind, ModelStyleKind, LightingStyleKind,
 } from './designTypes';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -1610,6 +1611,42 @@ export async function generatePhotoshoot(req: {
     mode: 'photoshoot',
   }, count);
   return makeResult(prompt, 'editorial' as AIStyleKind, imageUris);
+}
+
+// generatePhotoshootShot — one shot, with real per-slot progress (used by
+// design-ai-photoshoot.tsx's 2-screen rebuild). Unlike generatePhotoshoot()
+// above, this takes arbitrary product + creative-reference photo URIs
+// directly (no productId lookup) so the seller's own creative reference
+// photos — not just the product's existing images — drive the scene,
+// model, pose and lighting, per Dev's explicit spec. Reuses the existing,
+// unmodified /photography/generate endpoint (it already accepts a generic
+// `images` array): no backend changes needed for this.
+//
+// The endpoint currently caps the combined image count at a small number
+// (artifacts/api-server/src/routes/photography.ts's MAX_IMAGES = 4,
+// server-owned — not touched here). The 400 it returns if exceeded
+// surfaces as this function's rejection; see design-ai-photoshoot.tsx's
+// MAX_REFS comment for the resulting seller-facing-cap-vs-backend-cap gap,
+// flagged as needs-backend in the PR body.
+export async function generatePhotoshootShot(req: {
+  productImageUris: string[];
+  referenceUris: string[];
+  prompt?: string;
+  sceneStyle?: SceneStyleKind;
+  modelStyle?: ModelStyleKind;
+  lightingStyle?: LightingStyleKind;
+}): Promise<string> {
+  const allUris = [...req.productImageUris, ...req.referenceUris];
+  if (allUris.length === 0) throw new Error('Select at least one product photo.');
+  const images = await Promise.all(allUris.map(imageUriToDataUrl));
+  const describedPrompt = [
+    req.prompt?.trim(),
+    req.sceneStyle ? `Scene: ${req.sceneStyle}.` : '',
+    req.modelStyle ? `Model: ${req.modelStyle}.` : '',
+    req.lightingStyle ? `Lighting: ${req.lightingStyle}.` : '',
+    'Use the uploaded creative reference photos (if any) to match scene, model, pose, and lighting — preserve the product exactly (logo, print, color, fabric texture unchanged).',
+  ].filter(Boolean).join(' ');
+  return callGenerateAPI('/photography/generate', { images, prompt: describedPrompt, mode: 'photoshoot' });
 }
 
 // applyPromptEdit — accepts an object (used by design-prompt-edit.tsx)

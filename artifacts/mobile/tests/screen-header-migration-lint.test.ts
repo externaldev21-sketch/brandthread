@@ -160,7 +160,6 @@ function isRouteFile(full: string, entry: string): boolean {
 // yet reference useSafeAreaInsets/useHeaderTopInset/SafeAreaView anywhere.
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
-  'app/design-ai-photoshoot.tsx',
   'app/design-bg-replace.tsx',
   'app/help.tsx',
   'components/PlanUpsellModal.tsx',

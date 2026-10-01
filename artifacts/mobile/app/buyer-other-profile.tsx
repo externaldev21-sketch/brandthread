@@ -1,4 +1,13 @@
 /**
+ * A buyer's profile as seen by a VISITOR — the same ProfileShell as every
+ * other profile. Visitors get only: avatar, name, @username, followers /
+ * following, bio, highlights, Posts | Tagged, and Follow / Message / "...".
+ * Nothing private is ever rendered here (no orders, saved, Thread Cash,
+ * addresses, payments, activity, settings) and the public API never returns
+ * it. If the viewer IS this buyer (viewerId === ownerId) they are sent to
+ * their own owner profile instead; the owner's "View as visitor" preview
+ * opens this screen with `asVisitor=1` (it can only ever downgrade an owner).
+ *
  * Another buyer's profile — the same ProfileShell as every other profile,
  * filled with the buyer-to-buyer pieces: Follow / Follow back / Friends,
  * Message, stories, "Follows you", mute / restrict / report / block.
@@ -7,7 +16,7 @@
  * a non-friend sees a clear locked state instead of an empty grid.
  */
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, Text, Alert, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,16 +38,27 @@ import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
-  InteractionLayer, ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat,
+  InteractionLayer, ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
+import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
+import { taggedItemHref } from '@/services/profileService';
+import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
+import { Snackbar } from '@/components/ui/Snackbar';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
+
+type ContentTab = 'Posts' | 'Tagged';
+const CONTENT_TAB_ITEMS: ProfileTab[] = [
+  { key: 'Posts', label: 'Posts', icon: 'grid' },
+  { key: 'Tagged', label: 'Tagged', icon: 'tag' },
+];
 
 type RemoteProfile = {
   coverVideoUrl?: string | null;
@@ -46,7 +66,7 @@ type RemoteProfile = {
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
-  followersCount: number; followingCount: number;
+  followersCount: number; followingCount: number; likesCount?: number;
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
   postsCount: number;
@@ -63,8 +83,9 @@ export default function BuyerOtherProfileScreen() {
   const { userId: currentUserId } = useAuth();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   const params  = useLocalSearchParams<{
-    userId: string; name: string; handle: string; initials: string; color: string;
+    userId: string; name: string; handle: string; initials: string; color: string; asVisitor?: string;
   }>();
+  const previewAsVisitor = isVisitorPreviewParam(params.asVisitor);
 
   // In dev-preview (including a Clerk-stubbed audit/e2e session) these
   // params can be the audit's own generic synthetic fallback (its
@@ -101,7 +122,19 @@ export default function BuyerOtherProfileScreen() {
   const isMutual      = profile?.isMutual     ?? false;
   const iBlockedThem  = profile?.iBlockedThem ?? false;
 
-  const videos = useCreatorVideos(canonicalReady && !iBlockedThem ? canonicalUserId : null);
+  const videos = useCreatorVideos(canonicalReady && !iBlockedThem ? canonicalUserId : null, { asVisitor: previewAsVisitor });
+
+  // Mode is decided by id alone. The owner lands on their own profile (with
+  // their private tabs) — this screen is only ever the visitor view, apart
+  // from the owner's explicit "View as visitor" preview.
+  const mode = resolveProfileMode({ viewerId: currentUserId, ownerId: canonicalReady ? canonicalUserId : null, previewAsVisitor });
+  const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
+  const [snackbar, setSnackbar] = useState('');
+  const devPreview = isBuyerDevPreview() || isSellerDevPreview();
+  const tagged = useTaggedPosts(canonicalReady ? canonicalUserId : null, activeTab === 'Tagged' && !!currentUserId && !devPreview && !iBlockedThem);
+  useEffect(() => {
+    if (mode === 'owner') router.replace('/(buyer)/profile' as never);
+  }, [mode, router]);
 
   // ── Load profile + stories ─────────────────────────────────────────────────
   const loadProfile = useCallback(async () => {
@@ -218,6 +251,24 @@ export default function BuyerOtherProfileScreen() {
     }
   };
 
+  const handleShare = () => {
+    setMoreSheetOpen(false);
+    const username = profile?.username;
+    const url = username ? buildCanonicalProfileUrl(username) : null;
+    if (!url) {
+      if (Platform.OS !== 'web') void Share.share({ message: `Check out ${displayName} on Brandthread` }).catch(() => {});
+      return;
+    }
+    void shareLinkWithFallback({
+      url,
+      message: `Check out ${displayName} on Brandthread:`,
+      platformOS: Platform.OS,
+      nativeShare: (content) => Share.share(content),
+      webNavigator: typeof navigator !== 'undefined' ? (navigator as any) : null,
+    })
+      .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
+      .catch(() => {});
+  };
   const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
   const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
   const handleBlock = async () => {
@@ -249,10 +300,24 @@ export default function BuyerOtherProfileScreen() {
     router.push(profileVideosHref({ source: 'creator', id: canonicalUserId, startPostId: item.id, title: displayName }) as never);
   }, [canonicalUserId, displayName, router]);
 
-  const gridItems = useMemo(() => videos.posts.map(gridItemFromThreadPost), [videos.posts]);
+  const postItems = useMemo(() => videos.posts.map(gridItemFromThreadPost), [videos.posts]);
+  const taggedItems = useMemo<ProfileGridItem[]>(() => tagged.items.map((entry) => ({
+    id: entry.id,
+    kind: entry.mediaType === 'video' ? 'video' : entry.mediaType === 'slideshow' ? 'slideshow' : 'photo',
+    posterUri: entry.posterUri,
+    caption: entry.caption ?? '',
+    productCount: 0,
+  })), [tagged.items]);
+  const gridItems = activeTab === 'Tagged' ? taggedItems : postItems;
+  const openTagged = useCallback((item: ProfileGridItem) => {
+    const entry = tagged.items.find((candidate) => candidate.id === item.id);
+    if (!entry) return;
+    hapticSelection();
+    router.push(taggedItemHref(entry) as never);
+  }, [router, tagged.items]);
   const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
-    <ProfileVideoTile item={item} index={index} width={layout.tileWidth} height={layout.tileHeight} onPress={openVideo} />
-  ), [layout.tileHeight, layout.tileWidth, openVideo]);
+    <ProfileVideoTile item={item} index={index} width={layout.tileWidth} height={layout.tileHeight} onPress={activeTab === 'Tagged' ? openTagged : openVideo} />
+  ), [activeTab, layout.tileHeight, layout.tileWidth, openTagged, openVideo]);
 
   const goBack = () => {
     if (router.canGoBack()) goBackOr(router);
@@ -273,6 +338,9 @@ export default function BuyerOtherProfileScreen() {
       key: 'following', label: 'Following', value: formatCompactCount(profile?.followingCount ?? 0),
       onPress: canonicalReady ? () => router.push(connectionsHref('following', canonicalUserId) as never) : undefined,
     },
+    ...(typeof profile?.likesCount === 'number'
+      ? [{ key: 'likes', label: 'Likes', value: formatCompactCount(profile.likesCount) } as ProfileStat]
+      : []),
   ];
 
   const meta = (
@@ -297,6 +365,15 @@ export default function BuyerOtherProfileScreen() {
           )}
         />
       ) : null}
+      {previewAsVisitor ? (
+        <View style={styles.blockedBanner} testID="buyer-profile-visitor-preview">
+          <Feather name="eye" size={16} color={theme.text} />
+          <Text style={styles.blockedBannerText}>You’re viewing your profile as a visitor</Text>
+          <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Exit visitor view" testID="buyer-profile-exit-preview">
+            <Text style={styles.blockedBannerAction}>Exit</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {iBlockedThem ? (
         <PressableScale
           onPress={handleBlock}
@@ -315,7 +392,7 @@ export default function BuyerOtherProfileScreen() {
     </ProfileMeta>
   );
 
-  const followDisabled = !canonicalReady || followLoading || iBlockedThem;
+  const followDisabled = !canonicalReady || followLoading || iBlockedThem || previewAsVisitor;
   const actions = (
     <>
       <View style={styles.actionRow}>
@@ -334,7 +411,8 @@ export default function BuyerOtherProfileScreen() {
           label={msgLoading ? 'Opening…' : 'Message'}
           icon="message-circle"
           onPress={handleMessage}
-          disabled={msgLoading || !canonicalReady || iBlockedThem}
+          disabled={msgLoading || !canonicalReady || iBlockedThem || previewAsVisitor}
+          testID="buyer-profile-message"
         />
       </View>
       <View style={styles.actionRow}>
@@ -372,23 +450,31 @@ export default function BuyerOtherProfileScreen() {
             posterUri: gridItems.find((item) => item.posterUri)?.posterUri ?? null,
           }}
         topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
+        // No inbox shortcut here: that is the owner's own messages, not part of
+        // someone else's profile. The "..." opens Share / Mute / Report / Block.
         topRight={(
           <ProfileGlassButton
-            icon="message-circle"
-            onPress={() => { hapticLight(); router.navigate('/(buyer)/inbox' as never); }}
-            accessibilityLabel="Messages"
+            icon="more-horizontal"
+            onPress={() => { hapticSelection(); setMoreSheetOpen(true); }}
+            accessibilityLabel="Profile options"
+            testID="buyer-other-profile-more"
           />
         )}
         meta={meta}
         stats={stats}
         statsLoading={!apiLoaded}
         actions={actions}
-        section={{ label: 'Posts', count: videos.restricted ? undefined : videos.total }}
+        tabsVariant="iconOnly"
+        tabs={{
+          items: CONTENT_TAB_ITEMS,
+          active: activeTab,
+          onChange: (key) => { hapticSelection(); setActiveTab(key === 'Tagged' ? 'Tagged' : 'Posts'); },
+        }}
         data={gridItems}
         renderItem={renderTile}
         keyExtractor={(item) => item.id}
         numColumns={layout.gridColumns}
-        listKey={`buyer-other-${layout.gridColumns}`}
+        listKey={`buyer-other-${activeTab}-${layout.gridColumns}`}
         ListEmptyComponent={
           loadFailed && apiLoaded ? (
             <ProfileGridPlaceholder
@@ -397,6 +483,17 @@ export default function BuyerOtherProfileScreen() {
               onRetry={() => { setApiLoaded(false); void loadProfile(); }}
               layout={layout}
               title="Couldn't load this profile"
+            />
+          ) : activeTab === 'Tagged' ? (
+            <ProfileGridPlaceholder
+              loading={!apiLoaded || tagged.loading}
+              error={tagged.error}
+              onRetry={() => { void tagged.reload(); }}
+              layout={layout}
+              icon="tag"
+              title={iBlockedThem ? 'Tagged posts hidden' : 'No tagged posts'}
+              description={profileEmptyState('buyer:tagged', false).message}
+              testID="buyer-other-profile-tagged-empty"
             />
           ) : (
             <ProfileGridPlaceholder
@@ -415,11 +512,13 @@ export default function BuyerOtherProfileScreen() {
           )
         }
         ListFooterComponent={<ProfileGridFooter loadingMore={videos.loadingMore} />}
-        onEndReached={videos.loadMore}
+        onEndReached={activeTab === 'Posts' ? videos.loadMore : undefined}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         bottomInset={barInset}
       />
+
+      <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
 
       {/* ── More options sheet ── */}
       <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
@@ -434,6 +533,8 @@ export default function BuyerOtherProfileScreen() {
             <View style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
               <View style={styles.moreHandle} />
               <Text style={styles.moreTitle}>{displayName}</Text>
+              <MoreRow icon="share-2" label="Share profile" onPress={handleShare} />
+              <View style={styles.moreDivider} />
               <MoreRow icon="volume-x" label="Mute" onPress={handleMute} />
               <View style={styles.moreDivider} />
               <MoreRow icon="user-x" label="Restrict" onPress={handleRestrict} />

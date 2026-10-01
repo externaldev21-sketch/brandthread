@@ -18,19 +18,19 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { useAuth } from '@clerk/expo';
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
+import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticTabChange } from '@/lib/haptics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { TabBarGlassZone } from '@/components/buyer-nav/TabBarGlassZone';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
   useTabBarActiveIndex,
@@ -182,14 +182,16 @@ interface SellerGlobalTabBarProps {
   hidden?: boolean;
 }
 
-export function SellerGlobalTabBar({ onOpenStudio, hidden = false }: SellerGlobalTabBarProps) {
+export function SellerGlobalTabBar({ onOpenStudio, hidden: hiddenProp = false }: SellerGlobalTabBarProps) {
+  // Also slides away for any screen with a bottom composer (useHideTabBar).
+  const hiddenByScreen = useTabBarHiddenByScreen();
+  const hidden = hiddenProp || hiddenByScreen;
   const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
-  const { width } = useWindowDimensions();
 
   const activeTab = getActiveTab(segments as string[]);
   const activeIndex = TABS.findIndex((tabDef) => tabDef.name === activeTab);
@@ -327,22 +329,6 @@ export function SellerGlobalTabBar({ onOpenStudio, hidden = false }: SellerGloba
       style={[styles.bar, { bottom: metrics.bottomOffset, gap: metrics.gap }, slideStyle]}
       testID="seller-global-tab-bar"
     >
-      {/* Frosted glass over whatever's actually rendered behind the bar —
-          same shared treatment as the buyer side's BuyerTabBar, and for the
-          same reason: this component is the one shared tab-bar container
-          mounted once for the whole seller shell (SellerNavigationShell,
-          below), so rendering the glass here gets Dashboard/Products/
-          Orders/Profile the same live-sampled frosted strip with no
-          per-screen wiring. See BuyerTabBar for why `bottom`/`height` are
-          computed this way (glass reaches the true screen bottom edge and
-          its own top lands exactly on the bar's top pixel). */}
-      <TabBarGlassZone
-        height={metrics.barTopInset}
-        width={width}
-        tint="dark"
-        style={{ bottom: -metrics.bottomOffset }}
-      />
-
       <TabBarCircle
         theme={theme}
         size={metrics.circleSize}

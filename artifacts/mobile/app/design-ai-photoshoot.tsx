@@ -1,1263 +1,557 @@
 /**
  * Brandthread Design Studio — AI Photoshoot
  * Route: /design-ai-photoshoot
+ *
+ * Rebuilt to exactly two screens (setup, results), per Dev's spec — no
+ * step-dot stepper, a thin white progress bar instead that glides
+ * 0->50%->100% across the two screens. Reuses the AI-tools family's
+ * shared pieces (components/ai-tools/*, lib/aiToolMedia.ts) — the same
+ * results grid/viewer, save/share logic, reference-photo tiles, and
+ * button system as Mockup to Model and Remove Background, per Dev's
+ * explicit shared-components ask (these tools may merge later; sharing
+ * the components now makes that a routing change, not a rewrite).
  */
-import React, { useState, useEffect } from 'react';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { goBackOr } from '@/lib/navigation/goBackOr';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Dimensions, Image, Modal, FlatList,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
+  ActivityIndicator, Alert, Image, FlatList,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BrandthreadScreen, BrandthreadHeader, GradientCard,
-} from '@/components/BrandthreadUI';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
-  BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  MODEL_STYLES, SCENE_STYLES, LIGHTING_STYLES,
-  ModelStyleKind, SceneStyleKind, LightingStyleKind, ImageRatioKind,
-} from '@/services/designTypes';
-import {
-  generatePhotoshoot, GeneratePhotoshootResult, createBrandAsset,
-} from '@/services/designService';
-import { getProducts, updateProduct } from '@/services/productService';
-import type { Product, ProductMedia } from '@/services/productTypes';
-import { useApi } from '@/hooks/useApi';
-import { WEB_INPUT_RESET } from '@/lib/inputReset';
-import { File, Paths } from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { saveImageToCameraRoll, saveAllToCameraRoll, shareImage } from '@/lib/aiToolMedia';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { AiToolProgressBar } from '@/components/ai-tools/AiToolProgressBar';
+import { AiPrimaryButton, AiButtonDock, AiSecondaryButton } from '@/components/ai-tools/AiToolButtons';
+import { ReferencePhotoTiles } from '@/components/ai-tools/ReferencePhotoTiles';
+import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
+import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
+import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+import { MODEL_STYLES, SCENE_STYLES, ImageRatioKind, ModelStyleKind, SceneStyleKind } from '@/services/designTypes';
+import { generatePhotoshootShot, createBrandAsset } from '@/services/designService';
+import { getProducts, updateProduct } from '@/services/productService';
+import type { Product } from '@/services/productTypes';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
-const { width: SW } = Dimensions.get('window');
-const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
-
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
-
-const IMAGE_RATIOS: { value: ImageRatioKind; label: string }[] = [
-  { value: '9:16', label: '9:16' },
-  { value: '4:5', label: '4:5' },
+const MAX_REFS = 6; // seller-facing cap. NOTE: combined with product photos,
+// the real generate call can still be rejected by the backend's own,
+// smaller total-image cap (artifacts/api-server/src/routes/photography.ts's
+// MAX_IMAGES = 4, server-owned, not touched here) — see handleGenerate's
+// catch. Flagged as a needs-backend item in the PR body: the seller-facing
+// "up to 6 references" UI exceeds what the server will actually accept
+// once product photos are added in too.
+const SHOT_COUNTS = [1, 2, 4];
+const RATIOS: { value: ImageRatioKind; label: string }[] = [
   { value: '1:1', label: '1:1' },
-  { value: '3:4', label: '3:4' },
+  { value: '4:5', label: '4:5' },
+  { value: '9:16', label: '9:16' },
 ];
 
-const OUTPUT_FORMATS = [
-  { value: 'product_page', label: 'Product page', icon: 'package' },
-  { value: 'campaign', label: 'Campaign', icon: 'trending-up' },
-  { value: 'story', label: 'Story', icon: 'smartphone' },
-  { value: 'thread_post', label: 'Thread post', icon: 'message-square' },
-  { value: 'lookbook', label: 'Lookbook', icon: 'book-open' },
-  { value: 'ad_creative', label: 'Ad creative', icon: 'zap' },
-] as const;
-
-type OutputFormat = typeof OUTPUT_FORMATS[number]['value'];
-type ProductOption = { id: string; name: string; images?: string[]; status?: string };
-
-
 export default function AIPhotoshootScreen() {
-  const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
-  const s = createStyles(theme);
+  useHideTabBar();
   const router = useRouter();
-  const api = useApi();
-  const [step, setStep] = useState<Step>(1);
+  const insets = useSafeAreaInsets();
 
-  // Step 1
-  const [productSearch, setProductSearch] = useState('');
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [products, setProducts] = useState<ProductOption[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  // Step 2
-  const [modelStyle, setModelStyle] = useState<ModelStyleKind>('female');
-  // Step 3
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Screen 1 state
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [refUris, setRefUris] = useState<string[]>([]);
+  const [prompt, setPrompt] = useState('');
   const [sceneStyle, setSceneStyle] = useState<SceneStyleKind>('studio');
-  // Step 4
-  const [lightingStyle, setLightingStyle] = useState<LightingStyleKind>('natural');
-  // Step 5
-  const [outputFormat, setOutputFormat] = useState<OutputFormat>('product_page');
-  const [count, setCount] = useState(4);
-  const [imageRatio, setImageRatio] = useState<ImageRatioKind>('4:5');
+  const [modelStyle, setModelStyle] = useState<ModelStyleKind>('female');
+  const [ratio, setRatio] = useState<ImageRatioKind>('4:5');
+  const [shotCount, setShotCount] = useState(2);
 
-  // Generation
+  // Results state
+  const [slots, setSlots] = useState<AiResultSlot[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCount, setGeneratedCount] = useState(0);
-  const [results, setResults] = useState<GeneratePhotoshootResult | null>(null);
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [libraryIndex, setLibraryIndex] = useState<number | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const requestRef = useRef<{ productImageUris: string[]; refUris: string[] } | null>(null);
 
-  // Multi-select for results
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Product picker source photos
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
+  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
+  const [pickerImageUri, setPickerImageUri] = useState<string | null>(null);
 
-  function toggleSelect(idx: number) {
-    setSelected(prev => {
+  useMemo(() => {
+    getProducts().then(setProducts).catch(() => setProducts([]));
+  }, []);
+
+  function toggleProduct(id: string) {
+    setSelectedProductIds(prev => {
       const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
-  useEffect(() => {
-    let active = true;
-    setLoadingProducts(true);
-    api.products.list()
-      .then((rows) => {
-        if (active) setProducts(Array.isArray(rows) ? rows as ProductOption[] : []);
-      })
-      .catch(() => {
-        if (active) setProducts([]);
-      })
-      .finally(() => {
-        if (active) setLoadingProducts(false);
+  async function pickReferences() {
+    const remaining = MAX_REFS - refUris.length;
+    if (remaining <= 0) {
+      Alert.alert('Maximum reached', `You can add at most ${MAX_REFS} reference photos.`);
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.92,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+    });
+    if (!res.canceled && res.assets.length > 0) {
+      setRefUris(prev => [...prev, ...res.assets.map(a => a.uri)].slice(0, MAX_REFS));
+    }
+  }
+
+  function removeRef(index: number) {
+    setRefUris(prev => prev.filter((_, i) => i !== index));
+  }
+
+  async function pickUploadInsteadOfProduct() {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.92,
+      allowsMultipleSelection: true,
+      selectionLimit: 4,
+    });
+    if (!res.canceled && res.assets.length > 0) {
+      setUploadedProductUris(prev => [...prev, ...res.assets.map(a => a.uri)].slice(0, 4));
+    }
+  }
+  const [uploadedProductUris, setUploadedProductUris] = useState<string[]>([]);
+
+  const selectedProducts = useMemo(
+    () => (products ?? []).filter(p => selectedProductIds.has(p.id)),
+    [products, selectedProductIds],
+  );
+  const productImageUris = useMemo(() => {
+    const fromProducts = selectedProducts.flatMap(p => (p.media ?? []).slice(0, 1).map(m => m.uri));
+    return [...fromProducts, ...uploadedProductUris];
+  }, [selectedProducts, uploadedProductUris]);
+
+  const canGenerate = productImageUris.length > 0;
+
+  async function handleGenerate() {
+    if (!canGenerate) {
+      Alert.alert('Choose a product', 'Select at least one product photo, or upload one, first.');
+      return;
+    }
+    if (isSellerDevPreview()) {
+      Alert.alert(
+        'Sign in required',
+        'Generating AI photoshoot photos requires a real seller account.\n\nSign in to a Brandthread seller account to continue.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+
+    requestRef.current = { productImageUris, refUris };
+    const initialSlots: AiResultSlot[] = Array.from({ length: shotCount }, (_, i) => ({
+      id: i,
+      status: 'generating',
+      sourceUri: productImageUris[0],
+      label: `Shot ${i + 1}`,
+    }));
+    setSlots(initialSlots);
+    setIsGenerating(true);
+    setStep(2);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const results = await Promise.allSettled(
+      initialSlots.map(() => generatePhotoshootShot({
+        productImageUris, referenceUris: refUris, prompt, sceneStyle, modelStyle,
+      })),
+    );
+    setSlots(prev => prev.map((slot, i) => {
+      const r = results[i];
+      if (r.status === 'fulfilled') return { ...slot, status: 'done', imageUri: r.value };
+      return { ...slot, status: 'failed', error: r.reason?.message ?? 'Generation failed. Please try again.' };
+    }));
+    setIsGenerating(false);
+  }
+
+  async function handleRetryOne(id: number) {
+    const req = requestRef.current;
+    if (!req) return;
+    setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'generating', error: undefined } : s));
+    try {
+      const uri = await generatePhotoshootShot({
+        productImageUris: req.productImageUris, referenceUris: req.refUris, prompt, sceneStyle, modelStyle,
       });
-    return () => { active = false; };
-  }, [api]);
-
-  async function saveDataUriToDevice(dataUri: string): Promise<void> {
-    const MediaLibrary = await import('expo-media-library');
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow photo library access to save images.');
-      return;
+      setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'done', imageUri: uri } : s));
+    } catch (err: any) {
+      setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'failed', error: err?.message ?? 'Retry failed. Please try again.' } : s));
     }
-    const b64 = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
-    const file = new File(Paths.cache, `photoshoot_${Date.now()}.png`);
-    file.write(b64, { encoding: 'base64' });
-    await MediaLibrary.saveToLibraryAsync(file.uri);
   }
 
-  async function handleSaveAll(imageUris: string[]): Promise<void> {
-    const realUris = imageUris.filter(u => u.startsWith('data:'));
-    if (realUris.length === 0) {
-      Alert.alert('Nothing to save', 'Generate images first.');
-      return;
-    }
+  const doneSlots = useMemo(() => slots.filter(sl => sl.status === 'done' && sl.imageUri), [slots]);
+
+  async function handleSaveSlot(id: number, imageUri: string) {
+    setSavingIndex(id);
+    const result = await saveImageToCameraRoll(imageUri, 'ai-photoshoot');
+    setSavingIndex(null);
+    if (result.ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else if (result.reason === 'permission') Alert.alert('Permission required', 'Allow photo library access to save this image.');
+    else Alert.alert('Download failed', 'Could not save this image. Please try again.');
+  }
+
+  async function handleSaveAll() {
+    const uris = doneSlots.map(sl => sl.imageUri!);
+    if (uris.length === 0) return;
+    setSavingAll(true);
+    const { failed, succeeded } = await saveAllToCameraRoll(uris, 'ai-photoshoot');
+    setSavingAll(false);
+    if (failed === 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else Alert.alert('Some downloads failed', `${succeeded} of ${uris.length} photos saved.`);
+  }
+
+  async function handleSaveToLibrary(id: number, imageUri: string) {
+    setLibraryIndex(id);
     try {
-      await Promise.all(realUris.map(uri => saveDataUriToDevice(uri)));
-      Alert.alert('Saved', `${realUris.length} photo${realUris.length !== 1 ? 's' : ''} saved to your photo library.`);
+      await createBrandAsset({ name: `AI Photoshoot #${id + 1}`, type: 'photo', uri: imageUri, tags: ['ai-generated', 'photoshoot'] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Saved to your design library.');
     } catch {
-      Alert.alert('Save failed', 'Could not save all images. Please try again.');
+      Alert.alert('Save failed', 'Could not save to your library. Please try again.');
+    } finally {
+      setLibraryIndex(null);
     }
   }
 
-  async function handleSaveSelected(imageUris: string[], selectedSet: Set<number>): Promise<void> {
-    if (selectedSet.size === 0) {
-      Alert.alert('Nothing selected', 'Tap photos to select them first.');
-      return;
-    }
-    const toSave = Array.from(selectedSet).map(i => imageUris[i]).filter(u => u?.startsWith('data:'));
-    if (toSave.length === 0) {
-      Alert.alert('Nothing to save', 'Selected images are not yet generated.');
-      return;
-    }
-    try {
-      await Promise.all(toSave.map(uri => saveDataUriToDevice(uri)));
-      Alert.alert('Saved', `${toSave.length} photo${toSave.length !== 1 ? 's' : ''} saved to your photo library.`);
-    } catch {
-      Alert.alert('Save failed', 'Could not save images. Please try again.');
-    }
-  }
-
-  // Result actions: Add to Product / Seller post / Store Builder / Campaign
-  const [showProductPicker, setShowProductPicker] = useState(false);
-  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
-  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
-
-  function imagesToUse(): string[] {
-    if (!results) return [];
-    const uris = selected.size > 0
-      ? Array.from(selected).map(i => results.imageUris[i])
-      : results.imageUris;
-    return uris.filter(u => !!u);
-  }
-
-  async function handleAddToProduct() {
-    if (imagesToUse().length === 0) {
-      Alert.alert('Nothing to add', 'Generate or select photos first.');
-      return;
-    }
+  async function handleUseAsProduct(imageUri: string) {
+    setPickerImageUri(imageUri);
     setLoadingPickerProducts(true);
     try {
       const all = await getProducts();
       const active = all.filter(p => p.status !== 'archived');
       if (active.length === 0) {
-        Alert.alert('No products', 'Create a product first, then add these photos to its media gallery.');
+        Alert.alert('No products', 'Create a product first, then use this photo as its product photo.');
         return;
       }
       setPickerProducts(active);
       setShowProductPicker(true);
-    } catch {
-      Alert.alert('Couldn’t load products', 'Try again.');
     } finally {
       setLoadingPickerProducts(false);
     }
   }
 
-  async function confirmAddToProduct(product: Product) {
+  async function confirmUseAsProduct(product: Product) {
     setShowProductPicker(false);
-    const uris = imagesToUse();
-    try {
-      const existing = product.media ?? [];
-      const newMedia: ProductMedia[] = uris.map((uri, i) => ({
-        id: `photoshoot-${Date.now()}-${i}`,
-        type: 'image',
-        uri,
-        altText: 'AI photoshoot image',
-        isCover: false,
-        sortOrder: existing.length + i,
-        createdAt: new Date().toISOString(),
-      }));
-      const updated = await updateProduct(product.id, { media: [...existing, ...newMedia] });
-      if (updated) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Added', `${uris.length} photo${uris.length === 1 ? '' : 's'} added to "${product.name ?? 'product'}".`);
-      } else {
-        Alert.alert('Couldn’t update product', 'Try again.');
-      }
-    } catch {
-      Alert.alert('Couldn’t add to product', 'Try again.');
+    const uri = pickerImageUri;
+    if (!uri) return;
+    const existing = product.media ?? [];
+    const updated = await updateProduct(product.id, {
+      media: [...existing, { id: `photoshoot-${Date.now()}`, type: 'image', uri, altText: 'AI photoshoot photo', isCover: true, sortOrder: existing.length, createdAt: new Date().toISOString() }],
+    }).catch(() => null);
+    if (updated) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Set', `"${product.name ?? 'Product'}" now uses this as its product photo.`);
+    } else {
+      Alert.alert("Couldn't update product", 'Try again.');
     }
   }
 
-  async function handleSaveToBrandAssets(tags: string[]): Promise<boolean> {
-    const uris = imagesToUse();
-    if (uris.length === 0) {
-      Alert.alert('Nothing to save', 'Generate or select photos first.');
-      return false;
-    }
-    try {
-      await Promise.all(uris.map((uri, i) => createBrandAsset({
-        name: `Photoshoot ${new Date().toLocaleDateString()} ${i + 1}`,
-        type: 'photo',
-        uri,
-        tags,
-      })));
-      return true;
-    } catch {
-      Alert.alert('Couldn’t save', 'Try again.');
-      return false;
-    }
-  }
+  // ─── Screen 2: results ───────────────────────────────────────────────────
 
-  async function handleSellerPost() {
-    const ok = await handleSaveToBrandAssets(['photoshoot', 'content-asset']);
-    if (!ok) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Saved to Brand Assets',
-      'Open the post composer and select these photos from the asset picker.',
-      [{ text: 'Open composer', onPress: () => router.push('/create-post' as never) }, { text: 'OK' }],
-    );
-  }
+  if (step === 2) {
+    const allDone = slots.every(sl => sl.status === 'done' || sl.status === 'failed');
+    const successCount = slots.filter(sl => sl.status === 'done').length;
 
-  async function handleStoreBuilder() {
-    const ok = await handleSaveToBrandAssets(['photoshoot', 'store-asset']);
-    if (!ok) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Saved to Brand Assets',
-      'Open Store Builder and select these photos from the asset picker.',
-      [{ text: 'Open Store Builder', onPress: () => router.push('/store-builder' as never) }, { text: 'OK' }],
-    );
-  }
-
-  async function handleCampaign() {
-    const ok = await handleSaveToBrandAssets(['photoshoot', 'campaign-asset']);
-    if (!ok) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Saved to Brand Assets',
-      'Open Create ad and select these photos as your creative.',
-      [{ text: 'Open Create ad', onPress: () => router.push('/design-campaign' as never) }, { text: 'OK' }],
-    );
-  }
-
-  async function handleGenerate() {
-    setIsGenerating(true);
-    setGeneratedCount(0);
-
-    try {
-      const result = await generatePhotoshoot({
-        productId: selectedProductId,
-        modelStyle,
-        sceneStyle,
-        lightingStyle,
-        outputFormat,
-        imageRatio,
-        count,
-      });
-      // generatePhotoshoot resolves all images together (no per-image
-      // completion signal is exposed), so once it resolves we know the
-      // full count finished — this is not a fake timer, just a single jump.
-      setGeneratedCount(result.imageUris.length);
-      setResults(result);
-      setSelected(new Set());
-    } catch (error: any) {
-      Alert.alert('Generation failed', error?.message || 'Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  function goBack() {
-    if (step > 1) setStep((step - 1) as Step);
-    else goBackOr(router);
-  }
-
-  function goNext() {
-    if (step === 1 && !selectedProductId) {
-      Alert.alert('Choose a product', 'Select a product with at least one photo for the AI photoshoot.');
-      return;
-    }
-    if (step < 6) setStep((step + 1) as Step);
-  }
-
-  // Step indicator
-  function StepBar() {
     return (
-      <View style={s.stepBar}>
-        {([1, 2, 3, 4, 5, 6] as Step[]).map(n => (
-          <View key={n} style={s.stepBarItem}>
-            <View style={[s.stepDot, step >= n && s.stepDotActive]}>
-              <Text style={[s.stepDotNum, step >= n && s.stepDotNumActive]}>{n}</Text>
-            </View>
-            {n < 6 && <View style={[s.stepConnector, step > n && s.stepConnectorActive]} />}
+      <View style={s.root}>
+        <ScreenHeader title="Photoshoot" onBack={() => setStep(1)} />
+        <AiToolProgressBar step={2} />
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + SP.xxl }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={s.progressBar}>
+            {!allDone ? (
+              <>
+                <ActivityIndicator size="small" color={FG} />
+                <Text style={s.progressText}>Generating {slots.filter(sl => sl.status === 'generating').length} shot{slots.filter(sl => sl.status === 'generating').length !== 1 ? 's' : ''}…</Text>
+              </>
+            ) : (
+              <>
+                <Feather name="check-circle" size={ICON.sm} color={FG} />
+                <Text style={[s.progressText, { color: FG }]}>{successCount} shot{successCount !== 1 ? 's' : ''} ready</Text>
+              </>
+            )}
           </View>
-        ))}
+
+          <AiResultsGrid
+            slots={slots}
+            onOpen={(id) => setViewerIndex(doneSlots.findIndex(d => d.id === id))}
+            onRetry={handleRetryOne}
+            onSaveToLibrary={handleSaveToLibrary}
+            onDownload={handleSaveSlot}
+            onUseAsProduct={handleUseAsProduct}
+            savingId={savingIndex}
+            libraryId={libraryIndex}
+          />
+
+          <View style={s.footerRow}>
+            {doneSlots.length > 0 && (
+              <AiPrimaryButton label={`Save all (${doneSlots.length})`} icon="download" onPress={handleSaveAll} loading={savingAll} />
+            )}
+            <AiSecondaryButton label="Back to setup" icon="arrow-left" variant="outline" onPress={() => setStep(1)} />
+          </View>
+        </ScrollView>
+
+        <AiResultViewer
+          visible={viewerIndex !== null}
+          items={doneSlots}
+          index={viewerIndex ?? 0}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewerIndex(null)}
+          actions={[
+            { icon: 'bookmark', label: 'Library', onPress: (item) => handleSaveToLibrary(item.id, item.imageUri!), loading: (item) => libraryIndex === item.id },
+            { icon: 'download', label: 'Save', onPress: (item) => handleSaveSlot(item.id, item.imageUri!), loading: (item) => savingIndex === item.id },
+            { icon: 'share', label: 'Share', onPress: (item) => shareImage(item.imageUri!, 'ai-photoshoot') },
+            { icon: 'package', label: 'Product', onPress: (item) => handleUseAsProduct(item.imageUri!) },
+            { icon: 'refresh-cw', label: 'Redo', onPress: (item) => handleRetryOne(item.id) },
+          ]}
+        />
+
+        <ProductPickerModal
+          visible={showProductPicker}
+          loading={loadingPickerProducts}
+          products={pickerProducts}
+          onClose={() => setShowProductPicker(false)}
+          onSelect={confirmUseAsProduct}
+        />
       </View>
     );
   }
 
-  // ─── Results screen ──────────────────────────────────────────────────────────
-  if (results) {
-    const selectedArr = Array.from(selected);
-    return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Photoshoot results" onBack={() => { setResults(null); setStep(6); }} />
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={s.content}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={s.resultsMeta}>
-            {results.imageUris.length} photos · {MODEL_STYLES.find(m => m.value === modelStyle)?.label ?? modelStyle} · {SCENE_STYLES.find(sc => sc.value === sceneStyle)?.label ?? sceneStyle}
-          </Text>
-          <View style={s.grid}>
-            {results.imageUris.map((uri, idx) => {
-              const isSelected = selected.has(idx);
-              return (
-                <TouchableOpacity
-                  key={uri}
-                  style={[s.resultCard, isSelected && s.resultCardSelected]}
-                  onPress={() => toggleSelect(idx)}
-                  activeOpacity={0.85}
-                >
-                  {uri.startsWith('data:') ? (
-                    <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
-                  ) : (
-                    <LinearGradient
-                      colors={[theme.cardElevated, theme.card]}
-                      style={s.resultGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                    >
-                      <Feather name="user" size={32} color={MUTED} />
-                      <Text style={s.resultLabel}>Photo {idx + 1}</Text>
-                    </LinearGradient>
-                  )}
-                  {/* Checkbox */}
-                  <View style={[s.checkbox, isSelected && s.checkboxActive]}>
-                    {isSelected && <Feather name="check" size={ICON.xs} color={theme.onAccent} />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+  // ─── Screen 1: setup ──────────────────────────────────────────────────────
 
-          {/* Actions bar */}
-          <View style={s.actionsBar}>
-            <Text style={s.actionsTitle}>
-              {selected.size > 0 ? `${selected.size} selected` : 'Select photos to act on'}
-            </Text>
-            <View style={s.actionsGrid}>
-              {[
-                { label: 'Save all', icon: 'save', onPress: () => handleSaveAll(results!.imageUris) },
-                { label: 'Save selected', icon: 'bookmark', onPress: () => handleSaveSelected(results!.imageUris, selected) },
-                { label: 'Retry', icon: 'refresh-cw', onPress: handleGenerate },
-                { label: 'Add to Product', icon: 'package', onPress: handleAddToProduct },
-                { label: 'Seller post', icon: 'send', onPress: handleSellerPost },
-                { label: 'Store Builder', icon: 'shopping-bag', onPress: handleStoreBuilder },
-                { label: 'Campaign', icon: 'trending-up', onPress: handleCampaign },
-              ].map(a => (
-                <TouchableOpacity key={a.label} style={s.actionItem} onPress={a.onPress}>
-                  <View style={s.actionItemIcon}>
-                    <Feather name={a.icon as any} size={ICON.sm} color={PURPLE} />
-                  </View>
-                  <Text style={s.actionItemText}>{a.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={s.disclaimer}>
-            <Feather name="info" size={ICON.sm} color={MUTED} />
-            <Text style={s.disclaimerText}>
-              Images generated by AI. Results may vary — refine your prompt for best quality.
-            </Text>
-          </View>
-        </ScrollView>
-
-        <Modal
-          visible={showProductPicker}
-          animationType="slide"
-          presentationStyle="formSheet"
-          onRequestClose={() => setShowProductPicker(false)}
-        >
-          <SafeAreaProvider style={s.pickerRoot}>
-            <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
-            <Text style={s.pickerSub}>Selected photos will be added to the product's media gallery.</Text>
-            {loadingPickerProducts ? (
-              <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
-            ) : (
-              <FlatList
-                data={pickerProducts}
-                keyExtractor={p => p.id}
-                contentContainerStyle={{ padding: SP.md }}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={s.productOption}
-                    onPress={() => confirmAddToProduct(item)}
-                    activeOpacity={0.82}
-                  >
-                    {item.media?.[0]?.uri ? (
-                      <Image source={{ uri: item.media[0].uri }} style={s.productCover} resizeMode="cover" />
-                    ) : (
-                      <View style={[s.productCover, s.productCoverEmpty]}>
-                        <Feather name="package" size={ICON.md} color={SUBTLE} />
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.productOptionName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={s.productOptionMeta}>{item.status}</Text>
-                    </View>
-                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </SafeAreaProvider>
-        </Modal>
-      </BrandthreadScreen>
-    );
-  }
-
-  // ─── Wizard ──────────────────────────────────────────────────────────────────
   return (
-    <BrandthreadScreen>
-      {isGenerating && (
-        <View style={s.loadingOverlay}>
-          <ActivityIndicator size="large" color={PURPLE} />
-          <Text style={s.loadingText}>Shooting your photos…</Text>
-          <Text style={s.loadingSubtext}>This usually takes under a minute.</Text>
-        </View>
-      )}
-
-      <BrandthreadHeader title="AI Photoshoot" onBack={goBack} />
-      <StepBar />
-
+    <View style={s.root}>
+      <ScreenHeader title="AI Photoshoot" onBack={() => goBackOr(router)} />
+      <AiToolProgressBar step={1} />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + 260 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Step 1 — Choose product */}
-        {step === 1 && (
-          <>
-            <Text style={s.stepTitle}>Choose product</Text>
-            <Text style={s.stepSub}>Select the real product photos the AI should use as its reference.</Text>
-            <View style={s.inputWrap}>
-              <Feather name="search" size={ICON.sm} color={SUBTLE} style={s.inputIcon} />
-              <TextInput
-                style={[s.input, { paddingLeft: ICON.sm + SP.md + SP.sm }, WEB_INPUT_RESET]}
-                value={productSearch}
-                onChangeText={setProductSearch}
-                placeholder="Search products…"
-                placeholderTextColor={SUBTLE}
-              />
+        <Text style={s.sectionLabel}>Product photos</Text>
+        {products === null ? (
+          <ActivityIndicator style={{ marginTop: SP.lg }} color={FG} />
+        ) : products.length === 0 && uploadedProductUris.length === 0 ? (
+          <View style={s.emptyCatalog}>
+            <Feather name="package" size={ICON.lg} color={MUTED} />
+            <Text style={s.emptyCatalogTitle}>No products yet</Text>
+            <Text style={s.emptyCatalogSub}>Add a product first, or upload photos directly for this shoot.</Text>
+            <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm }}>
+              <AiSecondaryButton label="Add a product" icon="plus" variant="outline" onPress={() => router.push('/add-product' as never)} />
+              <AiSecondaryButton label="Upload photos instead" icon="upload" variant="outline" onPress={pickUploadInsteadOfProduct} />
             </View>
-
-            {loadingProducts ? (
-              <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.xl }} />
-            ) : (
-              <View style={s.productList}>
-                {products
-                  .filter(p => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
-                  .map(product => {
-                    const selectedProduct = selectedProductId === product.id;
-                    const cover = Array.isArray(product.images) ? product.images[0] : undefined;
-                    return (
-                      <TouchableOpacity
-                        key={product.id}
-                        style={[s.productOption, selectedProduct && s.productOptionActive]}
-                        onPress={() => setSelectedProductId(product.id)}
-                        activeOpacity={0.82}
-                      >
-                        {cover ? (
-                          <Image source={{ uri: cover }} style={s.productCover} resizeMode="cover" />
-                        ) : (
-                          <View style={[s.productCover, s.productCoverEmpty]}>
-                            <Feather name="image" size={ICON.md} color={SUBTLE} />
-                          </View>
-                        )}
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.productOptionName} numberOfLines={1}>{product.name}</Text>
-                          <Text style={s.productOptionMeta}>
-                            {cover ? 'Product photo ready' : 'No product photo'}
-                          </Text>
-                        </View>
-                        <Feather
-                          name={selectedProduct ? 'check-circle' : 'circle'}
-                          size={ICON.md}
-                          color={selectedProduct ? PURPLE : MUTED}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-            )}
-
-            <View style={s.stepBtns}>
-              <GradientCard colors={theme.primaryGradient} style={{ flex: 1, shadowColor: theme.shadowColor }} onPress={goNext}>
-                <View style={s.nextInner}>
-                  <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next</Text>
-                  <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
-                </View>
-              </GradientCard>
-            </View>
-          </>
-        )}
-
-        {/* Step 2 — Model direction */}
-        {step === 2 && (
+          </View>
+        ) : (
           <>
-            <Text style={s.stepTitle}>Model direction</Text>
-            <Text style={s.stepSub}>Choose who wears your garment.</Text>
-            <View style={s.modelGrid}>
-              {MODEL_STYLES.map(m => (
-                <TouchableOpacity
-                  key={m.value}
-                  style={[s.modelCard, modelStyle === m.value && s.modelCardActive]}
-                  onPress={() => setModelStyle(m.value)}
-                >
-                  <View style={[s.modelCardIcon, modelStyle === m.value && s.modelCardIconActive]}>
-                    <Feather name="user" size={ICON.lg} color={modelStyle === m.value ? PURPLE_LIGHT : MUTED} />
-                  </View>
-                  <Text style={[s.modelCardText, modelStyle === m.value && s.modelCardTextActive]}>
-                    {m.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
-              <View style={s.nextInner}>
-                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Scene</Text>
-                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
-              </View>
-            </GradientCard>
-          </>
-        )}
-
-        {/* Step 3 — Scene */}
-        {step === 3 && (
-          <>
-            <Text style={s.stepTitle}>Scene</Text>
-            <Text style={s.stepSub}>Set the environment for your photoshoot.</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.sceneRow}>
-              {SCENE_STYLES.map(sc => (
-                <TouchableOpacity
-                  key={sc.value}
-                  style={[s.sceneCard, sceneStyle === sc.value && s.sceneCardActive]}
-                  onPress={() => setSceneStyle(sc.value)}
-                >
-                  <LinearGradient
-                    colors={sceneStyle === sc.value ? theme.primaryGradient : [theme.cardElevated, theme.card]}
-                    style={s.sceneCardGrad}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
+            <View style={s.productGrid}>
+              {(products ?? []).slice(0, 12).map((p) => {
+                const selected = selectedProductIds.has(p.id);
+                const thumb = p.media?.[0]?.uri;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[s.productTile, selected && s.productTileSelected]}
+                    onPress={() => toggleProduct(p.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${p.name}`}
                   >
-                    <Feather name="image" size={ICON.md} color={sceneStyle === sc.value ? theme.onAccent : MUTED} />
-                  </LinearGradient>
-                  <Text style={[s.sceneCardText, sceneStyle === sc.value && { color: PURPLE_LIGHT }]}>
-                    {sc.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
-              <View style={s.nextInner}>
-                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Lighting</Text>
-                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
-              </View>
-            </GradientCard>
+                    {thumb ? (
+                      <Image source={{ uri: thumb }} style={s.productTileImg} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.productTileImg, s.productTileImgEmpty]}>
+                        <Feather name="package" size={ICON.md} color={SUBTLE} />
+                      </View>
+                    )}
+                    {selected && (
+                      <View style={s.productTileCheck}>
+                        <Feather name="check" size={12} color={BG} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity style={s.uploadInsteadRow} onPress={pickUploadInsteadOfProduct} accessibilityRole="button">
+              <Feather name="upload" size={ICON.sm} color={MUTED} />
+              <Text style={s.uploadInsteadText}>Upload photos instead</Text>
+            </TouchableOpacity>
+            {uploadedProductUris.length > 0 && (
+              <ReferencePhotoTiles
+                uris={uploadedProductUris}
+                max={4}
+                onAdd={pickUploadInsteadOfProduct}
+                onRemove={(i) => setUploadedProductUris(prev => prev.filter((_, idx) => idx !== i))}
+                label="uploaded photo"
+              />
+            )}
           </>
         )}
 
-        {/* Step 4 — Lighting */}
-        {step === 4 && (
-          <>
-            <Text style={s.stepTitle}>Lighting</Text>
-            <Text style={s.stepSub}>Choose the lighting mood.</Text>
-            <View style={s.lightingWrap}>
-              {LIGHTING_STYLES.map(l => (
-                <TouchableOpacity
-                  key={l.value}
-                  style={[s.pill, lightingStyle === l.value && s.pillActive]}
-                  onPress={() => setLightingStyle(l.value)}
-                >
-                  <Text style={[s.pillText, lightingStyle === l.value && s.pillTextActive]}>
-                    {l.label}
-                  </Text>
+        <View style={s.sectionDivider} />
+        <Text style={s.sectionLabel}>Creative reference photos</Text>
+        <Text style={s.sectionSub}>Any scene, model, pose, or lighting you want to match. Optional.</Text>
+        <ReferencePhotoTiles uris={refUris} max={MAX_REFS} onAdd={pickReferences} onRemove={removeRef} label="reference" />
+
+        <View style={s.sectionDivider} />
+        <Text style={s.sectionLabel}>Describe the shoot</Text>
+        <TextInput
+          style={s.promptInput}
+          value={prompt}
+          onChangeText={setPrompt}
+          placeholder="e.g. Golden-hour rooftop, editorial mood, film grain"
+          placeholderTextColor={SUBTLE}
+          multiline
+        />
+
+        <View style={s.chipRow}>
+          {SCENE_STYLES.slice(0, 6).map((opt) => (
+            <TouchableOpacity key={opt.value} style={[s.chip, sceneStyle === opt.value && s.chipActive]} onPress={() => setSceneStyle(opt.value)}>
+              <Text style={[s.chipText, sceneStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={s.chipRow}>
+          {MODEL_STYLES.slice(0, 5).map((opt) => (
+            <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} onPress={() => setModelStyle(opt.value)}>
+              <Text style={[s.chipText, modelStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={s.optionRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.optionLabel}>Aspect ratio</Text>
+            <View style={s.chipRow}>
+              {RATIOS.map((r) => (
+                <TouchableOpacity key={r.value} style={[s.chip, ratio === r.value && s.chipActive]} onPress={() => setRatio(r.value)}>
+                  <Text style={[s.chipText, ratio === r.value && s.chipTextActive]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
-              <View style={s.nextInner}>
-                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Output format</Text>
-                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
-              </View>
-            </GradientCard>
-          </>
-        )}
-
-        {/* Step 5 — Output format */}
-        {step === 5 && (
-          <>
-            <Text style={s.stepTitle}>Output format</Text>
-            <Text style={s.stepSub}>Where will these photos be used?</Text>
-            <View style={s.formatGrid}>
-              {OUTPUT_FORMATS.map(f => (
-                <TouchableOpacity
-                  key={f.value}
-                  style={[s.formatCard, outputFormat === f.value && s.formatCardActive]}
-                  onPress={() => setOutputFormat(f.value)}
-                >
-                  <Feather
-                    name={f.icon as any}
-                    size={ICON.md}
-                    color={outputFormat === f.value ? PURPLE_LIGHT : MUTED}
-                  />
-                  <Text style={[s.formatCardText, outputFormat === f.value && { color: PURPLE_LIGHT }]}>
-                    {f.label}
-                  </Text>
+          </View>
+        </View>
+        <View style={s.optionRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.optionLabel}>Number of shots</Text>
+            <View style={s.chipRow}>
+              {SHOT_COUNTS.map((n) => (
+                <TouchableOpacity key={n} style={[s.chip, shotCount === n && s.chipActive]} onPress={() => setShotCount(n)}>
+                  <Text style={[s.chipText, shotCount === n && s.chipTextActive]}>{n}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-
-            <Text style={s.label}>Count</Text>
-            <View style={s.stepperRow}>
-              <TouchableOpacity style={s.stepperBtn} onPress={() => setCount(Math.max(1, count - 1))}>
-                <Feather name="minus" size={ICON.md} color={FG} />
-              </TouchableOpacity>
-              <Text style={s.stepperVal}>{count}</Text>
-              <TouchableOpacity style={s.stepperBtn} onPress={() => setCount(Math.min(4, count + 1))}>
-                <Feather name="plus" size={ICON.md} color={FG} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={s.label}>Image ratio</Text>
-            <View style={s.ratioRow}>
-              {IMAGE_RATIOS.map(r => (
-                <TouchableOpacity
-                  key={r.value}
-                  style={[s.ratioBtn, imageRatio === r.value && s.ratioBtnActive]}
-                  onPress={() => setImageRatio(r.value)}
-                >
-                  <Text style={[s.ratioBtnText, imageRatio === r.value && s.ratioBtnTextActive]}>
-                    {r.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
-              <View style={s.nextInner}>
-                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Review</Text>
-                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
-              </View>
-            </GradientCard>
-          </>
-        )}
-
-        {/* Step 6 — Generate */}
-        {step === 6 && (
-          <>
-            <Text style={s.stepTitle}>Ready to shoot</Text>
-            <Text style={s.stepSub}>Review your settings and generate.</Text>
-
-            <View style={s.summaryCard}>
-              <Text style={s.summaryTitle}>Photoshoot summary</Text>
-              {[
-                { label: 'Product', value: products.find(p => p.id === selectedProductId)?.name || 'No product selected' },
-                { label: 'Model', value: MODEL_STYLES.find(m => m.value === modelStyle)?.label ?? modelStyle },
-                { label: 'Scene', value: SCENE_STYLES.find(sc => sc.value === sceneStyle)?.label ?? sceneStyle },
-                { label: 'Lighting', value: LIGHTING_STYLES.find(l => l.value === lightingStyle)?.label ?? lightingStyle },
-                { label: 'Format', value: OUTPUT_FORMATS.find(f => f.value === outputFormat)?.label ?? outputFormat },
-                { label: 'Ratio', value: imageRatio },
-                { label: 'Images', value: String(count) },
-              ].map(row => (
-                <View key={row.label} style={s.summaryRow}>
-                  <Text style={s.summaryLabel}>{row.label}</Text>
-                  <Text style={s.summaryValue}>{row.value}</Text>
-                </View>
-              ))}
-            </View>
-
-            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
-              <View style={s.nextInner}>
-                <Feather name="camera" size={ICON.md} color={theme.onAccent} />
-                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate photoshoot</Text>
-              </View>
-            </GradientCard>
-          </>
-        )}
+          </View>
+        </View>
       </ScrollView>
-    </BrandthreadScreen>
+
+      <AiButtonDock bottomInset={COMP.tabBarH + insets.bottom}>
+        <AiPrimaryButton
+          label="Generate"
+          icon="zap"
+          onPress={handleGenerate}
+          disabled={!canGenerate}
+          accessibilityLabel="Generate photoshoot"
+          // No real per-shot cost/credit model exists in the backend yet —
+          // flagged as "needs backend" in the PR body instead of a made-up
+          // number here (same note as Mockup to Model's Create button).
+        />
+      </AiButtonDock>
+    </View>
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
-  return StyleSheet.create({
-  stepBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.md,
-  },
-  stepBarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stepDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotActive: {
-    backgroundColor: PURPLE_DIM,
-    borderColor: PURPLE,
-  },
-  stepDotNum: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    color: SUBTLE,
-  },
-  stepDotNumActive: {
-    color: PURPLE_LIGHT,
-  },
-  stepConnector: {
-    width: 20,
-    height: 2,
-    backgroundColor: BORDER,
-  },
-  stepConnectorActive: {
-    backgroundColor: PURPLE,
-  },
-  content: { padding: SP.lg, paddingBottom: SP.xxl },
-  stepTitle: {
-    fontFamily: FONT.bold,
-    fontSize: FS.lg,
-    color: FG,
-    marginBottom: SP.xs,
-  },
-  stepSub: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    marginBottom: SP.lg,
-    lineHeight: 20,
-  },
-  label: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
-    marginBottom: SP.sm,
-    marginTop: SP.lg,
-  },
-  inputWrap: {
-    position: 'relative',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    marginBottom: SP.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: SP.md,
-    zIndex: 1,
-  },
-  input: {
-    flex: 1,
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: FG,
-    padding: SP.md,
-    height: 52,
-  },
-  productPlaceholder: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: BORDER,
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-    marginBottom: SP.xl,
-  },
-  productPlaceholderText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: MUTED,
-  },
-  productPlaceholderSub: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
-    textAlign: 'center',
-    paddingHorizontal: SP.xl,
-  },
-  productList: {
-    gap: SP.sm,
-    marginBottom: SP.xl,
-  },
-  productOption: {
-    minHeight: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.md,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.sm,
-  },
-  productOptionActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
-  },
-  productCover: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.sm,
-  },
-  productCoverEmpty: {
-    backgroundColor: CARD_ELEVATED,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  productOptionName: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
-    marginBottom: 4,
-  },
-  productOptionMeta: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-  },
-  stepBtns: {
-    flexDirection: 'row',
-    gap: SP.sm,
-    alignItems: 'stretch',
-  },
-  skipBtn: {
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipBtnText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  modelGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-  },
-  modelCard: {
-    width: COL_W,
-    paddingVertical: SP.md,
-    paddingHorizontal: SP.sm,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    gap: SP.sm,
-  },
-  modelCardActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
-  },
-  modelCardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: SURFACE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modelCardIconActive: {
-    backgroundColor: PURPLE_DIM,
-  },
-  modelCardText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-    textAlign: 'center',
-  },
-  modelCardTextActive: {
-    color: PURPLE_LIGHT,
-  },
-  sceneRow: {
-    flexGrow: 0,
-    marginBottom: SP.lg,
-  },
-  sceneCard: {
-    width: 100,
-    marginRight: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
-    overflow: 'hidden',
-    alignItems: 'center',
-    paddingBottom: SP.sm,
-  },
-  sceneCardActive: {
-    borderColor: PURPLE,
-  },
-  sceneCardGrad: {
-    width: '100%',
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SP.xs,
-  },
-  sceneCardText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: MUTED,
-    textAlign: 'center',
-    paddingHorizontal: SP.xs,
-  },
-  lightingWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-  },
-  pill: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm - 2,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
-  },
-  pillActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
-  },
-  pillText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  pillTextActive: {
-    color: PURPLE_LIGHT,
-  },
-  formatGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-  },
-  formatCard: {
-    width: COL_W,
-    paddingVertical: SP.md,
-    paddingHorizontal: SP.sm,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  formatCardActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
-  },
-  formatCardText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-    textAlign: 'center',
-  },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.lg,
-  },
-  stepperBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepperVal: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xl,
-    color: FG,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  ratioRow: {
-    flexDirection: 'row',
-    gap: SP.sm,
-  },
-  ratioBtn: {
-    flex: 1,
-    paddingVertical: SP.sm,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-  },
-  ratioBtnActive: {
-    borderColor: CYAN,
-    backgroundColor: CYAN_DIM,
-  },
-  ratioBtnText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  ratioBtnTextActive: {
-    color: CYAN,
-  },
-  summaryCard: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.lg,
-    gap: SP.sm,
-    marginBottom: SP.md,
-  },
-  summaryTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-    marginBottom: SP.sm,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  summaryValue: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: FG,
-  },
-  nextCard: {
-    marginTop: SP.xl,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-  },
-  nextInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-    paddingVertical: SP.md,
-  },
-  nextText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    color: '#fff',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(7,7,15,0.92)',
-    zIndex: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.md,
-  },
-  loadingText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.lg,
-    color: FG,
-  },
-  loadingSubtext: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  // Results
-  resultsMeta: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    marginBottom: SP.md,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-  },
-  resultCard: {
-    width: COL_W,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: BORDER,
-    position: 'relative',
-  },
-  resultCardSelected: {
-    borderColor: PURPLE,
-    borderWidth: 2,
-  },
-  resultGradient: {
-    height: COL_W * 1.3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-  },
-  resultLabel: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  checkbox: {
-    position: 'absolute',
-    top: SP.sm,
-    right: SP.sm,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: PURPLE,
-    borderColor: PURPLE,
-  },
-  actionsBar: {
-    marginTop: SP.xl,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.lg,
-  },
-  actionsTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: MUTED,
-    marginBottom: SP.md,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-  },
-  actionItem: {
-    alignItems: 'center',
-    gap: SP.xs,
-    width: (SW - SP.lg * 2 - SP.lg * 2 - SP.sm * 6) / 4,
-  },
-  actionItemIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: PURPLE_DIM,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionItemText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: MUTED,
-    textAlign: 'center',
-  },
-  disclaimer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SP.sm,
-    marginTop: SP.lg,
-    padding: SP.md,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  disclaimerText: {
-    flex: 1,
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    lineHeight: 18,
-  },
-  pickerRoot: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  pickerSub: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    paddingHorizontal: SP.lg,
-    marginTop: SP.xs,
-    marginBottom: SP.sm,
-  },
-  });
-};
+function ProductPickerModal({ visible, loading, products, onClose, onSelect }: {
+  visible: boolean; loading: boolean; products: Product[]; onClose: () => void; onSelect: (p: Product) => void;
+}) {
+  if (!visible) return null;
+  return (
+    <View style={s.pickerOverlay}>
+      <View style={s.pickerSheet}>
+        <ScreenHeader title="Choose a product" variant="modal" onBack={onClose} />
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color={FG} />
+        ) : (
+          <FlatList
+            data={products}
+            keyExtractor={p => p.id}
+            contentContainerStyle={{ padding: SP.md }}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={s.productRow} onPress={() => onSelect(item)} activeOpacity={0.82}>
+                {item.media?.[0]?.uri ? (
+                  <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[s.productThumb, s.productTileImgEmpty]}>
+                    <Feather name="package" size={ICON.md} color={SUBTLE} />
+                  </View>
+                )}
+                <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
+                <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+              </TouchableOpacity>
+            )}
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: BG },
+  content: { padding: SP.lg },
+  sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.xs },
+  sectionSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, lineHeight: 18 },
+  sectionDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.lg },
+  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SP.sm },
+  productTile: { width: 88, height: 88, borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, position: 'relative' },
+  productTileSelected: { borderColor: FG, borderWidth: 2 },
+  productTileImg: { width: '100%', height: '100%' },
+  productTileImgEmpty: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  productTileCheck: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
+  uploadInsteadRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
+  uploadInsteadText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
+  emptyCatalog: { alignItems: 'center', gap: SP.xs, paddingVertical: SP.xl, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  emptyCatalogTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG, marginTop: SP.xs },
+  emptyCatalogSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.lg },
+  promptInput: {
+    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.lg, backgroundColor: CARD, color: FG,
+    fontFamily: FONT.regular, fontSize: FS.sm, padding: SP.md, minHeight: 64, textAlignVertical: 'top', marginBottom: SP.md,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.md },
+  chip: { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  chipActive: { backgroundColor: FG, borderColor: FG },
+  chipText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  chipTextActive: { color: BG },
+  optionRow: { marginBottom: SP.xs },
+  optionLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: SP.xs },
+  progressBar: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md,
+    padding: SP.md, marginBottom: SP.lg, borderWidth: 1, borderColor: BORDER,
+  },
+  progressText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  footerRow: { marginTop: SP.lg, gap: SP.sm },
+  pickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: BG, zIndex: 10 },
+  pickerSheet: { flex: 1 },
+  productRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
+  productThumb: { width: 44, height: 44, borderRadius: RADIUS.sm },
+  productName: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
+});

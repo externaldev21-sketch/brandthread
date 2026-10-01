@@ -34,6 +34,7 @@ export function createNotificationResponseHandler(
       targetType?: unknown;
       type?: unknown;
       commentId?: unknown;
+      communityId?: unknown;
     } | undefined;
 
     if (data?.route === '/subscription') {
@@ -62,6 +63,15 @@ export function createNotificationResponseHandler(
     }
     if (data?.targetType === 'bulk_order' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/production-detail?id=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    // Community (topic group chat) pushes carry `communityId` alongside
+    // targetId (see api-server lib/communityPush.ts) — never a DM thread.
+    if (data?.type === 'community_message' || data?.targetType === 'community') {
+      const communityId = typeof data.communityId === 'string' && data.communityId
+        ? data.communityId
+        : typeof data.targetId === 'string' ? data.targetId : '';
+      if (communityId) router.push(`/community-chat?id=${encodeURIComponent(communityId)}`);
       return;
     }
     if (data?.targetType === 'conversation' && typeof data.targetId === 'string' && data.targetId) {

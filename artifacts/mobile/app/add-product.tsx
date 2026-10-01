@@ -30,6 +30,7 @@ import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
+import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
@@ -44,6 +45,7 @@ import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -162,6 +164,7 @@ function centsToInput(cents: number | undefined): string {
 // ─── Screen ─────────────────────────────────────────────────────────
 
 export default function AddProductScreen() {
+  useHideTabBar();
   const { theme } = useAppTheme();
   const {
     background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
@@ -242,6 +245,7 @@ export default function AddProductScreen() {
   const [featuredHome, setFeaturedHome] = useState(false);
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
@@ -379,8 +383,21 @@ export default function AddProductScreen() {
         draftId.current = editId!;
         return;
       }
-      const product = await getProduct(editId!);
+      let product = await getProduct(editId!);
       if (product) {
+        // API rows carry isPreOrder / preOrderEstShipDate; map them onto the
+        // form so editing a pre-order shows its ship date (required on save).
+        const row = product as unknown as { isPreOrder?: boolean; preOrderEstShipDate?: string | null };
+        if (row.isPreOrder && !product.preorderSettings?.estimatedShippingDate) {
+          product = {
+            ...product,
+            salesModel: product.salesModel === 'both' ? 'both' : 'pre-order',
+            preorderSettings: {
+              unitsOrdered: 0, isFunded: false, ...product.preorderSettings,
+              estimatedShippingDate: row.preOrderEstShipDate ? String(row.preOrderEstShipDate).slice(0, 10) : undefined,
+            },
+          };
+        }
         setIsEditMode(true);
         setEditProductId(editId!);
         setDraftData(product as Partial<Product>);
@@ -570,9 +587,16 @@ export default function AddProductScreen() {
   }
 
   // ── Publish ──
+  // Alert.alert is a no-op on web, so surface the failure inline everywhere.
+  function showPublishError(title: string, message: string) {
+    setPublishError(`${title}: ${message}`);
+    if (Platform.OS !== 'web') Alert.alert(title, message);
+  }
+
   async function handlePublish() {
+    setPublishError(null);
     if (photosUploading) {
-      Alert.alert('Still uploading', 'Wait for your photos to finish uploading before publishing.');
+      showPublishError('Still uploading', 'Wait for your photos to finish uploading before publishing.');
       return;
     }
     const decimalFields: Array<[string, string]> = [
@@ -586,7 +610,7 @@ export default function AddProductScreen() {
     ];
     const invalidField = decimalFields.find(([, value]) => value.trim() !== '' && parseDecimalToCents(value) === null);
     if (invalidField) {
-      Alert.alert('Invalid price', `${invalidField[0]} must be a non-negative amount with up to two decimal places.`);
+      showPublishError('Invalid price', `${invalidField[0]} must be a non-negative amount with up to two decimal places.`);
       return;
     }
 
@@ -622,26 +646,29 @@ export default function AddProductScreen() {
     };
     const warnings = validateForPublish(forValidation);
     if (warnings.length > 0) {
-      Alert.alert(
+      showPublishError(
         'Cannot publish',
-        'Please fix the following:\n\n' + warnings.map(w => '• ' + w).join('\n'),
-        [{ text: 'OK' }]
+        'Please fix the following:\n' + warnings.map(w => '• ' + w).join('\n')
       );
       return;
     }
 
     if (publishing) return;
+    if (shipDateError) {
+      Alert.alert('Add a ship date', PREORDER_SHIP_DATE_REQUIRED_MESSAGE);
+      return;
+    }
     setPublishing(true);
 
     const retailPriceCents = parseDecimalToCents(priceStr);
     if (retailPriceCents === null || retailPriceCents <= 0) {
-      Alert.alert('Invalid price', 'Enter a valid price with up to two decimal places.');
+      showPublishError('Invalid price', 'Enter a valid price with up to two decimal places.');
       setPublishing(false);
       return;
     }
     const compareAtCents = compareAtStr ? parseDecimalToCents(compareAtStr) : undefined;
     if (compareAtStr && (compareAtCents === null || compareAtCents === undefined || compareAtCents <= retailPriceCents)) {
-      Alert.alert('Compare-at price', 'Compare-at price should be higher than the retail price.');
+      showPublishError('Compare-at price', 'Compare-at price should be higher than the retail price.');
       setPublishing(false);
       return;
     }
@@ -649,7 +676,7 @@ export default function AddProductScreen() {
     const ps = draftData.preorderSettings;
     const salesModel = draftData.salesModel;
     if ((salesModel === 'pre-order' || salesModel === 'both') && ps && ps.openDate && ps.closeDate && ps.closeDate <= ps.openDate) {
-      Alert.alert('Invalid dates', 'Pre-order close date must be after the open date.');
+      showPublishError('Invalid dates', 'Pre-order close date must be after the open date.');
       setPublishing(false);
       return;
     }
@@ -657,7 +684,7 @@ export default function AddProductScreen() {
     const skus = productVariants.map(v => v.sku).filter(Boolean);
     const uniqueSkus = new Set(skus);
     if (skus.length !== uniqueSkus.size) {
-      Alert.alert('Duplicate SKU', 'Each variant must have a unique SKU.');
+      showPublishError('Duplicate SKU', 'Each variant must have a unique SKU.');
       setPublishing(false);
       return;
     }
@@ -750,8 +777,12 @@ export default function AddProductScreen() {
         await deleteDraft(draftId.current);
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
-    } catch {
-      Alert.alert('Error', 'Could not publish. Please try again.');
+    } catch (err: any) {
+      const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
+      showPublishError(
+        needsShipDate ? 'Add a ship date' : 'Error',
+        needsShipDate ? PREORDER_SHIP_DATE_REQUIRED_MESSAGE : 'Could not publish. Please try again.',
+      );
     } finally {
       setPublishing(false);
     }
@@ -1828,6 +1859,10 @@ export default function AddProductScreen() {
     );
   }
 
+  // A pre-order needs a real future ship date (API: PREORDER_SHIP_DATE_REQUIRED);
+  // buyers are refunded automatically if it is missed, so it can't be skipped.
+  const shipDateError = preOrderShipDateError(isPreOrder, draftData.preorderSettings?.estimatedShippingDate);
+
   // Sales model / pre-order — a Brandthread-specific extra beyond vanilla
   // Shopify, folded into its own collapsible section.
   function renderSalesModelToggle() {
@@ -1855,10 +1890,12 @@ export default function AddProductScreen() {
               placeholder="YYYY-MM-DD"
             />
             <FormInput
-              label="Est. shipping date"
+              label="Ship date (required)"
               value={draftData.preorderSettings?.estimatedShippingDate ?? ''}
               onChange={v => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), estimatedShippingDate: v } })}
               placeholder="YYYY-MM-DD"
+              error={shipDateError}
+              helper={shipDateError ? undefined : PREORDER_SHIP_DATE_REQUIRED_MESSAGE}
             />
           </>
         )}
@@ -1938,7 +1975,8 @@ export default function AddProductScreen() {
   // can be filled in later, same bar whether saving as Active or Draft.
   const canSave = !!draftData.name?.trim()
     && (draftData.media ?? []).length > 0
-    && (parseDecimalToCents(priceStr) ?? 0) > 0;
+    && (parseDecimalToCents(priceStr) ?? 0) > 0
+    && !shipDateError;
 
   const currentStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
 
@@ -2000,6 +2038,12 @@ export default function AddProductScreen() {
           />
         </View>
       </View>
+
+      {publishError ? (
+        <View style={s.publishError} testID="add-product-publish-error" accessibilityRole="alert">
+          <Text style={s.publishErrorText}>{publishError}</Text>
+        </View>
+      ) : null}
 
       {/* ── One scrolling page, Shopify-iOS-style ── */}
       <KeyboardAvoidingView
@@ -2188,6 +2232,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderColor: BORDER,
   },
   statusPillText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  publishError: {
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    padding: SP.sm,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: RED,
+    backgroundColor: CARD,
+  },
+  publishErrorText: { fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
 
   // Scroll
   scrollView: { flex: 1 },
