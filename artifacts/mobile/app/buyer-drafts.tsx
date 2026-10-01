@@ -77,7 +77,6 @@ export default function BuyerDraftsScreen() {
             layout={layout}
             icon={empty.icon as keyof typeof Feather.glyphMap}
             title={empty.title}
-            description={empty.message}
             testID="buyer-drafts-empty"
           />
         )}

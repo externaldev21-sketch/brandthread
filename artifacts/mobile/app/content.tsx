@@ -9,7 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
 import {
-  archiveSellerPost, deleteSellerPost, getSellerPosts, updateSellerPost,
+  archiveSellerPost, deleteSellerPost, getSellerPosts, publishSellerPostNow, unscheduleSellerPost, updateSellerPost,
 } from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -144,6 +144,38 @@ export default function ContentScreen() {
         text: 'Edit',
         onPress: () => router.push(('/create-post?editId=' + encodeURIComponent(post.id)) as never),
       },
+      ...(post.status === 'draft' || post.status === 'scheduled' ? [{
+        text: 'Publish now',
+        onPress: async () => {
+          setDeletingPostId(post.id);
+          try {
+            await publishSellerPostNow(post.id);
+            setContent(current => current.map(item => (
+              item.id === post.id ? { ...item, status: 'published' as const, scheduledFor: undefined } : item
+            )));
+          } catch {
+            Alert.alert('Post not published', 'Check your connection and try again.');
+          } finally {
+            setDeletingPostId(null);
+          }
+        },
+      }] : []),
+      ...(post.status === 'scheduled' ? [{
+        text: 'Move to drafts',
+        onPress: async () => {
+          setDeletingPostId(post.id);
+          try {
+            await unscheduleSellerPost(post.id);
+            setContent(current => current.map(item => (
+              item.id === post.id ? { ...item, status: 'draft' as const, scheduledFor: undefined } : item
+            )));
+          } catch {
+            Alert.alert('Post not moved', 'Check your connection and try again.');
+          } finally {
+            setDeletingPostId(null);
+          }
+        },
+      }] : []),
       {
         text: post.status === 'archived' ? 'Restore' : 'Archive',
         onPress: async () => {
