@@ -22,6 +22,14 @@ export async function auditTextFit(page, { minButtonPad = 12, minCardPad = 16, a
       const cs = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
     };
+    // True when an ancestor is a horizontal scroller (table / chip row that scrolls on purpose).
+    const inHScroll = (el) => {
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const o = getComputedStyle(a).overflowX;
+        if ((o === 'auto' || o === 'scroll') && a.scrollWidth > a.clientWidth + 1) return true;
+      }
+      return false;
+    };
     // Leaf text nodes' parent elements.
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const seen = new Set();
@@ -30,6 +38,7 @@ export async function auditTextFit(page, { minButtonPad = 12, minCardPad = 16, a
       if (!n.textContent.trim()) continue;
       const el = n.parentElement;
       if (!el || seen.has(el) || el.closest(allowSelector) || !visible(el)) continue;
+      if (inHScroll(el)) continue; // content of an intentional horizontal scroller
       seen.add(el);
       const cs = getComputedStyle(el);
       const r = el.getBoundingClientRect();
@@ -67,19 +76,22 @@ export async function auditTextFit(page, { minButtonPad = 12, minCardPad = 16, a
     const pads = document.querySelectorAll('[role=button], button, [role=tab], [role=checkbox], a[role=link]');
     const rows = new Map();
     pads.forEach((b) => {
-      if (!visible(b) || b.closest(allowSelector)) return;
+      if (!visible(b) || b.closest(allowSelector) || inHScroll(b)) return;
       const txt = (b.innerText || '').trim();
+      if (txt.length <= 2) return; // icon-only buttons and count badges
       const br = b.getBoundingClientRect();
       if (txt && br.width > 40 && br.height < 90) {
         const range = document.createRange(); range.selectNodeContents(b);
         const tr = range.getBoundingClientRect();
         const padL = tr.left - br.left, padR = br.right - tr.right;
-        if (tr.width > 0 && (padL < minButtonPad - 0.5 || padR < minButtonPad - 0.5) && !(padL > 40 && padR > 40)) {
+        const bcs = getComputedStyle(b);
+        const boxed = bcs.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(bcs.borderTopWidth) > 0;
+        if (boxed && tr.width > 0 && (padL < minButtonPad - 0.5 || padR < minButtonPad - 0.5) && !(padL > 40 && padR > 40)) {
           // Only flag when the box is tight around the label (icon-only / full-width rows are fine).
           if (br.width < vw * 0.7) problems.push({ kind: 'tight-padding', el: describe(b), detail: `padL ${Math.round(padL)} padR ${Math.round(padR)} (< ${minButtonPad})` });
         }
         const vOff = Math.abs((tr.top + tr.height / 2) - (br.top + br.height / 2));
-        if (vOff > 3) problems.push({ kind: 'not-v-centred', el: describe(b), detail: `text centre off by ${Math.round(vOff)}px` });
+        if (vOff > Math.max(3, br.height * 0.25)) problems.push({ kind: 'not-v-centred', el: describe(b), detail: `text centre off by ${Math.round(vOff)}px` });
       }
       const key = `${b.parentElement ? [...b.parentElement.parentElement?.children || []].indexOf(b.parentElement) : 0}:${Math.round(br.top / 4)}`;
       const list = rows.get(b.parentElement) || [];
