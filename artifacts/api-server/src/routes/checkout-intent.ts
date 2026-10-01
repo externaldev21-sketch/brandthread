@@ -293,6 +293,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           clientIdempotencyKey: `${key}_${group.sellerId}`,
           chargeModel: "transfer",
           platformFeeCents: group.platformFeeCents,
+          platformFeeBps: group.platformFeeBps,
           processingFeeEstimateCents: group.processingFeeEstimateCents,
           ...(group.discountCodeId ? { discountCodeId: group.discountCodeId, discountCodeAmountCents: group.discountCents } : {}),
           amountTotalCents: group.totalCents,

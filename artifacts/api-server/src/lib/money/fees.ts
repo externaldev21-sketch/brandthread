@@ -48,9 +48,9 @@ export function bpsOfCents(amountCents: number, bps: number): number {
 }
 
 /** Brandthread's 5% commission on merchandise (after discounts). */
-export function platformFeeCents(merchandiseCents: number): number {
+export function platformFeeCents(merchandiseCents: number, feeBps: number = PLATFORM_FEE_BPS): number {
   assertCents(merchandiseCents, "merchandiseCents");
-  return bpsOfCents(merchandiseCents, PLATFORM_FEE_BPS);
+  return bpsOfCents(merchandiseCents, feeBps);
 }
 
 /**
@@ -77,6 +77,8 @@ export type OrderSplitInput = {
    * when known; otherwise the standard estimate is used.
    */
   processingFeeCents?: number | null;
+  /** Commission rate fixed at checkout (seller plan). Defaults to PLATFORM_FEE_BPS. */
+  platformFeeBps?: number | null;
 };
 
 export type OrderSplit = {
@@ -102,7 +104,7 @@ export function splitOrder(input: OrderSplitInput): OrderSplit {
   assertCents(input.grossCents, "grossCents");
 
   const merchandiseCents = Math.max(0, input.subtotalCents - input.discountCents);
-  const rawPlatformFee = platformFeeCents(merchandiseCents);
+  const rawPlatformFee = platformFeeCents(merchandiseCents, input.platformFeeBps ?? PLATFORM_FEE_BPS);
   const hasActualFee = input.processingFeeCents !== undefined && input.processingFeeCents !== null;
   if (hasActualFee) assertCents(input.processingFeeCents, "processingFeeCents");
   const rawProcessingFee = hasActualFee
@@ -130,10 +132,15 @@ export function splitOrder(input: OrderSplitInput): OrderSplit {
 export function destinationApplicationFeeCents(input: {
   merchandiseCents: number;
   preTaxTotalCents: number;
+  /** Seller-plan commission in bps; defaults to PLATFORM_FEE_BPS. */
+  platformFeeBps?: number | null;
 }): { platformFeeCents: number; processingFeeEstimateCents: number; applicationFeeCents: number } {
   assertCents(input.merchandiseCents, "merchandiseCents");
   assertCents(input.preTaxTotalCents, "preTaxTotalCents");
-  const platformFee = Math.min(platformFeeCents(input.merchandiseCents), input.preTaxTotalCents);
+  const platformFee = Math.min(
+    platformFeeCents(input.merchandiseCents, input.platformFeeBps ?? PLATFORM_FEE_BPS),
+    input.preTaxTotalCents,
+  );
   const processing = Math.min(
     estimateProcessingFeeCents(input.preTaxTotalCents),
     input.preTaxTotalCents - platformFee,
