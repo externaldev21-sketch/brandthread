@@ -146,7 +146,8 @@ describe("text helpers are never debited (real gate mounted)", () => {
 
   it("still works with zero credits", async () => {
     const { debitCredits } = await import("../../lib/aiCredits/ledger");
-    await debitCredits({ clerkUserId: ME, cost: await balance(), toolKey: "test" });
+    const bal = await balance();
+    if (bal > 0) await debitCredits({ clerkUserId: ME, cost: bal, toolKey: "test" });
     state.aiReply = captionReply;
     expect((await call("/caption", { draft: "hello" })).status).toBe(200);
     state.aiReply = () => ({ note: "Relaxed fit." });
