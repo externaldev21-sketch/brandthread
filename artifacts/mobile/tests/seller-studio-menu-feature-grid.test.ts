@@ -24,10 +24,12 @@ describe('Seller Studio page: search bar, pinned shortcuts and grouped sections 
     expect(studio).not.toContain("gridCell: { width: '25%'");
   });
 
-  it('still keeps the store header row (avatar/photo, store name, setup progress, View store, close)', () => {
-    expect(studio).toContain('accessibilityLabel="View store"');
-    expect(studio).toContain('accessibilityLabel="Close Studio tools"');
-    expect(studio).toContain('setupBarTrack');
+  it('the store header row is now ONLY the avatar/photo + store name — no View store, no close, no subtitle', () => {
+    expect(studio).toContain('styles.header');
+    expect(studio).toContain('styles.storeName');
+    expect(studio).not.toContain('accessibilityLabel="View store"');
+    expect(studio).not.toContain('accessibilityLabel="Close Studio tools"');
+    expect(studio).not.toContain('setupBarTrack');
   });
 
   it('no "?" help icon — Settings > Help & support covers it instead', () => {

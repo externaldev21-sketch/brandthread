@@ -1,11 +1,15 @@
 /**
  * Guards for the Seller Studio full-screen page's dismiss behavior — Dev's
- * final layout call: a full-screen page (not a partial sheet), closed by
- * swiping down anywhere or tapping the close (X) button, both on the same
- * fast Reanimated timeline (never a spring — a spring's overshoot reads as
- * a bounce, not the "swift and fast" slide Dev asked for). There is no
- * backdrop anymore — the page itself covers the whole screen, so there's no
- * "tap outside" affordance distinct from the close button.
+ * final call: a full-screen page (not a partial sheet), with NO close (X)
+ * button and no "View store" pill in the header at all (header content is
+ * ONLY the avatar + name — see seller-studio-header.test.ts). Closing works
+ * three ways: swiping down anywhere, Android back / web Escape (the Modal's
+ * own onRequestClose), or tapping the Studio tab button again (see
+ * seller-studio-tab-toggle.test.ts) — all on the same fast Reanimated
+ * timeline (never a spring — a spring's overshoot reads as a bounce, not
+ * the "swift and fast" slide Dev asked for). There is no backdrop anymore —
+ * the page itself covers the whole screen, so there's no "tap outside"
+ * affordance distinct from these three.
  *  - dragging up past the resting position rubber-bands instead of
  *    hard-clamping;
  *  - a fast flick's release velocity shortens the close duration;
@@ -19,11 +23,10 @@ import { describe, expect, it } from 'vitest';
 
 const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadialMenu.tsx'), 'utf8');
 
-describe('Seller Studio page has a real close (X) button — Dev\'s final layout call', () => {
-  it('a close button exists, with its own testID/accessibilityLabel and haptic', () => {
-    expect(studio).toContain('testID="seller-studio-menu-close"');
-    expect(studio).toContain('accessibilityLabel="Close Studio tools"');
-    expect(studio).toContain('cancelEnterFill(); hapticDismiss(); collapse();');
+describe('Seller Studio page has no close (X) button — Dev\'s final layout call', () => {
+  it('there is no close button anywhere — swipe-down, Android back, and the tab toggle are the only ways to close', () => {
+    expect(studio).not.toContain('testID="seller-studio-menu-close"');
+    expect(studio).not.toContain('accessibilityLabel="Close Studio tools"');
   });
 
   it('there is no separate backdrop layer anymore — the page itself fully covers the screen behind it', () => {
@@ -71,10 +74,9 @@ describe('Seller Studio page swipe-to-dismiss is UI-thread Reanimated + gesture-
     expect(studio).toContain('duration: SHEET_CLOSE_MS, easing: SHEET_EASING');
   });
 
-  it('close-button dismiss and swipe-past-threshold dismiss both fire a light haptic', () => {
+  it('swipe-past-threshold dismiss fires a light haptic', () => {
     expect(studio).toContain('hapticDismiss');
     expect(studio).toContain('ImpactFeedbackStyle.Light');
-    expect(studio).toContain('cancelEnterFill(); hapticDismiss(); collapse();');
     expect(studio).toContain('runOnJS(hapticDismiss)()');
   });
 });
