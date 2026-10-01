@@ -8,6 +8,7 @@ export * from './money';
 export * from './threadCash';
 export * from './threadCashExpiry';
 export * from './shopifyFulfillment';
+export * from './productFit';
 export * from './metaAds';
 export * from './communities';
 export * from './iapPromotions';
