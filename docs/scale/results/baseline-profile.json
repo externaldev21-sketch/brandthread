@@ -1,0 +1,24 @@
+{
+  "scenario": "profile",
+  "steps": [
+    50,
+    100,
+    200,
+    400,
+    800
+  ],
+  "stepSeconds": 15,
+  "requests": 17616,
+  "rps": 234.8707786287539,
+  "serverErrorRate": 0,
+  "rateLimitedRate": 0,
+  "dropped": 0,
+  "endpoints": {
+    "profile": {
+      "p50": 2.0569355,
+      "p95": 2.9639397499999998,
+      "p99": 6.80997839999997,
+      "max": 31.879447
+    }
+  }
+}

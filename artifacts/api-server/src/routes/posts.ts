@@ -15,7 +15,6 @@ import {
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
-import { enqueueBatchedNotification } from "../lib/push";
 import postVideoRouter, {
   mediaUrl as composedMediaUrl,
   setComposedMediaVisibility,
@@ -23,6 +22,8 @@ import postVideoRouter, {
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
+import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -1407,7 +1408,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // ─── POST /api/posts/:id/interact ────────────────────────────────────────────
-router.post("/:id/interact", requireAuth, async (req, res) => {
+router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { id } = req.params;
   if (typeof id !== "string" || !UUID_RE.test(id)) {
@@ -1433,12 +1434,28 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     .where(and(eq(posts.id, id), visiblePostCondition()))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
+  // Blocked in either direction: behave exactly like a missing post (same as comments).
+  if (visiblePost.ownerId && visiblePost.ownerId !== clerkId && await isBlockedEitherWay(clerkId, visiblePost.ownerId)) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+  // Owners always see their own count; everyone else gets none when the owner hides like counts.
+  const countFor = (n: number): number | undefined =>
+    visiblePost.visibility?.showLikeCount === false && visiblePost.ownerId !== clerkId ? undefined : n;
   if (type === "repost" && visiblePost.visibility?.allowReposts === false) {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
   }
 
   if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
+    if (type === "not_interested") {
+      // Persist the hide so For You never serves this post again; the taste
+      // penalty applies only for a newly hidden post (retries don't stack).
+      const hidden = await hidePostFromForYou(clerkId, { id, sellerId: visiblePost.ownerId ?? null })
+        .catch(() => false);
+      if (hidden) void recordPostSignal(clerkId, id, "not_interested");
+    } else {
+      void recordPostSignal(clerkId, id, type, value ?? null);
+    }
     return res.json({ action: "recorded" });
   }
 
@@ -1463,8 +1480,12 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
           where: sql`type = 'like' AND post_id IS NOT NULL`,
         })
         .returning({ id: interactions.id });
-      // Only a genuinely new like notifies the owner; retries are silent.
-      if (inserted.length > 0) void notifyPostLike({ postId: id, likerId: clerkId });
+      // Only a genuinely new like notifies the owner (single path: notifyPostLike,
+      // deduped per liker+post) and feeds the taste profile; retries are silent.
+      if (inserted.length > 0) {
+        void notifyPostLike({ postId: id, likerId: clerkId });
+        void recordPostSignal(clerkId, id, "like");
+      }
     }
 
     const [{ count: newCount }] = await db
@@ -1472,24 +1493,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       .from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
 
-    if (!removing && visiblePost.ownerId && visiblePost.ownerId !== clerkId) {
-      const [liker] = await db.select({
-        name: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, 'Someone')`,
-      }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
-      // Likes are bursty and low-priority: collapse them into one notification
-      // instead of pushing on every tap (see jobs/notificationBatchFlush.ts).
-      void enqueueBatchedNotification({
-        userId: visiblePost.ownerId,
-        category: "social",
-        type: "post_liked",
-        targetId: id,
-        targetType: "post",
-        actorName: liker?.name ?? "Someone",
-        cta: "View post",
-      });
-    }
-
-    return res.json({ action: removing ? "removed" : "added", count: newCount });
+    return res.json({ action: removing ? "removed" : "added", count: countFor(newCount) });
   }
 
   // Reposts are explicit and idempotent. Omitted value means add; callers that
@@ -1512,7 +1516,10 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       })
       .returning({ id: interactions.id });
     // Only a genuinely new repost notifies the owner; retries are silent.
-    if (inserted.length > 0) void notifyRepost({ postId: id, reposterId: clerkId });
+    if (inserted.length > 0) {
+      void notifyRepost({ postId: id, reposterId: clerkId });
+      void recordPostSignal(clerkId, id, "repost");
+    }
   }
 
   const [{ count: newCount }] = await db
