@@ -79,6 +79,7 @@ import {
   computeRotationDelta, applyRotateHandle,
   DistortQuad, WarpMeshPoint,
 } from '@/lib/transformModel';
+import { isDoubleTap, isPointInTransformBounds, TapRecord } from '@/lib/doubleTapModel';
 import {
   CurvesAdjustment, CurveChannel, LiquifyPushStroke,
   defaultCurvesAdjustment, curveToTableValues,
@@ -968,6 +969,44 @@ export default function DesignCanvasScreen() {
     quickMenuTouchStartRef.current = null;
   }
 
+  // ─── Double-tap-to-edit (Transform tool, text layers) ──────────────────────
+  // Procreate's own text tool: double-tap a placed text layer to re-open it
+  // for editing. There was previously NO way to reach text editing at all
+  // for a freshly-placed layer — the old "Edit" button only rendered in the
+  // 'select' tool's selBar, but every layer now auto-selects into the
+  // 'transform' tool on insert (see handleAddText etc.), where that bar
+  // never shows. This adds the real double-tap gesture instead of just
+  // moving the Edit button, matching Procreate's actual interaction.
+  const lastTapRef = useRef<TapRecord | null>(null);
+  const DOUBLE_TAP_MS = 300;
+  const DOUBLE_TAP_DIST = 30; // display px — generous since text can render small
+
+  function handleCanvasDoubleTapCheck(locX: number, locY: number) {
+    const current: TapRecord = { t: Date.now(), lx: locX, ly: locY };
+    const wasDoubleTap = isDoubleTap(lastTapRef.current, current, DOUBLE_TAP_MS, DOUBLE_TAP_DIST);
+
+    if (!wasDoubleTap) {
+      lastTapRef.current = current;
+      return;
+    }
+    lastTapRef.current = null; // consume — don't chain into a triple-tap
+
+    if (activeTopToolRef.current !== 'transform') return;
+    const sel = layersRef.current.find(l => l.id === selectedLayerIdRef.current);
+    if (!sel || sel.type !== 'text' || sel.locked) return;
+
+    const sx = dispScaleXRef.current || 1;
+    const sy = dispScaleYRef.current || 1;
+    const lx = locX / sx;
+    const ly = locY / sy;
+    if (!isPointInTransformBounds(lx, ly, sel.transform)) return;
+
+    const data = sel.data as DesignTextLayer;
+    setEditingTextLayerId(sel.id);
+    setEditingTextValue(data.content ?? data.text ?? '');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
   function handleCanvasTouchStart(e: GestureResponderEvent) {
     const touch = e.nativeEvent.touches[0] ?? e.nativeEvent.changedTouches[0];
     if (!touch) return;
@@ -981,6 +1020,8 @@ export default function DesignCanvasScreen() {
       }
       quickMenuLongPressTimerRef.current = null;
     }, QUICK_MENU_DELAY_MS);
+    // Double-tap-to-edit is hooked into extTransformPanResponder's
+    // onPanResponderGrant instead of here — see its comment for why.
   }
 
   function handleCanvasTouchMove(e: GestureResponderEvent) {
@@ -1372,6 +1413,14 @@ export default function DesignCanvasScreen() {
           startLocX: e.nativeEvent.locationX,
           startLocY: e.nativeEvent.locationY,
         };
+        // Double-tap-to-edit only makes sense for a plain body tap (kind
+        // 'move' — pendingExtHandleRef always resets to 'move' after each
+        // gesture, so a tap that didn't land on a specific resize/rotate
+        // handle Pressable has this kind), not a tap that happened to land
+        // on a handle.
+        if (kind === 'move') {
+          handleCanvasDoubleTapCheck(e.nativeEvent.locationX, e.nativeEvent.locationY);
+        }
       },
 
       onPanResponderMove: (e) => {
@@ -3754,6 +3803,7 @@ export default function DesignCanvasScreen() {
                 }}
                 onBlur={() => setEditingTextLayerId(null)}
                 multiline autoFocus
+                testID="inline-text-edit-input"
               />
             );
           })()}
