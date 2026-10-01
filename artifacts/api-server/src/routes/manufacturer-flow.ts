@@ -32,15 +32,43 @@ import {
   cardMessageType,
   cardSummary,
   loadOrderTimeline,
+  postThreadSystemMessage,
   recordOrderEvent,
   toCardSnapshot,
 } from "../lib/manufacturerOrders";
 import { publishNotification } from "./notifications-feed";
 import { serializeMessage } from "./manufacturers";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Same acceptance/validation rules as sample-orders.ts's own image upload —
+// duplicated rather than imported to keep that file untouched; both guard
+// the same object-storage write path independently.
+const ACCEPTED_IMAGE_MIMES = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/webp",
+  "image/heic", "image/heif",
+]);
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+function isValidImageBytes(bytes: Buffer, contentType: string): boolean {
+  if (contentType === "image/jpeg" || contentType === "image/jpg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === "image/png") {
+    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  if (contentType === "image/webp") {
+    return bytes.length >= 12 && bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP";
+  }
+  if (contentType === "image/heic" || contentType === "image/heif") {
+    return bytes.length >= 12 && bytes.subarray(4, 8).toString() === "ftyp";
+  }
+  return false;
+}
 
 function serializeOrder(order: typeof sampleOrders.$inferSelect) {
   return {
@@ -386,6 +414,102 @@ router.post("/orders/:orderId/confirm-delivery", ...participantAuth, async (req,
   } catch (err) {
     req.log.error({ err, orderId: req.params.orderId }, "Failed to confirm delivery");
     res.status(500).json({ error: "Delivery couldn't be confirmed. Try again." });
+  }
+});
+
+// ── Production-milestone photo updates ──────────────────────────────────────
+// The manufacturer posts progress photos against the order's CURRENT stage
+// without changing status — a same-stage event (fromStatus === toStatus) on
+// the same ledger the tracker timeline already reads. Two steps, mirroring
+// sample-orders.ts's own upload shape: upload each photo to get an object
+// path, then attach the collected paths (+ an optional note) as one update.
+
+router.post(
+  "/orders/:orderId/updates/photo",
+  ...participantAuth,
+  express.raw({ type: "image/*", limit: MAX_IMAGE_BYTES }),
+  async (req, res) => {
+    try {
+      const found = await loadParticipantOrder(req, String(req.params.orderId));
+      if (found.status !== 200) { res.status(404).json({ error: "Order not found" }); return; }
+      if (found.role !== "manufacturer") {
+        res.status(403).json({ error: "Only the manufacturer posts production photo updates." }); return;
+      }
+      const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+      const bytes = req.body as Buffer;
+      if (!contentType || !ACCEPTED_IMAGE_MIMES.has(contentType)) {
+        res.status(400).json({ error: `Invalid content type. Accepted: ${[...ACCEPTED_IMAGE_MIMES].join(", ")}` }); return;
+      }
+      if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+        res.status(400).json({ error: `Image too large. Maximum ${MAX_IMAGE_BYTES / 1024 / 1024} MB.` }); return;
+      }
+      if (!isValidImageBytes(bytes, contentType)) {
+        res.status(400).json({ error: "Uploaded file content does not match its image type." }); return;
+      }
+      const objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+      try {
+        await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: getAuth(req).userId ?? "", visibility: "private" });
+      } catch (error) {
+        await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        throw error;
+      }
+      const url = await objectStorage.getObjectEntityDownloadURL(objectPath);
+      res.status(201).json({ objectPath, url });
+    } catch (err) {
+      req.log.error({ err, orderId: req.params.orderId }, "Production photo upload failed");
+      res.status(500).json({ error: "The photo couldn't be uploaded. Try again." });
+    }
+  },
+);
+
+router.post("/orders/:orderId/updates", ...participantAuth, async (req, res) => {
+  try {
+    const found = await loadParticipantOrder(req, String(req.params.orderId));
+    if (found.status !== 200) { res.status(404).json({ error: "Order not found" }); return; }
+    if (found.role !== "manufacturer") {
+      res.status(403).json({ error: "Only the manufacturer posts production photo updates." }); return;
+    }
+    const { order } = found;
+    const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 1000) : null;
+    const imageObjectPaths = Array.isArray(req.body?.imageObjectPaths)
+      ? req.body.imageObjectPaths.filter((p: unknown): p is string => typeof p === "string").slice(0, 12)
+      : [];
+    if (!note && imageObjectPaths.length === 0) {
+      res.status(422).json({ error: "Add a note or at least one photo." }); return;
+    }
+    const event = await recordOrderEvent(db, {
+      order, actorRole: "manufacturer", actorClerkId: getAuth(req).userId ?? null,
+      fromStatus: order.status, toStatus: order.status,
+      note, imageUrls: imageObjectPaths,
+    });
+    const imageUrls = await Promise.all(imageObjectPaths.map((p: string) => objectStorage.getObjectEntityDownloadURL(p).catch(() => null)));
+    await postThreadSystemMessage(db, {
+      threadId: order.threadId,
+      content: imageObjectPaths.length > 0
+        ? `${found.mfrName} posted ${imageObjectPaths.length === 1 ? 'a production photo' : `${imageObjectPaths.length} production photos`}${note ? `: ${note}` : ''}`
+        : `${found.mfrName}: ${note}`,
+      notify: "seller",
+      dedupeKey: `update-photo:${event.id}`,
+    });
+    if (order.sellerId) {
+      await notify(req, {
+        userId: order.sellerId,
+        category: "production",
+        type: "manufacturer_order_status",
+        title: `${found.mfrName} posted a production update`,
+        body: note ?? "New production photos are ready to view.",
+        targetId: order.id,
+        targetType: order.orderType === "bulk" ? "bulk_order" : "sample_order",
+        cta: `/production-detail?id=${order.id}`,
+      });
+    }
+    res.status(201).json({
+      id: event.id, actorRole: event.actorRole, fromStatus: event.fromStatus, toStatus: event.toStatus,
+      note: event.note, imageUrls: imageUrls.filter((u): u is string => !!u), createdAt: event.createdAt.toISOString(),
+    });
+  } catch (err) {
+    req.log.error({ err, orderId: req.params.orderId }, "Failed to post production update");
+    res.status(500).json({ error: "The update couldn't be posted. Try again." });
   }
 });
 

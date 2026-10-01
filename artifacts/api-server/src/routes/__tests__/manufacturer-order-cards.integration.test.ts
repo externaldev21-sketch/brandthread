@@ -49,6 +49,11 @@ vi.mock("../../lib/brandthreadEmail", () => ({ sendManufacturerSignupEmail: asyn
 vi.mock("../../lib/objectStorage", () => ({
   ObjectStorageService: class {
     async getObjectEntityDownloadURL(path: string) { return `https://objects.test${path}`; }
+    async createObjectEntityFromBuffer(_bytes: Buffer, _contentType: string) {
+      return `/objects/uploads/${crypto.randomBytes(8).toString("hex")}`;
+    }
+    async trySetObjectEntityAclPolicy() { return undefined; }
+    async deleteObjectEntity() { return undefined; }
   },
 }));
 vi.mock("../../lib/stripe", () => ({
@@ -267,6 +272,58 @@ describe("manufacturer order card → payment → tracker", () => {
     );
     const payment = await db.select().from(manufacturerActivityEvents).where(eq(manufacturerActivityEvents.sampleOrderId, orderId));
     expect(payment.map((event) => event.type)).toContain("payment_received");
+  });
+
+  it("posts same-stage production-milestone photo updates onto the tracker", async () => {
+    const factory = await seedFactory();
+    const thread = await seedThread(factory.id);
+    const sent = await call(`/api/manufacturers/me/threads/${thread.id}/order-cards`, "POST", {
+      clientRequestId: `${prefix}-photo-update`, orderType: "sample", title: "Denim jacket", quantity: 1, priceCents: 12_000,
+    }, factory.clerkId!);
+    const orderId = sent.body.order.id as string;
+    const checkout = await call(`/api/sample-orders/${orderId}/checkout-session`, "POST", { returnUrl: returnUrl(orderId) }, seller);
+    stripeState.sessions.get(checkout.body.sessionId)!.payment_status = "paid";
+    await call(`/api/sample-orders/${orderId}/pay`, "POST", {}, seller);
+    await call(`/api/manufacturers/me/sample-orders/${orderId}/status`, "PATCH", { status: "processing", expectedRevision: 1 }, factory.clerkId!);
+
+    // A raw image upload, mirroring sample-orders.ts's own upload shape.
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
+    auth.userId = factory.clerkId!;
+    const uploadRes = await fetch(`${base}/api/manufacturers/orders/${orderId}/updates/photo`, {
+      method: "POST", headers: { "content-type": "image/png" }, body: png,
+    });
+    expect(uploadRes.status).toBe(201);
+    const upload = await uploadRes.json() as { objectPath: string; url: string };
+    expect(upload.objectPath).toBeTruthy();
+    expect(upload.url).toContain(upload.objectPath);
+
+    // Only the manufacturer posts production photo updates.
+    const sellerAttempt = await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", { note: "hi" }, seller);
+    expect(sellerAttempt.status).toBe(403);
+    expect((await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", { note: "hi" }, outsider)).status).toBe(404);
+
+    // Neither a note nor a photo is a no-op, not a silent success.
+    const empty = await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", {}, factory.clerkId!);
+    expect(empty.status).toBe(422);
+
+    const posted = await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", {
+      note: "Cutting complete, moving to sewing.", imageObjectPaths: [upload.objectPath],
+    }, factory.clerkId!);
+    expect(posted.status).toBe(201);
+    expect(posted.body).toMatchObject({ fromStatus: "processing", toStatus: "processing", note: "Cutting complete, moving to sewing." });
+    expect(posted.body.imageUrls).toEqual([upload.url]);
+
+    // The event shows up on both sides' timeline with resolved image URLs,
+    // and the seller's thread gets a system message about it.
+    const timeline = await call(`/api/manufacturers/orders/${orderId}/timeline`, "GET", undefined, seller);
+    const event = timeline.body.events.find((e: any) => e.id === posted.body.id);
+    expect(event).toMatchObject({ note: "Cutting complete, moving to sewing.", imageUrls: [upload.url] });
+    const lines = (await db.select().from(manufacturerMessages).where(eq(manufacturerMessages.threadId, thread.id)))
+      .filter((message) => message.messageType === "system").map((message) => message.content);
+    expect(lines).toEqual(expect.arrayContaining([expect.stringContaining("posted a production photo: Cutting complete, moving to sewing.")]));
+
+    // Every earlier event still comes back with an (empty) imageUrls array.
+    expect(timeline.body.events.filter((e: any) => e.id !== posted.body.id).every((e: any) => Array.isArray(e.imageUrls) && e.imageUrls.length === 0)).toBe(true);
   });
 
   it("lets bulk cards use the same card checkout", async () => {

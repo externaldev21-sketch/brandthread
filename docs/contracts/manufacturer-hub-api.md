@@ -143,7 +143,52 @@ deferred here rather than shipping a toggle with a dead second tab).
 defines the exact card payload shapes (product/quote/sample-order/bulk-order/
 payment-request/production-milestone/shipping) both sides render identically.
 
-## Phase 5 (planned): orders/escrow/milestones/payout release
+## Phase 5a (this PR): production-milestone photo updates
+The manufacturer can post progress photos against the order's **current**
+stage without changing its status — a same-stage event (`fromStatus ===
+toStatus`) on the same `manufacturer_order_events` ledger the tracker
+timeline already reads. Additive: the ledger's new `image_urls` column
+defaults to `[]`, so every existing event/reader is unchanged, and the
+timeline's `events[]` gained an `imageUrls: string[]` field (omitted/empty
+for every event shipped before this PR).
+
+### `POST /api/manufacturers/orders/:orderId/updates/photo`
+Manufacturer-only (403 for the seller side of the order; 404 for
+non-participants). Raw image bytes as the body, like
+`sample-orders.ts`'s own `images/upload` route: `Content-Type` one of
+`image/jpeg`, `image/jpg`, `image/png`, `image/webp`, `image/heic`,
+`image/heif`; ≤ 20 MB; magic-byte-validated. Stores the image in object
+storage and returns its **stable object path** plus a short-lived viewing
+URL — the object path (not the URL, which expires) is what you pass to the
+next call:
+```json
+{ "objectPath": "…", "url": "https://…" }
+```
+
+### `POST /api/manufacturers/orders/:orderId/updates`
+Manufacturer-only. Body:
+```json
+{ "note": "Cutting complete, moving to sewing.", "imageObjectPaths": ["…", "…"] }
+```
+`note` and `imageObjectPaths` are both optional but at least one is
+required (422 otherwise; up to 12 photos per update). Records a same-stage
+event, posts a system message into the seller↔manufacturer thread, and
+notifies the seller. Returns the created event with resolved (signed)
+`imageUrls`:
+```json
+{ "id": "…", "actorRole": "manufacturer", "fromStatus": "cut_and_sew", "toStatus": "cut_and_sew", "note": "…", "imageUrls": ["https://…"], "createdAt": "…" }
+```
+
+The manufacturer-portal renders its own upload UI against these two calls;
+the mobile app (seller side) only reads `timeline.events[].imageUrls` and
+shows them as thumbnails under a same-stage event — no seller-side upload
+affordance is added, since only the manufacturer posts production photos.
+
+## Phase 5b (planned): escrow/payout release
 `ProductionOrder`/`ProductionStage`/`ManufacturerPaymentRecord` types already
-exist. This phase defines the Stripe Connect payout-release contract and the
-milestone-photo upload shape.
+exist, along with `sampleOrders.payoutReleased`/`stripeTransferId` columns
+and general escrow machinery (`lib/money/escrow.ts`, `orderFundsMachine`)
+built for consumer drop preorders but not yet wired to manufacturer sample/
+bulk orders. This phase defines the Stripe Connect payout-release contract:
+holding funds until the seller approves each milestone, and the transfer
+call the manufacturer's payout is actually released through.
