@@ -7,6 +7,7 @@
  * src/index.ts before the HTTP server starts listening.
  */
 import { logger } from "./logger";
+import { assertStagingIsSafe, resolveAppEnv } from "./appEnv";
 
 type RequiredVar = {
   name: string;
@@ -31,6 +32,7 @@ const REQUIRED_VARS: RequiredVar[] = [
 // shipping labels, ...) rather than the whole server, so a missing one is
 // worth a warning but never a boot failure.
 const OPTIONAL_VARS = [
+  "REDIS_URL",
   "AGORA_APP_ID",
   "AGORA_APP_CERTIFICATE",
   "AGORA_CUSTOMER_ID",
@@ -56,6 +58,9 @@ const OPTIONAL_VARS = [
  * so a misconfigured environment can be fixed in a single pass.
  */
 export function validateEnv(): void {
+  assertStagingIsSafe();
+  const appEnv = resolveAppEnv();
+  if (appEnv === "staging") logger.warn("Running in STAGING (APP_ENV=staging): test credentials only");
   const isProduction = process.env.NODE_ENV === "production";
   const missing = REQUIRED_VARS.filter(
     (v) => (!v.productionOnly || isProduction) && !process.env[v.name]?.trim(),
