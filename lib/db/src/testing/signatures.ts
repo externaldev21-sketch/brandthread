@@ -89,4 +89,4 @@ export const EMAIL_COLUMN_NAME_FRAGMENT = "email";
  * and the leftover ledger rows are internal accounting data, never shown on
  * any buyer- or seller-facing surface.
  */
-export const NON_DELETABLE_TABLES = ["ledger_transactions", "ledger_postings"];
+export const NON_DELETABLE_TABLES = ["ledger_transactions", "ledger_postings", "admin_audit_log"];

@@ -71,6 +71,7 @@ import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 
 /**
@@ -1142,6 +1143,11 @@ export async function handleCheckoutPaid(
     }
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
+
+    // For You: a purchase is the strongest taste signal (seller + style of the content that sold it).
+    if (buyerId) {
+      void recordPurchaseSignals({ buyerId, sellerId: ownerId, variantIds: rawItems.map((i) => i.variantId) });
+    }
 
     if (createdOrderId) {
       const [createdOrder] = await db

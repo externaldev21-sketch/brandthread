@@ -45,11 +45,13 @@ export async function createShipment(body: {
   );
 }
 
+export type ShippoLabelFileType = "PDF" | "PDF_4x6" | "PNG" | "ZPLII";
+
 // Purchasing a label spends the seller's Shippo balance and Shippo does not
 // document a client-supplied idempotency key for this endpoint, so it is NOT
 // retried automatically — see src/lib/retry.ts's doc comment. A failed
 // purchase must be resolved (or explicitly resubmitted) by the caller.
-export async function purchaseTransaction(rateId: string, reference: string) {
+export async function purchaseTransaction(rateId: string, reference: string, labelFileType: ShippoLabelFileType = "PDF_4x6") {
   return shippoRequest<{
     object_id: string;
     status: string;
@@ -59,7 +61,7 @@ export async function purchaseTransaction(rateId: string, reference: string) {
     messages?: Array<{ text?: string }>;
   }>("/transactions", {
     method: "POST",
-    body: { rate: rateId, label_file_type: "PDF", metadata: reference, async: false },
+    body: { rate: rateId, label_file_type: labelFileType, metadata: reference, async: false },
   });
 }
 

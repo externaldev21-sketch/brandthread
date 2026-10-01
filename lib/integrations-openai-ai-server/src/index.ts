@@ -1,4 +1,4 @@
-export { openai } from "./client";
+export { openai, setAiUsageReporter, type AiUsageReport } from "./client";
 export { generateImageBuffer, editImages } from "./image";
 export {
   buildFashionPrompt,
