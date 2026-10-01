@@ -169,12 +169,11 @@ export function ShipItemsSheet({
               <FormInput label="Tracking number" value={tracking} onChange={setTracking} placeholder="Tracking number" />
             </View>
             <View style={s.actions}>
-              <SecondaryButton label="Cancel" onPress={onClose} style={{ flex: 1 }} />
+              <SecondaryButton label="Cancel" onPress={onClose} />
               <PrimaryButton
                 label={busy ? 'Saving…' : 'Save tracking'}
                 onPress={() => onSubmit(picked, tracking.trim(), carrier.trim())}
                 disabled={!canSubmit}
-                style={{ flex: 1 }}
               />
             </View>
           </View>
@@ -199,6 +198,6 @@ function sheetStyles(theme: AppThemePreset) {
     },
     itemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
     itemMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
-    actions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.lg },
+    actions: { gap: SP.sm, marginTop: SP.lg },
   });
 }
