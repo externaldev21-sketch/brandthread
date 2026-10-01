@@ -17,9 +17,9 @@ import { useColors } from '@/hooks/useColors';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
-  BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, HapticSwitch, EmptyState, PressableScale,
+  BrandthreadCard, PrimaryButton, SectionHeader, HapticSwitch, EmptyState, PressableScale,
 } from '@/components/BrandthreadUI';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 
@@ -240,8 +240,10 @@ export default function ProductVariantsScreen() {
   }, [sorted, groupByFirst, axes]);
 
   const header = (
-    <ScreenHeader
+    <Header
       title="Variants & stock"
+      transparent
+      dividerVariant="none"
       onBack={() => goBackOr(router)}
       rightElement={dirtyIds.length > 0
         ? <PrimaryButton label={busy === 'save' ? 'Saving...' : `Save ${dirtyIds.length}`} onPress={saveVariants} loading={busy === 'save'} small style={{ minWidth: 84 }} />
@@ -292,11 +294,11 @@ export default function ProductVariantsScreen() {
             </View>
             <View style={st.addRow}>
               <TextInput
-                style={[st.input, { flex: 1 }]} value={newValue[i] ?? ''} placeholder={`Add ${axis.name.toLowerCase()} value`}
+                style={[st.input, { flex: 1, minWidth: 0 }]} value={newValue[i] ?? ''} placeholder={`Add ${axis.name.toLowerCase()} value`}
                 placeholderTextColor={colors.subtle} onChangeText={(t) => setNewValue((p) => ({ ...p, [i]: t }))}
                 onSubmitEditing={() => addValue(i)} returnKeyType="done" maxLength={40}
               />
-              <SecondaryButton label="Add" small style={st.addBtn} onPress={() => addValue(i)} />
+              <Pressable style={st.addBtn} onPress={() => addValue(i)} accessibilityRole="button" accessibilityLabel="Add value"><Text style={st.addBtnText}>Add</Text></Pressable>
             </View>
           </BrandthreadCard>
         ))}
@@ -309,9 +311,9 @@ export default function ProductVariantsScreen() {
               ))}
             </View>
             <View style={st.addRow}>
-              <TextInput style={[st.input, { flex: 1 }]} value={newAxisName} onChangeText={setNewAxisName} placeholder="Or name your own"
+              <TextInput style={[st.input, { flex: 1, minWidth: 0 }]} value={newAxisName} onChangeText={setNewAxisName} placeholder="Or name your own"
                 placeholderTextColor={colors.subtle} onSubmitEditing={() => addAxis(newAxisName)} returnKeyType="done" maxLength={40} />
-              <SecondaryButton label="Add" small style={st.addBtn} onPress={() => addAxis(newAxisName)} />
+              <Pressable style={st.addBtn} onPress={() => addAxis(newAxisName)} accessibilityRole="button" accessibilityLabel="Add option"><Text style={st.addBtnText}>Add</Text></Pressable>
             </View>
           </BrandthreadCard>
         ) : (
@@ -373,7 +375,7 @@ export default function ProductVariantsScreen() {
                           <Pressable style={{ flex: 1 }} onPress={() => setExpanded(open ? null : v.id)} accessibilityLabel={`${label}, ${open ? 'collapse' : 'edit details'}`}>
                             <Text style={st.variantName} numberOfLines={1}>{shortLabel}</Text>
                             <Text style={st.muted} numberOfLines={1}>
-                              {e.sku ?? v.sku} · {formatCents(v.priceCents)}{out ? ' · Sold out' : low ? ' · Low stock' : ''}
+                              {formatCents(v.priceCents)}{out ? ' · Sold out' : low ? ' · Low stock' : ''}
                             </Text>
                           </Pressable>
                           <TextInput style={st.stockPill} value={stockText} keyboardType="number-pad" selectTextOnFocus
@@ -430,7 +432,7 @@ export default function ProductVariantsScreen() {
                   </Pressable>
                 );
               })}
-              <Text style={st.muted}>Pre-order products and drops are never hidden or archived.</Text>
+              <Text style={st.muted}>Pre-orders and drops always stay listed.</Text>
             </BrandthreadCard>
 
             <BrandthreadCard style={st.card}>
@@ -496,7 +498,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
   chipText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.foreground },
-  addBtn: { minWidth: 72, height: 46 },
+  addBtn: { minWidth: 72, height: 46, paddingHorizontal: 16, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  addBtnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   addRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
   input: { fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground, backgroundColor: c.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, paddingHorizontal: SP.md, paddingVertical: 10 },
   fieldLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: c.mutedForeground, marginBottom: 4 },
@@ -510,7 +513,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   groupTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: c.mutedForeground, letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: SP.md },
   variantRow: { paddingVertical: SP.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
   variantName: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
-  stockPill: { minWidth: 64, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 8 },
+  stockPill: { width: 68, flexShrink: 0, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 8 },
   editGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
   radioRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: 6 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginTop: 1 },

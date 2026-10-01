@@ -8,6 +8,7 @@
  */
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { reportTextFit } from './lib/textFitCheck.mjs';
 import {
   DEFAULT_BUILD_DIR, MOBILE_ROOT, buildPreviewWeb, launchBrowser, openContext, openScreen, serveBuild,
 } from './store-screenshots/harness.mjs';
@@ -75,38 +76,51 @@ async function run() {
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
   const browser = await launchBrowser();
   const device = { viewport: VIEWPORT, scale: 2, isMobile: true, userAgent: UA };
-  try {
-    // Seller screens
-    {
-      const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images: {} });
-      await fixtures(context, origin, {});
-      page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-      await openScreen(page, activity, origin, 'seller', '/product-variants?productId=empty');
-      await page.getByText('No options yet').waitFor({ timeout: 15000 });
-      await shot(page, '01-empty');
-      await go(page, '/product-variants?productId=p1&bt_preview=seller');
-      await page.getByText('Size (3)').waitFor({ timeout: 15000 });
-      await shot(page, '02-options-and-variants');
-      await wheel(page, 1150);
-      await shot(page, '03-variant-list');
-      await page.getByLabel(/L \/ Black \/ Slim, edit details/).first().click().catch(() => undefined);
-      await shot(page, '04-variant-expanded');
-      await wheel(page, 4000);
-      await shot(page, '05-stock-rules');
-      await context.close();
+
+  async function screen(role, route, info, ready, fn) {
+    const { context, page, activity } = await openContext(browser, { device, role, origin, images: {} });
+    await fixtures(context, origin, info);
+    page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
+    await openScreen(page, activity, origin, role, route);
+    let found = false;
+    for (let attempt = 0; attempt < 3 && !found; attempt++) {
+      found = await page.getByText(ready).first().waitFor({ timeout: 9000 }).then(() => true).catch(() => false);
+      if (!found) await go(page, `${route}${route.includes('?') ? '&' : '?'}bt_preview=${role}`);
     }
-    // Buyer PDP
-    for (const [name, info] of [
-      ['06-pdp-limited', { soldOut: false, limited: true, editionSize: 50, remaining: 12 }],
-      ['07-pdp-only-left', { soldOut: false, limited: false, editionSize: null, remaining: 3 }],
-      ['08-pdp-sold-out', { soldOut: true, limited: false, editionSize: null, remaining: null }],
+    if (!found) { await page.screenshot({ path: path.join(OUT, 'FAILED.png') }); throw new Error(`never saw "${ready}" on ${route}`); }
+    await page.waitForTimeout(800);
+    await fn(page);
+    await context.close();
+  }
+  const clip = async (page, name, y, height) => {
+    await page.screenshot({ path: path.join(OUT, `${name}.png`), clip: { x: 0, y, width: 393, height } });
+    console.log(`  ok ${name}`);
+  };
+
+  try {
+    await screen('seller', '/product-variants?productId=empty', {}, 'No options yet', async (page) => {
+      await shot(page, '01-empty'); await reportTextFit(page, '01-empty');
+      await page.getByLabel('Add option').click();
+      await shot(page, '01b-add-option'); await reportTextFit(page, '01b-add-option');
+    });
+    await screen('seller', '/product-variants?productId=p1', {}, 'Size (3)', async (page) => {
+      await shot(page, '02-options-and-variants'); await reportTextFit(page, '02-options-and-variants');
+      await clip(page, 'zoom-option-card', 190, 175);
+      await wheel(page, 1150);
+      await shot(page, '03-variant-list'); await reportTextFit(page, '03-variant-list');
+      await page.getByLabel(/L \/ Black \/ Slim, edit details/).first().click().catch(() => undefined);
+      await shot(page, '04-variant-expanded'); await reportTextFit(page, '04-variant-expanded');
+      await wheel(page, 4000);
+      await shot(page, '05-stock-rules'); await reportTextFit(page, '05-stock-rules');
+    });
+    for (const [name, readyText, info] of [
+      ['06-pdp-limited', 'Limited edition · 12 of 50 left', { soldOut: false, limited: true, editionSize: 50, remaining: 12 }],
+      ['07-pdp-only-left', 'Only 3 left', { soldOut: false, limited: false, editionSize: null, remaining: 3 }],
+      ['08-pdp-sold-out', 'Sold out', { soldOut: true, limited: false, editionSize: null, remaining: null }],
     ]) {
-      const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images: {} });
-      await fixtures(context, origin, info);
-      await openScreen(page, activity, origin, 'buyer', '/buyer-product-detail?productId=prod_nl_hoodie_ember');
-      await page.waitForTimeout(1500);
-      await shot(page, name);
-      await context.close();
+      await screen('buyer', '/buyer-product-detail?productId=prod_nl_hoodie_ember', info, readyText, async (page) => {
+        await shot(page, name);
+      });
     }
   } finally {
     await browser.close();
