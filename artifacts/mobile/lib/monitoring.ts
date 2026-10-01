@@ -1,10 +1,13 @@
 import * as Sentry from '@sentry/react-native';
 import * as Updates from 'expo-updates';
 import { Platform } from 'react-native';
+import type React from 'react';
+import { registerServerErrorReporter } from '@/lib/monitoringHooks';
 import {
   resolveDsn,
   resolveEnvironment,
   resolveTracesSampleRate,
+  normalizeApiPath,
   scrubBreadcrumb,
   stripUrlQuery,
 } from '@/lib/monitoringConfig';
@@ -55,6 +58,13 @@ export function initMonitoring(): boolean {
       },
     });
     initialized = true;
+    registerServerErrorReporter(reportServerErrorToSentry);
+    try {
+      // Which OTA bundle is running, so a crash can be tied to an update.
+      if (Platform.OS !== 'web' && Updates.updateId) Sentry.setTag('expo_update_id', Updates.updateId);
+    } catch {
+      // Not available in Expo Go or on web.
+    }
   } catch (error) {
     // Monitoring must never be the reason the app fails to start.
     if (__DEV__) console.warn('[monitoring] Sentry failed to start', error);
@@ -89,5 +99,44 @@ export function addMonitoringBreadcrumb(category: string, message: string, data?
     Sentry.addBreadcrumb({ category, message, data, level: 'info' });
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Tags reports with the account role ("buyer" / "seller") only. No user id,
+ * name or email: crash data is declared as not linked to the user in
+ * docs/app-store/privacy-labels.md.
+ */
+export function setMonitoringRole(role: string | null | undefined): void {
+  if (!initialized) return;
+  try {
+    Sentry.setTag('account_role', role === 'buyer' || role === 'seller' ? role : 'signed_out');
+  } catch {
+    // ignore
+  }
+}
+
+/** Wraps the root component for touch breadcrumbs and navigation context. Returns it untouched when Sentry is off. */
+export function wrapRootComponent<T extends React.ComponentType<any>>(Component: T): T {
+  if (!initialized) return Component;
+  try {
+    return Sentry.wrap(Component) as unknown as T;
+  } catch {
+    return Component;
+  }
+}
+
+/** Reports an API response with a 5xx status: method, status and a normalised path only (no body, no ids). */
+function reportServerErrorToSentry(status: number, method: string, path: string): void {
+  if (!initialized) return;
+  try {
+    const route = `${method.toUpperCase()} ${normalizeApiPath(path)}`;
+    Sentry.withScope((scope) => {
+      scope.setTags({ kind: 'api_5xx', status: String(status), route });
+      scope.setFingerprint(['api_5xx', route, String(status)]);
+      Sentry.captureException(new Error(`API ${status} ${route}`));
+    });
+  } catch {
+    // Never let reporting throw into request code.
   }
 }

@@ -72,6 +72,7 @@ import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
+import { amountBucket, captureServerEvent } from "../lib/analytics";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1099,6 +1100,18 @@ export async function handleCheckoutPaid(
       }
     }
   });
+
+  // Funnel analytics: the authoritative "purchase completed" (no-op without
+  // POSTHOG_API_KEY; never throws). Amount is bucketed, never exact.
+  if (createdOrderId && oversoldItems.length === 0) {
+    captureServerEvent("purchase_completed", buyerId, {
+      amount_bucket: amountBucket(totalCents),
+      currency: typeof session.currency === "string" ? session.currency.toLowerCase() : "usd",
+      item_count: cartItems.reduce((n, i) => n + i.quantity, 0),
+      charge_model: chargeModel,
+      is_guest: !buyerId,
+    });
+  }
 
   // ── Issue Stripe refund for oversold orders ───────────────────────────────
   if (oversoldItems.length > 0) {

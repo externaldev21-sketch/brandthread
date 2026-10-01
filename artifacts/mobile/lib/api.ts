@@ -15,6 +15,8 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import { reportServerError } from '@/lib/monitoringHooks';
+import { trackAfter } from '@/lib/analytics/trackAfter';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
@@ -447,6 +449,7 @@ async function doRequest<T = any>(
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
     const cached = cacheKey && (res.status >= 500 || res.status === 429) ? await readApiCache<T>(cacheKey) : null;
+    if (res.status >= 500) reportServerError(res.status, options.method ?? 'GET', resolvedPath);
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
@@ -849,10 +852,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       me:          ()             => get<LocalUserProfile>('/api/auth/me'),
       onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
       completeOnboarding: (accountType: 'buyer' | 'seller', expectedClerkId?: string) =>
-        post<LocalUserProfile>('/api/auth/onboarding/complete', {
+        trackAfter(post<LocalUserProfile>('/api/auth/onboarding/complete', {
           accountType,
           ...(expectedClerkId ? { expectedClerkId } : {}),
-        }),
+        }), [['onboarding_completed', { account_type: accountType }], ...(accountType === 'seller' ? [['seller_onboarding_completed'] as const] : [])]),
       saveBuyerPreferences: (styleInterests: string[], expectedClerkId: string) =>
         patch<{ ok: boolean }>('/api/auth/onboarding/buyer-preferences', {
           styleInterests,
@@ -963,7 +966,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList:     (ownerId?: string)       =>
         get<any[]>(`/api/public/products${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get:            (id: string)             => get(`/api/products/${id}`),
-      create:         (body: unknown)          => post('/api/products', body),
+      create:         (body: unknown)          => trackAfter(post('/api/products', body), [['product_published']]),
       update:         (id: string, body: unknown) => put(`/api/products/${id}`, body),
       archive:        (id: string)             => del(`/api/products/${id}`),
       restore:        (id: string)             => post(`/api/products/${id}/restore`, {}),
@@ -1405,7 +1408,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             discountCode?: string;
           },
         ) =>
-          post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
+          trackAfter(post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
             items,
             successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
             cancelUrl:  'mobile://checkout/cancel',
@@ -1416,7 +1419,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
             ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
             ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
-          }),
+          }), [['checkout_started', { flow: 'hosted', item_count: items.length }]]),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
         verifySession: (sessionId: string) =>
@@ -1437,7 +1440,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
          */
         paymentIntent: {
           quote: (body: QuoteBody) => post<CartQuote>('/api/buyer/checkout/payment-intent/quote', body),
-          create: (body: CreatePaymentIntentBody) => post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body),
+          create: (body: CreatePaymentIntentBody) => trackAfter(post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body), [['checkout_started', { flow: 'one_page' }]]),
           get: (paymentIntentId: string) =>
             get<PaymentIntentStatus>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}`),
           cancel: (paymentIntentId: string) =>
@@ -1565,7 +1568,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       setDisappearing: (id: string, enabled: boolean) =>
         patch<{ ok: boolean; disappearingEnabled: boolean; message: any }>(`/api/conversations/${encodeURIComponent(id)}/disappearing`, { enabled }),
       send:       (id: string, body: { text: string; attachment?: any; replyToId?: string }) =>
-        post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
+        trackAfter(post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body), [['message_sent', { surface: 'dm', has_attachment: Boolean(body.attachment) }]]),
       markRead:   (id: string) =>
         patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/read`, {}),
       /** Real-time "X is typing…" (no websocket layer — the other side picks
@@ -2163,7 +2166,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
         ),
       recordWatchedVideo: (id: string) =>
-        post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}),
+        trackAfter(post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}), [['video_watched', { surface: 'feed' }]]),
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
@@ -2223,7 +2226,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     social: {
       /** Follow another buyer */
       follow: (userId: string) =>
-        post<{ ok: boolean; isFollowing: boolean; followersCount: number }>('/api/social/follow', { userId }),
+        trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]]),
       /** Unfollow a buyer */
       unfollow: (userId: string) =>
         del<{ ok: boolean; isFollowing: boolean; followersCount: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
@@ -2706,7 +2709,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>('/api/live/start', data),
       active:         () => get<{ streams: any[] }>('/api/live/active'),
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
-      join:           (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}),
+      join:           (id: string) => trackAfter(post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}), [['live_joined']]),
       leave:          (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/leave`, {}),
       /** HTTP presence fallback — only used when the WebSocket can't connect (see lib/live/useLiveSocket.ts). */
       heartbeat:      (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/heartbeat`, {}),

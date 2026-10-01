@@ -3,6 +3,7 @@
  * AsyncStorage-backed layer. Real API failures propagate; no fake product substitution.
  */
 
+import { track } from '@/lib/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/safeAsyncStorage';
 import { previewShippingRate } from '@/lib/previewCheckout';
@@ -329,6 +330,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
   }
 
   await saveCart(cart, k);
+  track('add_to_cart', { quantity });
 
   // Meta Pixel + Conversions API — this is the single choke point every
   // "Add to cart" entry point (product detail, shop sheet, …) funnels
