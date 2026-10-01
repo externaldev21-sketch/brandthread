@@ -31,6 +31,7 @@ import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
+import { preOrderShipDateError, PREORDER_SHIP_DATE_REQUIRED_MESSAGE } from '@/lib/deliveryGuarantee';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
@@ -45,6 +46,7 @@ import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -163,6 +165,7 @@ function centsToInput(cents: number | undefined): string {
 // ─── Screen ─────────────────────────────────────────────────────────
 
 export default function AddProductScreen() {
+  useHideTabBar();
   const { theme } = useAppTheme();
   const {
     background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
@@ -381,8 +384,21 @@ export default function AddProductScreen() {
         draftId.current = editId!;
         return;
       }
-      const product = await getProduct(editId!);
+      let product = await getProduct(editId!);
       if (product) {
+        // API rows carry isPreOrder / preOrderEstShipDate; map them onto the
+        // form so editing a pre-order shows its ship date (required on save).
+        const row = product as unknown as { isPreOrder?: boolean; preOrderEstShipDate?: string | null };
+        if (row.isPreOrder && !product.preorderSettings?.estimatedShippingDate) {
+          product = {
+            ...product,
+            salesModel: product.salesModel === 'both' ? 'both' : 'pre-order',
+            preorderSettings: {
+              unitsOrdered: 0, isFunded: false, ...product.preorderSettings,
+              estimatedShippingDate: row.preOrderEstShipDate ? String(row.preOrderEstShipDate).slice(0, 10) : undefined,
+            },
+          };
+        }
         setIsEditMode(true);
         setEditProductId(editId!);
         setDraftData(product as Partial<Product>);
@@ -646,6 +662,10 @@ export default function AddProductScreen() {
     }
 
     if (publishing) return;
+    if (shipDateError) {
+      Alert.alert('Add a ship date', PREORDER_SHIP_DATE_REQUIRED_MESSAGE);
+      return;
+    }
     setPublishing(true);
 
     const retailPriceCents = parseDecimalToCents(priceStr);
@@ -765,8 +785,12 @@ export default function AddProductScreen() {
         await deleteDraft(draftId.current);
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
-    } catch {
-      showPublishError('Error', 'Could not publish. Please try again.');
+    } catch (err: any) {
+      const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
+      showPublishError(
+        needsShipDate ? 'Add a ship date' : 'Error',
+        needsShipDate ? PREORDER_SHIP_DATE_REQUIRED_MESSAGE : 'Could not publish. Please try again.',
+      );
     } finally {
       setPublishing(false);
     }
@@ -1865,6 +1889,10 @@ export default function AddProductScreen() {
     );
   }
 
+  // A pre-order needs a real future ship date (API: PREORDER_SHIP_DATE_REQUIRED);
+  // buyers are refunded automatically if it is missed, so it can't be skipped.
+  const shipDateError = preOrderShipDateError(isPreOrder, draftData.preorderSettings?.estimatedShippingDate);
+
   // Sales model / pre-order — a Brandthread-specific extra beyond vanilla
   // Shopify, folded into its own collapsible section.
   function renderSalesModelToggle() {
@@ -1892,10 +1920,12 @@ export default function AddProductScreen() {
               placeholder="YYYY-MM-DD"
             />
             <FormInput
-              label="Est. shipping date"
+              label="Ship date (required)"
               value={draftData.preorderSettings?.estimatedShippingDate ?? ''}
               onChange={v => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), estimatedShippingDate: v } })}
               placeholder="YYYY-MM-DD"
+              error={shipDateError}
+              helper={shipDateError ? undefined : PREORDER_SHIP_DATE_REQUIRED_MESSAGE}
             />
           </>
         )}
@@ -1975,7 +2005,8 @@ export default function AddProductScreen() {
   // can be filled in later, same bar whether saving as Active or Draft.
   const canSave = !!draftData.name?.trim()
     && (draftData.media ?? []).length > 0
-    && (parseDecimalToCents(priceStr) ?? 0) > 0;
+    && (parseDecimalToCents(priceStr) ?? 0) > 0
+    && !shipDateError;
 
   const currentStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
 
