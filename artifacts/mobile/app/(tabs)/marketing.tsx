@@ -290,6 +290,23 @@ export default function MarketingScreen() {
         <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
         <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
       </View>
+
+      {/* Email campaigns — list capture from the store site + campaign composer */}
+      <SectionHeader title="Email" />
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/email-campaigns' as never); }}
+        accessibilityRole="button"
+        accessibilityLabel="Email campaigns and audience"
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
+        <Feather name="mail" size={24} color={colors.foreground} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Email campaigns</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>Grow your list and send to subscribers</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
     </ScrollView>
     </View>
   );

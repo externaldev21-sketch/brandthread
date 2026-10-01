@@ -87,6 +87,9 @@ import notificationEventsRouter from "./notification-events";
  *  is a safe no-op on the second call. */
 const tc = teamContext();
 import storeRouter from "./store";
+import emailMarketingRouter from "./email-marketing";
+import emailMarketingPublicRouter from "./email-marketing-public";
+import emailMarketingWebhookRouter from "./email-marketing-webhook";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
 import salesRouter from "./sales";
@@ -144,6 +147,7 @@ router.use("/config/features", featureFlagsRouter);
 router.use("/public/account-deletion", accountDeletionPublicRouter);
 router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public/affiliate", affiliatePublicRouter); // creator link click tracking (rate-limited, no private data)
+router.use("/public",          emailMarketingPublicRouter); // /stores/:slug/subscribe, /email/unsubscribe/:token
 router.use("/public/featured", featuredPublicRouter); // admin-curated Discover picks
 // Shared response cache for the public read paths that dominate traffic. A no-op
 // unless REDIS_URL is set. Registered before the routers so a hit never reaches
@@ -165,6 +169,7 @@ router.use("/public",          profileMediaRouter); // /users/:id/videos, /produ
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
 router.use("/guest/checkout",  guestCheckoutRouter);
+router.use("/webhooks/resend-marketing", emailMarketingWebhookRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/webhooks/shopify", webhooksShopifyRouter);
@@ -293,6 +298,7 @@ router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, aiSafetyGuard("store-ai", { mode: "chat", scan: "all" }), storeAiRouter);
 router.use("/store",                     tc, storeRouter);
+router.use("/marketing/email",           tc, emailMarketingRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
 // Etsy redirects the browser to the callback with no session; it is mounted before the authenticated group.
