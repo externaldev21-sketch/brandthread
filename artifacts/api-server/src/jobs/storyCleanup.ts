@@ -14,7 +14,7 @@ const ARCHIVE_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
  *
  * Before an expired story is deleted, a copy (media URLs, audience) goes into
  * the author-only `story_archive` so it can still be added to a highlight. The
- * media objects themselves are never deleted here. Moderation-removed stories
+ * media objects themselves are never deleted here. Moderation-removed and screening-held stories
  * are not archived. Archive rows older than a year are pruned.
  */
 export async function runStoryCleanup(now = new Date()): Promise<number> {
@@ -24,7 +24,7 @@ export async function runStoryCleanup(now = new Date()): Promise<number> {
       .where(lt(stories.expiresAt, now))
       .limit(BATCH_SIZE);
     if (batch.length === 0) break;
-    const archivable = batch.filter((r) => r.moderationStatus !== "removed");
+    const archivable = batch.filter((r) => r.moderationStatus === "visible");
     if (archivable.length) {
       await db.insert(storyArchive).values(archivable.map((r) => ({
         storyId: r.id,

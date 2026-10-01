@@ -108,7 +108,7 @@ async function loadMyStorySnapshot(myId: string, storyId: string) {
   const [live] = await db.select().from(stories)
     .where(and(eq(stories.id, storyId), eq(stories.authorId, myId))).limit(1);
   if (live) {
-    if (live.moderationStatus === "removed") return null;
+    if (live.moderationStatus !== "visible") return null; // removed or held by media screening
     return { storyId, media: (Array.isArray(live.media) ? live.media : []) as unknown[], visibility: normalizeAudience(live.privacyVisibility), createdAt: live.createdAt };
   }
   const [arch] = await db.select().from(storyArchive)
@@ -155,7 +155,7 @@ router.get("/highlights/stories", async (req, res) => {
   const limit = Math.min(parseInt(String(req.query.limit ?? "60"), 10) || 60, 120);
   const [live, archived] = await Promise.all([
     db.select().from(stories)
-      .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, new Date()), ne(stories.moderationStatus, "removed")))
+      .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, new Date()), eq(stories.moderationStatus, "visible")))
       .orderBy(desc(stories.createdAt)).limit(limit),
     db.select().from(storyArchive).where(eq(storyArchive.authorId, myId))
       .orderBy(desc(storyArchive.storyCreatedAt)).limit(limit),

@@ -20,6 +20,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { storyListedFor } from "../lib/storyVisibility";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
 import { audienceAllows, viewerRelations } from "../lib/storyAccess";
 
@@ -136,7 +137,7 @@ router.get("/stories/mentions", async (req, res) => {
     .where(and(
       eq(storyMentions.mentionedUserId, myId),
       gt(stories.expiresAt, new Date()),
-      ne(stories.moderationStatus, "removed"),
+      storyListedFor(myId),
     ))
     .orderBy(desc(stories.createdAt));
 
