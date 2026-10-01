@@ -1692,6 +1692,15 @@ export const returns = pgTable('returns', {
     unitPriceCents?: number;
   }>>().notNull().default([]),
   createdAt:           timestamp('created_at').defaultNow().notNull(),
+  /** Prepaid return label (migration 241). */
+  returnLabelId:         uuid('return_label_id'),
+  returnLabelUrl:        text('return_label_url'),
+  returnCarrier:         text('return_carrier'),
+  returnTrackingNumber:  text('return_tracking_number'),
+  returnTrackingStatus:  text('return_tracking_status'),
+  /** When true the refund is issued at the carrier's first scan instead of at approval. */
+  refundOnScan:          boolean('refund_on_scan').notNull().default(false),
+  firstScanAt:           timestamp('first_scan_at'),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({
   orderIdx:  index('returns_order_idx').on(t.orderId),
@@ -2427,6 +2436,9 @@ export const shippingLabels = pgTable('shipping_labels', {
   providerRateId: text('provider_rate_id').notNull(),
   /** order_items.id values this label covers; null = the whole order (migration 112). */
   itemIds: uuid('item_ids').array(),
+  /** 'outbound' (to the buyer) | 'return' (prepaid, buyer to seller; migration 241). */
+  direction: text('direction').notNull().default('outbound'),
+  returnId: text('return_id'),
   carrier: text('carrier'),
   service: text('service'),
   trackingNumber: text('tracking_number'),
