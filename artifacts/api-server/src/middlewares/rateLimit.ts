@@ -21,6 +21,7 @@ export type RateLimitPolicyName =
   | "follow"
   | "report"
   | "feed-event"
+  | "email-subscribe"
   | "post-interact";
 
 export type RateLimitPolicy = {
@@ -165,6 +166,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 120,
     windowMs: 60_000,
     message: "Too many feed events submitted. Please wait a moment and try again.",
+  },
+  "email-subscribe": {
+    id: "email-subscribe",
+    // Public, unauthenticated store signup form: per-IP cap. A tighter
+    // per-IP+email bucket is applied inside the route.
+    limit: 20,
+    windowMs: 10 * 60_000,
+    message: "Too many signups from this connection. Please try again later.",
   },
   "post-interact": {
     id: "post-interact",

@@ -823,6 +823,56 @@ export interface PostAnalyticsResponse {
     };
   };
 }
+// ─── Email marketing (seller) ────────────────────────────────────────────────
+export type EmailAudience = 'subscribers' | 'customers' | 'followers';
+export interface EmailMarketingStatus {
+  enabled: boolean;
+  provider: string | null;
+  message: string | null;
+  dailyCap: number;
+  sentToday: number;
+  remainingToday: number;
+  tracking: { delivered: boolean; opened: boolean; clicked: boolean };
+  missing: string[];
+}
+export interface EmailSubscriberRow { id: string; email: string; status: string; source: string; createdAt: string }
+export interface EmailAudienceResponse {
+  counts: Record<EmailAudience, number>;
+  byStatus: Record<string, number>;
+  subscribers: EmailSubscriberRow[];
+  hasMore: boolean;
+}
+export interface EmailCampaignBody {
+  headline: string;
+  text: string;
+  imageUrl: string | null;
+  productIds: string[];
+  cta: { label: string; url: string } | null;
+}
+export interface EmailCampaignStats {
+  sent: number; failed: number; skipped: number; queued: number;
+  delivered: number; opened: number; clicked: number; bounced: number;
+}
+export interface EmailCampaign {
+  id: string;
+  subject: string;
+  preheader: string;
+  audience: EmailAudience;
+  body: EmailCampaignBody;
+  status: 'draft' | 'scheduled' | 'sending' | 'sent';
+  scheduledAt: string | null;
+  sentAt: string | null;
+  recipientCount: number;
+  createdAt: string;
+  updatedAt: string;
+  stats?: EmailCampaignStats | null;
+  tracking?: boolean;
+}
+export interface EmailSettings {
+  fromName: string; replyTo: string; postalAddress: string; doubleOptIn: boolean; defaultFromName: string;
+}
+export type EmailCampaignInput = Pick<EmailCampaign, 'subject' | 'preheader' | 'audience' | 'body'>;
+
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
@@ -2439,6 +2489,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`, {}),
       unsubscribe: (id: string) =>
         del<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),
+    },
+    /** Seller email marketing (list, campaigns, sending) */
+    emailMarketing: {
+      status:   () => get<EmailMarketingStatus>('/api/marketing/email/status'),
+      settings: () => get<EmailSettings>('/api/marketing/email/settings'),
+      saveSettings: (data: Omit<EmailSettings, 'defaultFromName'>) => put<{ ok: boolean }>('/api/marketing/email/settings', data),
+      audience: (offset = 0) => freshGet<EmailAudienceResponse>(`/api/marketing/email/audience?limit=50&offset=${offset}`),
+      exportCsv: () => getText('/api/marketing/email/audience/export'),
+      removeSubscriber: (id: string) => del<{ ok: boolean }>(`/api/marketing/email/subscribers/${encodeURIComponent(id)}`),
+      campaigns: () => freshGet<{ campaigns: EmailCampaign[] }>('/api/marketing/email/campaigns'),
+      campaign: (id: string) => freshGet<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}`),
+      createCampaign: (data: EmailCampaignInput) => post<EmailCampaign>('/api/marketing/email/campaigns', data),
+      updateCampaign: (id: string, data: EmailCampaignInput) => put<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}`, data),
+      deleteCampaign: (id: string) => del<{ ok: boolean }>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}`),
+      preview: (id: string) => post<{ html: string; text: string }>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/preview`, {}),
+      sendTest: (id: string) => post<{ ok: boolean; sentTo: string }>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/test`, {}),
+      send: (id: string, scheduleAt?: string) => post<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/send`, scheduleAt ? { scheduleAt } : {}),
+      unschedule: (id: string) => post<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/unschedule`, {}),
     },
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
