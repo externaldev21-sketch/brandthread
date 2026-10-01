@@ -40,7 +40,9 @@ export type PushEventCategory =
   | "subscription"
   | "stock"
   | "fulfillment"
-  | "return";
+  | "return"
+  | "live"
+  | "cart";
 
 const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
   drop: "drop",
@@ -61,6 +63,8 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
   fulfillment: "fulfillment",
   return: "return",
   returns: "return",
+  live: "live",
+  cart: "cart",
 };
 
 /**
@@ -121,6 +125,8 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
     social: "friend_activity",
     stock: "price_alerts",
     return: "return_updates",
+    live: "new_drops",
+    cart: "cart_reminders",
   };
   return buyerPreferences[category] ?? null;
 }
