@@ -50,7 +50,7 @@ import {
 } from '@/lib/api';
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
-import { initDesignService } from '@/services/designService';
+import { initDesignService, markDesignIdentityResolved } from '@/services/designService';
 import { initProductService } from '@/services/productService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
@@ -956,6 +956,11 @@ function ServiceConfigurer() {
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);
+    // Storage is now scoped to the resolved identity (this component mounts
+    // under <ClerkLoaded>, so `user` here is final, not a pre-load null).
+    // Cold-loaded design screens await this mark before their first read —
+    // see designService.whenDesignServiceReady.
+    if (isLoaded) markDesignIdentityResolved();
     initBuyerProfile(newUserId);
     initProductService(newUserId);
     initOrderService(newUserId);

@@ -24,7 +24,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   SectionHeader, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getProject, createBrandAsset } from '@/services/designService';
+import { getProject, createBrandAsset, whenDesignServiceReady } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -63,7 +63,14 @@ export default function DesignMockupPreviewScreen() {
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    let cancelled = false;
+    // On a cold load (deep link / reload) this effect fires before the app
+    // shell has scoped design storage to the signed-in user; reading then
+    // hits the 'anon' namespace and reports a real project as missing.
+    whenDesignServiceReady()
+      .then(() => getProject(projectId))
+      .then(p => { if (!cancelled) { setProject(p); setLoading(false); } });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   // Flattens the on-screen preview panel (garment + composited design layers
