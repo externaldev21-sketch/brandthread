@@ -340,6 +340,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'story-mention-viewer',
   'buyer-live',
   'live-feed',
+  // Full-screen live replay player.
+  'live-replay',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -801,7 +803,7 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products', 'muted-words'].includes(segments[0] as string);
+      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products', 'muted-words', 'live-replays', 'live-replay'].includes(segments[0] as string);
 
     // Development previews skip onboarding without writing completion flags.
     // PREVIEW_ROLE reads the query only once, while these dev-only web helpers
