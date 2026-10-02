@@ -122,6 +122,9 @@ async function openSeller(h: Harness, browser: any, origin: string, target: stri
   const { page, activity } = await h.openContext(browser, { device, role: 'seller', origin, images: {}, seedOptions: { fresh: true }, apiOptions: { fresh: true } });
   await h.openScreen(page, activity, origin, 'seller', target);
   await h.waitForQuietNetwork(activity, 1000, 15_000);
+  // The client-side navigation occasionally lands a beat late on a cold
+  // bundle — wait for the screen's own chrome before measuring anything.
+  await page.waitForSelector('[data-testid="screen-header"], [data-testid="seller-dashboard-hero-value"]', { timeout: 20_000 });
   await page.waitForTimeout(700);
   return page;
 }
@@ -212,11 +215,13 @@ test.describe('Seller Dashboard + Content Analytics fixes @ 393x852', () => {
         const traffic = document.querySelector('[data-testid="seller-dashboard-traffic-sources"]');
         const end = document.querySelector('[data-testid="seller-dashboard-scroll-end"]');
         const noVisits = Array.from(document.querySelectorAll('div')).find((d) => d.children.length === 0 && d.textContent?.trim().startsWith('No visits'));
-        // The last visible content element inside the scroll (deepest bottom edge) — must sit above the bar.
+        // The last visible content LEAF inside the scroll (deepest bottom
+        // edge of any text/icon/box with no children — containers' own
+        // padding boxes are not content) — must sit above the bar.
         const scroll = document.querySelector('[data-testid="seller-dashboard-scroll"]')!;
         let lowest = -Infinity;
         for (const el of scroll.querySelectorAll('*')) {
-          if (el === end || end?.contains(el)) continue;
+          if (el === end || end?.contains(el) || el.children.length > 0) continue;
           const r = el.getBoundingClientRect();
           if (r.height > 0 && r.width > 0 && r.bottom > lowest) lowest = r.bottom;
         }
@@ -286,7 +291,17 @@ test.describe('Seller Dashboard + Content Analytics fixes @ 393x852', () => {
       expect(Math.abs(leftPad - rightPad)).toBeLessThanOrEqual(1.5);
       expect(leftPad).toBeGreaterThanOrEqual(12);
       expect(fit!.btn.w).toBeLessThan(200);
-      const bg = await page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="content-analytics-empty-action"]')!).backgroundColor);
+      // PressableScale paints the caller's style on its inner view, so read
+      // the first opaque background down from the pressable itself.
+      const bg = await page.evaluate(() => {
+        let el: Element | null = document.querySelector('[data-testid="content-analytics-empty-action"]');
+        while (el) {
+          const c = getComputedStyle(el).backgroundColor;
+          if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+          el = el.firstElementChild;
+        }
+        return '';
+      });
       expect(bg.replace(/\s/g, '')).toMatch(/^rgb\(2(4[0-9]|5[0-5]),2(4[0-9]|5[0-5]),2(4[0-9]|5[0-5])\)$/);
       const emptyBox = await empty.boundingBox();
       await page.screenshot({ path: path.join(OUT_DIR, '07-content-analytics-empty-zoom.png'), clip: { x: 0, y: emptyBox!.y - 8, width: 393, height: emptyBox!.height + 16 } });
