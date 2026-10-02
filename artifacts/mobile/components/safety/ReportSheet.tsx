@@ -18,7 +18,7 @@ import React, { createContext, useCallback, useContext, useMemo, useRef, useStat
 import {
   ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';

@@ -81,6 +81,17 @@ export default function ProductDetailScreen() {
   const tabScrollRef = useRef<ScrollView>(null);
 
   const loadProduct = useCallback(async () => {
+    const { isSellerDevPreview, isPreviewDemoMode } = await import('@/lib/devPreview');
+    if (isSellerDevPreview() && isPreviewDemoMode()) {
+      const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
+      setProduct(getPreviewSellerProducts().find((item) => item.id === id) ?? null);
+      setLoadError(false);
+      if (params.tab && TABS.some((tab) => tab.key === params.tab)) {
+        setActiveTab(params.tab as Tab);
+      }
+      setLoading(false);
+      return;
+    }
     if (!id || !userId) {
       setLoading(false);
       return;

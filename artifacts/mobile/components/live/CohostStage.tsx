@@ -10,6 +10,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useUser } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
@@ -20,8 +21,7 @@ import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
-let AgoraModule: any = null;
-try { AgoraModule = require('react-native-agora'); } catch {}
+const AgoraModule = loadAgoraModule();
 
 export interface CohostCreds {
   channelName: string;

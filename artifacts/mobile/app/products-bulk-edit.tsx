@@ -22,6 +22,7 @@ import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   PRICE_EDIT_MODES, buildPriceChange, bulkErrorMessage, priceRangeLabel,
   type BulkPriceResult, type BulkProduct, type BulkRounding, type BulkStatusFilter, type PriceEditMode,
@@ -78,7 +79,16 @@ export default function ProductsBulkEditScreen() {
   }, [query]);
 
   const load = useCallback(async () => {
-    if (!isLoaded || !isSignedIn) return;
+    if (isSellerDevPreview()) {
+      setItems([]);
+      setLoading(false);
+      setError('Product bulk editing is unavailable in the signed-out preview.');
+      return;
+    }
+    if (!isLoaded || !isSignedIn) {
+      if (isLoaded) setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

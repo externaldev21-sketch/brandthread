@@ -7,6 +7,7 @@
  * pure URL logic stays testable without touching native modules.
  */
 import { Linking, Platform, Share } from 'react-native';
+import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 
 export const STORY_CARD_WIDTH = 1080;
 export const STORY_CARD_HEIGHT = 1920;
@@ -120,15 +121,16 @@ export async function shareCardToInstagramStories(imageUri: string): Promise<'st
   }
 }
 
-export type SaveCardResult = { ok: true } | { ok: false; canAskAgain: boolean };
+export type SaveCardResult = { ok: true } | { ok: false; canAskAgain: boolean; unavailable?: boolean };
 
 /** Saves a rendered card image to the device's Photos library. */
 export async function saveCardImageToLibrary(imageUri: string): Promise<SaveCardResult> {
-  const MediaLibrary = await import('expo-media-library');
+  const MediaLibrary = getMediaLibrary();
+  if (!MediaLibrary) return { ok: false, canAskAgain: false, unavailable: true };
   const permission = await MediaLibrary.requestPermissionsAsync();
   if (!permission.granted) {
     return { ok: false, canAskAgain: permission.canAskAgain };
   }
-  await MediaLibrary.Asset.create(imageUri);
+  await MediaLibrary.createAssetAsync(imageUri);
   return { ok: true };
 }

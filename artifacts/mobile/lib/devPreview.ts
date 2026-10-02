@@ -1,13 +1,13 @@
 /**
  * Dev web preview detection helper.
  *
- * Semantics match the existing PREVIEW_ROLE logic in app/_layout.tsx exactly
+ * Web role semantics match the existing PREVIEW_ROLE logic in app/_layout.tsx exactly
  * (including its `__DEV__ || EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST` OR — the
  * same env flag scripts/store-screenshots/harness.mjs's `buildPreviewWeb` sets
  * so an exported, production (__DEV__ === false) preview build can still be
  * screenshotted with ?bt_preview=buyer|seller):
  *   - Inert (returns false) in a real production build (neither flag set)
- *   - Inert on native (Platform.OS !== 'web')
+ *   - Native seller preview is an explicit, dev-build-only EXPO_PUBLIC_DEV_PREVIEW=seller opt-in
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
  *   - in dev, the saved tab role is used when the URL has no selection; a fresh
@@ -26,7 +26,7 @@
  */
 
 import { Platform } from 'react-native';
-import { NAVIGATION_ISOLATION_TEST } from './buildFlags';
+import { DEV_SELLER_PREVIEW, NAVIGATION_ISOLATION_TEST } from './buildFlags';
 import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
 
 // Use a new session key so the former buyer-first default does not keep an
@@ -107,15 +107,17 @@ function persistedPreviewRole(): 'buyer' | 'seller' | null {
  *   supplied by tests instead of reading window.location.search.
  */
 export function isSellerDevPreview(searchOverride?: string): boolean {
+  // Explicit temporary native seller preview; independent from browser URL
+  // state and impossible to enable in a release bundle.
+  if (Platform.OS !== 'web') return DEV_SELLER_PREVIEW;
   // A real production build (neither dev nor the screenshot-export flag): never activate
   if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
 
-  // Native (iOS / Android): never activate
-  if (Platform.OS !== 'web') return false;
   // Hard gate: never activate on the real production host, even if the
   // NAVIGATION_ISOLATION_TEST env var somehow reached a production build.
   if (isProductionPreviewHost()) return false;
   if (typeof window === 'undefined') return false;
+  if (DEV_SELLER_PREVIEW) return true;
   if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'seller';
   const v = new URLSearchParams(searchOverride ?? window.location.search).get('bt_preview');
   if (v === 'seller') return true;
@@ -161,10 +163,11 @@ function resolveSearch(searchOverride?: string): string | null {
  * gates isSellerDevPreview/isBuyerDevPreview apply).
  */
 export function isPreviewDemoMode(searchOverride?: string): boolean {
+  if (Platform.OS !== 'web') return DEV_SELLER_PREVIEW;
   if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
-  if (Platform.OS !== 'web') return false;
   if (isProductionPreviewHost()) return false;
   if (!isSellerDevPreview(searchOverride) && !isBuyerDevPreview(searchOverride)) return false;
+  if (DEV_SELLER_PREVIEW) return true;
 
   const search = resolveSearch(searchOverride);
   if (search === null) return false;

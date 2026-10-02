@@ -22,6 +22,7 @@ import {
 import { reportServerError } from '@/lib/monitoringHooks';
 import { trackAfter } from '@/lib/analytics/trackAfter';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
 import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
@@ -81,6 +82,13 @@ export const API_BASE_URL = BASE;
  * error a screen can show instead of leaving loading state stuck forever.
  */
 const REQUEST_TIMEOUT_MS = 15_000;
+
+function rejectSellerPreviewApiRequest(): void {
+  if (!isSellerDevPreview()) return;
+  throw new ApiError(403, JSON.stringify({
+    error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
+  }));
+}
 
 /**
  * AI generation endpoints (mockup/photography/logo/background-removal) can
@@ -454,6 +462,7 @@ async function doRequest<T = any>(
   reportErrors = true,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
+  rejectSellerPreviewApiRequest();
   await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
@@ -550,6 +559,7 @@ async function uploadImage<T = any>(
     throw new Error("Could not read the selected image.");
   }
   const imageBlob = await source.blob();
+  rejectSellerPreviewApiRequest();
   const contentType = image.mimeType || imageBlob.type || "image/jpeg";
   const token = await getCachedToken(getToken);
   let res: Response;
@@ -587,6 +597,7 @@ async function uploadVideo<T = any>(
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the recorded video.");
   const videoBlob = await source.blob();
+  rejectSellerPreviewApiRequest();
   const contentType = video.mimeType || videoBlob.type || "video/mp4";
   const token = await getCachedToken(getToken);
   let res: Response;
@@ -640,6 +651,7 @@ async function uploadVideoWithProgress<T = any>(
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the selected video.");
   const videoBlob = await source.blob();
+  rejectSellerPreviewApiRequest();
   const contentType = video.mimeType || videoBlob.type || "video/mp4";
   const token = await getCachedToken(getToken);
   const result = await new Promise<{ status: number; text: string }>((resolve, reject) => {
@@ -685,6 +697,7 @@ async function uploadVideoChunked(
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the selected video.");
   const blob = await source.blob();
+  rejectSellerPreviewApiRequest();
   const contentType = (video.mimeType || blob.type || "video/mp4").split(";")[0];
   const authHeaders = async () => {
     const token = await getCachedToken(getToken);

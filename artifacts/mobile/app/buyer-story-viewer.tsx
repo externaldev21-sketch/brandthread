@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { prefetchImage } from '@/lib/prefetch';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -26,6 +26,7 @@ import {
 import { RADII, radius } from '@/constants/radii';
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -933,10 +934,14 @@ export default function BuyerStoryViewer() {
                     text: 'Save to device',
                     onPress: async () => {
                       try {
-                        const MediaLibrary = await import('expo-media-library');
+                        const MediaLibrary = getMediaLibrary();
+                        if (!MediaLibrary) {
+                          Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+                          return;
+                        }
                         const perm = await MediaLibrary.requestPermissionsAsync();
                         if (!perm.granted || !currentSlide?.imageUri) throw new Error('permission');
-                        await MediaLibrary.Asset.create(currentSlide.imageUri);
+                        await MediaLibrary.createAssetAsync(currentSlide.imageUri);
                         hapticSuccessAction();
                       } catch {
                         Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');

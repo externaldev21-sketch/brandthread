@@ -36,6 +36,9 @@ REVENUECAT_GOOGLE_PLAY_STORE_APP_ID = "appb63d6e604b"
 REVENUECAT_PROJECT_ID = "proj6d3bb300"
 REVENUECAT_TEST_STORE_APP_ID = "app644e4c59dc"
 
+[userenv.development]
+EXPO_PUBLIC_DEV_PREVIEW = "seller"
+
 [[ports]]
 localPort = 8080
 externalPort = 80

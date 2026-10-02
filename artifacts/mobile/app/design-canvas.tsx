@@ -50,6 +50,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -2367,7 +2368,14 @@ export default function DesignCanvasScreen() {
         uri: localUri, mimeType: 'image/png',
         width: desc.width, height: desc.height, format: 'png', lossless: true,
       };
-      await saveImageToMediaLibrary(asset.uri);
+      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
+      if (mediaSaveResult !== 'saved') {
+        Alert.alert(
+          mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
+          mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
+        );
+        return;
+      }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
       Alert.alert(
         'Saved to Camera Roll',
@@ -2419,7 +2427,14 @@ export default function DesignCanvasScreen() {
         uri: localUri, mimeType: 'image/png',
         width: desc.width, height: desc.height, format: 'png', lossless: true,
       };
-      await saveImageToMediaLibrary(asset.uri);
+      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
+      if (mediaSaveResult !== 'saved') {
+        Alert.alert(
+          mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
+          mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
+        );
+        return;
+      }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
       Alert.alert(
         'Saved to Camera Roll',
@@ -2667,7 +2682,10 @@ export default function DesignCanvasScreen() {
         if (sharingAvailable) {
           await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Export ${projectName}`, UTI: uti });
         } else {
-          Alert.alert('Permission required', 'Allow media-library access in Settings to save the export.');
+          Alert.alert(
+            mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
+            mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow media-library access in Settings to save the export.',
+          );
         }
         return;
       }

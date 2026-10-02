@@ -23,7 +23,7 @@ import { Feather } from '@expo/vector-icons';
 import Animated, {
   interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming,
 } from 'react-native-reanimated';
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import { useReanimatedKeyboardAnimation } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';

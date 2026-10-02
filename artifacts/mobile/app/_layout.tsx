@@ -8,7 +8,7 @@ import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { isAccessCleared } from '@/lib/accessGate';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { KeyboardProvider } from '@/components/KeyboardProviderCompat';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -103,6 +103,12 @@ import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
 import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
+import { setRequestGuard } from '@workspace/api-client-react';
+
+// Generated API hooks share this guard with the app-local API clients so
+// signed-out seller preview never reaches the backend through an alternate
+// generated fetch path.
+setRequestGuard(() => isSellerDevPreview());
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -395,7 +401,7 @@ function SellerBarGate() {
   // Preview navigation must not depend on Clerk or completed onboarding.
   // The session fallback covers reloads after the URL query has been dropped;
   // PREVIEW_SESSION_ROLE is web-only, so native seller chrome requires a session.
-  const isPreviewSeller = PREVIEW_SESSION_ROLE === 'seller';
+  const isPreviewSeller = PREVIEW_SESSION_ROLE === 'seller' || DEV_BYPASS_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
 
@@ -717,11 +723,26 @@ function AuthGate() {
 
   // Read splash_seen once on mount
   useEffect(() => {
+    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE === 'seller') {
+      setSplashSeen(true);
+      return;
+    }
     AsyncStorage.getItem('splash_seen').then(v => setSplashSeen(v === 'true'));
   }, []);
 
   // Read AsyncStorage whenever auth state or top segment changes
   useEffect(() => {
+    // Expo Go seller preview is a session-only route mode. Do not inspect or
+    // write account/onboarding state and do not make auth/profile requests.
+    if (Platform.OS !== 'web' && DEV_BYPASS_ROLE === 'seller') {
+      setOnboardingChecked(true);
+      setOnboardingDone(true);
+      setStoredRole('seller');
+      setThreadExplainerSeen(true);
+      setAccessRequired(false);
+      setActiveSeller(true);
+      return;
+    }
     if (!isSignedIn) { setOnboardingChecked(false); return; }
     let cancelled = false;
     setOnboardingChecked(false);

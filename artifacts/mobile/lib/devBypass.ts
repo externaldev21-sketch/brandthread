@@ -1,14 +1,11 @@
 import { Platform } from 'react-native';
+import { DEV_SELLER_PREVIEW, DEV_WEB_BYPASS_ROLE } from './buildFlags';
 
 /**
- * Temporary Expo Go buyer preview: skip onboarding in development on native
- * without persisting a fake completion or changing production authentication.
- * Remove the native 'buyer' branch to restore the normal Expo Go entry flow.
- * Web's optional role override remains independent.
+ * Temporary development-only role bypass. Native defaults to the normal
+ * onboarding flow; the seller preview must be explicitly opted into.
  */
-const envRole = process.env.EXPO_PUBLIC_DEV_BYPASS_ROLE;
 export const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null =
   !__DEV__ ? null
-    : Platform.OS !== 'web' ? 'buyer'
-    : envRole === 'buyer' || envRole === 'seller' ? envRole
-    : null;
+    : Platform.OS !== 'web' ? (DEV_SELLER_PREVIEW ? 'seller' : null)
+    : DEV_WEB_BYPASS_ROLE;

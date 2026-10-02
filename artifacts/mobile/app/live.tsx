@@ -20,7 +20,7 @@ import {
   AccessibilityInfo, ActivityIndicator, Animated, FlatList, Platform,
   Pressable, Share, StyleSheet, Text, View, type GestureResponderEvent, type ViewToken,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';

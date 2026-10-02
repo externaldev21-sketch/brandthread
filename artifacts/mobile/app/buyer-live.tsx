@@ -10,11 +10,12 @@ import {
   ScrollView, Platform, ActivityIndicator,
   Alert, Dimensions, Share,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { loadAgoraModule } from '@/lib/agoraAvailability';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
@@ -42,8 +43,7 @@ import { radius } from '@/constants/radii';
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only) ──────────────────────────────────────────────────
-let AgoraModule: any = null;
-try { AgoraModule = require('react-native-agora'); } catch {}
+const AgoraModule = loadAgoraModule();
 
 interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }

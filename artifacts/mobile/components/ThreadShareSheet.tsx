@@ -32,6 +32,7 @@ import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
 import { quotePostHref } from '@/lib/quotePost';
 import { useRouter } from 'expo-router';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -188,10 +189,12 @@ export function ThreadShareSheet({
     abortRef.current = controller;
     let destination: InstanceType<typeof import('expo-file-system').File> | null = null;
     try {
-      const [{ File, Paths }, MediaLibrary] = await Promise.all([
-        import('expo-file-system'),
-        import('expo-media-library'),
-      ]);
+      const [{ File, Paths }] = await Promise.all([import('expo-file-system')]);
+      const MediaLibrary = getMediaLibrary();
+      if (!MediaLibrary) {
+        onFeedback(mediaLibraryUnavailableMessage(), 'error');
+        return;
+      }
       const permission = await MediaLibrary.requestPermissionsAsync();
       if (!permission.granted) {
         if (!permission.canAskAgain) {
@@ -233,7 +236,7 @@ export function ThreadShareSheet({
         downloaded = destination;
         setSavingProgress(90);
       }
-      await MediaLibrary.Asset.create(downloaded.uri);
+      await MediaLibrary.createAssetAsync(downloaded.uri);
       setSavingProgress(100);
       onFeedback('Video saved to Photos.', 'info');
     } catch (error) {

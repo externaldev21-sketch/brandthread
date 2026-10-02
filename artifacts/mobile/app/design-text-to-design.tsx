@@ -16,7 +16,7 @@ import {
   View, Text, FlatList, ScrollView, TouchableOpacity, Pressable, StyleSheet, Image,
   ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions, Dimensions,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';

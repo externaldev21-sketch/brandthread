@@ -17,7 +17,7 @@ import {
   Alert, View, Text, TextInput, StyleSheet, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import { useSignIn, useSSO, useAuth, useUser, useClerk } from '@clerk/expo';

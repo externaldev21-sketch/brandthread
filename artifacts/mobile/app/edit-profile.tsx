@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';

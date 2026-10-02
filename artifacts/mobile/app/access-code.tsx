@@ -6,7 +6,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Platform } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

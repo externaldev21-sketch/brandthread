@@ -19,6 +19,7 @@
  * has no bundled assets or CDN convention for.
  */
 import type { Manufacturer } from '@/services/manufacturerTypes';
+import type { ManufacturerProduct } from '@/services/manufacturerCatalog';
 
 function iso(daysAgo: number): string {
   return new Date(Date.now() - daysAgo * 86_400_000).toISOString();
@@ -122,4 +123,61 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
 
 export function getPreviewManufacturers(): Manufacturer[] {
   return PREVIEW_MANUFACTURERS;
+}
+
+const PREVIEW_MANUFACTURER_PRODUCTS: ManufacturerProduct[] = [
+  {
+    id: 'preview-mfg-product-porto-crew',
+    manufacturerId: 'preview-mfg-porto-knit',
+    name: 'Heavyweight French Terry Crew',
+    description: 'A midweight, loopback French terry crewneck with a relaxed fit.',
+    category: 'Sweatshirts',
+    images: [],
+    moq: 150,
+    leadTimeDays: 28,
+    samplePriceCents: 6500,
+    samplePriceLabel: '$65 sample',
+    customizationOptions: ['Custom colors', 'Woven label', 'Embroidery'],
+    status: 'active',
+    priceTiers: [
+      { id: 'preview-tier-porto-150', minQuantity: 150, maxQuantity: 499, unitPriceCents: 2600 },
+      { id: 'preview-tier-porto-500', minQuantity: 500, maxQuantity: null, unitPriceCents: 2200 },
+    ],
+    createdAt: iso(120),
+    updatedAt: iso(30),
+  },
+  {
+    id: 'preview-mfg-product-porto-hoodie',
+    manufacturerId: 'preview-mfg-porto-knit',
+    name: 'Organic Cotton Pullover Hoodie',
+    description: 'An organic cotton fleece hoodie with a two-panel hood.',
+    category: 'Hoodies',
+    images: [],
+    moq: 200,
+    leadTimeDays: 32,
+    samplePriceCents: 8200,
+    samplePriceLabel: '$82 sample',
+    customizationOptions: ['Custom colors', 'Screen print', 'Embroidery'],
+    status: 'active',
+    priceTiers: [
+      { id: 'preview-tier-hoodie-200', minQuantity: 200, maxQuantity: 499, unitPriceCents: 3400 },
+      { id: 'preview-tier-hoodie-500', minQuantity: 500, maxQuantity: null, unitPriceCents: 2950 },
+    ],
+    createdAt: iso(90),
+    updatedAt: iso(21),
+  },
+];
+
+export function getPreviewManufacturer(id: string): Manufacturer | undefined {
+  return PREVIEW_MANUFACTURERS.find((manufacturer) => manufacturer.id === id);
+}
+
+export function getPreviewManufacturerProducts(manufacturerId: string): ManufacturerProduct[] {
+  return PREVIEW_MANUFACTURER_PRODUCTS.filter((product) => product.manufacturerId === manufacturerId);
+}
+
+export function getPreviewManufacturerProduct(manufacturerId: string, productId: string): ManufacturerProduct | undefined {
+  return PREVIEW_MANUFACTURER_PRODUCTS.find((product) => (
+    product.manufacturerId === manufacturerId && product.id === productId
+  ));
 }

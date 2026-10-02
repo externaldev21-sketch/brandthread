@@ -16,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';

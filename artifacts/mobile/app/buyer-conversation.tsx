@@ -4,7 +4,7 @@ import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
   ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
 } from 'react-native';
-import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

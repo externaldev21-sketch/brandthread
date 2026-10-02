@@ -13,6 +13,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { previewSellerBrandName } from '@/lib/previewIdentity';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -56,6 +57,10 @@ export default function SellerSettingsScreen() {
   const [scopeSaveError, setScopeSaveError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isSellerDevPreview()) {
+      setIsModerator(false);
+      return;
+    }
     let active = true;
     api.moderation.me()
       .then((result) => { if (active) setIsModerator(result.isModerator); })

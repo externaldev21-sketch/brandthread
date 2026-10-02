@@ -1,7 +1,8 @@
-import * as Sentry from '@sentry/react-native';
 import * as Updates from 'expo-updates';
 import { Platform } from 'react-native';
 import type React from 'react';
+import type * as SentryModule from '@sentry/react-native';
+import { isExpoGo } from '@/lib/expoGoRuntime';
 import { registerServerErrorReporter } from '@/lib/monitoringHooks';
 import {
   resolveDsn,
@@ -13,6 +14,20 @@ import {
 } from '@/lib/monitoringConfig';
 
 let initialized = false;
+let sentry: typeof SentryModule | null = null;
+
+function getSentry(): typeof SentryModule | null {
+  if (sentry) return sentry;
+  if (isExpoGo()) return null;
+  try {
+    // Keep Sentry's native entrypoint out of Expo Go's startup module graph.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    sentry = require('@sentry/react-native') as typeof SentryModule;
+    return sentry;
+  } catch {
+    return null;
+  }
+}
 
 function updateChannel(): string | null {
   if (Platform.OS === 'web') return null;
@@ -32,10 +47,13 @@ function updateChannel(): string | null {
  */
 export function initMonitoring(): boolean {
   if (initialized) return true;
+  if (isExpoGo()) return false;
   const dsn = resolveDsn(process.env.EXPO_PUBLIC_SENTRY_DSN);
   if (!dsn) return false;
 
   try {
+    const Sentry = getSentry();
+    if (!Sentry) return false;
     Sentry.init({
       dsn,
       environment: resolveEnvironment(process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT, updateChannel(), __DEV__),
@@ -80,6 +98,8 @@ export function isMonitoringEnabled(): boolean {
 export function reportError(error: unknown, context?: { componentStack?: string; tags?: Record<string, string> }): void {
   if (!initialized) return;
   try {
+    const Sentry = getSentry();
+    if (!Sentry) return;
     Sentry.withScope((scope) => {
       if (context?.componentStack) {
         scope.setContext('react', { componentStack: context.componentStack });
@@ -96,6 +116,8 @@ export function reportError(error: unknown, context?: { componentStack?: string;
 export function addMonitoringBreadcrumb(category: string, message: string, data?: Record<string, unknown>): void {
   if (!initialized) return;
   try {
+    const Sentry = getSentry();
+    if (!Sentry) return;
     Sentry.addBreadcrumb({ category, message, data, level: 'info' });
   } catch {
     // ignore
@@ -110,6 +132,8 @@ export function addMonitoringBreadcrumb(category: string, message: string, data?
 export function setMonitoringRole(role: string | null | undefined): void {
   if (!initialized) return;
   try {
+    const Sentry = getSentry();
+    if (!Sentry) return;
     Sentry.setTag('account_role', role === 'buyer' || role === 'seller' ? role : 'signed_out');
   } catch {
     // ignore
@@ -120,6 +144,8 @@ export function setMonitoringRole(role: string | null | undefined): void {
 export function wrapRootComponent<T extends React.ComponentType<any>>(Component: T): T {
   if (!initialized) return Component;
   try {
+    const Sentry = getSentry();
+    if (!Sentry) return Component;
     return Sentry.wrap(Component) as unknown as T;
   } catch {
     return Component;
@@ -130,6 +156,8 @@ export function wrapRootComponent<T extends React.ComponentType<any>>(Component:
 function reportServerErrorToSentry(status: number, method: string, path: string): void {
   if (!initialized) return;
   try {
+    const Sentry = getSentry();
+    if (!Sentry) return;
     const route = `${method.toUpperCase()} ${normalizeApiPath(path)}`;
     Sentry.withScope((scope) => {
       scope.setTags({ kind: 'api_5xx', status: String(status), route });

@@ -110,8 +110,12 @@ export default function LaunchPublishScreen() {
       setTimeout(() => setSaved(false), 2500);
     } else {
       Alert.alert(
-        result.reason === 'permission' ? 'Photos access is off' : 'Could not save the QR code',
-        result.reason === 'permission' ? 'Allow Photos access in Settings to save your QR code.' : 'Try again.',
+        result.reason === 'permission' ? 'Photos access is off' : result.reason === 'unavailable' ? 'Photos unavailable' : 'Could not save the QR code',
+        result.reason === 'permission'
+          ? 'Allow Photos access in Settings to save your QR code.'
+          : result.reason === 'unavailable'
+            ? 'Saving to Photos is unavailable in this app build.'
+            : 'Try again.',
       );
     }
   };

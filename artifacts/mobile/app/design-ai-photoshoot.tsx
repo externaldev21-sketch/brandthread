@@ -246,17 +246,19 @@ export default function AIPhotoshootScreen() {
     setSavingIndex(null);
     if (result.ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     else if (result.reason === 'permission') Alert.alert('Permission required', 'Allow photo library access to save this image.');
-    else Alert.alert('Download failed', 'Could not save this image. Please try again.');
+    else Alert.alert(result.reason === 'unavailable' ? 'Unavailable' : 'Download failed',
+      result.reason === 'unavailable' ? 'Saving to Photos is unavailable in this app build.' : 'Could not save this image. Please try again.');
   }
 
   async function handleSaveAll() {
     const uris = doneSlots.map(sl => sl.imageUri!);
     if (uris.length === 0) return;
     setSavingAll(true);
-    const { failed, succeeded } = await saveAllToCameraRoll(uris, 'ai-photoshoot');
+    const { failed, succeeded, unavailable } = await saveAllToCameraRoll(uris, 'ai-photoshoot');
     setSavingAll(false);
     if (failed === 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    else Alert.alert('Some downloads failed', `${succeeded} of ${uris.length} photos saved.`);
+    else Alert.alert(unavailable ? 'Photos unavailable' : 'Some downloads failed',
+      unavailable ? 'Saving to Photos is unavailable in this app build.' : `${succeeded} of ${uris.length} photos saved.`);
   }
 
   async function handleSaveToLibrary(id: number, imageUri: string) {

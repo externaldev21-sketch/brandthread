@@ -8,21 +8,20 @@ const compatibilityGuide = readFileSync(
   'utf8',
 );
 
-describe('Expo Go SDK 57 animation compatibility workaround', () => {
+describe('Expo Go SDK 57 animation compatibility', () => {
   it('keeps the animation libraries on the same documented compatibility pair', () => {
-    expect(dependencies['react-native-reanimated']).toBe('4.5.0');
-    expect(dependencies['react-native-worklets']).toBe('0.10.0');
+    expect(dependencies['react-native-reanimated']).toBe('4.5.1');
+    expect(dependencies['react-native-worklets']).toBe('0.10.1');
     expect(dependencies.expo).toMatch(/^~57\./);
   });
 
-  it('limits the deliberate Expo dependency-check exceptions to the animation pair', () => {
-    expect([...packageJson.expo.install.exclude].sort()).toEqual([
-      'react-native-reanimated',
-      'react-native-worklets',
-    ]);
+  it('validates the animation pair instead of excluding it from SDK checks', () => {
+    const excluded = packageJson.expo.install?.exclude ?? [];
+    expect(excluded).not.toContain('react-native-reanimated');
+    expect(excluded).not.toContain('react-native-worklets');
   });
 
-  it('records the upstream evidence and requires a native cold launch before retiring the workaround', () => {
+  it('records upstream evidence and requires a native cold launch to verify the phone', () => {
     expect(compatibilityGuide).toContain('https://github.com/expo/expo/issues/48390');
     expect(compatibilityGuide).toContain('successful cold launch');
     expect(compatibilityGuide).toContain('not proof');

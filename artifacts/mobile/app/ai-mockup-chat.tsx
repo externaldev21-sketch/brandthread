@@ -8,7 +8,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';

@@ -29,19 +29,26 @@ describe('development app preview routing', () => {
 
   it('uses populated seller analytics and balances instead of protected APIs in preview', () => {
     expect(dashboardSource).toContain('const sellerPreview = isSellerDevPreview();');
-    expect(dashboardSource).toContain('previewSellerHomeAnalytics(range)');
+    expect(dashboardSource).toContain("from '@/lib/previewSellerChartData'");
+    expect(dashboardSource).toContain("buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh')");
     expect(dashboardSource).toContain("formatted: '$4,281.22'");
     expect(dashboardSource).toContain("formatted: '$1,842.50'");
   });
 
-  it('temporarily enters buyer on native development without persisting onboarding or affecting production', () => {
+  it('enters seller preview only when explicitly enabled in native development', () => {
     const devBypassSource = readFileSync(path.resolve(__dirname, '../lib/devBypass.ts'), 'utf8');
-    expect(devBypassSource).toContain('process.env.EXPO_PUBLIC_DEV_BYPASS_ROLE');
+    const buildFlagsSource = readFileSync(path.resolve(__dirname, '../lib/buildFlags.ts'), 'utf8');
+    expect(buildFlagsSource).toMatch(
+      /export const DEV_SELLER_PREVIEW = resolveDevSellerPreview\(\s*__DEV__,\s*IS_PROD_NATIVE,\s*process\.env\.EXPO_PUBLIC_DEV_PREVIEW,\s*\);/,
+    );
     expect(devBypassSource).toContain("!__DEV__ ? null");
-    expect(devBypassSource).toContain("Platform.OS !== 'web' ? 'buyer'");
-    expect(layoutSource).toContain('if (PREVIEW_ROLE || DEV_BYPASS_ROLE)');
-    expect(layoutSource).toContain('{PREVIEW_ROLE || DEV_BYPASS_ROLE ? (');
+    expect(devBypassSource).toContain("Platform.OS !== 'web' ? (DEV_SELLER_PREVIEW ? 'seller' : null)");
+    expect(layoutSource).toContain("DEV_BYPASS_ROLE === 'seller'");
+    expect(layoutSource).toContain('{PREVIEW_SESSION_ROLE || DEV_BYPASS_ROLE ? (');
     expect(indexSource).toContain("effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'");
     expect(devBypassSource).not.toContain('AsyncStorage');
+    expect(layoutSource).toMatch(
+      /if \(Platform\.OS !== 'web' && DEV_BYPASS_ROLE === 'seller'\) \{\s*setOnboardingChecked\(true\);\s*setOnboardingDone\(true\);[\s\S]*?return;\s*\}/,
+    );
   });
 });

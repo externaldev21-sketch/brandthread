@@ -16,7 +16,7 @@ import {
   ActivityIndicator, Alert, FlatList, Image, Modal, Platform, Pressable,
   RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +36,7 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { PendingManufacturerOperations } from '@/services/manufacturerIdempotency';
 import { getCallAvailability, type OrderCardSnapshot } from '@/services/manufacturerOrderFlow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,11 @@ export default function ManufacturerMessagesScreen() {
   }, [router]);
 
   const loadMessages = useCallback(async (id: string) => {
+    if (isSellerDevPreview()) {
+      setLoadError('Manufacturer messaging is unavailable in the signed-out preview.');
+      setRefreshing(false);
+      return;
+    }
     try {
       const rows: ApiMessage[] = await api.manufacturers.threads.messages.list(id);
       setMessages([...rows].reverse());
@@ -200,6 +206,11 @@ export default function ManufacturerMessagesScreen() {
   const { pay, payingId, outcome } = useOrderCardPayment(() => { if (threadId) void loadMessages(threadId); });
 
   useEffect(() => {
+    if (isSellerDevPreview()) {
+      setLoadError('Manufacturer messaging is unavailable in the signed-out preview.');
+      setLoading(false);
+      return;
+    }
     if (!authLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
@@ -234,7 +245,7 @@ export default function ManufacturerMessagesScreen() {
   }, [authLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!threadId) return;
+    if (!threadId || isSellerDevPreview()) return;
     const timer = setInterval(() => { void loadMessages(threadId); }, 5_000);
     const clock = setInterval(() => setClock((tick) => tick + 1), 60_000);
     return () => { clearInterval(timer); clearInterval(clock); };
@@ -364,7 +375,13 @@ export default function ManufacturerMessagesScreen() {
         {header}
         <View style={s.center}>
           <EmptyState icon="wifi-off" title="Conversation unavailable" description={loadError} />
-          <SecondaryButton label="Try again" onPress={() => { setLoading(true); if (threadId) void loadMessages(threadId).finally(() => setLoading(false)); else goBackOr(router); }} />
+          <SecondaryButton
+            label={isSellerDevPreview() ? 'Back' : 'Try again'}
+            onPress={() => {
+              if (isSellerDevPreview()) goBackOr(router);
+              else { setLoading(true); if (threadId) void loadMessages(threadId).finally(() => setLoading(false)); else goBackOr(router); }
+            }}
+          />
         </View>
       </View>
     );

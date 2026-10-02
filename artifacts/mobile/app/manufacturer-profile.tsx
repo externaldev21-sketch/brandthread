@@ -38,6 +38,7 @@ import { getManufacturerProducts, lowestTierPriceCents, type ManufacturerProduct
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { formatCents } from '@/lib/money';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
@@ -145,6 +146,10 @@ export default function ManufacturerProfileScreen() {
   async function handleMessage() {
     if (!id) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isSellerDevPreview()) {
+      Alert.alert('Offline in preview', 'Manufacturer messaging is unavailable in the signed-out demo.');
+      return;
+    }
     try {
       const conv = await getOrCreateConversation(id, { contextLabel: 'General' });
       router.push(('/manufacturer-messages?threadId=' + conv.id) as never);

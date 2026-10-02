@@ -7,7 +7,7 @@ description: Preventing installed custom native modules from crashing Brandthrea
 
 **Why:** Metro can produce a valid manifest and complete iOS/Android bundles even when the app will fail at launch because a statically imported package requests an unavailable native module. Bundle success alone does not prove Expo Go runtime compatibility.
 
-**How to apply:** When QR launch fails, run Expo dependency checks, fetch both native launch assets, then inspect root and route imports for third-party native packages. Confirm the corrected bundles exclude the incompatible module and restart Metro after changing the startup graph.
+**How to apply:** When QR launch fails, run Expo dependency checks, fetch both native launch assets, then inspect root and route imports for third-party native packages. Confirm guards prevent incompatible native initialization and restart Metro after changing the startup graph. A lazy `require` can leave code in the bundle without evaluating it; bundle inclusion alone is not evidence of a startup failure.
 
 If Expo Go exits to the iPhone home screen with no JavaScript exception, Replit's workflow logs cannot reveal the iOS process termination reason. A successful native bundle or even a logged first render does not identify the crashing native component.
 
@@ -20,3 +20,9 @@ Expo Doctor's recommended JavaScript dependencies can temporarily differ from th
 **Why:** Expo maintainers documented SDK 57 clients with native Worklets 0.10.0/Reanimated 4.5.0 while dependency checks recommended 0.10.1/4.5.1; affected clients could terminate without a JavaScript error even when Doctor passed. The reported correction was an Expo Go binary update, not a project cache repair. See https://github.com/expo/expo/issues/48390.
 
 **How to apply:** Verify the current Expo Go release and device crash evidence against upstream reports; do not assume matching symptoms establish the same cause. Align JavaScript packages with the installed native runtime rather than blindly pinning versions from an older workaround.
+
+**Rule:** An Expo-branded package can still expose an entrypoint unavailable in an older Expo Go binary; distinguish bridge registration from package installation before disabling an entire feature.
+
+**Why:** SDK 57 media-library's newer entrypoint requested `ExpoMediaLibraryNext` in a recorded JavaScript startup failure. An installed package and passing Doctor did not establish that the client's bridge exposed that API; legacy media access may still be available.
+
+**How to apply:** Preflight the needed native registration before evaluating the entrypoint, retain supported or legacy implementations where possible, and give an explicit unavailable outcome otherwise. Do not attribute an iOS process termination to that JavaScript error without device evidence.

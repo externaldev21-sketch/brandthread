@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { isSellerDevPreview, isPreviewDemoMode, isPreviewFreshMode } from '@/lib/devPreview';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -33,7 +33,7 @@ import {
   StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import {
   searchManufacturers, getRelationships, getRelationship,
-  saveManufacturer, getManufacturer,
+  saveManufacturer, getManufacturer, favoriteManufacturer,
   getFavoriteManufacturerIds, unfavoriteManufacturer,
   getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest,
   getSamples, getProductionOrders,
@@ -174,7 +174,10 @@ export default function ManufacturerHub() {
 
   const { hasPlan, loading: planLoading, error: planError } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
-  const hasGrowthAccess = !GROWTH_PLAN_ENFORCEMENT_ENABLED || hasPlan('growth');
+  // The demo opens the browse-only manufacturer UI without fabricating a
+  // paid entitlement. All mutation/payment APIs remain blocked by the preview
+  // network policy.
+  const hasGrowthAccess = isSellerDevPreview() || !GROWTH_PLAN_ENFORCEMENT_ENABLED || hasPlan('growth');
 
   useEffect(() => {
     if (isTab(tab)) setActiveTab(tab);
@@ -183,7 +186,7 @@ export default function ManufacturerHub() {
   // Native modals use a global portal, so the gate must follow route focus.
   useFocusEffect(
     useCallback(() => {
-      if (!planLoading && !planError && !hasGrowthAccess) {
+      if (!isSellerDevPreview() && !planLoading && !planError && !hasGrowthAccess) {
         setUpsellVisible(true);
       }
       return () => setUpsellVisible(false);
@@ -366,20 +369,8 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []));
 
   const load = useCallback(async (query = searchQuery, f = filters) => {
-    // Preview mode (?bt_preview=seller) never signs in via Clerk, so the
-    // real, requireAuth'd directory endpoint always 401s here — that's what
-    // produced the broken "Directory unavailable" error for every preview
-    // visitor. Fresh preview shows the honest empty state; &demo=1 shows a
-    // realistic seeded directory. A real signed-in seller never takes this
-    // branch and always hits the live API below.
-    if (isSellerDevPreview()) {
-      setLoadError(false);
-      setManufacturers(isPreviewDemoMode() ? getPreviewManufacturers() : []);
-      setSavedIds(new Set());
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+    // The service returns a contract-shaped local directory in demo mode and
+    // an empty list in fresh mode; live accounts still use the API.
     try {
       // allSettled (not all): favorites is a nice-to-have overlay on the
       // directory, not a co-requirement. A favorites-only outage used to
@@ -441,6 +432,8 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
     // heart still works, purely as local UI state, same as every other
     // preview-safe screen's local-only interactions.
     if (isSellerDevPreview()) {
+      if (savedIds.has(mfg.id)) await unfavoriteManufacturer(mfg.id);
+      else await favoriteManufacturer(mfg.id);
       setSavedIds(prev => {
         const next = new Set(prev);
         if (next.has(mfg.id)) next.delete(mfg.id); else next.add(mfg.id);
@@ -479,6 +472,10 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
       const conv = await getOrCreateConversation(mfg.id);
       router.push((`/manufacturer-messages?threadId=${conv.id}`) as never);
     } catch (e) {
+      if (isSellerDevPreview()) {
+        setMutationError('Messaging is unavailable in the signed-out preview.');
+        return;
+      }
       showManufacturerUpgrade(e, router);
       console.error(e);
     }
@@ -1046,15 +1043,13 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
-    // No signed-in seller in preview, so a fresh preview seller genuinely
-    // has zero relationships yet — the real empty state below, not an error.
-    if (isSellerDevPreview()) { setError(false); setRelationships([]); setLoading(false); setRefreshing(false); return; }
+    // Demo relationships are local fixtures; fresh preview correctly has none.
     try {
       setError(false);
       const rels = await getRelationships();
       const safeRels = (Array.isArray(rels) ? rels : []).filter((rel) => rel.manufacturer);
       setRelationships(safeRels);
-      await completeSetupTaskWhen('connect_manufacturer', safeRels.length > 0);
+      if (!isSellerDevPreview()) await completeSetupTaskWhen('connect_manufacturer', safeRels.length > 0);
     } catch (e) {
       if (!showManufacturerUpgrade(e, router)) setError(true);
       console.error(e);
@@ -1626,7 +1621,6 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
-    if (isSellerDevPreview()) { setError(false); setConversations([]); setLoading(false); setRefreshing(false); return; }
     try {
       setError(false);
       const convs = await getConversations();

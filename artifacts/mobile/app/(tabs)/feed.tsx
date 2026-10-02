@@ -7,7 +7,7 @@ import {
   AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';

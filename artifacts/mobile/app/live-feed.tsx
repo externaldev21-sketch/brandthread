@@ -21,7 +21,7 @@ import {
   AccessibilityInfo, useWindowDimensions,
 } from 'react-native';
 import { Asset } from 'expo-asset';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';

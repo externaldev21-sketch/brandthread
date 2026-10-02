@@ -246,7 +246,9 @@ export function ShareProfileSheet({
       } else {
         const result = await saveCardImageToLibrary(uri);
         if (result.ok) showToast('Saved to Photos');
-        else showToast('Enable Photos access to save this.', 'error');
+        else showToast(result.unavailable
+          ? 'Saving to Photos is unavailable in this app build.'
+          : 'Enable Photos access to save this.', 'error');
       }
     });
   }, [busy, normalizedUsername, runAction, showToast]);

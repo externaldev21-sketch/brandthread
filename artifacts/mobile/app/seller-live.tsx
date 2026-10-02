@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator, Dimensions } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -26,14 +26,12 @@ import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import { radius } from '@/constants/radii';
+import { loadAgoraModule } from '@/lib/agoraAvailability';
 
 const { width: W, height: H } = Dimensions.get('window');
 
 // ─── Agora SDK (native-only, gracefully skipped on web/Expo Go) ───────────────
-let AgoraModule: any = null;
-try {
-  AgoraModule = require('react-native-agora');
-} catch {}
+const AgoraModule = loadAgoraModule();
 
 interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 

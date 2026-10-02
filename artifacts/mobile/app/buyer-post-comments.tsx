@@ -27,7 +27,7 @@ import {
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import Composer from '@/components/ui/Composer';
-import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

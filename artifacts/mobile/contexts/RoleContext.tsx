@@ -45,7 +45,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     if (previewRole) {
       setRoleState(previewRole);
       setIsLoaded(true);
-      void AsyncStorage.setItem(roleKeyForUser('preview'), previewRole);
       return;
     }
     if (!authLoaded) return;
@@ -77,9 +76,10 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, [previewRole, userId, authLoaded]);
 
   async function setRole(r: UserRole) {
+    if (previewRole) return;
     setRoleState(r);
     if (!r) return;
-    const key = previewRole ? roleKeyForUser('preview') : userId ? roleKeyForUser(userId) : null;
+    const key = userId ? roleKeyForUser(userId) : null;
     if (key) await AsyncStorage.setItem(key, r);
   }
 

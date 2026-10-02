@@ -31,6 +31,7 @@ import {
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput,
 } from '@/components/BrandthreadUI';
 import { replaceBackground } from '@/services/designService';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -161,7 +162,11 @@ export default function DesignBgReplaceScreen({
     if (!resultUri) return;
     setIsSaving(true);
     try {
-      const MediaLibrary = await import('expo-media-library');
+      const MediaLibrary = getMediaLibrary();
+      if (!MediaLibrary) {
+        Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+        return;
+      }
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Allow photo library access to save this image.');

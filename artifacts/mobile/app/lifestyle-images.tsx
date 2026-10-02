@@ -13,7 +13,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { getProducts, updateProduct } from '@/services/productService';
 import { Product, ProductMedia } from '@/services/productTypes';
 
@@ -72,7 +73,8 @@ export default function LifestyleImagesScreen() {
       } else if (outcome === 'denied') {
         Alert.alert('Permission required', 'Allow photo library access to save this image.');
       } else {
-        Alert.alert('Save failed', 'Could not save this image. Please try again.');
+        Alert.alert(outcome === 'unavailable' ? 'Unavailable' : 'Save failed',
+          outcome === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Could not save this image. Please try again.');
       }
     } catch {
       Alert.alert('Save failed', 'Could not save this image. Please try again.');

@@ -19,11 +19,13 @@ const GATED_ENV_VARS = [
   'EXPO_PUBLIC_REVENUECAT_TEST_API_KEY',
   'EXPO_PUBLIC_BT_GROWTH_BYPASS',
   'EXPO_PUBLIC_DEV_BYPASS_ROLE',
+  'EXPO_PUBLIC_DEV_PREVIEW',
 ];
 
 /** The one place allowed to read them, plus the `__DEV__`-guarded role bypass. */
 const ALLOWED: Record<string, { file: string; mustContain?: string }[]> = {
   EXPO_PUBLIC_DEV_BYPASS_ROLE: [{ file: 'lib/devBypass.ts', mustContain: '__DEV__ &&' }],
+  EXPO_PUBLIC_DEV_PREVIEW: [{ file: 'lib/buildFlags.ts', mustContain: '__DEV__ && !IS_PROD_NATIVE' }],
 };
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -92,6 +94,7 @@ describe('production-gated flags are referenced only through lib/buildFlags.ts',
       'app/seller-conversation.tsx',
       'app/buyer-conversation.tsx',
       'lib/devPreview.ts',
+      'lib/previewRoleSelection.ts',
       'contexts/RoleContext.tsx',
       'contexts/AppThemeContext.tsx',
       'contexts/CookieConsentContext.tsx',
@@ -117,8 +120,22 @@ describe('production-gated flags are referenced only through lib/buildFlags.ts',
       const reads = codeLines(src).some((l) =>
         /\.get\(['"](bt_preview|demo|bt_theme|bt_capture|bt_call)['"]\)/.test(l.text),
       );
-      if (reads && rel !== 'lib/devPreview.ts' && !GATE.test(src)) offenders.push(rel);
+      if (reads && !['lib/devPreview.ts', 'lib/previewRoleSelection.ts'].includes(rel) && !GATE.test(src)) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('keeps the pure preview-role parser behind gated callers', () => {
+    const parser = readFileSync(join(ROOT, 'lib/previewRoleSelection.ts'), 'utf8');
+    const devPreview = readFileSync(join(ROOT, 'lib/devPreview.ts'), 'utf8');
+    const layout = readFileSync(join(ROOT, 'app/_layout.tsx'), 'utf8');
+
+    expect(parser).toContain("new URLSearchParams(search).get('bt_preview')");
+    expect(devPreview.indexOf("if (!__DEV__ || Platform.OS !== 'web'")).toBeLessThan(
+      devPreview.indexOf('resolvePreviewRole(search, savedRole)'),
+    );
+    expect(layout.indexOf('if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !==')).toBeLessThan(
+      layout.indexOf("new URLSearchParams(window.location.search).get('bt_preview')"),
+    );
   });
 });

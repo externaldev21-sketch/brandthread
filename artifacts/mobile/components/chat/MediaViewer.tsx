@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 /**
@@ -99,7 +100,7 @@ export default function MediaViewer({
       const result = await saveImageToMediaLibrary(uri);
       if (result === 'saved') Alert.alert('Saved', 'Photo saved to your library.');
       else if (result === 'denied') Alert.alert('Permission needed', 'Allow photo library access in Settings to save.');
-      else Alert.alert('Unavailable', 'Saving photos is not available here.');
+      else Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
     } catch {
       Alert.alert('Save failed', 'Could not save the photo.');
     } finally {

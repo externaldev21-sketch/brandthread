@@ -31,6 +31,21 @@ export const IS_PROD_NATIVE = !__DEV__ && !!EXPO_OS && EXPO_OS !== 'web';
 export const NAVIGATION_ISOLATION_TEST =
   !IS_PROD_NATIVE && process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
+/** Temporary Expo Go / dev-web seller preview. Never enabled in release builds. */
+export function resolveDevSellerPreview(isDev: boolean, isProductionNative: boolean, value?: string): boolean {
+  return isDev && !isProductionNative && value === 'seller';
+}
+
+export const DEV_SELLER_PREVIEW = resolveDevSellerPreview(
+  __DEV__,
+  IS_PROD_NATIVE,
+  process.env.EXPO_PUBLIC_DEV_PREVIEW,
+);
+
+const requestedWebRole = __DEV__ ? process.env.EXPO_PUBLIC_DEV_BYPASS_ROLE : undefined;
+export const DEV_WEB_BYPASS_ROLE: 'buyer' | 'seller' | null =
+  requestedWebRole === 'buyer' || requestedWebRole === 'seller' ? requestedWebRole : null;
+
 /** Dev build or the test/preview web export: preview bypass, test hooks allowed. */
 export const ALLOW_DEV_TOOLS = __DEV__ || NAVIGATION_ISOLATION_TEST;
 

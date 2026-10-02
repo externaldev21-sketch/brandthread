@@ -182,6 +182,10 @@ vi.mock('@/components/BrandthreadUI', () => {
   };
 });
 
+vi.mock('@/components/first-run-tips/FirstRunTip', () => ({
+  FirstRunTip: () => null,
+}));
+
 vi.mock('@/components/layout', () => {
   const React = require('react') as typeof import('react');
   return {

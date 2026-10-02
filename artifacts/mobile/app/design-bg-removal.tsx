@@ -40,13 +40,8 @@ import { pickImageOnWeb, fileToPickedImage } from '@/lib/webFilePicker';
 import { makeDemoCutout } from '@/lib/demoCutout';
 import { saveResult } from '@/services/bgRemovalService';
 import { BG, FG, MUTED, BORDER, RED, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 
-// expo-media-library has no web implementation — required lazily on native only.
-let MediaLibrary: typeof import('expo-media-library/legacy') | null = null;
-if (Platform.OS !== 'web') {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  MediaLibrary = require('expo-media-library/legacy');
-}
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -154,14 +149,15 @@ export default function DesignBgRemovalScreen() {
   // Native: the user's real library feeds the strip. Web has no library API, so
   // the strip starts with just the "+" tile and gains the photos picked here.
   useEffect(() => {
+    const MediaLibrary = getMediaLibrary();
     if (!MediaLibrary) return;
     let cancelled = false;
     (async () => {
       try {
-        const perm = await MediaLibrary!.requestPermissionsAsync();
+        const perm = await MediaLibrary.requestPermissionsAsync();
         if (!perm.granted) return;
-        const page = await MediaLibrary!.getAssetsAsync({
-          mediaType: ['photo'], sortBy: [[MediaLibrary!.SortBy.creationTime, false]], first: 30,
+        const page = await MediaLibrary.getAssetsAsync({
+          mediaType: ['photo'], sortBy: [[MediaLibrary.SortBy.creationTime, false]], first: 30,
         });
         if (!cancelled) setRecent(page.assets.map(a => ({ key: a.id, uri: a.uri, assetId: a.id })));
       } catch { /* no access — the "+" tile still opens the system picker */ }
@@ -237,7 +233,9 @@ export default function DesignBgRemovalScreen() {
       return;
     }
     try {
-      const info = await MediaLibrary!.getAssetInfoAsync(item.assetId);
+      const MediaLibrary = getMediaLibrary();
+      if (!MediaLibrary) throw new Error('Photo library unavailable');
+      const info = await MediaLibrary.getAssetInfoAsync(item.assetId);
       const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
       const out = await manipulateAsync(info.localUri ?? item.uri, [{ resize: { width: 2048 } }], { compress: 0.92, format: SaveFormat.JPEG, base64: true });
       if (!out.base64) throw new Error('no data');
@@ -273,6 +271,9 @@ export default function DesignBgRemovalScreen() {
         if (controller.signal.aborted) return;
         setCutoutUri(uri);
         return;
+      }
+      if (isSellerDevPreview()) {
+        return fail('Background removal is unavailable in the signed-out seller preview.');
       }
       const token = await getToken();
       if (!token) return fail('Session expired. Please sign in again.');
@@ -335,6 +336,8 @@ export default function DesignBgRemovalScreen() {
         savedTimer.current = setTimeout(() => setSaved(false), 1800);
       } else if (result.reason === 'permission') {
         Alert.alert('Permission required', 'Allow photo library access to save this image.');
+      } else if (result.reason === 'unavailable') {
+        Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
       } else {
         Alert.alert('Save failed', 'Could not save to photo library. Please try again.');
       }

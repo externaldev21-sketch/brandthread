@@ -9,12 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import type { PickedAsset } from '@/lib/createPost/types';
-
-let MediaLibrary: typeof import('expo-media-library/legacy') | null = null;
-if (Platform.OS !== 'web') {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  MediaLibrary = require('expo-media-library/legacy');
-}
+import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 
 const PAGE_SIZE = 60;
 export interface AlbumOption { id: string | null; title: string }
@@ -54,7 +49,8 @@ export function useDeviceMedia({ pageSize = PAGE_SIZE }: { pageSize?: number } =
   const busy = useRef(false);
 
   const loadPage = useCallback(async (target: string | null, reset: boolean, after?: string) => {
-    if (isWeb || !MediaLibrary || busy.current) return;
+    const MediaLibrary = isWeb ? null : getMediaLibrary();
+    if (!MediaLibrary || busy.current) return;
     busy.current = true;
     setLoading(true);
     try {
@@ -81,7 +77,11 @@ export function useDeviceMedia({ pageSize = PAGE_SIZE }: { pageSize?: number } =
   }, [isWeb, pageSize]);
 
   const requestAccess = useCallback(async () => {
-    if (isWeb || !MediaLibrary) return;
+    const MediaLibrary = isWeb ? null : getMediaLibrary();
+    if (!MediaLibrary) {
+      setPermission('denied');
+      return;
+    }
     const current = await MediaLibrary.getPermissionsAsync();
     const result = current.granted ? current : await MediaLibrary.requestPermissionsAsync();
     setPermission(result.granted ? 'granted' : 'denied');

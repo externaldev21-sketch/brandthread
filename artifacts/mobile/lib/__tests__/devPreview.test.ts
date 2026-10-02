@@ -407,7 +407,7 @@ describe('production-host hard gate is wired into the real module (source check)
   it("app/_layout.tsx's PREVIEW_ROLE also calls the same gate (no duplicated, unguarded copy)", () => {
     const { readFileSync } = require('fs');
     const layoutSrc: string = readFileSync(resolve(__dirname, '../../app/_layout.tsx'), 'utf8');
-    expect(layoutSrc).toContain("import { isProductionPreviewHost } from '@/lib/devPreview';");
+    expect(layoutSrc).toMatch(/import\s*\{[^}]*\bisProductionPreviewHost\b[^}]*\}\s*from\s*['"]@\/lib\/devPreview['"]/s);
     expect(layoutSrc).toContain('if (isProductionPreviewHost()) return null;');
   });
 });

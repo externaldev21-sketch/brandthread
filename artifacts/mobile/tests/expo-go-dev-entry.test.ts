@@ -14,14 +14,16 @@ const subscription = readFileSync(resolve(__dirname, '../hooks/useSubscriptionPl
 const dashboardContent = readFileSync(resolve(__dirname, '../components/SellerHomeCommerceDashboard.tsx'), 'utf8');
 
 describe('Expo Go development entry', () => {
-  it('waits for Clerk and routes new native testers through onboarding', () => {
-    expect(bypass).toContain("DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null");
-    expect(layout).not.toContain('if (DEV_BYPASS_ROLE');
-    expect(layout).toContain('{PREVIEW_ROLE ? (');
+  it('uses native dev-role routing while retaining web preview and normal auth gates', () => {
+    expect(bypass).toContain("DEV_BYPASS_ROLE: 'buyer' | 'seller' | null =");
+    expect(bypass).toContain("DEV_SELLER_PREVIEW ? 'seller' : null");
+    expect(layout).toContain("DEV_BYPASS_ROLE === 'seller'");
+    expect(layout).toContain('{PREVIEW_SESSION_ROLE || DEV_BYPASS_ROLE ? (');
     expect(layout).toContain('<ClerkLoaded>{appTree}</ClerkLoaded>');
     expect(layout).toContain("router.replace(splashSeen ? '/sign-in' : '/splash')");
     expect(layout).toContain("router.replace('/onboarding')");
-    expect(entry).toContain("if (Platform.OS !== 'web') return");
+    expect(entry).toContain("if (Platform.OS === 'web') {");
+    expect(entry).toContain('effectivePreviewRole = DEV_BYPASS_ROLE;');
   });
 
   it('never mounts seller dashboard requests without a native session', () => {
@@ -34,11 +36,12 @@ describe('Expo Go development entry', () => {
     expect(orders).toContain('await api.orders.list()');
   });
 
-  it('keeps signed-out review previews away from account-only requests', () => {
+  it('keeps seller demo data local and account-only services behind signed-in guards', () => {
     expect(theme).toContain('if (!userId) return;');
     expect(icons).toContain('if (!userId) {');
     expect(flags).toContain('if (!isSignedIn) return;');
     expect(subscription).toContain('if (!isSignedIn || !userId) {');
-    expect(dashboardContent).toContain('Design preview · no account');
+    expect(dashboardContent).toContain('if (sellerPreview) {');
+    expect(dashboardContent).toContain('const previewOrders = isPreviewDemoMode() ? allPreviewSellerOrders() : [];');
   });
 });

@@ -16,6 +16,7 @@ import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { bulkErrorMessage, errorCode, type ProductSeoDetail } from '@/lib/productBulk';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 const SITE_HOST = 'brandthread.app';
 
@@ -55,7 +56,15 @@ export default function ProductSeoScreen() {
   }, []);
 
   useEffect(() => {
-    if (!productId || !isLoaded || !isSignedIn) return;
+    if (isSellerDevPreview()) {
+      setLoadError('Product SEO editing is unavailable in the signed-out preview.');
+      setLoading(false);
+      return;
+    }
+    if (!productId || !isLoaded || !isSignedIn) {
+      if (isLoaded) setLoading(false);
+      return;
+    }
     let live = true;
     setLoading(true);
     api.productSeo.get(String(productId))

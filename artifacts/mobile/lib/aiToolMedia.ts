@@ -9,6 +9,7 @@
  */
 import { Platform, Share } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 
 /** Programmatically download a data/http(s) URL in the browser. */
 export function triggerWebDownload(url: string, filename: string) {
@@ -35,18 +36,19 @@ async function dataUrlToLocalFile(imageUri: string, prefix: string): Promise<str
  * since screens differ on how loud that confirmation should be).
  */
 export async function saveImageToCameraRoll(imageUri: string, filenamePrefix = 'brandthread'): Promise<
-  { ok: true } | { ok: false; reason: 'permission' | 'error' }
+  { ok: true } | { ok: false; reason: 'permission' | 'error' | 'unavailable' }
 > {
   if (Platform.OS === 'web') {
     triggerWebDownload(imageUri, `${filenamePrefix}-${Date.now()}.png`);
     return { ok: true };
   }
   try {
-    const MediaLibrary = await import('expo-media-library');
+    const MediaLibrary = getMediaLibrary();
+    if (!MediaLibrary) return { ok: false, reason: 'unavailable' };
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') return { ok: false, reason: 'permission' };
     const fileUri = await dataUrlToLocalFile(imageUri, filenamePrefix);
-    await MediaLibrary.saveToLibraryAsync(fileUri);
+    await MediaLibrary.createAssetAsync(fileUri);
     return { ok: true };
   } catch {
     return { ok: false, reason: 'error' };
@@ -57,15 +59,19 @@ export async function saveImageToCameraRoll(imageUri: string, filenamePrefix = '
 export async function saveAllToCameraRoll(
   imageUris: string[],
   filenamePrefix = 'brandthread',
-): Promise<{ succeeded: number; failed: number }> {
+): Promise<{ succeeded: number; failed: number; unavailable: number }> {
   let succeeded = 0;
   let failed = 0;
+  let unavailable = 0;
   for (const uri of imageUris) {
     const result = await saveImageToCameraRoll(uri, filenamePrefix);
     if (result.ok) succeeded++;
-    else failed++;
+    else {
+      failed++;
+      if (result.reason === 'unavailable') unavailable++;
+    }
   }
-  return { succeeded, failed };
+  return { succeeded, failed, unavailable };
 }
 
 /** Opens the native share sheet (native) or downloads (web, no share sheet exists). */

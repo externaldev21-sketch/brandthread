@@ -60,19 +60,10 @@ import {
 import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackground, sampleImageColor } from '@/lib/storyReshare';
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
+import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
-
-// expo-media-library has no web implementation — imported lazily (require)
-// only on native, same convention as components/create-post/MediaGrid.tsx.
-// The imperative getAssetsAsync/SortBy API used below lives under the
-// `/legacy` subpath in expo-media-library 57.
-let MediaLibrary: typeof import('expo-media-library/legacy') | null = null;
-if (!IS_WEB) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  MediaLibrary = require('expo-media-library/legacy');
-}
 
 type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
@@ -550,7 +541,8 @@ export default function StoryComposer() {
   // they've tapped anything. Falls back to the icon glyph until granted or
   // if the library is empty.
   useEffect(() => {
-    if (IS_WEB || !MediaLibrary) return;
+    const MediaLibrary = IS_WEB ? null : getMediaLibrary();
+    if (!MediaLibrary) return;
     void (async () => {
       try {
         const perm = await MediaLibrary.getPermissionsAsync();
