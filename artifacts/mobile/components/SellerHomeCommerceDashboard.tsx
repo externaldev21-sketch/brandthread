@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ApiError } from '@/lib/networkNotice';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -194,10 +194,13 @@ export default function SellerHomeCommerceDashboard({
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
-  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
+  // Scroll content must end ABOVE the floating bar — tab bar height + bottom
+  // safe inset + 16 (shared helper, same rule app-wide).
+  const tabBarClearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
   const scrollResetRef = useScrollReset<ScrollView>();
 
-  const [range, setRange] = useState<SellerDashboardRange>('week');
+  // Opens on Today every launch (Dev) — nothing persisted across launches.
+  const [range, setRange] = useState<SellerDashboardRange>('today');
   const [metric, setMetric] = useState<MetricKey>('sales');
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
@@ -696,7 +699,7 @@ export default function SellerHomeCommerceDashboard({
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarMetrics.occupiedHeight + SP.md }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12, paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
