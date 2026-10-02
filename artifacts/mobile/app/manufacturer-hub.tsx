@@ -4,7 +4,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
@@ -20,7 +19,7 @@ import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { isSellerDevPreview, isPreviewDemoMode, isPreviewFreshMode } from '@/lib/devPreview';
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
@@ -165,11 +164,9 @@ export default function ManufacturerHub() {
   const isSellerSetup = isSellerSetupOrigin(from);
 
   function leaveSetupDestination() {
-    if (isSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, from);
   }
 
   const { hasPlan, loading: planLoading, error: planError } = useSubscriptionPlan();
