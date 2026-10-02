@@ -19,10 +19,9 @@ import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashCard';
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
@@ -91,11 +90,9 @@ export default function PayoutsScreen() {
   const [cashOutVisible, setCashOutVisible] = useState(false);
 
   function leaveSetupDestination() {
-    if (launchedFromSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router, '/(tabs)/more');
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from, '/(tabs)/more');
   }
 
   const refreshConnectStatus = useCallback(async () => {

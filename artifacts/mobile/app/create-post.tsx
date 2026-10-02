@@ -3,7 +3,6 @@
 // Screen B: video-edit   → full-screen video preview, floating right toolbar
 // Screen C: post-details → caption + thumbnail at top, settings rows, dual CTA
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
@@ -44,7 +43,7 @@ import {
 } from '@/lib/videoEditing';
 import type { TextOverlay } from '@/lib/videoEditing';
 import { TextOverlayEditor, OverlayChip } from '@/components/TextOverlayEditor';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { startPostUpload, updatePostUploadProgress, completePostUpload, failPostUpload } from '@/lib/postUploadProgress';
 import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
@@ -473,8 +472,9 @@ export default function CreatePostScreen() {
   const botPad = insets.bottom;
 
   function leaveSetupDestination() {
-    if (isSellerSetup) { router.replace(SELLER_HOME_ROUTE as never); return; }
-    goBackOr(router);
+    // Pop to the exact screen underneath; a cold deep link with no history
+    // falls back to the explicit `from` origin.
+    leaveSetupFlow(router, params.from);
   }
 
   // ── Step ──
@@ -2237,7 +2237,14 @@ export default function CreatePostScreen() {
         <TouchableOpacity
           style={[ts.nextBtn, { marginTop: 32, alignSelf: 'stretch', marginHorizontal: 32 }]}
           activeOpacity={0.85}
-          onPress={() => haptic(() => router.replace((isSellerSetup ? SELLER_HOME_ROUTE : '/(tabs)/profile') as never))}
+          onPress={() => haptic(() => {
+            // Setup task: back to the dashboard / checklist it was opened from.
+            // Otherwise navigate (not replace) to the profile tab: navigate pops
+            // the root stack back to the existing (tabs) scene and switches
+            // tab, instead of stacking a second (tabs) instance.
+            if (isSellerSetup) leaveSetupDestination();
+            else router.navigate('/(tabs)/profile' as never);
+          })}
         >
           <LinearGradient colors={theme.primaryGradient} style={ts.nextBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <Text style={[ts.nextBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>View Profile</Text>

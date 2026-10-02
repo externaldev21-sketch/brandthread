@@ -31,7 +31,7 @@ import {
   markWalkthroughShown, markCelebrated,
   type SetupState, type SetupTask,
 } from '@/lib/setupStore';
-import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { withOrigin } from '@/lib/navigation/flowOrigin';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { middleTruncate } from '@/lib/middleTruncate';
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
@@ -603,10 +603,12 @@ export default function SellerHomeCommerceDashboard({
 
   const openTask = useCallback((task: SetupTask) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    // replace (not push): a setup task destination returns to the dashboard
-    // itself (see SELLER_HOME_ROUTE in each destination screen), so pushing
-    // would leave a dead, unreachable dashboard scene underneath it.
-    router.replace(withSellerSetupOrigin(task.route) as never);
+    // push (never replace) straight into the task's flow with an explicit
+    // `from=dashboard`: the destination's Cancel/Back pops to this exact
+    // dashboard scene (docs/NAVIGATION.md). replace() used to drop the
+    // dashboard from the stack, so the exit had to re-route to a tabs index
+    // and could land the seller on the wrong tab or the Studio menu.
+    router.push(withOrigin(task.route, 'dashboard') as never);
   }, [router]);
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
@@ -856,8 +858,8 @@ export default function SellerHomeCommerceDashboard({
                     <SellerDashboardSetupCard
                       theme={theme}
                       hasSetupChecklist={Boolean(addProductTask)}
-                      onAddProduct={() => nav(withSellerSetupOrigin('/add-product'))}
-                      onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withSellerSetupOrigin('/add-product')))}
+                      onAddProduct={() => nav(withOrigin('/add-product', 'dashboard'))}
+                      onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withOrigin('/add-product', 'dashboard')))}
                     />
                   </View>
                 ) : actionCounts ? (

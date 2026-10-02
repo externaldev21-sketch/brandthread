@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Platform } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -28,7 +27,7 @@ import {
   Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME,
   THREAD_THEME_LIGHT_PALETTE,
 } from '@/services/storeTypes';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { SheetRise } from '@/components/motion/SheetRise';
 
@@ -85,11 +84,9 @@ export default function StoreBuilderScreen() {
   const [submittingImport, setSubmittingImport] = useState(false);
 
   const leaveSetupDestination = () => {
-    if (isSellerSetupOrigin(params.from)) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from);
   };
 
   const loadData = useCallback(async () => {

@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { withOrigin } from '@/lib/navigation/flowOrigin';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 import {
   SetupState, SetupTask, SetupTaskId,
@@ -77,7 +77,7 @@ export default function SetupWalkthroughSheet({
     onSetupStateChange(next);
     onClose();
     try {
-      router.push(withSellerSetupOrigin(task.route) as never);
+      router.push(withOrigin(task.route, 'dashboard') as never);
     } catch { /* ignore */ }
   }, [onClose, onSetupStateChange, router, userId]);
 
