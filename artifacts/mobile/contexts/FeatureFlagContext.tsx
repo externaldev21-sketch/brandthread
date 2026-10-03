@@ -12,7 +12,8 @@ export type FeatureFlagKey =
   | 'threadCashSend'
   | 'oauthGoogleEnabled'
   | 'oauthAppleEnabled'
-  | 'hostedCheckoutFallback';
+  | 'hostedCheckoutFallback'
+  | 'autoCaptions';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -38,6 +39,9 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // One-page checkout kill switch (migration 107): ON sends every buyer back
   // to Stripe-hosted Checkout instead of paying in the app.
   hostedCheckoutFallback: false,
+  // Auto captions (Whisper) on video posts. OFF until the server has the AI keys
+  // and an operator flips it (PUT /api/feature-flags/autoCaptions).
+  autoCaptions: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

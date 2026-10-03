@@ -22,6 +22,7 @@ import postVideoRouter, {
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { scheduleAutoCaptions } from "../lib/captions";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -863,6 +864,11 @@ router.post("/", requireAuth, async (req, res) => {
         taggedProducts.push(...sellerProds);
       }
     }
+  }
+
+  // Auto captions: additive, fire-and-forget, no-op unless the flag + AI keys are on.
+  if (post.mediaType === "video" && postStatus === "published" && !captionHeld) {
+    scheduleAutoCaptions(post.id);
   }
 
   return res.status(201).json({

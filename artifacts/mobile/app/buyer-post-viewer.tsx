@@ -36,9 +36,18 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { CaptionsOverlay, type CaptionSegment } from '@/components/social/CaptionsOverlay';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 
-function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
-  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
+  const [currentTime, setCurrentTime] = useState(0);
+  useEffect(() => {
+    if (!captions) return;
+    const sub = player.addListener('timeUpdate', (e: { currentTime: number }) => setCurrentTime(e.currentTime));
+    return () => sub.remove();
+  }, [player, captions]);
   const isFocused = useIsFocused();
   useMeaningfulVideoWatch(player, isFocused, onWatched);
   useEffect(() => {
@@ -46,24 +55,28 @@ function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) 
     return () => { player.pause(); };
   }, [player]);
   return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="contain"
-      nativeControls
-    />
+    <>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="contain"
+        nativeControls
+      />
+      {captions ? <CaptionsOverlay segments={captions} currentTime={currentTime} bottomOffset={56} /> : null}
+    </>
   );
 }
 
 function PostMedia({
-  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched,
+  mediaUrl, type, mediaColor1, mediaColor2, typeIcon, onWatched, captions,
 }: {
   mediaUrl?: string; type: BuyerPost['type'];
   mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
   onWatched?: () => void;
+  captions?: CaptionSegment[];
 }) {
   if (mediaUrl && type === 'video') {
-    return <PostVideo uri={mediaUrl} onWatched={onWatched} />;
+    return <PostVideo uri={mediaUrl} onWatched={onWatched} captions={captions} />;
   }
   if (mediaUrl) {
     return (
@@ -137,6 +150,9 @@ export default function BuyerPostViewer() {
   const [editOpen, setEditOpen] = useState(false);
   const [editCaption, setEditCaption] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const captionsFlag = useFeatureFlag('autoCaptions');
+  const [captionsOn, setCaptionsOn] = useCaptionsPreference();
+  const fetchCaptionTracks = useCallback((id: string) => api.posts.captions(id) as Promise<{ tracks: import('@/lib/captions').CaptionTrack[] }>, [api]);
   const handleVideoWatched = useCallback(() => {
     if (userId && post?.id) void api.posts.recordWatchedVideo(post.id).catch(() => {});
   }, [api, userId, post?.id]);
@@ -215,6 +231,9 @@ export default function BuyerPostViewer() {
   const typeIcon: keyof typeof Feather.glyphMap =
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
 
+  const captionTrack = useReadyCaptionTrack(params.postId, postType === 'video', captionsFlag, fetchCaptionTracks);
+  const overlaySegments = captionTrack && captionsOn ? captionTrack.segments : undefined;
+
   // Media is a full-width square right under the header — a stable enough
   // target rect to grow the tapped grid tile into without needing to
   // measure the real content (see components/ExpandFromTileOverlay).
@@ -248,6 +267,7 @@ export default function BuyerPostViewer() {
             mediaColor2={mediaColor2}
             typeIcon={typeIcon}
             onWatched={post?.type === 'video' ? handleVideoWatched : undefined}
+            captions={overlaySegments}
           />
         </View>
 
@@ -334,6 +354,18 @@ export default function BuyerPostViewer() {
           >
             <Feather name="bookmark" size={22} color={saved ? PURPLE : FG} />
           </TouchableOpacity>
+          {captionTrack ? (
+            <TouchableOpacity
+              style={s.engageBtn}
+              onPress={() => { Haptics.selectionAsync(); setCaptionsOn(!captionsOn); }}
+              accessibilityRole="button"
+              accessibilityLabel={captionsOn ? 'Turn captions off' : 'Turn captions on'}
+              accessibilityState={{ selected: captionsOn }}
+              testID="captions-toggle"
+            >
+              <Text style={{ fontFamily: FONT.bold, fontSize: FS.base, color: captionsOn ? FG : MUTED }}>CC</Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={{ flex: 1 }} />
           {!isOwner && (
             <TouchableOpacity
@@ -368,6 +400,21 @@ export default function BuyerPostViewer() {
             ))}
           </View>
         )}
+
+        {/* Owner-only captions (video posts, flag on) */}
+        {isOwner && postType === 'video' && captionsFlag ? (
+          <View style={{ paddingHorizontal: SP.md, marginTop: SP.lg }}>
+            <TouchableOpacity
+              style={s.captionsBtn}
+              onPress={() => { Haptics.selectionAsync(); router.push(`/post-captions-edit?postId=${encodeURIComponent(params.postId ?? '')}` as never); }}
+              accessibilityRole="button"
+              testID="edit-captions"
+            >
+              <Feather name="type" size={16} color={FG} />
+              <Text style={s.captionsBtnText}>{captionTrack ? 'Edit captions' : 'Generate captions'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* Owner-only danger zone */}
         {isOwner && (
@@ -454,6 +501,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentAvatarText: { fontFamily: FONT.bold, fontSize: FS.xs, color: ON_DARK },
   commentName: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
   commentText: { fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
+  captionsBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, justifyContent: 'center' },
+  captionsBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED + '44', justifyContent: 'center' },
   deleteBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: RED },
   modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },

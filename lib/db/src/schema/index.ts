@@ -2318,3 +2318,5 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
 }));
 
 export * from './ranking';
+
+export * from './captions';
