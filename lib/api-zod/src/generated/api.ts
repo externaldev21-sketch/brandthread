@@ -2134,6 +2134,9 @@ export const getAccountDeletionCheckResponseBlockersItemCountMin = 0;
 export const GetAccountDeletionCheckResponse = zod.object({
   "canDelete": zod.boolean(),
   "accountType": zod.string().nullable(),
+  "graceDays": zod.number().optional().describe('Days the account stays restorable before permanent deletion'),
+  "reauth": zod.enum(['password', 'email_code']).optional().describe('Proof required by DELETE \/auth\/account'),
+  "deletionCancelledAt": zod.coerce.date().nullish().describe('Set for a week after signing back in cancelled a scheduled deletion'),
   "blockers": zod.array(zod.object({
   "code": zod.enum(['seller_open_orders', 'seller_held_funds', 'seller_reserved_label_funds', 'seller_open_returns', 'seller_open_disputes', 'seller_payout_in_flight', 'buyer_orders_awaiting_shipment']),
   "title": zod.string(),
@@ -2149,13 +2152,33 @@ export const GetAccountDeletionCheckResponse = zod.object({
 
 
 /**
- * @summary Permanently delete the account, its data, and the Clerk user
+ * @summary Schedule account deletion (30-day grace, then permanent). Hides the account and revokes every session. Needs a password, or an emailed code for password-less accounts.
  */
 export const DeleteAccountBody = zod.object({
-  "confirmation": zod.enum(['DELETE'])
+  "confirmation": zod.enum(['DELETE']),
+  "password": zod.string().optional().describe('Required for accounts that have a password'),
+  "code": zod.string().optional().describe('Emailed 6-digit code')
 })
 
 export const DeleteAccountResponse = zod.object({
+  "ok": zod.boolean(),
+  "scheduledFor": zod.coerce.date().nullish(),
+  "graceDays": zod.number().optional()
+})
+
+
+/**
+ * @summary Email a single-use 6-digit re-auth code to an account without a password
+ */
+export const RequestAccountDeletionCodeResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Cancel a pending account deletion (signing back in via POST /auth/sync also cancels it)
+ */
+export const RestoreAccountResponse = zod.object({
   "ok": zod.boolean()
 })
 

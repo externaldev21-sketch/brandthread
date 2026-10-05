@@ -97,3 +97,19 @@ export async function sendVerifyEmailEmail(options: { to: string; code: string }
   });
   return send({ to: options.to, subject: "Verify your email for Brandthread", html });
 }
+
+/** 6-digit code confirming an account deletion request (accounts without a password). */
+export async function sendAccountDeletionCodeEmail(options: { to: string; code: string }): Promise<boolean> {
+  const html = renderBrandthreadEmail({
+    preheader: "Your Brandthread account deletion code",
+    eyebrow: "Delete account",
+    title: "Confirm account deletion",
+    subtitle: "Use this code to confirm you want to delete your account. It expires in 15 minutes.",
+    bodyHtml: `
+      <p style="margin:0 0 18px;">Enter this code in the app:</p>
+      <p style="margin:0 0 18px;font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:#111111;text-align:center;">${options.code}</p>
+      <p style="margin:0;color:#666666;">If you didn't request this, ignore this email and consider changing your sign-in method. Nothing will be deleted without this code.</p>
+    `,
+  });
+  return send({ to: options.to, subject: "Your Brandthread account deletion code", html });
+}

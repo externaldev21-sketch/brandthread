@@ -413,7 +413,7 @@ export async function notifyCommentActivity(input: {
       const mentioned = await db
         .select({ clerkId: users.clerkId })
         .from(users)
-        .where(and(inArray(sql`lower(${users.username})`, handles), isNull(users.deletedAt)));
+        .where(and(inArray(sql`lower(${users.username})`, handles), isNull(users.deletedAt), isNull(users.deletionRequestedAt)));
       for (const { clerkId } of mentioned) {
         if (notified.has(clerkId) || blocked.has(clerkId)) continue;
         notified.add(clerkId);

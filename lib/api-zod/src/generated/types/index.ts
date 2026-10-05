@@ -8,6 +8,7 @@
 
 export * from './acceptLegalTerms200';
 export * from './accountDeletionCheck';
+export * from './accountDeletionCheckReauth';
 export * from './accountSession';
 export * from './attachmentReceipt';
 export * from './blockAccountInput';
@@ -35,6 +36,7 @@ export * from './createdCommentModerationStatus';
 export * from './createReport200';
 export * from './createReport200Status';
 export * from './createReportInput';
+export * from './deleteAccount200';
 export * from './deleteAccount409';
 export * from './deleteAccount409Code';
 export * from './deleteAccountInput';
