@@ -19,19 +19,25 @@ import {
 const router = Router();
 router.use(requireAuth);
 
-function daysAgo(n: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  d.setHours(0, 0, 0, 0);
-  return d;
+/** Start of the seller's local day, `n` days ago (tz = minutes offset, as /home). */
+function localDaysAgo(n: number, tzOffsetMinutes: number, now = new Date()): Date {
+  return new Date(floorToLocalStep(now, DAY_MS, tzOffsetMinutes).getTime() - n * DAY_MS);
 }
+
+/**
+ * The one revenue definition every analytics screen uses (same as /home):
+ * an order counts once it's paid and not cancelled, and its revenue is what
+ * the seller kept — the charged total minus anything refunded.
+ */
+const COUNTED_ORDER = sql`${orders.paidAt} IS NOT NULL AND ${orders.status} != 'cancelled'`;
+const NET_REVENUE = sql`coalesce(sum(${orders.totalCents} - coalesce(${orders.refundedCents}, 0)), 0)::int`;
 
 // GET /api/analytics/dashboard
 router.get("/dashboard", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const todayStart = daysAgo(0);
-  const weekStart  = daysAgo(6);
-  const monthStart = daysAgo(29);
+  const tz = parseTzOffsetMinutes(req.query.tz);
+  const todayStart = localDaysAgo(0, tz);
+  const weekStart  = localDaysAgo(6, tz);
 
   const [
     revenueToday,
@@ -47,18 +53,18 @@ router.get("/dashboard", async (req, res) => {
     preMadeAvailable,
     sellerRow,
   ] = await Promise.all([
-    db.select({ total: sql<number>`coalesce(sum(total_cents),0)::int` }).from(orders)
-      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, todayStart), sql`status != 'cancelled'`)),
-    db.select({ total: sql<number>`coalesce(sum(total_cents),0)::int` }).from(orders)
-      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, weekStart), sql`status != 'cancelled'`)),
-    // All-time revenue (non-cancelled) — primary number shown on dashboard
-    db.select({ total: sql<number>`coalesce(sum(total_cents),0)::int` }).from(orders)
-      .where(and(eq(orders.ownerId, ownerId), sql`status != 'cancelled'`)),
+    db.select({ total: NET_REVENUE }).from(orders)
+      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, todayStart), COUNTED_ORDER)),
+    db.select({ total: NET_REVENUE }).from(orders)
+      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, weekStart), COUNTED_ORDER)),
+    // All-time revenue kept (paid, not cancelled, net of refunds)
+    db.select({ total: NET_REVENUE }).from(orders)
+      .where(and(eq(orders.ownerId, ownerId), COUNTED_ORDER)),
     db.select({ count: sql<number>`count(*)::int` }).from(orders)
-      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, todayStart))),
-    // All-time order count (all statuses)
+      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, todayStart), COUNTED_ORDER)),
+    // All-time paid orders
     db.select({ count: sql<number>`count(*)::int` }).from(orders)
-      .where(eq(orders.ownerId, ownerId)),
+      .where(and(eq(orders.ownerId, ownerId), COUNTED_ORDER)),
     // Completed orders: delivered or shipped — numerator for conversion rate
     db.select({ count: sql<number>`count(*)::int` }).from(orders)
       .where(and(eq(orders.ownerId, ownerId), sql`status IN ('delivered','shipped')`)),
@@ -66,7 +72,7 @@ router.get("/dashboard", async (req, res) => {
       .where(eq(customers.ownerId, ownerId)),
     db.select({ count: sql<number>`count(*)::int` }).from(customers)
       .where(and(eq(customers.ownerId, ownerId), gte(customers.createdAt, todayStart))),
-    // Low stock: join through products to get ownerId filter
+    // Low stock on live listings only (not deleted or archived products)
     db.select({
       id: productVariants.id,
       productId: productVariants.productId,
@@ -76,11 +82,20 @@ router.get("/dashboard", async (req, res) => {
       stock: productVariants.stock,
       threshold: productVariants.lowStockThreshold,
     }).from(productVariants)
-      .innerJoin(products, and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId)))
+      .innerJoin(products, and(
+        eq(productVariants.productId, products.id),
+        eq(products.ownerId, ownerId),
+        sql`${products.deletedAt} IS NULL`,
+        sql`${products.status} != 'archived'`,
+      ))
       .where(sql`${productVariants.stock} <= ${productVariants.lowStockThreshold}`)
       .limit(10),
-    db.select({ total: sql<number>`coalesce(sum(total_collected_cents),0)::int` }).from(drops)
-      .where(and(eq(drops.ownerId, ownerId), eq(drops.type, "pre-order"), sql`payout_status = 'held'`)),
+    // Preorder money still held for the seller: paid preorder orders whose
+    // funds haven't been released, net of refunds (drops.total_collected_cents
+    // only ever grows, so it overstated this after any refund).
+    db.select({ total: NET_REVENUE }).from(orders)
+      .innerJoin(drops, eq(drops.id, orders.dropId))
+      .where(and(eq(orders.ownerId, ownerId), eq(drops.type, "pre-order"), COUNTED_ORDER, sql`${orders.fundsState} = 'held'`)),
     db.select({ total: sql<number>`coalesce(sum(total_collected_cents),0)::int` }).from(drops)
       .where(and(eq(drops.ownerId, ownerId), eq(drops.type, "pre-made"), sql`payout_status = 'processing'`)),
     // Storefront visit counter — denominator for real conversion rate
@@ -363,13 +378,18 @@ router.get("/home", async (req, res) => {
              count(o.id)::int AS order_count
       FROM generate_series(
         ${start}::timestamp,
-        ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+        -- Every bucket that STARTS before end. end can be capped mid-bucket
+        -- ("all" ends at the current hour while stepping by day); end - step
+        -- then dropped the current bucket and the chart summed to less than
+        -- the headline.
+        ${end}::timestamp - interval '1 microsecond',
         ${sql.raw(`interval '${step}'`)}
       ) AS series(bucket)
       LEFT JOIN orders o
         ON o.owner_id = ${ownerId}
         AND o.created_at >= series.bucket
         AND o.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+        AND o.created_at < ${end}
         AND o.status != 'cancelled'
         AND o.paid_at IS NOT NULL
       GROUP BY series.bucket
@@ -380,13 +400,14 @@ router.get("/home", async (req, res) => {
              count(v.id)::int AS visitor_count
       FROM generate_series(
         ${start}::timestamp,
-        ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+        ${end}::timestamp - interval '1 microsecond',
         ${sql.raw(`interval '${step}'`)}
       ) AS series(bucket)
       LEFT JOIN storefront_visits v
         ON v.seller_id = ${ownerId}
         AND v.created_at >= series.bucket
         AND v.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+        AND v.created_at < ${end}
       GROUP BY series.bucket
       ORDER BY series.bucket
     `),
@@ -456,42 +477,51 @@ router.get("/home", async (req, res) => {
 router.get("/revenue", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const period  = (req.query.period as string) ?? "last30";
+  const tz = parseTzOffsetMinutes(req.query.tz);
+  const now = new Date();
+  const thisMonth = floorToLocalMonth(now, tz);
 
-  const periodMap: Record<string, Date> = {
-    today:     daysAgo(0),
-    last7:     daysAgo(6),
-    last30:    daysAgo(29),
-    last90:    daysAgo(89),
-    thisMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    lastMonth: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1),
+  // [since, until) in the seller's local calendar.
+  const periodMap: Record<string, { since: Date; until?: Date }> = {
+    today:     { since: localDaysAgo(0, tz, now) },
+    last7:     { since: localDaysAgo(6, tz, now) },
+    last30:    { since: localDaysAgo(29, tz, now) },
+    last90:    { since: localDaysAgo(89, tz, now) },
+    thisMonth: { since: thisMonth },
+    lastMonth: { since: addLocalMonths(thisMonth, -1, tz), until: thisMonth },
   };
-  const since = periodMap[period] ?? daysAgo(29);
+  const { since, until } = periodMap[period] ?? periodMap.last30;
+  const window = until
+    ? and(gte(orders.createdAt, since), lt(orders.createdAt, until))
+    : gte(orders.createdAt, since);
 
   const [result] = await db
     .select({
-      totalCents:  sql<number>`coalesce(sum(total_cents),0)::int`,
+      totalCents:  NET_REVENUE,
       orderCount:  sql<number>`count(*)::int`,
     })
     .from(orders)
-    .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, since), sql`status != 'cancelled'`));
+    .where(and(eq(orders.ownerId, ownerId), window, COUNTED_ORDER));
 
-  const daily = await db.execute(sql`
-    SELECT date_trunc('day', created_at) AS day,
-           coalesce(sum(total_cents), 0)::int AS total_cents
-    FROM orders
-    WHERE owner_id = ${ownerId}
-      AND created_at >= ${since}
-      AND status != 'cancelled'
-    GROUP BY day
-    ORDER BY day ASC
-    LIMIT 10
-  `);
+  // One row per local day that had sales (no 10-row cap: a 90-day chart
+  // needs up to 90). `day` is the seller's local date, YYYY-MM-DD.
+  const local = sql`(${orders.createdAt} + make_interval(mins => ${tz}))`;
+  const daily = await db
+    .select({
+      day: sql<string>`to_char(date_trunc('day', ${local}), 'YYYY-MM-DD')`,
+      total_cents: NET_REVENUE,
+    })
+    .from(orders)
+    .where(and(eq(orders.ownerId, ownerId), window, COUNTED_ORDER))
+    .groupBy(sql`1`)
+    .orderBy(sql`1`)
+    .limit(400);
 
   res.json({
     period,
     totalCents:  result?.totalCents ?? 0,
     orderCount:  result?.orderCount ?? 0,
-    daily: (daily as any).rows ?? [],
+    daily,
   });
 });
 
@@ -509,9 +539,13 @@ router.get("/products", async (req, res) => {
       COUNT(DISTINCT o.id)::int                             AS order_count
     FROM products p
     LEFT JOIN product_variants pv ON pv.product_id = p.id
-    LEFT JOIN order_items oi      ON oi.variant_id = pv.id
-    LEFT JOIN orders o            ON oi.order_id = o.id AND o.status != 'cancelled'
-    WHERE p.owner_id = ${ownerId}
+    -- Only line items of paid, non-cancelled orders, minus refunded items
+    -- (the old join filtered cancelled orders but still summed their items).
+    LEFT JOIN (
+      order_items oi
+      JOIN orders o ON o.id = oi.order_id AND o.paid_at IS NOT NULL AND o.status != 'cancelled'
+    ) ON oi.variant_id = pv.id AND oi.refunded_at IS NULL
+    WHERE p.owner_id = ${ownerId} AND p.deleted_at IS NULL
     GROUP BY p.id, p.name
     ORDER BY revenue_cents DESC
     LIMIT 20
@@ -634,7 +668,7 @@ router.get("/customers", requirePlan("pro"), async (req, res) => {
         COALESCE(u.display_name, c.name, 'Customer')  AS name,
         COALESCE(c.email, '')                           AS email,
         COUNT(o.id)::int                               AS order_count,
-        COALESCE(SUM(o.total_cents), 0)::int           AS total_cents,
+        COALESCE(SUM(o.total_cents - COALESCE(o.refunded_cents, 0)), 0)::int AS total_cents,
         MAX(o.created_at)                              AS last_order_at,
         MIN(o.created_at)                              AS first_order_at
       FROM orders o
@@ -642,6 +676,7 @@ router.get("/customers", requirePlan("pro"), async (req, res) => {
       LEFT JOIN customers  c ON c.id        = o.customer_id
       WHERE o.owner_id = ${ownerId}
         AND o.status != 'cancelled'
+        AND o.paid_at IS NOT NULL
       GROUP BY o.buyer_id, c.id, u.display_name, c.name, c.email
       ORDER BY total_cents DESC
       LIMIT ${limit}
@@ -656,7 +691,7 @@ router.get("/customers", requirePlan("pro"), async (req, res) => {
       FROM (
         SELECT buyer_id, COUNT(*) AS order_count
         FROM orders
-        WHERE owner_id = ${ownerId} AND status != 'cancelled'
+        WHERE owner_id = ${ownerId} AND status != 'cancelled' AND paid_at IS NOT NULL
         GROUP BY buyer_id
       ) sub
     `);

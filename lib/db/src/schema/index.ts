@@ -369,9 +369,12 @@ export const dropAlertSubscriptions = pgTable('drop_alert_subscriptions', {
   dropId:    uuid('drop_id').notNull().references(() => drops.id, { onDelete: 'cascade' }),
   userId:    text('user_id').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  // Set when this subscriber was pushed the launch alert (migration 118).
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
 }, (t) => ({
   uniq:    unique().on(t.dropId, t.userId),
   userIdx: index('drop_alert_subscriptions_user_idx').on(t.userId),
+  pendingIdx: index('drop_alert_subscriptions_pending_idx').on(t.dropId).where(sql`notified_at IS NULL`),
 }));
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

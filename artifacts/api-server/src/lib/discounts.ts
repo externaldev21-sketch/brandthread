@@ -6,7 +6,7 @@
  * actual checkout charge (buyer.ts POST /checkout/session) can never disagree.
  */
 import { and, eq, sql } from "drizzle-orm";
-import { db, discountCodes, discountCodeUses } from "@workspace/db";
+import { db, checkoutSessions, discountCodes, discountCodeUses } from "@workspace/db";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type DiscountCodeRow = InferSelectModel<typeof discountCodes>;
@@ -163,4 +163,59 @@ export async function recordDiscountCodeUse(
     .update(discountCodes)
     .set({ usesCount: sql`${discountCodes.usesCount} + 1` })
     .where(eq(discountCodes.id, input.discountCodeId));
+}
+
+/** How long an unpaid checkout can still complete (Stripe Checkout's maximum session lifetime). */
+const OPEN_CHECKOUT_WINDOW_HOURS = 24;
+
+/**
+ * Holds one use of a capped code for the checkout about to be created. Run
+ * in the transaction that inserts that checkout row.
+ *
+ * `validateDiscountCode` only compares `usesCount` (paid orders) with
+ * `maxUses`, so several buyers paying at once could all pass and the code was
+ * redeemed past its limit. Here the code's row is locked, and checkouts other
+ * customers still have open with this code count against the limit too — one
+ * slot per customer, so a buyer retrying their own checkout doesn't use up
+ * extra. Expired or failed checkouts release theirs (releaseCheckoutDiscount).
+ */
+export async function reserveDiscountCapacity(
+  tx: Pick<typeof db, "execute">,
+  input: { discountCodeId: string; customerKey: string },
+): Promise<void> {
+  const locked = await tx.execute(sql`
+    SELECT max_uses, uses_count FROM discount_codes WHERE id = ${input.discountCodeId} FOR UPDATE
+  `);
+  const code = ((locked as unknown as { rows?: Array<{ max_uses: number | null; uses_count: number }> }).rows ?? [])[0];
+  if (!code || code.max_uses == null) return;
+  const open = await tx.execute(sql`
+    SELECT count(DISTINCT coalesce(cs.buyer_id, cs.guest_email))::int AS holders
+    FROM checkout_sessions cs
+    WHERE cs.discount_code_id = ${input.discountCodeId}
+      AND cs.created_at > now() - make_interval(hours => ${OPEN_CHECKOUT_WINDOW_HOURS})
+      AND coalesce(cs.buyer_id, cs.guest_email, '') <> ${input.customerKey}
+      AND NOT EXISTS (
+        SELECT 1 FROM orders o
+        WHERE o.stripe_checkout_session_id = cs.stripe_session_id
+      )
+  `);
+  const holders = Number(((open as unknown as { rows?: Array<{ holders: number }> }).rows ?? [])[0]?.holders ?? 0);
+  if (code.uses_count + holders >= code.max_uses) {
+    throw new DiscountValidationError(
+      "MAX_USES_REACHED",
+      "This discount code has reached its usage limit.",
+    );
+  }
+}
+
+/** An unpaid checkout ended (expired, failed, cancelled): it no longer holds a use of its code. */
+export async function releaseCheckoutDiscount(
+  tx: Pick<typeof db, "update">,
+  checkoutSessionId: string,
+): Promise<void> {
+  await tx.update(checkoutSessions)
+    .set({ discountCodeId: null })
+    .where(and(eq(checkoutSessions.id, checkoutSessionId), sql`NOT EXISTS (
+      SELECT 1 FROM orders o WHERE o.stripe_checkout_session_id = ${checkoutSessions.stripeSessionId}
+    )`));
 }

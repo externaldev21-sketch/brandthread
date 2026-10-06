@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { db, drops } from "@workspace/db";
 import { logger } from "../lib/logger";
-import { deliverDropBroadcast } from "../lib/dropBroadcast";
+import { deliverDropBroadcast, deliverDropLaunchAlerts } from "../lib/dropBroadcast";
 
 const INTERVAL_MS = 60 * 1000;
 
@@ -35,6 +35,13 @@ export async function runScheduledDropBroadcasts(now = new Date()): Promise<void
     }
   } catch (err) {
     logger.error({ err, job: "scheduledDropBroadcasts" }, "Scheduled drop broadcast job failed");
+  }
+  // Notify-me subscribers hear about every launch, broadcast or not.
+  try {
+    const sent = await deliverDropLaunchAlerts(now);
+    if (sent > 0) logger.info({ job: "scheduledDropBroadcasts", sent }, "Drop launch alerts delivered");
+  } catch (err) {
+    logger.error({ err, job: "scheduledDropBroadcasts" }, "Drop launch alerts failed");
   }
 }
 

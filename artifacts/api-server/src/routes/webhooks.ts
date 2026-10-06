@@ -61,7 +61,7 @@ import {
   type StripeWebhookClaim,
 } from "../lib/stripeWebhookLedger";
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
-import { recordDiscountCodeUse } from "../lib/discounts";
+import { recordDiscountCodeUse, releaseCheckoutDiscount } from "../lib/discounts";
 import { splitOrder } from "../lib/money/fees";
 import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
 import {
@@ -510,7 +510,10 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
       : eq(checkoutSessions.stripeSessionId, session.id))
     .limit(1);
 
-  if (!checkout?.buyerId) return;
+  if (!checkout) return;
+  // The ended checkout stops holding a use of its discount code.
+  await releaseCheckoutDiscount(db, checkout.id);
+  if (!checkout.buyerId) return;
   if (checkout.loyaltyToken) {
     await db.transaction((tx) => releaseLoyaltyRedemption(
       tx,
@@ -632,7 +635,10 @@ export async function handleCartPaymentEnded(pi: any, failed: boolean): Promise<
   const groups = await db.select({ id: checkoutSessions.id }).from(checkoutSessions)
     .where(eq(checkoutSessions.stripePaymentIntentId, pi.id));
   for (const group of groups) {
-    await db.transaction((tx) => releaseStockReservation(tx, group.id));
+    await db.transaction(async (tx) => {
+      await releaseStockReservation(tx, group.id);
+      await releaseCheckoutDiscount(tx, group.id);
+    });
   }
 }
 

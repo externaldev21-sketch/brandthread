@@ -50,6 +50,7 @@ export async function resolveChargePlan(input: {
     escrowState: drops.escrowState,
     deadline: drops.fulfillmentDeadlineAt,
     releaseAt: drops.releaseAt,
+    endsAt: drops.endsAt,
     earlyAccessMinutes: drops.earlyAccessMinutes,
   }).from(products)
     .leftJoin(drops, eq(drops.id, products.dropId))
@@ -66,6 +67,10 @@ export async function resolveChargePlan(input: {
   for (const drop of dropsById.values()) {
     if (drop.dropStatus && drop.dropStatus !== "active") {
       throw new CheckoutPlanError("This drop is not currently available.", 409, "DROP_NOT_ACTIVE");
+    }
+    // The public drop list already hides ended drops; checkout must agree.
+    if (drop.endsAt && drop.endsAt.valueOf() <= now.valueOf()) {
+      throw new CheckoutPlanError("This drop has ended.", 409, "DROP_ENDED");
     }
     if (!drop.releaseAt) continue;
     const earlyAccessMinutes = drop.earlyAccessMinutes ?? 0;
