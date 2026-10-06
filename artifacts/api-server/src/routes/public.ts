@@ -1685,6 +1685,8 @@ router.get("/posts", async (req, res) => {
     }
 
     const postIds = rows.map((r) => r.id);
+    // This viewer's own like/save/repost state (lib/viewerPostState.ts).
+    const stateFor = await viewerPostStates(viewerId, postIds);
 
     // Fetch tagged products and interaction counts in parallel
     const [tagRows, likeRows, repostRows, shareRows, saveRows, commentRows] = await Promise.all([
@@ -1743,7 +1745,6 @@ router.get("/posts", async (req, res) => {
     const savesByPost: Record<string, number> = {};
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
-    const stateFor = await viewerPostStates(viewerId, postIds);
 
     const result = rows.map((p) => ({
       id:             p.id,
