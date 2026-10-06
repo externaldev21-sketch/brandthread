@@ -21,7 +21,9 @@ export type RateLimitPolicyName =
   | "follow"
   | "report"
   | "feed-event"
-  | "post-interact";
+  | "post-interact"
+  | "access-code"
+  | "access-waitlist";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -151,6 +153,22 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: scaled(30),
     windowMs: 60_000,
     message: "Too many follow requests. Please wait a moment and try again.",
+  },
+  "access-code": {
+    id: "access-code",
+    // Guessing guard for invite-code validate/redeem. Deliberately low and
+    // NOT scaled for dev: a code is the only thing between a stranger and an
+    // invite-only launch.
+    limit: 10,
+    windowMs: 15 * 60_000,
+    ipLimit: 30,
+    message: "Too many attempts. Please wait a few minutes and try again.",
+  },
+  "access-waitlist": {
+    id: "access-waitlist",
+    limit: 5,
+    windowMs: 60 * 60_000,
+    message: "Too many requests. Please try again later.",
   },
   report: {
     id: "report",

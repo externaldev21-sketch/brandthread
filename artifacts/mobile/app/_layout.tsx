@@ -3,6 +3,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
+import { isAccessCleared } from '@/lib/accessGate';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -239,6 +240,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'forgot-password',
   // Onboarding — session incomplete, role not yet confirmed
   'onboarding',
+  // Invite-only launch gate (shown before onboarding when the flag is on)
+  'access-code',
   // Post-onboarding buyer screen — not a seller route
   'thread-explainer',
   // Legal public pages — reachable without any session
@@ -607,6 +610,7 @@ function AuthGate() {
   const [storedRole, setStoredRole]               = useState<string | null>(null);
   const [threadExplainerSeen, setThreadExplainerSeen] = useState<boolean | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
+  const [accessRequired, setAccessRequired]       = useState(false);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
   const [pendingCommunityInvite, setPendingCommunityInvite] = useState<string | null>(null);
   const prevSignedInRef = useRef<boolean | null>(null);
@@ -729,7 +733,15 @@ function AuthGate() {
         }
       }
 
+      // Invite-only launch mode: only a not-yet-onboarded account can be gated,
+      // and only when the server says so (flag off => required is false).
+      let gated = false;
+      if (!done) {
+        try { gated = (await api.access.status()).required; } catch { /* server still enforces */ }
+      }
+
       if (cancelled) return;
+      setAccessRequired(gated);
       setOnboardingDone(done);
       setStoredRole(role);
       setThreadExplainerSeen(role !== 'buyer' || pairs[3][1] === 'true');
@@ -842,6 +854,11 @@ function AuthGate() {
     // Exception: sellers are allowed on /plans after finishing the onboarding
     // wizard but before picking a subscription plan (onboarding_complete is
     // only written by plans.tsx after plan selection).
+    if (accessRequired && !onboardingDone && !isAccessCleared(userId)) {
+      if (segments[0] !== 'access-code') router.replace('/access-code' as never);
+      return;
+    }
+
     if (!onboardingDone && !inOnboarding && !inAuthScreen && !inPlans) {
       router.replace('/onboarding');
       return;
@@ -898,7 +915,7 @@ function AuthGate() {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key]);
+  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key]);
 
   return null;
 }
@@ -1225,6 +1242,7 @@ function RootLayoutNav() {
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="onboarding"        options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="access-code"       options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, gestureEnabled: false }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
