@@ -9,20 +9,25 @@
  * absolute-fill layer, and "minimizing" is just a boolean flip, not a nav
  * action.
  *
- * PR1: only `previewCallProvider` is wired (see lib/calls/previewCallProvider.ts) —
- * a fully simulated call, no media/signaling. PR2 swaps in `agoraCallProvider`
- * (adapting the existing engine logic in app/call-screen.tsx) with no changes
- * needed here or in any screen component.
+ * Only `previewCallProvider` is wired here (see lib/calls/previewCallProvider.ts)
+ * — a fully simulated call, no media/signaling — and only in the `&demo=1`
+ * web preview. Real 1:1 DM calls use app/call-screen.tsx (Agora); the
+ * conversation screens pick the path via lib/calls/dmCalls.ts.
  */
 import React, {
   createContext, useCallback, useContext, useMemo, useRef, useState,
 } from 'react';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 import { createPreviewCallProvider, schedulePreviewIncomingTimeout } from './previewCallProvider';
 import type {
   CallEndReason, CallLogEntry, CallProvider, CallSession, StartCallInput,
 } from './types';
 
+// The simulated provider is the only one this context drives. Real DM calls
+// go through app/call-screen.tsx (Agora) instead — see lib/calls/dmCalls.ts —
+// so this context refuses to start anything outside the `&demo=1` preview:
+// a production account can never get a fake ring / fake "connected" call.
 const provider: CallProvider = createPreviewCallProvider();
 
 interface CallSessionContextValue {
@@ -105,6 +110,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   }, [appendLog, teardownSubscription]);
 
   const startCall = useCallback(async (input: StartCallInput) => {
+    if (!isPreviewDemoMode()) return;
     if (sessionRef.current && sessionRef.current.status !== 'ended') return; // one call at a time
     hapticPrimaryAction();
     const { callId } = await provider.start(input);
@@ -128,6 +134,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   }, [applyPatch]);
 
   const simulateIncomingCall = useCallback((input: StartCallInput) => {
+    if (!isPreviewDemoMode()) return;
     if (sessionRef.current && sessionRef.current.status !== 'ended') return;
     const callId = `preview_incoming_${Date.now()}`;
     const next: CallSession = {

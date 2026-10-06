@@ -50,6 +50,11 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import Composer from '@/components/ui/Composer';
+import { useUser } from '@clerk/expo';
+import { apiErrorMessage } from '@/lib/safety';
+import {
+  confirmLiveChatLine, latestLiveChatCursor, liveCommentsToLines, mergeLiveChat, type LiveChatLine,
+} from '@/lib/live/liveFeedChat';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -354,9 +359,64 @@ function LiveRoomPage({
   onClose: () => void;
   onBuy: () => void;
 }) {
+  const api = useApi();
+  const { user } = useUser();
+  const { showToast } = useFeedToast();
   const [following, setFollowing] = useState(false);
-  const [chat, setChat] = useState(room.isSample ? SAMPLE_CHAT_LINES.slice(0, 2) : []);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [chat, setChat] = useState<LiveChatLine[]>(room.isSample ? SAMPLE_CHAT_LINES.slice(0, 2) : []);
   const [message, setMessage] = useState('');
+  const chatRef = useRef<LiveChatLine[]>(chat);
+  chatRef.current = chat;
+
+  // Real rooms: the Follow pill starts from the viewer's actual follow state
+  // (GET /api/social/status) instead of always reading "Follow". Sample
+  // rooms (`&demo=1` only) have no real host account to follow.
+  useEffect(() => {
+    if (room.isSample || !room.sellerId) return undefined;
+    let cancelled = false;
+    api.social.status(room.sellerId)
+      .then(res => { if (!cancelled) setFollowing(!!res?.isFollowing); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, room.isSample, room.sellerId]);
+
+  async function toggleFollow() {
+    hapticLight();
+    if (room.isSample) { setFollowing(v => !v); return; }
+    if (!room.sellerId || followBusy) return;
+    const was = following;
+    setFollowing(!was);
+    setFollowBusy(true);
+    try {
+      if (was) await api.social.unfollow(room.sellerId);
+      else await api.social.follow(room.sellerId);
+    } catch (error) {
+      setFollowing(was);
+      showToast(apiErrorMessage(error, was ? 'Could not unfollow. Try again.' : 'Could not follow. Try again.'), 'error');
+    } finally {
+      setFollowBusy(false);
+    }
+  }
+
+  // Real rooms: live chat comes from the server — everyone else's messages
+  // as well as your own — polled while this room is the active page.
+  useEffect(() => {
+    if (room.isSample || !room.streamId || !isActive) return undefined;
+    const streamId = room.streamId;
+    let cancelled = false;
+    const load = () => {
+      api.live.comments(streamId, latestLiveChatCursor(chatRef.current))
+        .then(res => {
+          if (cancelled) return;
+          setChat(prev => mergeLiveChat(prev, liveCommentsToLines(res?.comments)));
+        })
+        .catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 3000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [api, room.isSample, room.streamId, isActive]);
 
   // The pinned product card fades/rises in on the shared no-bounce sheet
   // timeline (withTiming only, same curve every sheet in the app uses) —
@@ -421,15 +481,34 @@ function LiveRoomPage({
     return () => clearInterval(id);
   }, [room.isSample, isActive]);
 
-  function sendMessage() {
+  async function sendMessage() {
     const text = message.trim();
     if (!text) return;
     setMessage('');
-    setChat(prev => [...prev, { user: 'You', text }]);
+    if (room.isSample) {
+      setChat(prev => [...prev, { user: 'You', text }]);
+      return;
+    }
+    if (!room.streamId) return;
+    // Optimistic line, swapped for the server's row on success; on failure
+    // (moderation, network) it's withdrawn and the draft restored.
+    const localId = `local_${Date.now()}`;
+    setChat(prev => [...prev, { id: localId, user: 'You', text }]);
+    try {
+      const res = await api.live.comment(room.streamId, {
+        message: text,
+        displayName: user?.firstName ?? user?.username ?? undefined,
+      });
+      const [confirmed] = liveCommentsToLines(res?.comment ? [res.comment] : []);
+      setChat(prev => (confirmed ? confirmLiveChatLine(prev, localId, confirmed) : prev));
+    } catch (error) {
+      setChat(prev => prev.filter(l => l.id !== localId));
+      setMessage(text);
+      showToast(apiErrorMessage(error, 'Message not sent. Try again.'), 'error');
+    }
   }
 
   // ─── Right rail: Share / Thread Cash / More ────────────────────────────
-  const { showToast } = useFeedToast();
   const [threadCashOpen, setThreadCashOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
@@ -460,9 +539,15 @@ function LiveRoomPage({
     }
   }
 
+  // Only called once the gift really went through (LiveThreadCashSheet
+  // awaits api.threadCash.liveGift for real rooms) — never on a failure.
   function handleSendThreadCash(amountCents: number) {
     setChat(prev => [...prev, { user: 'You', text: `sent $${(amountCents / 100).toFixed(2)} Thread Cash` }]);
     showToast(`You sent ${formatCents(amountCents)} Thread Cash`, 'info');
+  }
+
+  function handleThreadCashFailed(messageText: string) {
+    showToast(messageText, 'error');
   }
 
   async function handleCopyLink() {
@@ -576,7 +661,7 @@ function LiveRoomPage({
               </View>
             </View>
             <PressableScale
-              onPress={() => { hapticLight(); setFollowing(v => !v); }}
+              onPress={() => { void toggleFollow(); }}
               style={[styles.followBtn, following && styles.followBtnActive]}
               accessibilityRole="button"
               accessibilityLabel={following ? `Following ${room.brandName}` : `Follow ${room.brandName}`}
@@ -635,8 +720,12 @@ function LiveRoomPage({
       <LiveThreadCashSheet
         visible={threadCashOpen}
         brandName={room.brandName}
+        recipientId={room.isSample ? undefined : room.sellerId}
+        streamId={room.isSample ? undefined : room.streamId}
+        previewOnly={room.isSample}
         onClose={() => setThreadCashOpen(false)}
         onSent={handleSendThreadCash}
+        onSendFailed={handleThreadCashFailed}
       />
       <LiveMoreSheet
         visible={moreOpen}

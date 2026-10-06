@@ -8,9 +8,10 @@
  * sending is a real `api.threadCash.liveGift()` call — instant, never
  * gated on mutual follow (a viewer gifting a host they're watching rarely
  * follows them back), unlike `api.threadCash.send()`'s friend-to-friend
- * transfer. Without a `streamId` (app/live-feed.tsx's sample rooms, which
- * have no real host account to transfer to), sending stays local-only: it
- * decrements the shown balance and the caller posts a chat line.
+ * transfer. Only a `previewOnly` sheet (app/live-feed.tsx's `&demo=1`
+ * sample rooms, which have no real host account) or a dev web preview stays
+ * local-only. Anything else without a real `recipientId` + `streamId` fails
+ * visibly instead of reporting a gift that never happened.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -25,12 +26,13 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { hapticLight } from '@/lib/haptics';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
 export function LiveThreadCashSheet({
-  visible, brandName, recipientId, streamId, onClose, onSent, onSendFailed,
+  visible, brandName, recipientId, streamId, previewOnly = false, onClose, onSent, onSendFailed,
 }: {
   visible: boolean;
   brandName: string;
@@ -40,6 +42,8 @@ export function LiveThreadCashSheet({
   /** Real live stream id, required alongside `recipientId` for a real gift
    *  (the server looks up the authoritative host from it). */
   streamId?: string | null;
+  /** A demo sample room with no real host: the gift is shown locally only. */
+  previewOnly?: boolean;
   onClose: () => void;
   /** Fires once the gift is actually sent (transferred, or locally mocked
    *  when there's no `recipientId`) — the caller posts the chat line. */
@@ -92,7 +96,14 @@ export function LiveThreadCashSheet({
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
     hapticLight();
-    if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
+    const localOnly = previewOnly
+      || (isPreviewThreadCashEnabled() && (isBuyerDevPreview() || isSellerDevPreview()));
+    if (!localOnly) {
+      if (!recipientId || !streamId) {
+        setSending(false);
+        onSendFailed?.('This live can’t receive Thread Cash right now.');
+        return;
+      }
       try {
         await api.threadCash.liveGift({
           streamId,

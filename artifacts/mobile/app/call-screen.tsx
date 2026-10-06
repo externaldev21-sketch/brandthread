@@ -8,6 +8,9 @@
  *   participantInitials
  *   participantColor — avatar background color
  *   mode             — 'voice' | 'video'
+ *   dmCall / answer  — 1:1 DM calls (lib/calls/dmCalls.ts): the caller rings
+ *                      the other participant once joined; the callee joins
+ *                      from the ring notification with answer=1
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -98,6 +101,10 @@ function NativeCallScreen() {
     myColor?: string;
     mode?: string;
     manufacturerCall?: string;
+    /** '1' for a 1:1 DM call (buyer-/seller-conversation) — rings the other participant once joined. */
+    dmCall?: string;
+    /** '1' when the callee is joining from the ring notification (never re-rings the caller). */
+    answer?: string;
   }>();
 
   const mode             = (params.mode ?? 'voice') as 'voice' | 'video';
@@ -123,6 +130,7 @@ function NativeCallScreen() {
   const callStartedRef = useRef(false);
   const credentialsIssuedRef = useRef(false);
   const remoteJoinedRef = useRef(false);
+  const dmRungRef = useRef(false);
   const terminalEventRef = useRef<'ended' | 'failed' | 'declined' | null>(null);
   // Keep one UUID per lifecycle type. If an SDK callback repeats or an API
   // request is retried, the server receives the same idempotency key.
@@ -278,6 +286,10 @@ function NativeCallScreen() {
         onJoinChannelSuccess: () => {
           setStatus('ringing');
           callStartedRef.current = true;
+          if (params.dmCall === '1' && params.answer !== '1' && !dmRungRef.current) {
+            dmRungRef.current = true;
+            void api.call.dmRing({ conversationId: params.conversationId, mode }).catch(() => {});
+          }
           if (params.manufacturerCall === '1') {
             void api.call.event({
               threadId: params.conversationId,

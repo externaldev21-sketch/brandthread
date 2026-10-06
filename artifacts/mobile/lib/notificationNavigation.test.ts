@@ -162,4 +162,13 @@ describe('notification response navigation', () => {
       '/community-chat?id=g3',
     ]);
   });
+
+  it('answers an incoming DM call push on the real call screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('call-1', { type: 'dm_call_video', targetType: 'dm_call', targetId: 'conv-9', actorName: 'Ava Stone' }));
+    expect(router.push).toHaveBeenCalledWith(
+      '/call-screen?conversationId=conv-9&mode=video&participantName=Ava+Stone&dmCall=1&answer=1',
+    );
+  });
 });

@@ -4,6 +4,13 @@
  * behavior). Video posts show their poster with a play glyph in this v1 —
  * a full player is a follow-up, not required for the grid/viewer/filters
  * scope this PR covers.
+ *
+ * Like / Save are real for real posts (POST /api/posts/:id/interact and
+ * /api/buyer/saved, same calls as the Threads feed), optimistic with a
+ * rollback + toast on failure, and remembered for the session
+ * (lib/discoverEngagement.ts) so reopening a post shows them. Comments opens
+ * the shared /buyer-post-comments sheet; Share opens the shared
+ * ThreadShareSheet.
  */
 import React, { useState } from 'react';
 import { Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -22,6 +29,13 @@ import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
+import { useAuth } from '@clerk/expo';
+import { useApi } from '@/lib/api';
+import { isUUID } from '@/lib/engagementUtils';
+import { apiErrorMessage } from '@/lib/safety';
+import { discoverEngagementFor, discoverPostApiId, rememberDiscoverEngagement, toggledLike } from '@/lib/discoverEngagement';
+import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
+import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
@@ -37,18 +51,71 @@ function ActionButton({ icon, label, active, onPress }: {
 }
 
 function ViewerPage({
-  post, onOpenProfile, onOpenShopTheLook, onSafetyMenu,
+  post, onOpenProfile, onOpenShopTheLook, onSafetyMenu, onOpenComments, onRequireSignIn,
 }: {
   post: DiscoverPost;
   onOpenProfile: (post: DiscoverPost) => void;
   onOpenShopTheLook: (post: DiscoverPost) => void;
   onSafetyMenu: (post: DiscoverPost) => void;
+  onOpenComments: (post: DiscoverPost) => void;
+  onRequireSignIn: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const [liked, setLiked] = useState(!!post.likedByMe);
-  const [likesCount, setLikesCount] = useState(post.likesCount);
-  const [saved, setSaved] = useState(!!post.savedByMe);
+  const api = useApi();
+  const { isSignedIn } = useAuth();
+  const { showToast } = useFeedToast();
+  const [engagement, setEngagementState] = useState(() => discoverEngagementFor(post));
+  const { liked, likesCount, saved } = engagement;
+  const [shareOpen, setShareOpen] = useState(false);
   const hasTags = (post.productTags?.length ?? 0) > 0;
+  // Real posts persist through the API; seeded preview posts (non-UUID ids,
+  // `&demo=1` only) have nothing to persist against and stay session-local.
+  const apiPostId = discoverPostApiId(post.id);
+  const isRealPost = isUUID(apiPostId);
+
+  function setEngagement(next: typeof engagement) {
+    setEngagementState(next);
+    rememberDiscoverEngagement(post.id, next);
+  }
+
+  async function handleLike() {
+    hapticLight();
+    if (isRealPost && !isSignedIn) { onRequireSignIn(); return; }
+    const before = engagement;
+    const next = toggledLike(before);
+    setEngagement(next);
+    if (!isRealPost) return;
+    try {
+      await api.posts.interact(apiPostId, { type: 'like', value: next.liked ? 'add' : 'remove' });
+    } catch (error) {
+      setEngagement(before);
+      showToast(apiErrorMessage(error, 'Could not update like. Try again.'), 'error');
+    }
+  }
+
+  async function handleSave() {
+    hapticLight();
+    if (isRealPost && !isSignedIn) { onRequireSignIn(); return; }
+    const before = engagement;
+    const next = { ...before, saved: !before.saved };
+    setEngagement(next);
+    if (!isRealPost) return;
+    try {
+      if (next.saved) {
+        await api.buyer.saved.save({
+          type: 'post',
+          targetId: apiPostId,
+          title: post.caption?.trim() || `${post.authorName}'s post`,
+          subtitle: post.authorName,
+        });
+      } else {
+        await api.buyer.saved.remove(apiPostId);
+      }
+    } catch (error) {
+      setEngagement(before);
+      showToast(apiErrorMessage(error, 'Could not update save. Try again.'), 'error');
+    }
+  }
 
   return (
     <View style={{ width: '100%', height: WINDOW_HEIGHT, backgroundColor: '#000' }}>
@@ -119,17 +186,30 @@ function ViewerPage({
           icon={liked ? 'heart' : 'heart'}
           active={liked}
           label={formatCompactCount(likesCount)}
-          onPress={() => { hapticLight(); setLiked(!liked); setLikesCount((c) => c + (liked ? -1 : 1)); }}
+          onPress={() => { void handleLike(); }}
         />
-        <ActionButton icon="message-circle" label={formatCompactCount(post.commentsCount)} onPress={() => hapticLight()} />
-        <ActionButton icon="send" label="Share" onPress={() => hapticLight()} />
+        <ActionButton icon="message-circle" label={formatCompactCount(post.commentsCount)} onPress={() => { hapticLight(); onOpenComments(post); }} />
+        <ActionButton icon="send" label="Share" onPress={() => { hapticLight(); setShareOpen(true); }} />
         <ActionButton
           icon="bookmark"
           active={saved}
-          onPress={() => { hapticLight(); setSaved(!saved); }}
+          onPress={() => { void handleSave(); }}
         />
         <ActionButton icon="more-horizontal" onPress={() => onSafetyMenu(post)} />
       </View>
+
+      <ThreadShareSheet
+        visible={shareOpen}
+        postId={apiPostId}
+        creator={post.authorName}
+        caption={post.caption ?? ''}
+        mediaUri={post.imageUri}
+        isVideo={false}
+        onClose={() => setShareOpen(false)}
+        onReport={() => { setShareOpen(false); onSafetyMenu(post); }}
+        onNotInterested={() => { setShareOpen(false); onSafetyMenu(post); }}
+        onFeedback={showToast}
+      />
     </View>
   );
 }
@@ -154,8 +234,34 @@ export function DiscoverPostViewer({
     }
   }
 
+  // The viewer is a Modal, which sits above the navigation stack — close it
+  // before pushing a route so the pushed screen is actually visible.
+  function openComments(post: DiscoverPost) {
+    const qs = new URLSearchParams({
+      postId: discoverPostApiId(post.id),
+      postAuthorId: post.authorId,
+      postAuthorName: post.authorName,
+      postAuthorInitials: post.authorInitials,
+      postAuthorColor: post.authorColor,
+      postCaption: post.caption ?? '',
+      postMediaUri: post.imageUri ?? '',
+      postPosterUri: post.imageUri ?? '',
+      // Discover rows only carry the poster image, so the sheet's backdrop
+      // shows it as a photo either way.
+      postType: 'photo',
+    });
+    onClose();
+    router.push(`/buyer-post-comments?${qs.toString()}` as never);
+  }
+
+  function requireSignIn() {
+    onClose();
+    router.push('/sign-in' as never);
+  }
+
   return (
     <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <FeedToastProvider>
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <FlatList
           data={posts}
@@ -165,7 +271,14 @@ export function DiscoverPostViewer({
           pagingEnabled
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <ViewerPage post={item} onOpenProfile={openProfile} onOpenShopTheLook={onOpenShopTheLook} onSafetyMenu={onSafetyMenu} />
+            <ViewerPage
+              post={item}
+              onOpenProfile={openProfile}
+              onOpenShopTheLook={onOpenShopTheLook}
+              onSafetyMenu={onSafetyMenu}
+              onOpenComments={openComments}
+              onRequireSignIn={requireSignIn}
+            />
           )}
         />
         <IconButton
@@ -178,6 +291,7 @@ export function DiscoverPostViewer({
           style={[styles.backBtn, { top: headerTopInset + 8 }]}
         />
       </View>
+      </FeedToastProvider>
     </Modal>
   );
 }

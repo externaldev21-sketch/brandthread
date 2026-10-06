@@ -1,5 +1,6 @@
 import type * as Notifications from 'expo-notifications';
 import { activityHref, isBuyerOrderNotification } from './activity';
+import { dmCallModeFromType, dmCallScreenHref } from './calls/dmCallLinks';
 
 export type NotificationRouter = {
   push: (href: string) => void;
@@ -35,6 +36,7 @@ export function createNotificationResponseHandler(
       type?: unknown;
       commentId?: unknown;
       communityId?: unknown;
+      actorName?: unknown;
     } | undefined;
 
     if (data?.route === '/subscription') {
@@ -72,6 +74,17 @@ export function createNotificationResponseHandler(
         ? data.communityId
         : typeof data.targetId === 'string' ? data.targetId : '';
       if (communityId) router.push(`/community-chat?id=${encodeURIComponent(communityId)}`);
+      return;
+    }
+    // An incoming 1:1 DM call (POST /api/call/dm/ring): tapping the push
+    // joins the caller's Agora channel on the real call screen.
+    if (data?.targetType === 'dm_call' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(dmCallScreenHref({
+        conversationId: data.targetId,
+        mode: dmCallModeFromType(data.type),
+        participantName: typeof data.actorName === 'string' && data.actorName ? data.actorName : 'Call',
+        answer: true,
+      }));
       return;
     }
     if (data?.targetType === 'conversation' && typeof data.targetId === 'string' && data.targetId) {

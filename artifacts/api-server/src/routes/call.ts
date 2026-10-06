@@ -7,6 +7,9 @@
  * POST /api/call/token/renew
  *   Body: { threadId: string, mode?: 'voice' | 'video', clientRenewalId: string }
  *   Returns: { appId, token, channelName, uid, mode, expiresAt }
+ * POST /api/call/dm/ring
+ *   Body: { conversationId: string, mode?: 'voice' | 'video' }
+ *   Notifies the other DM participant(s) of an incoming call.
  *
  * The channel name is deterministic (call_{conversationId}) so both
  * participants independently derive the same channel and join it.
@@ -287,6 +290,73 @@ router.post("/token/renew", async (req, res) => {
       code: "CALL_TOKEN_RENEWAL_FAILED",
     });
   }
+});
+
+// ─── POST /api/call/dm/ring ───────────────────────────────────────────────────
+//
+// Rings the other side of a 1:1 DM call. The caller has already obtained a
+// token for `call_{conversationId}` and joined the channel; this tells every
+// other participant (push + in-app notification) so they can open the same
+// call screen and join. Without it the callee would never know a call was
+// placed. Refuses (503) when calling isn't configured, so no notification is
+// ever sent for a call that can't connect.
+type DmRingParticipant = { userId: string; name: string; initials: string; color: string };
+
+export function buildDmRingNotifications(
+  callerId: string,
+  conversationId: string,
+  mode: "voice" | "video",
+  participants: DmRingParticipant[],
+) {
+  const caller = participants.find((p) => p.userId === callerId);
+  if (!caller) return null;
+  const callerName = caller.name?.trim() || "Someone";
+  return participants
+    .filter((p) => p.userId !== callerId)
+    .map((p) => ({
+      userId: p.userId,
+      category: "message",
+      type: mode === "video" ? "dm_call_video" : "dm_call_voice",
+      title: `Incoming ${mode} call`,
+      body: `${callerName} is calling you`,
+      actorId: callerId,
+      actorName: callerName,
+      actorInitials: caller.initials || undefined,
+      actorColor: caller.color || undefined,
+      targetId: conversationId,
+      targetType: "dm_call",
+    }));
+}
+
+router.post("/dm/ring", async (req, res) => {
+  const callerId = (req as any).clerkUserId as string;
+  const { conversationId, mode = "voice" } = req.body ?? {};
+  if (typeof conversationId !== "string" || !conversationId) {
+    return res.status(400).json({ error: "conversationId is required" });
+  }
+  if (mode !== "voice" && mode !== "video") {
+    return res.status(400).json({ error: "mode must be voice or video" });
+  }
+  if (!isCallingConfigured()) {
+    return res.status(503).json({
+      error: "Calling is unavailable because secure call credentials are not configured",
+      code: "CALLING_NOT_CONFIGURED",
+    });
+  }
+  const participants = await db.select({
+    userId: conversationParticipants.userId,
+    name: conversationParticipants.name,
+    initials: conversationParticipants.initials,
+    color: conversationParticipants.color,
+  }).from(conversationParticipants)
+    .where(eq(conversationParticipants.conversationId, conversationId));
+  const notifications = buildDmRingNotifications(callerId, conversationId, mode, participants);
+  if (!notifications) {
+    return res.status(403).json({ error: "Not a participant in this conversation" });
+  }
+  await Promise.all(notifications.map((n) => publishNotification(n)
+    .catch((error) => req.log.error({ err: error, conversationId }, "DM call ring notification failed"))));
+  return res.status(201).json({ rung: notifications.length });
 });
 
 router.post("/events", async (req, res) => {

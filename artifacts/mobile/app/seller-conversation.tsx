@@ -48,6 +48,7 @@ import {
 } from '@/components/safety/DmSafety';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
+import { useDmCallRoute, dmCallScreenHref } from '@/lib/calls/dmCalls';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import {
@@ -540,6 +541,9 @@ export default function SellerConversationScreen() {
   const lastOwnMsgId = useMemo(() => lastOwnMessageId(messages, myId), [messages, myId]);
 
   const { startCall, simulateIncomingCall } = useCallSession();
+  // Real Agora call on native when configured, the simulated call only in the
+  // &demo=1 preview, otherwise no call buttons (lib/calls/dmCalls.ts).
+  const callRoute = useDmCallRoute();
   const callLog = useCallLog(id ?? '');
   const myName = user?.fullName || user?.username || 'You';
   const myInitials = (myName[0] ?? '?').toUpperCase();
@@ -588,6 +592,18 @@ export default function SellerConversationScreen() {
 
   function handleStartCall(mode: 'voice' | 'video') {
     if (!id) return;
+    if (callRoute === 'agora') {
+      router.push(dmCallScreenHref({
+        conversationId: id,
+        mode,
+        participantName: other?.name ?? 'User',
+        participantInitials: other?.initials,
+        participantColor: other?.color,
+        myInitials,
+      }) as never);
+      return;
+    }
+    if (callRoute !== 'simulated') return;
     void startCall({
       conversationId: id,
       surface: 'seller',
@@ -1583,7 +1599,7 @@ export default function SellerConversationScreen() {
             centered/adjacent to the name. s.header's justifyContent:
             'space-between' pushes this group to the far right. */}
         <View style={s.headerIconGroup}>
-          {id && (
+          {id && callRoute !== 'hidden' && (
             <>
               <PressableScale
                 style={s.headerCallBtn}

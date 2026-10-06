@@ -1699,6 +1699,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }) =>
         post<{ recorded: true }>('/api/call/events', body),
     },
+      /** Rings the other participant(s) of a 1:1 DM call (push + in-app notification). */
+      dmRing: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
+        post<{ rung: number }>('/api/call/dm/ring', body),
     /** Unauthenticated public endpoints — no Authorization header needed. */
     /**
      * Profile cover video (buyer + seller). The server enforces ≤25s and one

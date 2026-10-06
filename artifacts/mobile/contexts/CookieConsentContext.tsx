@@ -3,10 +3,10 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
+import { RADII } from '@/constants/radii';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics as canUseAnalyticsValue, canUseMarketing as canUseMarketingValue } from '@/lib/cookieConsent';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
 export { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics, canUseMarketing } from '@/lib/cookieConsent';
@@ -29,14 +29,6 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   const { theme } = useAppTheme();
   const pathname = usePathname();
   const suppressForRoute = SUPPRESS_ON_PATHNAMES.has(pathname);
-  // occupiedHeight is the exact space the floating tab bar (buyer or seller —
-  // both share this geometry) reserves at the bottom of the screen, including
-  // its own clearance. The banner's hardcoded "72" was tuned for phone
-  // proportions only; at tablet/desktop web widths the tab bar is taller
-  // (bigger capsule + safe-area-independent offset) and the fixed value left
-  // only a few px of margin, so the two could visually collide. Deriving it
-  // from the same metrics both tab bars use keeps this correct at every size.
-  const tabBarInset = useTabBarMetrics().occupiedHeight;
   const [consent, setConsent] = useState<CookieConsent | null>(null);
   const [loaded, setLoaded] = useState(Platform.OS !== 'web');
   const [customizing, setCustomizing] = useState(false);
@@ -57,10 +49,67 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
   const openPreferences = () => { setAnalytics(consent?.analytics ?? false); setMarketing(consent?.marketing ?? false); setCustomizing(true); };
-  return <Context.Provider value={{ consent, saveConsent, openPreferences }}>{children}{!suppressForCapture && !suppressForRoute && loaded && (!consent || customizing) && <View style={[s.bannerWrap, { bottom: tabBarInset + SP.sm }]} pointerEvents="box-none"><View style={[s.banner, { backgroundColor: theme.card, borderColor: theme.border }]} accessibilityRole="alert"><Text style={[s.copy, { color: theme.text }]}>Brandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage are off until you choose. You can change your choices at any time using “Change cookie preferences.”</Text>{customizing && <View style={s.choices}><View style={s.choiceRow}><Text style={[s.choice, { color: theme.text }]}>✓ Necessary</Text><Text style={[s.choiceDescription, { color: theme.muted }]}>Always on. Keeps Brandthread secure, remembers your consent, and supports core features.</Text></View><View style={s.choiceRow}><PressableScale onPress={() => setAnalytics(v => !v)}><Text style={[s.choice, { color: theme.text }]}>{analytics ? '✓' : '○'} Analytics</Text></PressableScale><Text style={[s.choiceDescription, { color: theme.muted }]}>Optional. Helps us understand aggregate use of Brandthread so we can measure and improve features.</Text></View><View style={s.choiceRow}><PressableScale onPress={() => setMarketing(v => !v)}><Text style={[s.choice, { color: theme.text }]}>{marketing ? '✓' : '○'} Marketing</Text></PressableScale><Text style={[s.choiceDescription, { color: theme.muted }]}>Optional. Helps us measure campaigns and personalize Brandthread promotional communications.</Text></View></View>}<View style={s.actions}><PressableScale onPress={() => setCustomizing(v => !v)}><Text style={[s.link, { color: theme.muted }]}>{customizing ? 'Close' : 'Customize'}</Text></PressableScale><PressableScale onPress={() => saveConsent({ analytics: false, marketing: false })}><Text style={[s.link, { color: theme.muted }]}>Necessary only</Text></PressableScale><PressableScale onPress={() => saveConsent(customizing ? { analytics, marketing } : { analytics: true, marketing: true })}><Text style={[s.accept, { color: theme.accentLight }]}>{customizing ? 'Save choices' : 'Accept all'}</Text></PressableScale></View></View></View>}</Context.Provider>;
+  const showSheet = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);
+  // A bottom sheet docked to the window's bottom edge that takes its own
+  // height out of the layout (a flex sibling, not an absolute overlay), so
+  // the app — fields, tiles, the floating tab bar — sits fully above it and
+  // nothing is ever covered. The wrapper is always rendered so showing or
+  // dismissing the sheet never remounts the app. Shown until a choice is
+  // saved (persisted under KEY), then never again unless reopened from
+  // "Change cookie preferences". Layout per Google Health's consent sheet
+  // (mobbin.com/screens/ebf2fdf2-414d-4d73-b9b8-94ad2392ab22): copy, then
+  // two equal-width pill buttons.
+  return (
+    <Context.Provider value={{ consent, saveConsent, openPreferences }}>
+      <View style={s.root}>
+        <View style={s.app}>{children}</View>
+        {showSheet && (
+          <View style={[s.sheet, { backgroundColor: theme.card, borderColor: theme.border }]} accessibilityRole="alert" testID="cookie-consent-sheet">
+            <View style={s.sheetInner}>
+              <Text style={[s.copy, { color: theme.text }]}>Brandthread uses cookies and similar storage. Necessary storage is always on; analytics and marketing stay off until you choose. Change this any time under “Change cookie preferences.”</Text>
+              {customizing && (
+                <View style={s.choices}>
+                  <View style={s.choiceRow}><Text style={[s.choice, { color: theme.text }]}>✓ Necessary</Text><Text style={[s.choiceDescription, { color: theme.muted }]}>Always on. Keeps Brandthread secure, remembers your consent, and supports core features.</Text></View>
+                  <View style={s.choiceRow}><PressableScale onPress={() => setAnalytics(v => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: analytics }}><Text style={[s.choice, { color: theme.text }]}>{analytics ? '✓' : '○'} Analytics</Text></PressableScale><Text style={[s.choiceDescription, { color: theme.muted }]}>Optional. Helps us understand aggregate use of Brandthread so we can measure and improve features.</Text></View>
+                  <View style={s.choiceRow}><PressableScale onPress={() => setMarketing(v => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: marketing }}><Text style={[s.choice, { color: theme.text }]}>{marketing ? '✓' : '○'} Marketing</Text></PressableScale><Text style={[s.choiceDescription, { color: theme.muted }]}>Optional. Helps us measure campaigns and personalize Brandthread promotional communications.</Text></View>
+                </View>
+              )}
+              <View style={s.buttons}>
+                <PressableScale style={s.buttonCell} onPress={() => saveConsent({ analytics: false, marketing: false })} accessibilityRole="button" testID="cookie-consent-necessary">
+                  <View style={[s.button, { borderColor: theme.border }]}><Text style={[s.buttonText, { color: theme.text }]}>Necessary only</Text></View>
+                </PressableScale>
+                <PressableScale style={s.buttonCell} onPress={() => saveConsent(customizing ? { analytics, marketing } : { analytics: true, marketing: true })} accessibilityRole="button" testID="cookie-consent-accept">
+                  <View style={[s.button, { backgroundColor: theme.text, borderColor: theme.text }]}><Text style={[s.buttonText, { color: theme.background }]}>{customizing ? 'Save choices' : 'Accept all'}</Text></View>
+                </PressableScale>
+              </View>
+              <PressableScale onPress={() => setCustomizing(v => !v)} style={s.customize} accessibilityRole="button">
+                <Text style={[s.link, { color: theme.muted }]}>{customizing ? 'Close' : 'Customize'}</Text>
+              </PressableScale>
+            </View>
+          </View>
+        )}
+      </View>
+    </Context.Provider>
+  );
 }
 export function ChangeCookiePreferences({ style }: { style?: any }) {
   const { openPreferences } = useCookieConsent();
   return <PressableScale style={style} onPress={openPreferences}><Text style={s.link}>Change cookie preferences</Text></PressableScale>;
 }
-const s = StyleSheet.create({ bannerWrap:{position:'absolute',left:0,right:0,alignItems:'center',zIndex:2000,elevation:2000,paddingHorizontal:SP.md}, banner:{width:'100%',maxWidth:WEB_SHELL_MAX_WIDTH-SP.md*2,borderWidth:1,borderRadius:RADIUS.md,padding:SP.md,gap:SP.sm},copy:{fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:18},choices:{gap:SP.sm},choiceRow:{gap:3},choiceDescription:{fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:17},actions:{flexDirection:'row',flexWrap:'wrap',gap:SP.md,alignItems:'center'},link:{fontFamily:FONT.semibold,fontSize:FS.xs},accept:{fontFamily:FONT.bold,fontSize:FS.sm},choice:{fontFamily:FONT.medium,fontSize:FS.sm} });
+const s = StyleSheet.create({
+  root: { flex: 1 },
+  app: { flex: 1, minHeight: 0 },
+  sheet: { borderTopWidth: 1, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.md, alignItems: 'center' },
+  sheetInner: { width: '100%', maxWidth: WEB_SHELL_MAX_WIDTH - SP.md * 2, gap: SP.sm },
+  copy: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+  choices: { gap: SP.sm },
+  choiceRow: { gap: 3 },
+  choiceDescription: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17 },
+  buttons: { flexDirection: 'row', gap: SP.sm },
+  buttonCell: { flex: 1 },
+  button: { height: 44, borderRadius: RADII.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  customize: { alignSelf: 'center', minHeight: 32, justifyContent: 'center' },
+  link: { fontFamily: FONT.semibold, fontSize: FS.xs },
+  choice: { fontFamily: FONT.medium, fontSize: FS.sm },
+});

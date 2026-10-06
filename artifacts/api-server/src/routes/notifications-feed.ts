@@ -410,6 +410,7 @@ export async function publishNotification(n: {
         targetType: n.targetType,
         cta: n.cta,
         commentId: n.commentId,
+        actorName: n.actorName,
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
