@@ -12,7 +12,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -53,7 +53,10 @@ function SellerGoLiveNativeScreen() {
 
   const [facing, setFacing] = useState<'front' | 'back'>('front');
   const [torch, setTorch] = useState(false);
-  const [title, setTitle] = useState('');
+  // Opened from a scheduled live's "Go live": prefill and link it so its
+  // reminder followers are notified when the stream starts.
+  const launch = useLocalSearchParams<{ scheduledLiveId?: string; title?: string }>();
+  const [title, setTitle] = useState(typeof launch.title === 'string' ? launch.title : '');
   const [description, setDescription] = useState('');
   const [starting, setStarting] = useState(false);
 
@@ -132,6 +135,7 @@ function SellerGoLiveNativeScreen() {
       const result = await (api as any).live.start({
         title: title.trim(),
         description: description.trim() || undefined,
+        ...(typeof launch.scheduledLiveId === 'string' && launch.scheduledLiveId ? { scheduledLiveId: launch.scheduledLiveId } : {}),
         productTags: featuredProducts.map(p => ({
           productId: p.id,
           productName: p.name,
@@ -274,6 +278,17 @@ function SellerGoLiveNativeScreen() {
                 ? `${featuredProducts.length} product${featuredProducts.length === 1 ? '' : 's'} featured`
                 : 'Feature products'}
             </Text>
+            <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.featureProductsBtn}
+            onPress={() => router.push('/seller-schedule-live' as never)}
+            activeOpacity={0.8}
+            accessibilityLabel="Schedule a live"
+          >
+            <Feather name="calendar" size={15} color={FG} />
+            <Text style={s.featureProductsText}>Schedule for later</Text>
             <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
 

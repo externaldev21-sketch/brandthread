@@ -22,6 +22,7 @@ import {
 } from './cartTypes';
 import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
@@ -594,7 +595,7 @@ async function fetchShippingRateDetails(
 
 // ─── Cart validation ──────────────────────────────────────────────────────────
 
-export async function validateCart(items: CartItem[], discountCodes: string[] = []): Promise<CartValidationResult> {
+export async function validateCart(items: CartItem[], discountCodes: string[] = [], liveStreamId?: string | null): Promise<CartValidationResult> {
   const result = await serviceRequest<{ isValid: boolean; issues: CartValidationIssue[] }>(
     '/api/buyer/cart/validate',
     {
@@ -608,6 +609,7 @@ export async function validateCart(items: CartItem[], discountCodes: string[] = 
           priceCents: item.priceCents,
         })),
         discountCodes,
+        ...(liveStreamId ? { liveStreamId } : {}),
       }),
     },
   );
@@ -771,7 +773,8 @@ export async function applyDiscount(
     : undefined;
   try {
     const { api } = await import('@/lib/api');
-    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents, items);
+    const liveStreamId = getLiveCheckoutContext(sellerId)?.streamId;
+    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents, items, liveStreamId);
     return {
       code: result.code,
       type: result.type,

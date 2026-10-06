@@ -36,6 +36,7 @@ import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
 import { broadcastToRoom } from "../ws/liveHub";
+import { markScheduledLiveStarted } from "../lib/scheduledLives";
 
 const router = Router();
 
@@ -83,7 +84,7 @@ function randomChannelName(): string {
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
 router.post("/start", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { title, description, thumbnailUrl, productTags = [] } = req.body;
+  const { title, description, thumbnailUrl, productTags = [], scheduledLiveId } = req.body;
 
   if (!title?.trim()) return res.status(400).json({ error: "title is required" });
 
@@ -134,6 +135,14 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
     logger.error({ err, streamId: stream.id }, "beginCloudRecording threw unexpectedly"),
   );
 
+  // Going live from a scheduled entry: link it and notify everyone who asked
+  // to be reminded. Never blocks or fails the start.
+  if (typeof scheduledLiveId === "string" && scheduledLiveId) {
+    markScheduledLiveStarted({ scheduledLiveId, sellerId, streamId: stream.id }).catch((err) =>
+      logger.error({ err, streamId: stream.id, scheduledLiveId }, "markScheduledLiveStarted threw unexpectedly"),
+    );
+  }
+
   return res.status(201).json({
     stream: {
       id: stream.id,
@@ -174,7 +183,7 @@ router.get("/feed", async (req, res) => {
   try {
     const rows = await db.execute(sql`
       SELECT ls.id, ls.seller_id, ls.title, ls.viewer_count, ls.product_tags,
-             ls.thumbnail_url, ls.started_at,
+             ls.pinned_product_id, ls.pin_updated_at, ls.thumbnail_url, ls.started_at,
              u.display_name AS seller_name, u.brand_name, u.avatar_url, u.username,
              COALESCE(u.verified, false) AS verified,
              ${viewerId

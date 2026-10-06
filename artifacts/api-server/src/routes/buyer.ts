@@ -84,6 +84,7 @@ const checkoutBodySchema = z.object({
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
   threadCashToken: z.string().trim().min(1).max(512).optional(),
   discountCode: z.string().trim().min(1).max(64).optional(),
+  liveStreamId: requestPrimitives.uuid.nullable().optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -95,6 +96,7 @@ const addressSuggestionParamsSchema = z.object({
 const cartValidationBodySchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(100),
   discountCodes: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+  liveStreamId: requestPrimitives.uuid.nullable().optional(),
 }).passthrough();
 
 type AddressInput = {
@@ -443,6 +445,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       try {
         await validateDiscountCode({
           sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotalCents, lines,
+          liveStreamId: typeof req.body?.liveStreamId === "string" ? req.body.liveStreamId : null,
         });
       } catch (err) {
         const message = err instanceof DiscountValidationError
@@ -484,7 +487,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const buyerId = (req as any).clerkUserId as string;
     const {
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
-      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode,
+      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode, liveStreamId,
     } = req.body;
 
     // ── Thread Cash ─────────────────────────────────────────────────────
@@ -920,6 +923,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           customerKey: buyerId,
           cartSubtotalCents: subtotalCents,
           lines: discountLines,
+          liveStreamId: typeof liveStreamId === "string" ? liveStreamId : null,
         });
       } catch (err) {
         if (err instanceof DiscountValidationError) {

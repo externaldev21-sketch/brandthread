@@ -141,6 +141,8 @@ export async function priceCartGroup(input: {
   buyerId: string;
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string | null;
+  /** Live stream the buyer is shopping from (live-only discount codes). */
+  liveStreamId?: string | null;
   shipping: CartShipping;
 }): Promise<PricedGroup> {
   const seen = new Set<string>();
@@ -249,6 +251,7 @@ export async function priceCartGroup(input: {
     try {
       discount = await validateDiscountCode({
         sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: subtotalCents, lines: discountLines,
+        liveStreamId: input.liveStreamId ?? null,
       });
     } catch (error) {
       if (error instanceof DiscountValidationError) {
