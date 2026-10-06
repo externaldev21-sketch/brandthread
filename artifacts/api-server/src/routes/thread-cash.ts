@@ -47,6 +47,7 @@ import {
   awardDailyActiveTimeClaimOnce,
   recordThreadCashHeartbeat,
   getBalanceCents,
+  getCashableBalanceCents,
   getHistory,
   getThreadCashConfig,
   isFeatureEnabled,
@@ -59,6 +60,8 @@ import {
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const router = Router();
 router.use(requireAuth);
@@ -87,8 +90,9 @@ async function loadStreakState(buyerId: string): Promise<{ state: StreakState; t
 // ─── GET /api/thread-cash ───────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  const [balanceCents, config, { state, timezone }, openRedemptions] = await Promise.all([
+  const [balanceCents, cashableCents, config, { state, timezone }, openRedemptions] = await Promise.all([
     getBalanceCents(db, buyerId),
+    getCashableBalanceCents(db, buyerId),
     getThreadCashConfig(),
     loadStreakState(buyerId),
     listOpenThreadCashRedemptions(db, buyerId),
@@ -96,6 +100,9 @@ router.get("/", async (req, res) => {
   const preview = computeCheckIn(state, config, new Date(), timezone);
   res.json({
     balanceCents,
+    // How much of balanceCents a seller may cash out (earned from Live gifts
+    // and payments, never reward credit). Additive field.
+    cashableCents,
     // Redeemed at checkout but neither spent nor attached to a payment (see
     // POST /redeem/:token/cancel). Additive field (item 109).
     openRedemptions,
@@ -445,10 +452,19 @@ router.post("/live-gift", async (req, res) => {
   }
   try {
     // The authoritative host — never trust a client-supplied sellerId.
-    const rows = await db.execute(sql`SELECT seller_id FROM live_streams WHERE id = ${streamId}::uuid LIMIT 1`);
-    const sellerId = (rows.rows[0] as any)?.seller_id as string | undefined;
+    if (!UUID_RE.test(streamId)) {
+      res.status(404).json({ error: "This live could not be found." });
+      return;
+    }
+    const rows = await db.execute(sql`SELECT seller_id, status FROM live_streams WHERE id = ${streamId}::uuid LIMIT 1`);
+    const stream = rows.rows[0] as { seller_id?: string; status?: string } | undefined;
+    const sellerId = stream?.seller_id;
     if (!sellerId) {
       res.status(404).json({ error: "This live could not be found." });
+      return;
+    }
+    if (stream?.status !== "live") {
+      res.status(409).json({ error: "This live has ended.", code: "LIVE_STREAM_NOT_LIVE" });
       return;
     }
     const gift = await sendLiveGift(buyerId, sellerId, streamId, amountCents, idempotencyKey);

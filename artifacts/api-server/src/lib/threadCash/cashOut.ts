@@ -16,7 +16,7 @@ import type Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";
 import { db, threadCashEntries, users } from "@workspace/db";
 import { postLedgerTransaction } from "../money/ledger";
-import { ThreadCashError, assertThreadCashNotFrozen, getBalanceCents } from "./wallet";
+import { ThreadCashError, assertThreadCashNotFrozen, balanceLockKey, getBalanceCents, getCashableBalanceCents } from "./wallet";
 
 type StripeLike = {
   transfers: {
@@ -67,16 +67,22 @@ export async function cashOutThreadCash(
   }
 
   return db.transaction(async (tx) => {
-    // Serializes concurrent cash-out attempts for this seller so two
-    // in-flight requests can never both pass the balance check below and
-    // jointly overdraw the balance (mirrors sendThreadCash's own lock).
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-cash-out:${sellerId}`}))`);
+    // The same per-user balance lock sends, live gifts and checkout
+    // redemptions take — a cash-out racing any of them could otherwise
+    // pass its balance check while the other also spends the same cents,
+    // leaving a negative balance after a real transfer was already paid.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${balanceLockKey(sellerId)}))`);
 
     const [existing] = await tx.select()
       .from(threadCashEntries)
       .where(eq(threadCashEntries.idempotencyKey, idempotencyKey))
       .limit(1);
     if (existing) {
+      // Keys are unique across every user's entries: only this seller's own
+      // earlier cash-out may be replayed, never someone else's transfer.
+      if (existing.buyerId !== sellerId || existing.source !== "cash_out") {
+        throw new ThreadCashError("This request key was already used. Try again.", 409, "THREAD_CASH_IDEMPOTENCY_KEY_REUSED");
+      }
       const debitedCents = -existing.amountCents;
       const { payoutCents, feeCents } = computeCashOutPayoutCents(debitedCents);
       return { threadCashCents: debitedCents, payoutCents, feeCents, transferId: existing.referenceId ?? "" };
@@ -90,6 +96,18 @@ export async function cashOutThreadCash(
         `Insufficient Thread Cash. You have $${(balance / 100).toFixed(2)}.`,
         400,
         "INSUFFICIENT_THREAD_CASH",
+      );
+    }
+    // Only Thread Cash earned from other people is real money owed to the
+    // seller; reward credit (check-ins, streaks, refunds) is not cashable.
+    const cashable = await getCashableBalanceCents(tx, sellerId);
+    if (threadCashCents > cashable) {
+      throw new ThreadCashError(
+        cashable > 0
+          ? `You can cash out up to $${(cashable / 100).toFixed(2)}. Thread Cash rewards can be spent in the app but not cashed out.`
+          : "Only Thread Cash you earn from Live gifts and payments can be cashed out.",
+        400,
+        "THREAD_CASH_NOT_CASHABLE",
       );
     }
 

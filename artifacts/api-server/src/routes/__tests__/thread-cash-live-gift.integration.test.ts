@@ -5,7 +5,7 @@
  * credit in one transaction, using the `live_gift` source cashOut.ts expects.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { blocks, db, follows, liveStreams, threadCashConfig, threadCashEntries, users } from "@workspace/db";
 import { getBalanceCents, sendLiveGift } from "../../lib/threadCash/wallet";
 
@@ -80,7 +80,7 @@ describe("sendLiveGift", () => {
     await sendLiveGift(buyer, seller, stream, 150, crypto.randomUUID());
 
     const [debit] = await db.select().from(threadCashEntries)
-      .where(eq(threadCashEntries.buyerId, buyer)).limit(1);
+      .where(and(eq(threadCashEntries.buyerId, buyer), eq(threadCashEntries.source, "live_gift_sent"))).limit(1);
     expect(debit).toMatchObject({ amountCents: -150, source: "live_gift_sent", referenceId: stream });
 
     const [credit] = await db.select().from(threadCashEntries)
@@ -171,11 +171,49 @@ describe("sendLiveGift", () => {
     const stream = await makeStream(seller);
     const [config] = await db.select().from(threadCashConfig).limit(1);
     const cap = config?.dailyReceiveCapCents ?? 5000;
-    await grant(buyer, cap * 3);
-
-    await sendLiveGift(buyer, seller, stream, cap, crypto.randomUUID());
+    const sendCap = config?.dailySendCapCents ?? 2000;
+    // The receive cap is larger than one buyer's send cap, so fill it from
+    // several buyers — the cap is per seller, across every sender.
+    let remaining = cap;
+    while (remaining > 0) {
+      const sender = await makeUser();
+      const amount = Math.min(sendCap, remaining);
+      await grant(sender, amount);
+      await sendLiveGift(sender, seller, stream, amount, crypto.randomUUID());
+      remaining -= amount;
+    }
+    await grant(buyer, 100);
     await expect(
       sendLiveGift(buyer, seller, stream, 1, crypto.randomUUID()),
     ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
+  });
+
+  it("a reused idempotency key from another buyer is refused, never read back as sent", async () => {
+    const a = await makeUser();
+    const b = await makeUser();
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    await grant(a, 500);
+    await grant(b, 500);
+    const key = crypto.randomUUID();
+
+    await sendLiveGift(a, seller, stream, 100, key);
+    await expect(sendLiveGift(b, seller, stream, 100, key))
+      .rejects.toMatchObject({ code: "THREAD_CASH_IDEMPOTENCY_KEY_REUSED" });
+    expect(await getBalanceCents(db, b)).toBe(500);
+  });
+
+  it("concurrent gifts from different buyers never push a seller past the receive cap", async () => {
+    const seller = await makeUser();
+    const stream = await makeStream(seller);
+    const [config] = await db.select().from(threadCashConfig).limit(1);
+    const receiveCap = config?.dailyReceiveCapCents ?? 5000;
+    const sendCap = config?.dailySendCapCents ?? 2000;
+    const amount = Math.min(sendCap, Math.ceil(receiveCap / 4));
+    const buyers = await Promise.all(Array.from({ length: 8 }, () => makeUser()));
+    await Promise.all(buyers.map((b) => grant(b, amount)));
+
+    await Promise.allSettled(buyers.map((b) => sendLiveGift(b, seller, stream, amount, crypto.randomUUID())));
+    expect(await getBalanceCents(db, seller)).toBeLessThanOrEqual(receiveCap);
   });
 });

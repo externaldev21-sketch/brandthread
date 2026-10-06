@@ -242,6 +242,7 @@ export default function PayoutsScreen() {
 
       <SellerThreadCashCard
         balanceCents={threadCash.balanceCents}
+        cashableCents={threadCash.cashableCents}
         loading={threadCash.loading}
         error={threadCash.error}
         onReload={threadCash.reload}
@@ -249,7 +250,7 @@ export default function PayoutsScreen() {
       />
       <CashOutSheet
         visible={cashOutVisible}
-        balanceCents={threadCash.balanceCents ?? 0}
+        balanceCents={threadCash.cashableCents ?? 0}
         onClose={() => setCashOutVisible(false)}
         onCashedOut={handleCashedOut}
       />
