@@ -71,7 +71,8 @@ export async function saveFilterState(state: AnalyticsFilterState): Promise<void
 }
 
 export async function getOverview(filter?: AnalyticsFilterState): Promise<AnalyticsOverview> {
-  const data = await serviceRequest<any>('/api/analytics/dashboard', {}, false);
+  // Seller-local "today"/"this week", like the Home dashboard (/home).
+  const data = await serviceRequest<any>(`/api/analytics/dashboard?tz=${-new Date().getTimezoneOffset()}`, {}, false);
   const revenueCents = cents(data?.revenue?.totalCents ?? 0, 'revenue total');
   const orders = number(data?.orders?.total);
   const visitors = number(data?.storefrontVisits);
@@ -95,7 +96,7 @@ export async function getOverview(filter?: AnalyticsFilterState): Promise<Analyt
 }
 
 export async function getSalesAnalytics(filter?: AnalyticsFilterState): Promise<SalesAnalytics> {
-  const data = await serviceRequest<any>(`/api/analytics/revenue?period=${periodFor(filter)}`, {}, false);
+  const data = await serviceRequest<any>(`/api/analytics/revenue?period=${periodFor(filter)}&tz=${-new Date().getTimezoneOffset()}`, {}, false);
   const daily = Array.isArray(data?.daily) ? data.daily : [];
   const salesChart = daily.map((row: any) => ({
     date: typeof row.day === 'string' ? row.day.slice(0, 10) : '',
