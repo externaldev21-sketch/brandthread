@@ -30,8 +30,5 @@ export const PARENT_FALLBACK: Record<string, string> = {
   '/notifications-settings': '/(tabs)/more',
   '/general-settings': '/seller-settings',
   '/ai-settings': '/ai-brain',
-  '/customer-accounts': '/seller-settings',
-  '/customer-events': '/seller-settings',
-  '/customer-privacy': '/seller-settings',
   '/customer-orders': '/customers',
 };
