@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { reviewTextModeration } from "../middlewares/reviewTextModeration";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import healthRouter from "./health";
 import { responseCache, invalidateResponseCache } from "../middlewares/responseCache";
@@ -111,6 +112,10 @@ import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
 
 const router = Router();
+
+// Review and seller-reply text goes through the public content filter before
+// the reviews router (see middlewares/reviewTextModeration.ts).
+router.use("/reviews", reviewTextModeration);
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);

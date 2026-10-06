@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { clerkClient } from "@clerk/express";
+import { revokeAppleSignInOnAccountDeletion } from "../lib/appleSignInRevoke";
 import {
   db, users, orders, orderItems, conversationParticipants, conversations, messages,
   passwordResetCodes,
@@ -24,6 +25,11 @@ import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 
 const router = Router();
+
+// Sign in with Apple: revoke the Apple tokens once an account deletion
+// succeeds (runs ahead of the DELETE /account handler; off until the
+// APPLE_SIGNIN_* keys are set — see lib/appleSignInRevoke.ts).
+router.delete("/account", requireAuth, revokeAppleSignInOnAccountDeletion);
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
 const optionalProfileText = z.string().trim().max(160).optional();
 const syncBodySchema = z.object({

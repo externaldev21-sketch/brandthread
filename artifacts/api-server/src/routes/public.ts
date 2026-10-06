@@ -14,6 +14,7 @@ import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
+import { isUuid } from "../lib/uuid";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
@@ -481,6 +482,10 @@ router.get("/products/:id", async (req, res) => {
 // GET /api/public/collections/:id — a shared "Save to collection" board (deep link).
 // Only ever returns collections the owner has explicitly marked public.
 router.get("/collections/:id", async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
   try {
     const [collection] = await db.select().from(savedCollections)
       .where(and(eq(savedCollections.id, req.params.id), eq(savedCollections.isPublic, true)))
@@ -1426,6 +1431,7 @@ router.get("/drops", async (req, res) => {
 // state instead of a dead link once the drop is over.
 router.get("/drops/:id", async (req, res) => {
   setPublicCacheHeaders(res);
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Drop not found" });
   const [drop] = await db
     .select()
     .from(drops)
@@ -1488,6 +1494,7 @@ router.get("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => 
   const userId = (req as any).clerkUserId as string;
   const dropId = typeof req.params.id === "string" ? req.params.id : undefined;
   if (!dropId) { res.status(400).json({ error: "drop id required" }); return; }
+  if (!isUuid(dropId)) { res.status(404).json({ error: "Drop not found" }); return; }
   const [subscription] = await db
     .select({ id: dropAlertSubscriptions.id })
     .from(dropAlertSubscriptions)
@@ -1500,6 +1507,7 @@ router.post("/drops/:id/notify", requireAuth, async (req, res): Promise<void> =>
   const userId = (req as any).clerkUserId as string;
   const dropId = typeof req.params.id === "string" ? req.params.id : undefined;
   if (!dropId) { res.status(400).json({ error: "drop id required" }); return; }
+  if (!isUuid(dropId)) { res.status(404).json({ error: "Drop not found" }); return; }
   const [drop] = await db.select({ id: drops.id }).from(drops)
     .where(and(eq(drops.id, dropId), eq(drops.status, "active")))
     .limit(1);
@@ -1512,6 +1520,7 @@ router.delete("/drops/:id/notify", requireAuth, async (req, res): Promise<void> 
   const userId = (req as any).clerkUserId as string;
   const dropId = typeof req.params.id === "string" ? req.params.id : undefined;
   if (!dropId) { res.status(400).json({ error: "drop id required" }); return; }
+  if (!isUuid(dropId)) { res.status(404).json({ error: "Drop not found" }); return; }
   await db.delete(dropAlertSubscriptions).where(
     and(eq(dropAlertSubscriptions.dropId, dropId), eq(dropAlertSubscriptions.userId, userId)),
   );
