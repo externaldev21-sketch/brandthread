@@ -460,7 +460,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
       {/* Unread dot — inside the content area (not out in the 16pt screen
           gutter), just ahead of the row's trailing pill/thumbnail. White
           not blue: monochrome brand. */}
-      {unread ? <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} /> : null}
+      {unread ? (
+        <View style={showFollowControl || trailingThumb ? styles.unreadDotAnchor : styles.unreadDotTrailing} pointerEvents="none">
+          <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} />
+        </View>
+      ) : null}
 
       {showFollowControl ? (
         // The shared Follow pill (components/search/PersonRow) — same one the
@@ -1504,7 +1508,25 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   // Inline before the trailing pill/thumbnail (inside the 16pt gutter, not
   // out in it). Theme text colour — white, not an accent.
+  // Zero-width anchor that cancels its own row gap, so the dot sits in the
+  // existing 12pt gap before the trailing pill/thumbnail and never takes
+  // width from the text (which would push a timestamp onto its own line).
+  unreadDotAnchor: {
+    width: 0,
+    marginLeft: -(SP.sm + 4),
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  // No trailing pill/thumbnail: the dot is the row's last item, in flow, so
+  // it stays inside the content edge instead of drifting into the gutter.
+  unreadDotTrailing: {
+    width: 6,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
   unreadDot: {
+    position: 'absolute',
+    left: 3,
     width: 6,
     height: 6,
     borderRadius: 3,

@@ -10,6 +10,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -227,20 +228,20 @@ export default function CommunityChatScreen() {
               icon="user-x"
               title="You’re no longer in this group"
               description="You can’t see or send messages here anymore."
-              action={{ label: 'Back', onPress: back }}
+              action={{ label: 'Go back', onPress: back }}
             />
           </View>
         );
       case 'deleted':
         return (
           <View style={s.center}>
-            <EmptyState icon="archive" title="This group was deleted" description="Its owner closed it, so the chat is no longer available." action={{ label: 'Back', onPress: back }} />
+            <EmptyState icon="archive" title="This group was deleted" description="Its owner closed it, so the chat is no longer available." action={{ label: 'Go back', onPress: back }} />
           </View>
         );
       case 'notfound':
         return (
           <View style={s.center}>
-            <EmptyState icon="users" title="This group isn’t available" description="It may have been removed or the link is out of date." action={{ label: 'Back', onPress: back }} />
+            <EmptyState icon="users" title="This group isn’t available" description="It may have been removed or the link is out of date." action={{ label: 'Go back', onPress: back }} />
           </View>
         );
       default:
@@ -319,8 +320,14 @@ export default function CommunityChatScreen() {
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
-      {/* Same metrics as ScreenHeader (top inset + SP.sm, 56pt row, 44pt targets), with the
-          group avatar/name/member count in the title slot, which ScreenHeader's string title can't hold. */}
+      {/* No group to show yet (loading) or at all (not found / deleted /
+          removed / load error): the shared ScreenHeader with a plain title,
+          rather than a bare back arrow next to an empty title slot. */}
+      {!community ? (
+        <ScreenHeader title="Group" onBack={back} backTestID="community-chat-back" />
+      ) : (
+      /* Same metrics as ScreenHeader (top inset + SP.sm, 56pt row, 44pt targets), with the
+          group avatar/name/member count in the title slot, which ScreenHeader's string title can't hold. */
       <View style={[s.header, { paddingTop: headerTopPad + SP.sm, paddingRight: SP.md + insets.right }]}>
         <PressableScale
           rippleEnabled={false}
@@ -374,6 +381,7 @@ export default function CommunityChatScreen() {
           </PressableScale>
         )}
       </View>
+      )}
 
       {renderBody()}
 
