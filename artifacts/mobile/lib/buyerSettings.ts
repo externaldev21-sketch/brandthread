@@ -79,6 +79,7 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   contactSync: false,
   showShoppingActivity: false,
   personalizedRecommendations: true,
+  // No sizes until the shopper picks them (empty = nothing selected).
   sizeTops: '',
   sizeBottoms: '',
   sizeShoes: '',

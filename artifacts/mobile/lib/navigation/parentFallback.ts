@@ -31,8 +31,5 @@ export const PARENT_FALLBACK: Record<string, string> = {
   '/seller-activity': '/(tabs)/profile',
   '/general-settings': '/seller-settings',
   '/ai-settings': '/ai-brain',
-  '/customer-accounts': '/seller-settings',
-  '/customer-events': '/seller-settings',
-  '/customer-privacy': '/seller-settings',
   '/customer-orders': '/customers',
 };

@@ -39,6 +39,10 @@ const SILVER = '#C0C0C0';
 const SILVER_BORDER = 'rgba(192,192,192,0.28)';
 const SILVER_WASH = 'rgba(192,192,192,0.12)';
 
+/** Demo store identity, shared with other demo-mode seller screens (Share store). */
+export const PREVIEW_STORE_NAME = 'Thread & Co.';
+export const PREVIEW_STORE_HANDLE = 'threadandco';
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -51,7 +55,7 @@ function formatUsd(cents: number): string {
  *  returns, using local seeded demo products instead of a network call. */
 export function buildPreviewStorefrontHtml(): string {
   const products = getPreviewSellerProducts();
-  const title = 'Thread & Co.';
+  const title = PREVIEW_STORE_NAME;
   // The store name already appears once, in the nav — the hero is a
   // tagline/banner line, not a second copy of the name.
   const heroLine = 'New arrivals, handmade in small batches.';
@@ -94,7 +98,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:20px 2
 .product-meta{display:flex;flex-direction:column;gap:2px;padding:10px 12px 4px;font-size:.85rem;font-weight:600;}
 .product-meta span:last-child{font-weight:500;color:${SILVER};}
 .add-to-cart-btn{margin:8px 12px 12px;padding:8px;border-radius:6px;border:1px solid #000000;background:#000000;color:#FFFFFF;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
-.add-to-cart-btn:disabled{background:#FFFFFF;color:${SILVER};border-color:${SILVER_BORDER};}
+.add-to-cart-btn:disabled{background:#FFFFFF;color:#000000;border-color:${SILVER};}
 </style>
 </head>
 <body>

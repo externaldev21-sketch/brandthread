@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Share, Alert, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, Share, Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
@@ -18,6 +18,10 @@ import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_STORE_HANDLE, PREVIEW_STORE_NAME } from '@/lib/previewStorefrontHtml';
 
 const BASE_URL = 'https://brandthread.app/store';
 
@@ -26,12 +30,20 @@ export default function ShareStoreScreen() {
   const router = useRouter();
   const api    = useApi();
   const colors = useColors();
+  const tabBarInset = useSellerTabBarInset();
 
   const [copied,    setCopied]    = useState(false);
   const [profile,   setProfile]   = useState<{ username?: string | null; brandName?: string | null; displayName?: string | null } | null>(null);
   const [loading,   setLoading]   = useState(true);
 
   useEffect(() => {
+    // Signed-out preview has no session for the protected profile call:
+    // demo mode uses the seeded demo store, fresh mode has no store yet.
+    if (isSellerDevPreview() || isBuyerDevPreview()) {
+      if (isPreviewDemoMode()) setProfile({ username: PREVIEW_STORE_HANDLE, brandName: PREVIEW_STORE_NAME });
+      setLoading(false);
+      return;
+    }
     (api as any).seller?.getProfile?.()
       ?.then((p: any) => setProfile(p))
       ?.catch(() => {})
@@ -40,12 +52,16 @@ export default function ShareStoreScreen() {
 
   // Construct the shareable URL — use username if set, fall back to encoded brand name
   const handle    = profile?.username ?? null;
-  const brandName = profile?.brandName ?? profile?.displayName ?? 'My Store';
+  const brandName = profile?.brandName ?? profile?.displayName ?? '';
   const storeSlug = handle
     ? handle
     : brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  // No handle and no name to build a link from — prompt store setup
+  // instead of sharing a placeholder storefront.
+  const needsSetup = !loading && !storeSlug;
   const storeUrl  = `${BASE_URL}/${storeSlug}`;
   const handleStr = `@${handle ?? storeSlug}`;
+  const storeTitle = brandName || storeSlug;
 
   async function copyLink() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -58,7 +74,7 @@ export default function ShareStoreScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Share.share({
-        message: `Shop ${brandName} on Brandthread: ${storeUrl}`,
+        message: `Shop ${storeTitle} on Brandthread: ${storeUrl}`,
         url:     storeUrl,
       });
     } catch {
@@ -68,10 +84,19 @@ export default function ShareStoreScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Share Store" />
+      <ScreenHeader title="Share store" />
 
-      {/* Content */}
-      <View style={s.body}>
+      {needsSetup ? (
+        <EmptyState
+          icon="shopping-bag"
+          title="Set up your store"
+          message="Choose your store name and URL to get a shareable link."
+          actionLabel="Store settings"
+          onAction={() => router.push('/store-settings' as any)}
+          style={{ flex: 1, paddingBottom: tabBarInset }}
+        />
+      ) : (
+      <ScrollView style={s.scroll} contentContainerStyle={[s.body, { paddingBottom: 24 + tabBarInset }]}>
         {/* QR Card */}
         <View style={[s.qrCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Store badge */}
@@ -84,7 +109,7 @@ export default function ShareStoreScreen() {
                 <ActivityIndicator color={colors.accentForeground} size="small" />
               ) : (
                 <>
-                  <Text style={[s.storeName, { color: colors.foreground }]} numberOfLines={1}>{brandName}</Text>
+                  <Text style={[s.storeName, { color: colors.foreground }]} numberOfLines={1}>{storeTitle}</Text>
                   <Text style={[s.storeHandle, { color: colors.mutedForeground }]}>{handleStr}</Text>
                 </>
               )}
@@ -128,7 +153,8 @@ export default function ShareStoreScreen() {
           Add this QR code to packaging, social bios, or pop-up event materials.
           Buyers scan it and land directly on your Brandthread storefront.
         </Text>
-      </View>
+      </ScrollView>
+      )}
     </View>
   );
 }
@@ -136,7 +162,8 @@ export default function ShareStoreScreen() {
 const s = StyleSheet.create({
   root:        { flex: 1 },
 
-  body:        { flex: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 36 },
+  scroll:      { flex: 1 },
+  body:        { alignItems: 'center', paddingHorizontal: 24, paddingTop: 36 },
 
   qrCard:      { width: '100%', borderRadius: 24, borderWidth: 1, alignItems: 'center', padding: 28, marginBottom: 20 },
   storeBadge:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, alignSelf: 'flex-start' },

@@ -22,6 +22,9 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { fitChipText, isVerifiedReview } from '@/lib/reviewDisplay';
 import { radius } from '@/constants/radii';
+import { EmptyState } from '@/components/layout';
+import { MissingItemState } from '@/components/states/MissingItemState';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -34,6 +37,7 @@ export default function ProductReviewsScreen() {
   const [avgRating, setAvgRating] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const tabBarInset = useSellerTabBarInset();
   const [photosOnly, setPhotosOnly] = useState(false);
   const [starFilter, setStarFilter] = useState<StarFilter>(null);
   const [sizeFilter, setSizeFilter] = useState<string | null>(null);
@@ -72,6 +76,12 @@ export default function ProductReviewsScreen() {
     (!sizeFilter || r.sizeBought === sizeFilter),
   );
 
+  // Opened without a product (stale link): there is nothing to fetch, so
+  // never sit on the spinner.
+  if (!productId) {
+    return <MissingItemState headerTitle="Reviews" title="Product not found" icon="star" />;
+  }
+
   return (
     <View style={s.root}>
       <ScreenHeader title={productName || 'Reviews'} />
@@ -90,6 +100,8 @@ export default function ProductReviewsScreen() {
         </View>
       ) : loadFailed && reviews.length === 0 ? (
         <ErrorState message="Couldn't load reviews." onRetry={() => { void load(); }} style={{ flex: 1 }} />
+      ) : reviews.length === 0 ? (
+        <EmptyState icon="star" title="No reviews yet" message="Reviews from buyers will show up here." />
       ) : (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
@@ -119,7 +131,7 @@ export default function ProductReviewsScreen() {
             data={filtered}
             keyExtractor={item => item.id}
             refreshControl={pull.refreshControl}
-            contentContainerStyle={{ padding: SP.md }}
+            contentContainerStyle={{ padding: SP.md, paddingBottom: SP.md + tabBarInset }}
             ListEmptyComponent={<View style={s.center}><Text style={s.muted}>No matching reviews</Text></View>}
             renderItem={({ item }) => (
               <>

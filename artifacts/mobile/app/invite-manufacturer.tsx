@@ -25,6 +25,8 @@ import { createInvitation, getInvitations } from '@/services/manufacturerService
 import type { ManufacturerInvitation } from '@/services/manufacturerTypes';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { radius } from '@/constants/radii';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 function inviteMessage(companyName: string, link: string) {
   return `Hi${companyName ? ` ${companyName}` : ''} — I'd like to manage our production on Brandthread. It's free for you: sign up with this private link and we'll have one place for messages, samples, orders and payments.\n\n${link}`;
@@ -34,6 +36,7 @@ export default function InviteManufacturerScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
 
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -47,6 +50,8 @@ export default function InviteManufacturerScreen() {
   const [invitesError, setInvitesError] = useState(false);
 
   const loadInvites = useCallback(async () => {
+    // Signed-out preview: no protected invites call, show the empty list.
+    if (isSellerDevPreview() || isBuyerDevPreview()) { setInvitesError(false); setInvites([]); return; }
     try {
       setInvitesError(false);
       setInvites(await getInvitations());
@@ -123,7 +128,7 @@ export default function InviteManufacturerScreen() {
       <ScreenHeader title="Invite a manufacturer" />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: SP.md }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl + tabBarInset, gap: SP.md }} keyboardShouldPersistTaps="handled">
           {created ? (
             <View style={s.card} testID="invite-created">
               <View style={s.successIcon}><Feather name="check" size={26} color={SUCCESS} /></View>

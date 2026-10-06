@@ -131,6 +131,10 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
+vi.mock('@/components/ScreenHeader', () => ({
+  ScreenHeader: () => null,
+}));
+
 vi.mock('@/lib/theme', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/theme')>(),
   BG: '#09090B',

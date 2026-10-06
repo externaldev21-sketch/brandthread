@@ -16,7 +16,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ProductImportPreview } from '@/components/products/ProductImportPreview';
 import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
@@ -196,7 +196,7 @@ export default function ProductImportScreen() {
 
   return (
     <View style={s.screen}>
-      <Header title="Import Products" dividerVariant="none" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }} />
+      <ScreenHeader title="Import products" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -217,7 +217,7 @@ export default function ProductImportScreen() {
               <Text style={s.methodTitle}>CSV File</Text>
               <Text style={s.methodDesc}>Upload a spreadsheet with your product catalogue</Text>
             </View>
-            <StatusBadge label="Supported" variant="success" />
+            <Feather name={selectedMethod === 'csv' ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
           </View>
 
           {selectedMethod === 'csv' && (
@@ -258,8 +258,8 @@ export default function ProductImportScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/store-builder' as never); }}
         >
           <View style={s.methodRow}>
-            <View style={[s.methodIconWrap, { backgroundColor: GOLD + '22' }]}>
-              <Feather name="shopping-bag" size={ICON.md} color={GOLD} />
+            <View style={[s.methodIconWrap, { backgroundColor: theme.accentDim }]}>
+              <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Transfer from Shopify</Text>
@@ -315,7 +315,7 @@ export default function ProductImportScreen() {
               <Text style={s.methodTitle}>Manual bulk entry</Text>
               <Text style={s.methodDesc}>Type in product names and details one line at a time</Text>
             </View>
-            <StatusBadge label="Available" variant="success" />
+            <Feather name={selectedMethod === 'manual' ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
           </View>
 
           {selectedMethod === 'manual' && (
@@ -476,6 +476,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   scroll: {
     paddingHorizontal: SP.md,
+    paddingTop: SP.md,
     gap: SP.sm,
   },
   methodCard: {

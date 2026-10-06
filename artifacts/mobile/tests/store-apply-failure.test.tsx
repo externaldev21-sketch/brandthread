@@ -113,6 +113,10 @@ vi.mock('@/hooks/useHeaderTopInset', () => ({
   useHeaderTopInset: () => 0,
 }));
 
+vi.mock('@/components/ScreenHeader', () => ({
+  ScreenHeader: () => null,
+}));
+
 vi.mock('@/lib/theme', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/theme')>(),
   BG: '#09090b',

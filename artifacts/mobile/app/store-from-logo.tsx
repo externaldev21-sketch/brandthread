@@ -12,6 +12,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -101,7 +102,10 @@ export default function StoreFromLogoScreen() {
   const fl = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
-  const { user, isLoaded: isUserLoaded } = useUser();
+  const { user, isLoaded: clerkLoaded } = useUser();
+  // The signed-out web preview never hydrates Clerk, so there is no user and
+  // nothing to restore — don't wait on isLoaded forever.
+  const isUserLoaded = clerkLoaded || isSellerDevPreview() || isBuyerDevPreview();
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [preparingLogo, setPreparingLogo] = useState(false);

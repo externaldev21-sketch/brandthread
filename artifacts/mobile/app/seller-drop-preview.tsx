@@ -22,6 +22,9 @@ import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
 import { computeCountdownParts } from '@/lib/dropCountdown';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState as LayoutEmptyState } from '@/components/layout';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 const { width: W } = Dimensions.get('window');
 const HERO_H = Math.max(420, Math.min(540, W * 1.2));
@@ -56,16 +59,18 @@ export default function SellerDropPreview() {
   const [drop, setDrop] = useState<PreviewDrop | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     if (!dropId) { setLoading(false); return () => { active = false; }; }
+    setLoading(true);
     api.drops.get(dropId).then((data: any) => {
       if (!active) return;
       setDrop(data);
-    }).finally(() => { if (active) setLoading(false); });
+    }).catch(() => {}).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [dropId, api]);
+  }, [dropId, api, reloadKey]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -89,14 +94,22 @@ export default function SellerDropPreview() {
       </View>
     );
   }
+  if (!dropId) {
+    return <MissingItemState headerTitle="Drop preview" title="Drop not found" icon="calendar" />;
+  }
   if (!drop) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background, gap: 12 }]}>
-        <Feather name="alert-triangle" size={28} color={theme.muted} />
-        <Text style={{ color: theme.text, fontFamily: FONT.regular }}>Couldn't load this drop.</Text>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={{ padding: 12 }}>
-          <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Back</Text>
-        </TouchableOpacity>
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <ScreenHeader title="Drop preview" />
+        <LayoutEmptyState
+          variant="error"
+          icon="alert-triangle"
+          title="Couldn't load this drop"
+          message="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => setReloadKey(k => k + 1)}
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }

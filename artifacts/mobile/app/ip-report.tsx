@@ -4,9 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/hooks/useApi';
-import { BrandthreadHeader, BrandthreadScreen, PrimaryButton, SecondaryButton, PressableScale } from '@/components/BrandthreadUI';
-import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandthreadScreen, PrimaryButton, SecondaryButton, PressableScale } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
@@ -21,10 +22,7 @@ export default function IpReportScreen() {
   const api = useApi();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
-  // Clear the floating tab bar so Submit isn't hidden behind it at scroll end
-  // (same clearance as design-export / design-prompt-edit).
-  const insets = useSafeAreaInsets();
-  const tabBarClearance = Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md;
+  const tabBarInset = useSellerTabBarInset();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
@@ -65,9 +63,9 @@ export default function IpReportScreen() {
     } catch { Alert.alert('Unable to check status', 'Please try again later.'); }
     finally { setChecking(null); }
   };
-  return <BrandthreadScreen>
-    <BrandthreadHeader title="Report IP infringement" onBack={() => goBackOr(router)} />
-    <ScrollView contentContainerStyle={[s.content, { paddingBottom: tabBarClearance }]} keyboardShouldPersistTaps="handled">
+  return <BrandthreadScreen noSafeTop>
+    <ScreenHeader title="Report IP infringement" onBack={() => goBackOr(router)} />
+    <ScrollView contentContainerStyle={[s.content, { paddingBottom: SP.xl + tabBarInset }]} keyboardShouldPersistTaps="handled">
       <Text style={s.legal}>Only a rights holder or an authorized agent may submit this report. By submitting, you certify that you are authorized to act, that the information is accurate, and that you have a good-faith belief the reported listing infringes your copyright, trademark, or other rights. Include the listing, the rights you own or represent, and supporting evidence. Brandthread may request more information, notify the seller, restrict or remove content, or close the case without action. Knowingly false or misleading reports may lead to account action. Questions about an IP case can be sent to support@brandthread.app.</Text>
       <Text style={s.label}>Your full name</Text><TextInput value={name} onChangeText={setName} style={s.input} placeholder="Rights holder or authorized agent" placeholderTextColor={theme.subtle} />
       <Text style={s.label}>Contact email</Text><TextInput value={email} onChangeText={setEmail} style={s.input} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={theme.subtle} />

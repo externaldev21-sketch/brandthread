@@ -25,6 +25,7 @@ import { calcPricing } from '@/lib/productUtils';
 import { formatCents, integerPercent } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { buildProductUrl } from '@/lib/shareLinks';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -112,8 +113,13 @@ export default function ProductStoreScreen() {
   useEffect(() => {
     async function load() {
       let p: Product | undefined;
-      if (id) {
-        p = await getProduct(id);
+      try {
+        if (id) {
+          p = await getProduct(id);
+        }
+      } catch {
+        // Failed fetch falls through to the not-found state instead of an endless "Loading…".
+        p = undefined;
       }
       // No demo fallback — if the product is not found, the screen shows an error.
       setProduct(p ?? null);
@@ -249,15 +255,13 @@ export default function ProductStoreScreen() {
 
   if (!product) {
     return (
-      <View style={[s.screen, { paddingTop: headerTopInset, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
-        <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
-        <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
-          Product not found or no longer available.
-        </Text>
-        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router, '/(buyer)/discover')} activeOpacity={0.7}>
-          <Text style={{ color: ACCENT_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <MissingItemState
+        headerTitle="Product"
+        title="Product not found"
+        message="It may have been removed or is no longer available."
+        icon="package"
+        onAction={() => goBackOr(router, '/(buyer)/discover')}
+      />
     );
   }
 

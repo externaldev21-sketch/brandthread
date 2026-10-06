@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert,
+  StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -152,7 +152,9 @@ export default function StoreAiImproveScreen() {
         </ScrollView>
 
         {/* Active Suggestions */}
-        {filtered.length === 0 && !loading ? (
+        {filtered.length === 0 && loading ? (
+          <ActivityIndicator color={MUTED} style={ai.loader} />
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon="check-circle"
             title="No suggestions right now"
@@ -240,6 +242,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
   chipScroll: { marginBottom: SP.md },
   chipRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md },
   emptyState: { paddingTop: SP.xl },
+  loader: { paddingTop: SP.xl },
   sugCard: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.sm },
   sugHeader: { flexDirection: 'row', alignItems: 'center' },
   sugTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },

@@ -29,6 +29,7 @@ import { clearAuditLog } from '../services/aiAuditLog';
 import { useColors } from '@/hooks/useColors';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -205,6 +206,7 @@ export default function AiSettingsScreen() {
   const router = useRouter();
   const colors = useColors();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
+  const tabBarInset = useSellerTabBarInset();
   const [settings, setSettings] = useState<AISettings | null>(null);
   const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   // Dev/web preview stays purely local — it never calls protected APIs.
@@ -286,7 +288,7 @@ export default function AiSettingsScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, tabBarInset > 0 && { paddingBottom: 48 + tabBarInset }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Section: Assistant */}

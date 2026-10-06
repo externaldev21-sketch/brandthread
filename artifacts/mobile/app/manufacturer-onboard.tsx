@@ -18,6 +18,7 @@ import { PillButton, Reveal, StepHeadline } from '@/components/onboarding/Onboar
 import { BG, BORDER, CARD, FG, FONT, FS, MUTED, SP, SUBTLE } from '@/lib/theme';
 import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 function portalJoinUrl(token?: string) {
   const origin = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/+$/, '') || BRANDTHREAD_ORIGIN;
@@ -28,12 +29,13 @@ export default function ManufacturerOnboardScreen() {
   const { token } = useLocalSearchParams<{ token?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const url = portalJoinUrl(typeof token === 'string' ? token : undefined);
 
   return (
     <View style={s.screen}>
     <ScreenHeader title="Manufacturer signup" onBack={() => (router.canGoBack() ? goBackOr(router) : router.replace('/' as never))} />
-    <View style={[s.root, { paddingTop: SP.md, paddingBottom: insets.bottom + SP.md }]}>
+    <View style={[s.root, { paddingTop: SP.md, paddingBottom: (tabBarInset || insets.bottom) + SP.md }]}>
       <View style={s.body}>
         <View style={s.hero}>
           <ThreadDraw height={72} color={FG} delay={150} duration={1200} style={s.heroThread} />

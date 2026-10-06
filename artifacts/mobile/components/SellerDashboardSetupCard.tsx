@@ -31,6 +31,9 @@ export function SellerDashboardSetupCard({
     <View
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
+      // Not a "button": the card holds the real "Add a product" button, and on
+      // web a button-role card renders as <button> nesting another <button>.
+      accessibilityRole="none"
     >
       <PressableScale
         onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}

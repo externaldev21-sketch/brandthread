@@ -12,6 +12,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
   BG, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -113,7 +114,10 @@ export default function StoreFromMoodboardScreen() {
   const mb = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
-  const { user, isLoaded: isUserLoaded } = useUser();
+  const { user, isLoaded: clerkLoaded } = useUser();
+  // The signed-out web preview never hydrates Clerk, so there is no user and
+  // nothing to restore — don't wait on isLoaded forever.
+  const isUserLoaded = clerkLoaded || isSellerDevPreview() || isBuyerDevPreview();
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [preparingImages, setPreparingImages] = useState(false);
@@ -292,22 +296,12 @@ export default function StoreFromMoodboardScreen() {
 
   return (
     <View style={mb.root}>
-      <ScreenHeader title="Generate from Mood Board" />
+      <ScreenHeader title="Mood board" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={mb.scroll}>
         <Text style={mb.subtitle}>
           Upload 2–8 images that represent your brand aesthetic. AI will suggest colors, typography, and a theme.
         </Text>
-
-        {/* AI badge */}
-        <BrandthreadCard style={[mb.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
-          <View style={mb.bannerRow}>
-            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={[mb.bannerText, { color: PURPLE_LIGHT }]}>
-              We'll pull your colors, type and vibe from your mood board.
-            </Text>
-          </View>
-        </BrandthreadCard>
 
         {/* Image Count */}
         <Text style={mb.countLabel}>{imageUris.length} of {MAX_IMAGES} images</Text>

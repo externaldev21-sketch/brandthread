@@ -4,7 +4,7 @@
  * Visual reference: Procreate Pocket iOS gallery screenshots (structure only, not branding).
  *
  * Gallery:
- *  - Large bold left-aligned "Design Studio" title directly below safe-area inset.
+ *  - Shared ScreenHeader ("Brandthread Studio": back arrow + title on one row).
  *  - Compact action row flush below title: "Select  Import  Photo" (FG color, no dividers)
  *    with a bare "+" pushed to the far right at the same baseline.
  *  - Three-column artwork grid. Thumbnails fill each cell with no card chrome.
@@ -33,6 +33,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -1460,8 +1461,6 @@ export default function DesignGalleryScreen() {
   const [moreOptionsVisible, setMoreOptionsVisible] = useState(false);
   const [sharing, setSharing]                   = useState(false);
 
-  // Safe area — web gets hardcoded insets per SKILL.md
-  const topInset = useHeaderTopInset();
   const botInset = insets.bottom;
 
   // ── Data load ──────────────────────────────────────────────────────────────
@@ -1793,40 +1792,16 @@ export default function DesignGalleryScreen() {
   return (
     <View style={s.screen} testID="design-gallery-screen">
 
-      {/*
-       * ── Gallery header ──────────────────────────────────────────────────
-       *
-       * Layout (screenshot 0):
-       *   [insets.top gap]
-       *   [large bold title "Design Studio"  ]
-       *   [Select  Import  Photo          [+]]   ← same row, spaced right
-       *
-       * Tight vertical rhythm: title → actions without extra padding between them.
-       * Horizontal alignment: both flush to GRID_H_PAD.
-       */}
-      <View style={[s.header, { paddingTop: topInset }]}>
-        {/* Back arrow — pops history when there is any (router.back(), via
-            goBackOr), else replaces to the seller dashboard so the user
-            never sees expo-router's "GO_BACK not handled" error. */}
-        <TouchableOpacity
-          onPress={() => goBackOr(router, '/(tabs)/' as never)}
-          hitSlop={HIT}
-          style={s.backBtn}
-          accessibilityLabel="Back"
-          accessibilityRole="button"
-          testID="design-gallery-back"
-        >
-          <Text style={s.backArrow}>←</Text>
-        </TouchableOpacity>
-
-        <Text
-          style={s.title}
-          accessibilityRole="header"
-          testID="gallery-title"
-        >
-          Brandthread Studio
-        </Text>
-
+      {/* Shared header (back arrow + title on one row). Back pops history when
+          there is any, else replaces to the seller dashboard so the user never
+          sees expo-router's "GO_BACK not handled" error. */}
+      <ScreenHeader
+        title="Brandthread Studio"
+        onBack={() => goBackOr(router, '/(tabs)/' as never)}
+        backTestID="design-gallery-back"
+        backAccessibilityLabel="Back"
+      />
+      <View style={s.header}>
         <View style={s.actionRow}>
           {selectionMode ? (
             /* Selection mode: Delete + More on the left, X (Cancel) on the
@@ -1953,6 +1928,7 @@ export default function DesignGalleryScreen() {
                 icon="edit-3"
                 title="No designs yet"
                 description="Tap + to start a design."
+                action={{ label: 'New canvas', icon: 'plus', onPress: () => setNewCanvasVisible(true) }}
               />
             </View>
           }
@@ -2061,35 +2037,11 @@ export default function DesignGalleryScreen() {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
 
-  // Header block — left-aligned, flush to grid horizontal padding
+  // Action row block below the shared header — flush to grid horizontal padding
   header: {
     paddingHorizontal: GRID_H_PAD,
+    paddingTop: SP.xs,
     paddingBottom: SP.sm,
-  },
-
-  // Back arrow — sits above the title, minimum 44×44 touch target
-  backBtn: {
-    width: COMP.iconBtn,
-    height: COMP.iconBtn,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    marginLeft: -SP.xs,   // align icon visually with title text
-    marginBottom: SP.xs,
-  },
-  backArrow: {
-    color: FG,
-    fontFamily: FONT.medium,
-    fontSize: FS.xxl,   // 26 — on the declared scale (28 wasn't)
-    lineHeight: 32,
-  },
-
-  // Large bold left-aligned title (screenshot 0: ~34pt, bold, white)
-  title: {
-    fontFamily: FONT.bold,
-    fontSize: FS.h2,         // 30pt — closest to the reference without being h1
-    color: FG,
-    letterSpacing: -0.5,
-    marginBottom: SP.xs,     // 4px gap before action row
   },
 
   // Action row: text buttons flush left, + icon pushed right

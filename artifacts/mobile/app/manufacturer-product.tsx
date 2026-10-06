@@ -15,6 +15,7 @@ import { formatCents } from '@/lib/money';
 import { getManufacturerProduct, type ManufacturerProduct } from '@/services/manufacturerCatalog';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 export default function ManufacturerProductScreen() {
   const { theme } = useAppTheme();
@@ -38,6 +39,11 @@ export default function ManufacturerProductScreen() {
   }, [manufacturerId, productId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // No ids, or the catalog has no such product: nothing to retry.
+  if (!manufacturerId || !productId || (!loading && !error && !product)) {
+    return <MissingItemState headerTitle="Product" title="Product not found" icon="package" />;
+  }
 
   return (
     <View style={s.root}>

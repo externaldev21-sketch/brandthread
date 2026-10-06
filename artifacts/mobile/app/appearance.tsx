@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useAppIconPreference, type AppIconPreference } from '@/contexts/AppIconContext';
 import { APP_THEME_PRESETS, type AppThemeId, type AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
@@ -18,6 +19,7 @@ const presetById = (id: AppThemeId): AppThemePreset =>
 
 export default function AppearanceScreen() {
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const { theme, selectTheme } = useAppTheme();
   const { preference, resolvedIconId, followsTheme, selectIcon } = useAppIconPreference();
 
@@ -47,7 +49,7 @@ export default function AppearanceScreen() {
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Appearance" />
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SP.xl }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SP.xl + tabBarInset }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero — big icon preview with a glow in the selected icon's color */}

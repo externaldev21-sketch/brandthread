@@ -13,7 +13,8 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LinearGradient } from 'expo-linear-gradient';
+import { MissingItemState } from '@/components/states/MissingItemState';
+import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -28,6 +29,7 @@ import { getProject, exportProject } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+const THUMB_SIZE = 144;
 
 interface FormatOption {
   id: string;
@@ -81,7 +83,12 @@ export default function DesignExportScreen() {
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    let cancelled = false;
+    getProject(projectId)
+      .then(p => { if (!cancelled) setProject(p); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   const handleExport = useCallback(async () => {
@@ -118,6 +125,19 @@ export default function DesignExportScreen() {
     );
   }
 
+  // Opened without a project (or with an unknown id) there is nothing to
+  // export or preview.
+  if (!project) {
+    return (
+      <MissingItemState
+        headerTitle="Export"
+        title="No design to export"
+        message="Open a design in Design Studio to export it."
+        icon="image"
+      />
+    );
+  }
+
   return (
     <View style={styles.root}>
       <ScreenHeader title="Export" variant="modal" onBack={() => goBackOr(router)} />
@@ -126,17 +146,11 @@ export default function DesignExportScreen() {
 
         {/* Preview thumbnail */}
         <View style={styles.thumbWrap}>
-          <LinearGradient
-            colors={theme.primaryGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.thumb}
-          >
-            <Text style={styles.thumbLabel}>{project?.name ?? 'Untitled'}</Text>
-            <Text style={styles.thumbSub}>
-              {project ? `${project.canvas.width} × ${project.canvas.height}` : '–'}
-            </Text>
-          </LinearGradient>
+          <View style={styles.thumb}>
+            <DesignLayerCompositor project={project} displaySize={THUMB_SIZE} borderRadius={RADIUS.sm} />
+          </View>
+          <Text style={styles.thumbLabel}>{project.name}</Text>
+          <Text style={styles.thumbSub}>{`${project.canvas.width} × ${project.canvas.height}`}</Text>
         </View>
 
         {/* Format cards */}
@@ -227,9 +241,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   thumb: {
     width: SCREEN_W - SP.md * 2, height: 160,
     borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
   },
-  thumbLabel: { fontSize: FS.lg, fontFamily: FONT.bold, color: '#FFF' },
-  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  thumbLabel: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginTop: SP.sm },
+  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4 },
 
   sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
 

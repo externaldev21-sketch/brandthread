@@ -184,14 +184,17 @@ export default function QuoteDetailScreen() {
   const [counteroffers, setCounteroffers] = useState<Counteroffer[]>([]);
   const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCounterForm, setShowCounterForm] = useState(mode === 'counter');
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
-    if (!quoteId) return;
+    // No id never fetches, so resolve straight to the not-found state.
+    if (!quoteId) { setLoading(false); return; }
     const generation = ++loadGeneration.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const [q, cos] = await Promise.all([
         getQuote(quoteId),
@@ -204,7 +207,7 @@ export default function QuoteDetailScreen() {
         if (generation === loadGeneration.current) setManufacturerName(mfg?.name ?? 'Manufacturer');
       } else if (generation === loadGeneration.current) setQuote(null);
     } catch {
-      if (generation === loadGeneration.current) setQuote(null);
+      if (generation === loadGeneration.current) { setQuote(null); setLoadError(true); }
     } finally {
       if (generation === loadGeneration.current) setLoading(false);
     }
@@ -310,6 +313,22 @@ export default function QuoteDetailScreen() {
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
           <LoadingSkeleton height={160} style={s.skeleton} />
+        </View>
+      </BrandthreadScreen>
+    );
+  }
+
+  if (!quote && loadError) {
+    return (
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Quote Details" onBack={() => goBackOr(router)} />
+        <View style={s.centered}>
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load this quote"
+            description="Check your connection and try again."
+            action={{ label: 'Retry', onPress: () => { void load(); } }}
+          />
         </View>
       </BrandthreadScreen>
     );

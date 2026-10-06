@@ -49,6 +49,7 @@ import { RemoveFollowerSheet, type RemoveFollowerPerson } from '@/components/soc
 import { CenteredToast } from '@/components/social/CenteredToast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { radius } from '@/constants/radii';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 export type ConnectionsTab = 'followers' | 'following';
 export type FollowSort = 'default' | 'latest' | 'earliest';
@@ -145,7 +146,9 @@ export default function ConnectionsScreen() {
   const listOwner = isOwnList ? undefined : userId;
 
   const load = useCallback((activeSort: FollowSort) => {
-    if (!clerkLoaded) return;
+    // The signed-out web preview never finishes loading Clerk — fall through
+    // to the no-user branch so the empty state renders instead of a blank body.
+    if (!clerkLoaded && !isSellerDevPreview() && !isBuyerDevPreview()) return;
     if (!user?.id) {
       setFollowers([]); setFollowing([]);
       setFollowersLoaded(true); setFollowingLoaded(true);
@@ -449,23 +452,28 @@ function initialsFor(name: string): string {
 function TabButton({ label, active, onPress, theme }: {
   label: string; active: boolean; onPress: () => void; theme: AppThemePreset;
 }) {
+  // PressableScale applies a non-function style to its inner view, so the
+  // flex:1 slot lives on this wrapper — otherwise both tabs shrink to their labels.
   return (
-    <PressableScale
-      onPress={onPress}
-      style={[tabStyles.tab, active && { borderBottomColor: theme.text, borderBottomWidth: 2 }]}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-    >
-      {() => (
-        <Text style={[tabStyles.tabText, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.semibold }]}>
-          {label}
-        </Text>
-      )}
-    </PressableScale>
+    <View style={tabStyles.slot}>
+      <PressableScale
+        onPress={onPress}
+        style={[tabStyles.tab, active && { borderBottomColor: theme.text, borderBottomWidth: 2 }]}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+      >
+        {() => (
+          <Text style={[tabStyles.tabText, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.semibold }]}>
+            {label}
+          </Text>
+        )}
+      </PressableScale>
+    </View>
   );
 }
 
 const tabStyles = StyleSheet.create({
+  slot: { flex: 1 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontSize: FS.sm },
 });
@@ -526,7 +534,7 @@ function makeStyles(theme: AppThemePreset) {
     root:   { flex: 1, backgroundColor: theme.background },
     pad:    { padding: SP.md },
     headerExtras: { gap: SP.sm, paddingBottom: SP.xs },
-    tabsRow: { flexDirection: 'row' },
+    tabsRow: { flexDirection: 'row', paddingHorizontal: SP.md },
     search: { marginTop: 2 },
     sortRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

@@ -19,6 +19,7 @@ import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { PressableScale, HapticSwitch, TertiaryButton } from '@/components/BrandthreadUI';
 import { BrandMemory, DEFAULT_BRAND_MEMORY } from '../services/aiTypes';
 import {
@@ -32,6 +33,7 @@ import {
 export default function AiBrandMemoryScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const tabBarInset = useSellerTabBarInset();
   const router = useRouter();
   const { getToken } = useAuth();
   const [localMemory, setLocalMemory] = useState<BrandMemory | null>(null);
@@ -118,7 +120,7 @@ export default function AiBrandMemoryScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, tabBarInset > 0 && { paddingBottom: SP.xxl + tabBarInset }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Info card */}

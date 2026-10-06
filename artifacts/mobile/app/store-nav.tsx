@@ -351,7 +351,7 @@ export default function StoreNavScreen() {
             icon="menu"
             title="No items yet"
             description="Add your first menu item."
-            action={{ label: '+ Add Item', onPress: () => openNewItem(null), icon: 'plus' }}
+            action={{ label: 'Add item', onPress: () => openNewItem(null), icon: 'plus' }}
             style={styles.emptyState}
           />
         )}
@@ -362,10 +362,11 @@ export default function StoreNavScreen() {
           </View>
         )}
 
-        {activeMenu && (
+        {/* The empty state already carries the add action. */}
+        {activeMenu && activeMenu.items.length > 0 && (
           <TouchableOpacity style={styles.addItemBtn} onPress={() => openNewItem(null)}>
             <Feather name="plus" size={ICON.sm} color={PURPLE} />
-            <Text style={styles.addItemBtnText}>+ Add Menu Item</Text>
+            <Text style={styles.addItemBtnText}>Add menu item</Text>
           </TouchableOpacity>
         )}
 

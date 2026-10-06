@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
@@ -249,10 +249,13 @@ export default function FollowingScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: palette.background }]}>
-      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page.
-          No subtitle, matching Discover; the status line moved into the body. */}
-      <Header title="Following" largeTitle showBack={false} />
-      <Text style={[TYPE_SCALE.footnote, s.statusLine, { color: palette.mutedForeground }]}>{subtitle}</Text>
+      {/* Pushed from the feed's "See all" (hidden tab), so the shared back-arrow
+          header. The status line only shows with drops — the empty state below
+          already says "No drops yet". */}
+      <ScreenHeader title="Following" />
+      {!loading && drops.length > 0 ? (
+        <Text style={[TYPE_SCALE.footnote, s.statusLine, { color: palette.mutedForeground }]}>{subtitle}</Text>
+      ) : null}
 
       {/* Brand avatars row — only shown when real drops exist */}
       {avatarBrands.length > 0 && (
@@ -296,7 +299,7 @@ export default function FollowingScreen() {
         <View style={s.centeredWrap}>
           <Feather name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
           <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>No drops yet</Text>
-          <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
+          <Text style={[TYPE_SCALE.footnote, s.emptyBody, { color: palette.mutedForeground }]}>
             Follow sellers to see their latest drops here.{'\n'}New drops from sellers you follow will appear when they go live.
           </Text>
         </View>
@@ -327,7 +330,7 @@ export default function FollowingScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
 
-  statusLine: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
+  statusLine: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.sm },
 
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },

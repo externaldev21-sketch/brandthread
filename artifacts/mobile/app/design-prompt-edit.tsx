@@ -19,11 +19,12 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY, COMP,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { applyPromptEdit, getProjects } from '@/services/designService';
 import { recentProjectSources, type RecentProjectSource } from '@/lib/designProjectSource';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import type { AIGenerationResult } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 
@@ -119,8 +120,8 @@ export default function DesignPromptEditScreen() {
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
@@ -283,8 +284,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   uploadZone:             { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.xl, paddingHorizontal: SP.md },
   uploadTitle:            { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   uploadSub:              { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
-  uploadActions:          { flexDirection: 'row', gap: SP.sm, padding: SP.md },
-  uploadBtn:              { flex: 1 },
+  // Stacked full-width: side by side, the two labels ran to the button edges.
+  uploadActions:          { gap: SP.sm, padding: SP.md },
+  uploadBtn:              { width: '100%' },
   preview:                { width: '100%', height: 200 },
   mockPreview:            { alignItems: 'center', justifyContent: 'center', height: 200, gap: SP.sm },
   mockLabel:              { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },

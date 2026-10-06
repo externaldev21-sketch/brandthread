@@ -30,6 +30,7 @@ import type {
 } from '@/lib/safetyTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { radius, nestedRadius } from '@/constants/radii';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 type Status = 'open' | 'resolved';
 type TypeFilter = 'all' | ReportTargetType;
@@ -88,6 +89,9 @@ export default function ReviewQueueScreen() {
   const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
+    // The signed-out preview is never a moderator and must not call the
+    // protected moderation API (its auth token never resolves there).
+    if (isSellerDevPreview() || isBuyerDevPreview()) { setAccess('denied'); setLoading(false); return; }
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
@@ -504,7 +508,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   filterChip: { height: 32, paddingHorizontal: 14, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, justifyContent: 'center', backgroundColor: theme.card },
   filterChipActive: { borderColor: theme.text, backgroundColor: theme.cardElevated },
   filterText: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs + 1 },
-  filterTextActive: { color: theme.text, fontFamily: FONT.semibold },
+  filterTextActive: { color: theme.onAccent, fontFamily: FONT.semibold },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, gap: 10 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },

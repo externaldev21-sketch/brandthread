@@ -13,6 +13,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
+import { EmptyState } from '@/components/layout';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 type Review = {
   id: string;
@@ -173,13 +175,17 @@ export default function SellerReviewsScreen() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Clerk never finishes loading in the signed-out web preview; treat it as
+  // signed out so the screen settles on its empty state.
+  const [isPreview] = useState(() => isSellerDevPreview() || isBuyerDevPreview());
+  const authReady = clerkLoaded || isPreview;
 
   useEffect(() => {
     requestGeneration.current += 1;
     setReviews([]);
     setError(null);
-    setLoading(!clerkLoaded);
-  }, [clerkLoaded, user?.id]);
+    setLoading(!authReady);
+  }, [authReady, user?.id]);
 
   const load = useCallback(async () => {
     if (!clerkLoaded || !user?.id) return;
@@ -200,12 +206,12 @@ export default function SellerReviewsScreen() {
   useFocusEffect(useCallback(() => {
     if (!clerkLoaded || !user?.id) {
       setReviews([]);
-      setLoading(!clerkLoaded);
+      setLoading(!authReady);
       return;
     }
     setLoading(true);
     load();
-  }, [load, clerkLoaded, user?.id]));
+  }, [load, clerkLoaded, authReady, user?.id]));
 
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
@@ -252,6 +258,15 @@ export default function SellerReviewsScreen() {
           <View style={s.center}>
             <ActivityIndicator size="large" color={PURPLE} />
           </View>
+        ) : error ? (
+          <EmptyState
+            variant="error"
+            icon="alert-triangle"
+            title="Couldn't load reviews"
+            message="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => { setLoading(true); load(); }}
+          />
         ) : (
           <View style={s.center}>
             <Feather name="star" size={40} color={MUTED} />

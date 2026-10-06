@@ -16,7 +16,7 @@ import {
   retainDesignUploadAsset,
 } from '@/lib/designCloudImageCache';
 import { ApiError } from '@/lib/networkNotice';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -668,6 +668,12 @@ export async function recoverLegacyDesignProjects(): Promise<number> {
 export async function getProjects(): Promise<DesignProject[]> {
   const context = captureSyncContext();
   const keys = context.keys;
+  // Signed-out web preview: local (or demo-seeded) projects only. The cloud
+  // call can only 401 there — or, before auth is wired, stall the gallery
+  // for ~8s waiting on services config.
+  if (_designUserId === 'anon' && (isSellerDevPreview() || isBuyerDevPreview())) {
+    return (await seedIfEmpty(keys.projects)).filter(p => !p.deletedAt);
+  }
   await drainProjectDeletes(context);
   const pendingDeletes = new Set((await loadSyncState(keys.syncState)).deletedIds);
   let all: DesignProject[];

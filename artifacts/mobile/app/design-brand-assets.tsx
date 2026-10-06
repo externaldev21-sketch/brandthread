@@ -27,6 +27,7 @@ import {
   getBrandAssets, addBrandAsset, renameBrandAsset, deleteBrandAsset, getProjects,
 } from '@/services/designService';
 import { BRAND_ASSET_TYPES } from '@/services/designTypes';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import type { BrandAsset, BrandAssetType } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 
@@ -44,6 +45,7 @@ export default function DesignBrandAssetsScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const bas = createStyles(theme);
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const router = useRouter();
   const [assets, setAssets] = useState<BrandAsset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,9 +55,11 @@ export default function DesignBrandAssetsScreen() {
   // ── Load assets ────────────────────────────────────────────────────────────
   async function loadAssets() {
     setLoading(true);
-    const all = await getBrandAssets();
-    setAssets(all);
-    setLoading(false);
+    try {
+      setAssets(await getBrandAssets());
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadAssets(); }, []);
@@ -258,7 +262,7 @@ export default function DesignBrandAssetsScreen() {
             icon="star"
             title="No assets yet"
             description="Save logos, colors, graphics, and reusable assets."
-            action={{ label: 'Add Your First Asset', onPress: handleAddAsset, icon: 'plus' }}
+            action={{ label: 'Add your first asset', onPress: handleAddAsset, icon: 'plus' }}
           />
         </View>
       ) : (
@@ -266,22 +270,25 @@ export default function DesignBrandAssetsScreen() {
           data={filtered}
           keyExtractor={item => item.id}
           numColumns={2}
-          contentContainerStyle={[bas.gridContent, { paddingBottom: insets.bottom + 80 }]}
+          contentContainerStyle={[bas.gridContent, { paddingBottom: insets.bottom + 80 + tabBarInset }]}
           columnWrapperStyle={bas.columnWrapper}
           showsVerticalScrollIndicator={false}
           renderItem={renderAsset}
         />
       )}
 
-      {/* ── FAB ── */}
-      <TouchableOpacity
-        style={[bas.fab, { bottom: insets.bottom + SP.lg }]}
-        onPress={handleAddAsset}
-        activeOpacity={0.85}
-      >
-        <Feather name="upload" size={ICON.md} color={theme.onAccent} />
-        <Text style={bas.fabText}>Upload Asset</Text>
-      </TouchableOpacity>
+      {/* ── FAB ── (hidden while the empty state's own add button is showing,
+          so there's one primary add action; lifted above the seller tab bar) */}
+      {!loading && filtered.length > 0 && (
+        <TouchableOpacity
+          style={[bas.fab, { bottom: (tabBarInset || insets.bottom) + SP.lg }]}
+          onPress={handleAddAsset}
+          activeOpacity={0.85}
+        >
+          <Feather name="upload" size={ICON.md} color={theme.onAccent} />
+          <Text style={bas.fabText}>Upload asset</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

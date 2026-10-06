@@ -373,6 +373,17 @@ function defaultStorefront(): Storefront {
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
+// Lazily imported (devPreview pulls in react-native) so narrowly-mocked tests
+// of this module keep working — same pattern as productService.
+async function inSignedOutPreview(): Promise<boolean> {
+  try {
+    const { isSellerDevPreview, isBuyerDevPreview } = await import('@/lib/devPreview');
+    return isSellerDevPreview() || isBuyerDevPreview();
+  } catch {
+    return false;
+  }
+}
+
 export async function getStorefront(options: {
   refreshRemote?: boolean;
   onLocal?: (store: Storefront) => void;
@@ -405,7 +416,7 @@ export async function getStorefront(options: {
 
     // Publication-sensitive callers still await authoritative server state.
     // Local editing operations don't need a network read before every change.
-    if (options.refreshRemote !== false) try {
+    if (options.refreshRemote !== false && !(await inSignedOutPreview())) try {
       const remote = await api.store.get();
       if (remote?.status === 'published') {
         local.publishStatus = 'published';

@@ -16,6 +16,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
+import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { radius } from '@/constants/radii';
@@ -89,9 +90,16 @@ export default function ContentScreen() {
   const [loadError, setLoadError] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
+  const { userId } = useAuth();
   const loadContent = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
+    // Signed-out web preview: no session, so never hit the protected posts API.
+    if (isSellerDevPreview() && !userId) {
+      setContent([]);
+      setLoading(false);
+      return;
+    }
     try {
       const posts = await getSellerPosts();
       setContent(posts.map((post): ContentPost => ({
@@ -125,7 +133,7 @@ export default function ContentScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { loadContent(); }, [loadContent]);
 

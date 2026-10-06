@@ -9,6 +9,8 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent } from '@/components/onboarding/OnboardingUI';
 import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
+import { useAuth } from '@clerk/expo';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 const getCards = (theme: AppThemePreset): {
   type: AccountType;
@@ -156,9 +158,23 @@ export function AccountTypeStep({
 
 export default function AccountTypeScreen() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
+  const inPreview = isSellerDevPreview() || isBuyerDevPreview();
   useEffect(() => {
-    router.replace('/onboarding' as never);
-  }, [router]);
+    // Someone who already has an account (or a role preview) wants the
+    // account-type switcher, not the signed-out onboarding welcome.
+    if (inPreview || (isLoaded && isSignedIn)) {
+      router.replace('/account-type-settings' as never);
+    } else if (isLoaded) {
+      router.replace('/onboarding' as never);
+    }
+  }, [router, inPreview, isLoaded, isSignedIn]);
+  useEffect(() => {
+    // Never strand the user on a blank screen if Clerk never hydrates.
+    if (inPreview || isLoaded) return;
+    const t = setTimeout(() => router.replace('/onboarding' as never), 4000);
+    return () => clearTimeout(t);
+  }, [router, inPreview, isLoaded]);
 
   return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -47,12 +48,19 @@ function generateBrandNames(count: number): string[] {
   return Array.from(results);
 }
 
+/** Domain suggestion derived from the seller's brand name (never the platform's own domain). */
+export function suggestedDomain(brandName: string): string {
+  const slug = brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return `${slug || 'yourbrand'}.com`;
+}
+
 export default function BrandScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const router = useRouter();
   // Starts empty: the generator input and name ideas only fill in once the
   // seller types or taps Generate — never with sample names.
+  const tabBarInset = useSellerTabBarInset();
   const [nameInput, setNameInput] = useState('');
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [suggestedNames, setSuggestedNames] = useState<string[]>([]);
@@ -132,7 +140,7 @@ export default function BrandScreen() {
       <ScreenHeader title="Brand Creation" />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: Math.max(100, tabBarInset + 24), paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
 
@@ -316,9 +324,10 @@ export default function BrandScreen() {
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Domain & Trademark</Text>
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Text style={[styles.domainText, { color: colors.mutedForeground }]}>brandthread.app</Text>
-          <View style={[styles.availBadge, { backgroundColor: theme.accentDim }]}>
-            <Text style={[styles.availText, { color: colors.success }]}>Available</Text>
+          <Text style={[styles.domainText, { color: colors.mutedForeground }]} numberOfLines={1}>{suggestedDomain(nameInput)}</Text>
+          {/* No availability lookup exists, so this is only ever a suggestion. */}
+          <View style={[styles.availBadge, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={[styles.availText, { color: colors.mutedForeground }]}>Suggested</Text>
           </View>
         </View>
         <TouchableOpacity style={[styles.connectBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>

@@ -27,6 +27,7 @@ import {
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 
 type MergedDomain = StoreDomain & { dnsToken?: string };
 
@@ -75,7 +76,8 @@ export default function StoreDomainScreen() {
   }, [api, inPreview]);
 
   const load = useCallback(async () => {
-    if (inPreview) { setDomains([]); return; }
+    // Signed-out web preview: custom domains come from a protected API.
+    if (inPreview || isBuyerDevPreview()) { setDomains([]); return; }
     try {
       const apiDomains = await (api as any).store.domains() as any[];
       const customFromApi: MergedDomain[] = (apiDomains ?? []).map((d: any) => ({
@@ -326,7 +328,7 @@ export default function StoreDomainScreen() {
         {!adding ? (
           <TouchableOpacity style={dm.addDomainBtn} onPress={() => setAdding(true)}>
             <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={dm.addDomainText}>+ Connect Custom Domain</Text>
+            <Text style={dm.addDomainText}>Connect custom domain</Text>
           </TouchableOpacity>
         ) : (
           <BrandthreadCard style={dm.card}>

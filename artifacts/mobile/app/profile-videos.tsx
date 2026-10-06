@@ -13,7 +13,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams } from 'expo-router';
 import FeedScreen from './(tabs)/feed';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 export default function ProfileVideosScreen() {
   const params = useLocalSearchParams<{ source?: string; id?: string; startPostId?: string; title?: string; exactPost?: string }>();
@@ -21,7 +21,14 @@ export default function ProfileVideosScreen() {
   const id = typeof params.id === 'string' ? params.id : '';
 
   if (!id) {
-    return <EmptyState icon="film" title="Video not found" description="This link is missing the creator or product it belongs to." />;
+    return (
+      <MissingItemState
+        headerTitle="Videos"
+        icon="film"
+        title="Video not found"
+        message="This link is missing its creator or product."
+      />
+    );
   }
 
   return (
