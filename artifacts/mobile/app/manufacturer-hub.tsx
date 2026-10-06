@@ -59,7 +59,7 @@ type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production'
 // that clipped off the right edge of a 393pt screen with no affordance.
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { key: 'discover',         label: 'Discover',       icon: 'search' },
-  { key: 'my_manufacturers', label: 'My manufacturers', icon: 'users' },
+  { key: 'my_manufacturers', label: 'Saved',          icon: 'users' },
   { key: 'quotes',           label: 'Quotes',         icon: 'file-text' },
   { key: 'samples',          label: 'Samples',        icon: 'package' },
   { key: 'production',       label: 'Orders',         icon: 'layers' },
@@ -544,7 +544,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           </TouchableOpacity>
           <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} testID="button-compare-suppliers">
             <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
-            <Text style={s.rfqSecondaryText}>Compare manufacturers</Text>
+            <Text style={s.rfqSecondaryText}>Compare</Text>
           </TouchableOpacity>
         </View>
 
