@@ -21,7 +21,7 @@
 import { Router } from "express";
 import {
   db, conversations, conversationParticipants, messages, messageReactions, blocks, users,
-  products, orders, posts,
+  products, orders, posts, notificationsFeed, accountMutes,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -40,6 +40,8 @@ import {
   checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
 } from "../lib/dmAttachmentPolicy";
 import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
+import { emitToUsers } from "../ws/userHub";
+import { publicPostCondition } from "../lib/postVisibility";
 
 const router = Router();
 router.use(requireAuth);
@@ -120,7 +122,9 @@ function buildConversationView(
     unreadCount:        me?.unreadCount        ?? 0,
     isMuted:            me?.isMuted            ?? false,
     isFriendshipActive: true,
-    isArchived:         false,
+    // Per-viewer Archive (migration 131) — was hardcoded false, so a client
+    // archive reverted on the next refresh.
+    isArchived:         !!(me as { archivedAt?: Date | null } | undefined)?.archivedAt,
     // The Brandthread Agent's welcome thread is always pinned regardless of
     // this viewer's own real pin state (see the isPinned comment on
     // Conversation in mobile's socialTypes.ts); everything else reflects the
@@ -256,7 +260,21 @@ router.get("/", async (req, res) => {
     .select({ conversationId: conversationParticipants.conversationId })
     .from(conversationParticipants)
     .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
-    .where(eq(conversationParticipants.userId, userId))
+    .where(and(
+      eq(conversationParticipants.userId, userId),
+      // Delete-for-me: hidden until a new message arrives (migration 131).
+      sql`${conversationParticipants.hiddenAt} IS NULL`,
+      // A 1:1 thread with someone blocked (either way) leaves the inbox; it
+      // comes back on unblock. Group threads stay (the send gate handles them).
+      sql`NOT EXISTS (
+        SELECT 1 FROM conversation_participants other
+        JOIN blocks b ON (b.blocker_id = ${userId} AND b.blocked_id = other.user_id)
+                      OR (b.blocker_id = other.user_id AND b.blocked_id = ${userId})
+        WHERE other.conversation_id = ${conversationParticipants.conversationId}
+          AND other.user_id <> ${userId}
+          AND (SELECT count(*) FROM conversation_participants c2 WHERE c2.conversation_id = ${conversationParticipants.conversationId}) = 2
+      )`,
+    ))
     .orderBy(desc(conversations.updatedAt))
     .limit(limit)
     .offset(offset);
@@ -279,7 +297,20 @@ router.get("/", async (req, res) => {
        attachments: messages.attachments,
     })
       .from(messages)
-      .where(inArray(messages.conversationId, convIds))
+      .innerJoin(conversationParticipants, and(
+        eq(conversationParticipants.conversationId, messages.conversationId),
+        eq(conversationParticipants.userId, userId),
+      ))
+      .where(and(
+        inArray(messages.conversationId, convIds),
+        // The inbox row previews only what the thread itself would show:
+        // never a moderator-removed, deleted or expired (disappearing)
+        // message, nor one from before this viewer cleared the chat.
+        sql`${messages.moderationStatus} <> 'removed'`,
+        sql`${messages.deletedAt} IS NULL`,
+        sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now())`,
+        sql`(${conversationParticipants.historyClearedAt} IS NULL OR ${messages.createdAt} > ${conversationParticipants.historyClearedAt})`,
+      ))
       .orderBy(messages.conversationId, desc(messages.createdAt)),
   ]);
 
@@ -429,6 +460,9 @@ router.post("/", rateLimit("messaging"), async (req, res) => {
     const existing = await db.select().from(conversations).where(whereClause).limit(1);
 
     if (existing.length > 0) {
+      // Re-opening a chat I deleted brings it back (history stays cleared).
+      await db.update(conversationParticipants).set({ hiddenAt: null })
+        .where(and(eq(conversationParticipants.conversationId, existing[0].id), eq(conversationParticipants.userId, myUserId)));
       const parts = await db.select().from(conversationParticipants)
         .where(eq(conversationParticipants.conversationId, existing[0].id));
       return res.json(buildConversationView(existing[0], parts, myUserId));
@@ -563,12 +597,17 @@ router.get("/:id/messages", async (req, res) => {
   // don't apply to a search result set.
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
 
-  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+  const [isMember] = await db.select({ userId: conversationParticipants.userId, historyClearedAt: conversationParticipants.historyClearedAt })
     .from(conversationParticipants)
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
     .limit(1);
 
   if (!isMember) return res.status(403).json({ error: "Not a participant" });
+
+  // Delete-for-me cleared everything before this point for THIS viewer only.
+  const afterCleared = isMember.historyClearedAt
+    ? sql`${messages.createdAt} > ${isMember.historyClearedAt}`
+    : undefined;
 
   // Disappearing messages: expired rows are hidden by the query itself, and the
   // hard delete (an opportunistic sweep in place of a cron job, see
@@ -578,10 +617,10 @@ router.get("/:id/messages", async (req, res) => {
   const notExpired = sql`(${messages.disappearAt} IS NULL OR ${messages.disappearAt} >= now())`;
 
   const whereClause = q
-    ? and(eq(messages.conversationId, id), notExpired, ilike(messages.body, `%${q}%`))
+    ? and(eq(messages.conversationId, id), notExpired, afterCleared, ilike(messages.body, `%${q}%`))
     : before
-      ? and(eq(messages.conversationId, id), notExpired, sql`${messages.createdAt} < ${new Date(before)}`)
-      : and(eq(messages.conversationId, id), notExpired);
+      ? and(eq(messages.conversationId, id), notExpired, afterCleared, sql`${messages.createdAt} < ${new Date(before)}`)
+      : and(eq(messages.conversationId, id), notExpired, afterCleared);
 
   const msgs = await db.select().from(messages)
     .where(whereClause)
@@ -794,8 +833,27 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
         .where(eq(posts.id, postId))
         .limit(1);
       if (!post) return res.status(400).json({ error: "Attached post not found." });
-      const postDecision = decidePostShare({ post, senderId: userId });
-      if (!postDecision.ok) return res.status(postDecision.status).json({ error: postDecision.error });
+      // Sharing a public post to anyone you can message (Instagram's "Send
+      // to" — the share sheet's friends row) is allowed; it used to 403 in
+      // every friend DM ("Could not share this post").
+      const [publicPost] = post.userId === userId ? [post] : await db
+        .select({ id: posts.id })
+        .from(posts)
+        .where(and(eq(posts.id, postId), publicPostCondition()))
+        .limit(1);
+      if (post.userId !== userId && !publicPost) {
+        const [conversation] = await db
+          .select({ type: conversations.type })
+          .from(conversations)
+          .where(eq(conversations.id, id))
+          .limit(1);
+        const isSellerConversation = conversation?.type === "buyer_to_seller"
+          || conversation?.type === "buyer_to_seller_product"
+          || conversation?.type === "buyer_to_seller_order";
+        if (!isSellerConversation || !otherIds.includes(post.userId)) {
+          return res.status(403).json({ error: "You can only attach posts from this conversation's seller." });
+        }
+      }
       (att as any).meta = { ...((att as any).meta ?? {}), postId };
     }
   }
@@ -838,7 +896,12 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     db.update(conversationParticipants)
       .set({ unreadCount: sql`unread_count + 1` })
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
+    // A new message brings a deleted-for-me chat back (with only new history).
+    db.update(conversationParticipants)
+      .set({ hiddenAt: null })
+      .where(and(eq(conversationParticipants.conversationId, id), sql`${conversationParticipants.hiddenAt} IS NOT NULL`)),
   ]);
+  emitToUsers([userId, ...otherIds], { type: "conversation.updated", conversationId: id, reason: "message" });
 
   // Seller away auto-reply (non-critical). Awaited so the reply is already
   // persisted when the sender's client next polls; errors never fail the send.
@@ -864,6 +927,10 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
             .filter((r: { userId: string; mutedUntil: Date | null }) => r.mutedUntil && r.mutedUntil.getTime() > now)
             .map((r: { userId: string; mutedUntil: Date | null }) => r.userId),
         );
+        // Account-level Mute (Social > Mute account) also silences their DMs.
+        const accountMuters = await db.select({ userId: accountMutes.userId }).from(accountMutes)
+          .where(and(inArray(accountMutes.userId, otherIds), eq(accountMutes.mutedUserId, userId), eq(accountMutes.muteMessages, true)));
+        for (const row of accountMuters) mutedIds.add(row.userId);
         // Map conversation type to the notification type the mobile client expects
         const notifType = conv?.type === "buyer_to_buyer" ? "new_friend_message" : "new_order_message";
         for (const recipientId of otherIds) {
@@ -874,6 +941,9 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
             type:          notifType,
             title:         `New message from ${sender.name || "someone"}`,
             body:          previewText.slice(0, 100),
+            // The sender, so Activity's block filter and "see less" actor
+            // mutes apply to message notifications like every other row.
+            actorId:       userId,
             actorName:     sender.name,
             actorHandle:   sender.handle,
             actorInitials: sender.initials,
@@ -1002,7 +1072,24 @@ router.patch("/:id/read", async (req, res) => {
     db.update(messages)
       .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
       .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
+    // This thread's "New message" Activity rows are read too — the badge
+    // adds feed rows to conversation unread counts, so leaving them unread
+    // double-counted every message and kept the badge up after reading.
+    db.update(notificationsFeed)
+      .set({ isRead: true })
+      .where(and(
+        eq(notificationsFeed.userId, userId),
+        eq(notificationsFeed.targetType, "conversation"),
+        eq(notificationsFeed.targetId, id),
+        eq(notificationsFeed.isRead, false),
+      )),
   ]);
+
+  // The sender's ticks flip to "Seen" now, not on their next poll.
+  const readers = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
+    .where(eq(conversationParticipants.conversationId, id));
+  emitToUsers(readers.map((r) => r.userId), { type: "conversation.updated", conversationId: id, reason: "read" });
+  emitToUsers([userId], { type: "activity.updated" });
 
   return res.json({ ok: true });
 });
@@ -1032,6 +1119,10 @@ router.patch("/:id/typing", rateLimit("mutation"), async (req, res) => {
   await db.update(conversationParticipants)
     .set({ typingUntil })
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  const others = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`));
+  emitToUsers(others.map((o) => o.userId), { type: "conversation.updated", conversationId: id, reason: "typing" });
 
   return res.json({ ok: true });
 });
@@ -1229,6 +1320,7 @@ router.patch("/:id/accept", async (req, res) => {
     .where(eq(conversationParticipants.conversationId, id));
   const [updated] = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
 
+  emitToUsers(parts.map((p) => p.userId), { type: "conversation.updated", conversationId: id, reason: "accepted" });
   return res.json(buildConversationView(updated, parts, userId));
 });
 
@@ -1316,7 +1408,28 @@ router.post("/upload-media", async (req, res) => {
   }
 });
 
-// ─── DELETE /api/conversations/:id — decline / delete conversation ────────────
+// ─── PATCH /api/conversations/:id/archive ────────────────────────────────────
+// Inbox swipe / chat menu > Archive. Body: { archived: boolean }. Per-viewer
+// (migration 131): the other side's inbox is unaffected.
+router.patch("/:id/archive", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const archived = req.body?.archived !== false;
+  const updated = await db.update(conversationParticipants)
+    .set({ archivedAt: archived ? new Date() : null })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .returning({ userId: conversationParticipants.userId });
+  if (updated.length === 0) return res.status(404).json({ error: "Conversation not found" });
+  return res.json({ ok: true, isArchived: archived });
+});
+
+// ─── DELETE /api/conversations/:id — delete for me / decline a request ────────
+// Instagram semantics: deleting a chat (or declining a request) removes it
+// from MY inbox and clears MY history only — the other person keeps theirs.
+// (It used to hard-delete the conversation for both sides, erasing a buyer's
+// order thread from the seller's inbox and any reported-message evidence.)
+// A new message brings it back with only the new history. Once every member
+// has deleted it and nothing in it is under report, the rows are removed.
 router.delete("/:id", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
@@ -1328,8 +1441,22 @@ router.delete("/:id", async (req, res) => {
 
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
-  // Hard-delete: cascade removes participants + messages
-  await db.delete(conversations).where(eq(conversations.id, id));
+  const now = new Date();
+  await db.update(conversationParticipants)
+    .set({ hiddenAt: now, historyClearedAt: now, unreadCount: 0, archivedAt: null, pinnedAt: null })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+  await db.update(notificationsFeed)
+    .set({ isRead: true })
+    .where(and(eq(notificationsFeed.userId, userId), eq(notificationsFeed.targetType, "conversation"), eq(notificationsFeed.targetId, id)));
+
+  const [{ visibleTo, reported }] = await db.select({
+    visibleTo: sql<number>`(SELECT count(*)::int FROM conversation_participants p WHERE p.conversation_id = ${id} AND p.hidden_at IS NULL)`,
+    reported: sql<number>`(SELECT count(*)::int FROM messages m WHERE m.conversation_id = ${id} AND m.reported_at IS NOT NULL)`,
+  }).from(sql`(SELECT 1) AS one`);
+  if (Number(visibleTo) === 0 && Number(reported) === 0) {
+    await db.delete(conversations).where(eq(conversations.id, id));
+  }
+  emitToUsers([userId], { type: "conversation.updated", conversationId: id, reason: "deleted" });
   return res.json({ ok: true });
 });
 

@@ -8,10 +8,10 @@ import { useSettled } from '@/lib/animationUtils';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
-import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
+import { getConversations, subscribeSocial } from '@/services/socialService';
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
 import { isBuyerDevPreview } from '@/lib/devPreview';
-import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
+import { getPreviewConversations } from '@/lib/previewInbox';
 import { useCommunityBadgeCount } from '@/lib/communities/useCommunityInbox';
 // Instagram/TikTok-style directional slide — shared with the seller tab
 // layout (app/(tabs)/_layout.tsx) so both sides use the same duration/
@@ -75,16 +75,17 @@ function BuyerTabLayout() {
       // reachable dev/staging backend answering with unrelated real rows
       // (or the real endpoint simply not existing yet) puts a stray number
       // on a fresh, zero-state preview account's tab bar.
-      const [conversations, notifications] = isBuyerDevPreview()
-        ? [getPreviewConversations(), getPreviewNotifications()]
-        : await Promise.all([getConversations(), getNotifications()]);
+      // The Messages tab counts unread messages only. Activity rows have
+      // their own badge on the bell tab (useActivityUnreadCount); adding
+      // them here counted every DM twice (its unread count + its "New
+      // message" Activity row) and showed likes/follows as unread messages.
+      const conversations = isBuyerDevPreview()
+        ? getPreviewConversations()
+        : await getConversations();
       const unreadMessages = conversations.reduce(
         (sum, conv) => sum + (conv.unreadCount ?? 0), 0,
       );
-      const unreadNotifications = notifications.filter(
-        n => !n.isRead && !n.isMuted,
-      ).length;
-      setDmBadgeCount(unreadMessages + unreadNotifications);
+      setDmBadgeCount(unreadMessages);
     } catch {
       // Badges are non-critical.
     }

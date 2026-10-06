@@ -76,7 +76,7 @@ export default function IpReportScreen() {
       <PrimaryButton label="Submit report" onPress={submit} loading={submitting} />
       {cases.length > 0 && <View style={s.cases}><Text style={s.title}>Submitted cases</Text>{cases.map(item => <View key={item.caseReference} style={s.case}><View style={{ flex: 1 }}><Text style={s.ref}>{item.caseReference}</Text><Text style={s.status}>Status: {item.status}</Text></View><PressableScale onPress={() => refreshStatus(item)}><Feather name="refresh-cw" size={18} color={theme.text} /></PressableScale></View>)}</View>}
     </ScrollView>
-  </View>;
+  </BrandthreadScreen>;
 }
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:{flex:1,backgroundColor:theme.background},

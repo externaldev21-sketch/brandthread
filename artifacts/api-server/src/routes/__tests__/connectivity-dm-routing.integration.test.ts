@@ -184,13 +184,21 @@ describe("3. DM + request routing (lib/conversationRouting.ts, every branch)", (
     expect(replyAfterAccept.status).toBe(201);
   });
 
-  it("decline (DELETE /:id) removes the conversation entirely", async () => {
+  it("decline (DELETE /:id) removes the request from the recipient only; the conversation is gone once both sides delete it", async () => {
     const conv = await createConversation(A, S, "DM Seller", "seller", "DM Buyer A", "buyer");
     const convId = conv.body.id as string;
 
     const declineRes = await call("DELETE", `/api/conversations/${convId}`, S);
     expect(declineRes.status).toBe(200);
+    // Instagram semantics (Social E2E, migration 131): the recipient's
+    // Requests no longer list it; the requester's own copy is untouched.
+    const sellerList = await call("GET", "/api/conversations", S);
+    expect((sellerList.body as Array<{ id: string }>).some((c) => c.id === convId)).toBe(false);
+    const buyerList = await call("GET", "/api/conversations", A);
+    expect((buyerList.body as Array<{ id: string }>).some((c) => c.id === convId)).toBe(true);
 
+    // When the requester deletes it too, the rows are removed.
+    expect((await call("DELETE", `/api/conversations/${convId}`, A)).status).toBe(200);
     const rows = await db.select().from(conversations).where(eq(conversations.id, convId));
     expect(rows).toHaveLength(0);
   });

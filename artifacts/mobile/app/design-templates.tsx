@@ -190,7 +190,7 @@ export default function DesignTemplatesScreen() {
                     color={theme.muted}
                   />
                 </View>
-              </View>
+              </LinearGradient>
 
               {/* Info */}
               <View style={ts.cardInfo}>

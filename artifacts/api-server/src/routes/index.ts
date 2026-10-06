@@ -100,6 +100,7 @@ import sellerPaymentSettingsRouter from "./seller-payment-settings";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
+import accountMutesRouter from "./account-mutes";
 
 /** Lazily-resolved team context for routes that don't mount it themselves.
  *  `resolveTeamContext` is idempotent (cached on req.teamContext), so applying
@@ -305,6 +306,7 @@ router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
 router.use("/buyer/post-purchase",       buyerPostPurchaseRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
+router.use("/social/mutes",              accountMutesRouter); // account mutes (GET/POST/DELETE); the /social routers define no /mutes route
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
 // Topic group chats (unlimited members). Public discovery + invite preview are

@@ -20,6 +20,7 @@ import {
   markPreviewActivityRead,
   previewUnreadActivityCount,
 } from '@/lib/previewActivity';
+import { isUserEventsConnected, subscribeUserEvents } from '@/lib/realtime/userEvents';
 
 export type { ActivityItem, ActivityFilter } from '@/lib/activity';
 
@@ -184,11 +185,13 @@ export async function dismissSuggestedPerson(userId: string): Promise<void> {
 
 // ─── Realtime (short polling while a screen is focused) ──────────────────────
 //
-// There is no websocket/SSE layer in this codebase (see lib/api's polling
-// helpers for the same pattern elsewhere, e.g. buyer-conversation.tsx). This
-// polls the tiny `/unread-count` endpoint every ~1.5s while a screen is
+// Polls the tiny `/unread-count` endpoint every ~1.5s while a screen is
 // focused, and only fires `onChange` when the count or latest event actually
-// moved — cheap enough to run this often, close enough to feel live.
+// moved. The per-user realtime socket (lib/realtime/userEvents.ts → api
+// /ws/user) triggers an immediate tick the moment a row lands; while it is
+// connected the poll relaxes to a 15s safety net.
+const REALTIME_SAFETY_POLL_MS = 15_000;
+
 export interface ActivityRealtimeHandle {
   stop(): void;
 }
@@ -201,8 +204,11 @@ export function watchActivityRealtime(
   let lastKey = '';
   let timer: ReturnType<typeof setTimeout> | null = null;
 
+  let inFlight = false;
   const tick = async () => {
-    if (stopped) return;
+    if (stopped || inFlight) return;
+    inFlight = true;
+    if (timer) { clearTimeout(timer); timer = null; }
     try {
       const result = await serviceRequest<{ count?: number; latestId?: string | null }>(
         `${BASE}/unread-count`, {}, false,
@@ -217,15 +223,23 @@ export function watchActivityRealtime(
     } catch {
       // A failed poll just tries again next tick.
     } finally {
-      if (!stopped) timer = setTimeout(tick, intervalMs);
+      inFlight = false;
+      // With the realtime socket up, the server pushes `activity.updated` the
+      // moment a row lands, so the poll only needs to be a slow safety net.
+      if (!stopped) timer = setTimeout(tick, isUserEventsConnected() ? Math.max(intervalMs, REALTIME_SAFETY_POLL_MS) : intervalMs);
     }
   };
+
+  const unsubscribeRealtime = subscribeUserEvents((event) => {
+    if (event.type === 'activity.updated' || (event.type === 'conversation.updated' && event.reason === 'message')) void tick();
+  });
 
   void tick();
   return {
     stop() {
       stopped = true;
       if (timer) clearTimeout(timer);
+      unsubscribeRealtime();
     },
   };
 }

@@ -94,8 +94,10 @@ describe('fresh buyer zero state — inbox / activity / stories gating (source c
 describe('fresh buyer zero state — Inbox tab badge', () => {
   it('routes through the demo-gated preview fallbacks in preview mode, not the real API unconditionally', () => {
     const s = src('app/(buyer)/_layout.tsx');
-    expect(s).toContain("import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';");
-    expect(s).toMatch(/isBuyerDevPreview\(\)\s*\n?\s*\?\s*\[getPreviewConversations\(\), getPreviewNotifications\(\)\]/);
+    // The Messages badge counts unread messages only (Activity has its own
+    // bell badge), so only the conversations fallback is needed.
+    expect(s).toContain("import { getPreviewConversations } from '@/lib/previewInbox';");
+    expect(s).toMatch(/isBuyerDevPreview\(\)\s*\n?\s*\?\s*getPreviewConversations\(\)/);
   });
 
   it('computing the badge from empty preview conversations/notifications yields zero', () => {
