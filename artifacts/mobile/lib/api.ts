@@ -4,6 +4,7 @@
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
 import { useAuth } from '@clerk/expo';
+import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
@@ -1906,6 +1907,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  SearchResult shape (kind='brand'|'product') compatible with searchData.ts. */
       search: (q: string, limit = 20) =>
         get<{ results: any[] }>(`/api/public/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      launchChecklist: {
+        get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
+        previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
+        dismiss: () => post<void>('/api/seller/launch-checklist/dismiss', {}),
+      },
       verification: {
         /** Returns the seller's current identity verification status. */
         status: () =>
