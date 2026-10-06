@@ -150,6 +150,7 @@ export default function AiBrandMemoryScreen() {
                   <HapticSwitch
                     value={field.enabled}
                     onValueChange={() => handleToggle(key)}
+                    accessibilityLabel={field.label}
                   />
                 </View>
 
