@@ -104,6 +104,9 @@ const fakeStripe = vi.hoisted(() => {
   };
 });
 
+// The route reads the key before building a client; the client itself is faked.
+process.env.STRIPE_SECRET_KEY ||= "sk_test_buyer_payment_methods";
+
 vi.mock("stripe", () => ({
   default: class FakeStripe {
     constructor() {
