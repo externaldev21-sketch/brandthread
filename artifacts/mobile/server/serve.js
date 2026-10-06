@@ -93,6 +93,9 @@ function serveFile(filePath, res, acceptEncoding = '') {
   return true;
 }
 
+// Kept apart from the imports at the top of the file on purpose.
+const { storefrontRedirectTarget } = require('./storefrontRedirects');
+
 function canonicalRedirectLocation(req, requestUrl) {
   const forwardedHost = req.headers?.['x-forwarded-host'];
   const hostHeader = String(forwardedHost || req.headers?.host || '')
@@ -121,6 +124,18 @@ const server = http.createServer(async (req, res) => {
       location: redirectLocation,
       'cache-control': 'public, max-age=31536000, immutable',
     });
+    res.end();
+    return;
+  }
+
+  // Published storefronts: /store/<username>, /s/<slug>, and a store's own
+  // host (subdomain or verified custom domain) are served by the API.
+  const storefrontTarget = storefrontRedirectTarget({
+    host: req.headers['x-forwarded-host'] || req.headers.host,
+    pathname,
+  });
+  if (storefrontTarget) {
+    res.writeHead(302, { location: `${storefrontTarget}${requestUrl.search}`, 'cache-control': 'no-cache' });
     res.end();
     return;
   }

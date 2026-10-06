@@ -254,11 +254,20 @@ async function getStoreProducts(ownerId: string, limit = 8): Promise<Array<{
     .filter((p): p is NonNullable<typeof p> => p !== null);
 }
 
+import {
+  normalizeCustomDomain,
+  publicStorefrontView,
+  publishedStorefrontForHost,
+  publishedStorefrontForSlug,
+  publishedStorefrontForUsername,
+} from "../lib/storefrontHosting";
+import { CANONICAL_WEB_ORIGIN } from "../lib/webOrigin";
+
 // Helper — build self-contained HTML for a storefront (shared by /preview,
 // /preview/:token, and the public /site/:slug route). `isPreview` only
 // changes the banner shown at the top of the page; the rendering, catalog,
 // cart, and checkout wiring are identical to what a real customer sees.
-async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; sf?: any }): Promise<string> {
+export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; sf?: any }): Promise<string> {
   const isPreview = opts?.isPreview ?? true;
   const sf = opts?.sf ?? await getOrCreateStorefront(ownerId);
   const storeProducts = await getStoreProducts(ownerId);
@@ -741,6 +750,36 @@ router.get("/site/:slug", async (req, res): Promise<void> => {
   res.send(html);
 });
 
+// GET /api/store/public/:slug — the published storefront as JSON for the
+// app's buyer screens. Public by intent, so it must sit before requireAuth
+// (a later copy of this route below it was unreachable without a session —
+// anonymous buyers got 401). Only the public projection is returned.
+// GET /api/store/by-username/:username — the Share Store link
+// (brandthread.app/store/<username> redirects here; see mobile server/serve.js).
+router.get("/by-username/:username", async (req, res): Promise<void> => {
+  const sf = await publishedStorefrontForUsername(String(req.params.username ?? ""));
+  res.set("Content-Type", "text/html");
+  if (!sf) { res.status(404).send(NOT_FOUND_PAGE); return; }
+  res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf }));
+});
+
+// GET /api/store/host-site — a store's own host: <slug>.brandthread.app or
+// a verified custom domain (the web server redirects "/" there).
+router.get("/host-site", async (req, res): Promise<void> => {
+  const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host;
+  const sf = await publishedStorefrontForHost(host);
+  if (!sf) { res.redirect(302, CANONICAL_WEB_ORIGIN); return; }
+  res.set("Content-Type", "text/html");
+  res.set("Cache-Control", "public, max-age=60");
+  res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf }));
+});
+
+router.get("/public/:slug", async (req, res): Promise<void> => {
+  const sf = await publishedStorefrontForSlug(String(req.params.slug ?? ""));
+  if (!sf) { res.status(404).json({ error: "Store not found" }); return; }
+  res.json(publicStorefrontView(sf));
+});
+
 router.use(requireAuth);
 
 // ─── Helper — get or create storefront for a seller ──────────────────────────
@@ -798,6 +837,15 @@ router.put("/", async (req, res) => {
       update[dbKey] = key === "theme"
         ? normalizeThreadTheme(req.body[key])
         : req.body[key];
+    }
+  }
+
+  // Drizzle's .set() takes the schema's camelCase keys; the snake_case
+  // mapping above made it silently drop socialLinks and analyticsCode.
+  for (const [snake, camel] of [["social_links", "socialLinks"], ["analytics_code", "analyticsCode"]] as const) {
+    if (snake in update) {
+      update[camel] = update[snake];
+      delete update[snake];
     }
   }
 
@@ -916,8 +964,8 @@ router.post("/versions/:id/restore", async (req, res): Promise<void> => {
   if ("subtitle"      in snap) update.subtitle     = snap.subtitle;
   if ("description"   in snap) update.description  = snap.description;
   if ("seo"           in snap) update.seo          = snap.seo;
-  if ("socialLinks"   in snap) update.social_links  = snap.socialLinks;
-  if ("analyticsCode" in snap) update.analytics_code = snap.analyticsCode;
+  if ("socialLinks"   in snap) update.socialLinks   = snap.socialLinks;
+  if ("analyticsCode" in snap) update.analyticsCode = snap.analyticsCode;
 
   // branding: both schemas may carry it, but with different shapes.
   // Store whatever the snapshot says — the mobile client reads it back verbatim.
@@ -967,16 +1015,43 @@ router.get("/domains", async (req, res) => {
 // POST /api/store/domains — add a custom domain
 router.post("/domains", async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
-  const { domain } = req.body;
-  if (!domain) { res.status(400).json({ error: "domain required" }); return; }
+  const domain = normalizeCustomDomain(req.body?.domain);
+  if (!domain) {
+    res.status(400).json({ error: "Enter a domain you own, like shop.yourbrand.com.", code: "INVALID_DOMAIN" });
+    return;
+  }
   const sf = await getOrCreateStorefront(ownerId);
 
   const verifyToken = `brandthread-verify-${crypto.randomBytes(12).toString("hex")}`;
 
-  const [record] = await db
-    .insert(storefrontCustomDomains)
-    .values({ storefrontId: sf.id, domain, verifyToken })
-    .returning();
+  // One store per domain. A verified domain is never taken over; an
+  // unverified claim by another store is released after 48 hours, so nobody
+  // can park a brand's real domain by adding it and never verifying.
+  const [held] = await db.select().from(storefrontCustomDomains)
+    .where(eq(storefrontCustomDomains.domain, domain)).limit(1);
+  if (held && held.storefrontId === sf.id) {
+    res.json({ ...held, verificationInstructions: `Add a TXT record: _brandthread-verify.${held.domain} → ${held.verifyToken}` });
+    return;
+  }
+  if (held && (held.verified || held.createdAt.getTime() > Date.now() - 48 * 3600_000)) {
+    res.status(409).json({ error: "That domain is already connected to another store.", code: "DOMAIN_TAKEN" });
+    return;
+  }
+  if (held) await db.delete(storefrontCustomDomains).where(eq(storefrontCustomDomains.id, held.id));
+
+  let record;
+  try {
+    [record] = await db
+      .insert(storefrontCustomDomains)
+      .values({ storefrontId: sf.id, domain, verifyToken })
+      .returning();
+  } catch (err) {
+    if ((err as any)?.code === "23505" || (err as any)?.cause?.code === "23505") {
+      res.status(409).json({ error: "That domain is already connected to another store.", code: "DOMAIN_TAKEN" });
+      return;
+    }
+    throw err;
+  }
 
   res.json({ ...record, verificationInstructions: `Add a TXT record: _brandthread-verify.${domain} → ${verifyToken}` });
 });

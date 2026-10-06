@@ -1531,12 +1531,23 @@ export async function publishStore(): Promise<{ success: boolean; message: strin
   const prePublishSnapshot = await _createVersionSnapshot(store, 'publish', publishLabel);
   api.store.saveVersion(publishLabel, prePublishSnapshot as Record<string, unknown>).catch(() => {});
 
+  const previousStatus = store.publishStatus;
+  const previousPublishedAt = store.publishedAt;
   store.publishStatus = 'published';
   store.publishedAt = new Date().toISOString();
   await saveStorefront(store);
 
-  // Publish to real API
-  try { await api.store.publish(); } catch { /* no-op */ }
+  // Publish on the server — that is what makes the store visible to buyers.
+  // Saying "live" after a failed call left sellers believing buyers could
+  // see a store that was still a draft.
+  try {
+    await api.store.publish();
+  } catch (e: any) {
+    store.publishStatus = previousStatus;
+    store.publishedAt = previousPublishedAt;
+    await saveStorefront(store).catch(() => {});
+    return { success: false, message: e?.message ? `Could not publish: ${e.message}` : 'Could not publish your store. Check your connection and try again.' };
+  }
 
   return { success: true, message: 'Your store is now live.', storefront: store };
 }
