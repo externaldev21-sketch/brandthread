@@ -9,7 +9,7 @@
  *     affinity overlap), trending sellers (today's `seller_ranking_cache`),
  *     fresh uploads (platform-wide recent posts), and active live streams.
  *  3. Scoring: weighted sum of affinity match, recency, trending/seller
- *     strength, followed bonus, and an active-boost bonus, minus a penalty
+ *     strength, followed bonus (paid boosts are NOT scored here; see promotions/sponsored.ts), minus a penalty
  *     for sellers/styles the buyer has skipped or marked not-interested.
  *  4. Diversity: no same seller twice in a row, lives interleaved at a fixed
  *     cadence (owner's rule: feed is mostly videos with lives mixed in).
@@ -25,7 +25,7 @@
  * cache read — same idiom as `computeSellerRanking`/`computeTrending`.
  */
 import {
-  db, posts, users, follows, interactions, boosts, blocks,
+  db, posts, users, follows, interactions, blocks,
   buyerTasteProfiles, sellerRankingCache, forYouFeedCache, liveStreams,
   feedNotInterested, savedItems, postComments, postTaggedProducts, productVariants, orderItems, orders,
 } from "@workspace/db";
@@ -354,19 +354,9 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
     if (!merged.has(p.id)) merged.set(p.id, p);
   }
 
-  const postIds = [...merged.keys()];
-  const [boostRows] = await Promise.all([
-    postIds.length === 0 ? Promise.resolve([]) : db
-      .select({ targetId: boosts.targetId })
-      .from(boosts)
-      .where(and(
-        eq(boosts.targetType, "post"),
-        eq(boosts.status, "active"),
-        gte(boosts.endsAt, now),
-        inArray(boosts.targetId, postIds),
-      )),
-  ]);
-  const boostedIds = new Set(boostRows.map((b) => b.targetId));
+  // Paid promotion no longer boosts organic ranking: a boosted post would
+  // surface unlabelled. Boosts are delivered only through the labelled
+  // Sponsored placement (lib/promotions/sponsored.ts, /api/promotions).
 
   const candidates: RankingCandidate[] = [...merged.values()].map((p) => ({
     id: p.id,
@@ -374,7 +364,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
     createdAt: p.createdAt,
     styleTags: Array.isArray(p.styleTags) ? (p.styleTags as string[]) : [],
     isFollowed: followedSet.has(p.userId),
-    isBoosted: boostedIds.has(p.id),
+    isBoosted: false,
     isLive: false,
     sellerScore: sellerScoreById.get(p.userId) ?? 0,
   }));

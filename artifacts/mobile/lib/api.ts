@@ -2812,6 +2812,40 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       summary: () =>
         get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
     },
+    /** Featured brand slots on Discover (seller purchase flow; /active is public). */
+    featuredSlots: {
+      active: () => get<{ label: 'Featured'; brands: FeaturedBrand[] }>('/api/featured-slots/active'),
+      availability: () => freshGet<FeaturedAvailability>('/api/featured-slots/availability'),
+      mine: () => freshGet<FeaturedSlot[]>('/api/featured-slots/mine'),
+      reserve: (durationDays: number) => post<FeaturedSlot>('/api/featured-slots', { durationDays }),
+      pay: (id: string, returnUrl: string) =>
+        post<{ sessionId: string; url: string | null; paymentStatus: string; status: string }>(
+          `/api/featured-slots/${encodeURIComponent(id)}/pay`, { returnUrl }),
+      verify: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/pay/verify`, {}),
+      cancel: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/cancel`, {}),
+    },
+    /** Sponsored placement in For You: slots to splice in + impression confirmation. */
+    promotions: {
+      sponsored: (p: { sessionId: string; organicOffset: number; organicCount: number }) =>
+        freshGet<{ slots: Array<{ afterIndex: number; boostId: string; label: 'Sponsored'; post: any }> }>(
+          `/api/promotions/sponsored?sessionId=${encodeURIComponent(p.sessionId)}&organicOffset=${p.organicOffset}&organicCount=${p.organicCount}`),
+      impression: (boostId: string, sessionId: string) =>
+        post<{ counted: boolean }>('/api/promotions/sponsored/impression', { boostId, sessionId }),
+    },
+    /** Admin approval queue for boosts + featured slots (users.role = 'admin'). */
+    adminPromotions: {
+      queue: (params: { status?: 'in_review' | 'approved' | 'rejected' | 'all'; kind?: 'all' | 'boost' | 'featured_slot' } = {}) => {
+        const q = new URLSearchParams();
+        if (params.status) q.set('status', params.status);
+        if (params.kind) q.set('kind', params.kind);
+        const suffix = q.toString();
+        return freshGet<AdminPromotionQueue>(`/api/admin/promotions${suffix ? `?${suffix}` : ''}`);
+      },
+      approve: (kind: 'boost' | 'featured_slot', id: string) =>
+        post<{ state: string }>(`/api/admin/promotions/${kind === 'boost' ? 'boosts' : 'featured'}/${encodeURIComponent(id)}/approve`, {}),
+      reject: (kind: 'boost' | 'featured_slot', id: string, reason: string) =>
+        post<{ state: string; refundStatus: string }>(`/api/admin/promotions/${kind === 'boost' ? 'boosts' : 'featured'}/${encodeURIComponent(id)}/reject`, { reason }),
+    },
     /** Ad Campaigns — end-to-end Create Ad flow with media upload, payment, and lifecycle. */
     adCampaigns: {
       create: () =>
@@ -3107,6 +3141,31 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
  * Memoised per user. Clerk may return a new getToken function between renders,
  * so the client reads it through a ref instead of rebuilding on function identity.
  */
+
+// ─── Promotions (featured slots + admin approval) ─────────────────────────────
+export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+export type FeaturedSlot = {
+  id: string; placement: string; durationDays: number; priceCents: number;
+  startsAt: string; endsAt: string; status: string;
+  displayState: 'awaiting_payment' | 'in_review' | 'scheduled' | 'live' | 'rejected' | 'ended' | 'cancelled';
+  paid: boolean; rejectionReason: string | null; refundStatus: string; createdAt: string;
+};
+export type FeaturedAvailability = {
+  placement: string; capacity: number;
+  options: Array<{ durationDays: number; priceCents: number; startsAt: string; endsAt: string; availableNow: boolean }>;
+  openSlot: FeaturedSlot | null;
+};
+export type AdminPromotionItem = {
+  kind: 'boost' | 'featured_slot'; id: string;
+  seller: { userId: string; name: string; avatarUrl: string | null } | null;
+  state: 'in_review' | 'approved' | 'rejected';
+  amountCents: number; durationDays: number;
+  submittedAt: string | null; reviewedAt: string | null; rejectionReason: string | null; refundStatus: string;
+  post: { id: string; caption: string | null; mediaUrl: string | null; thumbnailUrl: string | null; mediaType: string | null } | null;
+  window: { startsAt: string; endsAt: string } | null;
+};
+export type AdminPromotionQueue = { items: AdminPromotionItem[]; summary: { pendingBoosts: number; pendingFeatured: number } };
+
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
   const getTokenRef = useRef(getToken);

@@ -21,6 +21,7 @@ import {
   setSellerFollowing,
   subscribeSocial,
 } from '@/services/socialService';
+import { confirmSponsoredImpression } from '@/services/sponsoredService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
@@ -346,6 +347,9 @@ interface SpotlightItem {
   productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
+  /** Admin-approved paid promotion served in For You; rendered with a "Sponsored" label. */
+  sponsored?: boolean;
+  sponsoredBoostId?: string;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
@@ -1794,6 +1798,7 @@ function SpotlightPageImpl({
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         creator={item.creator}
         verified={!!item.verified}
+        sponsored={item.sponsored}
         caption={item.caption}
         sound={item.sound}
         soundOn={soundOn}
@@ -1916,6 +1921,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     authorAccountType: post.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     productTags: post.productTags ?? [],
     commentsCount: post.commentsCount,
+    sponsored: post.sponsored === true ? true : undefined,
+    sponsoredBoostId: post.sponsoredBoostId,
   };
 }
 
@@ -2619,6 +2626,17 @@ export default function FeedScreen({
     viewedPostIdsRef.current.add(id);
     api.posts.interact(id, { type: 'view' }).catch(() => {});
   }, [activeIndex, api, displayItems, userId]);
+
+  // Sponsored posts bill on the server once they are actually on screen.
+  const confirmedSponsoredRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!userId) return;
+    const item = displayItems[activeIndex];
+    const boostId = item && 'sponsored' in item && item.sponsored ? item.sponsoredBoostId : undefined;
+    if (!boostId || confirmedSponsoredRef.current.has(boostId)) return;
+    confirmedSponsoredRef.current.add(boostId);
+    void confirmSponsoredImpression(boostId);
+  }, [activeIndex, displayItems, userId]);
 
   const handleVideoWatched = useCallback((id: string) => {
     if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;

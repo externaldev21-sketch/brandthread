@@ -8,6 +8,7 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './promotions';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
@@ -1863,7 +1864,7 @@ export const boosts = pgTable('boosts', {
   stripeCheckoutSessionId: text('stripe_checkout_session_id').unique(),
   /** Incremented each time an expired session is rotated out; used for versioned idempotency keys. */
   checkoutSessionVersion:  integer('checkout_session_version').notNull().default(0),
-  /** 'pending_payment' | 'active' | 'paused' | 'completed' | 'cancelled' | 'failed' */
+  /** 'pending_payment' | 'in_review' | 'active' | 'paused' | 'completed' | 'cancelled' | 'rejected' | 'failed' */
   status:                  text('status').notNull().default('pending_payment'),
   impressionsCount:        integer('impressions_count').notNull().default(0),
   /** Set only after Stripe confirms payment — null for pending/failed/cancelled boosts. */
@@ -1871,6 +1872,17 @@ export const boosts = pgTable('boosts', {
   startsAt:                timestamp('starts_at', { withTimezone: true }),
   endsAt:                  timestamp('ends_at').notNull(),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
+  /** 'pending' | 'approved' | 'rejected' — admin review (migration 114). Legacy rows are 'approved'. */
+  reviewStatus:            text('review_status').notNull().default('approved'),
+  reviewedBy:              text('reviewed_by'),
+  reviewedAt:              timestamp('reviewed_at', { withTimezone: true }),
+  rejectionReason:         text('rejection_reason'),
+  refundId:                text('refund_id'),
+  /** 'none' | 'refunded' | 'failed' */
+  refundStatus:            text('refund_status').notNull().default('none'),
+  refundedAt:              timestamp('refunded_at', { withTimezone: true }),
+  /** Spend delivered through the Sponsored placement; never exceeds budgetCents. */
+  deliveredSpendCents:     integer('delivered_spend_cents').notNull().default(0),
 }, (table) => ({
   csStatusIdx: index('boosts_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
