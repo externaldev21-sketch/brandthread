@@ -4,8 +4,9 @@
  */
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { adCampaigns, boosts, db, iapPromotionPurchases, posts } from "@workspace/db";
+import { adCampaigns, boosts, db, featuredSlots, iapPromotionPurchases, posts } from "@workspace/db";
 import { checkPostMediaEligibility, estimateBoostReach } from "../routes/boosts";
+import { activateFeaturedSlotFromStore } from "../routes/featured-slots";
 import {
   findPurchaseInPayload,
   type ActivateResult,
@@ -108,6 +109,14 @@ export const drizzlePromoStore: PromoStore = {
         .from(boosts).where(where).orderBy(desc(boosts.createdAt)).limit(1);
       return row ?? null;
     }
+    if (kind === "featured_slot") {
+      const where = explicitId
+        ? and(eq(featuredSlots.id, explicitId), eq(featuredSlots.sellerId, ownerId))
+        : and(eq(featuredSlots.sellerId, ownerId), eq(featuredSlots.status, "pending_payment"));
+      const [row] = await db.select({ id: featuredSlots.id, budgetCents: featuredSlots.priceCents })
+        .from(featuredSlots).where(where).orderBy(desc(featuredSlots.createdAt)).limit(1);
+      return row ?? null;
+    }
     const where = explicitId
       ? and(eq(adCampaigns.id, explicitId), eq(adCampaigns.sellerId, ownerId))
       : and(eq(adCampaigns.sellerId, ownerId), eq(adCampaigns.status, "pending_payment"));
@@ -116,7 +125,10 @@ export const drizzlePromoStore: PromoStore = {
     return row ?? null;
   },
 
-  activate: (kind, targetId, paidAt) => (kind === "boost" ? activateBoost(targetId, paidAt) : activateCampaign(targetId, paidAt)),
+  activate: (kind, targetId, paidAt) => (
+    kind === "boost" ? activateBoost(targetId, paidAt)
+      : kind === "featured_slot" ? activateFeaturedSlotFromStore(targetId, paidAt)
+        : activateCampaign(targetId, paidAt)),
 
   async markGranted(transactionId, targetId, at) {
     await db.update(iapPromotionPurchases)

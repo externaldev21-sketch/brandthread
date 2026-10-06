@@ -33,11 +33,13 @@ export const featuredSlots = pgTable('featured_slots', {
   stripeCheckoutSessionId: text('stripe_checkout_session_id').unique(),
   checkoutSessionVersion:  integer('checkout_session_version').notNull().default(0),
   paidAt:                  timestamp('paid_at', { withTimezone: true }),
+  /** 'stripe' | 'store' (App Store / Google Play via RevenueCat); NULL = legacy Stripe */
+  paymentRail:             text('payment_rail'),
   reviewedBy:              text('reviewed_by'),
   reviewedAt:              timestamp('reviewed_at', { withTimezone: true }),
   rejectionReason:         text('rejection_reason'),
   refundId:                text('refund_id'),
-  /** 'none' | 'refunded' | 'failed' */
+  /** 'none' | 'refunded' | 'failed' | 'store' (store-paid: the seller requests it from Apple / Google) */
   refundStatus:            text('refund_status').notNull().default('none'),
   refundedAt:              timestamp('refunded_at', { withTimezone: true }),
   createdAt:               timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

@@ -453,7 +453,7 @@ export default function BoostScreen() {
   const api     = useApi();
   const { purchaseConsumable } = useRevenueCat();
   // Native iOS/Android buys the boost through the store (Guideline 3.1.1);
-  // web keeps Stripe Checkout. Off unless EXPO_PUBLIC_IAP_PROMOTIONS=1.
+  // web keeps Stripe Checkout. Always on for iOS/Android (QA-0001/0003).
   const nativeRail = nativePromotionsEnabled();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 

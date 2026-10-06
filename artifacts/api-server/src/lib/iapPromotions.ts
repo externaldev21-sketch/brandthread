@@ -17,25 +17,39 @@
  * without a database; iapPromotionsStore.ts holds the Drizzle implementation.
  */
 
-export type PromoKind = "boost" | "ad_campaign";
+import { FEATURED_DURATIONS, FEATURED_PRICE_LIST } from "./promotions/featured";
+
+export type PromoKind = "boost" | "ad_campaign" | "featured_slot";
 
 /** Whole-dollar budgets sold natively. Every tier is a valid existing budget step. */
 export const IAP_PROMO_TIER_DOLLARS = [5, 10, 25, 50, 100, 250, 500] as const;
 
-const PRODUCT_PREFIX: Record<PromoKind, string> = {
+type BudgetKind = Exclude<PromoKind, "featured_slot">;
+
+const PRODUCT_PREFIX: Record<BudgetKind, string> = {
   boost: "brandthread_boost_",
   ad_campaign: "brandthread_ad_",
 };
 
-export function promoProductId(kind: PromoKind, dollars: number): string {
+export function promoProductId(kind: BudgetKind, dollars: number): string {
   return `${PRODUCT_PREFIX[kind]}${dollars}`;
+}
+
+/** Featured slots are sold per length; the price is the server price list. */
+const FEATURED_PRODUCT_RE = /^brandthread_featured_(\d+)d$/;
+
+export function featuredProductId(durationDays: number): string {
+  return `brandthread_featured_${durationDays}d`;
 }
 
 /** Every product id Dev must create in App Store Connect / Play / RevenueCat. */
 export function allPromoProductIds(): string[] {
-  return (Object.keys(PRODUCT_PREFIX) as PromoKind[]).flatMap((kind) =>
-    IAP_PROMO_TIER_DOLLARS.map((d) => promoProductId(kind, d)),
-  );
+  return [
+    ...(Object.keys(PRODUCT_PREFIX) as BudgetKind[]).flatMap((kind) =>
+      IAP_PROMO_TIER_DOLLARS.map((d) => promoProductId(kind, d)),
+    ),
+    ...FEATURED_DURATIONS.map(featuredProductId),
+  ];
 }
 
 /** Returns the kind + budget a product id sells, or null when it is not a promotion product. */
@@ -43,7 +57,12 @@ export function parsePromoProductId(raw: unknown): { kind: PromoKind; amountCent
   if (typeof raw !== "string") return null;
   // Play Billing may report "product:base-plan"; consumables have none, tolerate it anyway.
   const id = raw.split(":")[0];
-  for (const kind of Object.keys(PRODUCT_PREFIX) as PromoKind[]) {
+  const featured = FEATURED_PRODUCT_RE.exec(id);
+  if (featured) {
+    const price = FEATURED_PRICE_LIST[Number(featured[1])];
+    return price ? { kind: "featured_slot", amountCents: price } : null;
+  }
+  for (const kind of Object.keys(PRODUCT_PREFIX) as BudgetKind[]) {
     const prefix = PRODUCT_PREFIX[kind];
     if (!id.startsWith(prefix)) continue;
     const dollars = Number(id.slice(prefix.length));
@@ -54,9 +73,14 @@ export function parsePromoProductId(raw: unknown): { kind: PromoKind; amountCent
   return null;
 }
 
-/** Feature flag. Off unless Dev has created the store products and flips it. */
+/**
+ * On by default (QA-0001/0003/0004): the native apps always buy promotions
+ * through the store, so the server must always grant those purchases — a
+ * store charge that the server ignored would be money taken for nothing.
+ * IAP_PROMOTIONS_ENABLED=false is an emergency kill switch only.
+ */
 export function iapPromotionsEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.IAP_PROMOTIONS_ENABLED === "true";
+  return env.IAP_PROMOTIONS_ENABLED !== "false";
 }
 
 export type PurchaseRow = {

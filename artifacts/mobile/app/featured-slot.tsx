@@ -4,13 +4,14 @@
  *        /featured-slot?id=<uuid>&paymentReturn=1   (Stripe Checkout return)
  *
  * Same shape as the Boost flow it is reached from: pick a length, see the
- * window and total, pay through Stripe Checkout, then track the state
+ * window and total, pay (iOS / Android: App Store / Google Play consumable via
+ * RevenueCat, QA-0004; web: Stripe Checkout), then track the state
  * (In review / Scheduled / Live / Rejected / Ended). Nothing goes live on the
  * client's say-so: the server confirms payment, an admin approves, and a
  * rejected or withdrawn slot is refunded in full.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -24,7 +25,13 @@ import { formatCents } from '@/lib/money';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
-import { buildFeaturedReturnUrl, featuredStateLabel } from '@/services/featuredSlotService';
+import {
+  buildFeaturedReturnUrl, featuredStateLabel, needsStoreRefund, storeName, storeRefundUrl,
+} from '@/services/featuredSlotService';
+import { useRevenueCat } from '@/lib/revenueCat';
+import {
+  confirmNativePromotion, featuredProductId, isPurchaseCancelled, nativePromotionsEnabled,
+} from '@/lib/iapPromotions';
 import type { FeaturedAvailability, FeaturedSlot } from '@/lib/api';
 
 const DAY = 86_400_000;
@@ -59,6 +66,9 @@ export default function FeaturedSlotScreen() {
   const api = useApi();
   const { isSignedIn } = useAuth();
   const params = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
+  const { purchaseConsumable } = useRevenueCat();
+  // iOS / Android buy through the store (App Store 3.1.1); web keeps Stripe.
+  const nativeRail = nativePromotionsEnabled();
 
   // Signed-out web preview must not call protected APIs: it renders only with &demo=1.
   const demo = isSellerDevPreview() && isPreviewDemoMode() && !isSignedIn;
@@ -127,6 +137,23 @@ export default function FeaturedSlotScreen() {
     setBusy(true);
     try {
       const slot = await api.featuredSlots.reserve(option.durationDays);
+      if (nativeRail) {
+        try {
+          const { transactionId } = await purchaseConsumable(featuredProductId(slot.durationDays));
+          // The RevenueCat webhook grants it too if the verify retries run out.
+          const confirmed = await confirmNativePromotion(() => api.featuredSlots.iapVerify(slot.id, transactionId));
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert(
+            confirmed ? 'In review' : 'Payment received',
+            confirmed
+              ? "Payment confirmed. We'll review your brand before it goes live."
+              : 'Your slot will show as In review here shortly.',
+          );
+        } catch (e) {
+          if (!isPurchaseCancelled(e)) Alert.alert('Payment failed', 'Could not complete the purchase. Please try again.');
+        }
+        return;
+      }
       const returnUrl = buildFeaturedReturnUrl(slot.id);
       const { url, paymentStatus } = await api.featuredSlots.pay(slot.id, returnUrl);
       if (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') { await verify(slot.id); return; }
@@ -147,7 +174,12 @@ export default function FeaturedSlotScreen() {
 
   function cancel(slot: FeaturedSlot) {
     const paid = slot.paid;
-    Alert.alert('Cancel Featured slot', paid ? 'Your payment will be refunded in full.' : 'Release this reservation?', [
+    const message = !paid
+      ? 'Release this reservation?'
+      : needsStoreRefund(slot)
+        ? `Request the refund from ${storeName(Platform.OS)}.`
+        : 'Your payment will be refunded in full.';
+    Alert.alert('Cancel Featured slot', message, [
       { text: 'Keep', style: 'cancel' },
       {
         text: 'Cancel slot', style: 'destructive',
@@ -212,7 +244,11 @@ export default function FeaturedSlotScreen() {
                     <Row s={s} label="Total" value={formatCents(option.priceCents)} bold />
                   </View>
                 )}
-                <Text style={s.note}>Reviewed before it goes live. Refunded in full if it isn't approved.</Text>
+                <Text style={s.note}>
+                  {nativeRail
+                    ? `Reviewed before it goes live. If it isn't approved, request a refund from ${storeName(Platform.OS)}.`
+                    : "Reviewed before it goes live. Refunded in full if it isn't approved."}
+                </Text>
                 <Button
                   label={`Pay ${formatCents(option?.priceCents ?? 0)}`}
                   variant="primary"
@@ -258,11 +294,31 @@ function SlotState({ slot, s }: { slot: FeaturedSlot; s: Styles }) {
   return (
     <View style={{ marginBottom: SP.xs }}>
       <View style={s.badge}><Text style={s.badgeText}>{featuredStateLabel(slot.displayState)}</Text></View>
-      {slot.displayState === 'rejected' && (
+      {slot.displayState === 'rejected' && !needsStoreRefund(slot) && (
         <Text style={s.meta}>{slot.rejectionReason ? `${slot.rejectionReason}. ` : ''}Your payment was refunded.</Text>
       )}
       {slot.displayState === 'cancelled' && slot.refundStatus === 'refunded' && (
         <Text style={s.meta}>Your payment was refunded.</Text>
+      )}
+      {(slot.displayState === 'rejected' || slot.displayState === 'cancelled') && slot.paid && needsStoreRefund(slot) && (
+        <StoreRefund s={s} reason={slot.displayState === 'rejected' ? slot.rejectionReason : null} />
+      )}
+    </View>
+  );
+}
+
+/** Store-paid slots: only Apple / Google can refund, so point the seller there (QA-0004). */
+function StoreRefund({ reason, s }: { reason: string | null; s: Styles }) {
+  const url = storeRefundUrl(Platform.OS);
+  return (
+    <View>
+      <Text style={s.meta}>
+        {reason ? `${reason}. ` : ''}Paid through {storeName(Platform.OS)}, so the refund comes from there.
+      </Text>
+      {url && (
+        <TouchableOpacity style={s.linkBtn} onPress={() => { void Linking.openURL(url); }} accessibilityRole="link">
+          <Text style={s.linkBtnText}>Request a refund</Text>
+        </TouchableOpacity>
       )}
     </View>
   );

@@ -2,25 +2,31 @@
  * Native (iOS / Android) rail for Boost and Create-ad (App Store 3.1.1).
  *
  * On a native build, paid promotion is bought as a RevenueCat consumable
- * through the store's own purchase sheet; Stripe Checkout stays on web. The
- * rail is OFF unless EXPO_PUBLIC_IAP_PROMOTIONS=1 is set in the build (after
- * the store products below exist), so nothing changes or crashes until Dev
- * flips it. Product ids mirror artifacts/api-server/src/lib/iapPromotions.ts.
+ * through the store's own purchase sheet; Stripe Checkout stays on web. This
+ * is unconditional on iOS/Android — there is no build flag that sends a
+ * native user to Stripe (QA-0001/0003/0004). If a store product is missing
+ * the purchase sheet fails with an error; it never falls back to Stripe.
+ * Product ids mirror artifacts/api-server/src/lib/iapPromotions.ts.
  */
 import { Platform } from 'react-native';
 
-export type PromoKind = 'boost' | 'ad_campaign';
+export type PromoKind = 'boost' | 'ad_campaign' | 'featured_slot';
 
 /** Whole-dollar budget tiers sold natively, in cents. All are existing budget steps. */
 export const IAP_PROMO_TIERS_CENTS = [500, 1000, 2500, 5000, 10000, 25000, 50000] as const;
 
-const PREFIX: Record<PromoKind, string> = {
+const PREFIX: Record<Exclude<PromoKind, 'featured_slot'>, string> = {
   boost: 'brandthread_boost_',
   ad_campaign: 'brandthread_ad_',
 };
 
-export function promoProductId(kind: PromoKind, cents: number): string {
+export function promoProductId(kind: Exclude<PromoKind, 'featured_slot'>, cents: number): string {
   return `${PREFIX[kind]}${Math.round(cents / 100)}`;
+}
+
+/** Featured slots are sold per length (3 / 7 / 14 days), not per budget. */
+export function featuredProductId(durationDays: number): string {
+  return `brandthread_featured_${durationDays}d`;
 }
 
 /** Closest sellable tier to a chosen budget (ties round up). */
@@ -34,11 +40,9 @@ export function nearestPromoTierCents(cents: number): number {
   return best;
 }
 
-export function nativePromotionsEnabled(
-  os: string = Platform.OS,
-  flag: string | undefined = process.env.EXPO_PUBLIC_IAP_PROMOTIONS,
-): boolean {
-  return (os === 'ios' || os === 'android') && flag === '1';
+/** iOS and Android always buy promotions through the store; web uses Stripe. */
+export function nativePromotionsEnabled(os: string = Platform.OS): boolean {
+  return os === 'ios' || os === 'android';
 }
 
 /** True when the store purchase sheet was dismissed by the user (not an error). */

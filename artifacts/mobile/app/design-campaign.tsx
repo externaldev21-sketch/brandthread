@@ -251,7 +251,7 @@ export default function CreateAdScreen() {
   const api       = useApi();
   const { purchaseConsumable } = useRevenueCat();
   // Native iOS/Android buys the ad through the store (Guideline 3.1.1);
-  // web keeps Stripe Checkout. Off unless EXPO_PUBLIC_IAP_PROMOTIONS=1.
+  // web keeps Stripe Checkout. Always on for iOS/Android (QA-0001/0003).
   const nativeRail = nativePromotionsEnabled();
   const { theme } = useAppTheme();
   const colors    = useColors();
