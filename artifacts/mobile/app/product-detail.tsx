@@ -12,6 +12,8 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
@@ -81,7 +83,9 @@ export default function ProductDetailScreen() {
   const tabScrollRef = useRef<ScrollView>(null);
 
   const loadProduct = useCallback(async () => {
-    if (!id || !userId) {
+    // Signed-out seller preview has no userId but still has a (local)
+    // product store — e.g. a product it just saved from Add product.
+    if (!id || (!userId && !isSellerDevPreview())) {
       setLoading(false);
       return;
     }
@@ -1187,6 +1191,8 @@ function StoreTab({
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const st = React.useMemo(() => makeStStyles(theme), [theme]);
+  const { userId: viewerId } = useAuth();
+  const canPreviewAsBuyer = product.status === 'active' && !!viewerId && !isPreviewSellerProductId(id);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
@@ -1295,25 +1301,21 @@ function StoreTab({
             </GradientCard>
           )}
 
-          {/* CTA buttons — this is a seller preview of the buyer-facing store page,
-              so these don't actually add to a bag or check out here. */}
-          <View style={st.ctaRow}>
-            <SecondaryButton
-              label="Add to Cart"
-              icon="shopping-cart"
-              onPress={() => {}}
-              disabled
-              style={{ flex: 1 }}
-            />
-            <PrimaryButton
-              label="Buy Now"
-              icon="zap"
-              onPress={() => {}}
-              disabled
-              style={{ flex: 1 }}
-            />
-          </View>
-          <Text style={st.previewCaption}>Buttons are live on your store</Text>
+          {/* QA-1344: no dead Add to Cart / Buy Now here — open the real buyer
+              product page for this product instead. Only for a live listing
+              that exists on the server: the public product page serves
+              active products only, so a draft (or a signed-out preview's
+              local-only product) would open "Product not found". */}
+          {canPreviewAsBuyer && (
+            <View style={st.ctaRow}>
+              <SecondaryButton
+                label="Preview as buyer"
+                icon="eye"
+                onPress={() => router.push(('/buyer-product-detail?productId=' + encodeURIComponent(id)) as never)}
+                style={{ flex: 1 }}
+              />
+            </View>
+          )}
 
           {/* Description accordion */}
           <PressableScale

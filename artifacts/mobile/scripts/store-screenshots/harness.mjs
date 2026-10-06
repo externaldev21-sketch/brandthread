@@ -135,6 +135,7 @@ export async function openContext(browser, { device, role, origin, images, video
   }, HIDE_SCROLLBARS_CSS);
 
   const activity = { lastApiAt: Date.now() };
+  let cartState = null;
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -160,6 +161,15 @@ export async function openContext(browser, { device, role, origin, images, video
       };
       if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
       activity.lastApiAt = Date.now();
+      // The buyer cart is a full-replace store on the real server
+      // (api-server/src/routes/cart-db.ts): once this context syncs a cart,
+      // read that back instead of the static seed, like the real API does.
+      const cartPath = url.pathname.replace(/^\/api(\/v1)?/, '');
+      if (cartPath === '/buyer/cart/sync' && request.method() === 'POST') {
+        try { cartState = JSON.parse(request.postData() ?? '{}'); } catch { /* keep previous */ }
+      } else if (cartPath === '/buyer/cart' && request.method() === 'GET' && cartState) {
+        return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify({ items: cartState.items ?? [], savedItems: cartState.savedItems ?? [] }) });
+      }
       const body = respond({ method: request.method(), path: url.pathname, query: url.searchParams, role, options: apiOptions });
       if (body === undefined) {
         onUnseeded?.(`${request.method()} ${url.pathname}`);
