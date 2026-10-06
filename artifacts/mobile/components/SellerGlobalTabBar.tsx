@@ -45,6 +45,7 @@ import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
+import { cancelStudioReturn } from '@/lib/navigation/studioReturn';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -196,6 +197,7 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
   const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
+  const onPushedScreen = (segments[0] as string | undefined) !== '(tabs)';
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
@@ -370,10 +372,20 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
 
             const onPress = () => {
               if (!isFocused) hapticTabChange();
-              // navigate() (not replace()) so the (tabs) navigator sees a
-              // real focus change and runs its transitionSpec — replace()
-              // swaps the route with no transition at all.
-              router.navigate(tabDef.destination as never);
+              // A tab tap is a deliberate destination, never "back" — so a
+              // tile opened from the Studio menu must not re-open the menu
+              // on top of the tab the seller just chose.
+              cancelStudioReturn();
+              // From a pushed root-stack screen (segments[0] !== '(tabs)'),
+              // dismissTo() pops the stack back down to the existing (tabs)
+              // scene and focuses the tab — "tapping a tab pops to that
+              // tab's root" (docs/NAVIGATION.md rule 3). navigate() alone
+              // would stack a second (tabs) instance on top of the flow.
+              // On a tab already, navigate() (not replace()) so the (tabs)
+              // navigator sees a real focus change and runs its
+              // transitionSpec — replace() swaps with no transition at all.
+              if (onPushedScreen && router.canGoBack()) router.dismissTo(tabDef.destination as never);
+              else router.navigate(tabDef.destination as never);
             };
 
             return (

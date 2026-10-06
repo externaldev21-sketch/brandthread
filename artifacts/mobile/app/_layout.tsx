@@ -8,6 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { shouldReopenStudioMenu } from '@/lib/navigation/studioReturn';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Inter_400Regular,
@@ -22,7 +23,7 @@ import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
 import {
   DarkTheme, Stack, ThemeProvider as NavigationThemeProvider,
-  useGlobalSearchParams, useRootNavigationState, useRouter, useSegments,
+  useGlobalSearchParams, usePathname, useRootNavigationState, useRouter, useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
@@ -383,6 +384,16 @@ function SellerBarGate() {
   useEffect(() => {
     if (isFullScreenRoute) setIsStudioOpen(false);
   }, [isFullScreenRoute]);
+
+  // "Menu → tile → back ⇒ menu" (docs/NAVIGATION.md): a tile opened from the
+  // Studio menu is pushed over the active tab; when that tile pops back to
+  // the very same tab, re-open the menu so the seller lands where they left.
+  // lib/navigation/studioReturn.ts decides; this gate (always mounted, unlike
+  // the menu itself on full-screen routes) is where every pathname is seen.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (shouldReopenStudioMenu(pathname)) setStudioOpenRequestKey((k) => k + 1);
+  }, [pathname]);
 
   if (!showBar) return null;
 

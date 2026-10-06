@@ -32,27 +32,31 @@ describe('seller setup destination navigation', () => {
     }
   });
 
-  it('replaces transparent checklist scenes from both launch surfaces', () => {
-    // The dashboard's own "add first product" shortcut still replaces (not
-    // pushes) into the setup origin; the full per-task checklist itself now
-    // lives in the guided walkthrough sheet the dashboard's "Continue setup"
-    // banner opens, rather than being duplicated inline in the dashboard.
+  it('pushes (never replaces) into a task with an explicit origin from every launch surface', () => {
+    // docs/NAVIGATION.md: a task flow is PUSHED over the screen that opened
+    // it, carrying `from=<origin>`, so its Cancel/Back pops to that exact
+    // scene. replace() used to drop the dashboard from the stack and force
+    // the exit onto a generic tabs index (wrong tab / Studio menu bug).
     const dashboard = read('components/SellerHomeCommerceDashboard.tsx');
     const walkthrough = read('components/SetupWalkthroughSheet.tsx');
     const setup = read('app/setup.tsx');
 
-    expect(dashboard).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
+    expect(dashboard).toContain("router.push(withOrigin(task.route, 'dashboard') as never)");
+    expect(dashboard).toContain("nav(withOrigin('/add-product', 'dashboard'))");
+    expect(dashboard).not.toContain('router.replace(withSellerSetupOrigin');
     expect(walkthrough).toContain('onPress={() => openTask(task)}');
-    expect(setup).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
+    expect(walkthrough).toContain("router.push(withOrigin(task.route, 'dashboard') as never)");
+    expect(setup).toContain("router.push(withOrigin(task.route, 'setup') as never)");
+    expect(setup).not.toContain('router.replace(');
   });
 
-  it('gives every destination an explicit seller-setup return path', () => {
+  it('gives every destination a pop-first exit that never hard-routes to a tabs index', () => {
     for (const [, , file] of setupDestinations) {
       const destination = read(file);
 
-      expect(destination).toContain('isSellerSetupOrigin');
-      expect(destination).toContain('SELLER_HOME_ROUTE');
-      expect(destination).toContain('router.replace(SELLER_HOME_ROUTE as never)');
+      expect(destination).toContain('leaveSetupFlow(router, ');
+      expect(destination).not.toContain('router.replace(SELLER_HOME_ROUTE as never)');
+      expect(destination).not.toContain("router.replace('/(tabs)/'");
     }
   });
 
@@ -64,7 +68,8 @@ describe('seller setup destination navigation', () => {
     // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
     // still returns to the seller-setup origin via leaveProductFlow.
     expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
-    expect(createPost).toContain("(isSellerSetup ? SELLER_HOME_ROUTE : '/(tabs)/profile') as never");
+    expect(createPost).toContain('if (isSellerSetup) leaveSetupDestination();');
+    expect(createPost).toContain("else router.navigate('/(tabs)/profile' as never);");
   });
 
   it('routes all nine completion signals through the behavioral completion boundary', () => {
