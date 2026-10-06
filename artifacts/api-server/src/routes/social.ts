@@ -619,6 +619,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .innerJoin(users, eq(users.clerkId, posts.userId))
     .where(and(
       eq(postUserTags.taggedUserId, other),
+      eq(postUserTags.status, "approved"), // pending tags stay off the Tagged tab until approved
       publicPostCondition(),
       notBlockedWith(myId, posts.userId),
     ))
@@ -635,6 +636,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
     .innerJoin(stories, eq(stories.id, storyMentions.storyId))
     .where(and(
       eq(storyMentions.mentionedUserId, other),
+      eq(storyMentions.status, "approved"), // pending tags stay off the Tagged tab until approved
       gt(stories.expiresAt, new Date()),
       storyListedFor(myId),
       ne(stories.privacyVisibility, "friends"),
@@ -1149,8 +1151,8 @@ router.post("/stories", async (req, res) => {
     });
   }
 
-  await recordStoryMentions(row.id, myId, mentions);
-  for (const mention of storyHeld ? [] : mentions) {
+  const pendingMentions = await recordStoryMentions(row.id, myId, mentions);
+  for (const mention of storyHeld ? [] : mentions.filter((m) => !pendingMentions?.has(m.userId))) {
     void notifyStoryMention({
       storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
     });

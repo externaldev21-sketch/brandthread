@@ -29,6 +29,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useApi } from '@/lib/api';
 import { isUUID } from '@/lib/engagementUtils';
+import { useRouter } from 'expo-router';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { remixActionVisible, remixRoute } from '@/lib/remix';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -70,6 +73,10 @@ export function ThreadShareSheet({
   // posts/:id/download). Preview/demo posts (non-UUID ids) have no author
   // account to ask, so they keep the plain save action.
   const [downloadAllowed, setDownloadAllowed] = useState<boolean | null>(null);
+  // "Remix" — offered only when the server says the author allows this viewer
+  // to remix (GET /api/remix/posts/:id) and the viewer can publish video.
+  const [remixAllowed, setRemixAllowed] = useState(false);
+  const router = useRouter();
   const abortRef = useRef<AbortController | null>(null);
   const actionInFlightRef = useRef(false);
 
@@ -101,6 +108,16 @@ export function ThreadShareSheet({
       .catch(() => { if (!cancelled) setDownloadAllowed(false); });
     return () => { cancelled = true; };
   }, [api, visible, isVideo, mediaUri, postId]);
+
+  useEffect(() => {
+    // Signed-out web preview never calls protected APIs.
+    if (!visible || !isVideo || !isUUID(postId) || isBuyerDevPreview()) { setRemixAllowed(false); return; }
+    let cancelled = false;
+    api.remix.check(postId)
+      .then(result => { if (!cancelled) setRemixAllowed(remixActionVisible(result)); })
+      .catch(() => { if (!cancelled) setRemixAllowed(false); });
+    return () => { cancelled = true; };
+  }, [api, visible, isVideo, postId]);
 
   useEffect(() => {
     if (!visible) return;
@@ -319,6 +336,9 @@ export function ThreadShareSheet({
               <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
               {isVideo && mediaUri && downloadAllowed === true ? (
                 <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />
+              ) : null}
+              {remixAllowed ? (
+                <ShareAction label="Remix" icon="layers" onPress={() => { onClose(); router.push(remixRoute(postId) as never); }} muted />
               ) : null}
             </View>
           </View>

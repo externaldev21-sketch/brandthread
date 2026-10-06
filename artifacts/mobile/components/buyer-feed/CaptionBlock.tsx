@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
 
 export interface RepostFriend {
@@ -41,7 +42,7 @@ export const CAPTION_BLOCK_HEIGHT = 56;
 export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
 
 export function CaptionBlock({
-  creator, verified, caption, sound, soundOn, onToggleSound,
+  creator, verified, caption, sound, soundOn, onToggleSound, remixCredit,
   friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
@@ -54,6 +55,8 @@ export function CaptionBlock({
   caption: string;
   sound: string;
   soundOn: boolean;
+  /** "Remix of @handle" — credits the original video under the creator name. */
+  remixCredit?: string | null;
   onToggleSound: () => void;
   friendReposts: RepostFriend[];
   hasRepostIdentity: boolean;
@@ -89,6 +92,7 @@ export function CaptionBlock({
   const creatorHit = useHitAreaBoost();
   const captionHit = useHitAreaBoost();
   const soundHit = useHitAreaBoost();
+  const translation = useCaptionTranslation(caption);
   return (
     <Animated.View
       style={[styles.root, hasRepostIdentity && styles.rootWithRepost, style]}
@@ -152,6 +156,12 @@ export function CaptionBlock({
           {verified && <Feather name="check-circle" size={14} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
         </View>
       </TouchableOpacity>
+      {remixCredit ? (
+        <View style={styles.remixRow}>
+          <Feather name="layers" size={12} color={ON_DARK} style={styles.iconTextShadow} />
+          <Text style={styles.soundText} numberOfLines={1}>{remixCredit}</Text>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         style={captionHit.boostStyle}
@@ -163,12 +173,14 @@ export function CaptionBlock({
         hitSlop={{ top: 4, bottom: 4 }}
       >
         <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-          {caption}
+          {translation.text}
           {caption.length > 86 && (
             <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
           )}
         </Text>
       </TouchableOpacity>
+
+      <TranslationLink translation={translation} style={styles.translationLink} />
 
       <TouchableOpacity
         style={soundHit.boostStyle}
@@ -236,11 +248,16 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  translationLink: {
+    alignSelf: 'flex-start', marginTop: -4, marginBottom: 8, color: ON_DARK,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
   // Same shadow, for icon glyphs (Feather renders as a text font, so
   // textShadow applies) — used by the verified badge above.
   iconTextShadow: {
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+  remixRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -2, marginBottom: 6 },
   soundRow: {
     height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,

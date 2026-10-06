@@ -441,7 +441,7 @@ export default function AiBrainScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
-  const params = useLocalSearchParams<{ context?: string }>();
+  const params = useLocalSearchParams<{ context?: string; prompt?: string }>();
 
   const parsedContext: AIScreenContext = useMemo(() => {
     try {
@@ -455,6 +455,15 @@ export default function AiBrainScreen() {
 
   const [session, setSession] = useState<AISession | null>(null);
   const [inputText, setInputText] = useState('');
+  // A `prompt` param (e.g. "Ask AI" on a dashboard suggestion) pre-fills the
+  // composer; the seller still reviews and sends it themselves.
+  const appliedPromptRef = useRef<string | null>(null);
+  useEffect(() => {
+    const p = typeof params.prompt === 'string' ? params.prompt.trim() : '';
+    if (!p || appliedPromptRef.current === p) return;
+    appliedPromptRef.current = p;
+    setInputText(p.slice(0, 2000));
+  }, [params.prompt]);
   const [isGenerating, setIsGenerating] = useState(false);
   /**
    * When a request fails we keep the error alongside the preserved input

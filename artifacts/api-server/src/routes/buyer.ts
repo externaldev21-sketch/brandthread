@@ -38,6 +38,7 @@ import {
 } from "../lib/threadCash/wallet";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { loadSellerCheckoutSettings, stripeCheckoutLocale } from "../lib/sellerCheckoutSettings";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
@@ -1136,6 +1137,9 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     }
 
     const validDropId = chargePlan.dropId;
+    // Seller Checkout settings: the hosted page's language follows the store
+    // language, and a "Guest checkout only" store never saves the card.
+    const storeCheckout = (await loadSellerCheckoutSettings([sellerId])).get(sellerId);
 
     // ── Create Stripe Session after durable cart persistence ─────────────────
     // Held preorders use separate charges and transfers: the charge lands on
@@ -1174,9 +1178,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
             ...(validDropId ? { dropId: validDropId } : {}),
           },
           // Save the payment method to the buyer's Customer for future
-          // off-session Checkout payments.
-          setup_future_usage: "off_session",
+          // off-session Checkout payments (not for "Guest checkout only" stores).
+          ...(storeCheckout?.checkoutMode === "guest_only" ? {} : { setup_future_usage: "off_session" as const }),
         },
+        ...(storeCheckout ? { locale: stripeCheckoutLocale(storeCheckout.storeLanguage) } : {}),
       },
       hasKey ? { idempotencyKey: `cs_${clientIdempotencyKey}` } : {},
     );

@@ -203,7 +203,13 @@ async function cookieSheet(browser, origin) {
 
 async function calls(browser, origin) {
   const convId = 'a3c5d7e9-1111-4222-8333-944455556666';
-  const overrides = ({ path: p }) => {
+  const peer = { id: 'user_ava', name: 'Ava Stone', initials: 'AS', color: '#555', avatarUrl: null };
+  const ringing = (direction) => ({
+    id: 'c0ffee00-0000-4000-8000-000000000001', conversationId: convId, mode: 'voice', status: 'ringing', direction,
+    callerId: direction === 'incoming' ? 'user_ava' : BUYER_USER.id, calleeId: direction === 'incoming' ? BUYER_USER.id : 'user_ava',
+    peer, createdAt: '2026-10-06T10:00:00.000Z', answeredAt: null, endedAt: null, durationSec: null, endReason: null,
+  });
+  const conversation = ({ path: p }) => {
     if (p === `/conversations/${convId}`) {
       return { body: { id: convId, type: 'buyer_to_buyer', participants: [
         { userId: BUYER_USER.id, name: 'Jordan Reyes', initials: 'JR', color: '#333' },
@@ -211,14 +217,58 @@ async function calls(browser, origin) {
       ] } };
     }
     if (p === `/conversations/${convId}/messages`) return { body: [] };
+    if (p === `/call/dm/conversations/${convId}/calls`) return { body: { calls: [] } };
     return undefined;
   };
-  const { context, page } = await openPage(browser, origin, { overrides });
-  await page.goto(`${origin}/buyer-conversation?id=${convId}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(2500);
-  check(await page.getByTestId('conversation-call-voice').count() === 0, 'QA-0002 no simulated call buttons outside the demo preview');
-  await page.screenshot({ path: path.join(OUT, 'buyer-conversation-no-fake-call.png') });
-  await context.close();
+
+  // 1) Placing a call goes to the server; with no Agora keys the server
+  //    refuses and the app says so — no simulated ring.
+  {
+    const callsMade = [];
+    const overrides = (req) => {
+      if (req.method === 'POST' && req.path === '/call/dm/calls') {
+        return { status: 503, body: { error: 'Calling is unavailable because secure call credentials are not configured', code: 'CALLING_NOT_CONFIGURED' } };
+      }
+      if (req.path === '/call/dm/incoming') return { body: { call: null } };
+      return conversation(req);
+    };
+    const { context, page } = await openPage(browser, origin, { overrides, calls: callsMade });
+    await page.goto(`${origin}/buyer-conversation?id=${convId}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2500);
+    check(await page.getByTestId('conversation-call-voice').count() > 0, 'QA-0002 call buttons are shown (not hidden)');
+    await page.screenshot({ path: path.join(OUT, 'buyer-conversation-call-buttons.png') });
+    await page.getByTestId('conversation-call-voice').first().click();
+    await page.waitForTimeout(1500);
+    const create = callsMade.find((c) => c.method === 'POST' && c.path === '/call/dm/calls');
+    check(!!create && create.body?.conversationId === convId && create.body?.mode === 'voice', 'QA-0002 placing a call creates a server call (POST /api/call/dm/calls)');
+    check(await page.getByText(/Calling isn’t available right now/).count() > 0, 'QA-0002 a refused call says why instead of faking a ring');
+    await page.screenshot({ path: path.join(OUT, 'call-refused-not-configured.png') });
+    await context.close();
+  }
+
+  // 2) A ringing call from the other person shows the incoming screen
+  //    anywhere in the app; Decline is recorded on the server.
+  {
+    const callsMade = [];
+    const overrides = (req) => {
+      if (req.path === '/call/dm/incoming') return { body: { call: ringing('incoming') } };
+      if (req.path === `/call/dm/calls/${ringing('incoming').id}`) return { body: { call: ringing('incoming') } };
+      if (req.method === 'POST' && req.path === `/call/dm/calls/${ringing('incoming').id}/decline`) {
+        return { body: { call: { ...ringing('incoming'), status: 'declined', endedAt: '2026-10-06T10:00:04.000Z', endReason: 'declined' } } };
+      }
+      return conversation(req);
+    };
+    const { context, page } = await openPage(browser, origin, { overrides, calls: callsMade });
+    await page.goto(`${origin}/discover`, { waitUntil: 'networkidle' });
+    await page.getByLabel('Accept call').first().waitFor({ timeout: 20_000 });
+    check(await page.getByText('Ava Stone').count() > 0, 'QA-0006 an incoming call from the server rings with the caller’s name');
+    await page.screenshot({ path: path.join(OUT, 'call-incoming.png') });
+    await page.getByLabel('Decline call').first().click();
+    await page.waitForTimeout(1200);
+    check(callsMade.some((c) => c.method === 'POST' && c.path === `/call/dm/calls/${ringing('incoming').id}/decline`), 'QA-0006 Decline is recorded on the server (POST …/decline)');
+    await page.screenshot({ path: path.join(OUT, 'call-declined.png') });
+    await context.close();
+  }
 }
 
 async function main() {

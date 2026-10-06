@@ -136,6 +136,7 @@ router.get("/stories/mentions", async (req, res) => {
     .innerJoin(stories, eq(stories.id, storyMentions.storyId))
     .where(and(
       eq(storyMentions.mentionedUserId, myId),
+      eq(storyMentions.status, "approved"), // pending tags wait in Pending tags
       gt(stories.expiresAt, new Date()),
       storyListedFor(myId),
     ))

@@ -23,6 +23,8 @@ import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { repostsAllowedBy } from "../lib/interactionSettings";
+import { checkRemix, remixCredits } from "../lib/remix";
+import { cleanTaggedUserIds, MAX_POST_USER_TAGS, recordPostUserTags } from "../lib/tagApproval";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -399,6 +401,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         styleTags:   posts.styleTags,
         sound:       posts.sound,
         visibility:  posts.visibility,
+        remixOfPostId: posts.remixOfPostId,
         createdAt:   posts.createdAt,
         cursorTs:    sql<string>`${posts.createdAt}::text`,
         displayName: users.displayName,
@@ -523,9 +526,11 @@ router.get("/feed", requireAuth, async (req, res) => {
         .catch(() => {});
     }
 
+    const remixOfByPost = await remixCredits(rows);
     const result = rows.map((p) => ({
       id:        p.id,
       userId:    p.userId,
+      remixOf:   remixOfByPost.get(p.id) ?? null,
       mediaUrl:  p.mediaUrl,
       thumbnailUrl: p.thumbnailUrl,
       mediaUrls: p.mediaUrls,
@@ -600,6 +605,7 @@ router.post("/", requireAuth, async (req, res) => {
     mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
     sound, visibility, taggedProductIds, isDraft, scheduledAt,
+    remixOfPostId, taggedUserIds: requestedTaggedUserIds,
   } = req.body as {
     mediaUrl?:          string;
     thumbnailUrl?:      string;
@@ -618,6 +624,10 @@ router.post("/", requireAuth, async (req, res) => {
     taggedProductIds?:  string[];
     isDraft?:           boolean;
     scheduledAt?:       string | null;
+    /** The video this post remixes (lib/remix.ts); the author's setting decides. */
+    remixOfPostId?:     string | null;
+    /** People tagged on the post (lib/tagApproval.ts). */
+    taggedUserIds?:     unknown;
   };
 
   const restriction = await publishingRestriction(clerkId);
@@ -650,6 +660,22 @@ router.post("/", requireAuth, async (req, res) => {
 
   if (caption !== undefined && caption !== null && typeof caption !== "string") {
     return res.status(400).json({ error: "caption must be a string" });
+  }
+  const taggedUserIds = cleanTaggedUserIds(clerkId, requestedTaggedUserIds);
+  if (!taggedUserIds) {
+    return res.status(400).json({ error: `taggedUserIds must be up to ${MAX_POST_USER_TAGS} user ids` });
+  }
+  // A remix must be a video and the source author must allow this account to remix it.
+  if (remixOfPostId !== undefined && remixOfPostId !== null) {
+    if (typeof remixOfPostId !== "string") return res.status(400).json({ error: "remixOfPostId must be a string" });
+    if (mediaType !== "video") {
+      return res.status(400).json({ error: "Only video posts can be remixes", code: "REMIX_NOT_VIDEO" });
+    }
+    const remix = await checkRemix(remixOfPostId, clerkId);
+    if (!remix.allowed) {
+      return res.status(remix.code === "REMIX_NOT_ALLOWED" ? 403 : remix.status)
+        .json({ error: remix.message, code: remix.code });
+    }
   }
   const captionDecision = evaluateContent(publicPostText(caption, hashtags), "public");
   if (captionDecision.action === "reject") {
@@ -795,6 +821,7 @@ router.post("/", requireAuth, async (req, res) => {
     postStatus,
     scheduledAt: postStatus === "scheduled" ? parsedScheduledAt : null,
     publishedAt: postStatus === "published" ? now : null,
+    remixOfPostId: typeof remixOfPostId === "string" ? remixOfPostId : null,
     moderationStatus: postHeld ? "held" : "visible",
     moderationReason: captionDecision.action === "hold"
       ? captionDecision.category
@@ -866,9 +893,20 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
 
+  // People tags: pending for accounts that approve tags manually; notified once public.
+  await recordPostUserTags({
+    postId: post.id,
+    taggerId: clerkId,
+    taggedUserIds,
+    notify: postStatus === "published" && !postHeld && resolvedVisibility.isPublic !== false,
+    post,
+  }).catch((err) => req.log.error({ err, postId: post.id }, "Could not record people tags"));
+  const remixOf = (await remixCredits([post])).get(post.id) ?? null;
+
   return res.status(201).json({
     ...post,
     taggedProducts,
+    remixOf,
     moderation: postHeld
       ? {
           status: "held",

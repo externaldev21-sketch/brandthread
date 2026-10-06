@@ -10,6 +10,9 @@ const state = vi.hoisted(() => ({
   allowDownloads: true,
   saved: [] as Array<Record<string, unknown>>,
   hiddenSaved: [] as string[][],
+  pending: [] as Array<{ kind: "post" | "story"; id: string }>,
+  approved: [] as string[],
+  removed: [] as string[],
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -52,6 +55,9 @@ vi.mock("../../lib/interactionSettings", async () => {
       commentAudience: z.enum(["everyone", "following", "nobody"]).optional(),
       allowReposts: z.boolean().optional(),
       allowDownloads: z.boolean().optional(),
+      manualTagApproval: z.boolean().optional(),
+      remixAudience: z.enum(["everyone", "following", "off"]).optional(),
+      snoozeSuggested: z.boolean().optional(),
     }),
     storyHiddenBodySchema: z.object({ userIds: z.array(z.string().min(1)).max(1000) }),
     loadInteractionSettings: async () => ({
@@ -70,6 +76,26 @@ vi.mock("../../lib/interactionSettings", async () => {
     },
   };
 });
+
+vi.mock("../../lib/tagApproval", () => ({
+  isTagKind: (value: unknown) => value === "post" || value === "story",
+  pendingTagCount: async () => state.pending.length,
+  listPendingTags: async () => state.pending.map((tag) => ({ ...tag, authorId: "author" })),
+  approvePendingTag: async (_userId: string, kind: string, id: string) => {
+    const index = state.pending.findIndex((tag) => tag.kind === kind && tag.id === id);
+    if (index < 0) return false;
+    state.pending.splice(index, 1);
+    state.approved.push(`${kind}:${id}`);
+    return true;
+  },
+  removeTag: async (_userId: string, kind: string, id: string) => {
+    const index = state.pending.findIndex((tag) => tag.kind === kind && tag.id === id);
+    if (index < 0) return false;
+    state.pending.splice(index, 1);
+    state.removed.push(`${kind}:${id}`);
+    return true;
+  },
+}));
 
 import interactionSettingsRouter from "../interaction-settings";
 
@@ -98,6 +124,9 @@ beforeEach(() => {
   state.allowDownloads = true;
   state.saved = [];
   state.hiddenSaved = [];
+  state.pending = [];
+  state.approved = [];
+  state.removed = [];
 });
 
 describe("GET /posts/:postId/download", () => {
@@ -146,6 +175,7 @@ describe("account settings", () => {
     expect(await res.json()).toEqual({
       settings: { commentAudience: "everyone", allowReposts: true, allowDownloads: true },
       storyHiddenCount: 2,
+      pendingTagCount: 0,
     });
   });
 
@@ -176,5 +206,55 @@ describe("account settings", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ userIds: ["a", "b"] });
     expect(state.hiddenSaved).toEqual([["a", "b"]]);
+  });
+});
+
+describe("tag approval, remix and snooze settings", () => {
+  const TAG_ID = "22222222-2222-4222-8222-222222222222";
+
+  it("accepts the new settings in a patch and refuses bad values", async () => {
+    const ok = await fetch(base, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ manualTagApproval: true, remixAudience: "following", snoozeSuggested: true }),
+    });
+    expect(ok.status).toBe(200);
+    expect(state.saved).toEqual([{ manualTagApproval: true, remixAudience: "following", snoozeSuggested: true }]);
+    const bad = await fetch(base, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ remixAudience: "friends" }),
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  it("counts and lists pending tags", async () => {
+    state.pending = [{ kind: "post", id: TAG_ID }, { kind: "story", id: POST_ID }];
+    expect((await (await fetch(base)).json()).pendingTagCount).toBe(2);
+    const list = await (await fetch(`${base}/pending-tags`)).json();
+    expect(list.items.map((t: { kind: string }) => t.kind)).toEqual(["post", "story"]);
+  });
+
+  it("approves a pending tag and returns the new count", async () => {
+    state.pending = [{ kind: "post", id: TAG_ID }];
+    const res = await fetch(`${base}/pending-tags/post/${TAG_ID}/approve`, { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, pendingTagCount: 0 });
+    expect(state.approved).toEqual([`post:${TAG_ID}`]);
+  });
+
+  it("removes (untags) and 404s for unknown tags, kinds and ids", async () => {
+    state.pending = [{ kind: "story", id: TAG_ID }];
+    expect((await fetch(`${base}/tags/story/${TAG_ID}`, { method: "DELETE" })).status).toBe(200);
+    expect(state.removed).toEqual([`story:${TAG_ID}`]);
+    expect((await fetch(`${base}/tags/story/${TAG_ID}`, { method: "DELETE" })).status).toBe(404);
+    expect((await fetch(`${base}/tags/reel/${TAG_ID}`, { method: "DELETE" })).status).toBe(404);
+    expect((await fetch(`${base}/pending-tags/post/not-a-uuid/approve`, { method: "POST" })).status).toBe(404);
+  });
+
+  it("keeps pending tags behind sign-in", async () => {
+    state.userId = null;
+    expect((await fetch(`${base}/pending-tags`)).status).toBe(401);
+    expect((await fetch(`${base}/pending-tags/post/${TAG_ID}/approve`, { method: "POST" })).status).toBe(401);
   });
 });

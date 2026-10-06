@@ -20,7 +20,11 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
-import type { InteractionSettings } from '@/lib/interactionSettings';
+import type { InteractionSettings, InteractionSettingsPatch, PendingTag } from '@/lib/interactionSettings';
+import type { DisplayPrefs } from '@/lib/displayPrefs';
+import type { TranslationResult } from '@/lib/translation';
+import type { RemixCheck, RemixClip } from '@/lib/remix';
+import type { DmCallDto, DmCallRtcDto } from '@/lib/calls/dmCallClient';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
 import type {
@@ -1699,9 +1703,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         clientEventId: string;
       }) =>
         post<{ recorded: true }>('/api/call/events', body),
-      /** Rings the other participant(s) of a 1:1 DM call (push + in-app notification). */
-      dmRing: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
-        post<{ rung: number }>('/api/call/dm/ring', body),
+      /** Real 1:1 DM calls (see lib/calls/agoraCallProvider.ts) — server-tracked call state shared by both sides. */
+      dm: {
+        create: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
+          post<{ call: DmCallDto; rtc: DmCallRtcDto }>('/api/call/dm/calls', body),
+        accept: (id: string) =>
+          post<{ call: DmCallDto; rtc: DmCallRtcDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/accept`, {}),
+        decline: (id: string) =>
+          post<{ call: DmCallDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/decline`, {}),
+        end: (id: string) =>
+          post<{ call: DmCallDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/end`, {}),
+        token: (id: string) =>
+          post<{ rtc: DmCallRtcDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}/token`, {}),
+        get: (id: string) =>
+          freshGet<{ call: DmCallDto }>(`/api/call/dm/calls/${encodeURIComponent(id)}`),
+        incoming: () => freshGet<{ call: DmCallDto | null }>('/api/call/dm/incoming'),
+        rate: (id: string, rating: 'good' | 'not_good') =>
+          post<{ ok: boolean }>(`/api/call/dm/calls/${encodeURIComponent(id)}/rating`, { rating }),
+        log: (conversationId: string) =>
+          freshGet<{ calls: DmCallDto[] }>(`/api/call/dm/conversations/${encodeURIComponent(conversationId)}/calls?limit=50`),
+      },
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
     /**
@@ -2396,15 +2417,39 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
      * people I hide my stories from.
      */
     interactionSettings: {
-      get: () => freshGet<{ settings: InteractionSettings; storyHiddenCount: number }>('/api/interaction-settings'),
-      update: (body: Partial<InteractionSettings>) =>
+      get: () => freshGet<{ settings: InteractionSettings; storyHiddenCount: number; pendingTagCount?: number }>('/api/interaction-settings'),
+      update: (body: InteractionSettingsPatch) =>
         patch<{ settings: InteractionSettings }>('/api/interaction-settings', body),
+      /** Tags waiting for my approval ("Manually approve tags"). */
+      pendingTags: () => freshGet<{ items: PendingTag[] }>('/api/interaction-settings/pending-tags'),
+      approveTag: (kind: PendingTag['kind'], id: string) =>
+        post<{ ok: boolean; pendingTagCount: number }>(`/api/interaction-settings/pending-tags/${kind}/${encodeURIComponent(id)}/approve`, {}),
+      /** Remove me from a post/story tag (untag). */
+      removeTag: (kind: PendingTag['kind'], id: string) =>
+        del<{ ok: boolean; pendingTagCount: number }>(`/api/interaction-settings/tags/${kind}/${encodeURIComponent(id)}`),
       storyHidden: () => freshGet<{ userIds: string[] }>('/api/interaction-settings/story-hidden'),
       setStoryHidden: (userIds: string[]) =>
         put<{ userIds: string[] }>('/api/interaction-settings/story-hidden', { userIds }),
       /** May the viewer save this post's media? (signed-out allowed) */
       downloadAllowed: (postId: string) =>
         quietGet<{ allowed: boolean }>(`/api/interaction-settings/posts/${encodeURIComponent(postId)}/download`),
+    },
+    /** Translation language, auto-translate captions, text size, high-contrast icons (signed-in). */
+    displayPreferences: {
+      get: () => freshGet<{ preferences: DisplayPrefs }>('/api/display-preferences'),
+      update: (body: Partial<DisplayPrefs>) =>
+        patch<{ preferences: DisplayPrefs }>('/api/display-preferences', body),
+    },
+    /** Translate captions/comments (signed-in). 503 { code: 'TRANSLATION_NOT_CONFIGURED' } without the server's AI integration. */
+    translate: (texts: string[], targetLanguage: string) =>
+      post<{ targetLanguage: string; translations: TranslationResult[] }>('/api/translate', { texts, targetLanguage }),
+    /** Video remixes (api-server routes/remix.ts) — the source author's setting decides. */
+    remix: {
+      check: (postId: string) =>
+        quietGet<RemixCheck>(`/api/remix/posts/${encodeURIComponent(postId)}`),
+      /** Copies the source video into a private clip I own for the create flow. */
+      clip: (postId: string) =>
+        post<RemixClip>(`/api/remix/posts/${encodeURIComponent(postId)}/clip`, {}),
     },
     /**
      * Server-side "seen" state for the buyer "Watching Threads" gesture coach

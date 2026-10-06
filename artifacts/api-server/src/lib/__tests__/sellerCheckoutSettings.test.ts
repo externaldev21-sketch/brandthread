@@ -34,13 +34,14 @@ beforeEach(() => {
 describe("normalizeSellerCheckoutSettings", () => {
   it("defaults to guest checkout allowed and tipping off", () => {
     expect(normalizeSellerCheckoutSettings(undefined)).toEqual(DEFAULT_SELLER_CHECKOUT_SETTINGS);
-    expect(DEFAULT_SELLER_CHECKOUT_SETTINGS).toEqual({ checkoutMode: "accounts_optional", tippingEnabled: false });
+    expect(DEFAULT_SELLER_CHECKOUT_SETTINGS).toEqual({ checkoutMode: "accounts_optional", tippingEnabled: false, storeLanguage: "en" });
   });
 
   it("reads stored keys and ignores invalid ones", () => {
     expect(normalizeSellerCheckoutSettings({ checkoutMode: "accounts_required", tippingEnabled: true, storeLanguage: "fr" }))
-      .toEqual({ checkoutMode: "accounts_required", tippingEnabled: true });
-    expect(normalizeSellerCheckoutSettings({ checkoutMode: "checkout_only", tippingEnabled: "yes" }))
+      .toEqual({ checkoutMode: "accounts_required", tippingEnabled: true, storeLanguage: "fr" });
+    expect(normalizeSellerCheckoutSettings({ checkoutMode: "guest_only" }).checkoutMode).toBe("guest_only");
+    expect(normalizeSellerCheckoutSettings({ checkoutMode: "checkout_only", tippingEnabled: "yes", storeLanguage: "xx" }))
       .toEqual(DEFAULT_SELLER_CHECKOUT_SETTINGS);
   });
 });
@@ -54,6 +55,8 @@ describe("checkoutSettingsPatchError", () => {
   it("refuses invalid checkout values and non-objects", () => {
     expect(checkoutSettingsPatchError({ checkoutMode: "everyone" })).toMatch(/checkoutMode/);
     expect(checkoutSettingsPatchError({ tippingEnabled: "true" })).toMatch(/tippingEnabled/);
+    expect(checkoutSettingsPatchError({ storeLanguage: "klingon" })).toMatch(/storeLanguage/);
+    expect(checkoutSettingsPatchError({ checkoutMode: "guest_only" })).toBeNull();
     expect(checkoutSettingsPatchError(null)).toMatch(/object/);
     expect(checkoutSettingsPatchError([])).toMatch(/object/);
   });
@@ -86,7 +89,7 @@ describe("loadSellerCheckoutSettings", () => {
   it("returns stored settings and defaults for sellers without a row", async () => {
     state.rows = [{ ownerId: "seller-a", settings: { tippingEnabled: true, checkoutMode: "accounts_required" } }];
     const map = await loadSellerCheckoutSettings(["seller-a", "seller-b", "seller-a"]);
-    expect(map.get("seller-a")).toEqual({ checkoutMode: "accounts_required", tippingEnabled: true });
+    expect(map.get("seller-a")).toEqual({ checkoutMode: "accounts_required", tippingEnabled: true, storeLanguage: "en" });
     expect(map.get("seller-b")).toEqual(DEFAULT_SELLER_CHECKOUT_SETTINGS);
     expect(state.queried).toBe(1);
   });

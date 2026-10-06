@@ -2,7 +2,11 @@
  * Account interaction settings (lib/interactionSettings.ts).
  *
  * GET   /api/interaction-settings                       — my settings + hidden-story count
- * PATCH /api/interaction-settings                       — { commentAudience?, allowReposts?, allowDownloads? }
+ * PATCH /api/interaction-settings                       — { commentAudience?, allowReposts?, allowDownloads?,
+ *                                                          manualTagApproval?, remixAudience?, snoozeSuggested? }
+ * GET   /api/interaction-settings/pending-tags          — { items } tags waiting for my approval
+ * POST  /api/interaction-settings/pending-tags/:kind/:id/approve — show it on my Tagged tab
+ * DELETE /api/interaction-settings/tags/:kind/:id       — remove me from that post/story tag
  * GET   /api/interaction-settings/story-hidden          — { userIds } I hide my stories from
  * PUT   /api/interaction-settings/story-hidden          — replace that list
  * GET   /api/interaction-settings/posts/:postId/download — may the viewer save this post's media?
@@ -23,6 +27,7 @@ import {
   storyHiddenBodySchema,
   storyHiddenUserIds,
 } from "../lib/interactionSettings";
+import { approvePendingTag, isTagKind, listPendingTags, pendingTagCount, removeTag } from "../lib/tagApproval";
 
 const router = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,11 +59,12 @@ router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const [settings, hidden] = await Promise.all([
+  const [settings, hidden, pendingTags] = await Promise.all([
     loadInteractionSettings(userId),
     storyHiddenUserIds(userId),
+    pendingTagCount(userId),
   ]);
-  res.json({ settings, storyHiddenCount: hidden.length });
+  res.json({ settings, storyHiddenCount: hidden.length, pendingTagCount: pendingTags });
 });
 
 router.patch("/", validateRequest({ body: interactionSettingsPatchSchema }), async (req, res) => {
@@ -76,6 +82,35 @@ router.put("/story-hidden", validateRequest({ body: storyHiddenBodySchema }), as
   const userId = (req as any).clerkUserId as string;
   const { userIds } = req.body as { userIds: string[] };
   res.json({ userIds: await replaceStoryHiddenUserIds(userId, userIds) });
+});
+
+router.get("/pending-tags", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  res.json({ items: await listPendingTags(userId) });
+});
+
+function tagTarget(req: { params: Record<string, unknown> }): { kind: "post" | "story"; id: string } | null {
+  const kind = req.params.kind;
+  const id = String(req.params.id ?? "");
+  return isTagKind(kind) && UUID_RE.test(id) ? { kind, id } : null;
+}
+
+router.post("/pending-tags/:kind/:id/approve", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const target = tagTarget(req);
+  if (!target || !(await approvePendingTag(userId, target.kind, target.id))) {
+    return res.status(404).json({ error: "Tag not found", code: "TAG_NOT_FOUND" });
+  }
+  return res.json({ ok: true, pendingTagCount: await pendingTagCount(userId) });
+});
+
+router.delete("/tags/:kind/:id", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const target = tagTarget(req);
+  if (!target || !(await removeTag(userId, target.kind, target.id))) {
+    return res.status(404).json({ error: "Tag not found", code: "TAG_NOT_FOUND" });
+  }
+  return res.json({ ok: true, pendingTagCount: await pendingTagCount(userId) });
 });
 
 export default router;

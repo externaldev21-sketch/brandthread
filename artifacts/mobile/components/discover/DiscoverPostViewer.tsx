@@ -36,6 +36,7 @@ import { apiErrorMessage } from '@/lib/safety';
 import { discoverEngagementFor, discoverPostApiId, rememberDiscoverEngagement, toggledLike } from '@/lib/discoverEngagement';
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
+import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
@@ -174,7 +175,7 @@ function ViewerPage({
             style={styles.followInline}
           />
         </View>
-        {!!post.caption && <Text style={styles.caption} numberOfLines={3}>{post.caption}</Text>}
+        {!!post.caption && <TranslatableCaption text={post.caption} style={styles.caption} numberOfLines={3} linkStyle={styles.translationLink} />}
         {hasTags && (
           <Pressable
             onPress={() => { hapticPrimaryAction(); onOpenShopTheLook(post); }}
@@ -319,6 +320,7 @@ const styles = StyleSheet.create({
   authorName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.sm, marginLeft: 8 },
   followInline: { alignSelf: 'flex-start' },
   caption: { color: '#FFFFFF', fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm },
+  translationLink: { color: ON_DARK },
   shopPill: {
     marginTop: SP.sm, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#FFFFFF', borderRadius: RADII.pill, paddingHorizontal: 14, paddingVertical: 9,

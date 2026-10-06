@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
+import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
@@ -1192,7 +1193,11 @@ function StoreTab({
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const st = React.useMemo(() => makeStStyles(theme), [theme]);
   const { userId: viewerId } = useAuth();
-  const canPreviewAsBuyer = product.status === 'active' && !!viewerId && !isPreviewSellerProductId(id);
+  // Every one of the seller's products can be previewed: a live one opens
+  // its public page, a draft / archived one is served to its owner only
+  // (flagged previewOnly, not buyable), and one stored only on this device
+  // (signed-out preview, seeded demo) is built from the local product store.
+  const previewAsBuyerRoute = previewAsBuyerHref(id, { signedIn: !!viewerId && !isPreviewSellerProductId(id) });
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
@@ -1302,20 +1307,15 @@ function StoreTab({
           )}
 
           {/* QA-1344: no dead Add to Cart / Buy Now here — open the real buyer
-              product page for this product instead. Only for a live listing
-              that exists on the server: the public product page serves
-              active products only, so a draft (or a signed-out preview's
-              local-only product) would open "Product not found". */}
-          {canPreviewAsBuyer && (
-            <View style={st.ctaRow}>
-              <SecondaryButton
-                label="Preview as buyer"
-                icon="eye"
-                onPress={() => router.push(('/buyer-product-detail?productId=' + encodeURIComponent(id)) as never)}
-                style={{ flex: 1 }}
-              />
-            </View>
-          )}
+              product page for this product instead (see previewAsBuyerRoute). */}
+          <View style={st.ctaRow}>
+            <SecondaryButton
+              label="Preview as buyer"
+              icon="eye"
+              onPress={() => router.push(previewAsBuyerRoute as never)}
+              style={{ flex: 1 }}
+            />
+          </View>
 
           {/* Description accordion */}
           <PressableScale

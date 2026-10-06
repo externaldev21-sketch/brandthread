@@ -5,24 +5,50 @@
  *
  *   • checkoutMode "accounts_required" → guest checkout (routes/guest-checkout.ts)
  *     refuses the seller's items; buyers sign in and pay in the app.
+ *   • checkoutMode "guest_only" (the screen's "Guest checkout only", the
+ *     original "Checkout only" option — Shopify's "accounts disabled") →
+ *     buyers check out as guests: anyone may buy (signed-in buyers too), but
+ *     nothing from this store's checkout is kept on an account — the card is
+ *     not saved to the buyer's Stripe customer (routes/checkout-intent.ts,
+ *     routes/buyer.ts), and the app neither saves the address nor asks the
+ *     buyer to create an account. With no saved card there is no
+ *     post-purchase one-click offer either (lib/postPurchaseOffer.ts).
  *   • tippingEnabled → the in-app checkout (routes/checkout-intent.ts) accepts
  *     a tip for that seller's group, charges it and pays it out with the order.
+ *   • storeLanguage (Languages screen) → the buyer checkout's language
+ *     (GET /api/checkout-profile, mobile lib/checkoutI18n.ts) and the hosted
+ *     guest Stripe Checkout page's locale (stripeCheckoutLocale below).
  */
 import { inArray } from "drizzle-orm";
 import { db, sellerSettings } from "@workspace/db";
 
-export const CHECKOUT_MODES = ["accounts_optional", "accounts_required"] as const;
+export const CHECKOUT_MODES = ["guest_only", "accounts_optional", "accounts_required"] as const;
 export type CheckoutMode = (typeof CHECKOUT_MODES)[number];
 
 export interface SellerCheckoutSettings {
   checkoutMode: CheckoutMode;
   tippingEnabled: boolean;
+  /** The store language (Languages screen); one of STORE_LANGUAGES. */
+  storeLanguage: StoreLanguage;
 }
+
+/** The Languages screen's store languages (mobile app/languages.tsx). */
+export const STORE_LANGUAGES = ["en", "es", "fr", "de", "pt", "zh", "ja", "ko", "ar", "it"] as const;
+export type StoreLanguage = (typeof STORE_LANGUAGES)[number];
 
 export const DEFAULT_SELLER_CHECKOUT_SETTINGS: SellerCheckoutSettings = {
   checkoutMode: "accounts_optional",
   tippingEnabled: false,
+  storeLanguage: "en",
 };
+
+/**
+ * Stripe Checkout's `locale` for a store language. Stripe Checkout has no
+ * Arabic, so an Arabic store lets Stripe follow the buyer's browser ("auto").
+ */
+export function stripeCheckoutLocale(language: StoreLanguage): "auto" | "en" | "es" | "fr" | "de" | "pt" | "zh" | "ja" | "ko" | "it" {
+  return language === "ar" ? "auto" : language;
+}
 
 /** Largest tip accepted for one seller group, whatever the order size ($1,000). */
 export const MAX_TIP_CENTS = 100_000;
@@ -34,6 +60,9 @@ export function normalizeSellerCheckoutSettings(raw: unknown): SellerCheckoutSet
       ? value.checkoutMode as CheckoutMode
       : DEFAULT_SELLER_CHECKOUT_SETTINGS.checkoutMode,
     tippingEnabled: value.tippingEnabled === true,
+    storeLanguage: STORE_LANGUAGES.includes(value.storeLanguage as StoreLanguage)
+      ? value.storeLanguage as StoreLanguage
+      : DEFAULT_SELLER_CHECKOUT_SETTINGS.storeLanguage,
   };
 }
 
@@ -50,6 +79,9 @@ export function checkoutSettingsPatchError(body: unknown): string | null {
   }
   if ("tippingEnabled" in value && typeof value.tippingEnabled !== "boolean") {
     return "tippingEnabled must be true or false";
+  }
+  if ("storeLanguage" in value && !STORE_LANGUAGES.includes(value.storeLanguage as StoreLanguage)) {
+    return `storeLanguage must be one of: ${STORE_LANGUAGES.join(", ")}`;
   }
   return null;
 }

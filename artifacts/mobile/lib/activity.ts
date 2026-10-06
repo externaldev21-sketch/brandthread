@@ -624,11 +624,6 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
     case 'conversation':
       if (!id) return null;
       return role === 'seller' ? `/seller-conversation?id=${q(id)}` : `/buyer-conversation?id=${q(id)}`;
-    case 'dm_call':
-      // A call notification opened later from Activity: the call itself has
-      // long since rung out, so land in the conversation it was placed from.
-      if (!id) return null;
-      return role === 'seller' ? `/seller-conversation?id=${q(id)}` : `/buyer-conversation?id=${q(id)}`;
     case 'variant':
       // Inventory folded into Products (no more standalone /inventory) —
       // the low-stock filter is the closest equivalent destination without

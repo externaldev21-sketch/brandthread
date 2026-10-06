@@ -141,6 +141,8 @@ type PricedCartGroup = PricedGroup & {
   calculationId: string | null;
   tipCents: number;
   tippingEnabled: boolean;
+  /** The seller's checkout mode is "Guest checkout only": nothing is saved to the buyer's account. */
+  guestCheckoutOnly: boolean;
   totalCents: number;
 };
 
@@ -166,6 +168,7 @@ async function priceCart(
       calculationId: tax.calculationId,
       tipCents: 0,
       tippingEnabled: false,
+      guestCheckoutOnly: false,
       totalCents: pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents,
     });
   }
@@ -178,6 +181,7 @@ async function priceCart(
     const check = checkTip({ tipCents, subtotalCents: group.subtotalCents, tippingEnabled });
     if (!check.ok) throw new CartCheckoutError(400, check.code, check.message, { sellerId: group.sellerId });
     group.tippingEnabled = tippingEnabled;
+    group.guestCheckoutOnly = settings.get(group.sellerId)?.checkoutMode === "guest_only";
     group.tipCents = tipCents;
     group.totalCents += tipCents;
   });
@@ -367,7 +371,8 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
       customer,
       // Card covers Apple Pay and Google Pay (both are card wallets).
       payment_method_types: ["card"],
-      ...(body.saveCard === false ? {} : { setup_future_usage: "off_session" as const }),
+      // A "Guest checkout only" store (seller Checkout settings) never saves the card.
+      ...(body.saveCard === false || priced.some((group) => group.guestCheckoutOnly) ? {} : { setup_future_usage: "off_session" as const }),
       receipt_email: body.contactEmail,
       shipping: {
         name: shipping.name,

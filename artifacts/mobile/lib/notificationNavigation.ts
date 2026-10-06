@@ -1,6 +1,6 @@
 import type * as Notifications from 'expo-notifications';
 import { activityHref, isBuyerOrderNotification } from './activity';
-import { dmCallModeFromType, dmCallScreenHref } from './calls/dmCallLinks';
+import { signalIncomingCall } from './calls/incomingCallSignal';
 
 export type NotificationRouter = {
   push: (href: string) => void;
@@ -76,15 +76,12 @@ export function createNotificationResponseHandler(
       if (communityId) router.push(`/community-chat?id=${encodeURIComponent(communityId)}`);
       return;
     }
-    // An incoming 1:1 DM call (POST /api/call/dm/ring): tapping the push
-    // joins the caller's Agora channel on the real call screen.
-    if (data?.targetType === 'dm_call' && typeof data.targetId === 'string' && data.targetId) {
-      router.push(dmCallScreenHref({
-        conversationId: data.targetId,
-        mode: dmCallModeFromType(data.type),
-        participantName: typeof data.actorName === 'string' && data.actorName ? data.actorName : 'Call',
-        answer: true,
-      }));
+    // An incoming 1:1 DM call: the ringing screen is the app-wide call
+    // overlay (lib/calls/CallSessionContext.tsx), not a route — ask it to
+    // fetch the ringing call now (if it already rang out, the missed call is
+    // in Activity and in the conversation's call log).
+    if (data?.targetType === 'dm_call') {
+      signalIncomingCall();
       return;
     }
     if (data?.targetType === 'conversation' && typeof data.targetId === 'string' && data.targetId) {

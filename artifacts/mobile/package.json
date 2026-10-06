@@ -125,6 +125,7 @@
     "@stripe/stripe-react-native": "0.64.0",
     "@tanstack/query-async-storage-persister": "5.101.0",
     "@tanstack/react-query-persist-client": "5.101.0",
+    "agora-rtc-sdk-ng": "^4.24.7",
     "expo": "~57.0.24",
     "expo-apple-authentication": "~57.0.2",
     "expo-asset": "~57.0.18",

@@ -11,6 +11,12 @@ export const userInteractionSettings = pgTable("user_interaction_settings", {
   commentAudience: text("comment_audience").notNull().default("everyone"),
   allowReposts: boolean("allow_reposts").notNull().default(true),
   allowDownloads: boolean("allow_downloads").notNull().default(true),
+  /** "Manually approve tags": new tags of this account wait in Pending tags (migration 119). */
+  manualTagApproval: boolean("manual_tag_approval").notNull().default(false),
+  /** Who may remix this account's videos: 'everyone' | 'following' | 'off' (migration 119). */
+  remixAudience: text("remix_audience").notNull().default("everyone"),
+  /** "Snooze suggested posts": feeds show followed accounts only until this time (migration 119). */
+  suggestedSnoozedUntil: timestamp("suggested_snoozed_until"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

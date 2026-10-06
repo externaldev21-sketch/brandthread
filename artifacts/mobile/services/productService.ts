@@ -581,6 +581,11 @@ export async function getTaggableProducts(forDraftContent = false): Promise<Prod
 export async function getProductStats() {
   await ensureInitialized();
   const list = (await demoActive()) ? [..._products, ...(await ensurePreviewProducts())] : _products;
+  return summarizeProducts(list);
+}
+
+/** The Products tab's summary counts for any product list. */
+export function summarizeProducts(list: Product[]) {
   return {
     total: list.length,
     active: list.filter(p => p.status === 'active').length,

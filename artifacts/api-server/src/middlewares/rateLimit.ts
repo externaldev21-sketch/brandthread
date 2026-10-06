@@ -177,7 +177,7 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
 };
 
 const EXPENSIVE_PATH =
-  /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai|support-chat\/message)(\/|$)/;
+  /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai|support-chat\/message|translate)(\/|$)/;
 // Binary uploads are recognised by what they carry, not only by route name, so
 // a new upload endpoint is covered the day it ships.
 const UPLOAD_PATH = /\/(?:upload|upload-media|upload-photo|images\/upload|avatar\/upload|logo\/upload|banner\/upload|media)(?:\/|$)/;

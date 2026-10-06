@@ -342,6 +342,12 @@ export async function publishNotification(n: {
   pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
+  /** Expo push priority ('high' for incoming calls). */
+  pushPriority?: "default" | "normal" | "high";
+  /** iOS interruption level ('time-sensitive' for incoming calls). */
+  pushInterruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
+  /** Extra keys merged into the push `data` payload; they override core keys except notificationId. */
+  extraData?: Record<string, unknown>;
 }): Promise<void> {
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
@@ -403,7 +409,6 @@ export async function publishNotification(n: {
       title: n.title,
       body: n.body ?? "",
       data: {
-        notificationId: notification.id,
         type: n.type,
         category: n.category,
         targetId: n.targetId,
@@ -411,9 +416,15 @@ export async function publishNotification(n: {
         cta: n.cta,
         commentId: n.commentId,
         actorName: n.actorName,
+        // Extra push-only keys; they may override the feed row's targetType/
+        // targetId (e.g. an incoming call pushes the call, the feed row opens the chat).
+        ...(n.extraData ?? {}),
+        notificationId: notification.id,
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
+      ...(n.pushPriority ? { priority: n.pushPriority } : {}),
+      ...(n.pushInterruptionLevel ? { interruptionLevel: n.pushInterruptionLevel } : {}),
     }, pushCategory, n.analyticsOwnerId);
   }
 }

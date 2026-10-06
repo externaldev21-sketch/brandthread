@@ -29,7 +29,6 @@ import {
 } from '@/services/socialService';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
-import { useDmCallRoute, dmCallScreenHref } from '@/lib/calls/dmCalls';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import type { CallLogEntry } from '@/lib/calls/types';
 import type {
@@ -263,9 +262,6 @@ export default function BuyerConversationScreen() {
   const api = useApi();
   const { userId } = useAuth();
   const { startCall } = useCallSession();
-  // Real Agora call on native when configured, the simulated call only in the
-  // &demo=1 preview, otherwise no call buttons (lib/calls/dmCalls.ts).
-  const callRoute = useDmCallRoute();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   // A sent/claimed/cancelled Thread Cash bubble's status is set once, in the
   // message's own attachment meta, at send time — it never gets rewritten
@@ -721,18 +717,6 @@ export default function BuyerConversationScreen() {
   function handleStartCall(mode: 'voice' | 'video') {
     if (!conv) { Alert.alert('Not ready', 'Wait for the conversation to load.'); return; }
     const p = participant;
-    if (callRoute === 'agora') {
-      router.push(dmCallScreenHref({
-        conversationId: conv.id,
-        mode,
-        participantName: displayName,
-        participantInitials: p?.initials,
-        participantColor: p?.color,
-        myInitials: MY_INITIALS,
-      }) as never);
-      return;
-    }
-    if (callRoute !== 'simulated') return;
     void startCall({
       conversationId: conv.id,
       surface: 'buyer',
@@ -2214,7 +2198,7 @@ export default function BuyerConversationScreen() {
         <View style={s.headerIconGroup}>
           {/* An AI account can't take a call — no voice/video icons for it,
               just the info icon below. */}
-          {conv && !isAgentConv && callRoute !== 'hidden' && (
+          {conv && !isAgentConv && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
               onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
@@ -2226,7 +2210,7 @@ export default function BuyerConversationScreen() {
               <Feather name="phone" size={ICON.lg} color={theme.muted} />
             </PressableScale>
           )}
-          {conv && !isAgentConv && callRoute !== 'hidden' && (
+          {conv && !isAgentConv && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
               onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}

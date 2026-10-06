@@ -13,7 +13,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
-import { loadSellerCheckoutSettings } from "../lib/sellerCheckoutSettings";
+import { loadSellerCheckoutSettings, stripeCheckoutLocale } from "../lib/sellerCheckoutSettings";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -306,6 +306,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
       success_url: successUrl, cancel_url: cancelUrl,
       customer_email: email,
+      // The store language (seller Languages screen) for Stripe's page.
+      ...(checkoutSettings ? { locale: stripeCheckoutLocale(checkoutSettings.storeLanguage) } : {}),
       metadata: { csRef: checkout.id, guest: "true", ...(validDropId ? { dropId: validDropId } : {}) },
       payment_intent_data: {
         ...money.paymentIntentData,

@@ -24,6 +24,7 @@ import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../li
 import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
 import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { withoutSuggestedWhenSnoozed } from "../lib/interactionSettings";
 
 const router = Router();
 
@@ -120,7 +121,8 @@ router.get("/for-you", requireAuth, async (req, res) => {
   const { limit, offset } = page.data;
 
   try {
-    const ranked = await getForYouFeed(userId);
+    // "Snooze suggested posts": followed accounts (and the viewer) only.
+    const ranked = await withoutSuggestedWhenSnoozed(userId, await getForYouFeed(userId), (item) => item.sellerId);
     const slice = ranked.slice(offset, offset + limit);
     setPaginationHeaders(res, page.data, slice.length, ranked.length);
 

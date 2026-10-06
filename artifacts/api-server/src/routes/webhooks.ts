@@ -73,6 +73,7 @@ import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
+import { sendPurchaseConversions } from "../lib/conversionTracking";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -695,6 +696,8 @@ export async function handleCheckoutPaid(
     } catch (err) {
       logger.error({ err, orderId: existing.id }, "Order confirmation email delivery failed");
     }
+    // The seller's conversion tracking; idempotent per order and provider.
+    void sendPurchaseConversions(existing.id);
     try {
       await applyThreadCashSellerTopup(stripe, existing.id);
     } catch (err) {
@@ -902,6 +905,8 @@ export async function handleCheckoutPaid(
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
         ...(dropId ? { dropId } : {}),
+        // An accepted post-purchase offer (lib/postPurchaseOffer.ts) links to the order it adds to.
+        ...(csRecord.upsellOfOrderId ? { upsellOfOrderId: csRecord.upsellOfOrderId } : {}),
       })
       .returning();
     createdOrderId = order.id;
@@ -1204,6 +1209,11 @@ export async function handleCheckoutPaid(
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
       }
+
+      // The seller's conversion tracking (Checkout settings → Additional
+      // scripts): a server-to-server Purchase event per configured provider.
+      // Best effort, never blocks the order (lib/conversionTracking.ts).
+      void sendPurchaseConversions(createdOrderId);
 
       // This buyer now has a real paid order with this seller — if a
       // pending message request from this buyer is sitting in the seller's
