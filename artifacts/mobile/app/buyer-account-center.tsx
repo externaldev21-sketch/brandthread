@@ -26,8 +26,8 @@ const ROWS: Row[] = [
   { label: 'Login methods', icon: 'link', sub: 'Apple, Google and email', route: '/login-methods' },
   { label: 'Biometric unlock', icon: 'unlock', sub: 'Face ID, Touch ID or device biometrics', route: '/biometric-unlock' },
   { label: "Where you're logged in", icon: 'smartphone', sub: 'Review active sessions', route: '/buyer-login-activity' },
-  { label: 'Download your information', icon: 'download', sub: 'Get a copy of your data', route: '/buyer-download-data' },
-  { label: 'Ad and recommendation preferences', icon: 'sliders', sub: 'Control personalisation', route: '/buyer-settings-detail?section=content' },
+  { label: 'Download my data', icon: 'download', sub: 'Get a copy of your data', route: '/buyer-download-data' },
+  { label: 'Content preferences', icon: 'sliders', sub: 'Hidden words and muted accounts', route: '/buyer-settings-detail?section=content' },
   { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account and data', route: '/delete-account', destructive: true },
 ];
 

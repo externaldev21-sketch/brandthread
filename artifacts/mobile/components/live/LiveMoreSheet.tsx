@@ -90,8 +90,8 @@ export function LiveMoreSheet({
         <Row icon="eye-off" label="Not interested" onPress={() => { onClose(); onNotInterested(); }} theme={theme} />
         <Row icon="link" label="Copy link" onPress={() => { onClose(); onCopyLink(); }} theme={theme} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <ToggleRow icon="type" label="Captions" value={captionsOn} onToggle={onToggleCaptions} theme={theme} />
-        <ToggleRow icon="wifi-off" label="Data Saver" value={dataSaverOn} onToggle={onToggleDataSaver} theme={theme} />
+        <ToggleRow icon="type" label="Show chat as captions" value={captionsOn} onToggle={onToggleCaptions} theme={theme} />
+        <ToggleRow icon="wifi-off" label="Pause video" value={dataSaverOn} onToggle={onToggleDataSaver} theme={theme} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Pressable
           onPress={onClose}

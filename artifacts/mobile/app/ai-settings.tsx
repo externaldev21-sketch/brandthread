@@ -10,6 +10,7 @@ import {
   Pressable,
   Alert,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -244,7 +245,18 @@ export default function AiSettingsScreen() {
     );
   };
 
-  if (!settings) return null;
+  // Keep the header (and its back button) while settings load instead of a
+  // blank screen.
+  if (!settings) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader title="AI Settings" onBack={() => goBackOr(router, '/ai-brain')} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.foreground} />
+        </View>
+      </View>
+    );
+  }
 
   const ds = settings.dataSources;
 

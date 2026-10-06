@@ -9,6 +9,8 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Share, Animated, useWindowDimensions,
 } from 'react-native';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
@@ -135,6 +137,8 @@ export default function BuyerPostViewer() {
   const [reposted, setReposted] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [savingCaption, setSavingCaption] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editCaption, setEditCaption] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const handleVideoWatched = useCallback(() => {
@@ -146,6 +150,8 @@ export default function BuyerPostViewer() {
   const isOwner = post !== null && post.authorId === MY_USER_ID;
 
   const loadPost = useCallback(async () => {
+    // A link without a post id would request /posts/undefined.
+    if (!params.postId) return;
     let found: BuyerPost | null = null;
     try {
       const all = await getMyPosts();
@@ -189,18 +195,34 @@ export default function BuyerPostViewer() {
   };
 
   const handleSaveCaption = async () => {
-    if (!post) return;
-    await updatePost(post.id, { caption: editCaption });
-    setPost(prev => prev ? { ...prev, caption: editCaption } : prev);
-    setEditOpen(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!post || savingCaption) return;
+    setSavingCaption(true);
+    try {
+      await updatePost(post.id, { caption: editCaption });
+      setPost(prev => prev ? { ...prev, caption: editCaption } : prev);
+      setEditOpen(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // Keep the sheet open with the typed caption so nothing is lost.
+      Alert.alert('Couldn’t save caption', 'Check your connection and try again.');
+    } finally {
+      setSavingCaption(false);
+    }
   };
 
   const handleDelete = async () => {
-    if (!post) return;
-    await deletePost(post.id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    goBackOr(router);
+    if (!post || deleting) return;
+    setDeleting(true);
+    try {
+      await deletePost(post.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setDeleteConfirm(false);
+      goBackOr(router);
+    } catch {
+      Alert.alert('Couldn’t delete post', 'Check your connection and try again.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Use params as display fallback while the async load completes
@@ -224,6 +246,20 @@ export default function BuyerPostViewer() {
     width: windowWidth,
     height: windowWidth,
   });
+
+  if (!params.postId) {
+    return (
+      <View style={s.page}>
+        <ScreenHeader title="Post" onBack={() => goBackOr(router)} />
+        <EmptyState
+          icon="image"
+          title="Post not found"
+          description="This link doesn't point to a post."
+          action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={s.page}>
@@ -401,7 +437,7 @@ export default function BuyerPostViewer() {
               />
               <View style={s.modalActions}>
                 <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setEditOpen(false)} />
-                <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} />
+                <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} loading={savingCaption} />
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -418,7 +454,7 @@ export default function BuyerPostViewer() {
               <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
               <View style={s.modalActions}>
                 <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setDeleteConfirm(false)} />
-                <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} />
+                <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} loading={deleting} />
               </View>
             </TouchableOpacity>
           </TouchableOpacity>

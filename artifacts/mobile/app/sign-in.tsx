@@ -697,6 +697,10 @@ export default function SignInScreen() {
             </PressableScale>
           )}
 
+          {/* Apple / Google can create a new account from here, so name the
+              documents that apply (the gate then asks for explicit agreement). */}
+          {showAnyOAuth && <SignInLegalNotice />}
+
           {/* Divider */}
           {showAnyOAuth && (
             <View style={s.divider}>
@@ -884,3 +888,31 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     ...TYPE_SCALE.footnote, color: theme.muted,
   },
 });
+
+/**
+ * Apple / Google on this screen can create a brand-new account without the
+ * sign-up checkbox, so name the documents that apply here; the legal gate then
+ * asks a new account for explicit agreement before the app opens.
+ */
+function SignInLegalNotice() {
+  const { theme } = useAppTheme();
+  const router = useRouter();
+  const link = (label: string, route: string) => (
+    <Text
+      style={{ fontFamily: FONT.semibold, textDecorationLine: 'underline', color: theme.text }}
+      onPress={() => router.push(route as never)}
+      accessibilityRole="link"
+      suppressHighlighting
+    >
+      {label}
+    </Text>
+  );
+  return (
+    <Text
+      style={{ fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center', color: theme.muted, marginTop: 4, marginBottom: 4 }}
+      testID="sign-in-legal-notice"
+    >
+      By continuing, you agree to the {link('Terms of Service', '/terms')} and {link('Community Guidelines', '/community-guidelines')} and acknowledge the {link('Privacy Policy', '/privacy')}.
+    </Text>
+  );
+}

@@ -61,6 +61,22 @@ function BootTimedOut() {
   );
 }
 
+/**
+ * On web, clerk-js is a separate script. When it can't be fetched (offline,
+ * ad-blocker, CDN hiccup) Clerk rejects a promise asynchronously
+ * ("failed_to_load_clerk_js") — not during render, so no error boundary sees
+ * it and the boot screen would sit there until the timeout (and dev builds
+ * paint a red overlay). Recognise that rejection.
+ */
+export function isClerkScriptLoadFailure(reason: unknown): boolean {
+  const r = reason as { code?: unknown; message?: unknown } | null | undefined;
+  const code = typeof r?.code === 'string' ? r.code : '';
+  const message = typeof r?.message === 'string' ? r.message : typeof reason === 'string' ? reason : '';
+  return code === 'failed_to_load_clerk_js'
+    || /failed[_ ]to[_ ]load[_ ]clerk/i.test(message)
+    || /Clerk: Failed to load Clerk/i.test(message);
+}
+
 /** Wraps `<ClerkLoading>`'s children (normally just `<BootScreen />`) with a timeout. */
 export default function ClerkBootGate() {
   const [timedOut, setTimedOut] = useState(false);
@@ -68,6 +84,27 @@ export default function ClerkBootGate() {
   useEffect(() => {
     const timer = setTimeout(() => setTimedOut(true), BOOT_TIMEOUT_MS);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Web: show "Couldn't connect — Retry" as soon as clerk-js fails to load.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (!isClerkScriptLoadFailure(event.reason)) return;
+      event.preventDefault();
+      setTimedOut(true);
+    };
+    const onError = (event: ErrorEvent) => {
+      if (!isClerkScriptLoadFailure(event.error ?? event.message)) return;
+      event.preventDefault();
+      setTimedOut(true);
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    window.addEventListener('error', onError);
+    return () => {
+      window.removeEventListener('unhandledrejection', onRejection);
+      window.removeEventListener('error', onError);
+    };
   }, []);
 
   return timedOut ? <BootTimedOut /> : <BootScreen />;

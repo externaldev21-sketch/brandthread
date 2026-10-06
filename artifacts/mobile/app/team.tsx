@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { parseTeamInviteTarget } from '@/lib/teamInviteTarget';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -140,10 +141,11 @@ export default function TeamScreen() {
   const handleInvite = async () => {
     const value = inviteEmail.trim();
     if (!value) return;
+    const target = parseTeamInviteTarget(value);
+    if (!target.ok) { Alert.alert('Check the invite', target.error); return; }
     setInviting(true);
     try {
-      const isEmail = value.includes('@') && value.includes('.');
-      const payload = isEmail ? { email: value, role: inviteRole } : { username: value.replace(/^@/, ''), role: inviteRole };
+      const payload = { ...target.payload, role: inviteRole };
       const res = await api.team.invite(payload);
       setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email: res.member?.email ?? value });
       await load();

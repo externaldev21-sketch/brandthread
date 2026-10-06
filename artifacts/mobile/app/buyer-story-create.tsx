@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
-  Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -473,6 +473,9 @@ function VideoPreview({ uri }: { uri: string }) {
 }
 
 export default function StoryComposer() {
+  // Live window size (not read once at import) so iPad rotation and Split
+  // View resize the canvas and sticker positions.
+  const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // On web the safe-area inset can under-report how much the browser chrome
   // (or a notch-simulating preview frame) actually occupies, which is what
@@ -1676,14 +1679,6 @@ export default function StoryComposer() {
           <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
             <Feather name="edit-2" size={20} color={drawOpen ? theme.accent : ON_DARK} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.camIconBtn}
-            onPress={() => Alert.alert('More tools', 'Additional tools are coming soon.')}
-            accessibilityLabel="More tools"
-            accessibilityRole="button"
-          >
-            <Feather name="more-horizontal" size={20} color={ON_DARK} />
-          </TouchableOpacity>
         </View>
       </View>
       {isPosting && <PostingToast percent={postingPercent} topInset={topInset} />}
@@ -2491,8 +2486,8 @@ const styles = StyleSheet.create({
   alsoShareSendText: { color: '#000', fontFamily: FONT.semibold, fontSize: FS.sm },
   alsoShareHint: { color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: SP.xl },
 
-  overlayModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  overlayModalCard: { width: W - SP.xl * 2, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
+  overlayModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
+  overlayModalCard: { width: '100%', maxWidth: 480, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
   shopInput: { color: ON_DARK, fontSize: FS.md, borderBottomWidth: 1, borderBottomColor: BORDER, paddingVertical: SP.sm },
   overlayModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: SP.sm, marginTop: SP.md },
   modalCancelBtn: { paddingHorizontal: SP.md, paddingVertical: SP.sm },

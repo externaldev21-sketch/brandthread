@@ -13,6 +13,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { appVersion } from '@/lib/appVersion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -188,7 +189,7 @@ export default function SellerSettingsScreen() {
           </SettingsGroup>
         ))}
 
-        <Text style={s.version}>Brandthread v1.0.0</Text>
+        <Text style={s.version}>Brandthread v{appVersion()}</Text>
       </ScrollView>
 
       <PlanUpsellModal

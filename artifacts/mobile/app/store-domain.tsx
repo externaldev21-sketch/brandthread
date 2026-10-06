@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { normalizeCustomDomain } from '@/lib/customDomain';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -95,18 +96,28 @@ export default function StoreDomainScreen() {
   };
 
   const handleConnectDomain = async () => {
-    if (!newDomain.trim()) return;
+    if (connectingDomain) return;
+    const parsed = normalizeCustomDomain(newDomain);
+    if (!parsed.ok) { setDomainError(parsed.error); return; }
+    setDomainError(null);
+    setConnectingDomain(true);
     try {
-      const result = await (api as any).store.addDomain(newDomain.trim());
+      const result = await (api as any).store.addDomain(parsed.domain);
       await load();
       setNewDomain('');
       setAdding(false);
-      const instructions = result?.verificationInstructions ?? `Add a TXT record _brandthread-verify.${newDomain} pointing to your verification token.`;
+      const instructions = result?.verificationInstructions ?? `Add a TXT record _brandthread-verify.${parsed.domain} pointing to your verification token.`;
       Alert.alert('Domain Added', instructions);
     } catch {
       Alert.alert('Error', 'Failed to connect domain. Check your internet connection and try again.');
+    } finally {
+      setConnectingDomain(false);
     }
   };
+  // Busy + inline error for "Add Domain" (double taps used to submit twice,
+  // and "my brand" or a pasted URL was sent as-is).
+  const [connectingDomain, setConnectingDomain] = useState(false);
+  const [domainError, setDomainError] = useState<string | null>(null);
 
   const handleVerifyDomain = async (domainId: string) => {
     setVerifying(domainId);
@@ -257,19 +268,21 @@ export default function StoreDomainScreen() {
             <TextInput
               style={dm.input}
               value={newDomain}
-              onChangeText={setNewDomain}
+              onChangeText={(v) => { setNewDomain(v); setDomainError(null); }}
               placeholder="yourbrand.com"
               placeholderTextColor={SUBTLE}
               autoCapitalize="none"
+              autoCorrect={false}
               keyboardType="url"
               autoFocus
             />
+            {domainError ? <Text style={[dm.noteText, { color: theme.error }]} accessibilityLiveRegion="polite">{domainError}</Text> : null}
             <Text style={dm.noteText}>
               You'll receive DNS instructions after adding. No domain purchase required — just configure your existing domain registrar.
             </Text>
             <View style={dm.actionRow}>
               <SecondaryButton label="Cancel" small accent={MUTED} onPress={() => { setAdding(false); setNewDomain(''); }} style={{ flex: 1 }} />
-              <PrimaryButton label="Add Domain" small onPress={handleConnectDomain} disabled={!newDomain.trim()} style={{ flex: 1 }} />
+              <PrimaryButton label="Add Domain" small onPress={handleConnectDomain} disabled={!newDomain.trim() || connectingDomain} loading={connectingDomain} style={{ flex: 1 }} />
             </View>
           </BrandthreadCard>
         )}

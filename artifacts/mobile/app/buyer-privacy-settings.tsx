@@ -237,14 +237,6 @@ export default function BuyerPrivacySettings() {
             chevron
             onPress={() => router.push('/buyer-muted' as never)}
           />
-          <View style={styles.divider} />
-          <ListRow
-            icon="user-x"
-            title="Restricted accounts"
-            value="Manage"
-            chevron
-            onPress={() => router.push('/buyer-restricted' as never)}
-          />
         </Card>
       </ScrollView>
 

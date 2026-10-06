@@ -1,4 +1,5 @@
 import React from 'react';
+import { Redirect } from 'expo-router';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -13,7 +14,17 @@ const FEATURES = [
   { icon: 'upload-cloud' as const, title: 'One-tap publishing', desc: 'Ship updates to the App Store & Google Play instantly' },
 ];
 
+/**
+ * Not linked from anywhere in the app and not finished ("Start building" has no flow behind it, and it promises App Store publishing that does not exist), so release
+ * builds send a deep link here to the home screen. Development builds still
+ * open it for work on the feature.
+ */
 export default function MobileAppBuilderScreen() {
+  if (!__DEV__) return <Redirect href={'/' as never} />;
+  return <MobileAppBuilderScreenContent />;
+}
+
+function MobileAppBuilderScreenContent() {
   const colors = useColors();
   const primary = colors.primary;
 

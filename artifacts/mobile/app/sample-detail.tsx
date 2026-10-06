@@ -364,11 +364,15 @@ const tl = StyleSheet.create({
 
 export default function SampleDetailScreen() {
   const colors = useColors();
-  const { id, paymentPrompt, paymentReturn } = useLocalSearchParams<{ id: string; paymentPrompt?: string; paymentReturn?: string }>();
+  const { id, paymentPrompt, paymentReturn, action } = useLocalSearchParams<{ id: string; paymentPrompt?: string; paymentReturn?: string; action?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const reviewSectionRef = useRef<ScrollView>(null);
   const paymentPromptConsumed = useRef(false);
+  // "Approve" / "Revision" on the Manufacturer hub card open this screen with
+  // ?action=approve|revision: open the review form with that decision picked.
+  const reviewActionConsumed = useRef(false);
+  const reviewSectionY = useRef<number | null>(null);
   const paymentReturnConsumed = useRef(false);
 
   const [sample, setSample] = useState<Sample | null>(null);
@@ -496,6 +500,19 @@ export default function SampleDetailScreen() {
       void handlePaySecurely();
     }
   }, [paymentPrompt, sample?.id, sample?.status, paying, handlePaySecurely]);
+
+  useEffect(() => {
+    if (reviewActionConsumed.current || !sample) return;
+    if (action !== 'approve' && action !== 'revision') return;
+    reviewActionConsumed.current = true;
+    const reviewable = (sample.status === 'review_needed' || sample.status === 'delivered') && !sample.review;
+    if (!reviewable) return;
+    setReviewDecision(action === 'approve' ? 'approved' : 'revision_requested');
+    setReviewMode(true);
+    setTimeout(() => {
+      if (reviewSectionY.current != null) reviewSectionRef.current?.scrollTo({ y: reviewSectionY.current, animated: true });
+    }, 250);
+  }, [action, sample]);
 
   // A Checkout redirect can recreate the app (cold return) or update route
   // params in place (warm return). Confirmation is idempotent server-side;
@@ -835,6 +852,7 @@ export default function SampleDetailScreen() {
           {/* ── REVIEW SECTION ───────────────────────────────────── */}
           {(canReview || sample.review) && (
             <>
+              <View onLayout={(e) => { reviewSectionY.current = e.nativeEvent.layout.y; }} />
               <SectionHeader title="Review" style={s.sectionHeader} />
               {sample.review ? (
                 <BrandthreadCard style={s.section} elevated>

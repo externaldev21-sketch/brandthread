@@ -3,6 +3,7 @@
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
 import React, { useMemo, useState } from 'react';
+import { appVersion } from '@/lib/appVersion';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -111,7 +112,7 @@ export default function BuyerSettingsScreen() {
           </View>
         ))}
 
-        <Text style={s.version}>Brandthread v1.0.0</Text>
+        <Text style={s.version}>Brandthread v{appVersion()}</Text>
       </ScrollView>
 
       <ConfirmSheet

@@ -30,3 +30,14 @@ describe('subscription payment recovery', () => {
     expect(getBillingRecoveryTarget('none', null)).toBe('subscription');
   });
 });
+import { platformSubscriptionSettingsUrl } from './subscriptionRecovery';
+
+describe('platform subscription settings fallback', () => {
+  it('opens the store subscription page on native', () => {
+    expect(platformSubscriptionSettingsUrl('ios')).toBe('https://apps.apple.com/account/subscriptions');
+    expect(platformSubscriptionSettingsUrl('android')).toBe('https://play.google.com/store/account/subscriptions');
+  });
+  it('has nothing on web', () => {
+    expect(platformSubscriptionSettingsUrl('web')).toBeNull();
+  });
+});

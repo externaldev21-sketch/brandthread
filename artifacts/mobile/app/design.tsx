@@ -23,6 +23,7 @@
  */
 
 import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { relativeTime } from '@/lib/activity';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity,
@@ -92,13 +93,9 @@ let _uid = 0;
 function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
 
 function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
+  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
+  return relativeTime(iso);
 }
 
 // "1847 × 4000px" — uses narrow multiplication sign (U+00D7) matching the reference

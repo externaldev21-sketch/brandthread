@@ -88,7 +88,7 @@ export default function StoreVersionsScreen() {
   return (
     <View style={vs.root}>
       <ScreenHeader
-        title="Version History"
+        title="Version history"
         actions={[{ icon: 'plus', onPress: () => setCreating(true), accessibilityLabel: 'Save version' }]}
       />
 

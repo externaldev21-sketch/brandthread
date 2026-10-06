@@ -105,7 +105,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Help and support', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Report a problem', description: 'Tell us about a bug or an issue', aliases: ['bug', 'issue', 'feedback'], icon: 'alert-triangle', route: '/buyer-problem-report', audience: 'buyer' },
       { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared' },
-      { label: 'About Brandthread', description: 'App version, licenses, and more', aliases: ['about', 'version', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
+      { label: 'About Brandthread', description: 'App version, terms, and policies', aliases: ['about', 'version', 'terms'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
     ],
   },
   {
@@ -217,7 +217,6 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Privacy & safety',
     items: [
-      { label: 'Customer privacy', description: 'How customer data is collected and used', aliases: ['gdpr', 'ccpa', 'customer data'], icon: 'lock', route: '/customer-privacy', audience: 'seller' },
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },

@@ -5,6 +5,7 @@
  * Never shows mock/invented brands — shows real empty state when there are no drops.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { plural } from '@/lib/plural';
 import {
   View, Text, StyleSheet, ScrollView,
   FlatList,
@@ -221,7 +222,7 @@ export default function FollowingScreen() {
             tagColor: sellerColor,
             desc: d.type === 'pre-order'
               ? `Pre-order — limited run. Ships ${d.estimatedShipDate ? new Date(d.estimatedShipDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'soon'}.`
-              : `${d.orderCount ?? 0} orders placed so far.`,
+              : d.orderCount ? `${plural(d.orderCount, 'order')} placed so far.` : 'No orders yet.',
           };
         });
         setDrops(mapped);

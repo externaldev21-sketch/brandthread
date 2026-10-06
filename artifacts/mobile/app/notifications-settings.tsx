@@ -5,7 +5,8 @@
  * so nothing else that reads it breaks).
  */
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -63,6 +64,11 @@ export default function NotificationsSettingsScreen() {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [categories, setCategories] = useState<Record<string, boolean>>({});
+  // Until the saved preferences load, the switches would show defaults
+  // ("all on") that may not be the account's real choices — so show a
+  // loading / retry state instead.
+  const [prefsState, setPrefsState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
 
   const rows = role === 'buyer' ? BUYER_ROWS : SELLER_ROWS;
 
@@ -72,15 +78,30 @@ export default function NotificationsSettingsScreen() {
   // `digest` isn't read here: every account gets real-time pushes and
   // there's no UI to change it, so there's nothing to hydrate into state.
   useEffect(() => {
+    setPrefsState('loading');
     api.notificationPrefs.get()
       .then(data => {
+        setPrefsState('ready');
         setCategories(data.categories);
         setRole(data.role);
         setPushEnabled(data.pushEnabled ?? true);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
       })
-      .catch(() => {/* fallback to push on, quiet hours off */});
-  }, []);
+      .catch(() => setPrefsState('error'));
+  }, [reloadKey]);
+
+  if (prefsState !== 'ready') {
+    return (
+      <View style={[s.container, { backgroundColor: 'transparent' }]}>
+        <ScreenHeader title="Notifications" onBack={() => goBackOr(router, '/(tabs)/more')} />
+        {prefsState === 'error' ? (
+          <ErrorState message="Couldn't load your notification settings." onRetry={() => setReloadKey(k => k + 1)} />
+        ) : (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.foreground} /></View>
+        )}
+      </View>
+    );
+  }
 
   async function handleMasterToggle(value: boolean) {
     hapticToggle();
@@ -90,6 +111,7 @@ export default function NotificationsSettingsScreen() {
       await api.notificationPrefs.update({ pushEnabled: value });
     } catch {
       setPushEnabled(prior);
+      Alert.alert('Couldn’t save that change', 'Check your connection and try again.');
     }
   }
 
@@ -103,6 +125,7 @@ export default function NotificationsSettingsScreen() {
       await api.notificationPrefs.update({ quietHours: preset ? { start: preset.start, end: preset.end } : null });
     } catch {
       setQuietHours(prior);
+      Alert.alert('Couldn’t save quiet hours', 'Check your connection and try again.');
     }
   }
 
@@ -115,6 +138,7 @@ export default function NotificationsSettingsScreen() {
       setCategories(result.categories);
     } catch {
       setCategories(prior);
+      Alert.alert('Couldn’t save that change', 'Check your connection and try again.');
     }
   }
 

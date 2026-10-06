@@ -4,6 +4,7 @@
  * bottom gradient, then hands off into the existing /seller-live broadcast flow.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
@@ -342,7 +343,7 @@ function SellerGoLiveNativeScreen() {
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={s.pickerRowName} numberOfLines={1}>{p.name}</Text>
-                        <Text style={s.pickerRowPrice}>${((p.priceCents ?? 0) / 100).toFixed(2)}</Text>
+                        <Text style={s.pickerRowPrice}>{p.priceCents != null ? formatCents(p.priceCents) : '—'}</Text>
                       </View>
                       <View style={[s.checkbox, tagged && s.checkboxActive]}>
                         {tagged && <Feather name="check" size={13} color="#000" />}

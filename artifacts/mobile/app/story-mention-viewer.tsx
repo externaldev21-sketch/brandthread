@@ -19,7 +19,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Animated, Dimensions, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View,
+  Alert, Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
@@ -57,7 +57,6 @@ import {
 import { advance, retreat, nextUser, prevUser, classifyGesture, type NavResult } from '@/lib/storyViewerNav';
 import type { MessageAttachment, StoryMedia, StoryMentionItem, StoryOverlay } from '@/services/socialTypes';
 
-const { height: H } = Dimensions.get('window');
 
 /** Every slide runs this long; an unavailable story only flashes its notice. */
 const SLIDE_MS = 5000;
@@ -144,6 +143,9 @@ function SlideMedia({ slide, overlays, original, paused }: {
 }
 
 export default function StoryMentionViewerScreen() {
+  // Live window height (not read once at import) so iPad rotation and Split
+  // View keep the swipe-to-dismiss distances right.
+  const { height: H } = useWindowDimensions();
   const router = useRouter();
   const api = useApi();
   const insets = useSafeAreaInsets();
@@ -556,7 +558,7 @@ const styles = StyleSheet.create({
   closeWrap: { position: 'absolute', right: SP.sm, zIndex: 10 },
   textSlide: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   textSlideText: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center', paddingHorizontal: SP.xl },
-  tapRow: { position: 'absolute', top: 0, left: 0, right: 0, height: H * 0.7, flexDirection: 'row' },
+  tapRow: { position: 'absolute', top: 0, left: 0, right: 0, height: '70%', flexDirection: 'row' },
   tapLeft: { width: '30%', height: '100%' },
   tapRight: { width: '70%', height: '100%' },
   topScrim: { position: 'absolute', left: 0, right: 0, top: 0, height: 140, zIndex: 1 },

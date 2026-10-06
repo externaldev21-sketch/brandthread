@@ -143,11 +143,15 @@ function HLFormModal({
 export default function BuyerHighlightsManager() {
   const colors = useColors();
   const { theme } = useAppTheme();
+  // Several theme tokens resolve to the same hex (e.g. accent and accentLight
+  // are both white in Monochrome), and the list repeats two of them. Identical
+  // swatches looked like duplicates and gave React duplicate keys, so keep
+  // each colour once.
   const COVER_COLORS = [
     theme.accent, theme.accentLight,
     '#F472B6', // theme-exempt: user-selectable cover color swatch, not UI chrome
     theme.warning, theme.success, colors.destructive, theme.accentLight, theme.accent,
-  ];
+  ].filter((c, i, all) => all.findIndex((o) => o.toUpperCase() === c.toUpperCase()) === i);
   const s = makeStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();

@@ -72,7 +72,7 @@ export default function BuyerDownloadData() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Download your data" />
+      <ScreenHeader title="Download my data" />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (requested ? 40 : 120) }}>
         {requested ? (

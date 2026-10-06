@@ -9,6 +9,9 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useRouter } from 'expo-router';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { CachedImage } from '@/components/CachedImage';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -21,6 +24,7 @@ type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 export default function ProductReviewsScreen() {
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const api = useApi();
+  const router = useRouter();
   const { theme } = useAppTheme();
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [avgRating, setAvgRating] = useState(0);
@@ -54,6 +58,22 @@ export default function ProductReviewsScreen() {
     (!starFilter || Math.round(r.rating) === starFilter) &&
     (!sizeFilter || r.sizeBought === sizeFilter),
   );
+
+  // Opened without a product (malformed deep link): say so instead of a
+  // spinner that never stops.
+  if (!productId) {
+    return (
+      <View style={s.root}>
+        <ScreenHeader title="Reviews" />
+        <EmptyState
+          icon="alert-circle"
+          title="Product not found"
+          description="This link doesn't point to a product."
+          action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={s.root}>

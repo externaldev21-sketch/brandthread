@@ -4,6 +4,7 @@
  * time). Same layout family as rfq-compare.tsx, but for directory data.
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { plural } from '@/lib/plural';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -28,7 +29,7 @@ type Row = { label: string; format: (m: Manufacturer) => string; numeric?: (m: M
 const ROWS: Row[] = [
   { label: 'MOQ', format: (m) => m.moq > 0 ? `${m.moq} units` : 'Contact', numeric: (m) => m.moq || Infinity, lowerIsBetter: true },
   { label: 'Unit price', format: (m) => m.unitPriceMinCents > 0 ? `${formatCents(m.unitPriceMinCents)}–${formatCents(m.unitPriceMaxCents)}` : '—', numeric: (m) => m.unitPriceMinCents || Infinity, lowerIsBetter: true },
-  { label: 'Lead time', format: (m) => m.leadTimeDays > 0 ? `${m.leadTimeDays} days` : '—', numeric: (m) => m.leadTimeDays || Infinity, lowerIsBetter: true },
+  { label: 'Lead time', format: (m) => m.leadTimeDays > 0 ? plural(m.leadTimeDays, 'day') : '—', numeric: (m) => m.leadTimeDays || Infinity, lowerIsBetter: true },
   { label: 'Rating', format: (m) => m.reviewCount > 0 ? `★ ${m.rating.toFixed(1)} (${m.reviewCount})` : 'Not rated', numeric: (m) => m.reviewCount > 0 ? m.rating : 0, lowerIsBetter: false },
   { label: 'Response time', format: (m) => m.responseTimeHours > 0 ? `~${m.responseTimeHours}h` : '—', numeric: (m) => m.responseTimeHours || Infinity, lowerIsBetter: true },
   { label: 'Years active', format: (m) => m.yearsInBusiness > 0 ? `${m.yearsInBusiness} yrs` : '—', numeric: (m) => m.yearsInBusiness, lowerIsBetter: false },

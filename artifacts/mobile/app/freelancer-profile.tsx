@@ -49,7 +49,8 @@ export default function FreelancerProfileScreen() {
   const isOwn = !!freelancer && !!me && freelancer.id === me.id;
 
   const load = useCallback(async () => {
-    if (!id) return;
+    // A link without an id can never load; fall through to "not found".
+    if (!id) { setLoading(false); return; }
     try {
       setError(null);
       const [{ freelancer: f }, meRes] = await Promise.all([

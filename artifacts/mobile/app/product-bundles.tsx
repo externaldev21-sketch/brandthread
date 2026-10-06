@@ -24,6 +24,7 @@ import {
 } from '@/lib/theme';
 import { BrandthreadHeader, EmptyState, IconButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
 
@@ -63,12 +64,16 @@ export default function ProductBundlesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api    = useApi();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
 
   const [bundles, setBundles]     = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (silent = false) => {
+    // Signed-out web preview: bundles are a protected API — show the empty
+    // state instead of calling it (and logging a 401).
+    if (!authLoaded || !isSignedIn) { setLoading(false); setRefreshing(false); return; }
     if (!silent) setLoading(true);
     try {
       const data = await (api as any).bundles.list();
@@ -79,7 +84,7 @@ export default function ProductBundlesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [api]);
+  }, [api, authLoaded, isSignedIn]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

@@ -73,7 +73,7 @@ export const ProductCard = React.memo(function ProductCard({
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
   const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
-  const stockLabel = stock === 0 ? 'Out of stock' : stock <= threshold ? `${stock} in stock` : `${stock} in stock`;
+  const stockLabel = stock === 0 ? 'Out of stock' : stock <= threshold ? `Only ${stock} left` : `${stock} in stock`;
 
   const price = product.pricing.priceCents;
   const compare = product.pricing.compareAtPriceCents;

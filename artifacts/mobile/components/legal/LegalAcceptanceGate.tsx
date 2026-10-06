@@ -19,7 +19,7 @@ import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import { LegalConsent } from '@/components/legal/LegalConsent';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_VERSION } from '@/content/legal';
-import { apiErrorCode, apiErrorMessage } from '@/lib/safety';
+import { apiErrorMessage } from '@/lib/safety';
 import { clearPendingConsent, hasAcceptedCurrentTerms, readPendingConsent } from '@/lib/legalConsent';
 import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
@@ -58,9 +58,11 @@ export default function LegalAcceptanceGate() {
       setPreviouslyAgreed(!!profile.termsVersion);
       setNeedsAgreement(true);
       return 'done';
-    } catch (err) {
-      // The local account may not exist yet while onboarding is syncing.
-      return apiErrorCode(err) === 'NOT_FOUND' || !apiErrorCode(err) ? 'retry' : 'done';
+    } catch {
+      // The local account may not exist yet while onboarding is syncing, or
+      // the server had a hiccup. Never treat an error as "agreed": retry, and
+      // if it still can't be confirmed, ask (see the run loop below).
+      return 'retry';
     }
   }, [api]);
 
@@ -76,7 +78,13 @@ export default function LegalAcceptanceGate() {
       if (cancelled || outcome === 'done') return;
       const delay = RETRY_DELAYS_MS[attemptRef.current];
       attemptRef.current += 1;
-      if (delay) timer = setTimeout(run, delay);
+      if (delay) {
+        timer = setTimeout(run, delay);
+      } else {
+        // Out of retries without confirming the agreement: keep the app
+        // gated. Agreeing saves it (acceptLegal) and retries the server.
+        setNeedsAgreement(true);
+      }
     };
     run();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
