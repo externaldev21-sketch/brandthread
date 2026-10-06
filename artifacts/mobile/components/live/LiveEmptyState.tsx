@@ -46,7 +46,7 @@ export function LiveEmptyState({
             : upcoming.length > 0
               // Only promise a reminder when a "Remind me" row exists below.
               ? 'Live shopping drops in and out through the day. Set a reminder and we’ll tell you when it starts.'
-              : 'Live shopping drops in and out through the day. Check back soon.'}
+              : 'Live shopping drops in and out through the day.'}
         </Text>
         {!error && onBrowse && (
           <Pressable onPress={onBrowse} style={[styles.browse, { backgroundColor: theme.accent }]} accessibilityRole="button" testID="live-empty-browse">
