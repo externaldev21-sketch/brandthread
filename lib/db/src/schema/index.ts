@@ -8,6 +8,7 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './sellerAnalytics';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
@@ -198,6 +199,9 @@ export const storeVisits = pgTable('store_visits', {
   // mobile app's lib/profileNavigation.ts for how each is attached.
   source:        text('source').notNull(),
   viewerUserId:  text('viewer_user_id'),
+  // 'ios' | 'android' | 'web' (migration 121) — sent by the app, else sniffed
+  // from the User-Agent. Null for rows recorded before it existed.
+  device:        text('device'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   sellerIdIndex:        index('store_visits_seller_id_idx').on(table.sellerId),

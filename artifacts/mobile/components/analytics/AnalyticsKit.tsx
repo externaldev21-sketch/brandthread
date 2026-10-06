@@ -345,8 +345,9 @@ export function AnalyticsBarChart({
         })}
         {points.length > 0 && (() => {
           const indices = points.length <= 7 ? points.map((_, i) => i) : [0, Math.floor((points.length - 1) / 2), points.length - 1];
+          // First/last labels anchor inward so they never run past the chart edge.
           return indices.map(i => (
-            <SvgText key={`lbl-${i}`} x={barX(i) + barW / 2} y={height - 2} textAnchor="middle" fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.subtle}>
+            <SvgText key={`lbl-${i}`} x={barX(i) + barW / 2} y={height - 2} textAnchor={points.length > 7 && i === 0 ? 'start' : points.length > 7 && i === points.length - 1 ? 'end' : 'middle'} fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.subtle}>
               {points[i].label}
             </SvgText>
           ));
