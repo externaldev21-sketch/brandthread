@@ -6,6 +6,7 @@ import {
   isOAuthFlowComplete,
   makeBrandthreadRedirectUri,
   mapOAuthError,
+  oauthProviderVisibility,
 } from "./oauthFlow";
 
 describe("Apple OAuth flow contracts", () => {
@@ -35,5 +36,19 @@ describe("Apple OAuth flow contracts", () => {
       .toContain("existing account");
     expect(mapOAuthError("Apple", { code: "redirect_uri_mismatch" }))
       .toContain("Try again");
+  });
+});
+describe("oauthProviderVisibility (App Store 4.8)", () => {
+  it("offers Apple next to Google on iOS", () => {
+    expect(oauthProviderVisibility("ios", { apple: true, google: true })).toEqual({ apple: true, google: true });
+  });
+
+  it("never leaves Google as the only social login on iOS", () => {
+    expect(oauthProviderVisibility("ios", { apple: false, google: true })).toEqual({ apple: false, google: false });
+  });
+
+  it("keeps Android and web unchanged (Apple is iOS-only in the app)", () => {
+    expect(oauthProviderVisibility("android", { apple: true, google: true })).toEqual({ apple: false, google: true });
+    expect(oauthProviderVisibility("web", { apple: false, google: true })).toEqual({ apple: false, google: true });
   });
 });

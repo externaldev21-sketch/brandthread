@@ -2807,6 +2807,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        */
       verify: (id: string) =>
         post<any>(`/api/boosts/${encodeURIComponent(id)}/pay/verify`, {}),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and grants the boost. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/boost/${encodeURIComponent(id)}/verify`, { transactionId }),
       update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
       summary: () =>
@@ -2881,6 +2884,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/ad-campaigns/${encodeURIComponent(id)}/pay/verify`,
           {},
         ),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and grants the campaign. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/campaign/${encodeURIComponent(id)}/verify`, { transactionId }),
     },
     /**
      * Meta (Facebook & Instagram) Ads — OAuth connection, campaign builder,
