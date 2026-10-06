@@ -13,6 +13,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -153,18 +154,9 @@ export default function LocationsScreen() {
             {/* Tabs */}
             <View style={s.toolbarRow}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-                <View style={[s.tabsRow, { backgroundColor: colors.secondary }]}>
+                <View style={s.tabsRow}>
                   {TABS.map((tab) => (
-                    <TouchableOpacity
-                      key={tab}
-                      onPress={() => { Haptics.selectionAsync(); setActiveTab(tab); }}
-                      activeOpacity={0.7}
-                      style={[s.tabChip, activeTab === tab && { backgroundColor: colors.card }]}
-                    >
-                      <Text style={[s.tabText, { color: activeTab === tab ? colors.foreground : colors.mutedForeground }, activeTab === tab && s.tabTextActive]}>
-                        {tab}
-                      </Text>
-                    </TouchableOpacity>
+                    <Chip key={tab} label={tab} selected={activeTab === tab} onPress={() => setActiveTab(tab)} />
                   ))}
                 </View>
               </ScrollView>
@@ -267,7 +259,7 @@ export default function LocationsScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
+  section: { paddingHorizontal: SP.md, paddingVertical: 18 },
   sectionTitle: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 4 },
   sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
   rowStart: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -275,10 +267,7 @@ const s = StyleSheet.create({
   addBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 9, alignSelf: 'flex-start' },
   addBtnText: { fontSize: 13, fontFamily: FONT.semibold },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  tabsRow: { flexDirection: 'row', borderRadius: RADIUS.sm, padding: 3, gap: 2 },
-  tabChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
-  tabText: { fontSize: 12, fontFamily: FONT.medium },
-  tabTextActive: { fontFamily: FONT.semibold },
+  tabsRow: { flexDirection: 'row', gap: SP.sm },
   emptyCard: { borderRadius: RADIUS.lg, borderWidth: 1, padding: 40, alignItems: 'center' },
   emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 20 },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },

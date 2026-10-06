@@ -112,5 +112,6 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
     fontVariant: ['tabular-nums'],
     maxWidth: 100,
+    flexShrink: 0,
   },
 });

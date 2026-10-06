@@ -248,7 +248,7 @@ export default function DesignBgRemovalScreen() {
         >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Remove Background</Text>
+        <Text style={s.headerTitle}>Remove background</Text>
         <View style={{ width: ICON.md }} />
       </View>
 

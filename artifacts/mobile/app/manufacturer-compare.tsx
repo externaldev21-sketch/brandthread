@@ -81,7 +81,7 @@ export default function ManufacturerCompareScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Compare Suppliers" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Compare manufacturers" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
@@ -104,7 +104,7 @@ export default function ManufacturerCompareScreen() {
           </View>
 
           {compared.length < MIN_COMPARE ? (
-            <EmptyState icon="git-branch" title={`Select at least ${MIN_COMPARE} manufacturers`} description="Choose which saved suppliers to compare side by side." />
+            <EmptyState icon="git-branch" title={`Select at least ${MIN_COMPARE} manufacturers`} description="Choose which saved manufacturers to compare side by side." />
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
               <View style={s.labelCol}>
@@ -152,7 +152,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   pickerWrap: { paddingTop: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm },
   pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: SP.md, marginBottom: SP.xs },
   pickerRow: { paddingHorizontal: SP.md, gap: SP.sm },
-  pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
+  pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   pickerChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   pickerChipTextActive: { color: theme.accentLight, fontFamily: FONT.semibold },

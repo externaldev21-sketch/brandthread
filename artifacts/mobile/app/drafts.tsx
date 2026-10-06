@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import {
-  BG, BORDER, CARD, FG, MUTED, ORANGE, RED, SUCCESS,
+  BG, BORDER, CARD, FG, MUTED,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -61,7 +61,7 @@ function DraftRow({
     <View style={styles.row}>
       <View style={styles.rowHeading}>
         <View style={styles.draftIcon}>
-          <Feather name="edit-3" size={ICON.sm} color={ORANGE} />
+          <Feather name="edit-3" size={ICON.sm} color={FG} />
         </View>
         <View style={styles.rowTitleWrap}>
           <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
@@ -92,7 +92,7 @@ function DraftRow({
           accessibilityRole="button"
           accessibilityLabel={`Discard ${name}`}
         >
-          <Feather name="trash-2" size={13} color={RED} />
+          <Feather name="trash-2" size={13} color={FG} />
           <Text style={styles.discardLabel}>Discard</Text>
         </TouchableOpacity>
       </View>
@@ -331,7 +331,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     width: 38,
     height: 38,
     borderRadius: RADIUS.sm,
-    backgroundColor: ORANGE + '18',
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SP.sm,
@@ -354,7 +356,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   stepLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: ORANGE,
+    color: MUTED,
     marginLeft: SP.sm,
   },
   progressTrack: {
@@ -370,7 +372,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   progressFill: {
     height: '100%',
     borderRadius: RADIUS.pill,
-    backgroundColor: SUCCESS,
+    backgroundColor: FG,
   },
   rowActions: {
     flexDirection: 'row',
@@ -401,13 +403,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     gap: 6,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: RED + '66',
-    backgroundColor: RED + '12',
+    borderColor: BORDER,
+    backgroundColor: 'transparent',
   },
   discardLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: RED,
+    color: FG,
   },
   rowSeparator: {
     height: SP.sm,

@@ -3,7 +3,7 @@
  * Route: /design-prompt-edit
  */
 import React, { useState } from 'react';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -19,9 +19,11 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY, COMP,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
-  GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
+  BrandthreadScreen, BrandthreadCard,
+  PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { applyPromptEdit } from '@/services/designService';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui';
 import type { AIGenerationResult } from '@/services/designTypes';
 
 const EXAMPLE_PROMPTS = [
@@ -112,8 +114,8 @@ export default function DesignPromptEditScreen() {
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Edit with prompt" onBack={() => goBackOr(router)} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
@@ -137,8 +139,12 @@ export default function DesignPromptEditScreen() {
             </View>
           )}
           <View style={s.uploadActions}>
-            <PrimaryButton label={imageUri ? 'Change image' : 'Upload image'} onPress={pickImage} icon="upload" style={s.uploadBtn} />
-            <SecondaryButton label="Recent projects" onPress={chooseFromRecent} icon="folder" style={s.uploadBtn} />
+            <View style={s.uploadBtn}>
+              <Button label={imageUri ? 'Change' : 'Upload'} onPress={pickImage} icon="upload" size="small" fullWidth style={s.uploadBtnInner} />
+            </View>
+            <View style={s.uploadBtn}>
+              <Button label="Recent" accessibilityLabel="Recent projects" onPress={chooseFromRecent} icon="folder" variant="secondary" size="small" fullWidth style={s.uploadBtnInner} />
+            </View>
           </View>
         </BrandthreadCard>
 
@@ -180,12 +186,9 @@ export default function DesignPromptEditScreen() {
 
         {/* Generate Button */}
         <View style={s.ph}>
-          <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
-            <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
-              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate edit</Text>
-            </View>
-          </GradientCard>
+          <View style={s.generateBtn}>
+            <Button label="Generate edit" icon="zap" onPress={handleGenerate} fullWidth />
+          </View>
         </View>
 
         {/* Results */}
@@ -276,6 +279,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   uploadSub:              { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   uploadActions:          { flexDirection: 'row', gap: SP.sm, padding: SP.md },
   uploadBtn:              { flex: 1 },
+  uploadBtnInner:         { paddingHorizontal: SP.md },
   preview:                { width: '100%', height: 200 },
   mockPreview:            { alignItems: 'center', justifyContent: 'center', height: 200, gap: SP.sm },
   mockLabel:              { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
@@ -293,8 +297,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   toggleDesc:             { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   divider:                { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
   generateBtn:            { marginTop: SP.md },
-  generateInner:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.md },
-  generateText:           { fontSize: FS.md, fontFamily: FONT.bold, color: theme.onAccent },
   resultsSection:         { marginTop: SP.lg },
   comparison:             { flexDirection: 'row', gap: SP.sm, marginHorizontal: SP.md },
   compPanel:              { flex: 1, height: 200, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: theme.border },

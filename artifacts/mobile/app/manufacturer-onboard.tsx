@@ -42,7 +42,7 @@ export default function ManufacturerOnboardScreen() {
         <StepHeadline size="title1">{token ? 'You were invited to work on Brandthread' : 'List your factory on Brandthread'}</StepHeadline>
         <Reveal index={1}>
         <Text style={s.text}>
-          Manufacturers use the Brandthread Manufacturer Portal to set up their profile and photos, chat with sellers, send priced sample and bulk cards, update production and get paid through Stripe.
+          Manufacturers use the Brandthread Manufacturer Portal to set up their profile and photos, chat with sellers, send priced sample and bulk-order quotes, update production and get paid through Stripe.
           {token ? ' Your invite is private: only the seller who invited you will see your profile.' : ' Your listing goes live in the directory as soon as you finish.'}
         </Text>
         </Reveal>

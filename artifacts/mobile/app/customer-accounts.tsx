@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui';
 
 /**
  * This screen used to be a static Shopify-admin clone: fake sign-in-link
@@ -26,6 +27,8 @@ export default function CustomerAccountsScreen() {
         <Text style={[styles.body, { color: colors.mutedForeground }]}>
           Customer account settings aren{'’'}t editable here.
         </Text>
+        {/* Way forward instead of a dead end: the real customer list. */}
+        <Button label="View customers" onPress={() => router.push('/customers' as never)} style={styles.cta} />
       </View>
     </View>
   );
@@ -36,4 +39,5 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40 },
   title: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
   body: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18 },
+  cta: { marginTop: 16 },
 });

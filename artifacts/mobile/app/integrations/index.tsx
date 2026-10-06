@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, ICON, RADIUS } from '@/lib/theme';
+import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { isStripeFullyConnected, normalizeConnectStatus, type ConnectStatus } from '@/lib/stripeConnectStatus';
 
 interface IntegrationDef {
@@ -140,10 +140,6 @@ export default function IntegrationsScreen() {
       <ScreenHeader title="Integrations" />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={s.section}>
-          <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Connect the tools you already use to run your brand — sales channels, marketing, and shipping in one place.
-          </Text>
-
           {loading ? (
             <View style={s.loadingRow}><ActivityIndicator color={colors.primary} /></View>
           ) : loadError ? (
@@ -205,8 +201,7 @@ export default function IntegrationsScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 16 },
+  section: { paddingHorizontal: SP.md, paddingVertical: 18 },
   loadingRow: { alignItems: 'center', paddingVertical: 30 },
   errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular },

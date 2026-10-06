@@ -27,7 +27,7 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput,
 } from '@/components/BrandthreadUI';
 import { replaceBackground } from '@/services/designService';
@@ -243,8 +243,8 @@ export default function DesignBgReplaceScreen({
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Background Tools" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Background tools" onBack={() => goBackOr(router)} />
       {embedded && (
         <View style={s.modeWrap}>
           <View style={s.modeRow}>

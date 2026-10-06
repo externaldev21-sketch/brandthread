@@ -58,7 +58,7 @@ const ROLE_LABEL: Record<string, string> = {
   manager: 'Manager', staff: 'Staff',
 };
 const ROLE_ACCESS: Record<string, string> = {
-  owner: 'Full Access',
+  owner: 'Full access',
   admin: 'Products, orders, payouts, marketing & team',
   finance: 'Balance, payouts & transactions',
   orders: 'Orders, fulfillment & inventory',
@@ -306,7 +306,7 @@ export default function TeamScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Team Management" subtitle="Staff, permissions & tasks" />
+      <ScreenHeader title="Team management" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -316,7 +316,7 @@ export default function TeamScreen() {
 
       {/* Members */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff Accounts</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff accounts</Text>
         <TouchableOpacity onPress={openInvite} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
           <Feather name="user-plus" size={14} color={colors.primaryForeground} />
           <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Invite</Text>
@@ -384,13 +384,13 @@ export default function TeamScreen() {
       )}
 
       {/* Approval Workflows */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Approval Workflows</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Approval workflows</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
-          { label: 'Product Publishing', value: 'Manager approval' },
+          { label: 'Product publishing', value: 'Manager approval' },
           { label: 'Refunds > $100', value: 'Owner approval' },
-          { label: 'Discount Codes', value: 'Manager approval' },
-          { label: 'Manufacturer Orders', value: 'Owner approval' },
+          { label: 'Discount codes', value: 'Manager approval' },
+          { label: 'Manufacturer orders', value: 'Owner approval' },
         ].map((w, i) => (
           <View key={w.label} style={[styles.workflowRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
             <Text style={[styles.workflowLabel, { color: colors.foreground }]}>{w.label}</Text>
@@ -400,7 +400,7 @@ export default function TeamScreen() {
       </View>
 
       {/* Audit Log */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Audit Log</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Audit log</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {activity.length === 0 ? (
           <View style={{ padding: 16, alignItems: 'center' }}>
@@ -486,7 +486,7 @@ export default function TeamScreen() {
                   style={[styles.addBtn, { backgroundColor: colors.primary, opacity: inviting || !inviteEmail.trim() ? 0.5 : 1 }]}
                 >
                   <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>
-                    {inviting ? 'Creating…' : 'Create Invite'}
+                    {inviting ? 'Creating…' : 'Create invite'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -520,7 +520,7 @@ export default function TeamScreen() {
                   style={[styles.addBtn, { backgroundColor: colors.secondary }]}
                 >
                   <Feather name="copy" size={14} color={colors.foreground} />
-                  <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy Link</Text>
+                  <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy link</Text>
                 </TouchableOpacity>
                 <View style={{ flex: 1 }} />
                 <TouchableOpacity

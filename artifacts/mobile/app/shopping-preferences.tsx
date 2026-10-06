@@ -119,14 +119,14 @@ export default function ShoppingPreferences() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Shopping Preferences" />
+      <ScreenHeader title="Shopping preferences" />
 
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Sizes */}
-        <Text style={s.sectionTitle}>Your Sizes</Text>
+        <Text style={s.sectionTitle}>Your sizes</Text>
         <Text style={s.sectionDesc}>Used for size recommendations and filtering.</Text>
         <View style={s.card}>
           <SizeSelector label="Tops" options={TOPS} selected={settings.sizeTops} onSelect={v => patch({ sizeTops: v })} />
@@ -137,7 +137,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Fit */}
-        <Text style={s.sectionTitle}>Preferred Fit</Text>
+        <Text style={s.sectionTitle}>Preferred fit</Text>
         <Text style={s.sectionDesc}>We'll show you cuts that match your style.</Text>
         <View style={s.card}>
           {FIT_OPTIONS.map((opt, i) => (
@@ -161,7 +161,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Categories */}
-        <Text style={s.sectionTitle}>Style Categories</Text>
+        <Text style={s.sectionTitle}>Style categories</Text>
         <Text style={s.sectionDesc}>Select all that apply — we'll personalize your Discover feed.</Text>
         <View style={s.catGrid}>
           {CATEGORIES.map(cat => (
@@ -185,7 +185,7 @@ export default function ShoppingPreferences() {
         <View style={s.card}>
           {([
             { key: 'dropAlerts' as const, label: 'Drop alerts', sub: 'Notify me when brands drop new collections', icon: 'zap' },
-            { key: 'restockAlerts' as const, label: 'Restock alerts', sub: 'Get notified when sold-out items come back', icon: 'refresh-cw' },
+            { key: 'restockAlerts' as const, label: 'Restock alerts', sub: 'Notify me when sold-out items return', icon: 'refresh-cw' },
             { key: 'priceDropAlerts' as const, label: 'Price drop alerts', sub: 'Alert me when saved items go on sale', icon: 'tag' },
           ]).map((item, i, arr) => (
             <React.Fragment key={item.key}>
@@ -237,7 +237,7 @@ export default function ShoppingPreferences() {
       <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
         <TouchableOpacity onPress={save} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save Preferences</Text>
+            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save preferences</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

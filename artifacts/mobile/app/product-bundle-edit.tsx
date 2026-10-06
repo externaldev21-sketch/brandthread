@@ -17,7 +17,6 @@ import {
   TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -29,8 +28,9 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  BrandthreadHeader, PrimaryButton, SecondaryButton,
+  PrimaryButton, SecondaryButton,
   BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
@@ -187,9 +187,9 @@ export default function ProductBundleEditScreen() {
   if (loading) return <BrandedLoadingState message="Loading bundle…" />;
 
   return (
-    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
-      <BrandthreadHeader
-        title={isNew ? 'New Bundle' : 'Edit Bundle'}
+    <View style={s.root}>
+      <ScreenHeader
+        title={isNew ? 'New bundle' : 'Edit bundle'}
         onBack={() => goBackOr(router)}
       />
 
@@ -224,7 +224,7 @@ export default function ProductBundleEditScreen() {
         <View style={s.priceRow}>
           <Text style={s.dollarSign}>$</Text>
           <TextInput
-            style={[s.input, { flex: 1 }]}
+            style={s.priceInput}
             value={priceStr}
             onChangeText={setPriceStr}
             placeholder="0.00"
@@ -261,8 +261,10 @@ export default function ProductBundleEditScreen() {
         <View style={s.itemsHeader}>
           <Text style={s.sectionTitle}>Products in bundle</Text>
           <TouchableOpacity
-            style={s.addItemBtn}
+            style={[s.addItemBtn, isNew && { opacity: 0.5 }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
+            disabled={isNew}
+            accessibilityState={{ disabled: isNew }}
             activeOpacity={0.7}
           >
             <Feather name="plus" size={14} color={PURPLE_LIGHT} />
@@ -321,7 +323,7 @@ export default function ProductBundleEditScreen() {
 
         {/* Actions */}
         <PrimaryButton
-          label={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
+          label={saving ? 'Saving…' : isNew ? 'Create bundle' : 'Save changes'}
           onPress={save}
           loading={saving}
           disabled={saving}
@@ -342,14 +344,16 @@ export default function ProductBundleEditScreen() {
 
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  content:      { padding: SP.lg, gap: SP.md },
+  content:      { padding: SP.md, gap: SP.md },
   sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.xs },
   fieldLabel:   { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 4 },
   fieldHint:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 17 },
   input:        { height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   multiline:    { height: 88, paddingTop: SP.sm, textAlignVertical: 'top' },
-  priceRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  dollarSign:   { fontFamily: FONT.bold, fontSize: FS.md, color: FG, paddingBottom: 2 },
+  // '$' sits inside the field: the row itself is the bordered input box.
+  priceRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs, height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm },
+  dollarSign:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
+  priceInput:   { flex: 1, height: '100%', fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   savingsCard:  { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, padding: SP.sm, gap: 2 },
   savingsLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   savingsAmount:{ fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT },

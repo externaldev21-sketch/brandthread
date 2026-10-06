@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -140,26 +141,26 @@ export default function ProductDetailScreen() {
   }
 
   if (!product) {
+    // A failed fetch is a connection problem worth retrying; a missing id or
+    // an id that resolves to nothing is a dead link — say so and offer a way back.
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
-        <View style={s.header}>
-          <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
-            style={s.backBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Back"
-          >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </PressableScale>
-          <Text style={s.headerTitle} numberOfLines={1}>Product</Text>
-          <View style={s.headerRight} />
-        </View>
-        <EmptyState
-          icon="alert-circle"
-          title="Couldn't load this product"
-          description="Check your connection and try again."
-          action={{ label: 'Try again', onPress: () => { void loadProduct(); }, icon: 'refresh-cw' }}
-        />
+      <View style={s.root}>
+        <ScreenHeader title="Product" />
+        {loadError ? (
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load this product"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => { void loadProduct(); }, icon: 'refresh-cw' }}
+          />
+        ) : (
+          <EmptyState
+            icon="package"
+            title="Product not found"
+            description="This product may have been removed or is no longer available."
+            action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+          />
+        )}
       </View>
     );
   }

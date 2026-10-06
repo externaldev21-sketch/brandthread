@@ -195,10 +195,9 @@ export default function StoreSEOScreen() {
               style={se.input}
               value={seo.productSeoDefaults.titleTemplate}
               onChangeText={v => patch({ productSeoDefaults: { ...seo.productSeoDefaults, titleTemplate: v } })}
-              placeholder="Use {{product}} and {{store}}"
+              placeholder="{{product}} – {{store}}"
               placeholderTextColor={SUBTLE}
             />
-            <Text style={se.hint}>Use {'{{product}}'} and {'{{store}}'}</Text>
           </View>
           <View style={se.divider} />
           <View style={se.fieldRow}>
@@ -207,13 +206,12 @@ export default function StoreSEOScreen() {
               style={[se.input, se.multiline]}
               value={seo.productSeoDefaults.descriptionTemplate}
               onChangeText={v => patch({ productSeoDefaults: { ...seo.productSeoDefaults, descriptionTemplate: v } })}
-              placeholder="Use {{description}}"
+              placeholder="{{description}}"
               placeholderTextColor={SUBTLE}
               multiline
               numberOfLines={2}
               textAlignVertical="top"
             />
-            <Text style={se.hint}>Use {'{{description}}'}</Text>
           </View>
         </BrandthreadCard>
 
@@ -245,8 +243,6 @@ export default function StoreSEOScreen() {
             />
           </View>
         </BrandthreadCard>
-
-        <PrimaryButton label="Save SEO" onPress={handleSave} loading={saving} style={se.saveBtn} />
       </ScrollView>
     </View>
   );
@@ -264,7 +260,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   charCount: { fontSize: FS.xs, fontFamily: FONT.medium },
-  hint: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 4 },
   input: {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG,
     backgroundColor: SURFACE, borderRadius: RADIUS.sm,
@@ -292,6 +287,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
     borderWidth: 1, borderRadius: RADIUS.sm, padding: SP.sm,
   },
   warnText: { fontSize: FS.sm, fontFamily: FONT.medium, flex: 1 },
-  saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
   });
 };

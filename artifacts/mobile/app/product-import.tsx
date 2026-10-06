@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, EmptyState, FormInput } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, EmptyState, FormInput } from '@/components/BrandthreadUI';
 
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -183,9 +183,9 @@ export default function ProductImportScreen() {
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>CSV File</Text>
-              <Text style={s.methodDesc}>Upload a spreadsheet with your product catalogue</Text>
+              <Text style={s.methodDesc}>Upload a spreadsheet with your product catalog</Text>
             </View>
-            <StatusBadge label="Supported" variant="success" />
+            <Feather name={selectedMethod === 'csv' ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
           </View>
 
           {selectedMethod === 'csv' && (
@@ -219,8 +219,8 @@ export default function ProductImportScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/store-builder' as never); }}
         >
           <View style={s.methodRow}>
-            <View style={[s.methodIconWrap, { backgroundColor: GOLD + '22' }]}>
-              <Feather name="shopping-bag" size={ICON.md} color={GOLD} />
+            <View style={[s.methodIconWrap, { backgroundColor: theme.accentDim }]}>
+              <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Transfer from Shopify</Text>
@@ -244,7 +244,7 @@ export default function ProductImportScreen() {
               <Text style={s.methodTitle}>Manual bulk entry</Text>
               <Text style={s.methodDesc}>Type in product names and details one line at a time</Text>
             </View>
-            <StatusBadge label="Available" variant="success" />
+            <Feather name={selectedMethod === 'manual' ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
           </View>
 
           {selectedMethod === 'manual' && (

@@ -249,7 +249,7 @@ export default function StoreDomainScreen() {
         {!adding ? (
           <TouchableOpacity style={dm.addDomainBtn} onPress={() => setAdding(true)}>
             <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={dm.addDomainText}>+ Connect Custom Domain</Text>
+            <Text style={dm.addDomainText}>Connect custom domain</Text>
           </TouchableOpacity>
         ) : (
           <BrandthreadCard style={dm.card}>

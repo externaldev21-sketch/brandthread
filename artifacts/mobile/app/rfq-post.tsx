@@ -140,7 +140,7 @@ export default function RfqPostScreen() {
           <FormInput label="Quantity" value={quantity} onChange={setQuantity} placeholder="500" keyboardType="numeric" style={[s.field, s.half]} />
           <FormInput label="Target price / unit" value={targetPrice} onChange={setTargetPrice} placeholder="$6.50" keyboardType="decimal-pad" style={[s.field, s.half]} />
         </View>
-        <FormInput label="Deadline (optional)" value={deadline} onChange={setDeadline} placeholder="YYYY-MM-DD" style={s.field} />
+        <FormInput label="Deadline (optional)" value={deadline} onChange={setDeadline} placeholder="e.g. 2026-12-31" style={s.field} />
 
         <View style={s.sectionHeaderRow}>
           <Text style={s.sectionLabel}>Send to manufacturers</Text>

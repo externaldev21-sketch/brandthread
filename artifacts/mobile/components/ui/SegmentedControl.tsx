@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   underlineSegment: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, flexShrink: 1, minWidth: 0 },
   underlineLabel: {
     fontSize: 15, lineHeight: 18,
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   // `left: 0` is load-bearing, not decorative: on web, an absolutely
   // positioned flex child with no inset (left/right/top/bottom) of its own

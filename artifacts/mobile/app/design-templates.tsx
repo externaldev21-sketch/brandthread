@@ -23,6 +23,10 @@ import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
+// Monochrome (silver) placeholder thumbnail for every template — the
+// per-template hues in `gradColors` were off-palette.
+const MONO_THUMB_GRADIENT = ['rgba(192,192,192,0.18)', 'rgba(192,192,192,0.04)'] as const;
+
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
 
@@ -159,7 +163,7 @@ export default function DesignTemplatesScreen() {
             <View style={ts.templateCard}>
               {/* Thumbnail */}
               <LinearGradient
-                colors={item.gradColors}
+                colors={MONO_THUMB_GRADIENT}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={ts.thumbnail}

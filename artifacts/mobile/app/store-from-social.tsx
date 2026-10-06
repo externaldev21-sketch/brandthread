@@ -15,7 +15,8 @@ import {
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, SecondaryButton, EmptyState } from '@/components/BrandthreadUI';
+import { Button, SegmentedControl } from '@/components/ui';
 import { generateFromSocial, getStoreApplyFailure, StoreApplyFailure } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 
@@ -56,7 +57,7 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 export default function StoreFromSocialScreen() {
   const { theme } = useAppTheme();
   const ss = makeStyles(theme);
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { primary: PURPLE, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const api = useApi();
   const [activeTab, setActiveTab] = useState<TabMode>('upload');
@@ -191,28 +192,24 @@ export default function StoreFromSocialScreen() {
 
   return (
     <View style={ss.root}>
-      <ScreenHeader title="Generate from Social" />
+      <ScreenHeader title="Generate from social" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
         <Text style={ss.subtitle}>
           Mirror your social brand identity. Import screenshots, pick posts, or paste your profile URL — AI builds the store.
         </Text>
 
-        {/* AI badge */}
-        <BrandthreadCard style={[ss.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
-          <View style={ss.bannerRow}>
-            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={[ss.bannerText, { color: PURPLE_LIGHT }]}>
-              We'll pull your colors, type and vibe from your social presence.
-            </Text>
-          </View>
-        </BrandthreadCard>
-
         {/* Tab Switcher */}
         <View style={ss.tabRow}>
-          {([['upload', 'Upload Screenshots'], ['posts', 'My Posts'], ['url', 'Social URL']] as [TabMode, string][]).map(([t, label]) => (
-            <FilterChip key={t} label={label} active={activeTab === t} onPress={() => setActiveTab(t)} />
-          ))}
+          <SegmentedControl
+            options={[
+              { id: 'upload', label: 'Screenshots' },
+              { id: 'posts', label: 'My posts' },
+              { id: 'url', label: 'Social URL' },
+            ]}
+            selectedId={activeTab}
+            onChange={(id) => setActiveTab(id as TabMode)}
+          />
         </View>
 
         {/* ─── Upload Tab ──────────────────────────────────────── */}
@@ -234,9 +231,6 @@ export default function StoreFromSocialScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            {screenshots.length === 0 && (
-              <Text style={ss.hintText}>Screenshot your Instagram grid, product pages, or any visual references.</Text>
-            )}
             {analysisFailure && (
               <BrandthreadCard style={[ss.card, ss.importFailureCard]}>
                 <View style={ss.bannerRow}>
@@ -258,8 +252,8 @@ export default function StoreFromSocialScreen() {
                 </TouchableOpacity>
               </BrandthreadCard>
             )}
-            <PrimaryButton
-              label={analyzing ? 'Analyzing...' : `Analyze ${screenshots.length > 0 ? screenshots.length + ' ' : ''}Screenshot${screenshots.length !== 1 ? 's' : ''}`}
+            <Button
+              label={analyzing ? 'Analyzing...' : `Analyze ${screenshots.length > 0 ? screenshots.length + ' ' : ''}screenshot${screenshots.length !== 1 ? 's' : ''}`}
               onPress={handleAnalyzeScreenshots}
               loading={analyzing}
               disabled={screenshots.length === 0 || analyzing}
@@ -297,8 +291,8 @@ export default function StoreFromSocialScreen() {
                     </TouchableOpacity>
                   );
                 })}
-                <PrimaryButton
-                  label={analyzing ? 'Generating...' : `Generate from ${selectedPostIds.length > 0 ? selectedPostIds.length + ' ' : ''}Post${selectedPostIds.length !== 1 ? 's' : ''}`}
+                <Button
+                  label={analyzing ? 'Generating...' : `Generate from ${selectedPostIds.length > 0 ? selectedPostIds.length + ' ' : ''}post${selectedPostIds.length !== 1 ? 's' : ''}`}
                   onPress={handleGenerateFromPosts}
                   loading={analyzing}
                   disabled={selectedPostIds.length === 0 || analyzing}
@@ -314,7 +308,7 @@ export default function StoreFromSocialScreen() {
         {activeTab === 'url' && (
           <>
             <BrandthreadCard style={ss.card}>
-              <Text style={ss.fieldLabel}>Social Profile or Website URL</Text>
+              <Text style={ss.fieldLabel}>Social profile or website URL</Text>
               <TextInput
                 style={ss.input}
                 value={profileUrl}
@@ -335,8 +329,8 @@ export default function StoreFromSocialScreen() {
                 <Text style={ss.loadingText}>Analyzing brand identity with AI...</Text>
               </View>
             ) : (
-              <PrimaryButton
-                label="Analyze & Generate"
+              <Button
+                label="Analyze & generate"
                 onPress={handleAnalyzeUrl}
                 disabled={!profileUrl.trim()}
                 icon="zap"
@@ -377,7 +371,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   failureCopy: { flex: 1, gap: 3 },
   failureTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   failureText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
-  tabRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, marginBottom: SP.md, flexWrap: 'wrap' },
+  tabRow: { paddingHorizontal: SP.md, marginBottom: SP.md },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.md },
   gridWrap: { position: 'relative' },
   gridImg: { width: 100, height: 100, borderRadius: RADIUS.md },
@@ -392,7 +386,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
   addTileLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
-  hintText: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.md, paddingHorizontal: SP.xl },
   tabInfo: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.sm },
   postRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.md,

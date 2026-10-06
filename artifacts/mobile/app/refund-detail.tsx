@@ -16,6 +16,7 @@ import {
   BrandthreadCard, PrimaryButton,
   FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Order, RefundType } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
@@ -116,11 +117,15 @@ export default function RefundDetailScreen() {
   if (loading || !order) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Issue Refund" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Issue refund" onBack={() => goBackOr(router)} />
         <View style={styles.centered}>
-          <Text style={styles.loadingText}>
-            {loading ? 'Loading…' : loadError ? 'Couldn’t load this order. Check your connection and try again.' : 'Order not found.'}
-          </Text>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading…</Text>
+          ) : loadError ? (
+            <ErrorState message="Couldn’t load this order." onRetry={() => { void load(); }} />
+          ) : (
+            <ErrorState message="Order not found" onRetry={() => goBackOr(router)} retryLabel="Go back" />
+          )}
         </View>
       </View>
     );
@@ -187,7 +192,7 @@ export default function RefundDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      <ScreenHeader title="Issue Refund" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Issue refund" onBack={() => goBackOr(router)} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -354,7 +359,7 @@ export default function RefundDetailScreen() {
               so this never fakes success; it only confirms the amount and
               then tells the seller to finish the refund in Stripe. */}
         <PrimaryButton
-          label="Issue Refund"
+          label="Issue refund"
           onPress={confirmAndSubmit}
           disabled={computedTotal <= 0 || overMax}
           icon="dollar-sign"

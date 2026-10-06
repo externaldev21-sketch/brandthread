@@ -99,7 +99,7 @@ async function resizeToBase64(uri: string, maxPx = 1024): Promise<string> {
 export default function StoreFromLogoScreen() {
   const { theme } = useAppTheme();
   const fl = makeStyles(theme);
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { primary: PURPLE, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { user, isLoaded: isUserLoaded } = useUser();
   const [logoUri, setLogoUri] = useState<string | null>(null);
@@ -108,6 +108,9 @@ export default function StoreFromLogoScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
+  // Only a cached analysis that was actually found shows the restore spinner;
+  // a fresh account (or a user still loading) has nothing to restore.
+  const [hasCachedAnalysis, setHasCachedAnalysis] = useState(false);
   const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<LogoAnalysisResult | null>(null);
@@ -147,6 +150,7 @@ export default function StoreFromLogoScreen() {
       try {
         const raw = await AsyncStorage.getItem(cacheKey);
         if (!raw) return;
+        if (isMounted) setHasCachedAnalysis(true);
 
         const cached: unknown = JSON.parse(raw);
         if (!isLogoAnalysisCache(cached) || !(await isUsableImageUri(cached.logoUri))) {
@@ -168,7 +172,10 @@ export default function StoreFromLogoScreen() {
       } catch {
         // This cache only prevents repeat work. Ignore malformed or unavailable storage.
       } finally {
-        if (isMounted) setRestoringAnalysis(false);
+        if (isMounted) {
+          setRestoringAnalysis(false);
+          setHasCachedAnalysis(false);
+        }
       }
     };
 
@@ -261,22 +268,12 @@ export default function StoreFromLogoScreen() {
 
   return (
     <View style={fl.root}>
-      <ScreenHeader title="Generate from Logo" />
+      <ScreenHeader title="Generate from logo" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fl.scroll}>
         <Text style={fl.subtitle}>
           Upload your brand logo. AI will extract your colors and suggest a matching storefront style.
         </Text>
-
-        {/* AI badge */}
-        <BrandthreadCard style={[fl.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
-          <View style={fl.bannerRow}>
-            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={[fl.bannerText, { color: PURPLE_LIGHT }]}>
-              We'll pull your colors, type and vibe from your logo.
-            </Text>
-          </View>
-        </BrandthreadCard>
 
         {/* Upload Area */}
         <TouchableOpacity
@@ -308,14 +305,14 @@ export default function StoreFromLogoScreen() {
 
         {logoUri && !result && !preparingLogo && !analyzing && !restoringAnalysis && (
           <PrimaryButton
-            label="Analyze Logo"
+            label="Analyze logo"
             onPress={handleAnalyze}
             icon="zap"
             style={fl.analyzeBtn}
           />
         )}
 
-        {(analyzing || restoringAnalysis) && (
+        {(analyzing || (restoringAnalysis && hasCachedAnalysis)) && (
           <View style={fl.loadingRow}>
             <ActivityIndicator color={PURPLE} />
             <Text style={fl.loadingText}>

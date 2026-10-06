@@ -3,13 +3,13 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from '
 import { useColors } from '@/hooks/useColors';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
-import { EmptyState, IconButton, PressableScale } from '@/components/BrandthreadUI';
+import { EmptyState, IconButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { FS, FONT, SP, COMP, ICON } from '@/lib/theme';
+import { FS, FONT, SP, COMP } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
@@ -117,15 +117,11 @@ export default function MarketingScreen() {
     <ScreenHeader
       title="Marketing"
       onBack={() => router.push('/(tabs)/more' as never)}
-      rightElement={(
-        <PressableScale
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/analytics' as never); }}
-          accessibilityRole="button"
-          accessibilityLabel="View analytics"
-        >
-          <Feather name="bar-chart-2" size={ICON.md} color={colors.foreground} />
-        </PressableScale>
-      )}
+      actions={[{
+        icon: 'bar-chart-2',
+        accessibilityLabel: 'View analytics',
+        onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/analytics' as never); },
+      }]}
     />
     <ScrollView
       ref={scrollResetRef}
@@ -138,8 +134,8 @@ export default function MarketingScreen() {
           separation (Dev's standing "no grey boxes" rule). */}
       <View style={[styles.statsRow, { borderBottomColor: colors.border }]}>
         {[
-          { label: 'Email Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
-          { label: 'SMS Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
+          { label: 'Email subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
+          { label: 'SMS subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
         ].map((s, i) => (
           <View key={s.label} style={[styles.statChip, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
@@ -167,7 +163,7 @@ export default function MarketingScreen() {
       {/* Campaigns */}
       <SectionHeader
         title="Campaigns"
-        action="New +"
+        action={campaigns.length > 0 ? 'New' : undefined}
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/design-campaign' as never); }}
       />
       {campaignsError ? (
@@ -214,8 +210,8 @@ export default function MarketingScreen() {
 
       {/* Discount Codes */}
       <SectionHeader
-        title="Discount Codes"
-        action="New +"
+        title="Discount codes"
+        action={discounts.length > 0 ? 'New' : undefined}
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
       />
       {discountsError ? (
@@ -261,7 +257,7 @@ export default function MarketingScreen() {
       )}
 
       {/* Referral */}
-      <SectionHeader title="Referral Program" />
+      <SectionHeader title="Referral program" />
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-invite' as never); }}

@@ -99,7 +99,7 @@ export default function AiBrandMemoryScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title="Brand Memory"
+        title="Brand memory"
         rightElement={
           <PressableScale
             onPress={handleSave}
@@ -154,7 +154,7 @@ export default function AiBrandMemoryScreen() {
                 </View>
 
                 {/* Content */}
-                {field.enabled ? (
+                {field.enabled && (
                   <TextInput
                     style={styles.fieldInput}
                     value={field.value}
@@ -164,10 +164,6 @@ export default function AiBrandMemoryScreen() {
                     placeholder={`Enter ${field.label.toLowerCase()}…`}
                     placeholderTextColor={colors.subtle}
                   />
-                ) : (
-                  <Text style={styles.fieldDisabled}>
-                    Disabled — tap toggle to enable
-                  </Text>
                 )}
               </View>
 
@@ -271,12 +267,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     padding: SP.sm,
     minHeight: 72,
     textAlignVertical: 'top',
-  },
-  fieldDisabled: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: colors.subtle,
-    padding: SP.sm,
   },
   divider: {
     height: SP.sm,

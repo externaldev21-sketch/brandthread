@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 export const PENDING_INVITE_KEY = 'bt:pendingTeamInvite';
 
@@ -52,7 +53,7 @@ export default function TeamInviteScreen() {
 
   useEffect(() => {
     if (!token) {
-      setError('This invite link is missing its token.');
+      setError("This invite link isn't valid.");
       setLoading(false);
       return;
     }
@@ -101,6 +102,8 @@ export default function TeamInviteScreen() {
   const roleLabel = ROLE_LABEL[invite?.role] ?? invite?.role ?? '';
 
   return (
+    <View style={styles.root}>
+    <ScreenHeader title="Team invite" />
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
@@ -120,8 +123,8 @@ export default function TeamInviteScreen() {
           </>
         ) : error ? (
           <>
-            <View style={[styles.icon, { backgroundColor: colors.destructive + '22' }]}>
-              <Feather name="x-circle" size={26} color={colors.destructive} />
+            <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
+              <Feather name="x-circle" size={26} color={colors.mutedForeground} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite not available</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>{error}</Text>
@@ -191,10 +194,12 @@ export default function TeamInviteScreen() {
         )}
       </View>
     </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, justifyContent: 'center', padding: 24 },
   card: { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center' },
   icon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },

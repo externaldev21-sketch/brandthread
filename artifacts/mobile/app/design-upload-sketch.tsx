@@ -23,6 +23,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { AI_STYLES, AIStyleKind } from '@/services/designTypes';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   generateSketchToDesign, GenerateDesignResult,
 } from '@/services/designService';
@@ -126,8 +127,8 @@ export default function UploadSketchScreen() {
   // ─── Results ─────────────────────────────────────────────────────────────────
   if (step === 'results' && results) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Cleaned designs" onBack={() => setStep('style')} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Cleaned designs" onBack={() => setStep('style')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -205,14 +206,14 @@ export default function UploadSketchScreen() {
   // ─── Style selection ──────────────────────────────────────────────────────────
   if (step === 'style') {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {isGenerating && (
           <View style={s.loadingOverlay}>
             <ActivityIndicator size="large" color={PURPLE} />
             <Text style={s.loadingText}>Generating designs…</Text>
           </View>
         )}
-        <BrandthreadHeader title="Choose style" onBack={() => setStep('upload')} />
+        <ScreenHeader title="Choose style" onBack={() => setStep('upload')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -266,17 +267,13 @@ export default function UploadSketchScreen() {
 
   // ─── Upload step ──────────────────────────────────────────────────────────────
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Upload sketch" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={s.uploadHint}>
-          Upload a hand-drawn sketch or rough design. Our AI will clean and vectorize it.
-        </Text>
-
         <TouchableOpacity style={s.uploadZone} onPress={pickSketch}>
           {sketchUri ? (
             <Image source={{ uri: sketchUri }} style={s.uploadThumb} />
@@ -320,16 +317,6 @@ export default function UploadSketchScreen() {
           </>
         )}
 
-        {!sketchUri && (
-          <View style={s.emptyHints}>
-            {['Hand-drawn logos', 'Rough illustrations', 'Typography sketches', 'Pattern drafts'].map(hint => (
-              <View key={hint} style={s.hintChip}>
-                <Feather name="check" size={ICON.xs} color={CYAN} />
-                <Text style={s.hintChipText}>{hint}</Text>
-              </View>
-            ))}
-          </View>
-        )}
       </ScrollView>
     </BrandthreadScreen>
   );
@@ -339,13 +326,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   content: { padding: SP.lg, paddingBottom: SP.xxl },
-  uploadHint: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    marginBottom: SP.lg,
-    lineHeight: 20,
-  },
   uploadZone: {
     borderWidth: 2,
     borderColor: BORDER,
@@ -434,21 +414,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.bold,
     fontSize: FS.md,
     color: '#fff',
-  },
-  emptyHints: {
-    marginTop: SP.xl,
-    gap: SP.sm,
-  },
-  hintChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    paddingVertical: SP.xs,
-  },
-  hintChipText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
   },
   // Processing
   processCenter: {

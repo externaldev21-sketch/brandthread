@@ -19,6 +19,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui';
 import {
   getStorefront, applyTheme, generateAISuggestions,
   startShopifyImport, getLatestShopifyImport, getShopifyImport, continueShopifyImport,
@@ -223,6 +224,7 @@ export default function StoreBuilderScreen() {
     { label: 'SEO',     icon: 'search' as const, route: '/store-seo' },
     { label: 'Domains', icon: 'globe'  as const, route: '/store-domain' },
   ];
+  const MGMT_COLUMNS = 4;
   const managementItems = [
     { label: 'Policies', icon: 'shield'    as const, route: '/store-policies' },
     { label: 'Versions', icon: 'clock'     as const, route: '/store-versions' },
@@ -390,7 +392,7 @@ export default function StoreBuilderScreen() {
 
           {/* STORE MANAGEMENT */}
           <View style={s.section}>
-            <SectionHeader title="Manage Your Store" />
+            <SectionHeader title="Manage your store" style={{ paddingHorizontal: 0 }} />
 
             {/* Content — Sections, Pages, Navigation, Collections */}
             <Text style={s.mgmtSubLabel}>Content</Text>
@@ -408,6 +410,8 @@ export default function StoreBuilderScreen() {
                   <Text style={s.mgmtLabel}>{label}</Text>
                 </TouchableOpacity>
               ))}
+              {/* Pad each row to 4 columns so every tile is the same size. */}
+              {Array.from({ length: MGMT_COLUMNS - contentItems.length }, (_, i) => <View key={`pad-${i}`} style={s.mgmtCardSpacer} />)}
             </View>
 
             {/* Discovery — SEO, Domains */}
@@ -426,6 +430,8 @@ export default function StoreBuilderScreen() {
                   <Text style={s.mgmtLabel}>{label}</Text>
                 </TouchableOpacity>
               ))}
+              {/* Pad each row to 4 columns so every tile is the same size. */}
+              {Array.from({ length: MGMT_COLUMNS - discoveryItems.length }, (_, i) => <View key={`pad-${i}`} style={s.mgmtCardSpacer} />)}
             </View>
 
             {/* Management — Policies, Versions, Settings */}
@@ -444,6 +450,8 @@ export default function StoreBuilderScreen() {
                   <Text style={s.mgmtLabel}>{label}</Text>
                 </TouchableOpacity>
               ))}
+              {/* Pad each row to 4 columns so every tile is the same size. */}
+              {Array.from({ length: MGMT_COLUMNS - managementItems.length }, (_, i) => <View key={`pad-${i}`} style={s.mgmtCardSpacer} />)}
             </View>
           </View>
 
@@ -452,27 +460,27 @@ export default function StoreBuilderScreen() {
             <GradientCard colors={GRAD_CARD_GLOW} glow>
               <View style={s.aiImproveRow}>
                 <View style={s.aiImproveIconWrap}>
-                  <Feather name="zap" size={ICON.lg} color={GOLD} />
-                  {suggestionCount > 0 && (
+                  <Feather name="zap" size={ICON.lg} color={theme.text} />
+                  {hasStore && suggestionCount > 0 && (
                     <View style={s.suggestionBadge}>
                       <Text style={s.suggestionBadgeText}>{suggestionCount}</Text>
                     </View>
                   )}
                 </View>
                 <View style={s.aiImproveText}>
-                  <Text style={s.aiImproveTitle}>Improve Store with AI</Text>
+                  <Text style={s.aiImproveTitle}>Improve your store with AI</Text>
                   <Text style={s.aiImproveDesc}>
                     Get personalized recommendations for your storefront.
                   </Text>
                 </View>
               </View>
-              <PrimaryButton
-                label="Open Suggestions →"
+              <Button
+                label="Open suggestions →"
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push('/store-ai-improve' as never);
                 }}
-                style={s.aiImproveBtn}
+                fullWidth
               />
             </GradientCard>
           </View>
@@ -777,7 +785,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.md,
-    borderColor: '#95BF47',
   },
   shopifyLogo: {
     width: 42,
@@ -789,7 +796,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   shopifyLogoText: { color: '#142000', fontSize: 21, fontFamily: FONT.bold },
   shopifyCopy: { flex: 1, gap: 3 },
-  shopifyEyebrow: { color: '#95BF47', fontSize: FS.xs, letterSpacing: 1.2, fontFamily: FONT.bold },
+  shopifyEyebrow: { color: MUTED, fontSize: FS.xs, letterSpacing: 1.2, fontFamily: FONT.bold },
   shopifyTitle: { color: FG, fontSize: FS.base, lineHeight: 21, fontFamily: FONT.bold },
   shopifyDesc: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
@@ -878,6 +885,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: SP.xs,
   },
+  mgmtCardSpacer: { flex: 1 },
   mgmtIconWrap: {
     width: 40,
     height: 40,
@@ -914,6 +922,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   aiImproveText: { flex: 1, gap: SP.xs },
   aiImproveTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   aiImproveDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  aiImproveBtn: {},
   });
 };

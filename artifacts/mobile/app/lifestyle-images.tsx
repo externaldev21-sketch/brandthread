@@ -236,7 +236,7 @@ export default function LifestyleImagesScreen() {
       style={[styles.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScreenHeader title="Lifestyle Images" subtitle="Contextual lifestyle shots for any product" />
+      <ScreenHeader title="Lifestyle images" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Step indicator */}
@@ -278,7 +278,7 @@ export default function LifestyleImagesScreen() {
               onPress={goToProductStep}
               activeOpacity={0.85}
               disabled={referencePhotos.length === 0}
-              style={[styles.primaryBtn, { backgroundColor: referencePhotos.length > 0 ? colors.primary : colors.secondary, marginTop: 24 }]}
+              style={[styles.primaryBtn, { backgroundColor: referencePhotos.length > 0 ? colors.primary : colors.elevated, borderWidth: 1, borderColor: referencePhotos.length > 0 ? colors.primary : colors.border, marginTop: 24 }]}
             >
               <Text style={[styles.primaryBtnText, { color: referencePhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground }]}>
                 Next: add your product
@@ -322,7 +322,7 @@ export default function LifestyleImagesScreen() {
               onPress={generate}
               activeOpacity={0.85}
               disabled={productPhotos.length === 0}
-              style={[styles.primaryBtn, { backgroundColor: productPhotos.length > 0 ? colors.primary : colors.secondary, marginTop: 20 }]}
+              style={[styles.primaryBtn, { backgroundColor: productPhotos.length > 0 ? colors.primary : colors.elevated, borderWidth: 1, borderColor: productPhotos.length > 0 ? colors.primary : colors.border, marginTop: 20 }]}
             >
               <Feather name="zap" size={16} color={productPhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground} />
               <Text style={[styles.primaryBtnText, { color: productPhotos.length > 0 ? colors.primaryForeground : colors.mutedForeground }]}>

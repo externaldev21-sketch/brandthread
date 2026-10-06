@@ -90,7 +90,7 @@ export default function RfqCompareScreen() {
   if (loading) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Compare quotes" onBack={() => goBackOr(router)} />
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       </View>
     );
@@ -99,8 +99,8 @@ export default function RfqCompareScreen() {
   if (!rfq) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
-        <EmptyState icon="alert-circle" title="RFQ unavailable" description="This request could not be loaded." />
+        <ScreenHeader title="Compare quotes" onBack={() => goBackOr(router)} />
+        <EmptyState icon="alert-circle" title="Quote request not found" action={{ label: 'Go back', onPress: () => goBackOr(router) }} />
       </View>
     );
   }
@@ -109,7 +109,7 @@ export default function RfqCompareScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Compare quotes" onBack={() => goBackOr(router)} />
       <View style={s.summary}>
         <Text style={s.summaryTitle} numberOfLines={1}>{rfq.garmentType}</Text>
         <Text style={s.summaryMeta}>{rfq.quantity.toLocaleString('en-US')} units · sent to {rfq.manufacturersCount} manufacturers · {rfq.quotesReceivedCount} quoted</Text>
