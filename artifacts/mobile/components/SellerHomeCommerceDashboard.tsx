@@ -775,7 +775,6 @@ export default function SellerHomeCommerceDashboard({
                       { color: deltaLine.direction === 'flat' ? theme.muted : theme.text },
                     ]}
                   >
-                    {deltaLine.direction === 'up' ? '↑ ' : deltaLine.direction === 'down' ? '↓ ' : ''}
                     {deltaLine.label}
                   </Text>
                 ) : (

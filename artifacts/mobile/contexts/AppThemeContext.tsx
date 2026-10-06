@@ -24,7 +24,7 @@ export type AppThemePreset = {
 };
 
 export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
-  return { color: theme.onAccent, textShadowColor: '#00000055', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 };
+  return { color: theme.onAccent };
 }
 
 type Palette = Omit<AppThemePreset, 'id' | 'name'>;
