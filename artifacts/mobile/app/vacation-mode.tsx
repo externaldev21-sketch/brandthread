@@ -27,7 +27,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
+  const { accent: PURPLE } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -80,7 +80,7 @@ export default function VacationModeScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
+        vacationMode ? 'Vacation mode on' : 'Store reopened',
         vacationMode
           ? 'Buyers will see an away banner on your storefront. New orders are paused.'
           : 'Your store is open again. Buyers can place new orders.',
@@ -114,16 +114,16 @@ export default function VacationModeScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Vacation Mode" />
+      <ScreenHeader title="Vacation mode" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md }}>
 
         {/* Status hero card */}
-        <View style={[s.statusCard, { borderColor: vacationMode ? ORANGE : SUCCESS }]}>
-          <View style={[s.statusIndicator, { backgroundColor: vacationMode ? ORANGE : SUCCESS }]} />
+        <View style={[s.statusCard, { borderColor: BORDER }]}>
+          <View style={[s.statusIndicator, { backgroundColor: vacationMode ? MUTED : FG }]} />
           <View style={{ flex: 1 }}>
             <Text style={s.statusTitle}>
-              {vacationMode ? '🏖  Currently Away' : '🟢  Store Open'}
+              {vacationMode ? 'Currently away' : 'Store open'}
             </Text>
             <Text style={s.statusSub}>
               {vacationMode
@@ -136,21 +136,19 @@ export default function VacationModeScreen() {
         {/* Toggle */}
         <View style={s.toggleCard}>
           <View style={{ flex: 1 }}>
-            <Text style={s.toggleLabel}>Enable Vacation Mode</Text>
+            <Text style={s.toggleLabel}>Enable vacation mode</Text>
             <Text style={s.toggleSub}>Pause new orders without hiding your listings</Text>
           </View>
           <HapticSwitch
             value={vacationMode}
             onValueChange={setVacationMode}
-            trackColor={{ false: BORDER, true: ORANGE }}
-            thumbColor="#fff"
           />
         </View>
 
         {/* Away message (shown when toggled on) */}
         {vacationMode && (
           <View style={s.card}>
-            <Text style={s.label}>Away Message <Text style={s.optional}>(optional)</Text></Text>
+            <Text style={s.label}>Away message <Text style={s.optional}>(optional)</Text></Text>
             <TextInput
               style={s.input}
               value={message}
@@ -162,7 +160,7 @@ export default function VacationModeScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={[s.label, { marginTop: SP.md }]}>Return Date <Text style={s.optional}>(optional)</Text></Text>
+            <Text style={[s.label, { marginTop: SP.md }]}>Return date <Text style={s.optional}>(optional)</Text></Text>
             <TextInput
               style={s.input}
               value={returnDate}
@@ -178,12 +176,12 @@ export default function VacationModeScreen() {
 
         {/* Info bullets */}
         <View style={s.infoCard}>
-          <Text style={s.infoTitle}>What Vacation Mode Does</Text>
+          <Text style={s.infoTitle}>What vacation mode does</Text>
           {[
-            { icon: 'alert-triangle', text: 'Buyers see an "Away" banner on your storefront', color: ORANGE },
-            { icon: 'x-circle',       text: 'New orders cannot be placed while active',       color: RED },
-            { icon: 'check-circle',   text: 'Your products and listings stay visible',        color: SUCCESS },
-            { icon: 'package',        text: 'Existing orders are completely unaffected',      color: PURPLE_LIGHT },
+            { icon: 'alert-triangle', text: 'Buyers see an "Away" banner on your storefront', color: MUTED },
+            { icon: 'x-circle',       text: 'New orders cannot be placed while active',       color: MUTED },
+            { icon: 'check-circle',   text: 'Your products and listings stay visible',        color: MUTED },
+            { icon: 'package',        text: 'Existing orders are completely unaffected',      color: MUTED },
             { icon: 'bell-off',       text: 'Drop announcements are paused automatically',    color: MUTED },
           ].map((item, i) => (
             <View key={i} style={s.infoBullet}>
@@ -202,7 +200,7 @@ export default function VacationModeScreen() {
         >
           {saving
             ? <ActivityIndicator color={theme.onAccent} />
-            : <Text style={s.saveBtnText}>Save Changes</Text>
+            : <Text style={s.saveBtnText}>Save changes</Text>
           }
         </TouchableOpacity>
 

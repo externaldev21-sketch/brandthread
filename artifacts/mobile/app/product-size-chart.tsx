@@ -43,7 +43,7 @@ export default function ProductSizeChartScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const t = useMemo(() => makeTableStyles(theme), [theme]);
-  const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
+  const { productId } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
@@ -197,7 +197,7 @@ export default function ProductSizeChartScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Size Chart" />
+      <ScreenHeader title="Size chart" onBack={() => goBackOr(router)} />
 
       <ScrollView
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 120 }]}
@@ -347,7 +347,7 @@ export default function ProductSizeChartScreen() {
 
         {/* Actions */}
         <PrimaryButton
-          label={saving ? 'Saving…' : 'Save Size Chart'}
+          label={saving ? 'Saving…' : 'Save size chart'}
           onPress={save}
           loading={saving}
           disabled={saving}
@@ -385,7 +385,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   addBtn:        { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
   notesInput:    { borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, padding: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, minHeight: 72, textAlignVertical: 'top' },
   clearBtn:      { alignItems: 'center', paddingVertical: SP.md, marginTop: SP.sm },
-  clearBtnText:  { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.error },
+  clearBtnText:  { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted },
 });
 
 const makeTableStyles = (theme: AppThemePreset) => StyleSheet.create({

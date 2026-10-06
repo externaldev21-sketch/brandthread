@@ -153,7 +153,7 @@ export default function QuoteCompareScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Compare quotes" onBack={() => goBackOr(router)} />
 
       {loadError ? (
         <ErrorState
@@ -163,10 +163,7 @@ export default function QuoteCompareScreen() {
       ) : quotes.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
           <Feather name="inbox" size={48} color={SUBTLE} style={{ marginBottom: SP.md }} />
-          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>No Quotes Yet</Text>
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>
-            No quotes have been received for this request yet.
-          </Text>
+          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG }}>No quotes yet</Text>
         </View>
       )}
 

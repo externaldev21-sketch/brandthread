@@ -53,6 +53,10 @@ export default function HelpScreen() {
   const tabBarInset = useSellerTabBarInset();
   const scrollRef = useRef<ScrollView>(null);
   const [contactY, setContactY] = useState(0);
+  const [gridW, setGridW] = useState(0);
+  // Equal-width category cards: 3 per row, exact width so a short last row
+  // keeps the same card size instead of stretching.
+  const categoryW = gridW > 0 ? Math.floor((gridW - SP.sm * 2) / 3) : undefined;
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -122,13 +126,13 @@ export default function HelpScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Search */}
-        <SearchBar value={query} onChange={setQuery} placeholder="Search help articles…" />
+        <SearchBar value={query} onChange={setQuery} placeholder="Search help articles…" style={s.search} />
 
         {!isSearching && (
           <>
             {/* Popular topics */}
             <View style={{ gap: SP.sm }}>
-              <SectionHeader title="Popular topics" />
+              <SectionHeader title="Popular topics" style={s.sectionHeader} />
               <View style={{ gap: SP.sm }}>
                 {POPULAR.map((faq) => (
                   <NavigationCard
@@ -144,14 +148,14 @@ export default function HelpScreen() {
 
             {/* Category cards */}
             <View style={{ gap: SP.sm }}>
-              <SectionHeader title="Browse by category" />
-              <View style={s.categoryGrid}>
+              <SectionHeader title="Browse by category" style={s.sectionHeader} />
+              <View style={s.categoryGrid} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
                 {CATEGORIES.map((c) => {
                   const count = FAQS.filter(f => f.category === c.key).length;
                   return (
                     <TouchableOpacity
                       key={c.key}
-                      style={s.categoryCard}
+                      style={[s.categoryCard, categoryW !== undefined && { width: categoryW }]}
                       activeOpacity={0.85}
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveCategory(c.key); }}
                     >
@@ -172,6 +176,7 @@ export default function HelpScreen() {
         <View style={{ gap: SP.sm }}>
           <SectionHeader
             title={isSearching ? 'Results' : 'All questions'}
+            style={s.sectionHeader}
             action={activeCategory ? { label: 'Clear filter', onPress: () => setActiveCategory(null) } : undefined}
           />
 
@@ -229,7 +234,7 @@ export default function HelpScreen() {
 
         {/* Support ticket form */}
         <View onLayout={(e) => setContactY(e.nativeEvent.layout.y)}>
-          <BrandthreadCard style={[s.ticketSection, { backgroundColor: theme.accentDim, borderColor: `${theme.accent}33` }]}>
+          <BrandthreadCard style={s.ticketSection}>
             <View style={s.ticketHeader}>
               <Feather name="life-buoy" size={ICON.md} color={theme.accent} />
               <Text style={s.ticketTitle}>Still stuck? Send us a message</Text>
@@ -247,7 +252,7 @@ export default function HelpScreen() {
             ) : (
               <>
                 {/* Category chips */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll} contentContainerStyle={{ gap: SP.sm }}>
+                <View style={s.chipRow}>
                   {CATEGORIES.map((c) => (
                     <FilterChip
                       key={c.key}
@@ -256,7 +261,7 @@ export default function HelpScreen() {
                       onPress={() => setCategory(c.key)}
                     />
                   ))}
-                </ScrollView>
+                </View>
 
                 <FormInput
                   value={subject}
@@ -321,7 +326,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   contactLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
 
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  categoryCard: { width: '31%', flexGrow: 1, backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, gap: 4, alignItems: 'flex-start' },
+  search:        { borderWidth: 1, borderColor: theme.border },
+  sectionHeader: { paddingHorizontal: 0 },
+  categoryCard: { width: '31%', backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, gap: 4, alignItems: 'flex-start' },
   categoryIconWrap: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   categoryLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   categoryCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
@@ -332,7 +339,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   ticketHeader:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   ticketTitle:     { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
   ticketSub:       { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 19 },
-  catScroll:       { flexGrow: 0, marginBottom: -2 },
   submittedBadge:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, backgroundColor: `${theme.success}1F`, borderRadius: RADIUS.sm },
   submittedText:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   sendAnotherText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textDecorationLine: 'underline' },

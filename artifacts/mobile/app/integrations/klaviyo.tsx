@@ -167,7 +167,7 @@ export default function KlaviyoIntegrationScreen() {
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Klaviyo Private API Key</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
-              placeholder="pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              placeholder="pk_..."
               placeholderTextColor={colors.mutedForeground}
               value={apiKey}
               onChangeText={setApiKey}

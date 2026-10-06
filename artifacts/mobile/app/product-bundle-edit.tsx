@@ -29,6 +29,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   PrimaryButton, SecondaryButton,
   BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
@@ -189,7 +190,10 @@ export default function ProductBundleEditScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={isNew ? 'New Bundle' : 'Edit Bundle'} />
+      <ScreenHeader
+        title={isNew ? 'New bundle' : 'Edit bundle'}
+        onBack={() => goBackOr(router)}
+      />
 
       <ScrollView
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
@@ -261,8 +265,10 @@ export default function ProductBundleEditScreen() {
           {/* Items can only be added once the bundle exists (see addItem). */}
           {!isNew && (
           <TouchableOpacity
-            style={s.addItemBtn}
+            style={[s.addItemBtn, isNew && { opacity: 0.5 }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
+            disabled={isNew}
+            accessibilityState={{ disabled: isNew }}
             activeOpacity={0.7}
           >
             <Feather name="plus" size={14} color={PURPLE_LIGHT} />
@@ -322,7 +328,7 @@ export default function ProductBundleEditScreen() {
 
         {/* Actions */}
         <PrimaryButton
-          label={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
+          label={saving ? 'Saving…' : isNew ? 'Create bundle' : 'Save changes'}
           onPress={save}
           loading={saving}
           disabled={saving}
@@ -349,9 +355,9 @@ const s = StyleSheet.create({
   fieldHint:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 17 },
   input:        { height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   multiline:    { height: 88, paddingTop: SP.sm, textAlignVertical: 'top' },
-  // '$' sits inside the field as a prefix.
-  priceRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  dollarSign:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  // '$' sits inside the field: the row itself is the bordered input box.
+  priceRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs, height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm },
+  dollarSign:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
   priceInput:   { flex: 1, height: '100%', fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   savingsCard:  { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, padding: SP.sm, gap: 2 },
   savingsLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },

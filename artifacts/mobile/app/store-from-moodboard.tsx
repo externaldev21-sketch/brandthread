@@ -112,7 +112,7 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 export default function StoreFromMoodboardScreen() {
   const { theme } = useAppTheme();
   const mb = makeStyles(theme);
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { primary: PURPLE, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { user, isLoaded: clerkLoaded } = useUser();
   // The signed-out web preview never hydrates Clerk, so there is no user and
@@ -124,6 +124,9 @@ export default function StoreFromMoodboardScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
+  // Only a cached analysis that was actually found shows the restore spinner;
+  // a fresh account (or a user still loading) has nothing to restore.
+  const [hasCachedAnalysis, setHasCachedAnalysis] = useState(false);
   const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<MoodboardAnalysisResult | null>(null);
@@ -163,6 +166,7 @@ export default function StoreFromMoodboardScreen() {
       try {
         const raw = await AsyncStorage.getItem(cacheKey);
         if (!raw) return;
+        if (isMounted) setHasCachedAnalysis(true);
 
         const cached: unknown = JSON.parse(raw);
         if (!isMoodboardAnalysisCache(cached)) {
@@ -190,7 +194,10 @@ export default function StoreFromMoodboardScreen() {
       } catch {
         // This cache only prevents repeat work. Ignore malformed or unavailable storage.
       } finally {
-        if (isMounted) setRestoringAnalysis(false);
+        if (isMounted) {
+          setRestoringAnalysis(false);
+          setHasCachedAnalysis(false);
+        }
       }
     };
 
@@ -336,7 +343,7 @@ export default function StoreFromMoodboardScreen() {
         </View>
 
         <PrimaryButton
-          label={analyzing ? 'Analyzing...' : 'Analyze Mood Board'}
+          label={analyzing ? 'Analyzing...' : 'Analyze mood board'}
           onPress={handleAnalyze}
           loading={analyzing}
           disabled={imageUris.length < 2 || restoringAnalysis || preparingImages}
@@ -344,7 +351,7 @@ export default function StoreFromMoodboardScreen() {
           style={mb.analyzeBtn}
         />
 
-        {(preparingImages || analyzing || restoringAnalysis) && (
+        {(preparingImages || analyzing || (restoringAnalysis && hasCachedAnalysis)) && (
           <View style={mb.loadingRow}>
             <ActivityIndicator color={PURPLE} />
             <Text style={mb.loadingText}>

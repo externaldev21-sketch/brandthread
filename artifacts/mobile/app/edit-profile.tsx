@@ -26,6 +26,7 @@ import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { getPreviewAccount } from '@/lib/previewAccount';
 import { Avatar } from '@/components/ui/Avatar';
+import { getInitials } from '@/lib/format';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -487,7 +488,7 @@ export default function EditProfileScreen() {
               <Image source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
             ) : (
               <LinearGradient colors={theme.primaryGradient as any} style={styles.previewLogo}>
-                <Text style={styles.previewLogoText}>{(fields.name || 'B').slice(0, 2).toUpperCase()}</Text>
+                <Text style={styles.previewLogoText}>{getInitials(fields.name || fields.username, 'B')}</Text>
               </LinearGradient>
             )}
           </View>
@@ -605,8 +606,7 @@ export default function EditProfileScreen() {
           </View>
           <Divider theme={theme} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel} />
-            <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
+            <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={2}>
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
             <TouchableOpacity onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
@@ -654,7 +654,7 @@ export default function EditProfileScreen() {
         </View>
 
         {/* Quick links to existing seller settings — never duplicated here */}
-        <Text style={styles.sectionLabel}>Store settings</Text>
+        <Text style={styles.sectionLabel}>Settings</Text>
         <View style={{ gap: 8, paddingHorizontal: 14 }}>
           {QUICK_LINKS.map(link => (
             <NavigationCard
@@ -851,7 +851,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.muted,
   },
   rowInput: {
-    flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
+    flex: 1, minWidth: 0, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
     padding: 0, textAlign: 'right',
   },
   charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'right', marginTop: 4 },

@@ -255,7 +255,7 @@ export default function DesignBgReplaceScreen({
 
   return (
     <BrandthreadScreen noSafeTop>
-      <ScreenHeader title="Background Tools" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Background tools" onBack={() => goBackOr(router)} />
       {embedded && (
         <View style={s.modeWrap}>
           <View style={s.modeRow}>

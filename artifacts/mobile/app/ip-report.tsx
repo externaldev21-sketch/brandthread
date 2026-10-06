@@ -70,25 +70,27 @@ export default function IpReportScreen() {
       <Text style={s.label}>Your full name</Text><TextInput value={name} onChangeText={setName} style={s.input} placeholder="Rights holder or authorized agent" placeholderTextColor={theme.subtle} />
       <Text style={s.label}>Contact email</Text><TextInput value={email} onChangeText={setEmail} style={s.input} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={theme.subtle} />
       <Text style={s.label}>Type of report</Text>
-      <View style={s.rights}>{(['copyright', 'trademark', 'counterfeit'] as const).map(type => <PressableScale key={type} onPress={() => setRightsType(type)} style={[s.right, rightsType === type && s.rightSelected]}><Text style={[s.rightText, rightsType === type && s.rightTextSelected]}>{type[0].toUpperCase() + type.slice(1)}</Text></PressableScale>)}</View>
+      <View style={s.rights}>{(['copyright', 'trademark', 'counterfeit'] as const).map(type => <View key={type} style={s.rightCell}><PressableScale onPress={() => setRightsType(type)} style={[s.right, rightsType === type && s.rightSelected]}><Text style={[s.rightText, rightsType === type && s.rightTextSelected]}>{type[0].toUpperCase() + type.slice(1)}</Text></PressableScale></View>)}</View>
       <Text style={s.label}>Describe your rights</Text><TextInput value={description} onChangeText={setDescription} style={[s.input, s.area]} multiline placeholder="Copyright, trademark, or other rights and why this listing infringes them." placeholderTextColor={theme.subtle} />
       <Text style={s.label}>Evidence URLs (optional)</Text><TextInput value={evidence} onChangeText={setEvidence} style={[s.input, s.area]} multiline autoCapitalize="none" placeholder="One public URL per line" placeholderTextColor={theme.subtle} />
       <PrimaryButton label="Submit report" onPress={submit} loading={submitting} />
-      {cases.length > 0 && <View style={s.cases}><Text style={s.title}>Submitted cases</Text>{cases.map(item => <View key={item.caseReference} style={s.case}><View style={{ flex: 1 }}><Text style={s.ref}>{item.caseReference}</Text><Text style={s.status}>Status: {item.status}</Text></View><PressableScale onPress={() => refreshStatus(item)}><Feather name="refresh-cw" size={18} color={theme.success} /></PressableScale></View>)}</View>}
+      {cases.length > 0 && <View style={s.cases}><Text style={s.title}>Submitted cases</Text>{cases.map(item => <View key={item.caseReference} style={s.case}><View style={{ flex: 1 }}><Text style={s.ref}>{item.caseReference}</Text><Text style={s.status}>Status: {item.status}</Text></View><PressableScale onPress={() => refreshStatus(item)}><Feather name="refresh-cw" size={18} color={theme.text} /></PressableScale></View>)}</View>}
     </ScrollView>
-  </BrandthreadScreen>;
+  </View>;
 }
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root:{flex:1,backgroundColor:theme.background},
   content:{padding:SP.md,gap:SP.sm,paddingBottom:SP.xl},
-  legal:{color:theme.muted,fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:18,backgroundColor:theme.card,borderRadius:RADIUS.sm,padding:SP.sm,marginBottom:SP.sm},
+  legal:{color:theme.muted,fontFamily:FONT.regular,fontSize:FS.sm,lineHeight:19,backgroundColor:theme.card,borderRadius:RADIUS.sm,padding:SP.sm,marginBottom:SP.sm},
   label:{color:theme.text,fontFamily:FONT.semibold,fontSize:FS.sm,marginTop:SP.xs},
   input:{color:theme.text,fontFamily:FONT.regular,fontSize:FS.base,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.sm,backgroundColor:theme.card,padding:SP.sm,minHeight:46},
   area:{height:100,textAlignVertical:'top'},
-  rights:{flexDirection:'row',gap:SP.xs,flexWrap:'wrap'},
-  right:{borderWidth:1,borderColor:theme.border,borderRadius:radius.sm,paddingHorizontal:SP.sm,paddingVertical:7,backgroundColor:theme.card},
-  rightSelected:{borderColor:theme.success},
-  rightText:{color:theme.muted,fontFamily:FONT.medium,fontSize:FS.xs},
-  rightTextSelected:{color:theme.success},
+  rights:{flexDirection:'row',gap:SP.xs},
+  rightCell:{flex:1},
+  right:{flex:1,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:theme.border,borderRadius:radius.sm,paddingHorizontal:SP.sm,paddingVertical:7,backgroundColor:theme.card},
+  rightSelected:{borderColor:theme.text},
+  rightText:{color:theme.muted,fontFamily:FONT.medium,fontSize:FS.sm},
+  rightTextSelected:{color:theme.text},
   cases:{marginTop:SP.lg,gap:SP.sm},
   title:{color:theme.text,fontFamily:FONT.bold,fontSize:FS.lg},
   case:{flexDirection:'row',alignItems:'center',backgroundColor:theme.card,borderRadius:RADIUS.sm,padding:SP.sm,borderWidth:1,borderColor:theme.border},

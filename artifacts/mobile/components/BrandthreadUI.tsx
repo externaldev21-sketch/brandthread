@@ -488,7 +488,7 @@ export function PrimaryButton({
       // the caller's `style` sets a slimmer one — so PressableScale's forced
       // 44pt minimum is skipped here (its auto hit-slop still pads the TAP
       // area back up to 44pt; only the drawn box gets slimmer).
-      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, style]}
+      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, disabled && { borderWidth: 1, borderColor: palette.border }, style]}
       noMinHeight
       testID={testID}
     >

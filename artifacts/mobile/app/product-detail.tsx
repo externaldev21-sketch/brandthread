@@ -16,6 +16,8 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
 import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -169,15 +171,26 @@ export default function ProductDetailScreen() {
   }
 
   if (!product) {
+    // A failed fetch is a connection problem worth retrying; a missing id or
+    // an id that resolves to nothing is a dead link — say so and offer a way back.
     return (
       <View style={s.root}>
         <ScreenHeader title="Product" />
-        <EmptyState
-          icon="alert-circle"
-          title="Couldn't load this product"
-          description="Check your connection and try again."
-          action={{ label: 'Try again', onPress: () => { void loadProduct(); }, icon: 'refresh-cw' }}
-        />
+        {loadError ? (
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load this product"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => { void loadProduct(); }, icon: 'refresh-cw' }}
+          />
+        ) : (
+          <EmptyState
+            icon="package"
+            title="Product not found"
+            description="This product may have been removed or is no longer available."
+            action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+          />
+        )}
       </View>
     );
   }

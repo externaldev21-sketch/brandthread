@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, EmptyState, FormInput } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, EmptyState, FormInput } from '@/components/BrandthreadUI';
 
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -215,7 +215,7 @@ export default function ProductImportScreen() {
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>CSV File</Text>
-              <Text style={s.methodDesc}>Upload a spreadsheet with your product catalogue</Text>
+              <Text style={s.methodDesc}>Upload a spreadsheet with your product catalog</Text>
             </View>
             <Feather name={selectedMethod === 'csv' ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
           </View>

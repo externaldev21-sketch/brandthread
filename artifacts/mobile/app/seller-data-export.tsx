@@ -87,7 +87,7 @@ export default function SellerDataExportScreen() {
 
   return (
       <View style={styles.root}>
-      <ScreenHeader title="Export My Data" />
+      <ScreenHeader title="Export my data" />
 
        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}
@@ -152,7 +152,7 @@ export default function SellerDataExportScreen() {
 
         {/* Generate button */}
         <PrimaryButton
-          label={loading ? 'Generating…' : 'Generate Export'}
+          label={loading ? 'Generating…' : 'Generate export'}
           onPress={handleExport}
           disabled={loading || include.length === 0}
           loading={loading}

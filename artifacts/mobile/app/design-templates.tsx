@@ -25,6 +25,10 @@ import { radius } from '@/constants/radii';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { minHitSlop } from '@/lib/hitSlop';
 
+// Monochrome (silver) placeholder thumbnail for every template — the
+// per-template hues in `gradColors` were off-palette.
+const MONO_THUMB_GRADIENT = ['rgba(192,192,192,0.18)', 'rgba(192,192,192,0.04)'] as const;
+
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
 
@@ -168,8 +172,13 @@ export default function DesignTemplatesScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={ts.templateCard}>
-              {/* Thumbnail — neutral placeholder (no real template previews yet) */}
-              <View style={[ts.thumbnail, { backgroundColor: theme.borderSubtle }]}>
+              {/* Thumbnail */}
+              <LinearGradient
+                colors={MONO_THUMB_GRADIENT}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={ts.thumbnail}
+              >
                 <View style={ts.thumbnailContent}>
                   <Feather
                     name={

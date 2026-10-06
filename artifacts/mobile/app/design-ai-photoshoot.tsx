@@ -598,8 +598,9 @@ const UPLOAD_INSTEAD_HIT_SLOP_ABOVE_TILES = { top: 8, bottom: 0, left: 0, right:
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
-  content: { padding: SP.lg },
-  sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.sm },
+  content: { padding: SP.md },
+  sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.xs },
+  sectionSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, lineHeight: 18 },
   sectionDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.lg },
   tileRowScroller: { alignSelf: 'stretch' },
   tileRow: { flexDirection: 'row', gap: 10, paddingRight: SP.lg },

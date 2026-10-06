@@ -75,16 +75,7 @@ export default function SellerDrops() {
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <ScreenHeader
         title="Drops"
-        rightElement={
-          <TouchableOpacity
-            style={[styles.newBtn, { backgroundColor: theme.accent }]}
-            onPress={() => router.push('/seller-drop-create' as never)}
-            accessibilityRole="button"
-            accessibilityLabel="New drop"
-          >
-            <Feather name="plus" size={18} color={theme.onAccent} />
-          </TouchableOpacity>
-        }
+        actions={[{ icon: 'plus', onPress: () => router.push('/seller-drop-create' as never), accessibilityLabel: 'New drop' }]}
       />
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: 10 }}
@@ -131,7 +122,6 @@ export default function SellerDrops() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  newBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 13 },
   emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.md },
 });

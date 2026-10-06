@@ -22,10 +22,10 @@ import { radius } from '@/constants/radii';
 type Colors = ReturnType<typeof useColors>;
 
 const STATUS_OPTIONS: { value: StorePublishStatus; label: string }[] = [
-  { value: 'not_started', label: 'Not Started' },
+  { value: 'not_started', label: 'Not started' },
   { value: 'draft', label: 'Draft' },
   { value: 'published', label: 'Published' },
-  { value: 'password_protected', label: 'Password Protected' },
+  { value: 'password_protected', label: 'Password protected' },
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'unpublished', label: 'Unpublished' },
 ];
@@ -111,7 +111,7 @@ export default function StoreSettingsScreen() {
   return (
     <View style={ss.root}>
       <ScreenHeader
-        title="Store Settings"
+        title="Store settings"
         variant="push"
         rightElement={(
           <PrimaryButton
@@ -137,7 +137,7 @@ export default function StoreSettingsScreen() {
         {/* STORE IDENTITY */}
         <SectionHeader title="STORE IDENTITY" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
-          <FieldRow ss={ss} label="Store Name">
+          <FieldRow ss={ss} label="Store name">
             <TextInput
               style={ss.input}
               value={form.storeName}
@@ -161,7 +161,7 @@ export default function StoreSettingsScreen() {
             </View>
           </FieldRow>
           <View style={ss.divider} />
-          <FieldRow ss={ss} label="Contact Email">
+          <FieldRow ss={ss} label="Contact email">
             <TextInput
               style={ss.input}
               value={form.contactEmail}
@@ -173,7 +173,7 @@ export default function StoreSettingsScreen() {
             />
           </FieldRow>
           <View style={ss.divider} />
-          <FieldRow ss={ss} label="Customer Support Email">
+          <FieldRow ss={ss} label="Customer support email">
             <TextInput
               style={ss.input}
               value={form.supportEmail}
@@ -198,7 +198,7 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Language">
-            <View style={ss.chipRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ss.chipScroll}>
               {LANGUAGES.map(l => (
                 <FilterChip
                   key={l}
@@ -207,10 +207,10 @@ export default function StoreSettingsScreen() {
                   onPress={() => patch({ language: langCode(l) })}
                 />
               ))}
-            </View>
+            </ScrollView>
           </FieldRow>
           <View style={ss.divider} />
-          <FieldRow ss={ss} label="Time Zone">
+          <FieldRow ss={ss} label="Time zone">
             <TextInput
               style={ss.input}
               value={form.timezone}
@@ -257,7 +257,7 @@ export default function StoreSettingsScreen() {
           {form.storeStatus === 'password_protected' && (
             <>
               <View style={ss.divider} />
-              <FieldRow ss={ss} label="Store Password">
+              <FieldRow ss={ss} label="Store password">
                 <TextInput
                   style={ss.input}
                   value={form.storePassword ?? ''}
@@ -284,7 +284,7 @@ export default function StoreSettingsScreen() {
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Require Account"
+            label="Require account"
             description="Buyers must create an account to check out"
             descriptionLines={2}
             value={form.checkoutRequireAccount}
@@ -292,14 +292,14 @@ export default function StoreSettingsScreen() {
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Guest Checkout"
+            label="Guest checkout"
             description="Allow guest checkout"
             value={form.checkoutGuestAllowed}
             onValueChange={v => patch({ checkoutGuestAllowed: v })}
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Order Notifications"
+            label="Order notifications"
             description="Email seller on new orders"
             value={form.orderNotifications}
             onValueChange={v => patch({ orderNotifications: v })}
@@ -320,8 +320,6 @@ export default function StoreSettingsScreen() {
             style={{ minHeight: 48 }}
           />
         </BrandthreadCard>
-
-        <PrimaryButton label="Save Settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
       </ScrollView>
       )}
     </View>
@@ -370,12 +368,12 @@ function makeStyles(colors: Colors) {
     urlRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     urlSuffix: { flexShrink: 0, fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+    chipScroll: { flexDirection: 'row', gap: SP.sm },
     statusChip: {
       paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.md,
       borderWidth: 1, borderColor: colors.border,
       minHeight: 44, justifyContent: 'center',
     },
     statusChipLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium },
-    saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
   });
 }

@@ -437,7 +437,18 @@ export default function DesignBgRemovalScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Remove Background" onBack={() => goBackOr(router)} divider={false} />
+      <ScreenHeader title="Remove background" onBack={() => goBackOr(router)} divider={false} />
+
+      {/* Radial vignette/spotlight atmosphere behind the stage — Dev's
+          "make the layout look cooler" ask, kept subtle. */}
+      <View style={s.vignetteWrap} pointerEvents="none">
+        <LinearGradient
+          colors={['rgba(255,255,255,0.06)', 'rgba(0,0,0,0)']}
+          style={s.vignette}
+          start={{ x: 0.5, y: 0.15 }}
+          end={{ x: 0.5, y: 0.75 }}
+        />
+      </View>
 
       <View style={s.body}>
         <View style={s.frameOuter}>

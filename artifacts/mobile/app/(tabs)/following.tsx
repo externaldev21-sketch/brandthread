@@ -252,7 +252,7 @@ export default function FollowingScreen() {
       {/* Pushed from the feed's "See all" (hidden tab), so the shared back-arrow
           header. The status line only shows with drops — the empty state below
           already says "No drops yet". */}
-      <ScreenHeader title="Following" />
+      <ScreenHeader title="Drops" />
       {!loading && drops.length > 0 ? (
         <Text style={[TYPE_SCALE.footnote, s.statusLine, { color: palette.mutedForeground }]}>{subtitle}</Text>
       ) : null}
@@ -296,11 +296,11 @@ export default function FollowingScreen() {
           <DropCardSkeleton />
         </View>
       ) : drops.length === 0 ? (
-        <View style={s.centeredWrap}>
+        <View style={[s.centeredWrap, { paddingBottom: barInset + SPACING.xxl }]}>
           <Feather name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
           <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>No drops yet</Text>
-          <Text style={[TYPE_SCALE.footnote, s.emptyBody, { color: palette.mutedForeground }]}>
-            Follow sellers to see their latest drops here.{'\n'}New drops from sellers you follow will appear when they go live.
+          <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
+            Follow sellers to see their latest drops here.
           </Text>
         </View>
       ) : (
@@ -330,7 +330,7 @@ export default function FollowingScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
 
-  statusLine: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.sm },
+  statusLine: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
 
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },

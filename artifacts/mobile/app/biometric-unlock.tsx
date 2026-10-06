@@ -39,6 +39,9 @@ export default function AppLockSettingsScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const label = device?.label ?? 'Face ID';
+  // Generic method names are common nouns, so they read lowercase mid-sentence
+  // ("Require biometrics"); branded ones (Face ID, Touch ID) keep their case.
+  const inlineLabel = ['Biometrics', 'Passcode', 'Fingerprint', 'Iris'].includes(label) ? label.toLowerCase() : label;
   const available = !!device?.supported && !!device?.hasDeviceSecurity;
 
   async function toggle(nextEnabled: boolean) {
@@ -79,9 +82,9 @@ export default function AppLockSettingsScreen() {
             <View style={s.heroIcon}>
               <Feather name={label === 'Passcode' ? 'hash' : 'lock'} size={24} color={theme.text} />
             </View>
-            <Text style={s.heroTitle}>Lock Brandthread with {label}</Text>
+            <Text style={s.heroTitle}>Lock Brandthread with {inlineLabel}</Text>
             <Text style={s.heroBody}>
-              Keep your orders, messages and payouts private. When App Lock is on, Brandthread asks for {label} every time it opens.
+              Keep your orders, messages and payouts private. When App Lock is on, Brandthread asks for {inlineLabel} every time it opens.
               {label !== 'Passcode' ? ' Your device passcode always works as a backup.' : ''}
             </Text>
           </View>
@@ -108,7 +111,7 @@ export default function AppLockSettingsScreen() {
           <View style={[s.card, !available && { opacity: 0.5 }]}>
             <View style={s.row}>
               <View style={{ flex: 1, paddingRight: SP.md }}>
-                <Text style={s.rowTitle}>Require {label}</Text>
+                <Text style={s.rowTitle}>Require {inlineLabel}</Text>
                 <Text style={s.rowSub}>{settings.enabled ? 'On — required to open the app' : 'Off'}</Text>
               </View>
               {busy ? <ActivityIndicator color={theme.text} /> : (
@@ -116,7 +119,7 @@ export default function AppLockSettingsScreen() {
                   value={settings.enabled}
                   onValueChange={toggle}
                   disabled={!available}
-                  accessibilityLabel={`Require ${label}`}
+                  accessibilityLabel={`Require ${inlineLabel}`}
                 />
               )}
             </View>

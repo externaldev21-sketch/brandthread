@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
@@ -256,11 +257,11 @@ export default function UsersScreen() {
       ) : (
         <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
           {members.length === 0 ? (
-            <View style={[styles.body, { backgroundColor: colors.secondary }]}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
-                {role ? `No one has the ${ROLE_LABEL[String(role)] ?? role} role yet.` : 'No team members yet.'}
-              </Text>
-            </View>
+            <EmptyState
+              icon="users"
+              title={role ? `No one has the ${ROLE_LABEL[String(role)] ?? role} role yet` : 'No team members yet'}
+              action={{ label: 'Invite someone', icon: 'user-plus', onPress: () => { haptic(); router.push('/team' as never); } }}
+            />
           ) : (
             members.map((m) => (
               <TouchableOpacity
@@ -311,7 +312,6 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
   statusText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   onlineDot: { width: 10, height: 10, borderRadius: 5 },
-  body: { flex: 1, alignItems: 'center', paddingTop: 24, paddingBottom: 24 },
   // Detail mode
   card: { borderRadius: 14, borderWidth: 1, marginBottom: 20 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },

@@ -194,7 +194,7 @@ const s = StyleSheet.create({
   langName: { fontSize: 14, fontFamily: FONT.semibold },
   defaultBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
   defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2, textAlign: 'left', alignSelf: 'flex-start' },
+  langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2, textAlign: 'left', writingDirection: 'ltr', alignSelf: 'stretch' },
   langMarket: { fontSize: 11, fontFamily: FONT.regular },
   footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 });
