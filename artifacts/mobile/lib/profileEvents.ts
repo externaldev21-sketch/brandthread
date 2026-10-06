@@ -21,6 +21,8 @@ export type ProfileEvent =
       followersCount?: number;
       /** Canonical id of the viewer whose following count changed. */
       viewerId?: string | null;
+      /** Server-confirmed following count of the viewer, when the API returned one. */
+      viewerFollowingCount?: number;
     }
   | { type: 'content'; ownerId?: string | null };
 
@@ -44,4 +46,16 @@ export function emitProfileEvent(event: ProfileEvent): void {
  */
 export function nextFollowingCount(current: number, isFollowing: boolean): number {
   return Math.max(0, current + (isFollowing ? 1 : -1));
+}
+
+/**
+ * The viewer's Following count after a follow event: the server-confirmed
+ * number when the event carries one (exact, so duplicate events and no-op
+ * follows — e.g. "Follow all" on brands already followed — can't drift it),
+ * else the ±1 estimate.
+ */
+export function followingCountAfter(current: number, event: { isFollowing: boolean; viewerFollowingCount?: number }): number {
+  return typeof event.viewerFollowingCount === 'number'
+    ? Math.max(0, event.viewerFollowingCount)
+    : nextFollowingCount(current, event.isFollowing);
 }

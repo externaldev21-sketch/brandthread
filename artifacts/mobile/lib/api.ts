@@ -2924,10 +2924,15 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       /** Follow another buyer */
       follow: (userId: string) =>
-        trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number; status?: 'requested' }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]]),
+        trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number; followingCount?: number; status?: 'requested' }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]]),
       /** Unfollow a buyer */
       unfollow: (userId: string) =>
-        del<{ ok: boolean; isFollowing: boolean; followersCount: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
+        del<{ ok: boolean; isFollowing: boolean; followersCount: number; followingCount?: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
+      /** Batch follow state for up to 100 accounts, keyed by the ids as sent. */
+      statuses: (userIds: string[]) =>
+        get<Record<string, { isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean }>>(
+          `/api/social/status?ids=${userIds.map(encodeURIComponent).join(',')}`
+        ),
       /** Check follow status between me and another user */
       status: (userId: string) =>
         get<{
