@@ -30,7 +30,7 @@ export default function MobileAppBuilderScreen() {
             <View style={[styles.heroIcon, { backgroundColor: primary + '22' }]}>
               <Feather name="smartphone" size={22} color={primary} />
             </View>
-            <Badge label="Pro" variant="gold" />
+            <Badge label="Pro" />
           </View>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>Launch your own app</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>

@@ -59,7 +59,7 @@ type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production'
 // that clipped off the right edge of a 393pt screen with no affordance.
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { key: 'discover',         label: 'Discover',       icon: 'search' },
-  { key: 'my_manufacturers', label: 'My Mfgs',        icon: 'users' },
+  { key: 'my_manufacturers', label: 'My manufacturers', icon: 'users' },
   { key: 'quotes',           label: 'Quotes',         icon: 'file-text' },
   { key: 'samples',          label: 'Samples',        icon: 'package' },
   { key: 'production',       label: 'Orders',         icon: 'layers' },
@@ -544,12 +544,12 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           </TouchableOpacity>
           <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} testID="button-compare-suppliers">
             <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
-            <Text style={s.rfqSecondaryText}>Compare Suppliers</Text>
+            <Text style={s.rfqSecondaryText}>Compare manufacturers</Text>
           </TouchableOpacity>
         </View>
 
         {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleedRow} contentContainerStyle={s.categoryRow}>
           {CATEGORY_CHIPS.map((category) => (
             <FilterChip key={category} label={category} active={filters.category === category} onPress={() => toggleCategory(category)} />
           ))}
@@ -560,7 +560,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         {rails.map((rail) => rail.data.length > 0 && (
           <View key={rail.key} style={s.featuredSection}>
             <SectionHeader title={rail.title} style={s.sectionHeaderTight} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.featuredRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleedRow} contentContainerStyle={s.featuredRow}>
               {rail.data.map((mfg) => (
                 <TouchableOpacity
                   key={mfg.id}
@@ -581,8 +581,8 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
                       </View>
                     )}
                   </View>
-                  <Text style={s.featuredName} numberOfLines={1}>{mfg.name}</Text>
-                  <Text style={s.featuredMeta} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
+                  <Text style={s.featuredName} numberOfLines={2}>{mfg.name}</Text>
+                  <Text style={s.featuredMeta} numberOfLines={2}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -788,14 +788,14 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
       <View style={card.topRow}>
         <View style={card.nameCol}>
           <View style={card.nameRow}>
-            <Text style={card.name} numberOfLines={1}>{mfg.name}</Text>
+            <Text style={card.name} numberOfLines={2}>{mfg.name}</Text>
             {mfg.isVerified && (
               <View style={[card.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
                 <Feather name="check-circle" size={11} color={theme.secondary} />
               </View>
             )}
           </View>
-          <Text style={card.location} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
+          <Text style={card.location} numberOfLines={2}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
           <View style={card.ratingRow}>
             <Feather name="star" size={12} color={theme.warning} />
             <Text style={card.ratingText}>{mfg.reviewCount > 0 ? mfg.rating.toFixed(1) : 'Not rated'}</Text>
@@ -1748,7 +1748,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive:{ borderColor: theme.border, backgroundColor: theme.accentDim },
   filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: 10, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
-  resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, paddingHorizontal: SP.md, marginBottom: SP.sm },
+  resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.sm },
   skeletonList: { padding: SP.md, gap: SP.md },
   skeletonRow:  { height: 132, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md },
@@ -1763,7 +1763,9 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   emptyState:   { flex: 1, justifyContent: 'center', paddingBottom: COMP.tabBarH + SP.lg },
 
   // Discover tab — Alibaba-style sourcing intro (RFQ CTA, categories, featured, previews)
-  discoverIntroContent: { paddingHorizontal: SP.md, paddingTop: SP.xs, gap: SP.md },
+  // No own horizontal padding: the FlatList's gridContent already supplies
+  // the single 16px gutter (this used to double it to 32px).
+  discoverIntroContent: { paddingTop: SP.xs, gap: SP.md },
   rfqCta:       { borderRadius: RADIUS.lg, overflow: 'hidden' },
   rfqCtaGrad:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md },
   rfqCtaIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }, // theme-exempt: overlay on gradient
@@ -1773,10 +1775,13 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   rfqSecondaryRow: { flexDirection: 'row', gap: SP.sm },
   rfqSecondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs, height: 40, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
   rfqSecondaryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
-  categoryRow:  { gap: SP.sm, paddingRight: SP.md },
+  // Horizontal rails bleed to the screen edge (cancelling the list gutter)
+  // so chips/cards scroll off the edge instead of being cut 16px short.
+  bleedRow:     { marginHorizontal: -SP.md },
+  categoryRow:  { gap: SP.sm, paddingHorizontal: SP.md },
   sectionHeaderTight: { marginBottom: SP.xs },
   featuredSection: { gap: SP.xs },
-  featuredRow:  { gap: SP.sm, paddingRight: SP.md },
+  featuredRow:  { gap: SP.sm, paddingHorizontal: SP.md },
   featuredCard: { width: 108 },
   featuredCover:{ width: 108, height: 88, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: theme.accentDim, position: 'relative' },
   featuredCoverImage: { width: '100%', height: '100%' },

@@ -11,7 +11,6 @@ import {
   ActivityIndicator, RefreshControl, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -22,7 +21,8 @@ import {
   ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadHeader, EmptyState, IconButton } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
@@ -86,16 +86,13 @@ export default function ProductBundlesScreen() {
   function onRefresh() { setRefreshing(true); load(true); }
 
   return (
-    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
-      <BrandthreadHeader
+    <View style={s.root}>
+      <ScreenHeader
         title="Bundles"
         onBack={() => goBackOr(router)}
-        rightElement={
-          <IconButton
-            name="plus"
-            onPress={() => router.push('/product-bundle-edit' as never)}
-          />
-        }
+        actions={[
+          { icon: 'plus', onPress: () => router.push('/product-bundle-edit' as never), accessibilityLabel: 'Create bundle' },
+        ]}
       />
 
       {loading ? (
