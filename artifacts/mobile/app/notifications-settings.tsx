@@ -20,6 +20,8 @@ import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications
 import { Card } from '@/components/ui/Card';
 import { SPACING } from '@/constants/spacing';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { FONT } from '@/lib/theme';
+import { useRole } from '@/contexts/RoleContext';
 
 type Role = 'buyer' | 'seller';
 
@@ -56,9 +58,14 @@ export default function NotificationsSettingsScreen() {
   const api    = useApi();
   const colors = useColors();
   const s = React.useMemo(() => makeStyles(), []);
-  // Unknown until the server says: never show seller rows to a buyer.
-  const [role, setRole] = useState<Role | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // The server's role (from the auth token) decides which preference keys
+  // apply once loaded; until then — or when the request can't run, e.g. a
+  // signed-out preview — fall back to the app's active role so a buyer never
+  // sees seller-only categories.
+  const { role: activeRole } = useRole();
+  const [serverRole, setRole] = useState<Role | null>(null);
+  const role: Role = serverRole ?? (activeRole === 'buyer' ? 'buyer' : 'seller');
   const [pushEnabled, setPushEnabled] = useState(true);
   const [promotionalPush, setPromotionalPush] = useState(false);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
@@ -146,7 +153,7 @@ export default function NotificationsSettingsScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Master switch ── */}
-        <View style={s.section}>
+        <View style={[s.section, s.sectionFirst]}>
           <Card>
             <ListRow
               icon={pushEnabled ? 'bell' : 'bell-off'}
@@ -157,8 +164,6 @@ export default function NotificationsSettingsScreen() {
             />
           </Card>
         </View>
-
-        <View style={s.divider} />
 
         {/* ── Notification types ── */}
         <View style={s.section}>
@@ -181,8 +186,6 @@ export default function NotificationsSettingsScreen() {
           </Card>
         </View>
 
-        <View style={s.divider} />
-
         {/* ── Promotions (explicit opt-in, off by default; Guideline 4.5.4) ── */}
         <View style={s.section}>
           <Card>
@@ -196,14 +199,11 @@ export default function NotificationsSettingsScreen() {
           </Card>
         </View>
 
-        <View style={s.divider} />
-
         {/* ── Quiet hours ── */}
         <View style={s.section}>
           <QuietHoursRow start={quietHours.start} end={quietHours.end} onChange={handleQuietHoursChange} />
         </View>
 
-        <View style={s.divider} />
 
         {/* ── Other channels ── */}
         <View style={s.section}>
@@ -228,8 +228,11 @@ export default function NotificationsSettingsScreen() {
 function makeStyles() {
   return StyleSheet.create({
     container:        { flex: 1 },
-    section:          { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md + 2 },
-    divider:          { height: 10 },
+    // One consistent 24pt gap between stacked sections (16pt below the header).
+    section:          { paddingHorizontal: SPACING.md, paddingTop: SPACING.xl },
+    sectionFirst:     { paddingTop: SPACING.md },
+    sectionTitle:     { fontFamily: FONT.semibold, marginBottom: SPACING.xxs + 2 },
+    sectionSubtitle:  { marginBottom: SPACING.sm + 2, lineHeight: 17 },
     listCard:         { padding: SPACING.sm },
     rowDivider:       { height: StyleSheet.hairlineWidth },
   });

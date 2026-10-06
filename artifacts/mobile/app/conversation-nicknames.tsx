@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { isPreviewConversationId } from '@/lib/previewInbox';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { setConversationNickname } from '@/services/socialService';
 import { apiErrorMessage } from '@/lib/safety';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -40,7 +41,7 @@ export default function ConversationNicknamesScreen() {
   // current nickname with it — prefill once it arrives.
   useEffect(() => { if (participant) setNickname(participant.nickname ?? ''); }, [participant?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [saving, setSaving] = useState(false);
-  const isPreview = isPreviewConversationId(conversationId);
+  const isPreview = isPreviewConversationId(conversationId) || isSellerDevPreview() || isBuyerDevPreview();
   const canSave = !!participant && canSaveNickname(nickname, initialNickname);
 
   async function save() {

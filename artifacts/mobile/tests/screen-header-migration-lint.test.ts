@@ -93,7 +93,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/call-screen.tsx',
   'app/camera-capture.tsx',
   'app/community-guidelines.tsx',
-  'app/conversation-details.tsx',
   'app/conversation-search.tsx',
   'app/customer-accounts.tsx', // redirect-only route
   'app/customer-events.tsx', // redirect-only route
@@ -101,6 +100,9 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/design-canvas.tsx',
   'app/design-project.tsx',
   'app/dispute-detail.tsx',
+  'app/design-prompt-edit.tsx',
+  'app/design-upload-sketch.tsx',
+  'app/design.tsx',
   'app/drops/[dropId].tsx',
   'app/forgot-password.tsx',
   'app/index.tsx',
@@ -129,7 +131,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/seller-profile.tsx',
   'app/settings.tsx',
   'app/shipping-delivery.tsx',
-  'app/shipping-label.tsx',
   'app/sign-in.tsx',
   'app/splash.tsx',
   'app/store-generating.tsx',

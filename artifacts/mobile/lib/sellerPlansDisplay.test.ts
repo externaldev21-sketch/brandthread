@@ -6,7 +6,23 @@ import {
   formatDollars,
   planIncludesFeature,
   PLAN_FAQ,
+  weeklyCentsFromMonthly,
+  weeklyEquivalentFor,
 } from './sellerPlansDisplay';
+
+describe('weeklyEquivalentFor', () => {
+  it('spreads 12 monthly charges over 52 weeks', () => {
+    expect(weeklyCentsFromMonthly(2900)).toBe(669); // 348 / 52 = 6.692…
+    expect(weeklyCentsFromMonthly(7900)).toBe(1823); // 948 / 52 = 18.230…
+    expect(weeklyCentsFromMonthly(19900)).toBe(4592); // 2388 / 52 = 45.923…
+    expect(weeklyCentsFromMonthly(0)).toBe(0);
+  });
+  it('formats the real catalogue price', () => {
+    const starter = SELLER_PLANS.find((p) => p.id === 'starter')!;
+    expect(starter.priceCents).toBe(2900);
+    expect(weeklyEquivalentFor(starter)).toBe('~$6.69/wk');
+  });
+});
 
 describe('formatDollars', () => {
   it('formats whole and fractional dollar amounts', () => {

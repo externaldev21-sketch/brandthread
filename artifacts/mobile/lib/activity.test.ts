@@ -19,6 +19,8 @@ import {
   createDeferredDelete,
   ACTIVITY_UNDO_MS,
   groupByRecency,
+  excludeActivityActors,
+  chipRowGap,
   groupedPeopleHref,
   groupedPeopleTitle,
   GROUPED_PEOPLE_MAX_IDS,
@@ -650,5 +652,31 @@ describe('delete with undo', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(d.isPending('n1')).toBe(false);
     expect(onFailed).toHaveBeenCalledWith(['n2']);
+  });
+});
+
+describe('excludeActivityActors', () => {
+  const people = [{ userId: 'a', name: 'A' }, { userId: 'b', name: 'B' }, { userId: 'c', name: 'C' }];
+  it('drops anyone who is an actor in the loaded feed', () => {
+    expect(excludeActivityActors(people, [{ actorId: 'b' }, { actorId: undefined }]).map((p) => p.userId)).toEqual(['a', 'c']);
+  });
+  it('keeps everyone when the feed is empty', () => {
+    expect(excludeActivityActors(people, [])).toEqual(people);
+  });
+});
+
+describe('chipRowGap', () => {
+  // All / Follows / Likes / Comments / Orders / Thread Cash, measured on web.
+  const widths = [42, 72, 58, 92, 67, 114];
+  it('tightens the gap when the default leaves a chip flush with the edge and the next hidden', () => {
+    // 390pt: with 8pt gaps "Orders" ends at ~383 and "Thread Cash" starts off-screen.
+    expect(chipRowGap(widths, 390)).toBe(6);
+  });
+  it('keeps the default gap when the next chip already visibly peeks in', () => {
+    expect(chipRowGap(widths, 375)).toBe(8);
+    expect(chipRowGap(widths, 430)).toBe(8);
+  });
+  it('keeps the default gap when everything fits', () => {
+    expect(chipRowGap([40, 40], 390)).toBe(8);
   });
 });

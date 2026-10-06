@@ -31,6 +31,8 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui/Button';
+import { inboxPillColors } from '@/components/inbox/inboxPillColors';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -140,8 +142,8 @@ function InboxPillRow({
             style={[
               pillS.pill,
               active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
-                : { backgroundColor: 'transparent', borderColor: theme.border },
+                ? { backgroundColor: inboxPillColors(theme, true).backgroundColor, borderColor: inboxPillColors(theme, true).borderColor }
+                : { backgroundColor: inboxPillColors(theme, false).backgroundColor, borderColor: inboxPillColors(theme, false).borderColor },
             ]}
             onPress={() => onChange(pill.key)}
             rippleEnabled={NO_RIPPLE}
@@ -149,7 +151,7 @@ function InboxPillRow({
             accessibilityState={{ selected: active }}
             testID={`inbox-tab-${pill.key}`}
           >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
+            <Text style={[pillS.pillLabel, { color: inboxPillColors(theme, active).label }]}>
               {pill.label}
             </Text>
             {!!pill.count && pill.count > 0 && (
@@ -2118,13 +2120,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   // (and empty) even for authors with no active note, so every avatar in
   // the row still lines up on the same baseline regardless of who has a
   // note bubble floating above them.
-  activeRailNoteWrap: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
-  noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  activeRailNoteWrap: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  noteBubbleTouchable: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
     maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
-  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
+  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14, textAlign: 'center' },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],

@@ -2,6 +2,7 @@ import { useSellerShell } from '@/contexts/SellerShellContext';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
+import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
 
 /**
  * Bottom space taken by the floating seller tab bar (SellerGlobalTabBar),
@@ -16,6 +17,7 @@ export function useSellerTabBarInset(): number {
   const { isActiveSeller } = useSellerShell();
   const hiddenByScreen = useTabBarHiddenByScreen();
   const occupied = useTabBarMetrics(2).occupiedHeight;
+  const floor = useScreenBottomInset();
   const sellerBarShown = isActiveSeller || isSellerDevPreview();
-  return sellerBarShown && !hiddenByScreen ? occupied : 0;
+  return sellerBarShown && !hiddenByScreen ? occupied : floor;
 }

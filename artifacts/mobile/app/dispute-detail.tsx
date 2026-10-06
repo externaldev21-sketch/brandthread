@@ -19,6 +19,8 @@ import { DisputeEvidenceFiles } from '@/components/disputes/DisputeEvidenceFiles
 import { demoDisputeDetail } from '@/components/disputes/demoDisputes';
 import type { DisputeEvidenceFile } from '@/lib/disputeTypes';
 import { radius } from '@/constants/radii';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -224,14 +226,32 @@ export default function DisputeDetailScreen() {
 
   if (loading || !dispute || !order) {
     return (
-      <View style={styles.centered}>
-        {loading ? (
-          <Text style={styles.loadingText}>Loading…</Text>
-        ) : loadError ? (
-          <RetryRow label="Couldn't load dispute" onRetry={() => void load()} />
-        ) : (
-          <Text style={styles.loadingText}>Dispute not found.</Text>
-        )}
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Dispute" onBack={() => goBackOr(router, '/(tabs)/orders')} />
+        <View style={styles.centered}>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading…</Text>
+          ) : loadError ? (
+            <EmptyState
+              variant="error"
+              icon="alert-circle"
+              title="Couldn't load dispute"
+              message="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={() => void load()}
+              testID="dispute-detail-error"
+            />
+          ) : (
+            <EmptyState
+              icon="alert-circle"
+              title="Dispute not found"
+              message="This dispute may have been closed or the link is incomplete."
+              actionLabel="Go back"
+              onAction={() => goBackOr(router, '/(tabs)/orders')}
+              testID="dispute-detail-not-found"
+            />
+          )}
+        </View>
       </View>
     );
   }

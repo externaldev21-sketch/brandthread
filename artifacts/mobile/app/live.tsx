@@ -45,7 +45,7 @@ import { clearLiveCheckoutContext, getLiveCheckoutContext, setLiveCheckoutContex
 import type { LiveStream } from '@/lib/live/types';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
-  type LiveHeartLayerHandle,
+  LiveViewerStack, type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -202,9 +202,14 @@ function LivePage({
           onFollow={onFollow}
           onOpenHost={onOpenHost}
         />
-        <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
-          <Feather name="x" size={22} color="#fff" />
-        </Pressable>
+        <View style={styles.topRight}>
+          {/* Count lives once, in the host pill's LIVE row — not repeated
+              here next to the avatars. */}
+          <LiveViewerStack viewers={stream.topViewers} />
+          <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
+            <Feather name="x" size={22} color="#fff" />
+          </Pressable>
+        </View>
       </View>
       <Text style={[styles.title, { top: topInset + 68 }]} numberOfLines={1}>{stream.title}</Text>
 
@@ -421,8 +426,9 @@ export default function LiveScreen() {
             onFollow={pager.setFollowing}
             onOpenCreator={id => openHost(id)}
           />
-          <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 8 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" testID="live-close">
-            <Feather name="x" size={22} color="#888" />
+          <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 6 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
+            {/* Same close control as a live page's (white, same spot). */}
+            <Feather name="x" size={22} color="#fff" />
           </Pressable>
         </>
       ) : ready ? (
@@ -543,6 +549,7 @@ const styles = StyleSheet.create({
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   topRow: { position: 'absolute', left: 12, right: 12, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,

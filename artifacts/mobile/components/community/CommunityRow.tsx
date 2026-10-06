@@ -44,8 +44,15 @@ function OneLineOrNothing({ text, style }: { text: string; style: object }) {
   );
 }
 
+export function splitLastWord(name: string): { head: string; tail: string } {
+  const trimmed = name.trimEnd();
+  const at = trimmed.lastIndexOf(' ');
+  return at < 0 ? { head: '', tail: trimmed } : { head: trimmed.slice(0, at + 1), tail: trimmed.slice(at + 1) };
+}
+
 export function CommunityRow({ community, joined, joining, error, onPress, onJoin }: CommunityRowProps) {
   const colors = useColors();
+  const { head: nameHead, tail: nameTail } = splitLastWord(community.name);
   return (
     <View>
       <View style={styles.row}>
@@ -60,8 +67,9 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
           <CommunityAvatar community={community} size={52} />
           <View style={styles.copy}>
             <View style={styles.nameRow}>
-              <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={2}>{community.name}</Text>
-              {community.verified ? <VerifiedMark size={14} /> : null}
+              <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={2}>
+                {community.verified ? <>{nameHead}<Text style={styles.noWrap}>{nameTail}{'\u00A0'}<View style={styles.inlineMark}><VerifiedMark size={14} /></View></Text></> : community.name}
+              </Text>
             </View>
             {community.memberCount > 0 ? (
               <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
@@ -102,6 +110,8 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
 }
 
 const styles = StyleSheet.create({
+  inlineMark: { transform: [{ translateY: 1 }] },
+  noWrap: Platform.OS === 'web' ? ({ whiteSpace: 'nowrap' } as object) : {},
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, paddingVertical: SP.sm + 2, minHeight: 72 },
   bodyWrap: { flex: 1, minWidth: 0 },
   body: { flexDirection: 'row', alignItems: 'center', gap: SP.md - 4 },

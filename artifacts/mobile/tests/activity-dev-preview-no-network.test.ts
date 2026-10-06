@@ -46,6 +46,6 @@ describe('activity/login-activity screens never hit the real API in dev-preview,
     const src = read('components/security/LoginActivity.tsx');
     expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';");
     expect(src).toContain('if (isSellerDevPreview() || isBuyerDevPreview()) {');
-    expect(src).toContain('setSessions([PREVIEW_CURRENT_SESSION]);');
+    expect(src).toContain('setSessions([previewCurrentSession()]);');
   });
 });

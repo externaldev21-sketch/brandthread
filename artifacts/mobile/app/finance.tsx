@@ -8,11 +8,12 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { formatCents } from '@/lib/money';
+import { formatCents, formatDeductionCents } from '@/lib/money';
 import { currentPlanSummary } from '@/lib/currentPlan';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
@@ -73,7 +74,7 @@ export default function FinanceScreen() {
       if (isDemoPreview) {
         const demo = getPreviewFinanceDemo();
         setTransactions(demo.transactions);
-        setBalance(null);
+        setBalance(buildDemoSellerFinance().balance);
         setSummary(demo.summary);
       } else {
         setTransactions([]);
@@ -158,10 +159,13 @@ export default function FinanceScreen() {
   }));
 
   // Fallback P&L data when not connected
+  const grossCents = transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0);
+  const feeCents   = transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0);
   const PL_DATA_FALLBACK = [
-     { label: 'Gross Revenue', value: formatCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
-     { label: 'Fees',          value: '-' + formatCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
-     { label: 'Net (recent)',  value: formatCents(totalNet), positive: totalNet >= 0, highlight: true },
+     { label: 'Gross revenue', value: formatCents(grossCents),        color: grossCents > 0 ? colors.success : colors.foreground },
+     // Deductions stay neutral (monochrome), and zero fees read "$0.00", never "-$0.00".
+     { label: 'Fees',          value: formatDeductionCents(feeCents), color: colors.foreground },
+     { label: 'Net (recent)',  value: formatCents(totalNet),          color: totalNet >= 0 ? colors.primary : colors.destructive, highlight: true },
   ];
 
   const subPlan = currentPlanSummary(subStatus ?? { plan: null, status: null, amountCents: 0 });
@@ -295,7 +299,7 @@ export default function FinanceScreen() {
               <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
                 {item.label}
               </Text>
-              <Text style={[styles.plValue, TABULAR_NUMS, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
+              <Text style={[styles.plValue, TABULAR_NUMS, { color: item.color, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
                 {item.value}
               </Text>
             </View>
@@ -303,8 +307,8 @@ export default function FinanceScreen() {
         )}
       </View>
 
-      {/* Recent Transactions */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
+      {/* Recent transactions */}
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent transactions</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 20 }} />

@@ -16,6 +16,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBa
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RADII, radius } from '@/constants/radii';
+import { EmptyState as StateView } from '@/components/layout/EmptyState';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
@@ -820,7 +821,8 @@ export default function OrderDetailScreen() {
 
   if (!order) {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
+      <View style={s.root}>
+        <ScreenHeader title="Order" variant="push" onBack={() => goBackOr(router, '/(tabs)/orders')} />
         {updatesPaused && (
           <PressableScale
             style={s.pausedBanner}
@@ -835,14 +837,16 @@ export default function OrderDetailScreen() {
             <Feather name="refresh-cw" size={12} color={ORANGE} />
           </PressableScale>
         )}
-        <EmptyState
-          icon="alert-circle"
-          title={orderLoadFailed ? "Couldn't load this order" : 'Order not found'}
-          description={orderLoadFailed ? 'Check your connection and try again.' : 'This order may have been deleted or the ID is invalid.'}
-          action={orderLoadFailed
-            ? { label: 'Retry', onPress: retryUpdates, icon: 'refresh-cw' }
-            : { label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
-        />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <StateView
+            icon="alert-circle"
+            title={orderLoadFailed ? "Couldn't load this order" : 'Order not found'}
+            message={orderLoadFailed ? 'Check your connection and try again.' : 'This order may have been deleted or the link is incomplete.'}
+            actionLabel={orderLoadFailed ? 'Retry' : 'Go back'}
+            onAction={orderLoadFailed ? retryUpdates : () => goBackOr(router, '/(tabs)/orders')}
+            testID="order-detail-not-found"
+          />
+        </View>
       </View>
     );
   }

@@ -27,12 +27,19 @@ export function displayPriceFor(plan: SellerPlanDefinition): {
 }
 
 /**
+ * Per-week equivalent of a monthly price in cents: a year of monthly charges
+ * spread over 52 weeks ($29/mo → $348/yr → $6.69/wk), rounded to the cent.
+ */
+export function weeklyCentsFromMonthly(monthlyCents: number): number {
+  return Math.round((monthlyCents * 12) / 52);
+}
+
+/**
  * Simple per-week equivalent of a monthly price, e.g. "$29/mo" → "~$6.69/wk".
  * Uses the real billed price (priceCents) — never an invented number.
  */
 export function weeklyEquivalentFor(plan: SellerPlanDefinition): string {
-  const perWeek = plan.priceCents / 100 / 4.345;
-  return `~$${perWeek.toFixed(2)}/wk`;
+  return `~$${(weeklyCentsFromMonthly(plan.priceCents) / 100).toFixed(2)}/wk`;
 }
 
 /**

@@ -35,7 +35,10 @@ interface Props {
 
 export function GroupFormFields({ value, onChange, errors = {}, uploading, onPickPhoto, onRemovePhoto, hideVisibility }: Props) {
   const colors = useColors();
-  const field = [styles.field, { backgroundColor: colors.card, color: colors.foreground }, WEB_INPUT_RESET];
+  // Outlined like the segmented control below: on the dark theme the card fill
+  // alone is invisible, so the empty multiline description read as an ~80pt
+  // blank gap before "Who can join".
+  const field = [styles.field, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }, WEB_INPUT_RESET];
   return (
     <View style={{ gap: SP.md }}>
       <View style={styles.photoRow}>
@@ -76,7 +79,7 @@ export function GroupFormFields({ value, onChange, errors = {}, uploading, onPic
         <TextInput
           value={value.name}
           onChangeText={(name) => onChange({ name })}
-          placeholder="Graphic Design Community"
+          placeholder="Group name"
           placeholderTextColor={colors.subtle}
           maxLength={NAME_MAX + 10}
           style={field}
@@ -149,7 +152,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   label: { fontFamily: FONT.semibold, fontSize: FS.base },
   count: { fontFamily: FONT.regular, fontSize: FS.meta },
-  field: { minHeight: COMP.inputH, borderRadius: RADIUS.md, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
+  field: { minHeight: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
   multiline: { minHeight: 96, paddingTop: SP.md - 2, textAlignVertical: 'top' },
   note: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, padding: SP.md, borderRadius: RADIUS.md },

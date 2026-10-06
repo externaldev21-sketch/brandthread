@@ -297,11 +297,12 @@ export default function PaymentsScreen() {
   const api    = useApi();
   const router = useRouter();
   const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
-  // ?bt_preview=seller with no signed-in account has no token for the
-  // protected /api/drops read — it 401'd into "Couldn't load drops". Resolve
-  // straight to the honest empty state instead (same guard as finance.tsx).
+  // ?bt_preview=seller with no real signed-in account: there is no token to
+  // read drop payouts with, so GET /api/drops would 401 and surface a
+  // misleading "couldn't load" pill. Resolve straight to the honest empty
+  // state instead (same guard as app/finance.tsx / app/payouts.tsx).
   const isPreviewMode = isSellerDevPreview();
-  const skipProtectedReads = (isPreviewMode && !userId) || (isPreviewMode && (!isAuthLoaded || !isSignedIn));
+  const skipProtectedReads = isPreviewMode && (!userId || !isAuthLoaded || !isSignedIn);
   const [drops,   setDrops]   = useState<Drop[]>([]);
   const [loading, setLoading] = useState(!skipProtectedReads);
   // A failed fetch must never silently masquerade as "no drops yet" — track
