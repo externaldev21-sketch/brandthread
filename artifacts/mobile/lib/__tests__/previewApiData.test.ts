@@ -83,7 +83,8 @@ describe('previewApiData', () => {
   });
 
   it('does not answer paths it does not know (the guard then rejects them locally)', () => {
-    expect(resolvePreviewApiResponse('/api/seller/giveaways', fresh())).toBeNull();
+    expect(resolvePreviewApiResponse('/api/seller/giveaways/rules-template?prizeText=x', fresh())).toBeNull();
+    expect(resolvePreviewApiResponse('/api/seller/giveaways', fresh())!.data).toEqual({ giveaways: [] });
     expect(resolvePreviewApiResponse('/api/ai-helpers/caption', fresh())).toBeNull();
     expect(previewApiPaths().some((p) => p.startsWith('ai') || p.includes('upload'))).toBe(false);
   });

@@ -102,6 +102,8 @@ export default function FinanceScreen() {
   useEffect(() => { load(); }, [load]);
 
   const handleDownloadStatement = async () => {
+    // The statement is account data; the signed-out preview has none to download.
+    if (skipProtectedReads) return;
     const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
     const url  = `${BASE}/api/finance/statement.csv`;
     try { await Linking.openURL(url); } catch { /* ignore */ }

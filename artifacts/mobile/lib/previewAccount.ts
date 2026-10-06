@@ -32,21 +32,24 @@ export interface PreviewAccount {
 }
 
 const BASE: Record<PreviewRole, Pick<PreviewAccount, 'id' | 'role' | 'name' | 'username'>> = {
-  seller: { id: 'preview-seller', role: 'seller', name: 'Atelier Noire', username: 'atelier_noire' },
+  // Same seller identity the preview already used (and that PR #593's
+  // lib/previewIdentity.ts standardises on).
+  seller: { id: 'preview-seller', role: 'seller', name: 'Preview Studio', username: 'preview_studio' },
   buyer: { id: 'preview-buyer', role: 'buyer', name: 'Ava', username: 'ava' },
 };
 
 const DEMO_DETAILS: Record<PreviewRole, Omit<PreviewAccount, 'id' | 'role' | 'name' | 'username'>> = {
+  // The values the seller preview's Edit profile showed before — now demo-only.
   seller: {
-    email: 'studio@ateliernoire.co',
-    bio: 'Sculpted outerwear and evening pieces, cut in small runs.',
-    website: 'https://ateliernoire.co',
-    category: 'Womenswear',
-    tags: ['tailoring', 'small batch'],
-    location: 'Paris, France',
-    contactEmail: 'studio@ateliernoire.co',
-    instagram: '@atelier.noire',
-    tiktok: '@atelier.noire',
+    email: 'hello@example.com',
+    bio: 'Handmade goods, made to order.',
+    website: 'https://example.com',
+    category: 'Streetwear',
+    tags: ['handmade', 'small batch'],
+    location: 'Los Angeles, CA',
+    contactEmail: 'hello@example.com',
+    instagram: '@previewstudio',
+    tiktok: '@previewstudio',
     pronouns: '',
     phone: '',
   },

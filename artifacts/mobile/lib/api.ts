@@ -412,21 +412,38 @@ function request<T = any>(
  *   send (code `auth_required`), without the offline banner.
  *
  * Returns `{ data }` when the preview answered locally, null to proceed.
+ * lib/serviceConfig.ts serviceRequest and lib/uploadWithProgress.ts use it too,
+ * so every request path to the API goes through this one guard.
  */
-async function signedOutGate<T>(
+export async function signedOutGate<T>(
   resolvedPath: string,
   method: string,
   getToken: GetToken,
 ): Promise<{ data: T } | null> {
   if (isPublicApiRequest(method, resolvedPath)) return null;
   if (await getCachedToken(getToken)) return null;
+  const preview = await signedOutPreviewAnswer<T>(resolvedPath, method);
+  if (preview) return preview;
+  throw new ApiError(401, signedOutErrorBody());
+}
+
+/**
+ * The preview half of signedOutGate, for callers that have no token getter
+ * yet (lib/serviceConfig.ts before Clerk configures it — which never happens
+ * in the signed-out preview). Outside the preview returns null; inside it,
+ * a protected request is answered locally or rejected, never sent.
+ */
+export async function signedOutPreviewAnswer<T>(
+  resolvedPath: string,
+  method: string,
+): Promise<{ data: T } | null> {
   // The dev web preview only exists in a browser (react-native has no
   // `document`), so native and tests never load the preview modules.
-  if (method.toUpperCase() === 'GET' && typeof document !== 'undefined') {
-    const { resolveSignedOutPreviewGet } = await import('@/lib/previewApiSession');
-    const hit = resolveSignedOutPreviewGet(resolvedPath);
-    if (hit) return { data: hit.data as T };
-  }
+  if (typeof document === 'undefined' || isPublicApiRequest(method, resolvedPath)) return null;
+  const { isWebPreviewSession, resolveSignedOutPreviewGet } = await import('@/lib/previewApiSession');
+  if (!isWebPreviewSession()) return null;
+  const hit = method.toUpperCase() === 'GET' ? resolveSignedOutPreviewGet(resolvedPath) : null;
+  if (hit) return { data: hit.data as T };
   throw new ApiError(401, signedOutErrorBody());
 }
 

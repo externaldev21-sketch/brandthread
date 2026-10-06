@@ -127,6 +127,22 @@ const WILL_RETAIN = [
   "Reports you made about other people's content, without your identity",
 ];
 
+const sizes = (rows: Array<[string, string[]]>) => rows.map(([size, values]) => ({ size, values }));
+/** The size-chart presets #646's server ships (lib/sizeChart.ts SIZE_CHART_PRESETS). */
+const SIZE_CHART_PRESETS = [
+  { key: 'tops', name: 'Tops & tees', chart: { unit: 'inches', columns: ['Chest', 'Length', 'Sleeve'], rows: sizes([
+    ['XS', ['32-34', '25', '7.5']], ['S', ['35-37', '26', '8']], ['M', ['38-40', '27', '8.5']],
+    ['L', ['41-43', '28', '9']], ['XL', ['44-46', '29', '9.5']], ['XXL', ['47-49', '30', '10']]]) } },
+  { key: 'bottoms', name: 'Pants & shorts', chart: { unit: 'inches', columns: ['Waist', 'Hip', 'Inseam'], rows: sizes([
+    ['XS', ['26-28', '34-36', '30']], ['S', ['29-31', '37-39', '30']], ['M', ['32-34', '40-42', '31']],
+    ['L', ['35-37', '43-45', '31']], ['XL', ['38-40', '46-48', '32']], ['XXL', ['41-43', '49-51', '32']]]) } },
+  { key: 'dresses', name: 'Dresses', chart: { unit: 'inches', columns: ['Bust', 'Waist', 'Hip', 'Length'], rows: sizes([
+    ['XS', ['32', '25', '35', '38']], ['S', ['34', '27', '37', '39']], ['M', ['36', '29', '39', '40']],
+    ['L', ['38', '31', '41', '41']], ['XL', ['41', '34', '44', '42']]]) } },
+  { key: 'hats', name: 'Hats & beanies', chart: { unit: 'inches', columns: ['Head circumference'], rows: sizes([
+    ['S/M', ['21-22']], ['L/XL', ['22.5-24']]]) } },
+];
+
 const TEAM_ROLES = [
   { key: 'owner', name: 'Owner', group: 'Organization', description: 'Full access to all features including billing, payouts, and team management', permissions: ['*'] },
   { key: 'admin', name: 'Admin', group: 'Organization', description: 'Manage products, orders, inventory, analytics, customers, marketing, payouts and the team', permissions: ['products', 'orders', 'inventory', 'analytics', 'customers', 'marketing', 'payouts', 'team'] },
@@ -160,6 +176,9 @@ const RESOLVERS: Record<string, Resolver> = {
   'public/search/recent': () => ({ recent: [] }),
   'referrals/stats': () => ({ total: 0, pointsEarned: 0, referrals: [] }),
   'freelancers/me': () => ({ freelancer: null }),
+  'buyer/notifications': () => [],
+  'buyer/notifications/unread-count': () => ({ count: 0 }),
+  'social/suggested': () => [],
   'team/context': (_c, a) => ({ role: 'owner', storeOwnerId: a.id, teamMembershipId: null }),
 
   // ── Seller account & settings ──────────────────────────────────────────
@@ -240,6 +259,55 @@ const RESOLVERS: Record<string, Resolver> = {
   }),
   'finance/transactions': () => ({ transactions: [], connected: false }),
   'finance/payouts': () => ({ payouts: [], connected: false }),
+
+  // ── Endpoints added by open PRs (answered here so those screens render the
+  // fresh state in the preview as soon as they land). Bodies are what each
+  // PR's server returns for a new seller with no keys configured. ───────────
+  'marketing/email/status': () => ({
+    enabled: false, provider: null, message: "Email sending isn't set up yet. Drafts are saved and nothing is sent.",
+    dailyCap: 1000, sentToday: 0, remainingToday: 1000,
+    tracking: { delivered: false, opened: false, clicked: false }, missing: ['mailing_address'],
+  }), // #634
+  'marketing/email/audience': () => ({ counts: { subscribers: 0, customers: 0, followers: 0 }, byStatus: {}, subscribers: [], hasMore: false }), // #634
+  'marketing/email/campaigns': () => ({ campaigns: [] }), // #634
+  'seller/push-broadcasts': () => ({
+    canSendNow: true, nextSendAt: null, limits: { titleMax: 50, bodyMax: 178 },
+    audience: { followers: 0, recipients: 0 }, history: [],
+  }), // #660
+  'seller/giveaways': () => ({ giveaways: [] }), // #660
+  'posts/mine': () => [], // #660
+  'size-chart-templates': () => ({ templates: [], presets: SIZE_CHART_PRESETS }), // #646
+  'seller/launch-checklist': (_c, a) => ({
+    steps: ['name_handle', 'logo_banner', 'accent', 'socials', 'first_product', 'preview', 'publish', 'payouts']
+      .map((id) => ({ id, done: id === 'name_handle' })),
+    doneCount: 1, total: 8, complete: false, handle: a.username, dismissed: false,
+  }), // #649
+  'live/cohost-invites': () => ({ invites: [] }), // #628
+  'seller/affiliate': (_c, a) => ({
+    program: { enabled: false, commissionPercent: 10, buyerDiscountPercent: 0, windowDays: 30, holdDays: 30, minPayoutCents: 2500, autoApprove: false },
+    creators: [],
+    totals: { clicks: 0, orders: 0, revenueCents: 0, earnedCents: 0, pendingCents: 0, payableCents: 0, paidCents: 0 },
+    programLink: `https://brandthread.app/creator-program/join?brand=${encodeURIComponent(a.username)}`,
+    payoutsAvailable: false,
+  }), // #610
+  'gift-cards/seller/settings': (_c, a) => ({
+    sellerId: a.id, enabled: false, denominations: [2500, 5000, 10000], allowCustom: false, expiryMonths: null, minCents: 500, maxCents: 100000,
+  }), // #635
+  'gift-cards/store': (_c, a) => ({
+    sellerId: a.id, storeName: a.name, enabled: false, denominations: [], allowCustom: false, minCents: 500, maxCents: 100000,
+  }), // #635 (called with the preview's empty seller id)
+  'gift-cards/mine': () => ({ cards: [], totalCents: 0 }), // #635
+  'finance/payout-schedule': () => ({
+    connected: false, providerConfigured: false, payoutsEnabled: false, schedule: null,
+    instant: { eligible: false, reason: 'not_connected', destination: null, feeBps: 100, minFeeCents: 50, maxAmount: null, quote: null },
+    nextPayoutEstimate: null,
+  }), // #631
+  'finance/statements': () => ({ connected: false, months: [] }), // #596
+  'product-qa/seller': () => ({ unansweredCount: 0, questions: [] }), // #657
+  'sales': () => [], // #602
+  'sales/collections': () => [], // #602
+  'discount-codes/collections': () => [], // #617
+  'social/follow-requests': () => [], // #637
 };
 
 export type PreviewApiHit = { data: unknown };

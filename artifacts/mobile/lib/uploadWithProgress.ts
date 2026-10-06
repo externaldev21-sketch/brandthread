@@ -6,6 +6,7 @@
  * replacement for the shared client.
  */
 import { versionApiPath, storeContextHeaders } from '@/lib/api';
+import { isPublicApiRequest } from '@/lib/signedOutApiPolicy';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -29,6 +30,9 @@ export function uploadImageWithProgress<T = any>(
   return new Promise((resolve, reject) => {
     (async () => {
       try {
+        // Signed out (or the web preview): never send an upload to a
+        // protected endpoint — fail the same way the server's 401 would.
+        if (!token && !isPublicApiRequest('POST', path)) throw new UploadError(401, 'Sign in to continue.');
         const source = await fetch(image.uri);
         if (!source.ok) throw new Error('Could not read the selected image.');
         const blob = await source.blob();

@@ -105,7 +105,7 @@ describe('signed-out API guard (lib/api.ts)', () => {
     await expect(api.team.members()).resolves.toMatchObject([{ role: 'owner', isOwner: true }]);
     await expect(api.auth.deletionCheck()).resolves.toMatchObject({ canDelete: true, accountType: 'seller', blockers: [] });
     const profile = await api.seller.getProfile();
-    expect(profile).toMatchObject({ displayName: 'Atelier Noire', bio: null, website: null, location: null, contactEmail: null });
+    expect(profile).toMatchObject({ displayName: 'Preview Studio', bio: null, website: null, location: null, contactEmail: null });
     expect(networkCalls()).toEqual([]);
   });
 
@@ -129,6 +129,37 @@ describe('signed-out API guard (lib/api.ts)', () => {
     preview.role = 'buyer';
     const api = createApi(async () => null);
     await expect(api.safety.muteWord('spoiler')).rejects.toMatchObject({ status: 401 });
+    expect(networkCalls()).toEqual([]);
+  });
+});
+
+describe('signed-out guard on the other request paths', () => {
+  beforeEach(() => {
+    fetchMock.mockClear();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('document', undefined);
+    preview.role = null;
+  });
+
+  it('lib/serviceConfig.ts serviceRequest never sends a protected request without a session', async () => {
+    const { configureServices, serviceRequest } = await import('../serviceConfig');
+    configureServices(async () => null);
+    await expect(serviceRequest('/api/buyer/notifications?limit=30')).rejects.toMatchObject({ status: 401 });
+    expect(networkCalls()).toEqual([]);
+  });
+
+  it('lib/serviceConfig.ts serviceRequest is answered by the preview without waiting for Clerk', async () => {
+    vi.stubGlobal('document', {});
+    preview.role = 'seller';
+    vi.resetModules();
+    const { serviceRequest } = await import('../serviceConfig');
+    await expect(serviceRequest('/api/buyer/notifications?limit=30')).resolves.toEqual([]);
+    expect(networkCalls()).toEqual([]);
+  });
+
+  it('lib/uploadWithProgress.ts refuses a protected upload without a token', async () => {
+    const { uploadImageWithProgress } = await import('../uploadWithProgress');
+    await expect(uploadImageWithProgress('/api/seller/profile/avatar/upload', { uri: 'file:///a.jpg' }, null)).rejects.toMatchObject({ status: 401 });
     expect(networkCalls()).toEqual([]);
   });
 });

@@ -12,7 +12,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
-import { storeContextHeaders, versionApiPath } from '@/lib/api';
+import { signedOutGate, signedOutPreviewAnswer, storeContextHeaders, versionApiPath } from '@/lib/api';
 
 type GetToken = () => Promise<string | null>;
 
@@ -84,7 +84,16 @@ export async function serviceRequest<T = unknown>(
   options: RequestInit = {},
   reportErrors = true,
 ): Promise<T> {
+  // The signed-out preview never configures services (no Clerk); answer it
+  // locally instead of waiting for a session that will not come.
+  if (!_getToken) {
+    const preview = await signedOutPreviewAnswer<T>(versionApiPath(path), options.method ?? 'GET');
+    if (preview) return preview.data;
+  }
   await whenConfigured();
+  // Same signed-out guard as lib/api.ts: no session never reaches a protected endpoint.
+  const signedOut = await signedOutGate<T>(versionApiPath(path), options.method ?? 'GET', _getToken!);
+  if (signedOut) return signedOut.data;
   const token = await _getToken!();
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   let res: Response;
