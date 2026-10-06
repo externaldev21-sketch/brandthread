@@ -78,7 +78,8 @@ import type {
   AdFormatKind,
   AdMediaKind,
 } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getStorefront } from '@/services/storeService';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -157,7 +158,6 @@ function AdPreviewCard({
       ) : (
         <View style={[pv.media, pv.mediaEmpty, { backgroundColor: colors.elevated }]}>
           <Feather name="image" size={ICON.lg} color={colors.mutedForeground} />
-          <Text style={[pv.emptyText, { color: colors.mutedForeground }]}>Add media to see your ad preview</Text>
         </View>
       )}
 
@@ -182,9 +182,11 @@ function AdPreviewCard({
 
       <View style={pv.bottomInfo} pointerEvents="none">
         <Text style={pv.brandName} numberOfLines={1}>{brandName}</Text>
-        <Text style={pv.headline} numberOfLines={2}>
-          {headline || 'Your headline appears here'}
-        </Text>
+        {headline ? (
+          <Text style={pv.headline} numberOfLines={2}>{headline}</Text>
+        ) : (
+          <View style={pv.headlineSkeleton} />
+        )}
         {ctaText && (
           <View style={[pv.ctaPill, { backgroundColor: theme.accent }]}>
             <Text style={[pv.ctaPillText, getOnAccentTextStyle(theme)]}>{ctaText}</Text>
@@ -199,7 +201,6 @@ const pv = StyleSheet.create({
   card:          { width: '100%', aspectRatio: 4 / 5, borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden', position: 'relative' },
   media:         { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   mediaEmpty:    { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.xl },
-  emptyText:     { fontSize: FS.sm, fontFamily: FONT.medium, textAlign: 'center' },
   videoBadge:    { position: 'absolute', top: SP.sm, right: SP.sm, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, padding: 6 },
   sponsoredWrap: { position: 'absolute', top: SP.sm, left: SP.sm },
   sponsoredPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 4 },
@@ -208,6 +209,7 @@ const pv = StyleSheet.create({
   bottomInfo:    { position: 'absolute', left: SP.md, right: SP.md, bottom: SP.md, gap: 6 },
   brandName:     { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
   headline:      { fontSize: FS.base, fontFamily: FONT.semibold, color: '#fff', lineHeight: 20 },
+  headlineSkeleton: { height: 12, width: '60%', borderRadius: RADIUS.xs, backgroundColor: 'rgba(255,255,255,0.25)', marginVertical: 4 },
   ctaPill:       { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 8, marginTop: 2 },
   ctaPillText:   { fontSize: FS.sm, fontFamily: FONT.bold },
 });
@@ -293,7 +295,14 @@ export default function CreateAdScreen() {
   // Detect preview once at mount (stable across the component lifetime)
   const inSellerPreview = isSellerDevPreview();
 
-  const brandName = user?.fullName || (user as any)?.username || 'Your Store';
+  // Seller's store name for the ad preview; demo mode uses the same demo
+  // identity as Edit profile's preview seller.
+  const [storeName, setStoreName] = useState('');
+  useEffect(() => {
+    if (isPreviewDemoMode()) { setStoreName('Preview Studio'); return; }
+    getStorefront().then(sf => { if (sf?.settings?.storeName) setStoreName(sf.settings.storeName); }).catch(() => {});
+  }, []);
+  const brandName = storeName || user?.fullName || (user as any)?.username || 'Your store';
 
   // ── Create draft on mount ─────────────────────────────────────────────────
   useEffect(() => {
@@ -872,7 +881,7 @@ export default function CreateAdScreen() {
         {/* 5 — Audience & reach (read-only — no audience targeting exists server-side) */}
         <Section title="Audience & reach" colors={colors}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }}>
-            <Feather name="users" size={16} color={colors.success} />
+            <Feather name="users" size={16} color={colors.foreground} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
@@ -887,9 +896,9 @@ export default function CreateAdScreen() {
         <Section title="Budget & duration" subtitle="Slide to set your total spend and how long your ad runs." colors={colors}>
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
-              <Text style={[styles.sliderMin, { color: colors.subtle }]}>${BUDGET_MIN_CENTS / 100}</Text>
-              <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>${budgetDollars}</Text>
-              <Text style={[styles.sliderMax, { color: colors.subtle }]}>${BUDGET_MAX_CENTS / 100}</Text>
+              <Text style={[styles.sliderMin, { color: colors.subtle }]}>${(BUDGET_MIN_CENTS / 100).toLocaleString('en-US')}</Text>
+              <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>${budgetDollars.toLocaleString('en-US')}</Text>
+              <Text style={[styles.sliderMax, { color: colors.subtle }]}>${(BUDGET_MAX_CENTS / 100).toLocaleString('en-US')}</Text>
             </View>
             <InlineSlider
               value={budgetCents}
@@ -923,10 +932,10 @@ export default function CreateAdScreen() {
             <Text style={[styles.sliderHint, { color: colors.subtle }]}>1 to 30 days</Text>
           </View>
 
-          <View style={[styles.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]} testID="estimated-reach">
-            <Feather name="trending-up" size={16} color={colors.success} />
+          <View style={[styles.reachCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID="estimated-reach">
+            <Feather name="trending-up" size={16} color={colors.foreground} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.reachLabel, { color: colors.success }]}>Estimated reach</Text>
+              <Text style={[styles.reachLabel, { color: colors.mutedForeground }]}>Estimated reach</Text>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
                 Estimate only — based on your budget. Not a guarantee of delivered impressions.
@@ -974,7 +983,7 @@ export default function CreateAdScreen() {
             ) : (
               <>
                 <Feather name="zap" size={18} color={theme.onAccent} />
-                <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Launch · ${budgetDollars}</Text>
+                <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Launch · ${budgetDollars.toLocaleString('en-US')}</Text>
               </>
             )}
           </TouchableOpacity>

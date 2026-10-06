@@ -71,13 +71,13 @@ export default function DesignBrandAssetsScreen() {
 
   // ── Add asset ──────────────────────────────────────────────────────────────
   async function handleAddAsset() {
-    Alert.alert('Add Brand Asset', 'Choose asset type:', [
+    Alert.alert('Add brand asset', 'Choose asset type:', [
       {
         text: 'Image / Logo / Graphic',
         onPress: async () => {
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
           if (result.canceled || !result.assets?.[0]) return;
-          Alert.alert('Asset Type', 'What is this image?', [
+          Alert.alert('Asset type', 'What is this image?', [
             { text: 'Logo',    onPress: () => saveImageAsset(result.assets![0].uri, 'logo') },
             { text: 'Icon',    onPress: () => saveImageAsset(result.assets![0].uri, 'icon') },
             { text: 'Graphic', onPress: () => saveImageAsset(result.assets![0].uri, 'graphic') },
@@ -88,9 +88,9 @@ export default function DesignBrandAssetsScreen() {
         },
       },
       {
-        text: 'Brand Color',
+        text: 'Brand color',
         onPress: () => {
-          Alert.prompt('Brand Color', 'Enter hex color (e.g. #0EA5E9):', async (hex) => {
+          Alert.prompt('Brand color', 'Enter hex color (e.g. #0EA5E9):', async (hex) => {
             if (!hex?.trim()) return;
             const color = hex.startsWith('#') ? hex : '#' + hex;
             const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
@@ -101,7 +101,7 @@ export default function DesignBrandAssetsScreen() {
       {
         text: 'Font',
         onPress: () => {
-          Alert.prompt('Font Name', 'Enter font family name:', async (name) => {
+          Alert.prompt('Font name', 'Enter font family name:', async (name) => {
             if (!name?.trim()) return;
             const newAsset = await addBrandAsset({ name: name.trim(), type: 'font', fontFamily: name.trim(), tags: [] });
             setAssets(prev => [newAsset, ...prev]);
@@ -134,11 +134,11 @@ export default function DesignBrandAssetsScreen() {
         },
       },
       {
-        text: 'Add to Project',
+        text: 'Add to project',
         onPress: async () => {
           const projects = await getProjects();
           if (projects.length === 0) {
-            Alert.alert('No Projects', 'Create a design project first to add assets.', [
+            Alert.alert('No projects', 'Create a design project first to add assets.', [
               { text: 'Go to Design Studio', onPress: () => router.push('/design' as never) },
               { text: 'Cancel', style: 'cancel' },
             ]);
@@ -149,7 +149,7 @@ export default function DesignBrandAssetsScreen() {
             onPress: () => router.push((`/design-canvas?id=${p.id}&addAssetId=${asset.id}`) as never),
           }));
           buttons.push({ text: 'Cancel', style: 'cancel' });
-          Alert.alert('Add to Project', 'Choose a design project:', buttons);
+          Alert.alert('Add to project', 'Choose a design project:', buttons);
         },
       },
       {
@@ -224,7 +224,7 @@ export default function DesignBrandAssetsScreen() {
   return (
     <View style={bas.root}>
       <ScreenHeader
-        title="Brand Assets"
+        title="Brand assets"
         actions={[{ icon: 'plus', onPress: handleAddAsset, accessibilityLabel: 'Add asset' }]}
       />
 
@@ -257,7 +257,7 @@ export default function DesignBrandAssetsScreen() {
             icon="star"
             title="No assets yet"
             description="Save logos, colors, graphics, and reusable assets."
-            action={{ label: 'Add Your First Asset', onPress: handleAddAsset, icon: 'plus' }}
+            action={{ label: 'Add your first asset', onPress: handleAddAsset, icon: 'plus' }}
           />
         </View>
       ) : (
@@ -272,15 +272,6 @@ export default function DesignBrandAssetsScreen() {
         />
       )}
 
-      {/* ── FAB ── */}
-      <TouchableOpacity
-        style={[bas.fab, { bottom: insets.bottom + SP.lg }]}
-        onPress={handleAddAsset}
-        activeOpacity={0.85}
-      >
-        <Feather name="upload" size={ICON.md} color={theme.onAccent} />
-        <Text style={bas.fabText}>Upload Asset</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -314,7 +305,7 @@ function assetTypeIcon(type: BrandAssetType): keyof typeof Feather.glyphMap {
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { accent: PURPLE, accentDim: PURPLE_DIM } = theme;
+  const { accentDim: PURPLE_DIM } = theme;
   return StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
@@ -347,7 +338,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   assetType:     { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
   assetDate:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
-  fab:           { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  fabText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.onAccent },
   });
 };

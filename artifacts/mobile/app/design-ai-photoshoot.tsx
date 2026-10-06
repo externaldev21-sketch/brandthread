@@ -517,7 +517,7 @@ function ProductPickerModal({ visible, loading, products, onClose, onSelect }: {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
-  content: { padding: SP.lg },
+  content: { padding: SP.md },
   sectionLabel: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.xs },
   sectionSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, lineHeight: 18 },
   sectionDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.lg },

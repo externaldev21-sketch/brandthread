@@ -136,7 +136,7 @@ export default function CustomersScreen() {
       />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
       >
 
@@ -207,8 +207,8 @@ export default function CustomersScreen() {
           // Dev's explicit call: Customers gets no action button, ever —
           // there's nothing a seller can "do" from an empty customer list
           // (see the fresh-preview empty-state action audit in this PR's
-          // description).
-          compact
+          // description). Not `compact`: compact drops the message line
+          // and squeezes the block up against the sort chips.
         />
       ) : (
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>

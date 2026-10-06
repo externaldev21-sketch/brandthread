@@ -24,6 +24,7 @@ import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { Avatar } from '@/components/ui/Avatar';
+import { getInitials } from '@/lib/format';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -474,7 +475,7 @@ export default function EditProfileScreen() {
               <Image source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
             ) : (
               <LinearGradient colors={theme.primaryGradient as any} style={styles.previewLogo}>
-                <Text style={styles.previewLogoText}>{(fields.name || 'B').slice(0, 2).toUpperCase()}</Text>
+                <Text style={styles.previewLogoText}>{getInitials(fields.name || fields.username, 'B')}</Text>
               </LinearGradient>
             )}
           </View>
@@ -592,8 +593,7 @@ export default function EditProfileScreen() {
           </View>
           <Divider theme={theme} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel} />
-            <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
+            <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={2}>
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
             <TouchableOpacity onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
@@ -641,7 +641,7 @@ export default function EditProfileScreen() {
         </View>
 
         {/* Quick links to existing seller settings — never duplicated here */}
-        <Text style={styles.sectionLabel}>Store settings</Text>
+        <Text style={styles.sectionLabel}>Settings</Text>
         <View style={{ gap: 8, paddingHorizontal: 14 }}>
           {QUICK_LINKS.map(link => (
             <NavigationCard
@@ -829,7 +829,9 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
   rowLabel: {
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 100,
+    // minWidth (not a fixed width) so longer labels like "Contact email"
+    // stay on one line instead of wrapping inside a 100px column.
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, minWidth: 100, flexShrink: 0,
   },
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
   rowValue: {

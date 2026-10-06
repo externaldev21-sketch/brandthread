@@ -16,14 +16,15 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  SUCCESS, BLUE, ORANGE, GOLD,
+  SUCCESS, BLUE,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   DesignProjectType, DesignCanvas, GarmentType,
   GARMENT_TEMPLATES, CANVAS_PRESETS, PROJECT_TYPE_LABELS,
@@ -45,10 +46,10 @@ type ProjectTypeOption = {
 const projectTypeOptions = (theme: ReturnType<typeof useAppTheme>['theme']): ProjectTypeOption[] => [
   { type: 'garment',   icon: 'layers',      label: 'Garment Design',   desc: 'Design apparel — tees, hoodies, hats & more', accent: theme.accent },
   { type: 'canvas',    icon: 'edit-2',      label: 'Free Canvas',      desc: 'Open canvas for any creative work',           accent: theme.secondary },
-  { type: 'mockup',    icon: 'box',         label: 'Product Mockup',   desc: 'Photorealistic product visuals',               accent: ORANGE },
+  { type: 'mockup',    icon: 'box',         label: 'Product Mockup',   desc: 'Photorealistic product visuals',               accent: theme.accent },
   { type: 'campaign',  icon: 'trending-up', label: 'Campaign Image',   desc: 'Multi-format marketing content',               accent: BLUE },
   { type: 'social',    icon: 'instagram',   label: 'Social Content',   desc: 'Posts, stories & reels content',               accent: theme.accentLight },
-  { type: 'packaging', icon: 'package',     label: 'Packaging',        desc: 'Box, bag & label design',                      accent: GOLD },
+  { type: 'packaging', icon: 'package',     label: 'Packaging',        desc: 'Box, bag & label design',                      accent: theme.accent },
 ];
 
 const BG_OPTIONS: { label: string; value: string; icon: string }[] = [
@@ -64,10 +65,10 @@ function typeAccent(type: DesignProjectType, theme: ReturnType<typeof useAppThem
   switch (type) {
     case 'garment':   return theme.accent;
     case 'canvas':    return theme.secondary;
-    case 'mockup':    return ORANGE;
+    case 'mockup':    return theme.accent;
     case 'campaign':  return BLUE;
     case 'social':    return theme.accentLight;
-    case 'packaging': return GOLD;
+    case 'packaging': return theme.accent;
     default:          return theme.accent;
   }
 }
@@ -214,8 +215,8 @@ export default function DesignProjectScreen() {
   const finalName = projectName || (projectType ? PROJECT_TYPE_LABELS[projectType] : 'New Project');
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="New Project" onBack={goBack} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="New project" onBack={goBack} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* ── Step 1: Choose type ── */}
@@ -273,8 +274,8 @@ export default function DesignProjectScreen() {
                           </View>
                         )}
                         {tmpl.hasEmbroideryArea && (
-                          <View style={[styles.badge, { backgroundColor: GOLD + '22' }]}>
-                            <Text style={[styles.badgeText, { color: GOLD }]}>Embroidery</Text>
+                          <View style={[styles.badge, { backgroundColor: BLUE + '22' }]}>
+                            <Text style={[styles.badgeText, { color: BLUE }]}>Embroidery</Text>
                           </View>
                         )}
                       </View>

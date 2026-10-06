@@ -238,7 +238,7 @@ export default function DesignGarmentScreen() {
         {/* ── GARMENT TYPE PICKER ── */}
         <View style={gs.section}>
           <Text style={gs.sectionLabel}>Garment Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md }}>
             {GARMENT_TYPES.map(t => (
               <TouchableOpacity
                 key={t.value}
@@ -428,9 +428,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colorSwatchActive: { borderColor: PURPLE_LIGHT, borderWidth: 2.5 },
 
   zoneGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  zoneChip:     { paddingHorizontal: SP.sm, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  zoneChip:     { minHeight: 36, justifyContent: 'center', paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   zoneChipActive: { backgroundColor: CYAN_DIM, borderColor: CYAN },
-  zoneChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  zoneChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   optionRow:    { flexDirection: 'row', gap: SP.sm },
   optionToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.xs, padding: SP.sm, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
