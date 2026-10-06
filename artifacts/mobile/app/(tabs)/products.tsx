@@ -497,6 +497,10 @@ export default function ProductsScreen() {
   function refresh() { loadProducts(); }
 
   async function handleDuplicate(id: string) {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     await duplicateProduct(id);
     Alert.alert('Duplicated', 'Product duplicated as a draft.');
     refresh();
@@ -514,6 +518,10 @@ export default function ProductsScreen() {
   }
 
   async function handleDelete(product: Product) {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     Alert.alert(
       'Delete product?',
       'You can undo this for a short time.',
@@ -545,6 +553,10 @@ export default function ProductsScreen() {
 
   // Swipe quick-action: archives (or unarchives) without opening the sheet.
   async function handleQuickArchive(product: Product) {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     const wasArchived = product.status === 'archived';
     setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, status: wasArchived ? 'active' : 'archived' } : p)));
     try {

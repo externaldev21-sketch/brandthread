@@ -28,7 +28,10 @@ describe('seller screens make no protected API call when signed out / Clerk not 
     const s = read('app/(tabs)/products.tsx');
     expect(s).toContain('const previewOnly = sellerPreview && (!authLoaded || !isSignedIn || !userId);');
     before(s, 'const loadStats = useCallback', 'if (previewOnly || previewOnlyRef.current)', 'await getProductStats()');
-    before(s, 'const loadProducts = useCallback', 'if (previewOnly || previewOnlyRef.current)', 'await getProducts(');
+    // The preview lists only the products saved on this device (getProducts
+    // reads the device product store, not the API) — never the seeded demo
+    // catalog or another account's data.
+    expect(s).toContain('setProducts(previewOnly || previewOnlyRef.current ? localPreviewSaves(list) : list);');
     before(s, 'async function handleDuplicate(id: string)', 'if (previewOnly)', 'await duplicateProduct');
     before(s, 'async function handleDelete(product: Product)', 'if (previewOnly)', 'Alert.alert(');
     before(s, 'async function handleQuickArchive(product: Product)', 'if (previewOnly)', 'await ');
