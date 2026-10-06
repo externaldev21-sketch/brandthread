@@ -137,20 +137,21 @@ describe('Studio card covers: per-card one-shot signature micro-animations', () 
 
 /**
  * Dev's FINAL layout call: a full-screen page (not a 75% sheet); small
- * position dots instead of "X / 16" text. See seller-studio-header.test.ts
+ * edge chevrons (no dots, no "X / 16" text). See seller-studio-header.test.ts
  * for the header itself (avatar + name only, per Dev's later "DEV CLARIFIED"
  * message superseding the header's earlier View-store/close-button shape).
  */
-describe('Studio page: full-screen layout, position dots', () => {
+describe('Studio page: full-screen layout, swipe hint', () => {
   it('is a genuine full-screen page — pageHeight is the screen height, not a 75%/90% fraction', () => {
     expect(studio).toContain('const pageHeight = screenHeight;');
     expect(studio).not.toContain('screenHeight * 0.75');
     expect(studio).not.toContain('screenHeight * 0.9');
   });
 
-  it('replaces the "X / 16" text indicator with a row of small position dots', () => {
+  it('has no "X / 16" text indicator and no position dots — the edge chevrons (StudioMenuHints) are the only swipe hint', () => {
     expect(studio).not.toContain('seller-studio-card-position');
-    expect(studio).toContain('testID="seller-studio-position-dots"');
-    expect(studio).toContain('i === cardIndexJS && styles.dotActive');
+    expect(studio).not.toContain('seller-studio-position-dots');
+    expect(studio).not.toContain('styles.dotActive');
+    expect(studio).toContain('<StudioEdgeChevrons');
   });
 });

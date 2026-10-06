@@ -28,8 +28,10 @@ describe('Seller Studio page close affordances — swipe, the X, Android back, a
   it('the close (X) button closes via the same cancelEnter/hapticDismiss/collapse path as the other close affordances', () => {
     expect(studio).toContain('testID="seller-studio-menu-close"');
     expect(studio).toContain('accessibilityLabel="Close Studio tools"');
-    const closeBlock = studio.slice(studio.indexOf('testID="seller-studio-menu-close"') - 200, studio.indexOf('testID="seller-studio-menu-close"'));
-    expect(closeBlock).toContain('onPress={() => { cancelEnter(); hapticDismiss(); collapse(); }}');
+    const closeBlock = studio.slice(studio.indexOf('testID="seller-studio-menu-close"') - 400, studio.indexOf('testID="seller-studio-menu-close"'));
+    // Same close path as before; the only thing ahead of it is the first-time
+    // coach's own "dismiss me first" guard (see seller-studio-menu-polish.test.ts).
+    expect(closeBlock).toContain('cancelEnter(); hapticDismiss(); collapse();');
   });
 
   it('there is no separate backdrop layer anymore — the page itself fully covers the screen behind it', () => {

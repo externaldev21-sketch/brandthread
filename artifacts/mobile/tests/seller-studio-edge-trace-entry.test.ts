@@ -127,9 +127,9 @@ describe('Studio edge-trace entry: lock -> trace -> zoom-through, replacing the 
     expect(retractBody).toContain('enterFade.value = 0;');
     // Both gesture entry points call it.
     const beginBlock = studio.slice(studio.indexOf('const cardAreaPan ='), studio.indexOf('.onUpdate(', studio.indexOf('const cardAreaPan =')));
-    expect(beginBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash);');
+    expect(beginBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);');
     const dismissStartBlock = studio.slice(studio.indexOf('const dismissGesture ='), studio.indexOf('.onUpdate(', studio.indexOf('const dismissGesture =')));
-    expect(dismissStartBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash);');
+    expect(dismissStartBlock).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);');
   });
 
   it('a tap or upward flick still opens instantly, unaffected by the trace mechanism (they call openCurrentItem directly, no skipHaptic)', () => {

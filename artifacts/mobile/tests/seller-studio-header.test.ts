@@ -96,7 +96,7 @@ describe('Studio header: avatar + name + close (X), nothing else', () => {
  */
 describe('Studio page: seamless black background under the status bar/notch', () => {
   it('overrides the Android status bar to pure black while this page is open', () => {
-    expect(studio).toContain("import {\n  Image,\n  Modal,\n  Pressable,\n  StatusBar,");
+    expect(studio).toContain("import {\n  Image,\n  Modal,\n  Platform,\n  Pressable,\n  StatusBar,");
     expect(studio).toContain('<StatusBar backgroundColor="#000000" barStyle="light-content" animated />');
   });
 
@@ -128,10 +128,11 @@ describe('Studio card area: full-bleed, edge to edge — header/dots float on to
     expect(cardAreaStyleBlock).not.toContain('flex: 1');
   });
 
-  it('the header and dots overlays are absolutely positioned on top of the card area, not flex siblings', () => {
+  it('the header and edge-chevron overlays are absolutely positioned on top of the card area, not flex siblings (the old dots row is gone)', () => {
     const renderBlock = studio.slice(studio.indexOf('{/* ── Card carousel'), studio.indexOf('</Animated.View>\n      </Modal>'));
     expect(renderBlock).toContain("[styles.header, { position: 'absolute', top: headerTopInset, left: 0, right: 0 }]");
-    expect(renderBlock).toContain("[styles.dotsRow, { position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }]");
+    expect(renderBlock).toContain('<StudioEdgeChevrons');
+    expect(renderBlock).not.toContain('styles.dotsRow');
   });
 
   it('the edge-trace Svg is sized to cardArea\'s own measured bounds, which now span the full screen', () => {
