@@ -15,13 +15,13 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
-import { isPublicApiRequest, signedOutErrorBody } from '@/lib/signedOutApiPolicy';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import { isPublicApiRequest, signedOutErrorBody } from '@/lib/signedOutApiPolicy';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
