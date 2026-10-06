@@ -39,7 +39,7 @@ The app locks and the server gates now read the same value: the plan the server 
 
 ### Checked and left as is
 - **Sandbox RevenueCat purchases count in production.** Apple's App Review buys with sandbox accounts against production builds, so refusing sandbox receipts would block review. RevenueCat already separates sandbox from production.
-- **AI credits and metering**, including image-generation metering, are in #661. Gaps found there: retry routes aren't in its catalogue, it debits the actor instead of the store owner, and image calls aren't metered. They're listed in that PR's thread so they aren't duplicated here.
+- **AI credits and metering**, including image-generation metering, are in #661. Gaps found there: retry routes aren't in its catalogue, it debits the actor instead of the store owner, and image calls aren't metered. They're listed for #661's author in this PR's description, not duplicated here.
 - **Remove Background, AI Photoshoot and Design Studio** belong to other in-flight sessions and weren't touched. For them:
   - `bg-removal` never saves results, and `GET /bg-removal/results/*` always returns 401 (the same `req.auth` bug as #2).
   - "Use as product photo" writes only to the local product cache.
