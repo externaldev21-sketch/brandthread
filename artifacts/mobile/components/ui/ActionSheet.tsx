@@ -19,6 +19,7 @@ import { SheetHandle, PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { hapticLight } from '@/lib/haptics';
+import { WebAlertHost } from '@/components/ui/WebAlertHost';
 
 export type ActionSheetButton = {
   text: string;
@@ -51,6 +52,9 @@ export function ActionSheetHost() {
   const close = () => setState(null);
 
   return (
+    <>
+    {/* Web only: renders Alert.alert / Alert.prompt, which react-native-web leaves as no-ops. */}
+    <WebAlertHost />
     <Modal visible={!!state} transparent animationType="fade" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close menu">
         <Pressable style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
@@ -89,6 +93,7 @@ export function ActionSheetHost() {
         </Pressable>
       </Pressable>
     </Modal>
+    </>
   );
 }
 
