@@ -73,6 +73,7 @@ import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { getPreviewSocialCounts } from '@/lib/previewSocialCounts';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
@@ -390,7 +391,12 @@ export default function ProfileScreen() {
     // protected screens render at all) still reports a truthy id, which
     // would otherwise fall through to the real backend-less endpoint below
     // and log a console 404 — see the identical fix in app/seller-inbox.tsx.
-    if (!id || isBuyerDevPreview()) return;
+    if (!id || isBuyerDevPreview()) {
+      // demo=1 only: counts consistent with the seeded Activity/Friends data.
+      const previewCounts = isBuyerDevPreview() ? await getPreviewSocialCounts() : null;
+      if (previewCounts && accountRef.current === id) setSocialCounts(previewCounts);
+      return;
+    }
     try {
       const data = await api.social.profile(id);
       if (accountRef.current !== id || !data) return;
