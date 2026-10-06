@@ -18,6 +18,8 @@ import { FS } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -293,8 +295,14 @@ export default function PaymentsScreen() {
   const colors = useColors();
   const api    = useApi();
   const router = useRouter();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
+  // ?bt_preview=seller with no signed-in account has no token for the
+  // protected /api/drops read — it 401'd into "Couldn't load drops". Resolve
+  // straight to the honest empty state instead (same guard as finance.tsx).
+  const isPreviewMode = isSellerDevPreview();
+  const skipProtectedReads = (isPreviewMode && !userId) || (isPreviewMode && (!isAuthLoaded || !isSignedIn));
   const [drops,   setDrops]   = useState<Drop[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!skipProtectedReads);
   // A failed fetch must never silently masquerade as "no drops yet" — track
   // it separately so the screen can render a retry affordance instead of a
   // fabricated empty financial state.
@@ -348,6 +356,14 @@ export default function PaymentsScreen() {
   }, [api, drops, showToast]);
 
   const load = useCallback(async () => {
+    if (skipProtectedReads) {
+      setDrops([]);
+      setBroadcastStates({});
+      setBroadcastPreviews({});
+      setLoadError(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
     setBroadcastPreviews({});
@@ -362,9 +378,9 @@ export default function PaymentsScreen() {
         mapped = raw.map((d: any) => ({
           id:             d.id,
           name:           d.name ?? d.title ?? 'Drop',
-          type:           d.releaseAt ? 'pre-order' : 'pre-made',
+          type:           d.type === 'pre-order' || d.type === 'pre-made' ? d.type : d.releaseAt ? 'pre-order' : 'pre-made',
           totalOrders:    d.orderCount ?? 0,
-           totalCollectedCents: d.totalCents ?? 0,
+           totalCollectedCents: d.totalCollectedCents ?? d.totalCents ?? 0,
           payoutDate:     d.releaseAt ? fmtDate(d.releaseAt) : '—',
           status:         dropStatusFromApiStatus(d.status ?? 'active'),
           releaseAt:      d.releaseAt ?? undefined,
@@ -401,7 +417,7 @@ export default function PaymentsScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [api]);
+  }, [api, skipProtectedReads]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
@@ -470,7 +486,7 @@ export default function PaymentsScreen() {
 
         {!loading && loadError ? (
           <View style={styles.retryWrap}>
-            <RetryRow label="Couldn't load drops" onRetry={load} />
+            <RetryRow label="Couldn't load drop payouts" onRetry={load} />
           </View>
         ) : !loading && drops.length === 0 ? (
           <EmptyState

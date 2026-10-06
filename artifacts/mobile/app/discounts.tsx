@@ -31,6 +31,8 @@ import {
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
+import { DayPickerSheet } from '@/components/DayPickerSheet';
+import { formatDayKey, isoToDayKey, resolveDiscountDates, toDayKey } from '@/lib/discountDates';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products';
@@ -142,6 +144,8 @@ export default function DiscountsScreen() {
   const [hasEnd, setHasEnd] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // Which date the calendar sheet is picking ('YYYY-MM-DD' local day keys).
+  const [datePickerFor, setDatePickerFor] = useState<'start' | 'end' | null>(null);
 
   const loadDiscounts = useCallback(async () => {
     if (previewOnly) {
@@ -205,8 +209,8 @@ export default function DiscountsScreen() {
     setUsageLimit(d.maxUses != null ? String(d.maxUses) : '100');
     setOneUsePerCustomer(d.oneUsePerCustomer);
     setHasEnd(!!d.expiresAt);
-    setStartDate(d.startsAt ? d.startsAt.slice(0, 10) : '');
-    setEndDate(d.expiresAt ? d.expiresAt.slice(0, 10) : '');
+    setStartDate(isoToDayKey(d.startsAt));
+    setEndDate(isoToDayKey(d.expiresAt));
     setEditingId(d.id);
     setShowModal(true);
   }
@@ -227,7 +231,7 @@ export default function DiscountsScreen() {
   const summaryUsageLabel = usageMode === 'unlimited' ? 'Unlimited uses' : usageMode === 'single' ? 'Single use (1 total)' : `${usageLimit || '0'} total uses`;
   const summaryDatesLabel = !startDate && !hasEnd
     ? 'Active immediately, no end date'
-    : `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : hasEnd ? '' : ' · No end date'}`;
+    : `${startDate ? `Starts ${formatDayKey(startDate)}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${formatDayKey(endDate)}` : hasEnd ? '' : ' · No end date'}`;
 
   async function handleSave() {
     if (previewOnly && userId) {
@@ -259,6 +263,13 @@ export default function DiscountsScreen() {
       Alert.alert('Invalid usage limit', 'Enter how many times this code can be used.');
       return;
     }
+    // Start = start of the local start day, end = END of the local end day
+    // (inclusive), and end must come after start.
+    const dates = resolveDiscountDates({ startKey: startDate, endKey: endDate, hasEnd });
+    if (!dates.ok) {
+      Alert.alert(dates.title, dates.message);
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
@@ -273,8 +284,8 @@ export default function DiscountsScreen() {
         maxUses: usageMode === 'unlimited' ? null : usageMode === 'single' ? 1 : Number(usageLimit),
         singleUse: usageMode === 'single',
         oneUsePerCustomer,
-        startsAt: startDate ? new Date(startDate).toISOString() : null,
-        expiresAt: hasEnd && endDate ? new Date(endDate).toISOString() : null,
+        startsAt: dates.startsAt,
+        expiresAt: dates.expiresAt,
       };
       if (previewOnly) {
         if (editingId) {
@@ -566,27 +577,27 @@ export default function DiscountsScreen() {
             <View>
               <Text style={s.label}>Active dates</Text>
               <Text style={s.subLabel}>Start date <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional — blank starts immediately)</Text></Text>
-              <TextInput
-                style={s.input}
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={MUTED}
-                autoCorrect={false}
-              />
+              <View style={[s.pickerRow, { marginTop: 0 }]}>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setDatePickerFor('start')} accessibilityRole="button" accessibilityLabel="Start date">
+                  <Text style={[s.pickerRowText, !startDate && { color: MUTED }]}>{startDate ? formatDayKey(startDate) : 'Starts immediately'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => (startDate ? setStartDate('') : setDatePickerFor('start'))}
+                  hitSlop={8}
+                  accessibilityLabel={startDate ? 'Clear start date' : 'Choose start date'}
+                >
+                  <Feather name={startDate ? 'x' : 'calendar'} size={16} color={MUTED} />
+                </TouchableOpacity>
+              </View>
               <View style={[s.switchRow, { marginTop: SP.sm }]}>
                 <Text style={s.switchLabel}>Set an end date</Text>
                 <HapticSwitch value={hasEnd} onValueChange={setHasEnd} />
               </View>
               {hasEnd && (
-                <TextInput
-                  style={s.input}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={MUTED}
-                  autoCorrect={false}
-                />
+                <TouchableOpacity style={[s.pickerRow, { marginTop: 0 }]} onPress={() => setDatePickerFor('end')} accessibilityRole="button" accessibilityLabel="End date">
+                  <Text style={[s.pickerRowText, !endDate && { color: MUTED }]}>{endDate ? `Through ${formatDayKey(endDate)}` : 'Choose end date'}</Text>
+                  <Feather name="calendar" size={16} color={MUTED} />
+                </TouchableOpacity>
               )}
             </View>
 
@@ -597,6 +608,18 @@ export default function DiscountsScreen() {
               style={{ marginTop: SP.sm }}
             />
           </ScrollView>
+          <DayPickerSheet
+            visible={datePickerFor !== null}
+            title={datePickerFor === 'end' ? 'End date' : 'Start date'}
+            value={datePickerFor === 'end' ? endDate : startDate}
+            minKey={datePickerFor === 'end' && startDate && startDate > toDayKey(new Date()) ? startDate : toDayKey(new Date())}
+            onConfirm={(key) => {
+              if (datePickerFor === 'end') setEndDate(key);
+              else setStartDate(key);
+              setDatePickerFor(null);
+            }}
+            onClose={() => setDatePickerFor(null)}
+          />
         </SafeAreaProvider>
       </Modal>
 
