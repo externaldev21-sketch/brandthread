@@ -28,6 +28,7 @@ import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-c
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { hapticLight } from '@/lib/haptics';
+import { apiErrorMessage } from '@/lib/safety';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
@@ -57,6 +58,8 @@ export function LiveThreadCashSheet({
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  // Shown inside the sheet: a toast from the caller would sit behind this Modal.
+  const [sendError, setSendError] = useState<string | null>(null);
   const [justSentCents, setJustSentCents] = useState<number | null>(null);
   const pop = useSharedValue(0);
 
@@ -64,6 +67,7 @@ export function LiveThreadCashSheet({
     if (!visible) return;
     setSelected(null);
     setJustSentCents(null);
+    setSendError(null);
     // Same short-circuit ChatAttachThreadCash.tsx uses: there's no backend
     // to answer this in the dev-web preview, so attempting the real call
     // first just means a multi-second wait for it to time out before the
@@ -95,12 +99,14 @@ export function LiveThreadCashSheet({
   async function handleSend() {
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
+    setSendError(null);
     hapticLight();
     const localOnly = previewOnly
       || (isPreviewThreadCashEnabled() && (isBuyerDevPreview() || isSellerDevPreview()));
     if (!localOnly) {
       if (!recipientId || !streamId) {
         setSending(false);
+        setSendError('This live can’t receive Thread Cash right now.');
         onSendFailed?.('This live can’t receive Thread Cash right now.');
         return;
       }
@@ -112,7 +118,9 @@ export function LiveThreadCashSheet({
         });
       } catch (error: any) {
         setSending(false);
-        onSendFailed?.(error?.message ?? 'Could not send Thread Cash. Try again.');
+        const message = apiErrorMessage(error, 'Could not send Thread Cash. Try again.');
+        setSendError(message);
+        onSendFailed?.(message);
         return;
       }
     }
@@ -177,6 +185,10 @@ export function LiveThreadCashSheet({
           })}
         </View>
 
+        {sendError != null && (
+          <Text style={[styles.sendError, { color: theme.text }]} accessibilityRole="alert" testID="live-thread-cash-error">{sendError}</Text>
+        )}
+
         <Pressable
           onPress={handleSend}
           disabled={!selected || sending || balanceCents == null || selected > balanceCents}
@@ -223,6 +235,7 @@ const styles = StyleSheet.create({
   },
   tipDisabled: { opacity: 0.35 },
   tipText: { fontFamily: FONT.bold, fontSize: FS.sm },
+  sendError: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center', marginBottom: SP.sm },
   sendBtn: { height: 46, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },

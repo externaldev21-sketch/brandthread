@@ -128,6 +128,7 @@ async function liveFeed(browser, origin) {
   await page.waitForTimeout(800);
   check(calls.some((c) => c.path === '/thread-cash/live-gift' && c.body?.streamId === STREAM_ID), 'QA-0111 Thread Cash send calls POST /api/thread-cash/live-gift with the stream id');
   check(await page.getByText(/You sent \$5\.00/).count() === 0, 'QA-0111 a failed gift is not reported as sent');
+  check(await page.getByTestId('live-thread-cash-error').count() > 0, 'QA-0111 a failed gift shows its error in the sheet');
   await page.screenshot({ path: path.join(OUT, 'live-feed-thread-cash-failed.png') });
   giftStatus = 200;
   await page.getByText('$5.00', { exact: true }).first().click();

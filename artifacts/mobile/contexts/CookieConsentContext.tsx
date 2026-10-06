@@ -75,12 +75,16 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
                 </View>
               )}
               <View style={s.buttons}>
-                <PressableScale style={s.buttonCell} onPress={() => saveConsent({ analytics: false, marketing: false })} accessibilityRole="button" testID="cookie-consent-necessary">
-                  <View style={[s.button, { borderColor: theme.border }]}><Text style={[s.buttonText, { color: theme.text }]}>Necessary only</Text></View>
-                </PressableScale>
-                <PressableScale style={s.buttonCell} onPress={() => saveConsent(customizing ? { analytics, marketing } : { analytics: true, marketing: true })} accessibilityRole="button" testID="cookie-consent-accept">
-                  <View style={[s.button, { backgroundColor: theme.text, borderColor: theme.text }]}><Text style={[s.buttonText, { color: theme.background }]}>{customizing ? 'Save choices' : 'Accept all'}</Text></View>
-                </PressableScale>
+                <View style={s.buttonCell}>
+                  <PressableScale onPress={() => saveConsent({ analytics: false, marketing: false })} accessibilityRole="button" testID="cookie-consent-necessary">
+                    <View style={[s.button, { borderColor: theme.border }]}><Text style={[s.buttonText, { color: theme.text }]}>Necessary only</Text></View>
+                  </PressableScale>
+                </View>
+                <View style={s.buttonCell}>
+                  <PressableScale onPress={() => saveConsent(customizing ? { analytics, marketing } : { analytics: true, marketing: true })} accessibilityRole="button" testID="cookie-consent-accept">
+                    <View style={[s.button, { backgroundColor: theme.text, borderColor: theme.text }]}><Text style={[s.buttonText, { color: theme.background }]}>{customizing ? 'Save choices' : 'Accept all'}</Text></View>
+                  </PressableScale>
+                </View>
               </View>
               <PressableScale onPress={() => setCustomizing(v => !v)} style={s.customize} accessibilityRole="button">
                 <Text style={[s.link, { color: theme.muted }]}>{customizing ? 'Close' : 'Customize'}</Text>
@@ -107,7 +111,7 @@ const s = StyleSheet.create({
   choiceDescription: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17 },
   buttons: { flexDirection: 'row', gap: SP.sm },
   buttonCell: { flex: 1 },
-  button: { height: 44, borderRadius: RADII.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  button: { width: '100%', height: 44, borderRadius: RADII.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   customize: { alignSelf: 'center', minHeight: 32, justifyContent: 'center' },
   link: { fontFamily: FONT.semibold, fontSize: FS.xs },
