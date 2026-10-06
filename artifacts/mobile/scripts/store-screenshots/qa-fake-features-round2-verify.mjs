@@ -40,7 +40,11 @@ async function openPage(browser, origin, { signedIn = true, seed: seedOver = {},
   });
   await context.clock.install({ time: DEMO_NOW });
   if (signedIn) await context.addInitScript(clerkStubScript(SELLER_USER));
-  const seed = signedIn ? { ...localStorageSeed('seller'), user_role: 'seller' } : { 'bt:cookie-consent': localStorageSeed('seller')['bt:cookie-consent'] };
+  const base = localStorageSeed('seller');
+  // Signed in: the seller's product store under their own account key.
+  const seed = signedIn
+    ? { ...base, [`@brandthread/products:${SELLER_USER.id}`]: base['@brandthread/products'], [`@brandthread/migration_v2_scoped:${SELLER_USER.id}`]: '1' }
+    : { 'bt:cookie-consent': base['bt:cookie-consent'] };
   Object.assign(seed, seedOver);
   await context.addInitScript((s) => {
     if (sessionStorage.getItem('bt:seeded')) return;
@@ -128,7 +132,9 @@ async function dashboard(browser, origin) {
       return undefined;
     };
     const { context, page } = await openPage(browser, origin, { overrides, calls });
-    await page.goto(`${origin}/`, { waitUntil: 'networkidle' });
+    await page.goto(`${origin}/?bt_preview=seller`, { waitUntil: 'load' });
+    await page.waitForTimeout(3000);
+    if (process.env.DEBUG_CALLS) console.log(calls.map((c) => `${c.method} ${c.path}`).join('\n'));
     await scrollTo(page, 'seller-dashboard-ai-suggestions');
     check(calls.some((c) => c.method === 'GET' && c.path === '/ai/suggestions' && c.auth), 'AI suggestions: dashboard calls GET /api/ai/suggestions with the account token');
     for (const s of SUGGESTIONS) check(await page.getByText(s.title).count() > 0, `AI suggestions: shows "${s.title}"`);
@@ -159,7 +165,7 @@ async function dashboard(browser, origin) {
       return undefined;
     };
     const { context, page } = await openPage(browser, origin, { overrides, calls, seed: { 'bt:ai:settings:v1': JSON.stringify(off) } });
-    await page.goto(`${origin}/`, { waitUntil: 'networkidle' });
+    await page.goto(`${origin}/?bt_preview=seller`, { waitUntil: 'load' });
     await page.getByTestId('seller-dashboard-hero-value').waitFor({ timeout: 30_000 });
     await page.waitForTimeout(2500);
     check(await page.getByTestId('seller-dashboard-ai-suggestions').count() === 0, 'AI suggestions off: no Suggestions card');
@@ -179,7 +185,15 @@ async function previewDraft(browser, origin) {
   };
   const overrides = ({ path: p }) => (p === `/public/products/${draft.id}` ? { body: row } : undefined);
   const { context, page } = await openPage(browser, origin, { overrides, calls });
-  await page.goto(`${origin}/product-detail?id=${draft.id}`, { waitUntil: 'networkidle' });
+  // The harness's way in (openScreen): boot signed in, then navigate in-app.
+  await page.goto(`${origin}/?bt_preview=seller`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
+  await page.waitForTimeout(2500);
+  await page.evaluate((url) => {
+    history.pushState(history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  }, `/product-detail?id=${draft.id}&bt_preview=seller`);
+  await page.waitForTimeout(1500);
   await page.getByText('Store page', { exact: true }).first().click();
   await page.waitForTimeout(800);
   const btn = page.getByText('Preview as buyer', { exact: true }).first();
@@ -201,7 +215,7 @@ async function sellerCart(browser, origin) {
   // Signed-out design preview, the reported route.
   {
     const { context, page } = await openPage(browser, origin, { signedIn: false });
-    await page.goto(`${origin}/cart?bt_preview=seller`, { waitUntil: 'networkidle' });
+    await page.goto(`${origin}/cart?bt_preview=seller`, { waitUntil: 'load' });
     await page.waitForTimeout(3000);
     check(await page.getByText(/not found/i).count() === 0, 'QA-0527: /cart?bt_preview=seller is not "Not found"');
     check(await page.getByText('Your cart is empty').count() > 0 || await page.getByText(/^Cart/).count() > 0, 'QA-0527: seller sees the real cart');
@@ -212,7 +226,7 @@ async function sellerCart(browser, origin) {
   // A signed-in seller account (role correction for real accounts).
   {
     const { context, page } = await openPage(browser, origin);
-    await page.goto(`${origin}/cart`, { waitUntil: 'networkidle' });
+    await page.goto(`${origin}/cart?bt_preview=seller`, { waitUntil: 'load' });
     await page.waitForTimeout(3000);
     check(await page.getByText(/not found/i).count() === 0 && new URL(page.url()).pathname === '/cart', 'QA-0527: signed-in seller /cart opens the cart');
     await page.screenshot({ path: path.join(OUT, 'seller-cart-signed-in.png') });
@@ -222,19 +236,27 @@ async function sellerCart(browser, origin) {
 
 async function productsAfterSave(browser, origin) {
   const { context, page } = await openPage(browser, origin, { signedIn: false });
-  await page.goto(`${origin}/products?bt_preview=seller`, { waitUntil: 'networkidle' });
+  await page.goto(`${origin}/products?bt_preview=seller`, { waitUntil: 'load' });
   await page.waitForTimeout(2500);
   check(await page.getByText('Washed Box Tee').count() === 0, 'Products tab (signed-out preview) starts without the product');
-  await page.goto(`${origin}/add-product?bt_preview=seller`, { waitUntil: 'networkidle' });
+  await page.goto(`${origin}/add-product?bt_preview=seller`, { waitUntil: 'load' });
   await page.getByPlaceholder('e.g. Vintage Washed Tee').waitFor({ timeout: 30_000 });
   await page.getByPlaceholder('e.g. Vintage Washed Tee').fill('Washed Box Tee');
   await page.getByPlaceholder('0.00').first().fill('48');
+  // A real photo through the web file picker, then the 3:4 crop step.
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByTestId('add-product-add-photos').first().click();
+  await (await chooser).setFiles(IMAGES['hoodie-ember'] ?? Object.values(IMAGES)[0]);
+  await page.getByTestId('media-cropper-save').waitFor({ timeout: 20_000 });
+  await page.waitForTimeout(1200);
+  await page.getByTestId('media-cropper-save').click();
+  await page.waitForTimeout(1500);
   await page.waitForTimeout(400);
-  await page.getByText('Save', { exact: true }).first().click();
+  await page.getByTestId('add-product-save').click();
   await page.getByTestId('add-product-success-sheet').waitFor({ timeout: 20_000 }).catch(() => {});
   await page.waitForTimeout(800);
   check(await page.getByTestId('add-product-success-sheet').count() > 0, 'Add product (signed-out preview): Save succeeds');
-  await page.goto(`${origin}/products?bt_preview=seller`, { waitUntil: 'networkidle' });
+  await page.goto(`${origin}/products?bt_preview=seller`, { waitUntil: 'load' });
   await page.getByText('Washed Box Tee').first().waitFor({ timeout: 20_000 }).catch(() => {});
   await page.waitForTimeout(1200);
   check(await page.getByText('Washed Box Tee').count() > 0, 'Products tab (signed-out preview) lists the saved product');

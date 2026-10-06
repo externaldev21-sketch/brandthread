@@ -108,7 +108,7 @@ type Rgba = { r: number; g: number; b: number; a: number };
 
 const NAMED: Record<string, string> = {
   gray: '#808080', grey: '#808080', silver: '#C0C0C0', darkgray: '#A9A9A9', darkgrey: '#A9A9A9',
-  lightgray: '#D3D3D3', lightgrey: '#D3D3D3', dimgray: '#696969', dimgrey: '#696969', white: '#FFFFFF',
+  lightgray: '#D3D3D3', lightgrey: '#D3D3D3', dimgray: '#696969', dimgrey: '#696969',
 };
 
 export function parseColor(input: unknown): Rgba | null {

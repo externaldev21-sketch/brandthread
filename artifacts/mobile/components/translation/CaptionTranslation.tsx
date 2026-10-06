@@ -17,7 +17,7 @@ import { useDisplayPrefs } from '@/contexts/DisplayPrefsContext';
 import {
   TranslationMemo, shouldOfferTranslation, translationLinkLabel, type TranslationResult, type TranslationStatus as Status,
 } from '@/lib/translation';
-import { FONT } from '@/lib/theme';
+import { FONT, MUTED } from '@/lib/theme';
 
 const memo = new TranslationMemo();
 
@@ -97,7 +97,7 @@ export function TranslationLink({ translation, style }: {
       onPress={translation.onPressLink}
       accessibilityRole="button"
       suppressHighlighting
-      style={[{ fontFamily: FONT.semibold, fontSize: 12, color: '#C0C0C0', marginTop: 4 }, style]}
+      style={[{ fontFamily: FONT.semibold, fontSize: 12, color: MUTED, marginTop: 4 }, style]}
     >
       {translation.linkLabel}
     </Text>

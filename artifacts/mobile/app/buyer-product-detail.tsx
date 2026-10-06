@@ -54,6 +54,7 @@ import {
 import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
 import { isPreviewSellerId } from '@/lib/previewCheckout';
 import { isOwnerPreviewRow, sellerProductToBuyerProduct } from '@/lib/sellerProductPreview';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { getProduct as getLocalSellerProduct } from '@/services/productService';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
@@ -526,6 +527,8 @@ export default function BuyerProductDetailScreen() {
   // archived product the API serves only to its owner (`previewOnly`), or one
   // stored only on this device. Shown, never sold.
   const [sellerPreview, setSellerPreview] = useState<null | 'server' | 'local'>(null);
+  // The seller's own tab bar would sit over the purchase bar on their preview.
+  useHideTabBar(!!sellerPreview);
   const [refreshing, setRefreshing] = useState(false);
   // Track whether options were touched at least once (for required-option feedback)
   const [optionsTouched, setOptionsTouched] = useState(false);

@@ -8,6 +8,7 @@ import React from 'react';
 import { formatCents } from '@/lib/money';
 import { TIP_PRESET_PERCENTS, maxTipCents, percentTipCents, tipCentsFor, type TipChoice } from '@/lib/checkoutTips';
 import { CheckoutField, CheckoutSection, OptionRow } from './CheckoutPrimitives';
+import { useCheckoutT } from './CheckoutLanguage';
 
 export function TipSection({
   groups, choices, onChange,
@@ -17,6 +18,7 @@ export function TipSection({
   choices: Record<string, TipChoice>;
   onChange: (sellerId: string, choice: TipChoice) => void;
 }) {
+  const t = useCheckoutT();
   if (groups.length === 0) return null;
   return (
     <>
@@ -26,13 +28,13 @@ export function TipSection({
         return (
           <CheckoutSection
             key={group.sellerId}
-            title={groups.length > 1 ? `Tip ${group.sellerName}` : 'Tip'}
+            title={groups.length > 1 ? t('Tip {name}', { name: group.sellerName }) : t('Tip')}
             testID={`checkout-tip-${group.sellerId}`}
           >
             <OptionRow
               selected={choice.kind === 'none'}
               onPress={() => onChange(group.sellerId, { kind: 'none' })}
-              title="No tip"
+              title={t('No tip')}
             />
             {TIP_PRESET_PERCENTS.map(percent => (
               <OptionRow
@@ -45,15 +47,15 @@ export function TipSection({
             <OptionRow
               selected={choice.kind === 'custom'}
               onPress={() => onChange(group.sellerId, { kind: 'custom', text: choice.kind === 'custom' ? choice.text : '' })}
-              title="Custom amount"
+              title={t('Custom amount')}
               last={choice.kind !== 'custom'}
             />
             {choice.kind === 'custom' ? (
               <CheckoutField
-                label="Tip amount"
+                label={t('Tip amount')}
                 value={choice.text}
                 onChangeText={text => onChange(group.sellerId, { kind: 'custom', text })}
-                error={customInvalid ? `Enter an amount up to ${formatCents(maxTipCents(group.subtotalCents))}` : undefined}
+                error={customInvalid ? t('Enter an amount up to {amount}', { amount: formatCents(maxTipCents(group.subtotalCents)) }) : undefined}
                 showError
                 placeholder="0.00"
                 keyboardType="decimal-pad"

@@ -4,7 +4,7 @@ import {
   View, Text, ScrollView, TextInput,
   StyleSheet, Alert,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -60,6 +60,7 @@ function langLabel(code: string): string {
 export default function StoreSettingsScreen() {
   const colors = useColors();
   const ss = React.useMemo(() => makeStyles(colors), [colors]);
+  const router = useRouter();
   const [form, setForm] = useState<StoreSettings>({
     storeName: '',
     storeUrl: '',
@@ -269,6 +270,15 @@ export default function StoreSettingsScreen() {
         {/* CHECKOUT & ACCOUNTS */}
         <SectionHeader title="CHECKOUT & ACCOUNTS" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
+          <ListRow
+            title="Checkout"
+            subtitle="Checkout mode, tipping, post-purchase offer, tracking, language"
+            chevron
+            onPress={() => router.push('/checkout' as never)}
+            style={{ minHeight: 48 }}
+            testID="store-settings-checkout"
+          />
+          <View style={ss.divider} />
           <SwitchRow
             label="Require Account"
             description="Buyers must create an account to check out"

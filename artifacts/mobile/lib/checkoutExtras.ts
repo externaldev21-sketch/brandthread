@@ -44,7 +44,12 @@ export function offerPriceCents(priceCents: number, discountPercent: number): nu
 
 export type OfferProductOption = { id: string; name: string; image: string | null; priceCents: number; inStock: boolean };
 
-/** The seller's products (GET /api/products) that can be offered: active and in stock. */
+/**
+ * The seller's products that can be offered: active and in stock. Reads the
+ * API's products (GET /api/products: images, variants[].priceCents/stock)
+ * and the app's local product store (services/productService.ts: media,
+ * pricing, inventory — the signed-out seller preview, which never calls the API).
+ */
 export function offerableProducts(raw: unknown): OfferProductOption[] {
   const list = Array.isArray(raw) ? raw : Array.isArray((raw as { products?: unknown })?.products) ? (raw as { products: unknown[] }).products : [];
   const result: OfferProductOption[] = [];
@@ -52,15 +57,24 @@ export function offerableProducts(raw: unknown): OfferProductOption[] {
     if (!item || typeof item.id !== 'string' || typeof item.name !== 'string') continue;
     if (item.deletedAt || (item.status && item.status !== 'active')) continue;
     const variants: Array<Record<string, any>> = Array.isArray(item.variants) ? item.variants : [];
-    const prices = variants.map(v => Number(v.priceCents)).filter(Number.isFinite);
-    const stock = variants.reduce((sum, v) => sum + (Number.isFinite(Number(v.stock)) ? Number(v.stock) : 0), 0);
-    const inStock = variants.length > 0 ? stock > 0 : Number(item.stock ?? item.inventory ?? 0) > 0;
+    const basePrice = Number(item.pricing?.priceCents ?? item.priceCents);
+    const prices = variants.map(v => Number(v.priceCents ?? basePrice)).filter(Number.isFinite);
+    const variantStock = variants.reduce((sum, v) => {
+      const n = Number(v.stock ?? v.inventoryQuantity);
+      return sum + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    const stock = item.inventory && Number.isFinite(Number(item.inventory.availableStock))
+      ? Number(item.inventory.availableStock)
+      : variants.length > 0 ? variantStock : Number(item.stock ?? 0);
+    const image = Array.isArray(item.images) && typeof item.images[0] === 'string'
+      ? item.images[0]
+      : Array.isArray(item.media) && typeof item.media[0]?.uri === 'string' ? item.media[0].uri : null;
     result.push({
       id: item.id,
       name: item.name,
-      image: Array.isArray(item.images) && typeof item.images[0] === 'string' ? item.images[0] : null,
-      priceCents: prices.length ? Math.min(...prices) : Number(item.priceCents ?? 0) || 0,
-      inStock,
+      image,
+      priceCents: prices.length ? Math.min(...prices) : Number.isFinite(basePrice) ? basePrice : 0,
+      inStock: stock > 0,
     });
   }
   return result.filter(product => product.inStock);

@@ -50,7 +50,7 @@ export function SellerDashboardAISuggestions({
   const [settings, setSettings] = useState<AISettings | null>(null);
   const [items, setItems] = useState<AISuggestion[]>([]);
   // A signed-out web preview has no account to compute suggestions from.
-  const preview = isSellerDevPreview();
+  const preview = isSellerDevPreview() && !(isLoaded && isSignedIn);
 
   // Device copy on every focus (a change made in AI Settings applies on
   // return), then the account's copy.
@@ -103,6 +103,8 @@ export function SellerDashboardAISuggestions({
           key={s.id}
           style={[styles.row, index > 0 && { borderTopColor: theme.borderSubtle, borderTopWidth: StyleSheet.hairlineWidth }]}
         >
+          {/* PressableScale styles its inner view only, so the flex lives on this wrapper. */}
+          <View style={styles.mainWrap}>
           <PressableScale
             onPress={() => open(s)}
             style={styles.main}
@@ -121,6 +123,7 @@ export function SellerDashboardAISuggestions({
               <Text style={[styles.action, { color: theme.text }]} numberOfLines={1}>{s.actionLabel}</Text>
             </View>
           </PressableScale>
+          </View>
           <TouchableOpacity
             onPress={() => askAI(s)}
             style={[styles.askButton, { borderColor: theme.borderSubtle }]}
@@ -151,7 +154,8 @@ const styles = StyleSheet.create({
     gap: SP.sm,
     paddingVertical: SP.sm,
   },
-  main: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
+  mainWrap: { flex: 1, minWidth: 0 },
+  main: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
   iconWrap: {
     width: 34,
     height: 34,

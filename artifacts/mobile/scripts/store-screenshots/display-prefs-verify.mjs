@@ -62,7 +62,7 @@ function fakeAccount({ translateStatus = 200, initialPrefs = {} } = {}) {
   return { state, overrides };
 }
 
-async function openPage(browser, origin, { overrides = () => undefined, calls = [] } = {}) {
+async function openPage(browser, origin, { overrides = () => undefined, calls = [], preview = false } = {}) {
   const context = await browser.newContext({
     viewport: DEVICE.viewport, deviceScaleFactor: DEVICE.scale, isMobile: true, hasTouch: true,
     locale: 'en-US', timezoneId: DEMO_TIME_ZONE, colorScheme: 'dark', reducedMotion: 'reduce',
@@ -70,7 +70,18 @@ async function openPage(browser, origin, { overrides = () => undefined, calls = 
   await context.clock.install({ time: DEMO_NOW });
   await context.addInitScript(clerkStubScript(BUYER_USER));
   const seed = localStorageSeed('buyer');
-  seed.user_role = 'buyer';
+  // A persisted user_role is what keeps the signed-out ?bt_preview=buyer mode
+  // on (lib/devPreview.ts); the signed-in runs must not carry it.
+  if (preview) seed.user_role = 'buyer'; else delete seed.user_role;
+  if (!preview) {
+    // The app mirrors the signed-in role into localStorage.user_role, which
+    // this preview-enabled export reads as "signed-out preview" on the next
+    // render. Keep the signed-in runs a real signed-in session.
+    await context.addInitScript(() => {
+      const set = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) { if (key !== 'user_role') set.call(this, key, value); };
+    });
+  }
   await context.addInitScript((s) => {
     if (sessionStorage.getItem('bt:seeded')) return;
     for (const [k, v] of Object.entries(s)) localStorage.setItem(k, v);
@@ -106,6 +117,13 @@ async function openPage(browser, origin, { overrides = () => undefined, calls = 
   globalThis.__lastPage = page;
   page.on('pageerror', (err) => console.log('[pageerror]', err.message));
   return { context, page };
+}
+
+/** Loads the app signed in (at Discover), then moves to `route` client-side. */
+async function start(page, origin, route) {
+  await page.goto(`${origin}/discover`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  await navigate(page, route);
 }
 
 /** Client-side navigation (keeps the loaded app and its in-memory state). */
@@ -157,6 +175,7 @@ async function textSize(browser, origin) {
   await shot(page, 'settings-text-size-sheet.png');
   await page.getByText('Larger', { exact: true }).first().click();
   await page.waitForTimeout(1200);
+  if (process.env.DEBUG_DP) console.log(JSON.stringify(calls.filter((c) => /display/.test(c.path))));
   check(calls.some((c) => c.method === 'PATCH' && c.path === '/display-preferences' && c.body?.textSize === 'larger'), 'choosing Larger calls PATCH /api/display-preferences { textSize: larger }');
   check(state.prefs.textSize === 'larger', 'account stores textSize = larger');
   const after = await fontSizeOf(page, 'Reduce motion');
@@ -193,7 +212,13 @@ async function highContrast(browser, origin) {
   const calls = [];
   const { state, overrides } = fakeAccount();
   const { context, page } = await openPage(browser, origin, { overrides, calls });
-  await page.goto(`${origin}/buyer-settings-detail?section=accessibility`, { waitUntil: 'networkidle' });
+  await start(page, origin, '/buyer-settings-detail?section=activity');
+  await page.getByText('Search history', { exact: true }).first().waitFor({ timeout: 20_000 });
+  await page.waitForTimeout(800);
+  const mutedOff = await mutedIconCount(page);
+  await shot(page, 'settings-high-contrast-off-icons.png');
+
+  await navigate(page, '/buyer-settings-detail?section=accessibility');
   await page.getByText('High contrast icons', { exact: true }).first().waitFor({ timeout: 20_000 });
   await page.waitForTimeout(800);
   await shot(page, 'settings-high-contrast-off.png');
@@ -203,19 +228,19 @@ async function highContrast(browser, origin) {
   check(state.prefs.highContrastIcons === true, 'account stores highContrastIcons = true');
   await shot(page, 'settings-high-contrast-on.png');
 
-  await navigate(page, '/activity');
-  await page.waitForTimeout(1500);
+  await navigate(page, '/buyer-settings-detail?section=activity');
+  await page.getByText('Search history', { exact: true }).first().waitFor({ timeout: 20_000 });
+  await page.waitForTimeout(800);
   const mutedOn = await mutedIconCount(page);
-  await shot(page, 'settings-high-contrast-on-activity.png');
-  await navigate(page, '/buyer-settings-detail?section=accessibility');
-  await page.getByText('High contrast icons', { exact: true }).first().waitFor({ timeout: 10_000 });
-  await page.getByRole('switch').last().click();
-  await page.waitForTimeout(1000);
-  await navigate(page, '/activity');
-  await page.waitForTimeout(1500);
-  const mutedOff = await mutedIconCount(page);
-  await shot(page, 'settings-high-contrast-off-activity.png');
+  await shot(page, 'settings-high-contrast-on-icons.png');
   check(mutedOff > 0 && mutedOn === 0, `silver icon glyphs become full-contrast (${mutedOff} muted off → ${mutedOn} on)`);
+
+  for (const [route, name] of [['/discover', 'discover'], ['/profile', 'profile']]) {
+    await navigate(page, route);
+    await page.waitForTimeout(1500);
+    check(await mutedIconCount(page) === 0, `${route}: no silver icon glyphs left with high contrast on`);
+    await shot(page, `settings-high-contrast-on-${name}.png`);
+  }
   await context.close();
 }
 
@@ -225,7 +250,7 @@ async function translation(browser, origin) {
     const calls = [];
     const { state, overrides } = fakeAccount();
     const { context, page } = await openPage(browser, origin, { overrides, calls });
-    await page.goto(`${origin}/buyer-settings-detail?section=language`, { waitUntil: 'networkidle' });
+    await start(page, origin, '/buyer-settings-detail?section=language');
     await page.getByText('Translation language', { exact: true }).first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(800);
     check(await page.getByText('English', { exact: true }).count() > 0, 'Translation language row shows the real value (English)');
@@ -253,6 +278,8 @@ async function translation(browser, origin) {
     check(!calls.some((c) => c.path === '/translate'), 'nothing is translated until asked (auto-translate off)');
     await shot(page, 'settings-translation-see-translation.png');
     await page.getByText('See translation', { exact: true }).first().click();
+    await page.waitForTimeout(1500);
+    if (process.env.DEBUG_DP) console.log(JSON.stringify(calls.filter((c) => /display|translate/.test(c.path))), await page.locator('text=/translat|original/i').allTextContents());
     await page.getByText('See original', { exact: true }).first().waitFor({ timeout: 10_000 });
     const req = calls.find((c) => c.method === 'POST' && c.path === '/translate');
     check(!!req && req.body?.texts?.[0] === SPANISH && req.body?.targetLanguage === 'en', 'See translation calls POST /api/translate { texts, targetLanguage: en }');
@@ -269,7 +296,7 @@ async function translation(browser, origin) {
     const calls = [];
     const { overrides } = fakeAccount({ initialPrefs: { autoTranslateCaptions: true } });
     const { context, page } = await openPage(browser, origin, { overrides, calls });
-    await page.goto(`${origin}/buyer-settings-detail?section=language`, { waitUntil: 'networkidle' });
+    await start(page, origin, '/buyer-settings-detail?section=language');
     await page.getByText('Auto-translate captions', { exact: true }).first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(800);
     await shot(page, 'settings-translation-auto-on.png');
@@ -290,8 +317,7 @@ async function translation(browser, origin) {
     const calls = [];
     const { overrides } = fakeAccount({ translateStatus: 503 });
     const { context, page } = await openPage(browser, origin, { overrides, calls });
-    await page.goto(`${origin}/discover`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
+    await start(page, origin, '/discover');
     await page.getByText(SPANISH.slice(0, 20), { exact: false }).first().click();
     await page.getByText('See translation', { exact: true }).first().click();
     await page.getByText('Translation unavailable', { exact: true }).first().waitFor({ timeout: 10_000 });
@@ -304,7 +330,7 @@ async function translation(browser, origin) {
 async function signedOutPreview(browser, origin) {
   const calls = [];
   const { overrides } = fakeAccount();
-  const { context, page } = await openPage(browser, origin, { overrides, calls });
+  const { context, page } = await openPage(browser, origin, { overrides, calls, preview: true });
   await page.goto(`${origin}/?bt_preview=buyer`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
   await navigate(page, '/buyer-settings-detail?section=accessibility&bt_preview=buyer');
@@ -318,20 +344,14 @@ async function signedOutPreview(browser, origin) {
   const after = await fontSizeOf(page, 'Reduce motion');
   check(after > before, `preview: text size applies locally (${before}px → ${after}px)`);
   await shot(page, 'settings-text-size-preview-large.png');
-  await navigate(page, '/discover?bt_preview=buyer');
-  await page.waitForTimeout(2000);
-  const tile = page.getByText(SPANISH.slice(0, 20), { exact: false }).first();
-  if (await tile.count()) {
-    await tile.click();
-    await page.getByText('See translation', { exact: true }).first().waitFor({ timeout: 10_000 });
-    await shot(page, 'settings-translation-preview-link.png');
-    await page.getByText('See translation', { exact: true }).first().click();
-    await page.waitForTimeout(1500);
-    check(page.url().includes('/sign-in'), `preview: See translation opens sign-in (${new URL(page.url()).pathname})`);
-    await shot(page, 'settings-translation-preview-sign-in.png');
-  } else {
-    console.log('note: preview Discover does not use the API trending rows; skipped the caption link check');
-  }
+  await navigate(page, `/buyer-post-viewer?postId=post_trending_1&postCaption=${encodeURIComponent(SPANISH)}&bt_preview=buyer`);
+  await page.getByText('See translation', { exact: true }).first().waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(500);
+  await shot(page, 'settings-translation-preview-link.png');
+  await page.getByText('See translation', { exact: true }).first().click();
+  await page.waitForTimeout(1500);
+  check(page.url().includes('/sign-in'), `preview: See translation opens sign-in instead of calling the API (${new URL(page.url()).pathname})`);
+  await shot(page, 'settings-translation-preview-sign-in.png');
   const protectedCalls = calls.filter((c) => c.path === '/display-preferences' || c.path === '/translate');
   check(protectedCalls.length === 0, `preview never calls /api/display-preferences or /api/translate (${protectedCalls.length} calls)`);
   await context.close();

@@ -25,6 +25,7 @@ import { createContext, useContext } from 'react';
 import { jsx } from 'react/jsx-runtime';
 import { Animated, Text } from 'react-native';
 import { contrastIconColor, flattenStyle, scaleTextStyle } from '../displayPrefs';
+import { FG } from '../theme';
 
 export interface DisplayRuntime {
   /** Multiplier for app text (1 = Default). */
@@ -34,7 +35,7 @@ export interface DisplayRuntime {
   iconForeground: string;
 }
 
-export const DEFAULT_DISPLAY_RUNTIME: DisplayRuntime = { textScale: 1, highContrastIcons: false, iconForeground: '#FFFFFF' };
+export const DEFAULT_DISPLAY_RUNTIME: DisplayRuntime = { textScale: 1, highContrastIcons: false, iconForeground: FG };
 
 export const DisplayRuntimeContext = createContext<DisplayRuntime>(DEFAULT_DISPLAY_RUNTIME);
 
