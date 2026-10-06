@@ -561,26 +561,19 @@ const DEV_WEB_ONBOARDING_PREVIEW =
 const PREVIEW_SESSION_ROLE: 'buyer' | 'seller' | null = PREVIEW_ROLE
   ?? (Platform.OS === 'web' ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null) : null);
 
+// Remove the retired demo flag on device too. Never touch account data or
+// onboarding completion; the native preview bypass remains development-only.
+if (__DEV__ && Platform.OS !== 'web') {
+  AsyncStorage.removeItem('bt_preview_demo').catch(() => {});
+}
+
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   localStorage.setItem('splash_seen', 'true');
   localStorage.setItem('onboarding_complete', 'true');
   localStorage.setItem('user_role', PREVIEW_ROLE);
-  // Reset (or set) the demo-data flag from THIS load's own query string,
-  // exactly like user_role just above — otherwise a `&demo=1` visited once,
-  // in any earlier session, in this same browser, would stick forever:
-  // lib/devPreview.ts's isPreviewDemoMode() only WRITES 'bt_preview_demo'
-  // when it sees demo=1 (so later in-app navigation, which drops the query
-  // string, can still recall it) — it never clears the flag, since a plain
-  // function called repeatedly through a session has no way to tell "the
-  // query string is gone because of in-app navigation" apart from "the user
-  // did a fresh reload without demo=1". This one-time, module-load-only
-  // block can tell the difference (it runs exactly once per real page load,
-  // the same reasoning user_role's own reset above relies on), so a plain
-  // `?bt_preview=buyer` reload always lands back on fresh, zero-state data.
-  const demoParam = new URLSearchParams(window.location.search).get('demo');
-  if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');
-  else localStorage.removeItem('bt_preview_demo');
+  // Demo is never stored; devPreview clears the old flag on module startup.
+  localStorage.removeItem('bt_preview_demo');
   // Preserve the ORIGINAL requested path for this load, so a preview
   // session can restore its real destination even after some other code
   // bounces it through "/" first — e.g. an onboarding-skip redirect that
@@ -894,10 +887,12 @@ function AuthGate() {
       // "/profile?bt_preview=seller" actually asked for.
       if (!atRoot) {
         const rest = (segments as string[]).slice(1).join('/');
+        const previewQuery = Platform.OS === 'web' && typeof window !== 'undefined'
+          ? window.location.search : '';
         if (devRole === 'buyer' && inTabsGroup) {
-          router.replace(`/(buyer)/${rest}` as never);
+          router.replace(`/(buyer)/${rest}${previewQuery}` as never);
         } else if (devRole === 'seller' && inBuyerGroup) {
-          router.replace(`/(tabs)/${rest}` as never);
+          router.replace(`/(tabs)/${rest}${previewQuery}` as never);
         }
       }
       return;

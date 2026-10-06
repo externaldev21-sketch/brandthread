@@ -23,13 +23,16 @@ export function SellerDashboardSetupCard({
   hasSetupChecklist: boolean;
 }) {
   return (
-    <PressableScale
-      onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}
+    <View
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
-      accessibilityRole="button"
-      accessibilityLabel="List your first product to start selling"
     >
+      <PressableScale
+        onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}
+        accessibilityRole="button"
+        accessibilityLabel="List your first product to start selling"
+      >
+      <View style={styles.cardContent}>
       <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
         <Feather name="plus-circle" size={20} color={theme.accent} />
       </View>
@@ -37,8 +40,10 @@ export function SellerDashboardSetupCard({
       <Text style={[styles.body, { color: theme.muted }]}>
         Your sales, orders, and store activity will show up here as soon as your first product goes live.
       </Text>
+      </View>
+      </PressableScale>
       <PrimaryButton label="Add a product" icon="plus" small onPress={onAddProduct} style={styles.button} />
-    </PressableScale>
+    </View>
   );
 }
 
@@ -48,6 +53,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     alignItems: 'flex-start',
+    gap: SP.xs,
+  },
+  cardContent: {
     gap: SP.xs,
   },
   iconWrap: {

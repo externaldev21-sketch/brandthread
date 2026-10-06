@@ -97,3 +97,4 @@
 - [Merge-only test boundary](merge-only-test-boundary.md) — report stale test contracts separately rather than changing product behavior during a requested upstream sync.
 - [Store responsiveness boundary](store-responsiveness-boundary.md) — draft interactions must not wait on publication reads; fast draft rendering is not proof of live publication.
 - [Shared performance boundaries](shared-performance-boundaries.md) — cache persistence throttles storage, not dehydration; frozen scenes need imperative animation cleanup.
+- [Fresh seller preview](fresh-seller-preview.md) — owner requires a new-account zero state; native preview is always empty, and web demo requires the current URL's explicit demo=1.

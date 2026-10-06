@@ -117,7 +117,10 @@ export default function Index() {
       // chance to land on it. Falls back to the plain dashboard root for a
       // genuine bare "/" load, exactly as before.
       const entryPath = consumePreviewEntryPath();
-      router.replace((entryPath ?? (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/')) as never);
+      const previewQuery = Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.location.search : '';
+      const previewRoot = (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') + previewQuery;
+      router.replace((entryPath ?? previewRoot) as never);
     }, 150);
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router, atRoot]);

@@ -28,6 +28,11 @@ function read(relPath: string): string {
 }
 
 describe('seller fresh preview: no seeded/demo data by default', () => {
+  it('keeps the first-product action outside the clickable setup card text', () => {
+    const src = read('components/SellerDashboardSetupCard.tsx');
+    expect(src.indexOf('</PressableScale>')).toBeLessThan(src.indexOf('<PrimaryButton'));
+    expect(src).toContain('onPress={onAddProduct}');
+  });
   it('seller-inbox.tsx only reads the seeded seller conversations behind isPreviewDemoMode()', () => {
     const src = read('app/seller-inbox.tsx');
     expect(src).toContain("import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");

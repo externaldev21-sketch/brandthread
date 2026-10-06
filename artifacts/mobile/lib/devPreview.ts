@@ -138,17 +138,19 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
  * a screen that wants to show one still has to check isPreviewDemoMode()
  * itself and fall back to empty when it's false.
  *
- * Like isSellerDevPreview/isBuyerDevPreview, `demo` only has to be present on
- * the first page load — it's mirrored into localStorage so it survives
- * Expo Router navigations that drop query strings.
+ * Demo mode is URL-only and web-only. It is never persisted, and a route
+ * without demo=1 is fresh even if an earlier page opted into demo data.
  */
-function persistedPreviewDemo(): boolean {
+export function clearStoredPreviewDemo(): void {
   try {
-    return typeof localStorage !== 'undefined' && localStorage.getItem('bt_preview_demo') === '1';
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('bt_preview_demo');
   } catch {
-    return false;
+    // Storage may be unavailable; demo detection never reads it regardless.
   }
 }
+
+// Clear the retired persistent flag before any screen reads preview state.
+clearStoredPreviewDemo();
 
 function resolveSearch(searchOverride?: string): string | null {
   if (searchOverride !== undefined) return searchOverride;
@@ -163,25 +165,14 @@ function resolveSearch(searchOverride?: string): string | null {
  * gates isSellerDevPreview/isBuyerDevPreview apply).
  */
 export function isPreviewDemoMode(searchOverride?: string): boolean {
-  if (Platform.OS !== 'web') return DEV_SELLER_PREVIEW;
+  // The native onboarding bypass selects a role, not a populated account.
+  if (Platform.OS !== 'web') return false;
   if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
   if (isProductionPreviewHost()) return false;
   if (!isSellerDevPreview(searchOverride) && !isBuyerDevPreview(searchOverride)) return false;
-  if (DEV_SELLER_PREVIEW) return true;
-
   const search = resolveSearch(searchOverride);
   if (search === null) return false;
-  const v = new URLSearchParams(search).get('demo');
-  if (v === '1') {
-    try {
-      if (typeof localStorage !== 'undefined') localStorage.setItem('bt_preview_demo', '1');
-    } catch {
-      // best-effort persistence only
-    }
-    return true;
-  }
-  if (searchOverride === undefined) return persistedPreviewDemo();
-  return false;
+  return new URLSearchParams(search).get('demo') === '1';
 }
 
 /**

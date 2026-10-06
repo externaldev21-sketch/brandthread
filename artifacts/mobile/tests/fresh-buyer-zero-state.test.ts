@@ -113,10 +113,9 @@ describe('fresh buyer zero state — Inbox tab badge', () => {
 // scanning fresh-buyer coverage finds the pointer here too. ────────────────
 
 describe('fresh buyer zero state — no sticky demo flag from a prior session', () => {
-  it('app/_layout.tsx resets bt_preview_demo from the current load, every load', () => {
+  it('startup removes the old flag and never saves demo mode', () => {
     const s = src('app/_layout.tsx');
-    expect(s).toContain("const demoParam = new URLSearchParams(window.location.search).get('demo');");
-    expect(s).toContain("if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');");
-    expect(s).toContain("else localStorage.removeItem('bt_preview_demo');");
+    expect(s).toContain("localStorage.removeItem('bt_preview_demo');");
+    expect(s).not.toContain("localStorage.setItem('bt_preview_demo'");
   });
 });
