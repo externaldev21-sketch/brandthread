@@ -10,6 +10,7 @@ import type {
 } from './safetyTypes';
 import { useMemo, useRef } from 'react';
 import { CLIENT_PLATFORM } from '@/lib/clientPlatform';
+import { withAiConsent } from '@/lib/aiConsent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ApiError,
@@ -397,7 +398,12 @@ function request<T = any>(
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
-  if (!isRead || options.cache === 'no-store') {
+  if (!isRead) {
+    // AI endpoints need a one-time permission to send content to the AI
+    // provider (QA-0043): ask through the consent sheet and retry once.
+    return withAiConsent(() => doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs));
+  }
+  if (options.cache === 'no-store') {
     return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs);
   }
   const dedupeKey = `${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
@@ -1263,6 +1269,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         eventType: 'receipt' | 'open' | 'tap';
         occurredAt?: string;
       }) => post<{ ok: boolean; recorded: boolean }>('/api/notifications/events', body),
+    },
+    /** Permission to send AI-tool content to the AI providers (QA-0043). */
+    aiConsent: {
+      get: () => freshGet<AiConsentStatus>('/api/ai-consent'),
+      set: (granted: boolean) => put<AiConsentStatus>('/api/ai-consent', { granted }),
     },
     notificationPrefs: {
       get: () =>
@@ -3222,6 +3233,7 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
 
 // ─── Promotions (featured slots + admin approval) ─────────────────────────────
 export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+export type AiConsentStatus = { granted: boolean; version: string; grantedAt: string | null; providers: string[] };
 export type FeaturedSlot = {
   id: string; placement: string; durationDays: number; priceCents: number;
   startsAt: string; endsAt: string; status: string;

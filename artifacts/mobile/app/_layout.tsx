@@ -87,6 +87,7 @@ import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
+import AiConsentSheet from '@/components/AiConsentSheet';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
@@ -1493,6 +1494,8 @@ function RootLayoutNav() {
       <PushRegistrar />
       <MarketingPixelTracker />
       <LegalAcceptanceGate />
+      {/* Asks once before AI tools send content to the AI providers (QA-0043). */}
+      <AiConsentSheet />
       <AppLockGate />
     </View>
   );

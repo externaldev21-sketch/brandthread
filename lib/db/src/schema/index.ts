@@ -11,6 +11,7 @@ export * from './communities';
 export * from './iapPromotions';
 export * from './promotions';
 export * from './sellerPushGiveaways';
+export * from './aiConsent';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';

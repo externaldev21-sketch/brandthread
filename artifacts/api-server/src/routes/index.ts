@@ -27,6 +27,8 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 import aiCreditsRouter from "./ai-credits";
 import { aiCreditsGate } from "../lib/aiCredits/gate";
+import { aiConsentGate } from "../lib/aiConsent";
+import aiConsentRouter from "./ai-consent";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
 import featuredPublicRouter from "./featured-public";
@@ -149,6 +151,11 @@ router.use("/webhooks/shopify", webhooksShopifyRouter);
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
+// AI data consent (App Store 5.1.2(i), QA-0043): no AI endpoint (support chat
+// and the AI credits catalogue) sends a person's content to a provider, or
+// debits credits, without their stored yes. Only acts on those paths.
+router.use("/ai-consent",      aiConsentRouter);
+router.use(aiConsentGate);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
