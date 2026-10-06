@@ -22,7 +22,8 @@ import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/prof
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { getPreviewAccount } from '@/lib/previewAccount';
 import { Avatar } from '@/components/ui/Avatar';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
@@ -56,11 +57,17 @@ type ImageSlotKey = 'avatar' | 'logo' | 'banner';
 // simulate the reserved-username / upload round trips below. __DEV__-gated,
 // so this is never reachable outside a dev web preview.
 const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'shop']);
-const PREVIEW_SELLER_FIELDS: Fields = {
-  name: 'Preview Studio', username: 'preview_studio', bio: 'Handmade goods, made to order.',
-  website: 'https://example.com', category: 'Streetwear', tagsText: 'handmade, small batch',
-  location: 'Los Angeles, CA', contactEmail: 'hello@example.com', instagram: '@previewstudio', tiktok: '@previewstudio',
-};
+// The preview account (lib/previewAccount.ts): a fresh preview is a brand-new
+// seller — just the name and username from onboarding, every other field
+// empty — and only `&demo=1` fills in the rest.
+function previewSellerFields(): Fields {
+  const a = getPreviewAccount('seller', isPreviewDemoMode());
+  return {
+    name: a.name, username: a.username, bio: a.bio, website: a.website, category: a.category,
+    tagsText: a.tags.join(', '), location: a.location, contactEmail: a.contactEmail,
+    instagram: a.instagram, tiktok: a.tiktok,
+  };
+}
 
 /** Quick links into existing seller settings screens — never duplicate those forms here. */
 const QUICK_LINKS: { icon: keyof typeof Feather.glyphMap; label: string; description: string; route: string }[] = [
@@ -123,8 +130,9 @@ export default function EditProfileScreen() {
     if (preview) {
       // No authenticated session to load from — seed a local, fully
       // editable preview profile so every control on this screen works.
-      setFields(PREVIEW_SELLER_FIELDS);
-      setInitial(PREVIEW_SELLER_FIELDS);
+      const seeded = previewSellerFields();
+      setFields(seeded);
+      setInitial(seeded);
       setProfileLoaded(true);
       return;
     }

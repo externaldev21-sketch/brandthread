@@ -31,6 +31,8 @@ import {
   requiredTaskCount, isSetupComplete,
 } from '@/lib/setupStore';
 import { useApi } from '@/hooks/useApi';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_DEMO_SETUP_TASKS, previewSetupUserId } from '@/lib/previewAccount';
 import {
   GradientCard, PrimaryButton, SecondaryButton,
   SectionHeader,
@@ -135,7 +137,11 @@ export default function SetupScreen() {
   const s = createStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userId } = useAuth();
+  const { userId: authUserId } = useAuth();
+  // The signed-out preview has no Clerk user: keep its checklist under the
+  // preview seller's own key (separate for demo), so it reflects that account.
+  const [previewDemo] = useState(() => !authUserId && isSellerDevPreview() ? isPreviewDemoMode() : null);
+  const userId = previewDemo === null ? authUserId : previewSetupUserId(previewDemo);
   const api = useApi();
   const { theme } = useAppTheme();
   const [state, setState] = useState<SetupState | null>(null);
@@ -154,13 +160,18 @@ export default function SetupScreen() {
         // Preserve local progress when the profile endpoint is temporarily
         // unavailable; only the server response can complete verification.
       }
-      const next = await getSetupState(userId, { onboardingComplete });
+      let next = await getSetupState(userId, { onboardingComplete });
+      if (previewDemo) {
+        for (const id of PREVIEW_DEMO_SETUP_TASKS) {
+          if (!next.tasks.find((task) => task.id === id)?.completed) next = await completeTask(id, userId);
+        }
+      }
       if (!active) return;
       setState(next);
     };
     void load();
     return () => { active = false; };
-  }, [api, userId]));
+  }, [api, previewDemo, userId]));
 
   async function handleComplete(id: SetupTaskId) {
     const next = await completeTask(id, userId);

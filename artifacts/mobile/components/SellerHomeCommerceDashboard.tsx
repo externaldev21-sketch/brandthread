@@ -351,7 +351,11 @@ export default function SellerHomeCommerceDashboard({
   // ── Range-independent data (orders, inventory, hub, products) — fetched
   // once per seller/refresh, not re-fetched on every chart range switch. ────
   const loadSecondaryData = useCallback(async () => {
-    if (!userId) {
+    // The signed-out preview has no userId, but its requests are answered by
+    // the preview data layer (lib/previewApiData.ts) — the same orders the
+    // Orders tab shows — so Dashboard and Orders agree (empty when fresh,
+    // the seeded orders with demo=1).
+    if (!userId && !isSellerDevPreview()) {
       setTopProducts([]);
       setRecentOrders([]);
       setEverSoldCount(0);

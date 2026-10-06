@@ -192,7 +192,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
           <View style={{ marginVertical: SP.md, paddingHorizontal: SP.md }}>
             <RailHeader
               title={row.kind === 'justDropped' ? 'Just Dropped' : 'High Demand'}
-              sub={row.kind === 'justDropped' ? 'Fresh from sellers you follow' : 'Moving fast across the platform'}
+              sub={row.kind === 'justDropped' ? 'Newest across Brandthread' : 'Moving fast across the platform'}
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
               {items.map((item) => <EditorialTile key={item.id} item={item} theme={theme} />)}

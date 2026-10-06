@@ -15,6 +15,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import { isPublicApiRequest, signedOutErrorBody } from '@/lib/signedOutApiPolicy';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
@@ -397,6 +398,38 @@ function request<T = any>(
   return promise;
 }
 
+/**
+ * The one signed-out guard (house rule: the signed-out web preview must never
+ * call a protected or paid API). Every request lib/api.ts makes passes here
+ * before it can reach the network:
+ *
+ * - Public endpoints (lib/signedOutApiPolicy.ts allowlist) always go through.
+ * - A signed-in session (a token) always goes through.
+ * - No session: the request is never sent. In the dev web preview
+ *   (`?bt_preview=…`) a GET is answered by the preview data layer
+ *   (lib/previewApiData.ts — the fresh empty state, or demo data with
+ *   `&demo=1`); everything else rejects with the same 401 the server would
+ *   send (code `auth_required`), without the offline banner.
+ *
+ * Returns `{ data }` when the preview answered locally, null to proceed.
+ */
+async function signedOutGate<T>(
+  resolvedPath: string,
+  method: string,
+  getToken: GetToken,
+): Promise<{ data: T } | null> {
+  if (isPublicApiRequest(method, resolvedPath)) return null;
+  if (await getCachedToken(getToken)) return null;
+  // The dev web preview only exists in a browser (react-native has no
+  // `document`), so native and tests never load the preview modules.
+  if (method.toUpperCase() === 'GET' && typeof document !== 'undefined') {
+    const { resolveSignedOutPreviewGet } = await import('@/lib/previewApiSession');
+    const hit = resolveSignedOutPreviewGet(resolvedPath);
+    if (hit) return { data: hit.data as T };
+  }
+  throw new ApiError(401, signedOutErrorBody());
+}
+
 async function doRequest<T = any>(
   path: string,
   options: RequestInit,
@@ -408,6 +441,8 @@ async function doRequest<T = any>(
 ): Promise<T> {
   await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
+  const signedOut = await signedOutGate<T>(resolvedPath, options.method ?? 'GET', getToken);
+  if (signedOut) return signedOut.data;
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
   const cacheKey = isRead && options.cache !== 'no-store' && !asText
     ? await apiCacheKey(resolvedPath, getCacheScope)
@@ -468,6 +503,7 @@ async function uploadImage<T = any>(
   getToken: GetToken,
   getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
+  await signedOutGate(versionApiPath(path), 'POST', getToken);
   const source = await fetch(image.uri);
   if (!source.ok) {
     throw new Error("Could not read the selected image.");
@@ -507,6 +543,7 @@ async function uploadVideo<T = any>(
   getToken: GetToken,
   getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
+  await signedOutGate(versionApiPath(path), 'POST', getToken);
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the recorded video.");
   const videoBlob = await source.blob();

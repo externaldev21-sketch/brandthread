@@ -87,7 +87,7 @@ export default function ShoppingPreferences() {
   useFocusEffect(useCallback(() => {
     loadBuyerSettings().then(s => {
       setSettings(s);
-      setSelectedCats(new Set(s.styleCategories ?? ['streetwear', 'vintage']));
+      setSelectedCats(new Set(s.styleCategories ?? []));
     });
   }, []));
 

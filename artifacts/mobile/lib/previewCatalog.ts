@@ -10,19 +10,25 @@
  *
  * Gating: `isPreviewCatalogEnabled()` is true only when `__DEV__` is true
  * (never in a production build/binary — Expo/React Native strip `__DEV__` to
- * `false` at build time) AND, on web, only for a non-production API base URL
+ * `false` at build time) AND the dev web preview asked for demo data
+ * (`?bt_preview=…&demo=1`, lib/devPreview.ts isPreviewDemoMode()) AND, on
+ * web, only for a non-production API base URL
  * — so this can never leak into a real signed-in production account even if
  * a production JS bundle were somehow loaded in a dev-like host. Every call
  * site must gate on this before using the catalog, and must prefer real API
  * data whenever the API actually returns any.
  */
 import { Asset } from 'expo-asset';
+import { isPreviewDemoMode } from './devPreview';
 
 export function isPreviewCatalogEnabled(): boolean {
   // Stripped to `false` in production builds — this whole module becomes
   // dead code there, not just a runtime-skipped branch.
   if (!__DEV__) return false;
-  return true;
+  // Seeded content is demo data: only the dev web preview with `&demo=1`
+  // gets it. The fresh preview (and any real account on a dev build) shows
+  // the honest empty state a new account sees instead.
+  return isPreviewDemoMode();
 }
 
 const POSTER_SOURCES = [

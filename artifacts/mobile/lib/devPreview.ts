@@ -127,6 +127,22 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
  * the first page load — it's mirrored into localStorage so it survives
  * Expo Router navigations that drop query strings.
  */
+// Demo data lives exactly as long as the page load that asked for it: a load
+// without `demo=1` in its URL (a fresh visit, a reload, a shared link) clears
+// the flag, so demo mode can never stick around on its own. In-app
+// navigation (which drops the query string) keeps it, because it does not
+// reload this module.
+(function clearDemoFlagUnlessRequested() {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('demo') !== '1') {
+      localStorage.removeItem('bt_preview_demo');
+    }
+  } catch {
+    // best-effort only
+  }
+})();
+
 function persistedPreviewDemo(): boolean {
   try {
     return typeof localStorage !== 'undefined' && localStorage.getItem('bt_preview_demo') === '1';
