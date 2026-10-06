@@ -21,6 +21,9 @@ import type {
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { InteractionSettings, InteractionSettingsPatch, PendingTag } from '@/lib/interactionSettings';
+import type {
+  AcceptOfferResult, BuyerOffer, ConversionTrackingView, PostPurchaseOfferResponse, PostPurchaseOfferSettings,
+} from '@/lib/checkoutExtras';
 import type { DisplayPrefs } from '@/lib/displayPrefs';
 import type { TranslationResult } from '@/lib/translation';
 import type { RemixCheck, RemixClip } from '@/lib/remix';
@@ -1448,6 +1451,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           cancel: (paymentIntentId: string) =>
             post<{ ok: boolean }>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
         },
+        /** Post-purchase offer on the order confirmation (seller Checkout settings; routes/checkout-extras.ts). */
+        postPurchase: {
+          get: (orderId: string) => get<BuyerOffer>(`/api/buyer/post-purchase/${encodeURIComponent(orderId)}`),
+          /** Charges the card from the original payment; the server prices it. Poll paymentIntent.get for the order. */
+          accept: (orderId: string, body: { variantId: string; clientIdempotencyKey: string }) =>
+            post<AcceptOfferResult>(`/api/buyer/post-purchase/${encodeURIComponent(orderId)}/accept`, body),
+        },
+        /** Public: each seller's store language and checkout mode (the checkout's language and guest-only rule). */
+        profiles: (sellerIds: string[]) =>
+          get<{ profiles: Record<string, { language: string; checkoutMode: string }> }>(
+            `/api/checkout-profile?sellerIds=${sellerIds.map(encodeURIComponent).join(',')}`),
       },
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
@@ -2056,6 +2070,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       // ─ Settings (language, preferences) ──────────────────────────────────
       getSettings:          () => get<{ settings: Record<string, any> }>('/api/seller/settings'),
       updateSettings:       (body: Record<string, any>) => patch<any>('/api/seller/settings', body),
+      // ─ Checkout settings: post-purchase offer + conversion tracking ──────
+      getPostPurchaseOffer:  () => get<PostPurchaseOfferResponse>('/api/seller/post-purchase-offer'),
+      savePostPurchaseOffer: (body: PostPurchaseOfferSettings) => put<PostPurchaseOfferResponse>('/api/seller/post-purchase-offer', body),
+      getConversionTracking: () => get<{ tracking: ConversionTrackingView }>('/api/seller/conversion-tracking'),
+      saveConversionTracking: (body: Record<string, string | null>) =>
+        put<{ tracking: ConversionTrackingView }>('/api/seller/conversion-tracking', body),
       // ─ Policies ───────────────────────────────────────────────────────────
       getPolicies:          () => get<{ policies: any[] }>('/api/seller/settings/policies'),
       savePolicies:         (policies: any[]) => put<any>('/api/seller/settings/policies', { policies }),

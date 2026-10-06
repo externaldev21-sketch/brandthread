@@ -137,3 +137,18 @@ export class TranslationMemo {
 
   clear() { this.results.clear(); this.inflight.clear(); }
 }
+
+export type TranslationStatus = 'idle' | 'loading' | 'error' | 'unavailable';
+
+/** The link under a caption: what it says for the current state, or null for none. */
+export function translationLinkLabel(input: {
+  offer: boolean; showingTranslation: boolean; status: TranslationStatus; result: TranslationResult | null;
+}): string | null {
+  if (!input.offer) return null;
+  if (input.result?.sameLanguage) return null;
+  if (input.showingTranslation && input.result) return 'See original';
+  if (input.status === 'loading') return 'Translating…';
+  if (input.status === 'unavailable') return 'Translation unavailable';
+  if (input.status === 'error') return "Couldn't translate. Tap to retry";
+  return 'See translation';
+}

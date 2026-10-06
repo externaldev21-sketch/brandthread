@@ -23,7 +23,7 @@ describe('text size', () => {
   it('appends a fontSize/lineHeight override to the original style', () => {
     const base = { fontSize: 14, lineHeight: 19, color: '#fff' };
     expect(scaleTextStyle(base, 1)).toBe(base);
-    expect(scaleTextStyle(base, 1.3)).toEqual([base, { fontSize: 18 + 0.5, lineHeight: 24.5 }]);
+    expect(scaleTextStyle(base, 1.3)).toEqual([base, { fontSize: 18, lineHeight: 24.5 }]);
     expect(scaleTextStyle([{ fontSize: 12 }, false, [{ lineHeight: 16 }]], 1.15)).toEqual([
       [{ fontSize: 12 }, false, [{ lineHeight: 16 }]], { fontSize: 14, lineHeight: 18.5 },
     ]);

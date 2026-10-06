@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TranslationMemo, guessLanguage, shouldOfferTranslation, translatableContent, translationLanguageName } from '../translation';
+import {
+  TranslationMemo, guessLanguage, shouldOfferTranslation, translatableContent, translationLanguageName, translationLinkLabel,
+} from '../translation';
 
 describe('guessLanguage', () => {
   it('detects non-Latin scripts', () => {
@@ -67,5 +69,18 @@ describe('TranslationMemo', () => {
     const fetcher = vi.fn(async () => result);
     await memo.get('Hola', 'en', fetcher);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('translationLinkLabel', () => {
+  const result = { text: 'Hola', translatedText: 'Hello', detectedLanguage: 'es', sameLanguage: false };
+  it('walks the Instagram-style states', () => {
+    expect(translationLinkLabel({ offer: false, showingTranslation: false, status: 'idle', result: null })).toBeNull();
+    expect(translationLinkLabel({ offer: true, showingTranslation: false, status: 'idle', result: null })).toBe('See translation');
+    expect(translationLinkLabel({ offer: true, showingTranslation: false, status: 'loading', result: null })).toBe('Translating…');
+    expect(translationLinkLabel({ offer: true, showingTranslation: true, status: 'idle', result })).toBe('See original');
+    expect(translationLinkLabel({ offer: true, showingTranslation: false, status: 'unavailable', result: null })).toBe('Translation unavailable');
+    expect(translationLinkLabel({ offer: true, showingTranslation: false, status: 'error', result: null })).toBe("Couldn't translate. Tap to retry");
+    expect(translationLinkLabel({ offer: true, showingTranslation: false, status: 'idle', result: { ...result, sameLanguage: true } })).toBeNull();
   });
 });

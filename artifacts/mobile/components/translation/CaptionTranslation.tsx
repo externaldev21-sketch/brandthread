@@ -14,12 +14,12 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { useDisplayPrefs } from '@/contexts/DisplayPrefsContext';
-import { TranslationMemo, shouldOfferTranslation, type TranslationResult } from '@/lib/translation';
+import {
+  TranslationMemo, shouldOfferTranslation, translationLinkLabel, type TranslationResult, type TranslationStatus as Status,
+} from '@/lib/translation';
 import { FONT } from '@/lib/theme';
 
 const memo = new TranslationMemo();
-
-type Status = 'idle' | 'loading' | 'error' | 'unavailable';
 
 export interface CaptionTranslation {
   /** The text to render: the translation while it is showing, else the original. */
@@ -27,18 +27,6 @@ export interface CaptionTranslation {
   /** Label for the link under the text, or null when there is nothing to offer. */
   linkLabel: string | null;
   onPressLink: () => void;
-}
-
-export function translationLinkLabel(input: {
-  offer: boolean; showingTranslation: boolean; status: Status; result: TranslationResult | null;
-}): string | null {
-  if (!input.offer) return null;
-  if (input.result?.sameLanguage) return null;
-  if (input.showingTranslation && input.result) return 'See original';
-  if (input.status === 'loading') return 'Translating…';
-  if (input.status === 'unavailable') return 'Translation unavailable';
-  if (input.status === 'error') return "Couldn't translate. Tap to retry";
-  return 'See translation';
 }
 
 export function useCaptionTranslation(original: string | null | undefined): CaptionTranslation {

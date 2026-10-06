@@ -2,11 +2,15 @@
  * Seller Checkout settings (app/checkout.tsx). Stored in the seller's
  * settings (PATCH /api/seller/settings) and enforced at checkout by the API
  * (api-server lib/sellerCheckoutSettings.ts):
+ *   - checkoutMode 'guest_only' ("Guest checkout only", the original
+ *     "Checkout only"): everyone checks out as a guest of this store — the
+ *     card isn't saved, the address isn't saved, no "create an account"
+ *     prompt (and so no one-click post-purchase offer);
  *   - checkoutMode 'accounts_required' turns guest checkout off;
  *   - tippingEnabled lets buyers add a tip in the in-app checkout.
  */
 
-export type CheckoutMode = 'accounts_optional' | 'accounts_required';
+export type CheckoutMode = 'guest_only' | 'accounts_optional' | 'accounts_required';
 
 export interface SellerCheckoutSettings {
   checkoutMode: CheckoutMode;
@@ -22,6 +26,7 @@ export const DEFAULT_SELLER_CHECKOUT_SETTINGS: SellerCheckoutSettings = {
 };
 
 export const CHECKOUT_MODE_OPTIONS: Array<{ id: CheckoutMode; label: string; description: string }> = [
+  { id: 'guest_only', label: 'Guest checkout only', description: 'Buyers check out without signing in. Cards and addresses aren’t saved to accounts' },
   { id: 'accounts_optional', label: 'Accounts optional', description: 'Buyers can check out as a guest or signed in' },
   { id: 'accounts_required', label: 'Accounts required', description: 'Buyers must sign in to check out' },
 ];
