@@ -74,6 +74,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/app-icon.tsx',
   'app/app-theme.tsx',
   'app/ai-assistant.tsx',
+  'app/push-notifications.tsx', // redirect-only route (QA-0057), renders no screen
   'app/bg-removal.tsx',
   'app/buyer-account-control.tsx',
   'app/buyer-drop-detail.tsx',
