@@ -31,6 +31,10 @@ const SELLER_DEFAULTS = {
   production_milestones: true,
   payout_confirmations: true,
   customer_messages: true,
+  // Followers, likes, comments, mentions, story replies — lib/push.ts already
+  // routed sellers' social pushes to this key, but sellers had no way to
+  // turn it off (PUT rejected it as an unknown category).
+  friend_activity: true,
   disputes: true,
   subscription_trial: true,
   inventory_alerts: true,

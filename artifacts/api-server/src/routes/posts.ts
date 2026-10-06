@@ -24,6 +24,7 @@ import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
+import { notifyCaptionMentions } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { screenText, MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
@@ -844,6 +845,12 @@ router.post("/", requireAuth, async (req, res) => {
       req.log.error({ err, clerkId, postId: post.id }, "Could not publish composed post media");
       return res.status(400).json({ error: "Composed media is unavailable or is not owned by this seller" });
     }
+  }
+
+  // "@handle" in the caption reaches the people mentioned (published + visible only;
+  // a held caption notifies nobody until a moderator approves it).
+  if (postStatus === "published" && !postHeld) {
+    void notifyCaptionMentions({ postId: post.id, authorId: clerkId, caption: post.caption });
   }
 
   // Validate + tag products (must belong to the posting seller)

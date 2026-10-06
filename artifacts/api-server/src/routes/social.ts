@@ -1404,6 +1404,9 @@ router.post("/stories/:id/view", async (req, res) => {
 
   const story = await loadActiveStory(storyId);
   if (!story) { res.status(404).json({ error: "Story not found" }); return; }
+  // The author opening their own story is not a view (it inflated the count
+  // and put the author in their own "Seen by" list).
+  if (story.authorId === myId) { res.json({ ok: true, own: true }); return; }
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
     res.status(404).json({ error: "Story not found" }); return;
   }
