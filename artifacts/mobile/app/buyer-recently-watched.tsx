@@ -32,7 +32,10 @@ function relativeTime(value: string) {
   if (minutes < 1) return 'Just watched';
   if (minutes < 60) return `Watched ${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  return `Watched ${hours}h ago`;
+  if (hours < 24) return `Watched ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Watched ${days}d ago`;
+  return `Watched ${new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 }
 
 export default function BuyerRecentlyWatched() {

@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
+import { SupportChatModal } from '@/components/SupportChatBubble';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -46,7 +47,8 @@ const POPULAR = FAQS.filter(f => f.popular);
 
 export default function HelpScreen() {
   const api = useApi();
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
+  const [chatOpen, setChatOpen] = useState(false);
   const { theme } = useAppTheme();
   const s = useMemo(() => createStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
@@ -102,6 +104,20 @@ export default function HelpScreen() {
 
   function scrollToContact() {
     scrollRef.current?.scrollTo({ y: contactY, animated: true });
+  }
+
+  // Live Chat is the in-app support assistant (it can hand off to a person).
+  // It reads the account, so it needs one; signed out, offer email instead.
+  function openLiveChat() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isSignedIn) {
+      setChatOpen(true);
+      return;
+    }
+    Alert.alert('Sign in to chat', 'Live chat is available once you sign in. You can email us any time.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Email us', onPress: () => { Linking.openURL('mailto:support@brandthread.app').catch(() => {}); } },
+    ]);
   }
 
   return (
@@ -215,13 +231,9 @@ export default function HelpScreen() {
             <Feather name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/chat')} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={openLiveChat} activeOpacity={0.8} accessibilityRole="button">
             <Feather name="message-circle" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/help')} activeOpacity={0.8}>
-            <Feather name="book-open" size={ICON.md} color={theme.accent} />
-            <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>
         </View>
 
@@ -308,6 +320,7 @@ export default function HelpScreen() {
           </View>
         </View>
       </Modal>
+      <SupportChatModal visible={chatOpen} onClose={() => setChatOpen(false)} />
     </View>
   );
 }

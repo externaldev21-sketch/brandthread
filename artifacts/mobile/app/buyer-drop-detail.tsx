@@ -352,7 +352,13 @@ export default function BuyerDropDetail() {
       setDrop(data as DropDetail);
       setSubscribed(notification.subscribed);
       Animated.timing(entrance, { toValue: 1, duration: 650, useNativeDriver: true }).start();
-    }).catch(() => { if (active) { setDrop(null); setLoadError(true); } })
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setDrop(null);
+      // A 404 (unknown or malformed link) is "This drop isn't available", not
+      // a connection problem with a Try again button.
+      setLoadError((error as { status?: number } | null)?.status !== 404);
+    })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [dropId, reloadGeneration]);

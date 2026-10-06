@@ -219,6 +219,16 @@ export default function DesignGarmentScreen() {
     Alert.alert('Saved', 'Placement saved to project.');
   }
 
+  // The canvas takes its garment view from the saved project
+  // (project.garmentView), not from the URL, so save the chosen view first —
+  // otherwise picking "Back" and opening the editor showed the front.
+  async function openInEditor() {
+    if (projectId) {
+      await updateProject(projectId, { garmentView: currentView } as any).catch(() => {});
+    }
+    router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any);
+  }
+
   // Determine if garment is light or dark for text contrast
   const isDarkGarment = ['#000000', '#1E3A5F', '#6B7280', '#EF4444', '#3B82F6', '#0F766E', '#22C55E', '#F97316', '#EC4899'].includes(garmentColor);
 
@@ -229,7 +239,7 @@ export default function DesignGarmentScreen() {
         onBack={() => goBackOr(router)}
         actions={[{
           icon: 'edit-2',
-          onPress: () => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any),
+          onPress: openInEditor,
           accessibilityLabel: 'Open in editor',
         }]}
       />
@@ -379,7 +389,7 @@ export default function DesignGarmentScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={gs.openEditorLargeBtn}
-            onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
+            onPress={openInEditor}
             activeOpacity={0.85}
           >
             <Feather name="edit-2" size={ICON.sm} color={FG} />

@@ -139,7 +139,7 @@ export default function DesignVersionsScreen() {
 
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Version History" />
+      <ScreenHeader title="Version history" />
 
       {loading ? (
         <View style={styles.centered}>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { validEmailOrPhone } from '@/lib/contactInput';
 import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View, Platform } from 'react-native';
@@ -34,6 +35,10 @@ export default function RequestSampleScreen() {
   const [notes, setNotes] = useState('');
   const [contact, setContact] = useState('');
   const [sending, setSending] = useState(false);
+  // A failed request is not the same as a delisted manufacturer: show a
+  // retry instead of "no longer listed".
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -41,20 +46,27 @@ export default function RequestSampleScreen() {
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setLoadError(false);
     getManufacturer(manufacturerId)
       .then((value) => {
         if (!active) return;
         setManufacturer(value ?? null);
       })
-      .catch(() => {})
+      .catch(() => { if (active) setLoadError(true); })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [manufacturerId]);
+  }, [manufacturerId, reloadKey]);
 
   async function submit() {
     if (!manufacturerId || !manufacturer) return;
     if (!contact.trim()) {
       Alert.alert('Missing info', 'Enter your email or WhatsApp number.');
+      return;
+    }
+    const replyContact = validEmailOrPhone(contact);
+    if (!replyContact) {
+      Alert.alert('Check your contact', 'Enter a valid email address or WhatsApp number so the manufacturer can reply.');
       return;
     }
     setSending(true);
@@ -67,7 +79,7 @@ export default function RequestSampleScreen() {
         sampleRequired: true,
         colorways: colorway.trim() ? [colorway.trim()] : [],
         sizes: size.trim() ? [size.trim()] : [],
-        notes: [notes.trim(), `Reply contact: ${contact.trim()}`].filter(Boolean).join('\n'),
+        notes: [notes.trim(), `Reply contact: ${replyContact}`].filter(Boolean).join('\n'),
         currentStep: 5,
       });
       await submitQuoteRequest(draft.id);
@@ -86,6 +98,23 @@ export default function RequestSampleScreen() {
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
+  }
+
+  if (!manufacturer && loadError) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader
+          title="Request Sample"
+          onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        />
+        <EmptyState
+          icon="wifi-off"
+          title="Couldn't load this manufacturer"
+          description="Check your connection and try again."
+          action={{ label: 'Try again', onPress: () => setReloadKey((k) => k + 1) }}
+        />
+      </View>
+    );
   }
 
   if (!manufacturer) {
@@ -127,7 +156,7 @@ export default function RequestSampleScreen() {
         </Field>
         <Field label="Colorway"><TextInput accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
         <Field label="Size"><TextInput accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
-        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" /></Field>
+        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" /></Field>
         <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={colors.mutedForeground} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>

@@ -38,8 +38,10 @@ import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
 import {
   getBillingRecoveryTarget,
   isSubscriptionPaymentRecoveryRequired,
+  platformSubscriptionSettingsUrl,
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
+import { manageOrCancelLine } from '@/lib/trialOffer';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 // Note: there is no real usage-metrics API in this codebase yet, so the Usage
@@ -168,12 +170,19 @@ export default function SubscriptionScreen() {
     if (planId === selectedPlan && currentPlan.status !== 'none') return;
 
     if (planId === 'starter' && currentPlan.status !== 'none') {
+      // App Store / Google Play subscriptions are changed in the store, not in
+      // the Stripe billing portal.
+      const storeManaged = currentPlan.effectiveProvider === 'revenuecat'
+        || (currentPlan.effectiveProvider !== 'stripe' && Platform.OS !== 'web');
+      const storeName = Platform.OS === 'android' ? 'Google Play' : 'App Store';
       Alert.alert(
         'Downgrade plan',
-        'To change or cancel your subscription, use the billing portal.',
+        storeManaged
+          ? `To change or cancel your plan, open your ${storeName} subscriptions.`
+          : 'To change or cancel your subscription, use the billing portal.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Open portal', onPress: handleOpenPortal },
+          { text: storeManaged ? 'Manage subscription' : 'Open portal', onPress: handleOpenPortal },
         ],
       );
       return;
@@ -215,7 +224,17 @@ export default function SubscriptionScreen() {
         return;
       }
       if (target === 'subscription') {
-        throw new Error('Subscription management is not available yet.');
+        // No management URL from the provider: fall back to the platform's own
+        // subscription settings instead of a dead end.
+        const fallback = platformSubscriptionSettingsUrl(Platform.OS);
+        if (fallback) {
+          await Linking.openURL(fallback);
+          return;
+        }
+        if (currentPlan.effectiveProvider === 'none') {
+          Alert.alert('No subscription to manage', 'Choose a plan above to start one.');
+          return;
+        }
       }
       const { url } = await api.seller.subscription.portal();
       externalSessionOpenedRef.current = { kind: 'portal' };
@@ -488,7 +507,7 @@ export default function SubscriptionScreen() {
               {/* Apple guideline 3.1.2 — auto-renew disclosure + Terms/Privacy links */}
               <View style={styles.legalFooter}>
                 <Text style={styles.legalFooterText}>
-                  Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. Manage or cancel in your App Store account settings.
+                  Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. {manageOrCancelLine(Platform.OS)}
                 </Text>
                 <View style={styles.legalLinksRow}>
                   <Text style={styles.legalLink} onPress={() => { haptic(); router.push('/terms' as never); }}>

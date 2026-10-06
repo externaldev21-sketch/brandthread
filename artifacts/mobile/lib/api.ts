@@ -475,6 +475,9 @@ async function uploadImage<T = any>(
   const imageBlob = await source.blob();
   const contentType = image.mimeType || imageBlob.type || "image/jpeg";
   const token = await getCachedToken(getToken);
+  // Every upload endpoint is protected. Without an account (signed-out web
+  // preview) fail here instead of sending the image to a protected API.
+  if (!token) throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in to upload images.', code: 'unauthenticated' } }));
   let res: Response;
   try {
     res = await fetch(`${BASE}${versionApiPath(path)}`, {

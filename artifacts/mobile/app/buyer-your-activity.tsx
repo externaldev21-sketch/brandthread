@@ -89,7 +89,7 @@ export default function BuyerYourActivity() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Your Activity" />
+      <ScreenHeader title="Your activity" />
 
       <ScrollView
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + SPACING.xxxl }}

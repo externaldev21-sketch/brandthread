@@ -7,7 +7,8 @@
  * - Inline unavailable/low-stock warnings backed by actual CartItem data
  * - Consistent monochrome Woven design-system tokens throughout
  */
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { formatCalendarDate } from '@/lib/calendarDate';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
@@ -18,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
@@ -227,7 +228,7 @@ function CartItemRow({
           <View style={ir.preOrderBadge}>
             <Feather name="clock" size={10} color={theme.secondary} />
             <Text style={[ir.preOrderText, { color: theme.secondary }]}>
-              Pre-order{item.preOrderEstShipDate ? ` · est. ${new Date(item.preOrderEstShipDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ''}
+              Pre-order{item.preOrderEstShipDate ? ` · est. ${formatCalendarDate(item.preOrderEstShipDate, { month: 'short', year: 'numeric' })}` : ''}
             </Text>
           </View>
         )}
@@ -657,6 +658,12 @@ export default function CartScreen() {
   const [validating, setValidating] = useState(false);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [pointsInput, setPointsInput] = useState('');
+  // Rewards → "Redeem" opens the cart with ?redeemPoints=N: start with that
+  // amount typed in instead of making the buyer enter it again.
+  const { redeemPoints } = useLocalSearchParams<{ redeemPoints?: string }>();
+  useEffect(() => {
+    if (redeemPoints && /^\d{1,7}$/.test(redeemPoints)) setPointsInput(redeemPoints);
+  }, [redeemPoints]);
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);

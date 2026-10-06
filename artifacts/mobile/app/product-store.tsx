@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { formatCalendarDate } from '@/lib/calendarDate';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -462,7 +463,7 @@ export default function ProductStoreScreen() {
                   <Feather name="truck" size={ICON.xs} color={MUTED} />
                   <Text style={s.preorderLabel}>Est. shipping:</Text>
                   <Text style={s.preorderValue}>
-                    {new Date(preorder.estimatedShippingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {formatCalendarDate(preorder.estimatedShippingDate)}
                   </Text>
                 </View>
               )}

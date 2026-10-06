@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
+import { appVersion } from '@/lib/appVersion';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +51,43 @@ const CONFIG: Record<string, Config> = {
   'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
   about: { title: 'About Brandthread', items: (_s, router) => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
 };
+
+// ─── Sections that only had device-only or dead rows (QA audit) ─────────────
+// Read receipts, activity status, message requests, personalized
+// recommendations, sensitive content, hide-like-counts, comment filtering,
+// autofill and "reset" rows were saved on this device only (or did nothing)
+// and the server never applied them. Each section now lists only controls
+// that really work, each opening the screen that does it.
+Object.assign(CONFIG, {
+  messages: { title: 'Messages and story replies', items: (_s, router) => [
+    { label: 'Who can message you', icon: 'message-circle', action: () => router?.push('/buyer-privacy-settings' as never) },
+    { label: 'Blocked accounts', icon: 'slash', action: () => router?.push('/buyer-blocked' as never) },
+  ] },
+  content: { title: 'Content preferences', items: (_s, router) => [
+    { label: 'Hidden words', sub: 'Hide posts and comments with words you choose', icon: 'filter', action: () => router?.push('/muted-words' as never) },
+    { label: 'Muted accounts', icon: 'volume-x', action: () => router?.push('/buyer-muted' as never) },
+  ] },
+  suggested: { title: 'Suggested content', items: (_s, router) => [
+    { label: 'Hidden words', sub: 'Hide posts and comments with words you choose', icon: 'filter', action: () => router?.push('/muted-words' as never) },
+  ] },
+  'hidden-words': { title: 'Hidden Words', intro: 'Automatically filter comments and message requests containing offensive or custom words.', items: (_s, router) => [
+    { label: 'Custom words and phrases', icon: 'filter', action: () => router?.push('/muted-words' as never) },
+  ] },
+  payments: { title: 'Addresses and payments', items: (_s, router) => [
+    { label: 'Shipping addresses', icon: 'map-pin', action: () => router?.push('/buyer-addresses' as never) },
+    { label: 'Payment methods', icon: 'credit-card', action: () => router?.push('/buyer-payment-methods' as never) },
+  ] },
+  'privacy-center': { title: 'Privacy Center', items: (_s, router) => [
+    { label: 'Privacy policy', icon: 'file-text', action: () => router?.push('/privacy' as never) },
+    { label: 'Download my data', icon: 'download', action: () => router?.push('/buyer-download-data' as never) },
+  ] },
+  about: { title: 'About Brandthread', items: (_s, router) => [
+    { label: 'App version', value: appVersion() || undefined },
+    { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) },
+    { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) },
+    { label: 'Privacy policy', icon: 'shield', action: () => router?.push('/privacy' as never) },
+  ] },
+} satisfies Partial<Record<string, Config>>);
 
 export default function BuyerSettingsDetail() {
   const colors = useColors();
@@ -107,6 +146,7 @@ export default function BuyerSettingsDetail() {
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
+      {!loading && loadError && !settings ? <ErrorState message="Couldn't load your settings." onRetry={() => { setLoading(true); load(); }} /> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {
         const isActionable = !!item.toggle || !!item.action;
         return <React.Fragment key={`${item.label}-${i}`}>

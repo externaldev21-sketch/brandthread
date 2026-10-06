@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
+import { apiErrorMessage } from '@/lib/safety';
+import { ActivityIndicator } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FS } from '@/lib/theme';
 
@@ -58,6 +60,25 @@ export default function BrandScreen() {
   const [logoGenerating, setLogoGenerating] = useState(false);
   const [logoImages, setLogoImages] = useState<string[]>([]); // base64 strings
   const [selectedLogo, setSelectedLogo] = useState<number | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
+
+  // "Use this logo" saves the picked logo as the storefront logo
+  // (same upload the store settings use); it used to only buzz.
+  async function saveSelectedLogo() {
+    if (selectedLogo === null || savingLogo) return;
+    const b64 = logoImages[selectedLogo];
+    if (!b64) return;
+    setSavingLogo(true);
+    try {
+      await api.seller.uploadLogo({ uri: `data:image/png;base64,${b64}`, mimeType: 'image/png' });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Logo saved', 'It’s now your store logo.');
+    } catch (error) {
+      Alert.alert('Couldn’t save logo', apiErrorMessage(error, 'Check your connection and try again.'));
+    } finally {
+      setSavingLogo(false);
+    }
+  }
 
   async function handleGenerateLogo() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -247,10 +268,14 @@ export default function BrandScreen() {
               <TouchableOpacity
                 style={[styles.generateBtn, { backgroundColor: theme.accentDim, marginTop: 8 }]}
                 activeOpacity={0.8}
-                onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
+                onPress={saveSelectedLogo}
+                disabled={savingLogo}
+                accessibilityRole="button"
               >
-                <Feather name="download" size={15} color={colors.success} />
-                <Text style={[styles.generateText, { color: colors.success }]}>Use this logo</Text>
+                {savingLogo
+                  ? <ActivityIndicator size="small" color={colors.success} />
+                  : <Feather name="download" size={15} color={colors.success} />}
+                <Text style={[styles.generateText, { color: colors.success }]}>{savingLogo ? 'Saving…' : 'Use this logo'}</Text>
               </TouchableOpacity>
             )}
           </>

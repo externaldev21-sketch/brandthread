@@ -9,6 +9,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -88,6 +89,7 @@ export default function SellerVerificationScreen() {
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
 
   const [state, setState] = useState<VerificationState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +106,8 @@ export default function SellerVerificationScreen() {
 
   // Load current verification status
   const loadStatus = useCallback(async () => {
+    // Signed-out web preview: the status endpoint is protected; don't call it.
+    if (!authLoaded || !isSignedIn) { setLoading(false); return; }
     try {
       const data = await (api as any).seller.verification.status();
       setState(data);
@@ -113,7 +117,7 @@ export default function SellerVerificationScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, authLoaded, isSignedIn]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
 

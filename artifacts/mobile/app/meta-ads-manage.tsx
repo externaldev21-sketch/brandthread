@@ -7,6 +7,7 @@
  * pause/resume, edit budget, duplicate actions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
@@ -243,7 +244,7 @@ function CampaignCard({
   onEditBudget: () => void; onFixAndRelaunch: () => void;
 }) {
   const i = row.insights;
-  const money = (c?: number) => `$${((c ?? 0) / 100).toFixed(2)}`;
+  const money = (c?: number) => formatCents(c ?? 0);
   return (
     <BrandthreadCard>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: SP.sm }}>

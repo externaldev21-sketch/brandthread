@@ -282,7 +282,7 @@ export default function LoginMethods() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Login Methods" />
+      <ScreenHeader title="Login methods" />
 
       {!isLoaded ? (
         <View style={s.loading}>

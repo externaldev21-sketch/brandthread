@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatCents } from '@/lib/money';
+import { plural } from '@/lib/plural';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -167,9 +169,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available directly in-app yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Managed in Stripe Tax</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Adding, removing, or reviewing where you're registered to collect tax (your nexus) is managed in your Stripe Tax dashboard, not in Brandthread. Tap "Open Stripe" to manage it there.
+                Where you're registered to collect tax (your nexus) is set in your Stripe Tax dashboard. Tap "Open Stripe" to add, remove, or review registrations.
               </Text>
             </View>
           </View>
@@ -183,9 +185,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Prices are tax-exclusive</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Your listed prices are currently tax-exclusive: calculated tax is added on top at checkout. Switching listings to tax-inclusive pricing isn't supported yet.
+                Tax is calculated at checkout and added on top of your listed prices.
               </Text>
             </View>
           </View>
@@ -202,9 +204,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>International orders ship DAP</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Brandthread doesn't calculate or collect customs duties at checkout. International orders currently ship DAP by default — buyers may be responsible for duties and import fees charged on delivery.
+                Customs duties aren't collected at checkout, so buyers may pay duties and import fees on delivery.
               </Text>
             </View>
           </View>
@@ -228,7 +230,7 @@ export default function TaxesDutiesScreen() {
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
                 {annualReport
-                  ? `${annualReport.year}: $${(annualReport.grossPaymentCents / 100).toFixed(2)} gross · ${annualReport.transactionCount} transactions`
+                  ? `${annualReport.year}: ${formatCents(annualReport.grossPaymentCents)} gross · ${plural(annualReport.transactionCount, 'transaction')}`
                   : 'Annual paid-order totals are unavailable.'}
               </Text>
               {annualReport && (

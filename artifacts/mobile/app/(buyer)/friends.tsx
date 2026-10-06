@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { relativeTime } from '@/lib/activity';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList,
@@ -41,13 +42,9 @@ const { width: SCREEN_W } = Dimensions.get('window');
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
+  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
+  return relativeTime(iso);
 }
 
 // ─── Post Card ───────────────────────────────────────────────────────────────

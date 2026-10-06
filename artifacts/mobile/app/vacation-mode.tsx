@@ -4,6 +4,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { futureDateInputError, toDateInputValue } from '@/lib/calendarDate';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator } from 'react-native';
@@ -36,6 +37,7 @@ export default function VacationModeScreen() {
   const [vacationMode,    setVacationMode]    = useState(false);
   const [message,         setMessage]         = useState('');
   const [returnDate,      setReturnDate]      = useState('');
+  const [returnDateError, setReturnDateError] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
@@ -44,7 +46,7 @@ export default function VacationModeScreen() {
         setVacationMode(d?.vacationMode ?? false);
         setMessage(d?.vacationMessage ?? '');
         if (d?.vacationUntil) {
-          setReturnDate(new Date(d.vacationUntil).toISOString().split('T')[0]);
+          setReturnDate(toDateInputValue(d.vacationUntil));
         }
       })
       .catch(() => {})
@@ -53,16 +55,18 @@ export default function VacationModeScreen() {
 
   async function handleSave() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const dateError = vacationMode ? futureDateInputError(returnDate) : null;
+    if (dateError) { setReturnDateError(dateError); return; }
     setSaving(true);
     try {
       await (api as any).seller?.vacation?.update?.({
         vacationMode,
         vacationMessage: message.trim() || null,
-        vacationUntil:   returnDate ? returnDate : null,
+        vacationUntil:   vacationMode && returnDate.trim() ? returnDate.trim() : null,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
+        vacationMode ? 'Vacation mode is on' : 'Your store is open',
         vacationMode
           ? 'Buyers will see an away banner on your storefront. New orders are paused.'
           : 'Your store is open again. Buyers can place new orders.',
@@ -137,13 +141,17 @@ export default function VacationModeScreen() {
             <TextInput
               style={s.input}
               value={returnDate}
-              onChangeText={setReturnDate}
+              onChangeText={(v) => { setReturnDate(v); setReturnDateError(null); }}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={MUTED}
-              keyboardType="default"
+              keyboardType="numbers-and-punctuation"
               autoCorrect={false}
+              maxLength={10}
+              accessibilityLabel="Return date, YYYY-MM-DD"
             />
-            <Text style={s.fieldHint}>Vacation mode auto-clears when this date passes.</Text>
+            {returnDateError
+              ? <Text style={[s.fieldHint, { color: RED }]} accessibilityLiveRegion="polite">{returnDateError}</Text>
+              : <Text style={s.fieldHint}>Vacation mode auto-clears when this date passes.</Text>}
           </View>
         )}
 

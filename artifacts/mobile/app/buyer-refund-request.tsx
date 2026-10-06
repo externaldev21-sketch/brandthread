@@ -25,7 +25,7 @@ import {
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
-import { PrimaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, PrimaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 const REFUND_REASONS = [
@@ -50,6 +50,8 @@ export default function BuyerRefundRequestScreen() {
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -70,12 +72,22 @@ export default function BuyerRefundRequestScreen() {
   }
 
   useEffect(() => {
-    if (!orderId) return;
+    // No order in the link: show "Order not found" below, not a spinner forever.
+    if (!orderId) { setLoading(false); return; }
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
     getBuyerOrder(orderId).then(o => {
+      if (!active) return;
       setOrder(o ?? null);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [orderId]);
+    }).catch(() => {
+      if (!active) return;
+      setLoadError(true);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [orderId, reloadKey]);
 
   const totalCents = order?.payment.totalCents ?? 0;
 
@@ -108,6 +120,31 @@ export default function BuyerRefundRequestScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <ScreenHeader title="Request Refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>
+      </View>
+    );
+  }
+
+  // Without the order there is nothing to refund, so never show the form
+  // (Submit used to return silently when the order hadn't loaded).
+  if (!order) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Request Refund" />
+        {loadError ? (
+          <EmptyState
+            icon="wifi-off"
+            title="Couldn't load this order"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => setReloadKey(k => k + 1) }}
+          />
+        ) : (
+          <EmptyState
+            icon="alert-circle"
+            title="Order not found"
+            description="This link doesn't point to one of your orders."
+            action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+          />
+        )}
       </View>
     );
   }

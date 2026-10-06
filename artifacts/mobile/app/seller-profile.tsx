@@ -17,6 +17,7 @@
  * feed player at that post.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { plural } from '@/lib/plural';
 import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -611,7 +612,7 @@ export default function SellerProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
-      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${rating.totalCount} reviews`} icon="star" /> : null}
+      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${plural(rating.totalCount, 'review')}`} icon="star" /> : null}
       {caps.showPlanChip && plan ? (
         <ProfileChip
           label={planChipLabel(plan)}

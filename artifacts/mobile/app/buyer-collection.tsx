@@ -43,7 +43,8 @@ export default function BuyerCollection() {
 
   const [collection, setCollection] = useState<SavedCollection | null>(null);
   const [items, setItems] = useState<SavedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // A link without a collection id has nothing to load (see the early return).
+  const [loading, setLoading] = useState(!!collectionId);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -184,6 +185,21 @@ export default function BuyerCollection() {
           {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
         </View>
       </TouchableOpacity>
+    );
+  }
+
+  if (!collectionId) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Collection" />
+        <EmptyState
+          icon="folder"
+          title="Collection not found"
+          description="This link doesn't point to a collection."
+          action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+          style={{ marginTop: SP.xxl }}
+        />
+      </View>
     );
   }
 

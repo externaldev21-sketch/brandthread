@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { relativeTime } from '@/lib/activity';
+import { plural } from '@/lib/plural';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -57,13 +59,9 @@ function getStatusLabel(status: StorePublishStatus): string {
 }
 
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
+  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
+  return relativeTime(dateStr);
 }
 
 export default function StoreBuilderScreen() {
@@ -532,7 +530,7 @@ export default function StoreBuilderScreen() {
                     <View style={[s.resultIcon, { backgroundColor: SUCCESS_DIM }]}><Feather name="check" size={ICON.lg} color={SUCCESS} /></View>
                     <Text style={s.progressTitle}>{importJob.importedCount} products transferred</Text>
                     <Text style={s.progressDesc}>
-                      {importJob.failedCount > 0 ? `${importJob.failedCount} products could not be converted. ` : ''}
+                      {importJob.failedCount > 0 ? `${plural(importJob.failedCount, 'product')} could not be converted. ` : ''}
                       Your catalog and Thread Theme storefront are ready.
                     </Text>
                     {importJob.status === 'needs_continuation' && (

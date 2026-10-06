@@ -64,7 +64,7 @@ import {
 } from '@/lib/paywallRetentionConfig';
 import { SellerPaywallHeadline } from '@/components/paywall/SellerPaywallHeadline';
 import { SellerPaywallBullets } from '@/components/paywall/SellerPaywallBullets';
-import { SellerPaywallSocialProof } from '@/components/paywall/SellerPaywallSocialProof';
+import { freeTrialDays, manageOrCancelLine } from '@/lib/trialOffer';
 import { SellerPlanSelector, type PlanPricing } from '@/components/paywall/SellerPlanSelector';
 import { SellerTrialTimeline, type TrialTimelineStep } from '@/components/paywall/SellerTrialTimeline';
 import { SellerPaywallCTA } from '@/components/paywall/SellerPaywallCTA';
@@ -84,11 +84,17 @@ const BENEFIT_BULLETS = [
 //     reminder is label-only: no local/scheduled-notification system exists
 //     in this app today (only the server-driven "Trial reminders" toggle in
 //     Notification Settings) — see the PR description. ────────────────────
-const TRIAL_STEPS: TrialTimelineStep[] = [
-  { key: 'today', label: 'Today', detail: 'Full access unlocked', icon: 'unlock' },
-  { key: 'day4',  label: 'Day 4', detail: "We remind you before your trial ends", icon: 'bell' },
-  { key: 'day5',  label: 'Day 5', detail: 'Billing starts', icon: 'credit-card' },
-];
+// Web checkout (Stripe) uses the server's trial (routes/subscription.ts
+// trial_period_days). Native reads each store product's own intro offer.
+const WEB_TRIAL_DAYS = 5;
+
+function trialSteps(days: number): TrialTimelineStep[] {
+  return [
+    { key: 'today', label: 'Today', detail: 'Full access unlocked', icon: 'unlock' },
+    { key: 'remind', label: `Day ${Math.max(1, days - 1)}`, detail: "We remind you before your trial ends", icon: 'bell' },
+    { key: 'bill',  label: `Day ${days}`, detail: 'Billing starts', icon: 'credit-card' },
+  ];
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -133,9 +139,7 @@ export default function PlansScreen() {
   const pricesFailed   = Platform.OS !== 'web' && packages.length === 0 && (!revenueCatAvailable || pricesTimedOut);
   // Whether the store actually returned a free-trial intro offer for this user
   // on ANY plan — used to avoid promising a trial that isn't really there.
-  const hasRealTrialOffer = Platform.OS === 'web'
-    ? true
-    : packages.some((pkg) => !!pkg.product.introPrice);
+  // (The trial shown is the selected plan's own offer — see selectedTrialDays.)
 
   // AppState ref to detect return from Stripe Checkout browser tab
   const checkoutOpenedRef = useRef(false);
@@ -371,6 +375,13 @@ export default function PlansScreen() {
   const selectedPlan = SELLER_PLANS.find((p) => p.id === selectedId) ?? SELLER_PLANS.find((p) => p.id === recommendedId) ?? SELLER_PLANS[0];
   const offerPlan = SELLER_PLANS.find((p) => p.id === recommendedId) ?? selectedPlan;
   const selectedPricing = getPricing(selectedPlan);
+  // Free-trial length for the SELECTED plan only: another plan having an
+  // intro offer must not make this one promise a trial, and the length comes
+  // from the store product rather than a hard-coded "5-day".
+  const selectedTrialDays = Platform.OS === 'web'
+    ? WEB_TRIAL_DAYS
+    : freeTrialDays(packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[selectedPlan.id])?.product.introPrice as any);
+  const hasRealTrialOffer = selectedTrialDays != null;
   const selectedCtaDisabled = loadingId !== null
     || (!isOnboarding && selectedPlan.id === currentPlanId && currentPlanStatus !== 'none')
     || selectedPricing.failed;
@@ -402,12 +413,10 @@ export default function PlansScreen() {
           theme={theme}
           eyebrow="BRANDTHREAD FOR SELLERS"
           title="Everything to build, run, and grow your brand"
-          subtitle="One home for your storefront, production, and sales — start free."
+          subtitle="One home for your storefront, production, and sales."
         />
 
         <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
-
-        <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
 
         <SellerPlanSelector
           theme={theme}
@@ -428,7 +437,7 @@ export default function PlansScreen() {
               : isCurrentSelected
                 ? 'Current plan'
                 : hasRealTrialOffer
-                  ? 'Start my 5-day free trial'
+                  ? `Start my ${selectedTrialDays}-day free trial`
                   : `Choose ${selectedPlan.name}`
           }
           onPress={() => handleSelect(selectedPlan)}
@@ -439,12 +448,12 @@ export default function PlansScreen() {
           subtext="No commitment. Cancel anytime."
           billingLine={
             hasRealTrialOffer && !selectedPricing.failed
-              ? `Free for 5 days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
+              ? `Free for ${selectedTrialDays} days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
               : null
           }
         />
 
-        {hasRealTrialOffer && <SellerTrialTimeline theme={theme} steps={TRIAL_STEPS} />}
+        {selectedTrialDays != null && <SellerTrialTimeline theme={theme} steps={trialSteps(selectedTrialDays)} />}
 
         {/* Commission disclosure — small print, not part of the primary pitch */}
         <Text style={styles.commissionNote}>
@@ -477,7 +486,7 @@ export default function PlansScreen() {
         {/* Apple guideline 3.1.2 — auto-renew disclosure + Terms/Privacy links */}
         <View style={styles.legalFooter}>
           <Text style={styles.legalFooterText}>
-            Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. Manage or cancel in your App Store account settings.
+            Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. {manageOrCancelLine(Platform.OS)}
           </Text>
           <View style={styles.legalLinksRow}>
             <Text

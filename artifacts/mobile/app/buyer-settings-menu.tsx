@@ -108,7 +108,7 @@ export default function BuyerSettingsMenuScreen() {
       rows: [
         { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => router.push('/settings' as any) },
         { key: 'help', icon: 'help-circle', label: 'Help', onPress: () => router.push('/help' as any) },
-        { key: 'log-out', icon: 'log-out', label: 'Log out', destructive: true, onPress: handleSignOut },
+        { key: 'log-out', icon: 'log-out', label: 'Sign out', destructive: true, onPress: handleSignOut },
       ],
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

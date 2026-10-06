@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { formatCalendarDate } from '@/lib/calendarDate';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -940,7 +941,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
 
         {mfg.productionDeadline && (
           <Text style={pt.deadline}>
-            Est. completion: {new Date(mfg.productionDeadline).toLocaleDateString()}
+            Est. completion: {formatCalendarDate(mfg.productionDeadline)}
           </Text>
         )}
         {mfg.unitsInProduction && (
@@ -1289,7 +1290,7 @@ function StoreTab({
               </View>
               {product.preorderSettings.estimatedShippingDate && (
                 <Text style={st.preorderSub}>
-                  Est. ship: {new Date(product.preorderSettings.estimatedShippingDate).toLocaleDateString()}
+                  Est. ship: {formatCalendarDate(product.preorderSettings.estimatedShippingDate)}
                 </Text>
               )}
             </GradientCard>

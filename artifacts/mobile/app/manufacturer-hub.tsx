@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { relativeTime } from '@/lib/activity';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -74,13 +75,9 @@ function fmtDate(iso?: string): string {
 }
 
 function timeAgo(iso?: string): string {
-  if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return 'just now';
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  // Shared wording ("just now", "5m ago", "3d ago", then a date) and an
+  // empty string for missing/invalid timestamps (was "NaNd ago" / "412d ago").
+  return iso ? relativeTime(iso) : '';
 }
 
 function relStatusVariant(status: ManufacturerRelationship['status']): 'success' | 'info' | 'warning' | 'neutral' | 'purple' | 'error' {
@@ -137,6 +134,22 @@ function productionStatusVariant(status: ProductionOrder['status']): 'success' |
     case 'cancelled': return 'error';
     default:          return 'neutral';
   }
+}
+
+/**
+ * "Send to manufacturer" on a product opens the hub with ?productId=…. Every
+ * quote request started from the hub then carries that product, so the
+ * seller doesn't have to find it again (quote-request already reads it).
+ */
+function useQuoteRequestHref() {
+  const { productId } = useLocalSearchParams<{ productId?: string }>();
+  return (manufacturerId?: string) => {
+    const params = new URLSearchParams();
+    if (manufacturerId) params.set('manufacturerId', manufacturerId);
+    if (productId) params.set('productId', productId);
+    const qs = params.toString();
+    return (qs ? `/quote-request?${qs}` : '/quote-request') as never;
+  };
 }
 
 function showManufacturerUpgrade(error: unknown, router: ReturnType<typeof useRouter>): boolean {
@@ -333,6 +346,7 @@ const CATEGORY_CHIPS = [
 ];
 
 function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const quoteHref = useQuoteRequestHref();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
@@ -687,7 +701,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             onSave={() => toggleSave(item)}
             onMessage={() => onMessage(item)}
             onProfile={() => router.push((`/manufacturer-profile?id=${item.id}`) as never)}
-            onQuote={() => router.push((`/quote-request?manufacturerId=${item.id}`) as never)}
+            onQuote={() => router.push(quoteHref(item.id))}
           />
         )}
         contentContainerStyle={[s.listContent, s.gridContent]}
@@ -1034,6 +1048,7 @@ const makeFm = (theme: AppThemePreset) => StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const quoteHref = useQuoteRequestHref();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
   const relCard = useMemo(() => makeRelCard(theme), [theme]);
@@ -1143,7 +1158,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
             <View style={relCard.divider} />
             <View style={relCard.actionRow}>
               <Button label="Message" icon="message-circle" variant="secondary" size="compact" onPress={() => openThread(rel)} testID={`relationship-message-${mfg.id}`} />
-              <Button label="Quote" icon="file-text" variant="secondary" size="compact" onPress={() => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never)} />
+              <Button label="Quote" icon="file-text" variant="secondary" size="compact" onPress={() => router.push(quoteHref(mfg.id))} />
               <Button label="Profile" icon="user" variant="secondary" size="compact" onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)} />
             </View>
           </View>
@@ -1179,6 +1194,7 @@ const makeRelCard = (theme: AppThemePreset) => StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const quoteHref = useQuoteRequestHref();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
   const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
@@ -1254,7 +1270,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
           icon="file-text"
           title="Request your first production quote."
           description="Send quote requests to manufacturers and compare their offers."
-          action={{ label: 'Request a quote', onPress: () => router.push('/quote-request' as never), icon: 'plus' }}
+          action={{ label: 'Request a quote', onPress: () => router.push(quoteHref()), icon: 'plus' }}
           style={s.emptyState}
         />
         <QuotesFAB router={router} />
@@ -1308,12 +1324,13 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
 }
 
 function QuotesFAB({ router }: { router: ReturnType<typeof useRouter> }) {
+  const quoteHref = useQuoteRequestHref();
   const { theme } = useAppTheme();
   const fab = useMemo(() => makeFab(theme), [theme]);
   return (
     <TouchableOpacity
       style={fab.root}
-      onPress={() => router.push('/quote-request' as never)}
+      onPress={() => router.push(quoteHref())}
       activeOpacity={0.85}
     >
       <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={fab.grad}>

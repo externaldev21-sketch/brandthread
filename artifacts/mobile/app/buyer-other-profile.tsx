@@ -26,7 +26,7 @@ import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
-import { muteUser, restrictUser, createOrGetConversation } from '@/services/socialService';
+import { muteUser, createOrGetConversation } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
@@ -270,7 +270,9 @@ export default function BuyerOtherProfileScreen() {
       .catch(() => {});
   };
   const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
-  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
+  // No "Restrict" here: it was only saved on this device, so the other person
+  // could still comment, message and see activity — it promised protection it
+  // didn't give. Mute, Report and Block are enforced by the server.
   const handleBlock = async () => {
     setMoreSheetOpen(false);
     const subject = { userId: canonicalUserId, name: displayName };
@@ -536,8 +538,6 @@ export default function BuyerOtherProfileScreen() {
               <MoreRow icon="share-2" label="Share profile" onPress={handleShare} />
               <View style={styles.moreDivider} />
               <MoreRow icon="volume-x" label="Mute" onPress={handleMute} />
-              <View style={styles.moreDivider} />
-              <MoreRow icon="user-x" label="Restrict" onPress={handleRestrict} />
               <View style={styles.moreDivider} />
               <MoreRow icon="flag" label="Report" onPress={handleReport} />
               <View style={styles.moreDivider} />

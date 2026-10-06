@@ -134,7 +134,9 @@ export default function ContentScreen() {
 
   function createPost(type: ContentType) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(('/create-post?type=' + type) as never);
+    // The composer chooses its mode from ?mode= (thread = video, post = photos);
+    // it never read ?type=, so the picked kind was dropped.
+    router.push(('/create-post?mode=' + (type === 'image' ? 'post' : 'thread')) as never);
   }
 
   function openPostActions(post: ContentPost) {

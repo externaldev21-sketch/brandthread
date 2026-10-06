@@ -284,7 +284,13 @@ export default function BuyerSearchScreen() {
 
   function goToVideo(video: VideoResult) {
     hapticPrimaryAction();
-    router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
+    // Open the tapped video itself (buyer-other-profile ignores postId, so this
+    // used to land on the author's profile with the video nowhere in view).
+    if (video.postId) {
+      router.push({ pathname: '/buyer-post-viewer' as any, params: { postId: video.postId } });
+      return;
+    }
+    router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId } });
   }
 
   function handleResultPress(r: ProductResult | BrandResult) {

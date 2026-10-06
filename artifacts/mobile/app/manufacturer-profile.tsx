@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { plural } from '@/lib/plural';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -96,7 +97,8 @@ export default function ManufacturerProfileScreen() {
   const [productsError, setProductsError] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    // A link without an id can never load; show "unavailable" instead of a spinner.
+    if (!id) { setLoading(false); return; }
     let active = true;
     Promise.all([getManufacturer(id), getFavoriteManufacturerIds()]).then(([mfg, favoriteIds]) => {
       if (!active) return;
@@ -245,7 +247,7 @@ export default function ManufacturerProfileScreen() {
           <View style={s.heroRatingRow}>
              <StarRating rating={m.rating} color={theme.onAccent} />
              <Text style={[s.heroRatingText, getOnAccentTextStyle(theme)]}>
-               {m.reviewCount > 0 ? `${m.rating.toFixed(1)} (${m.reviewCount} reviews)` : 'No ratings yet'}
+               {m.reviewCount > 0 ? `${m.rating.toFixed(1)} (${plural(m.reviewCount, 'review')})` : 'No ratings yet'}
              </Text>
           </View>
         </LinearGradient>
@@ -279,7 +281,7 @@ export default function ManufacturerProfileScreen() {
                 { icon: 'package', label: 'Minimum order', value: m.moq > 0 ? `${m.moq.toLocaleString('en-US')} pcs` : null },
                 { icon: 'tag', label: 'Price per piece', value: m.priceRangeLabel ?? null },
                 { icon: 'scissors', label: 'Sample time', value: m.sampleTurnaround ?? null },
-                { icon: 'calendar', label: 'Bulk time', value: m.bulkTurnaround ?? (m.leadTimeDays ? `${m.leadTimeDays} days` : null) },
+                { icon: 'calendar', label: 'Bulk time', value: m.bulkTurnaround ?? (m.leadTimeDays ? plural(m.leadTimeDays, 'day') : null) },
                 { icon: 'zap', label: 'Replies in', value: m.responseTimeHours > 0 ? `~${m.responseTimeHours}h` : null },
               ] as const).filter((item) => item.value).map((item) => (
                 <View key={item.label} style={s.overviewItem}>
@@ -382,7 +384,7 @@ export default function ManufacturerProfileScreen() {
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Lead Time</Text>
-                <Text style={s.pricingValue}>{m.leadTimeDays} days</Text>
+                <Text style={s.pricingValue}>{plural(m.leadTimeDays, 'day')}</Text>
               </View>
             </View>
             <TouchableOpacity

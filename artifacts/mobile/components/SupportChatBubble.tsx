@@ -96,7 +96,7 @@ const QUICK_REPLIES = [
 ];
 
 // ─── Main Chat Modal ──────────────────────────────────────────────────────────
-function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { theme } = useAppTheme();

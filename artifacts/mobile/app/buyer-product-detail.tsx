@@ -3,6 +3,7 @@
  * Variant selection, add to cart, buy now.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { formatCalendarDate } from '@/lib/calendarDate';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
@@ -1073,7 +1074,7 @@ export default function BuyerProductDetailScreen() {
               )}
               {product.preOrderEstShipDate && (
                 <Text style={s.preOrderDetail}>
-                  Est. ship date: {new Date(product.preOrderEstShipDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  Est. ship date: {formatCalendarDate(product.preOrderEstShipDate, { month: 'long', day: 'numeric', year: 'numeric' })}
                 </Text>
               )}
               <Text style={s.preOrderDisclaimer}>

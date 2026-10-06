@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { plural } from '@/lib/plural';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1961,7 +1962,7 @@ export default function AddProductScreen() {
           <View style={s.previewMetaRow}>
             <Text style={s.collapsibleHint}>{media.length} photo{media.length !== 1 ? 's' : ''}</Text>
             <Text style={s.collapsibleHint}>·</Text>
-            <Text style={s.collapsibleHint}>{localVariants.length > 0 ? `${localVariants.length} variants` : 'No variants'}</Text>
+            <Text style={s.collapsibleHint}>{localVariants.length > 0 ? plural(localVariants.length, 'variant') : 'No variants'}</Text>
             <Text style={s.collapsibleHint}>·</Text>
             <Text style={s.collapsibleHint}>{totalStock} in stock</Text>
           </View>
