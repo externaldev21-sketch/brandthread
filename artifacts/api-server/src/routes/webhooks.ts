@@ -21,11 +21,15 @@ import {
   activateBoostFromCheckoutSession,
   markBoostCheckoutFailed,
 } from "./boosts";
+import { activateFeaturedSlotFromCheckoutSession, markFeaturedSlotCheckoutFailed } from "./featured-slots";
+import { fulfilCreditCheckoutSession, grantRevenueCatCreditPurchase } from "../lib/aiCredits/purchases";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
+import { drizzlePromoStore } from "../lib/iapPromotionsStore";
 import {
   awardLoyaltyPointsOnce,
   consumeLoyaltyRedemption,
@@ -260,6 +264,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
           // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
           break;
         }
+        // ── Featured slot checkout ───────────────────────────────────────────
+        if (cs.metadata?.kind === "featured_slot") {
+          if (cs.payment_status === "paid" || cs.payment_status === "no_payment_required") {
+            await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
+          }
+          break;
+        }
+        // ── AI credit pack checkout ──────────────────────────────────────────
+        if (cs.metadata?.kind === "ai_credits") {
+          if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
+          break;
+        }
         // ── Regular buyer checkout ───────────────────────────────────────────
         if (cs.payment_status === "paid") {
           await handleCheckoutPaid(cs, event.id, paidAt);
@@ -272,10 +288,14 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "checkout.session.async_payment_succeeded": {
         const cs = event.data.object as any;
         const paidAt = new Date(event.created * 1000);
-        if (cs.metadata?.kind === "ad_campaign") {
+        if (cs.metadata?.kind === "ai_credits") {
+          await fulfilCreditCheckoutSession(cs);
+        } else if (cs.metadata?.kind === "ad_campaign") {
           await activateAdCampaignFromCheckoutSession(cs, paidAt);
         } else if (cs.metadata?.kind === "boost") {
           await activateBoostFromCheckoutSession(cs, paidAt);
+        } else if (cs.metadata?.kind === "featured_slot") {
+          await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
         } else {
           await handleCheckoutPaid(cs, event.id, paidAt);
         }
@@ -290,6 +310,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await markAdCampaignCheckoutFailed(cs);
         } else if (cs.metadata?.kind === "boost") {
           await markBoostCheckoutFailed(cs);
+        } else if (cs.metadata?.kind === "featured_slot") {
+          await markFeaturedSlotCheckoutFailed(cs);
         } else {
           await releaseCheckoutLoyaltyRedemption(cs);
         }
@@ -478,6 +500,28 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     if (!recorded) {
       res.json({ received: true, duplicate: true });
       return;
+    }
+    // Consumable Boost / Create-ad purchases (Guideline 3.1.1 native rail).
+    const promo = promotionPurchaseFromWebhookEvent(event);
+    if (promo) {
+      if (!iapPromotionsEnabled()) {
+        req.log.warn({ eventId }, "RevenueCat promotion purchase received while IAP_PROMOTIONS_ENABLED is off");
+        res.json({ received: true, ignored: true });
+        return;
+      }
+      const result = await grantPromotionPurchase(drizzlePromoStore, { ...promo, source: "webhook" });
+      req.log.info({ eventId, result }, "RevenueCat promotion purchase processed");
+      res.json({ received: true, promotion: result.status });
+      return;
+    }
+    // One-off AI credit packs (store consumables): credit once per event id.
+    // Subscription events fall through to the reconciliation below, untouched.
+    if (event.type === "NON_RENEWING_PURCHASE") {
+      const credit = await grantRevenueCatCreditPurchase({ eventId, appUserId, productId: event.product_id });
+      if (credit.handled) {
+        res.json({ received: true, credited: credit.granted === true });
+        return;
+      }
     }
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.

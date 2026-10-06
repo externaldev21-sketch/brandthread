@@ -1,11 +1,14 @@
 /**
- * Notification Settings — seller push notification preferences.
+ * Notification Settings — push preferences for buyers and sellers (the server
+ * resolves the role from the session, so buyers get buyer-only toggles;
+ * QA-0057). Every toggle is persisted through /api/notification-prefs,
+ * including the promotional opt-in (App Store 4.5.4).
  * Every account gets real-time pushes; there's no frequency control in the
  * UI (the stored/API `digest` value still defaults to 'realtime' server-side
  * so nothing else that reads it breaks).
  */
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -17,6 +20,7 @@ import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 type Role = 'buyer' | 'seller';
 
@@ -34,6 +38,7 @@ const SELLER_ROWS: NotifRow[] = [
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'New messages and replies from customers' },
   { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'New disputes and time-sensitive case updates' },
   { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low stock and out-of-stock warnings' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
   { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'A reminder before your free trial converts to paid' },
 ];
 
@@ -44,6 +49,7 @@ const BUYER_ROWS: NotifRow[] = [
   { key: 'friend_activity', icon: 'users',           label: 'Social',            description: 'New followers, likes, and friend activity' },
   { key: 'price_alerts',    icon: 'tag',             label: 'Price & stock alerts', description: 'Price drops and back-in-stock alerts on saved items' },
   { key: 'return_updates',  icon: 'refresh-ccw',     label: 'Returns',           description: 'Updates on your return and refund requests' },
+  { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
 ];
 
 const QUIET_HOURS_PRESETS: { id: string; start: string; end: string; label: string }[] = [
@@ -59,28 +65,35 @@ export default function NotificationsSettingsScreen() {
   const api    = useApi();
   const colors = useColors();
   const s = React.useMemo(() => makeStyles(), []);
-  const [role, setRole] = useState<Role>('seller');
+  // Unknown until the server says: never show seller rows to a buyer.
+  const [role, setRole] = useState<Role | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(true);
+  const [promotionalPush, setPromotionalPush] = useState(false);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [categories, setCategories] = useState<Record<string, boolean>>({});
 
-  const rows = role === 'buyer' ? BUYER_ROWS : SELLER_ROWS;
+  const rows = role === 'buyer' ? BUYER_ROWS : role === 'seller' ? SELLER_ROWS : [];
 
   // Load current preference from API. This screen adapts to whichever role
   // the signed-in account has — the server resolves that from the auth
   // token, so the same endpoint serves both buyer and seller accounts.
   // `digest` isn't read here: every account gets real-time pushes and
   // there's no UI to change it, so there's nothing to hydrate into state.
-  useEffect(() => {
+  const load = React.useCallback(() => {
+    setLoadFailed(false);
     api.notificationPrefs.get()
       .then(data => {
         setCategories(data.categories);
         setRole(data.role);
         setPushEnabled(data.pushEnabled ?? true);
+        setPromotionalPush(data.promotionalPush ?? false);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
       })
-      .catch(() => {/* fallback to push on, quiet hours off */});
-  }, []);
+      .catch(() => setLoadFailed(true));
+  }, [api]);
+
+  useEffect(() => { load(); }, [load]);
 
   async function handleMasterToggle(value: boolean) {
     hapticToggle();
@@ -90,6 +103,18 @@ export default function NotificationsSettingsScreen() {
       await api.notificationPrefs.update({ pushEnabled: value });
     } catch {
       setPushEnabled(prior);
+    }
+  }
+
+  async function handlePromotionalToggle(value: boolean) {
+    hapticToggle();
+    const prior = promotionalPush;
+    setPromotionalPush(value);
+    try {
+      const result = await api.notificationPrefs.update({ promotionalPush: value });
+      setPromotionalPush(result.promotionalPush ?? value);
+    } catch {
+      setPromotionalPush(prior);
     }
   }
 
@@ -125,6 +150,13 @@ export default function NotificationsSettingsScreen() {
   return (
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Notifications" onBack={() => goBackOr(router, '/(tabs)/more')} />
+      {!role ? (
+        <View style={s.section}>
+          {loadFailed
+            ? <RetryRow label="Couldn't load your notification settings" onRetry={load} />
+            : <ActivityIndicator color={colors.foreground} />}
+        </View>
+      ) : (
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Master switch ── */}
@@ -165,6 +197,21 @@ export default function NotificationsSettingsScreen() {
 
         <View style={s.divider} />
 
+        {/* ── Promotions (explicit opt-in, off by default; Guideline 4.5.4) ── */}
+        <View style={s.section}>
+          <Card>
+            <ListRow
+              icon="gift"
+              title="Promotions & offers"
+              subtitle="Drop launches, new products, and price or restock alerts"
+              subtitleNumberOfLines={2}
+              toggle={{ value: promotionalPush, onChange: handlePromotionalToggle }}
+            />
+          </Card>
+        </View>
+
+        <View style={s.divider} />
+
         {/* ── Quiet hours ── */}
         <View style={s.section}>
           <Text style={[TYPE_SCALE.footnote, s.sectionTitle, { color: colors.foreground }]}>Quiet hours</Text>
@@ -179,6 +226,7 @@ export default function NotificationsSettingsScreen() {
         </View>
 
       </ScrollView>
+      )}
     </View>
   );
 }

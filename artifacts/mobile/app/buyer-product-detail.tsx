@@ -29,6 +29,7 @@ import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -502,6 +503,7 @@ export default function BuyerProductDetailScreen() {
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { isSignedIn } = useAuth();
+  const { goToSignIn } = useSignInGate();
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -778,7 +780,7 @@ export default function BuyerProductDetailScreen() {
   async function handleJoinWaitlist() {
     if (!product || !variant) return;
     if (!isSignedIn) {
-      router.replace('/sign-in' as never);
+      goToSignIn();
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -794,7 +796,7 @@ export default function BuyerProductDetailScreen() {
   async function handleReserve() {
     if (!product) return;
     if (!isSignedIn) {
-      router.replace('/sign-in' as never);
+      goToSignIn();
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -867,7 +869,7 @@ export default function BuyerProductDetailScreen() {
       return;
     }
     if (!isSignedIn) {
-      router.push('/sign-in' as never);
+      goToSignIn();
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

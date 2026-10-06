@@ -25,6 +25,10 @@ import inventoryRouter from "./inventory";
 import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
 import aiRouter from "./ai";
+import aiCreditsRouter from "./ai-credits";
+import { aiCreditsGate } from "../lib/aiCredits/gate";
+import { aiConsentGate } from "../lib/aiConsent";
+import aiConsentRouter from "./ai-consent";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
 import featuredPublicRouter from "./featured-public";
@@ -94,7 +98,11 @@ import freelancersRouter from "./freelancers";
 import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
+import promotionsRouter from "./promotions";
+import featuredSlotsRouter from "./featured-slots";
+import adminPromotionsRouter from "./admin-promotions";
 import adCampaignsRouter from "./ad-campaigns";
+import iapPromotionsRouter from "./iap-promotions";
 import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
@@ -109,6 +117,8 @@ import webhooksShippoRouter from "./webhooks-shippo";
 import webhooksShopifyRouter from "./webhooks-shopify";
 import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
 import shopifyRouter from "./shopify";
+import sellerPushBroadcastsRouter from "./seller-push-broadcasts";
+import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
 const router = Router();
 
@@ -141,15 +151,25 @@ router.use("/webhooks/shopify", webhooksShopifyRouter);
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
+// AI data consent (App Store 5.1.2(i), QA-0043): no AI endpoint (support chat
+// and the AI credits catalogue) sends a person's content to a provider, or
+// debits credits, without their stored yes. Only acts on those paths.
+router.use("/ai-consent",      aiConsentRouter);
+router.use(aiConsentGate);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
+router.use("/giveaways",       publicGiveawaysRouter); // public reads; per-viewer entry status when signed in
 
 // ─── Authenticated seller + shared routes ─────────────────────────────────────
 // tc (teamContext) is applied to every seller-scoped route so X-Store-Context
 // is honoured consistently. resolveTeamContext is idempotent (cached on req),
 // so routes that already mount it internally get a free no-op on the second call.
+// AI credits: debits every paid AI endpoint listed in lib/aiCredits/catalogue.ts
+// (and refunds on error). Must stay ahead of the AI routers below.
+router.use(aiCreditsGate);
+router.use("/ai/credits",      aiCreditsRouter);
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
@@ -209,6 +229,8 @@ router.use("/brandthread-agent",         brandthreadAgentRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
+router.use("/seller/push-broadcasts",    tc, sellerPushBroadcastsRouter);
+router.use("/seller/giveaways",          tc, sellerGiveawaysRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 // Comments are attributed to the person writing them, so they are mounted
@@ -262,7 +284,11 @@ router.use("/live",                      tc, liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
+router.use("/promotions",                promotionsRouter); // viewer-scoped Sponsored delivery; no tc
+router.use("/featured-slots",            tc, featuredSlotsRouter); // /active is public; seller routes require auth
+router.use("/admin/promotions",          adminPromotionsRouter); // platform admins only
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
+router.use("/iap-promotions",            tc, iapPromotionsRouter);
 router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);

@@ -28,6 +28,9 @@ import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { formatCents } from '@/lib/money';
+import {
+  STORE_BILLED_NOTICE, WEB_BILLED_NOTICE, currentPlanSummary, manageSubscriptionAction,
+} from '@/lib/currentPlan';
 import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -36,7 +39,6 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
 import {
-  getBillingRecoveryTarget,
   isSubscriptionPaymentRecoveryRequired,
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
@@ -81,6 +83,9 @@ export default function SubscriptionScreen() {
 
   // Derive the active plan id from loaded data
   const selectedPlan = currentPlan.name.toLowerCase();
+  // No subscription = no plan (there is no free tier): never "Starter · Free"
+  // next to a "$29 CURRENT PLAN" card (QA-0166).
+  const planSummary = currentPlanSummary({ plan: selectedPlan, status: currentPlan.status, amountCents: currentPlan.amountCents });
   const hasGrowthAccess = selectedPlan === 'growth' || selectedPlan === 'pro';
 
   const externalSessionOpenedRef = useRef<
@@ -170,10 +175,12 @@ export default function SubscriptionScreen() {
     if (planId === 'starter' && currentPlan.status !== 'none') {
       Alert.alert(
         'Downgrade plan',
-        'To change or cancel your subscription, use the billing portal.',
+        Platform.OS === 'web'
+          ? 'To change or cancel your subscription, use the billing portal.'
+          : 'To change or cancel your subscription, use Manage subscription.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Open portal', onPress: handleOpenPortal },
+          { text: Platform.OS === 'web' ? 'Open portal' : 'Manage subscription', onPress: handleOpenPortal },
         ],
       );
       return;
@@ -209,12 +216,23 @@ export default function SubscriptionScreen() {
     if (isSellerPreview) return;
     haptic();
     try {
-      const target = getBillingRecoveryTarget(currentPlan.effectiveProvider, managementURL);
-      if (target === 'revenuecat') {
-        await Linking.openURL(managementURL!);
+      // Native never opens the Stripe portal (App Store 3.1.1 / 3.1.3, QA-0167):
+      // store plans open the store's subscription page, web-billed plans get a
+      // plain-text notice with no link.
+      const action = manageSubscriptionAction(Platform.OS, currentPlan.effectiveProvider, managementURL);
+      if (action.kind === 'open_url') {
+        await Linking.openURL(action.url);
         return;
       }
-      if (target === 'subscription') {
+      if (action.kind === 'web_billed') {
+        Alert.alert('Manage subscription', WEB_BILLED_NOTICE);
+        return;
+      }
+      if (action.kind === 'store_billed') {
+        Alert.alert('Manage subscription', STORE_BILLED_NOTICE);
+        return;
+      }
+      if (action.kind === 'no_subscription') {
         throw new Error('Subscription management is not available yet.');
       }
       const { url } = await api.seller.subscription.portal();
@@ -249,14 +267,14 @@ export default function SubscriptionScreen() {
     : currentPlan.status === 'trialing' ? theme.secondary
     : currentPlan.status === 'past_due' ? theme.warning
     : currentPlan.status === 'canceled' ? theme.error
-    : theme.muted;
+    : theme.onAccent;
 
   const statusLabel =
     currentPlan.status === 'active'    ? 'Active'
     : currentPlan.status === 'trialing' ? 'Trial'
     : currentPlan.status === 'past_due' ? 'Past Due'
     : currentPlan.status === 'canceled' ? 'Cancelled'
-    : 'Free';
+    : planSummary.statusLabel;
 
   if (isLoadingRole && !isSellerPreview) {
     return (
@@ -312,7 +330,7 @@ export default function SubscriptionScreen() {
                   <View style={styles.currentPlanRow}>
                     <View>
                       <Text style={[styles.currentPlanLabel, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Current plan</Text>
-                      <Text style={[styles.currentPlanName, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{currentPlan.name}</Text>
+                      <Text style={[styles.currentPlanName, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{planSummary.name}</Text>
                     </View>
                     <View style={[styles.statusPill, { backgroundColor: `${statusColor}30` }]}>
                       <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
@@ -349,7 +367,7 @@ export default function SubscriptionScreen() {
             {/* Plan options */}
             <Text style={styles.sectionTitle}>All plans</Text>
              {SELLER_PLANS.map((plan) => {
-              const isCurrent = plan.id === selectedPlan;
+              const isCurrent = planSummary.hasPlan && plan.id === planSummary.planId;
               return (
                 <View key={plan.id} style={[styles.planCard, plan.highlight && styles.planCardFeatured, isCurrent && styles.planCardHighlight]}>
                   {isCurrent && (
@@ -397,7 +415,7 @@ export default function SubscriptionScreen() {
                       onPress={() => handleChangePlan(plan.id)}
                     >
                       <Text style={[styles.changePlanText, plan.id === 'starter' && { color: MUTED }]}>
-                        {plan.id === 'starter' ? 'Downgrade' : `Switch to ${plan.name}`}
+                        {plan.id === 'starter' && planSummary.hasPlan ? 'Downgrade' : `Switch to ${plan.name}`}
                       </Text>
                     </TouchableOpacity>
                   )}

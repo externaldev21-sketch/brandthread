@@ -26,6 +26,7 @@ import {
 import { getEnabledMemorySummary } from './aiBrandMemory';
 import { addAuditEntry } from './aiAuditLog';
 import { getPreviewAiReply } from '../lib/previewAiBrain';
+import { AiConsentRequiredError, isAiConsentRequiredBody, withAiConsent } from '@/lib/aiConsent';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -221,6 +222,10 @@ async function callAI(
   });
 
   if (!res.ok) {
+    if (res.status === 403) {
+      const text = await res.text().catch(() => '');
+      if (isAiConsentRequiredBody(403, text)) throw new AiConsentRequiredError();
+    }
     if (res.status === 401 || res.status === 403) {
       throw new Error('Authentication error. Please sign in again.');
     }
@@ -311,7 +316,9 @@ function callAIStream(
       if (xhr.readyState === 4 && !settled) {
         settled = true;
         cleanup();
-        if (xhr.status === 401 || xhr.status === 403) {
+        if (xhr.status === 403 && isAiConsentRequiredBody(403, xhr.responseText)) {
+          reject(new AiConsentRequiredError());
+        } else if (xhr.status === 401 || xhr.status === 403) {
           reject(new Error('Authentication error. Please sign in again.'));
         } else if (xhr.status === 429) {
           reject(new Error('Rate limit reached — please wait a moment and try again.'));
@@ -450,7 +457,7 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
   // --- Network call (may throw) ---
   let response: AIChatResponse;
   try {
-    response = await callAI(request, authToken, signal);
+    response = await withAiConsent(() => callAI(request, authToken, signal));
   } catch (err: unknown) {
     // Re-throw AbortError — caller strips the streaming placeholder.
     if ((err as Error)?.name === 'AbortError') throw err;
@@ -482,7 +489,8 @@ export async function sendMessageStream(
 
   let response: AIChatResponse;
   try {
-    response = await callAIStream(request, authToken, onDelta, signal);
+    // First AI use: ask before sending the conversation to the provider (QA-0043).
+    response = await withAiConsent(() => callAIStream(request, authToken, onDelta, signal));
   } catch (err: unknown) {
     if ((err as Error)?.name === 'AbortError') throw err;
     throw err;

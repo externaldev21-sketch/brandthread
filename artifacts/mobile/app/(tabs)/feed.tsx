@@ -13,6 +13,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createThreadFeedCursor,
@@ -21,6 +22,7 @@ import {
   setSellerFollowing,
   subscribeSocial,
 } from '@/services/socialService';
+import { confirmSponsoredImpression } from '@/services/sponsoredService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
@@ -346,6 +348,9 @@ interface SpotlightItem {
   productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
+  /** Admin-approved paid promotion served in For You; rendered with a "Sponsored" label. */
+  sponsored?: boolean;
+  sponsoredBoostId?: string;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
@@ -1794,6 +1799,7 @@ function SpotlightPageImpl({
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         creator={item.creator}
         verified={!!item.verified}
+        sponsored={item.sponsored}
         caption={item.caption}
         sound={item.sound}
         soundOn={soundOn}
@@ -1916,6 +1922,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     authorAccountType: post.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     productTags: post.productTags ?? [],
     commentsCount: post.commentsCount,
+    sponsored: post.sponsored === true ? true : undefined,
+    sponsoredBoostId: post.sponsoredBoostId,
   };
 }
 
@@ -2065,6 +2073,8 @@ export default function FeedScreen({
   const buyerBarTopInset = useBuyerTabBarTopInset('compact');
   const router = useRouter();
   const { userId } = useAuth();
+  // Guests browse the feed; like/save/repost/follow prompt sign-in (returnTo).
+  const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
   const { showToast } = useFeedToast();
 
@@ -2620,6 +2630,17 @@ export default function FeedScreen({
     api.posts.interact(id, { type: 'view' }).catch(() => {});
   }, [activeIndex, api, displayItems, userId]);
 
+  // Sponsored posts bill on the server once they are actually on screen.
+  const confirmedSponsoredRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!userId) return;
+    const item = displayItems[activeIndex];
+    const boostId = item && 'sponsored' in item && item.sponsored ? item.sponsoredBoostId : undefined;
+    if (!boostId || confirmedSponsoredRef.current.has(boostId)) return;
+    confirmedSponsoredRef.current.add(boostId);
+    void confirmSponsoredImpression(boostId);
+  }, [activeIndex, displayItems, userId]);
+
   const handleVideoWatched = useCallback((id: string) => {
     if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
     void api.posts.recordWatchedVideo(id).catch(() => {});
@@ -2634,6 +2655,7 @@ export default function FeedScreen({
   }
 
   const handleLike = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const snapshot = engagements[id] ?? engagementFor(id);
     const willLike = !snapshot.liked;
     // Optimistic update
@@ -2666,9 +2688,10 @@ export default function FeedScreen({
       }
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
-  }, [engagementFor]);
+  }, [engagementFor, requireSignIn]);
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const cur = engagements[id] ?? engagementFor(id);
     const willSave = !cur.saved;
     const snapshot = { saved: cur.saved, saves: cur.saves };
@@ -2698,7 +2721,7 @@ export default function FeedScreen({
         }
       }
     }
-  }, [engagements, engagementFor, itemsById, showToast]);
+  }, [engagements, engagementFor, itemsById, showToast, requireSignIn]);
 
   const showRepostEducationOnce = useCallback(async () => {
     const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
@@ -2713,6 +2736,7 @@ export default function FeedScreen({
   }, [userId]);
 
   const handleRepost = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     if (repostPendingRef.current.has(id)) return;
     repostPendingRef.current.add(id);
     const snapshot = engagements[id] ?? engagementFor(id);
@@ -2745,9 +2769,10 @@ export default function FeedScreen({
       await showRepostEducationOnce();
     }
     repostPendingRef.current.delete(id);
-  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast]);
+  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast, requireSignIn]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
+    if (!requireSignIn()) return;
     const item = sellerFeedPosts.find(post => post.id === id);
     if (!item?.sellerId) return;
     const sellerId = item.sellerId;
@@ -2782,7 +2807,7 @@ export default function FeedScreen({
       ])));
       showToast('Could not update follow. Check your connection.', 'error');
     }
-  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast]);
+  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast, requireSignIn]);
 
   // "Not interested" removes the post from this session's feed immediately
   // (a real, visible effect — not just a toast) and records the signal so

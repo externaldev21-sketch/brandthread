@@ -20,6 +20,13 @@
  * A boost is NEVER activated on client redirect alone — only after server-verified
  * payment_status=paid via /pay/verify or the webhook.
  *
+ * Admin review (migration 114): a newly created boost carries review_status='pending'.
+ * Verified payment moves it to status='in_review' (paid, not yet serving). An admin
+ * then approves (-> 'active', flight starts at approval time) or rejects (-> 'rejected',
+ * full Stripe refund) through /api/admin/promotions. The seller may also cancel while
+ * in review, which refunds in full. Legacy rows are review_status='approved' and keep
+ * activating directly on payment.
+ *
  * Reach estimate formula (shared with adCampaignService):
  *   low  = floor(budgetCents / 100 * 35)   // ~35 per $1
  *   high = floor(budgetCents / 100 * 65)   // ~65 per $1
@@ -33,6 +40,8 @@ import { and, desc, eq, inArray, or, gte, lte, sum, count, sql } from "drizzle-o
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
+import { promotionReviewRequired, refundPromotionPayment } from "../lib/promotions/refund";
+import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
 
 const router = Router();
 router.use(requireAuth);
@@ -153,6 +162,22 @@ async function activateBoostBySessionId(
   if (boost.status === "active") return boost; // already activated (idempotent)
   if (boost.status !== "pending_payment") return boost; // wrong state — don't activate
 
+  // Review-gated boosts: payment is captured and recorded, but nothing serves
+  // until an admin approves. The flight (startsAt/endsAt) starts at approval.
+  if (boost.reviewStatus !== "approved") {
+    const [inReview] = await db
+      .update(boosts)
+      .set({ status: "in_review", paidAt })
+      .where(
+        and(
+          eq(boosts.stripeCheckoutSessionId, checkoutSessionId),
+          eq(boosts.status, "pending_payment"),
+        ),
+      )
+      .returning();
+    return inReview ?? boost;
+  }
+
   // Re-validate eligibility inside activation to catch deleted/unpublished posts
   const [postRow] = await db
     .select({
@@ -175,7 +200,6 @@ async function activateBoostBySessionId(
 
   const startsAt = paidAt;
   const endsAt   = new Date(paidAt.getTime() + boost.durationDays * 86_400_000);
-  const reach    = estimateBoostReach(boost.budgetCents);
 
   const [updated] = await db
     .update(boosts)
@@ -199,6 +223,42 @@ async function activateBoostBySessionId(
 
 // ─── Serialize boost for API response ─────────────────────────────────────────
 
+/**
+ * Refunds a boost whose status has already been moved off in_review (rejected or
+ * cancelled) and records the outcome. Safe to call again when refund_status='failed'.
+ */
+export async function refundBoostRecord(
+  boost: typeof boosts.$inferSelect,
+  context: string,
+): Promise<typeof boosts.$inferSelect> {
+  if (boost.refundStatus === "refunded") return boost;
+  try {
+    const result = await refundPromotionPayment(requireStripe(), {
+      kind: "boost", targetId: boost.id, checkoutSessionId: boost.stripeCheckoutSessionId, context,
+    });
+    const [updated] = await db
+      .update(boosts)
+      .set({ refundStatus: "refunded", refundId: result.refundId, refundedAt: new Date() })
+      .where(eq(boosts.id, boost.id))
+      .returning();
+    return updated ?? boost;
+  } catch {
+    const [updated] = await db
+      .update(boosts)
+      .set({ refundStatus: "failed" })
+      .where(eq(boosts.id, boost.id))
+      .returning();
+    return updated ?? boost;
+  }
+}
+
+export function boostDisplayState(b: { status: string; endsAt: Date }): string {
+  if (b.status === "in_review") return "in_review";
+  if (b.status === "active") return b.endsAt.getTime() <= Date.now() ? "ended" : "live";
+  if (b.status === "completed") return "ended";
+  return b.status;
+}
+
 function serializeBoost(b: typeof boosts.$inferSelect) {
   const reach = estimateBoostReach(b.budgetCents);
   return {
@@ -213,6 +273,8 @@ function serializeBoost(b: typeof boosts.$inferSelect) {
     // Legacy field — kept for compatibility with existing active boost list/summary consumers
     estimatedImpressions: Math.round(b.budgetCents * 0.4),
     paid: b.paidAt != null || b.status === "active",
+    // Seller-facing lifecycle: In review / Live / Rejected / Ended (paused, cancelled stay as-is).
+    displayState: boostDisplayState(b),
   };
 }
 
@@ -381,6 +443,7 @@ router.post("/", express.json({ limit: "16kb" }), async (req, res) => {
       budgetCents,
       durationDays: days,
       status:    "pending_payment",
+      reviewStatus: promotionReviewRequired() ? "pending" : "approved",
       endsAt,
     })
     .returning();
@@ -394,14 +457,14 @@ router.post("/", express.json({ limit: "16kb" }), async (req, res) => {
 // A still-open session is reused; expired sessions are rotated.
 // Boost stays pending_payment until /pay/verify or webhook confirms paid.
 
-router.post("/:id/pay", express.json({ limit: "4kb" }), async (req, res) => {
+router.post("/:id/pay", rejectNativeStripeCheckout, express.json({ limit: "4kb" }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const boost = await findOwnedBoost(req.params.id, sellerId);
     if (!boost) return res.status(404).json({ error: "Boost not found" });
 
-    if (boost.status === "active") {
-      return res.status(409).json({ error: "Boost is already active", code: "already_active" });
+    if (boost.status === "active" || boost.status === "in_review") {
+      return res.status(409).json({ error: "Boost is already paid", code: "already_active" });
     }
     if (boost.status !== "pending_payment" && boost.status !== "failed") {
       return res.status(409).json({ error: `Boost cannot be paid in status: ${boost.status}` });
@@ -614,7 +677,7 @@ router.post("/:id/pay/verify", express.json({ limit: "4kb" }), async (req, res) 
     if (!boost) return res.status(404).json({ error: "Boost not found" });
 
     // Already active (webhook or earlier verify call won the race) — idempotent
-    if (boost.status === "active") {
+    if (boost.status === "active" || boost.status === "in_review") {
       return res.json(serializeBoost(boost));
     }
 
@@ -715,6 +778,23 @@ router.patch("/:id", express.json({ limit: "4kb" }), async (req, res) => {
   }
   if (existing.status === "pending_payment") {
     return res.status(409).json({ error: "Pending boosts cannot be paused — cancel instead" });
+  }
+  if (["rejected", "cancelled", "failed"].includes(existing.status)) {
+    return res.status(409).json({ error: `Boost is already ${existing.status}` });
+  }
+  if (existing.status === "in_review") {
+    // The seller withdraws a paid boost before review: release and refund in full.
+    if (status !== "cancelled") {
+      return res.status(409).json({ error: "A boost in review can only be cancelled" });
+    }
+    const [claimed] = await db
+      .update(boosts)
+      .set({ status: "cancelled", reviewStatus: "rejected", rejectionReason: "Cancelled by seller" })
+      .where(and(eq(boosts.id, existing.id), eq(boosts.status, "in_review")))
+      .returning();
+    if (!claimed) return res.status(409).json({ error: "Boost is no longer in review" });
+    const refunded = await refundBoostRecord(claimed, "seller_cancelled_in_review");
+    return res.json(serializeBoost(refunded));
   }
 
   const [updated] = await db

@@ -1,6 +1,6 @@
 import { getWebOrigin } from "./webOrigin";
 
-type CallbackKind = "manufacturer_onboarding" | "sample_checkout" | "ad_campaign_checkout" | "boost_checkout";
+type CallbackKind = "manufacturer_onboarding" | "sample_checkout" | "ad_campaign_checkout" | "boost_checkout" | "featured_checkout" | "ai_credits_checkout";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -31,8 +31,21 @@ export function isAllowedBrandthreadCallbackUrl(value: unknown, kind: CallbackKi
           && UUID_RE.test(url.searchParams.get("id") ?? "")
           && url.searchParams.get("paymentReturn") === "1";
       }
+      if (kind === "ai_credits_checkout") {
+        return url.hostname === "ai-credits"
+          && (url.pathname === "" || url.pathname === "/")
+          && hasExactQueryParams(url, ["paymentReturn"])
+          && url.searchParams.get("paymentReturn") === "1";
+      }
       if (kind === "boost_checkout") {
         return url.hostname === "boost"
+          && (url.pathname === "" || url.pathname === "/")
+          && hasExactQueryParams(url, ["id", "paymentReturn"])
+          && UUID_RE.test(url.searchParams.get("id") ?? "")
+          && url.searchParams.get("paymentReturn") === "1";
+      }
+      if (kind === "featured_checkout") {
+        return url.hostname === "featured-slot"
           && (url.pathname === "" || url.pathname === "/")
           && hasExactQueryParams(url, ["id", "paymentReturn"])
           && UUID_RE.test(url.searchParams.get("id") ?? "")
@@ -61,8 +74,19 @@ export function isAllowedBrandthreadCallbackUrl(value: unknown, kind: CallbackKi
         && UUID_RE.test(url.searchParams.get("id") ?? "")
         && url.searchParams.get("paymentReturn") === "1";
     }
+    if (kind === "ai_credits_checkout") {
+      return url.pathname === "/ai-credits"
+        && hasExactQueryParams(url, ["paymentReturn"])
+        && url.searchParams.get("paymentReturn") === "1";
+    }
     if (kind === "boost_checkout") {
       return url.pathname === "/boost"
+        && hasExactQueryParams(url, ["id", "paymentReturn"])
+        && UUID_RE.test(url.searchParams.get("id") ?? "")
+        && url.searchParams.get("paymentReturn") === "1";
+    }
+    if (kind === "featured_checkout") {
+      return url.pathname === "/featured-slot"
         && hasExactQueryParams(url, ["id", "paymentReturn"])
         && UUID_RE.test(url.searchParams.get("id") ?? "")
         && url.searchParams.get("paymentReturn") === "1";

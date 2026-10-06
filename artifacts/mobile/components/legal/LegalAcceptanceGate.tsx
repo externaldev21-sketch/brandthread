@@ -50,7 +50,7 @@ export default function LegalAcceptanceGate() {
       }
       const pending = await readPendingConsent();
       if (pending && hasAcceptedCurrentTerms(pending.version)) {
-        await api.auth.acceptLegal(pending.version);
+        await api.auth.acceptLegal(pending.version, 'signup');
         await clearPendingConsent();
         setNeedsAgreement(false);
         return 'done';
@@ -87,7 +87,7 @@ export default function LegalAcceptanceGate() {
     setSaving(true);
     setError(null);
     try {
-      await api.auth.acceptLegal(LEGAL_VERSION);
+      await api.auth.acceptLegal(LEGAL_VERSION, 'update_prompt');
       await clearPendingConsent();
       setNeedsAgreement(false);
     } catch (err) {
@@ -97,14 +97,18 @@ export default function LegalAcceptanceGate() {
     }
   }
 
-  if (!isSignedIn || !needsAgreement) return null;
-
+  // Every hook runs before the early return below — calling one after it
+  // changes the hook count when needsAgreement flips true and React throws
+  // "Rendered more hooks than during the previous render" (QA-0005).
+  //
   // RN's Modal portals straight to <body> on web, outside WebAppShell's
   // centered column, so a full-bleed gate here would ignore the desktop web
   // shell entirely. The Modal itself still dims/covers the whole viewport
   // (correct — a legal gate should block everything), but its content is
   // capped and centered to the same column width as the rest of the app.
   const isWebShell = useIsWebShell();
+
+  if (!isSignedIn || !needsAgreement) return null;
 
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => {}}>

@@ -32,6 +32,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { Button } from '@/components/ui/Button';
+import { safeReturnTo } from '@/lib/guestRoutes';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -42,6 +43,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import {
   APPLE_OAUTH_STRATEGY,
+  oauthProviderVisibility,
   isOAuthCancellationError,
   makeBrandthreadRedirectUri,
   mapOAuthError,
@@ -61,15 +63,19 @@ export default function SignInScreen() {
   const clerk = useClerk();
 
   const router = useRouter();
-  const { addAccount } = useLocalSearchParams<{ addAccount?: string }>();
+  const { addAccount, returnTo } = useLocalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  // Guest tapped an account-only action: come back to it after signing in.
+  const afterSignIn = safeReturnTo(returnTo);
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const isAddAccount = addAccount === '1';
   const appleOAuthEnabled = useFeatureFlag('oauthAppleEnabled');
   const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
-  const showAppleOAuth = Platform.OS === 'ios' && appleOAuthEnabled;
-  const showAnyOAuth = showAppleOAuth || googleOAuthEnabled;
+  const { apple: showAppleOAuth, google: showGoogleOAuth } = oauthProviderVisibility(
+    Platform.OS, { apple: appleOAuthEnabled, google: googleOAuthEnabled },
+  );
+  const showAnyOAuth = showAppleOAuth || showGoogleOAuth;
 
   // Warm up the browser on Android for faster OAuth sheet presentation
   useEffect(() => {
@@ -140,7 +146,7 @@ export default function SignInScreen() {
         // on '/' after an add-account sign-in shows the newly-active
         // account's profile, where the switcher can be reopened at any time.
         checkMultiSessionDrop();
-        const destination = '/';
+        const destination = afterSignIn ?? '/';
         const url = decorateUrl(destination);
         if (url.startsWith('http') && typeof window !== 'undefined') {
           window.location.href = url;
@@ -679,7 +685,7 @@ export default function SignInScreen() {
           )}
 
           {/* Google — dark surface with Google logo, per Google brand guidelines */}
-          {googleOAuthEnabled && (
+          {showGoogleOAuth && (
             <PressableScale
               style={s.oauthBtn}
               onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
@@ -762,6 +768,18 @@ export default function SignInScreen() {
             onPress={() => router.replace('/onboarding' as never)}
             fullWidth
           />
+
+          {/* Guests can browse without an account (Guideline 5.1.1(v)). */}
+          {!isAddAccount && (
+            <Button
+              label="Browse as a guest"
+              variant="tertiary"
+              onPress={() => router.replace('/(buyer)/discover' as never)}
+              fullWidth
+              style={{ marginTop: 8 }}
+              testID="browse-as-guest-button"
+            />
+          )}
 
           <View nativeID="clerk-captcha" />
         </ScrollView>

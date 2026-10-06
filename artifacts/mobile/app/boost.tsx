@@ -35,6 +35,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useApi } from '@/hooks/useApi';
+import { useRevenueCat } from '@/lib/revenueCat';
+import {
+  confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
+  nearestPromoTierCents, promoProductId,
+} from '@/lib/iapPromotions';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
@@ -84,6 +89,9 @@ type Boost = {
   estimatedImpressions: number;
   paid?: boolean;
   paidAt?: string | null;
+  /** Admin review outcome, shown to the seller when a boost is rejected. */
+  rejectionReason?: string | null;
+  refundStatus?: string;
 };
 
 type Summary = {
@@ -153,6 +161,9 @@ function statusBg(s: string): string {
 
 function statusLabel(s: string): string {
   if (s === 'pending_payment') return 'Pending payment';
+  if (s === 'in_review')       return 'In review';
+  if (s === 'active')          return 'Live';
+  if (s === 'completed')       return 'Ended';
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -440,6 +451,10 @@ export default function BoostScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
+  const { purchaseConsumable } = useRevenueCat();
+  // Native iOS/Android buys the boost through the store (Guideline 3.1.1);
+  // web keeps Stripe Checkout. Always on for iOS/Android (QA-0001/0003).
+  const nativeRail = nativePromotionsEnabled();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
   const bottomPad = insets.bottom + 90;
@@ -615,12 +630,21 @@ export default function BoostScreen() {
 
   // ── Verify payment (called after browser redirect) ────────────────────────
 
-  const verifyPayment = useCallback(async (boostId: string) => {
+  const verifyPayment = useCallback(async (boostId: string, nativeTransactionId?: string) => {
     setVerifying(true);
     try {
-      const result = await boostsRef.current.verify(boostId);
+      let result: unknown;
+      if (nativeTransactionId) {
+        // Native store purchase: the server re-reads it from RevenueCat and
+        // grants the boost; a late grant falls through to "payment pending".
+        await confirmNativePromotion(() => boostsRef.current.iapVerify(boostId, nativeTransactionId));
+        const rows = (await boostsRef.current.list()) as Boost[];
+        result = rows.find((b) => b.id === boostId) ?? { status: 'pending_payment' };
+      } else {
+        result = await boostsRef.current.verify(boostId);
+      }
       const boost = result as Boost;
-      if (boost.status === 'active') {
+      if (boost.status === 'active' || boost.status === 'in_review') {
         setActiveBoost(boost);
         setSucceeded(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -692,6 +716,14 @@ export default function BoostScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    // Native store purchases are sold in fixed budget tiers; the price on the
+    // button follows the tier that will actually be bought.
+    if (nativeRail) {
+      const tier = nearestPromoTierCents(budgetCents);
+      if (tier !== budgetCents) setBudgetCents(tier);
+    }
+    const chargeCents = nativeRail ? nearestPromoTierCents(budgetCents) : budgetCents;
+
     // Step 1: Create pending boost (no charge yet)
     let boostRecord = pendingBoost;
     if (!boostRecord || boostRecord.status === 'failed') {
@@ -701,7 +733,7 @@ export default function BoostScreen() {
           targetType:  'post',
           targetId:    selectedTarget.id,
           objective:   'views',
-          budgetCents,
+          budgetCents: chargeCents,
           durationDays,
         });
         boostRecord = created as Boost;
@@ -717,6 +749,22 @@ export default function BoostScreen() {
     }
 
     if (!boostRecord) return;
+
+    // Step 2 (native): store purchase sheet, then server-side grant.
+    if (nativeRail) {
+      setPaying(true);
+      try {
+        const { transactionId } = await purchaseConsumable(promoProductId('boost', boostRecord.budgetCents));
+        await verifyPayment(boostRecord.id, transactionId);
+      } catch (e: any) {
+        if (!isPurchaseCancelled(e)) {
+          Alert.alert('Payment failed', 'Could not complete the purchase. Please try again.', [{ text: 'OK' }]);
+        }
+      } finally {
+        setPaying(false);
+      }
+      return;
+    }
 
     // Step 2: Create Checkout Session and open browser
     setPaying(true);
@@ -774,7 +822,9 @@ export default function BoostScreen() {
     const title     = isActive ? 'Pause Boost' : 'Cancel Boost';
     const message   = isActive
       ? 'Pause this boost? You can reactivate it later by contacting support.'
-      : 'Are you sure you want to cancel this boost? This cannot be undone.';
+      : boost.status === 'in_review'
+        ? 'Cancel this boost? Your payment will be refunded in full.'
+        : 'Are you sure you want to cancel this boost? This cannot be undone.';
 
     Alert.alert(title, message, [
       { text: 'Keep Running', style: 'cancel' },
@@ -918,7 +968,13 @@ export default function BoostScreen() {
               </Text>
             )}
 
-            {(b.status === 'active' || b.status === 'paused') && (
+            {b.status === 'rejected' && (
+              <Text style={s.historyMetaSmall}>
+                {b.rejectionReason ? `${b.rejectionReason}. ` : ''}Your payment was refunded.
+              </Text>
+            )}
+
+            {(b.status === 'active' || b.status === 'paused' || b.status === 'in_review') && (
               <TouchableOpacity
                 style={s.pauseBtn}
                 onPress={() => handlePause(b)}
@@ -1006,6 +1062,21 @@ export default function BoostScreen() {
               ))}
             </View>
           )}
+
+          <TouchableOpacity
+            style={s.featuredRow}
+            onPress={() => router.push('/featured-slot' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Get featured on Discover"
+            testID="boost-featured-row"
+          >
+            <Feather name="star" size={ICON.md} color={FG} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.featuredRowTitle}>Featured on Discover</Text>
+              <Text style={s.historyMetaSmall}>Put your brand at the top of Discover</Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.md} color={MUTED} />
+          </TouchableOpacity>
 
           {renderHistory()}
         </ScrollView>
@@ -1101,9 +1172,11 @@ export default function BoostScreen() {
               </>
             )}
           </TouchableOpacity>
-          <Text style={s.paymentNote}>
-            Secure payment via Stripe. You'll be redirected to complete payment.
-          </Text>
+          {!nativeRail && (
+            <Text style={s.paymentNote}>
+              Secure payment via Stripe. You'll be redirected to complete payment.
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -1123,9 +1196,11 @@ export default function BoostScreen() {
           <View style={s.successIcon}>
             <Feather name="zap" size={32} color={FG} />
           </View>
-          <Text style={s.successTitle}>Boost active!</Text>
+          <Text style={s.successTitle}>{b?.status === 'in_review' ? 'Boost in review' : 'Boost active!'}</Text>
           <Text style={s.successSub}>
-            Your post is now being promoted. Check back to see how it's performing.
+            {b?.status === 'in_review'
+              ? "Your payment is confirmed. We'll review your boost before it goes live, and refund you in full if it isn't approved."
+              : "Your post is now being promoted. Check back to see how it's performing."}
           </Text>
 
           {b && (
@@ -1336,6 +1411,12 @@ const s = StyleSheet.create({
   statusBadgeText:  { fontFamily: FONT.semibold, fontSize: FS.xs },
   progressTrack:    { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   progressFill:     { height: 4, borderRadius: 2, backgroundColor: FG },
+  featuredRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    paddingVertical: SP.md, marginTop: SP.lg,
+    borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  },
+  featuredRowTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   pauseBtn:         { marginTop: SP.sm, paddingVertical: SP.xs, alignItems: 'center' },
   pauseBtnText:     { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
 

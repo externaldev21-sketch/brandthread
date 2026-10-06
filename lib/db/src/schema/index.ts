@@ -8,6 +8,10 @@ export * from './threadCash';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
+export * from './iapPromotions';
+export * from './promotions';
+export * from './sellerPushGiveaways';
+export * from './aiConsent';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
@@ -138,6 +142,10 @@ export const users = pgTable('users', {
   // Master push kill switch. false suppresses push sends for every category
   // while leaving the in-app notification feed and per-category prefs intact.
   pushEnabled: boolean('push_enabled').notNull().default(true),
+  // Promotional/marketing push opt-in (App Store 4.5.4). Separate from the
+  // transactional category toggles in notificationPreferences and OFF by
+  // default; enforced server-side in lib/pushPolicy.ts / sendPushToUser.
+  promoPushOptIn: boolean('promo_push_opt_in').notNull().default(false),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
@@ -147,6 +155,13 @@ export const users = pgTable('users', {
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  // Soft-delete grace: the person asked to delete their account. It is hidden
+  // everywhere immediately and purged (see jobs/accountPurge.ts) once
+  // deletionScheduledFor passes, unless they restore it first.
+  deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
+  deletionScheduledFor: timestamp('deletion_scheduled_for', { withTimezone: true }),
+  // Set when signing back in during the grace period cancelled a deletion.
+  deletionCancelledAt: timestamp('deletion_cancelled_at', { withTimezone: true }),
   // Platform suspension set by a moderator. Suspended accounts cannot publish
   // and their public content is hidden from every surface.
   suspendedAt: timestamp('suspended_at', { withTimezone: true }),
@@ -1282,6 +1297,21 @@ export const postUserTags = pgTable('post_user_tags', {
   uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
 }));
 
+// ─── Legal acceptance history ────────────────────────────────────────────────
+// One row per (account, legal document set version) the person agreed to, at
+// sign-up or from the "updated terms" prompt. users.terms_version /
+// terms_accepted_at keep the latest agreement; this table keeps the history.
+
+export const legalAcceptances = pgTable('legal_acceptances', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  clerkId:    text('clerk_id').notNull(),
+  version:    text('version').notNull(),
+  source:     text('source').notNull().default('signup'), // 'signup' | 'update_prompt'
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userVersionUnique: uniqueIndex('legal_acceptances_clerk_version_unique').on(table.clerkId, table.version),
+}));
+
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
 
 export const stories = pgTable('stories', {
@@ -1863,7 +1893,7 @@ export const boosts = pgTable('boosts', {
   stripeCheckoutSessionId: text('stripe_checkout_session_id').unique(),
   /** Incremented each time an expired session is rotated out; used for versioned idempotency keys. */
   checkoutSessionVersion:  integer('checkout_session_version').notNull().default(0),
-  /** 'pending_payment' | 'active' | 'paused' | 'completed' | 'cancelled' | 'failed' */
+  /** 'pending_payment' | 'in_review' | 'active' | 'paused' | 'completed' | 'cancelled' | 'rejected' | 'failed' */
   status:                  text('status').notNull().default('pending_payment'),
   impressionsCount:        integer('impressions_count').notNull().default(0),
   /** Set only after Stripe confirms payment — null for pending/failed/cancelled boosts. */
@@ -1871,6 +1901,17 @@ export const boosts = pgTable('boosts', {
   startsAt:                timestamp('starts_at', { withTimezone: true }),
   endsAt:                  timestamp('ends_at').notNull(),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
+  /** 'pending' | 'approved' | 'rejected' — admin review (migration 114). Legacy rows are 'approved'. */
+  reviewStatus:            text('review_status').notNull().default('approved'),
+  reviewedBy:              text('reviewed_by'),
+  reviewedAt:              timestamp('reviewed_at', { withTimezone: true }),
+  rejectionReason:         text('rejection_reason'),
+  refundId:                text('refund_id'),
+  /** 'none' | 'refunded' | 'failed' */
+  refundStatus:            text('refund_status').notNull().default('none'),
+  refundedAt:              timestamp('refunded_at', { withTimezone: true }),
+  /** Spend delivered through the Sponsored placement; never exceeds budgetCents. */
+  deliveredSpendCents:     integer('delivered_spend_cents').notNull().default(0),
 }, (table) => ({
   csStatusIdx: index('boosts_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
@@ -2287,6 +2328,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
+export * from './aiCredits';
 
 // ─── Automatic media screening results (migration 115) ───────────────────────
 // Held / rejected uploads only. No raw images are stored.

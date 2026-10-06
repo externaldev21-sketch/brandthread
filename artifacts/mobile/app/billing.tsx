@@ -11,6 +11,10 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { useRevenueCat } from '@/lib/revenueCat';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { billingAccess } from '@/lib/billingAccess';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -20,7 +24,12 @@ export default function BillingScreen() {
   const api = useApi();
   const { managementURL, restore } = useRevenueCat();
   const [filter, setFilter] = useState<BillFilter>('all');
-  const { currentRole, isLoadingRole } = useTeamRole();
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
+  const { isSignedIn } = useAuth();
+  // Signed-out seller web preview: the preview seller is the store owner, and
+  // no protected API may be called (QA-0048 / QA-0049).
+  const isSellerPreview = isSellerDevPreview() && !isSignedIn;
+  const access = billingAccess({ isSellerPreview, isLoadingRole, currentRole, roleError });
   const [bills, setBills] = useState<Array<{
     id: string; date: string; note: string; amountCents: number; currency: string; status: 'Paid' | 'Unpaid';
   }>>([]);
@@ -33,6 +42,7 @@ export default function BillingScreen() {
   const isReadOnly = isManagerRole(currentRole);
 
   useEffect(() => {
+    if (isSellerPreview) return;
     let active = true;
     const billingRequest = Platform.OS === 'web'
       ? Promise.all([api.seller.subscription.status(), api.seller.subscription.invoices()])
@@ -61,13 +71,14 @@ export default function BillingScreen() {
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, isSellerPreview]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   async function openBillingPortal() {
+    if (isSellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (Platform.OS !== 'web') {
@@ -87,6 +98,7 @@ export default function BillingScreen() {
   }
 
   async function restorePurchases() {
+    if (isSellerPreview) return;
     try {
       await restore();
       const status = await api.seller.subscription.status();
@@ -113,7 +125,7 @@ export default function BillingScreen() {
     return b.status.toLowerCase() === filter;
   });
 
-  if (isLoadingRole) {
+  if (access === 'loading') {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Billing" />
@@ -124,7 +136,18 @@ export default function BillingScreen() {
     );
   }
 
-  if (currentRole !== 'owner' && !isReadOnly) {
+  if (access === 'retry') {
+    return (
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <ScreenHeader title="Billing" />
+        <View style={styles.accessLoading}>
+          <RetryRow label="Couldn't load billing" onRetry={retryRole} />
+        </View>
+      </View>
+    );
+  }
+
+  if (access === 'locked') {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Billing" />

@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { fetchSponsoredSlots } from '@/services/sponsoredService';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { isBuyerDevPreview } from '@/lib/devPreview';
@@ -553,6 +554,9 @@ export interface SellerThreadPost {
   isDeleted:         boolean;
   sound?:            SellerPostSound;
   productTags:       SellerPostProductTag[];
+  /** Paid promotion served in For You; must be rendered with a "Sponsored" label. */
+  sponsored?:        boolean;
+  sponsoredBoostId?: string;
   visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   scheduledAt:       string | null;
   publishedAt?:      string;
@@ -858,6 +862,8 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     isArchived:        false,
     isDeleted:         false,
     sound:             p.sound ?? undefined,
+    sponsored:         p.sponsored === true ? true : undefined,
+    sponsoredBoostId:  p.sponsored === true && typeof p.boostId === 'string' ? p.boostId : undefined,
     productTags:       (p.taggedProducts ?? []).map((t: any) => ({
       productId:   t.productId,
       productName: t.name ?? '',
@@ -904,6 +910,8 @@ export interface ThreadFeedCursor {
   followedDone: boolean;
   generalDone: boolean;
   seenPostIds: string[];
+  /** Organic posts served so far in this For You session — drives the Sponsored frequency cap. */
+  organicServed?: number;
 }
 export type ThreadFeedMode = 'following' | 'for-you' | 'mixed';
 
@@ -1835,9 +1843,28 @@ export async function getThreadPostsPage(
     } : row;
   });
 
+  // Sponsored placement (For You only): the server plans where labelled,
+  // admin-approved promotions go under a frequency cap. Optional — any failure
+  // leaves the organic page untouched.
+  let pageRows: any[] = rowsWithRepostContext;
+  const organicBefore = next.organicServed ?? 0;
+  if (mode === 'for-you' && rowsWithRepostContext.length > 0) {
+    const slots = await fetchSponsoredSlots(organicBefore, rowsWithRepostContext.length);
+    if (slots.length > 0) {
+      const byIndex = new Map<number, any[]>();
+      for (const slot of slots) {
+        if (seen.has(slot.post.id)) continue;
+        seen.add(slot.post.id);
+        byIndex.set(slot.afterIndex, [...(byIndex.get(slot.afterIndex) ?? []), slot.post]);
+      }
+      pageRows = rowsWithRepostContext.flatMap((row, i) => [row, ...(byIndex.get(i) ?? [])]);
+    }
+  }
+  next.organicServed = organicBefore + rowsWithRepostContext.length;
+
   next.seenPostIds = [...seen];
   return {
-    posts: rowsWithRepostContext.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
+    posts: pageRows.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
     cursor: next,
     hasMore: !next.followedDone || !next.generalDone,
   };

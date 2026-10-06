@@ -9,16 +9,21 @@ import type {
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
 } from './safetyTypes';
 import { useMemo, useRef } from 'react';
+import { CLIENT_PLATFORM } from '@/lib/clientPlatform';
+import { withAiConsent } from '@/lib/aiConsent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ApiError,
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
+import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
+import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
@@ -269,6 +274,15 @@ export function storeContextStorageKey(userId: string): string {
   return `@brandthread/store_context:${userId}`;
 }
 
+/**
+ * Tells the API which app is calling, so it can refuse Stripe Checkout for
+ * digital promotions from the iOS / Android apps (App Store 3.1.1, QA-0001).
+ * Web sends nothing extra.
+ */
+export function clientPlatformHeaders(os: string | null = CLIENT_PLATFORM): Record<string, string> {
+  return os === 'ios' || os === 'android' ? { 'X-Brandthread-Platform': os } : {};
+}
+
 export function storeContextHeaders(): Record<string, string> {
   return _storeContext && _storeContext !== 'joined'
     ? { 'X-Store-Context': _storeContext }
@@ -384,7 +398,12 @@ function request<T = any>(
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
-  if (!isRead || options.cache === 'no-store') {
+  if (!isRead) {
+    // AI endpoints need a one-time permission to send content to the AI
+    // provider (QA-0043): ask through the consent sheet and retry once.
+    return withAiConsent(() => doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs));
+  }
+  if (options.cache === 'no-store') {
     return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs);
   }
   const dedupeKey = `${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
@@ -413,11 +432,17 @@ async function doRequest<T = any>(
     ? await apiCacheKey(resolvedPath, getCacheScope)
     : null;
   const token = await getCachedToken(getToken);
+  // Guest guard (App Store 5.1.1(v)): a signed-out session never sends
+  // account-scoped or paid requests; it fails locally like the server's 401.
+  if (!token && isSignedInOnlyPath(resolvedPath)) {
+    throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
+  }
   // Build a plain Record so TypeScript is happy with every HeadersInit variant.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...storeContextHeaders(),
+    ...clientPlatformHeaders(),
     // Normalize any HeadersInit shape (Headers instance, string[][], or plain object).
     ...(options.headers
       ? options.headers instanceof Headers
@@ -440,8 +465,11 @@ async function doRequest<T = any>(
     throw error;
   }
   if (!res.ok) {
-    if (res.status === 429) noteRateLimited(retryAfterSecondsFrom(res));
     const body = await res.text();
+    // AI credit gate refusals (402/429/503 with a credits code) are not generic rate limiting.
+    const aiCreditsKind = classifyAiCreditsError(res.status, body);
+    if (res.status === 429 && !aiCreditsKind) noteRateLimited(retryAfterSecondsFrom(res));
+    if (aiCreditsKind) surfaceAiCreditsError(aiCreditsKind);
     const error = new ApiError(res.status, body);
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
@@ -759,6 +787,8 @@ export interface LocalUserProfile {
   termsAcceptedAt?: string | null;
   /** Set when a moderator suspends the account. */
   suspendedAt?: string | null;
+  /** True when this sync cancelled a pending deletion (signing back in cancels it). */
+  deletionCancelled?: boolean;
 }
 
 export interface ShopifyImportJob {
@@ -918,14 +948,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  endpoint — any authenticated user owns exactly one `profileImageUrl`. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
-      /** Permanently erase this account after the explicit DELETE confirmation. */
-      deleteAccount: () => request<{ ok: true }>(
+      /** Schedule deletion (30-day grace) after the typed DELETE confirmation plus
+       *  fresh proof: `password`, or `code` for accounts without a password. */
+      deleteAccount: (reauth: { password?: string; code?: string; appleIdentityToken?: string; appleAuthorizationCode?: string } = {}) => request<{ ok: true; scheduledFor: string | null; graceDays: number }>(
         '/api/auth/account',
-        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE' }) },
+        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE', ...reauth }) },
         getToken,
         false,
         getCacheScope,
       ),
+      /** Email a 6-digit re-auth code to an account that has no password. */
+      requestDeletionCode: () => post<{ ok: true }>('/api/auth/account/deletion-code', {}),
       /** Everything deletion removes/retains, plus anything that must be settled first. */
       deletionCheck: () => freshGet<AccountDeletionCheck>('/api/auth/account/deletion-check'),
       /** Send a branded, server-issued (Resend) 6-digit password reset code.
@@ -940,8 +973,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       confirmPasswordReset: (body: { email: string; code: string; newPassword: string }) =>
         post<{ ok: true }>('/api/auth/password-reset/confirm', body),
       /** Record agreement to the Terms, Community Guidelines and Privacy Policy version shown. */
-      acceptLegal: (version: string) =>
-        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', { version }),
+      acceptLegal: (version: string, source?: 'signup' | 'update_prompt') =>
+        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', source ? { version, source } : { version }),
       /** Real Clerk sessions for this account (Login Activity). */
       sessions: () => freshGet<{ sessions: AccountSession[] }>('/api/auth/sessions'),
       revokeSession: (sessionId: string) =>
@@ -1237,12 +1270,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         occurredAt?: string;
       }) => post<{ ok: boolean; recorded: boolean }>('/api/notifications/events', body),
     },
+    /** Permission to send AI-tool content to the AI providers (QA-0043). */
+    aiConsent: {
+      get: () => freshGet<AiConsentStatus>('/api/ai-consent'),
+      set: (granted: boolean) => put<AiConsentStatus>('/api/ai-consent', { granted }),
+    },
     notificationPrefs: {
       get: () =>
         get<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
           pushEnabled: boolean;
+          promotionalPush?: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs'),
@@ -1250,12 +1289,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         digest?: 'realtime' | 'daily';
         categories?: Record<string, boolean>;
         pushEnabled?: boolean;
+        promotionalPush?: boolean;
         quietHours?: { start: string; end: string; timezone?: string } | null;
       }) =>
         put<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
           pushEnabled: boolean;
+          promotionalPush?: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs', body),
@@ -2472,6 +2513,35 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
         get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
     },
+    /** Seller follower push broadcasts (1 per rolling 24h, enforced server-side). */
+    sellerPush: {
+      status: () => get<any>('/api/seller/push-broadcasts'),
+      preview: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+        post<any>('/api/seller/push-broadcasts/preview', body),
+      send: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+        post<any>('/api/seller/push-broadcasts', body),
+      results: (id: string) => get<any>(`/api/seller/push-broadcasts/${encodeURIComponent(id)}`),
+    },
+    /** Seller giveaway tool. */
+    sellerGiveaways: {
+      list: () => get<{ giveaways: any[] }>('/api/seller/giveaways'),
+      get: (id: string) => get<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`),
+      create: (body: unknown) => post<any>('/api/seller/giveaways', body),
+      rulesTemplate: (query: string) => get<{ rulesText: string }>(`/api/seller/giveaways/rules-template?${query}`),
+      end: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/end`, {}),
+      cancel: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/cancel`, {}),
+      draw: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/draw`, {}),
+      redraw: (id: string, winnerId: string, reason: string) =>
+        post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/redraw`, { reason }),
+      markShipped: (id: string, winnerId: string, shipped: boolean) =>
+        post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/shipped`, { shipped }),
+      myPosts: () => get<any[]>('/api/posts/mine?limit=30'),
+    },
+    /** Buyer-facing giveaway reads (card on a brand's profile + the entry page). */
+    giveaways: {
+      liveForSeller: (sellerId: string) => get<{ giveaway: any | null }>(`/api/giveaways/seller/${encodeURIComponent(sellerId)}/live`),
+      get: (code: string) => get<any>(`/api/giveaways/${encodeURIComponent(code)}`),
+    },
     /** Returns — buyer-initiated return requests */
     returns: {
       create: (data: {
@@ -2807,10 +2877,50 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        */
       verify: (id: string) =>
         post<any>(`/api/boosts/${encodeURIComponent(id)}/pay/verify`, {}),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and grants the boost. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/boost/${encodeURIComponent(id)}/verify`, { transactionId }),
       update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
       summary: () =>
         get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
+    },
+    /** Featured brand slots on Discover (seller purchase flow; /active is public). */
+    featuredSlots: {
+      active: () => get<{ label: 'Featured'; brands: FeaturedBrand[] }>('/api/featured-slots/active'),
+      availability: () => freshGet<FeaturedAvailability>('/api/featured-slots/availability'),
+      mine: () => freshGet<FeaturedSlot[]>('/api/featured-slots/mine'),
+      reserve: (durationDays: number) => post<FeaturedSlot>('/api/featured-slots', { durationDays }),
+      pay: (id: string, returnUrl: string) =>
+        post<{ sessionId: string; url: string | null; paymentStatus: string; status: string }>(
+          `/api/featured-slots/${encodeURIComponent(id)}/pay`, { returnUrl }),
+      verify: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/pay/verify`, {}),
+      /** Native (iOS / Android): confirm an App Store / Play purchase for this slot (QA-0004). */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/verify`, { transactionId }),
+      cancel: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/cancel`, {}),
+    },
+    /** Sponsored placement in For You: slots to splice in + impression confirmation. */
+    promotions: {
+      sponsored: (p: { sessionId: string; organicOffset: number; organicCount: number }) =>
+        freshGet<{ slots: Array<{ afterIndex: number; boostId: string; label: 'Sponsored'; post: any }> }>(
+          `/api/promotions/sponsored?sessionId=${encodeURIComponent(p.sessionId)}&organicOffset=${p.organicOffset}&organicCount=${p.organicCount}`),
+      impression: (boostId: string, sessionId: string) =>
+        post<{ counted: boolean }>('/api/promotions/sponsored/impression', { boostId, sessionId }),
+    },
+    /** Admin approval queue for boosts + featured slots (users.role = 'admin'). */
+    adminPromotions: {
+      queue: (params: { status?: 'in_review' | 'approved' | 'rejected' | 'all'; kind?: 'all' | 'boost' | 'featured_slot' } = {}) => {
+        const q = new URLSearchParams();
+        if (params.status) q.set('status', params.status);
+        if (params.kind) q.set('kind', params.kind);
+        const suffix = q.toString();
+        return freshGet<AdminPromotionQueue>(`/api/admin/promotions${suffix ? `?${suffix}` : ''}`);
+      },
+      approve: (kind: 'boost' | 'featured_slot', id: string) =>
+        post<{ state: string }>(`/api/admin/promotions/${kind === 'boost' ? 'boosts' : 'featured'}/${encodeURIComponent(id)}/approve`, {}),
+      reject: (kind: 'boost' | 'featured_slot', id: string, reason: string) =>
+        post<{ state: string; refundStatus: string }>(`/api/admin/promotions/${kind === 'boost' ? 'boosts' : 'featured'}/${encodeURIComponent(id)}/reject`, { reason }),
     },
     /** Ad Campaigns — end-to-end Create Ad flow with media upload, payment, and lifecycle. */
     adCampaigns: {
@@ -2881,6 +2991,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/ad-campaigns/${encodeURIComponent(id)}/pay/verify`,
           {},
         ),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and grants the campaign. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/campaign/${encodeURIComponent(id)}/verify`, { transactionId }),
     },
     /**
      * Meta (Facebook & Instagram) Ads — OAuth connection, campaign builder,
@@ -2967,6 +3080,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
     },
     /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
+    /** AI credits: balance, history and pack purchases (web checkout; native uses store billing). */
+    aiCredits: {
+      get: () => get<AiCreditsOverview>('/api/ai/credits'),
+      history: (limit = 30, before?: string) =>
+        get<AiCreditHistoryPage>(`/api/ai/credits/history?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+      checkout: (packId: string, returnUrl: string) =>
+        post<{ sessionId: string; url: string | null }>(`/api/ai/credits/packs/${encodeURIComponent(packId)}/checkout`, { returnUrl }),
+      verify: (sessionId: string) =>
+        post<{ credited: boolean; newlyGranted: boolean; credits: number; balance: number }>('/api/ai/credits/purchases/verify', { sessionId }),
+    },
     threadCash: {
       get: () =>
         get<ThreadCashStatus>('/api/thread-cash'),
@@ -3107,6 +3230,35 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
  * Memoised per user. Clerk may return a new getToken function between renders,
  * so the client reads it through a ref instead of rebuilding on function identity.
  */
+
+// ─── Promotions (featured slots + admin approval) ─────────────────────────────
+export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+export type AiConsentStatus = { granted: boolean; version: string; grantedAt: string | null; providers: string[] };
+export type FeaturedSlot = {
+  id: string; placement: string; durationDays: number; priceCents: number;
+  startsAt: string; endsAt: string; status: string;
+  displayState: 'awaiting_payment' | 'in_review' | 'scheduled' | 'live' | 'rejected' | 'ended' | 'cancelled';
+  paid: boolean;
+  /** 'store' = bought in the iOS / Android app, refunded only by Apple / Google. */
+  paidVia?: 'stripe' | 'store' | null;
+  rejectionReason: string | null; refundStatus: string; createdAt: string;
+};
+export type FeaturedAvailability = {
+  placement: string; capacity: number;
+  options: Array<{ durationDays: number; priceCents: number; startsAt: string; endsAt: string; availableNow: boolean }>;
+  openSlot: FeaturedSlot | null;
+};
+export type AdminPromotionItem = {
+  kind: 'boost' | 'featured_slot'; id: string;
+  seller: { userId: string; name: string; avatarUrl: string | null } | null;
+  state: 'in_review' | 'approved' | 'rejected';
+  amountCents: number; durationDays: number;
+  submittedAt: string | null; reviewedAt: string | null; rejectionReason: string | null; refundStatus: string;
+  post: { id: string; caption: string | null; mediaUrl: string | null; thumbnailUrl: string | null; mediaType: string | null } | null;
+  window: { startsAt: string; endsAt: string } | null;
+};
+export type AdminPromotionQueue = { items: AdminPromotionItem[]; summary: { pendingBoosts: number; pendingFeatured: number } };
+
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
   const getTokenRef = useRef(getToken);

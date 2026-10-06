@@ -10,7 +10,7 @@
  * lib/onboardingFlow.ts (a plain, RN-free module) so they're independently
  * unit-testable and are not duplicated as hand-maintained index objects here.
  */
-import { LegalConsent } from '@/components/legal/LegalConsent';
+import { LegalContinueNotice } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -72,6 +72,7 @@ import {
 import { ApiError } from '@/lib/networkNotice';
 import {
   APPLE_OAUTH_STRATEGY,
+  oauthProviderVisibility,
   isOAuthCancellationError,
   isOAuthFlowComplete,
   makeBrandthreadRedirectUri,
@@ -641,9 +642,10 @@ function BuyerAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
-  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
-  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
+    apple: useFeatureFlag('oauthAppleEnabled'),
+    google: useFeatureFlag('oauthGoogleEnabled'),
+  });
   const usernameLiveCheck = useUsernameLiveCheck(username);
 
   const [phase, setPhase]               = useState<BuyerAuthPhase>('choose');
@@ -656,23 +658,11 @@ function BuyerAuthStep({
   const [error, setError]               = useState('');
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
-  // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
-  // is required before any account is created (email, Google or Apple).
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [consentError, setConsentError] = useState(false);
-  function requireConsent(): boolean {
-    if (!agreedToTerms) {
-      setConsentError(true);
-      setError('Please agree to the Terms of Service and Community Guidelines to continue.');
-      return false;
-    }
+  // Continuing is the agreement to the Terms, Privacy Policy and Community
+  // Guidelines (see the line under the buttons). Remember it on the device so
+  // it is recorded on the account as soon as the account exists.
+  function recordConsent() {
     void rememberPendingConsent();
-    return true;
-  }
-  function updateConsent(value: boolean) {
-    setAgreedToTerms(value);
-    setConsentError(false);
-    setError((current) => current.startsWith('Please agree') ? '' : current);
   }
 
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
@@ -696,7 +686,7 @@ function BuyerAuthStep({
 
   async function handleSignUp() {
     if (!canSubmit || loading) return;
-    if (!requireConsent()) return;
+    recordConsent();
     if (isSignedIn) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
       setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
@@ -765,7 +755,7 @@ function BuyerAuthStep({
   }
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
-    if (!requireConsent()) return;
+    recordConsent();
     setOAuth(provider);
     setError('');
     try {
@@ -969,9 +959,9 @@ function BuyerAuthStep({
 
           {error ? <Text style={sba.error}>{error}</Text> : null}
 
-          <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 16 }} />
-
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
+
+          <LegalContinueNotice style={{ marginTop: 14 }} />
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -984,8 +974,6 @@ function BuyerAuthStep({
       <ScrollView contentContainerStyle={sba.chooseScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={sba.chooseHeadline}>Sign up</Text>
         <Text style={sba.chooseSub}>Discover brands, buy products, and follow the drops that move you.</Text>
-
-        <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 20 }} />
 
         {/* Apple row — iOS only. Shown first: App Store guideline 4.8 requires Sign in
             with Apple to be at least as prominent as other third-party social logins
@@ -1049,6 +1037,8 @@ function BuyerAuthStep({
           <Feather name="chevron-right" size={16} color={MUTED2} />
         </TouchableOpacity>
 
+        <LegalContinueNotice style={{ marginTop: 12 }} />
+
         {error ? <Text style={[sba.error, { textAlign: 'center', marginTop: 8 }]}>{error}</Text> : null}
 
         <TouchableOpacity style={sba.signInLink} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.8}>
@@ -1091,9 +1081,10 @@ function SharedAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
-  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
-  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const { apple: appleOAuthEnabled, google: googleOAuthEnabled } = oauthProviderVisibility(Platform.OS, {
+    apple: useFeatureFlag('oauthAppleEnabled'),
+    google: useFeatureFlag('oauthGoogleEnabled'),
+  });
   const showAnyOAuth = appleOAuthEnabled || googleOAuthEnabled;
   const usernameLiveCheck = useUsernameLiveCheck(username);
 
@@ -1111,23 +1102,11 @@ function SharedAuthStep({
   const [error, setError]             = useState('');
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
-  // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
-  // is required before any account is created (email, Google or Apple).
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [consentError, setConsentError] = useState(false);
-  function requireConsent(): boolean {
-    if (!agreedToTerms) {
-      setConsentError(true);
-      setError('Please agree to the Terms of Service and Community Guidelines to continue.');
-      return false;
-    }
+  // Continuing is the agreement to the Terms, Privacy Policy and Community
+  // Guidelines (see the line under the buttons). Remember it on the device so
+  // it is recorded on the account as soon as the account exists.
+  function recordConsent() {
     void rememberPendingConsent();
-    return true;
-  }
-  function updateConsent(value: boolean) {
-    setAgreedToTerms(value);
-    setConsentError(false);
-    setError((current) => current.startsWith('Please agree') ? '' : current);
   }
 
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
@@ -1165,7 +1144,7 @@ function SharedAuthStep({
 
   async function handleSignUp() {
     if (!canSubmit || loading) return;
-    if (!requireConsent()) return;
+    recordConsent();
     if (!passwordsMatch) { setError('Passwords do not match.'); return; }
     if (isSignedIn && !allowSignedInAccountCreation) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
@@ -1246,7 +1225,7 @@ function SharedAuthStep({
   }
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
-    if (!requireConsent()) return;
+    recordConsent();
     setOAuth(provider);
     setError('');
     try {
@@ -1479,15 +1458,12 @@ function SharedAuthStep({
           />
         </Reveal>
 
-        <Reveal index={9}>
-          <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginTop: SPACE.xs, marginBottom: SPACE.md }} />
-        </Reveal>
-
         {error ? <InlineError message={error} /> : null}
 
         <Reveal index={10}>
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
           {!canSubmit && missingFieldsHint ? <Text style={[ssa.hint, ssa.hintCentered]}>{missingFieldsHint}</Text> : null}
+          <LegalContinueNotice style={{ marginTop: SPACE.sm }} />
         </Reveal>
 
         {/* OAuth options below the main CTA */}
@@ -2402,6 +2378,7 @@ export default function OnboardingScreen() {
       <WelcomeStep
         onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}
         onSignIn={() => router.replace('/sign-in' as never)}
+        onBrowse={isSignedIn ? undefined : () => router.replace('/(buyer)/discover' as never)}
       />
     );
 

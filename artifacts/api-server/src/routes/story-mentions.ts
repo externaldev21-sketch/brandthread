@@ -87,7 +87,7 @@ router.get("/mention-search", async (req, res) => {
 
   const usable = and(
     ne(users.clerkId, myId),
-    isNull(users.deletedAt),
+    isNull(users.deletedAt), isNull(users.deletionRequestedAt),
     isNull(users.suspendedAt),
     eq(users.isSystemAccount, false),
     inArray(users.accountType, ["buyer", "seller", "both"]),

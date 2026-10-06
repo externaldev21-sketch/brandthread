@@ -20,8 +20,8 @@ Sign in with email and password on the first screen. Sign in with Apple and
 Google are also offered; the demo accounts use email and password.
 
 The seller is the store "Atelier Demo" (10 products with variants, posts and
-reviews). The buyer has 5 past orders in different states (delivered, shipped,
-processing, cancelled) and follows the seller.
+reviews). The buyer has 5 past orders (delivered, refunded, cancelled) and
+follows the seller. None is still open, so both demo accounts can be deleted.
 
 ## Where to find features
 
@@ -45,7 +45,7 @@ processing, cancelled) and follows the seller.
 Physical goods and services are paid through Stripe (Apple Guideline 3.1.3(e)).
 The production backend uses live Stripe keys, so test card numbers are
 rejected. You can open the checkout and payment sheet without paying. The buyer
-account already has 5 past orders (delivered, shipped, processing, cancelled)
+account already has 5 past orders (delivered, refunded, cancelled)
 under Profile, Orders, so order detail, tracking and reviews can be reviewed
 without a new purchase. No charge is made unless a real card is used. Seller subscription plans use in-app purchase.
 
@@ -67,6 +67,10 @@ without a new purchase. No charge is made unless a real card is used. Seller sub
 
 In the app: Profile, Settings, **Delete account** (`/delete-account`). It
 deletes the account and personal data in the app, with no email request needed.
+Both demo accounts can be deleted (re-run `seed:review-accounts` to recreate
+them). Accounts that use Sign in with Apple confirm with Apple, and their
+Apple tokens are revoked. A seller's web-billed plan is cancelled; a plan
+bought in the App Store is shown with a link to cancel it there.
 
 
 ## Contact

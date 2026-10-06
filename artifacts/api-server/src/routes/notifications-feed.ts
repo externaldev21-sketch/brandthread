@@ -342,6 +342,10 @@ export async function publishNotification(n: {
   pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
+  /** Promotional vs transactional override (see lib/pushPolicy.ts). */
+  pushKind?: "transactional" | "promotional";
+  /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
+  pushExplicitRequest?: boolean;
 }): Promise<void> {
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
@@ -413,6 +417,8 @@ export async function publishNotification(n: {
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
+      kind: n.pushKind,
+      explicitRequest: n.pushExplicitRequest,
     }, pushCategory, n.analyticsOwnerId);
   }
 }

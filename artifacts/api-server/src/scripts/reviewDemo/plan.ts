@@ -167,7 +167,7 @@ export function buildProducts(assetBaseUrl: string | null): DemoProduct[] {
 
 export interface DemoOrder {
   orderNumber: string;
-  status: "pending" | "processing" | "shipped" | "fulfilled" | "cancelled";
+  status: "pending" | "processing" | "shipped" | "fulfilled" | "cancelled" | "refunded";
   productKey: string;
   variantIndex: number;
   quantity: number;
@@ -176,14 +176,42 @@ export interface DemoOrder {
   review: { rating: number; body: string } | null;
 }
 
-/** Past orders in varied states, all from the demo buyer to the demo seller. */
+/**
+ * Past orders in varied states, all from the demo buyer to the demo seller.
+ * Every one is settled (delivered, cancelled or refunded): App Review must be
+ * able to delete both demo accounts (Guideline 5.1.1(v), QA-0072), and an
+ * open order — paid and not yet delivered — blocks deletion by design.
+ */
 export const DEMO_ORDERS: DemoOrder[] = [
   { orderNumber: `${DEMO_PREFIX}-1001`, status: "fulfilled", productKey: "tee", variantIndex: 0, quantity: 2, daysAgo: 40, trackingStatus: "delivered", review: { rating: 5, body: "Great fit and the fabric feels premium." } },
   { orderNumber: `${DEMO_PREFIX}-1002`, status: "fulfilled", productKey: "hoodie", variantIndex: 1, quantity: 1, daysAgo: 25, trackingStatus: "delivered", review: { rating: 4, body: "Warm and well made. Runs slightly large." } },
-  { orderNumber: `${DEMO_PREFIX}-1003`, status: "shipped", productKey: "cap", variantIndex: 0, quantity: 1, daysAgo: 4, trackingStatus: "in_transit", review: null },
-  { orderNumber: `${DEMO_PREFIX}-1004`, status: "processing", productKey: "tote", variantIndex: 0, quantity: 1, daysAgo: 1, trackingStatus: null, review: null },
+  { orderNumber: `${DEMO_PREFIX}-1003`, status: "fulfilled", productKey: "cap", variantIndex: 0, quantity: 1, daysAgo: 9, trackingStatus: "delivered", review: null },
+  { orderNumber: `${DEMO_PREFIX}-1004`, status: "refunded", productKey: "tote", variantIndex: 0, quantity: 1, daysAgo: 6, trackingStatus: null, review: null },
   { orderNumber: `${DEMO_PREFIX}-1005`, status: "cancelled", productKey: "socks", variantIndex: 0, quantity: 1, daysAgo: 12, trackingStatus: null, review: null },
 ];
+
+/** Statuses that leave nothing owed to anyone. */
+const SETTLED_STATUSES: ReadonlySet<DemoOrder["status"]> = new Set(["cancelled", "refunded"]);
+
+/**
+ * Real fulfilment timestamps for a demo order. Without them `shipped_at` is
+ * NULL and `updated_at` is the seed time, so every delivered order looked
+ * freshly shipped and blocked deletion (QA-0072).
+ */
+export function orderTimeline(o: DemoOrder, now: Date = new Date()) {
+  const day = 86_400_000;
+  const placedAt = new Date(now.getTime() - o.daysAgo * day);
+  const shipped = o.status === "fulfilled" || o.status === "shipped";
+  const shippedAt = shipped ? new Date(placedAt.getTime() + day) : null;
+  const deliveredAt = o.trackingStatus === "delivered" ? new Date(placedAt.getTime() + 4 * day) : null;
+  const updatedAt = deliveredAt ?? shippedAt ?? placedAt;
+  return { placedAt, shippedAt, deliveredAt, updatedAt };
+}
+
+/** True when the order leaves the buyer and seller owing each other nothing. */
+export function isSettledDemoOrder(o: DemoOrder): boolean {
+  return SETTLED_STATUSES.has(o.status) || (o.status === "fulfilled" && o.trackingStatus === "delivered");
+}
 
 export const DEMO_POSTS = [
   { key: "p1", caption: "New season basics are live. #atelierdemo", hashtags: ["atelierdemo", "basics"] },

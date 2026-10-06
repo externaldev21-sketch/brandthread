@@ -73,7 +73,8 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Notifications',
     items: [
-      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/push-notifications', audience: 'buyer' },
+      // The real, saved preferences screen (buyer toggles + promotional opt-in), QA-0057.
+      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/notifications-settings', audience: 'buyer' },
     ],
   },
   {
@@ -87,6 +88,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Who can message and see me', description: 'Messages, story replies, tags, mentions, comments, and sharing', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
       { label: 'Content you see', description: 'Favorites, content preferences, and suggested content', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
+      { label: 'AI data sharing', description: 'Whether Brandthread AI may send your content to its AI providers', aliases: ['ai', 'openai', 'consent', 'data sharing'], icon: 'cpu', route: '/ai-data-sharing', audience: 'buyer' },
     ],
   },
   {
@@ -114,6 +116,8 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
       { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
       { label: 'Privacy Policy', description: 'How we collect, use, and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
+      { label: 'Refund Policy', description: 'Cancellations, returns, and refunds', aliases: ['refund', 'refunds', 'returns', 'cancellation', 'buyer protection', 'legal'], icon: 'file-text', route: '/refund-policy', audience: 'shared' },
+      { label: 'Seller Agreement', description: 'Fees, payouts, and rules for selling on Brandthread', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
     ],
   },
   {
@@ -198,6 +202,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Subscription', description: 'Manage your Brandthread seller plan', aliases: ['plan', 'billing', 'membership'], icon: 'star', route: '/subscription', audience: 'seller' },
       { label: 'Compare plans', description: 'See all available Brandthread plans', aliases: ['plans', 'upgrade', 'compare'], icon: 'trending-up', route: '/plans', audience: 'seller' },
+      { label: 'AI credits', description: 'Balance, credit packs and usage history', aliases: ['credits', 'ai', 'top up', 'usage'], icon: 'zap', route: '/ai-credits', audience: 'seller' },
     ],
   },
   {
@@ -221,6 +226,8 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },
+      { label: 'Review promotions', description: 'Approve or reject paid boosts and Featured slots', aliases: ['promotions', 'boosts', 'featured', 'approve', 'admin'], icon: 'check-square', route: '/admin-promotions', audience: 'seller', requiresModerator: true },
+      { label: 'AI data sharing', description: 'Whether Brandthread AI may send your content to its AI providers', aliases: ['ai', 'openai', 'consent', 'data sharing'], icon: 'cpu', route: '/ai-data-sharing', audience: 'seller' },
     ],
   },
   {
@@ -237,6 +244,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Help and support', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Download my data', description: 'Export your products, orders, and customers', aliases: ['export', 'data', 'download'], icon: 'download', route: '/seller-data-export', audience: 'seller' },
+      { label: 'About Brandthread', description: 'App version and legal documents', aliases: ['about', 'version', 'legal', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'seller' },
       { label: 'Invite friends', description: 'Share your referral code and see rewards', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'seller' },
     ],
   },
@@ -246,6 +254,8 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
       { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
       { label: 'Privacy Policy', description: 'How we collect, use, and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
+      { label: 'Refund Policy', description: 'Cancellations, returns, and refunds', aliases: ['refund', 'refunds', 'returns', 'cancellation', 'buyer protection', 'legal'], icon: 'file-text', route: '/refund-policy', audience: 'shared' },
+      { label: 'Seller Agreement', description: 'Fees, payouts, and rules for selling on Brandthread', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
     ],
   },
   {
