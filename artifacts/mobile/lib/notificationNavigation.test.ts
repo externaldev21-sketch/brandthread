@@ -132,6 +132,13 @@ describe('notification response navigation', () => {
     ]);
   });
 
+  it('opens a "<brand> is live" push straight into the live, like its Activity row', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('live-1', { targetType: 'live_stream', targetId: 'stream-9', type: 'live_started' }));
+    expect(router.push).toHaveBeenCalledWith('/buyer-live?streamId=stream-9');
+  });
+
   it('opens a story mention push in the mention viewer and a reshare push in the story viewer', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

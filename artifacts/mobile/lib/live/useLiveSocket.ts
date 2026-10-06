@@ -30,7 +30,12 @@ import { API_BASE_URL } from '@/lib/api';
 export type LiveSocketEvent =
   | { type: 'comment'; comment: any }
   | { type: 'products'; productTags: any[] }
-  | { type: 'viewerCount'; count: number };
+  | { type: 'viewerCount'; count: number }
+  /** The stream ended (host ended it, restarted, or went silent). */
+  | { type: 'ended'; reason?: 'host' | 'restarted' | 'host_silent' | 'expired'; replayStatus?: 'ready' | 'pending' | 'unavailable'; replayPostId?: string | null }
+  | { type: 'likes'; likeCount: number; userId?: string; added?: number }
+  /** A viewer sent the host Thread Cash. */
+  | { type: 'gift'; gift: { fromUserId: string; displayName: string; amountCents: number } };
 
 interface UseLiveSocketOptions {
   streamId: string | undefined;
