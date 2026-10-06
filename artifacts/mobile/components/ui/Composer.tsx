@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { FONT, FS } from '@/lib/theme';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 export const COMPOSER_PILL_MIN_HEIGHT = 40;
 export const COMPOSER_SEND_SIZE = 32;
@@ -168,6 +169,9 @@ export default function Composer({
           <Animated.View
             pointerEvents={showAction ? 'auto' : 'none'}
             style={[styles.actionSlot, actionStyle]}
+            // Collapsed (nothing typed), the send button is invisible, shrunk
+            // and disabled — keep it out of the screen-reader tree until it shows.
+            {...a11yHidden(!showAction)}
           >
             <Pressable
               onPress={busy ? onStop : onSend}

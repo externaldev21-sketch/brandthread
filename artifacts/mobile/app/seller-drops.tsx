@@ -15,6 +15,10 @@ import { EmptyState } from '@/components/layout';
 import { SectionError } from '@/components/InlineFeedback';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// 36pt round 'New drop' button; pad touch area to 44pt.
+const NEW_BTN_HIT_SLOP = minHitSlop({ width: 36, height: 36 });
 
 type DropStatusVariant = 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple';
 
@@ -79,6 +83,7 @@ export default function SellerDrops() {
           <TouchableOpacity
             style={[styles.newBtn, { backgroundColor: theme.accent }]}
             onPress={() => router.push('/seller-drop-create' as never)}
+            hitSlop={NEW_BTN_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel="New drop"
           >

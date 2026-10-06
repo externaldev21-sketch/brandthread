@@ -27,6 +27,11 @@ import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashC
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Payout history / Bank account tabs draw 34pt tall (the active one has a 2pt
+// bottom border, so its padding box is 32pt); pad touch area vertically to 44pt.
+const TAB_HIT_SLOP = minHitSlop({ height: 32 });
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -290,6 +295,7 @@ export default function PayoutsScreen() {
             testID={`seller-payouts-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
             onPress={() => { haptic(); setActiveTab(t); }}
+            hitSlop={TAB_HIT_SLOP}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t === 'payouts' ? 'Payout history' : 'Bank account'}

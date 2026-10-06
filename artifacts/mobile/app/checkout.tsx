@@ -5,6 +5,13 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Checkbox rows draw only as tall as their label (~18-20pt); pad the touch
+// area vertically to 44pt without changing layout. The post-purchase row has
+// a text area 12pt below it, so its slop leans upward (onto static subtitle text).
+const TIPPING_ROW_HIT_SLOP = minHitSlop({ height: 20 });
+const POST_PURCHASE_ROW_HIT_SLOP = { top: 14, bottom: 12, left: 0, right: 0 };
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
 
@@ -49,6 +56,7 @@ export default function CheckoutScreen() {
             onPress={() => { haptic(); setTipping((v) => !v); }}
             activeOpacity={0.7}
             style={styles.checkRow}
+            hitSlop={TIPPING_ROW_HIT_SLOP}
           >
             <View
               style={[
@@ -70,7 +78,7 @@ export default function CheckoutScreen() {
             Add tracking scripts and other customizations
           </Text>
 
-          <TouchableOpacity onPress={() => { haptic(); setPostPurchaseFeatures((v) => !v); }} activeOpacity={0.7} style={styles.radioRow}>
+          <TouchableOpacity onPress={() => { haptic(); setPostPurchaseFeatures((v) => !v); }} activeOpacity={0.7} style={styles.radioRow} hitSlop={POST_PURCHASE_ROW_HIT_SLOP}>
             <View
               style={[
                 styles.checkbox,

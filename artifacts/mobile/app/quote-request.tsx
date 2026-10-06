@@ -34,6 +34,10 @@ import {
 } from '@/services/manufacturerService';
 
 import { QuoteRequest, Manufacturer } from '@/services/manufacturerTypes';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Header 'Save draft' text button draws 24pt tall; pad touch area vertically to 44pt.
+const SAVE_DRAFT_HIT_SLOP = minHitSlop({ height: 24 });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -666,7 +670,7 @@ export default function QuoteRequestScreen() {
         variant="modal"
         onBack={handleExit}
         rightElement={
-          <TouchableOpacity onPress={handleSaveDraft} style={sc.saveDraftBtn}>
+          <TouchableOpacity onPress={handleSaveDraft} style={sc.saveDraftBtn} hitSlop={SAVE_DRAFT_HIT_SLOP} accessibilityRole="button">
             <Text style={sc.saveDraftText}>Save draft</Text>
           </TouchableOpacity>
         }

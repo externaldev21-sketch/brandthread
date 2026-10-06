@@ -15,6 +15,10 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Full-width buttons draw ~43pt tall (13pt padding + text); top up the touch area to 44pt.
+const BTN_HIT_SLOP = minHitSlop({ height: 43 });
 
 export const PENDING_INVITE_KEY = 'bt:pendingTeamInvite';
 
@@ -114,7 +118,7 @@ export default function TeamInviteScreen() {
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               This invite link is no longer valid. Ask the store owner to send you a fresh one.
             </Text>
-            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} hitSlop={BTN_HIT_SLOP} style={[styles.btn, { backgroundColor: colors.secondary }]}>
               <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
             </TouchableOpacity>
           </>
@@ -125,7 +129,7 @@ export default function TeamInviteScreen() {
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite not available</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>{error}</Text>
-            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} hitSlop={BTN_HIT_SLOP} style={[styles.btn, { backgroundColor: colors.secondary }]}>
               <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
             </TouchableOpacity>
           </>
@@ -138,7 +142,7 @@ export default function TeamInviteScreen() {
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               You joined {brand} as {roleLabel}. You can now work in their store from the seller dashboard.
             </Text>
-            <TouchableOpacity onPress={goToDashboard} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity onPress={goToDashboard} activeOpacity={0.8} hitSlop={BTN_HIT_SLOP} style={[styles.btn, { backgroundColor: colors.primary }]}>
               <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Open Dashboard</Text>
             </TouchableOpacity>
           </>
@@ -151,7 +155,7 @@ export default function TeamInviteScreen() {
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               This invite to join {brand} has already been used.
             </Text>
-            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} hitSlop={BTN_HIT_SLOP} style={[styles.btn, { backgroundColor: colors.secondary }]}>
               <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
             </TouchableOpacity>
           </>
@@ -172,14 +176,14 @@ export default function TeamInviteScreen() {
             {!isLoaded ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: 18 }} />
             ) : isSignedIn ? (
-              <TouchableOpacity onPress={acceptInvite} disabled={accepting} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary, opacity: accepting ? 0.6 : 1 }]}>
+              <TouchableOpacity onPress={acceptInvite} disabled={accepting} activeOpacity={0.8} hitSlop={BTN_HIT_SLOP} style={[styles.btn, { backgroundColor: colors.primary, opacity: accepting ? 0.6 : 1 }]}>
                 <Text style={[styles.btnText, { color: colors.primaryForeground }]}>
                   {accepting ? 'Joining…' : 'Accept Invite'}
                 </Text>
               </TouchableOpacity>
             ) : (
               <>
-                <TouchableOpacity onPress={goToAuth} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary }]}>
+                <TouchableOpacity onPress={goToAuth} activeOpacity={0.8} hitSlop={BTN_HIT_SLOP} style={[styles.btn, { backgroundColor: colors.primary }]}>
                   <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Sign in / Create account to join</Text>
                 </TouchableOpacity>
                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>

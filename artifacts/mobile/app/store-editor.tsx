@@ -35,6 +35,18 @@ import {
   TYPOGRAPHY_STYLES,
 } from '@/services/storeTypes';
 
+// ── Touch-area extensions (hitSlop only — no layout/visual change) ──
+// Web slop is measured from each control's padding box, so bordered controls
+// use their inner size. Values stay inside the gaps between neighbours.
+const HEADER_ICON_HIT_SLOP = { top: 7, bottom: 7, left: 2, right: 2 }; // 32pt bordered icon btns, 4pt gaps
+const PUBLISH_HIT_SLOP = { top: 9, bottom: 9, left: 2, right: 4 };      // 28pt bordered pill
+const ADD_SECTION_HIT_SLOP = { top: 6, bottom: 6, left: 0, right: 0 };  // 35pt bordered button
+const SECTION_LABEL_HIT_SLOP = { top: 8, bottom: 2, left: 0, right: 0 }; // 34pt label/summary
+const SECTION_EDIT_HIT_SLOP = { top: 11, bottom: 10, left: 0, right: 0 }; // 23pt Edit/Close pill
+const SECTION_ACTION_HIT_SLOP = { top: 8, bottom: 12, left: 2, right: 2 }; // 26pt bordered Hide/Duplicate/Delete
+const MOVE_UP_HIT_SLOP = { top: 13, bottom: 14, left: 26, right: 2 };      // 16pt chevrons, 4pt apart
+const MOVE_DOWN_HIT_SLOP = { top: 13, bottom: 14, left: 2, right: 26 };
+
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
@@ -1025,6 +1037,7 @@ export default function StoreEditor() {
                 />
               ) : (
                 <TouchableOpacity
+                  hitSlop={SECTION_LABEL_HIT_SLOP}
                   onPress={() => {
                     Haptics.selectionAsync();
                     setInlineHeadingDraft(section.settings.heading ?? '');
@@ -1048,6 +1061,7 @@ export default function StoreEditor() {
               }
             }}
             style={sectionStyles.editBtn}
+            hitSlop={SECTION_EDIT_HIT_SLOP}
           >
             <Text style={sectionStyles.editBtnText}>{isActive ? 'Close' : 'Edit'}</Text>
             <Feather name={isActive ? 'chevron-up' : 'chevron-right'} size={ICON.xs} color={PURPLE_LIGHT} />
@@ -1055,26 +1069,29 @@ export default function StoreEditor() {
         </View>
 
         <View style={sectionStyles.rowActions}>
-          <TouchableOpacity onPress={() => handleToggle(section.id)} style={sectionStyles.actionBtn}>
+          <TouchableOpacity onPress={() => handleToggle(section.id)} style={sectionStyles.actionBtn} hitSlop={SECTION_ACTION_HIT_SLOP}>
             <Text style={sectionStyles.actionBtnText}>{section.enabled ? 'Hide' : 'Show'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDuplicate(section.id)} style={sectionStyles.actionBtn}>
+          <TouchableOpacity onPress={() => handleDuplicate(section.id)} style={sectionStyles.actionBtn} hitSlop={SECTION_ACTION_HIT_SLOP}>
             <Text style={sectionStyles.actionBtnText}>Duplicate</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(section.id, section.label)} style={[sectionStyles.actionBtn, sectionStyles.deleteBtn]}>
+          <TouchableOpacity onPress={() => handleDelete(section.id, section.label)} style={[sectionStyles.actionBtn, sectionStyles.deleteBtn]} hitSlop={SECTION_ACTION_HIT_SLOP}>
             <Text style={[sectionStyles.actionBtnText, { color: RED }]}>Delete</Text>
           </TouchableOpacity>
           <View style={sectionStyles.orderBtns}>
-            <TouchableOpacity onPress={() => handleMoveUp(section.id)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+            <TouchableOpacity onPress={() => handleMoveUp(section.id)} hitSlop={MOVE_UP_HIT_SLOP} accessibilityRole="button" accessibilityLabel={`Move ${section.label} up`}>
               <Feather name="chevron-up" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleMoveDown(section.id)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+            <TouchableOpacity onPress={() => handleMoveDown(section.id)} hitSlop={MOVE_DOWN_HIT_SLOP} accessibilityRole="button" accessibilityLabel={`Move ${section.label} down`}>
               <Feather name="chevron-down" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {isActive && renderSectionPanel()}
+        {/* The row no longer clips (so the controls' hitSlop isn't cut off on
+            web); this wrapper keeps the panel's background clipped to the
+            row's rounded bottom corners exactly as before. */}
+        {isActive && <View style={sectionStyles.panelClip}>{renderSectionPanel()}</View>}
       </Animated.View>
     );
   }
@@ -1098,6 +1115,7 @@ export default function StoreEditor() {
           <TouchableOpacity
             onPress={() => router.push('/store-sections' as never)}
             style={styles.addSectionBtn}
+            hitSlop={ADD_SECTION_HIT_SLOP}
           >
             <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={styles.addSectionBtnText}>Add Section</Text>
@@ -1186,6 +1204,7 @@ export default function StoreEditor() {
               onPress={handleSaveDraft}
               disabled={savingStatus === 'saving'}
               style={styles.headerBtn}
+              hitSlop={HEADER_ICON_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Save draft"
             >
@@ -1194,6 +1213,7 @@ export default function StoreEditor() {
             <TouchableOpacity
               onPress={() => router.push('/store-preview' as never)}
               style={styles.headerBtn}
+              hitSlop={HEADER_ICON_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="View live storefront"
             >
@@ -1202,6 +1222,7 @@ export default function StoreEditor() {
             <TouchableOpacity
               onPress={() => router.push('/store-publish' as never)}
               style={[styles.headerBtnLabeled, { backgroundColor: PURPLE }]}
+              hitSlop={PUBLISH_HIT_SLOP}
             >
               <Text style={[styles.headerBtnText, { color: theme.onAccent }]}>Publish</Text>
             </TouchableOpacity>
@@ -1314,8 +1335,11 @@ const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   row: {
     backgroundColor: CARD, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: BORDER,
-    marginBottom: SP.sm, overflow: 'hidden',
+    marginBottom: SP.sm,
   },
+  // Inner radius of a 1pt-bordered RADIUS.md box = what the row's own
+  // overflow clip used to cut the panel to.
+  panelClip: { overflow: 'hidden', borderBottomLeftRadius: RADIUS.md - 1, borderBottomRightRadius: RADIUS.md - 1 },
   rowActive: { borderColor: BORDER_ACTIVE },
   rowDragging: { borderColor: BORDER_ACTIVE, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   dragHandle: { padding: 2 },
