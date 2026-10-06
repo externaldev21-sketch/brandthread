@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { TypingBubble } from '@/components/chat/TypingBubble';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
@@ -2013,6 +2014,14 @@ export default function BuyerConversationScreen() {
               Seen {formatTime(new Date(msg.readAt!).getTime())}
             </Text>
           )}
+          {isOwn && msg.id === lastOwnMsgId && !msg.readAt && !!msg.deliveredAt && (
+            <Text style={s.seenReceipt} testID="conversation-delivered">Delivered</Text>
+          )}
+          {!!msg.automated && (
+            <Text style={[s.seenReceipt, { alignSelf: isOwn ? 'flex-end' : 'flex-start' }]} testID="conversation-automated-label">
+              Automated reply
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -2341,6 +2350,7 @@ export default function BuyerConversationScreen() {
           item.type === 'message' ? item.msg.id : `${item.type}-${i}-${'key' in item ? item.key : ''}`
         }
         renderItem={renderItem}
+        ListFooterComponent={conv?.otherTyping ? <TypingBubble testID="conversation-typing-bubble" /> : null}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
