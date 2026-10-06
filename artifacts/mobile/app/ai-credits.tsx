@@ -80,12 +80,15 @@ export default function AiCreditsScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
-  const { isSignedIn } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const rc = useRevenueCat();
   const params = useLocalSearchParams<{ paymentReturn?: string; checkout_session_id?: string; demoPlan?: string }>();
 
   const demo = isPreviewDemoMode() && (isBuyerDevPreview() || isSellerDevPreview());
   const live = !!isSignedIn;
+  // Fresh signed-out preview (no &demo=1): a new seller's real starting point
+  // — 0 credits and the way to get some — with no protected API call (QA-0040).
+  const freshPreview = !demo && !live && (isSellerDevPreview() || isBuyerDevPreview());
 
   const [overview, setOverview] = useState<AiCreditsOverview | null>(null);
   const [entries, setEntries] = useState<AiCreditEntry[]>([]);
@@ -103,7 +106,9 @@ export default function AiCreditsScreen() {
       setOverview(demoOverview(params.demoPlan)); setEntries(params.demoPlan === 'pro' ? [] : DEMO_HISTORY); setCursor(null); setLoading(false);
       return;
     }
-    if (!live) { setLoading(false); return; }
+    // Clerk still loading: keep the skeleton, never flash "Sign in" (QA-0040).
+    if (!live) { if (authLoaded || freshPreview) setLoading(false); return; }
+    setLoading(true);
     setLoadError(false);
     try {
       const [o, h] = await Promise.all([api.aiCredits.get(), api.aiCredits.history(30)]);
@@ -113,7 +118,7 @@ export default function AiCreditsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, demo, live, params.demoPlan]);
+  }, [api, authLoaded, demo, freshPreview, live, params.demoPlan]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -204,6 +209,17 @@ export default function AiCreditsScreen() {
         <View style={styles.body}>
           {loadError
             ? <RetryRow label="Couldn't load your credits" onRetry={() => { setLoading(true); void load(); }} />
+            : freshPreview ? (
+              <>
+                <Text style={styles.balanceLabel}>Available credits</Text>
+                <Text style={[styles.balance, tabularType('display')]} testID="ai-credits-balance">0</Text>
+                {isSellerDevPreview() ? (
+                  <View style={{ marginTop: SP.lg }}>
+                    <Button label="See plans" onPress={() => router.push('/plans' as never)} fullWidth />
+                  </View>
+                ) : null}
+              </>
+            )
             : <Text style={styles.muted}>Sign in to see your AI credits.</Text>}
         </View>
       ) : (
