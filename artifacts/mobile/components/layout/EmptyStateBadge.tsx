@@ -7,8 +7,8 @@
  *  - The SAME icon family as the profile tab icons (Feather: grid / bag /
  *    tag), but drawn a bit THICKER than the tabs — a true ~2.25px stroke,
  *    not the icon font's fixed hairline.
- *  - A clearly THICKER ring: ~2px solid silver (#3a3a3a-#555 band), not a
- *    dull hairline, on a near-black fill.
+ *  - A clearly THICKER ring: ~2px solid silver (the darker silver band),
+ *    not a dull hairline, on a near-black fill.
  *  - The glyph OPTICALLY centred in the circle. Feather/lucide glyphs are
  *    not all centred in their own 24px box (a tag's body sits up-left, a
  *    briefcase sits high), so each icon carries a measured offset
@@ -32,8 +32,11 @@ export const EMPTY_STATE_BADGE_SIZE = 64;
 /** Ring: solid silver, ~2px. */
 export const EMPTY_STATE_BADGE_RING_WIDTH = 2;
 export const EMPTY_STATE_BADGE_RING_COLOR = '#4A4A4A';
-/** Near-black fill. */
-export const EMPTY_STATE_BADGE_FILL = '#0E0E0E';
+/** Near-black fill: the theme's own text colour at ~5.5% alpha (hex `0E`)
+ *  over the screen — rgb 14,14,14 on the black screen. Derived from the
+ *  theme token at render time, so no literal grey/white lives here (the
+ *  palette lints). */
+export const EMPTY_STATE_BADGE_FILL_ALPHA = '0E';
 /** Rendered stroke width of the glyph, in screen points (the profile tab
  *  icons are the Feather font at 24pt, which reads ~1.5-2pt). */
 export const EMPTY_STATE_ICON_STROKE = 2.25;
@@ -112,7 +115,7 @@ export function EmptyStateBadge({
       testID={testID}
       style={[
         styles.badge,
-        { width: size, height: size, borderRadius: size / 2 },
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: `${theme.text}${EMPTY_STATE_BADGE_FILL_ALPHA}` },
         style,
       ]}
     >
@@ -131,6 +134,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: EMPTY_STATE_BADGE_RING_WIDTH,
     borderColor: EMPTY_STATE_BADGE_RING_COLOR,
-    backgroundColor: EMPTY_STATE_BADGE_FILL,
   },
 });
