@@ -316,6 +316,51 @@ export async function notifyStoryReshare(input: {
   }
 }
 
+// ─── Caption mentions ─────────────────────────────────────────────────────────
+
+/**
+ * "@handle" in a published post's caption notifies each mentioned account
+ * (Instagram's "mentioned you in a post"). Only comment mentions notified
+ * before. Skips the author, blocked pairs and unknown handles; one row per
+ * person per post (a caption edit never re-notifies).
+ */
+export async function notifyCaptionMentions(input: { postId: string; authorId: string; caption: string | null | undefined }): Promise<void> {
+  try {
+    const handles = extractMentions(input.caption ?? "");
+    if (handles.length === 0) return;
+    const post = await loadPost(input.postId);
+    if (!post) return;
+    const actor = await actorFields(input.authorId);
+    if (!actor) return;
+    const blocked = await blockedUserIds(input.authorId);
+    const mentioned = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(and(inArray(sql`lower(${users.username})`, handles), isNull(users.deletedAt)));
+    const recipients = mentioned.map((m) => m.clerkId).filter((id) => id !== input.authorId && !blocked.has(id));
+    if (recipients.length === 0) return;
+    const already = new Set((await db.select({ userId: notificationsFeed.userId }).from(notificationsFeed)
+      .where(and(
+        inArray(notificationsFeed.userId, recipients),
+        eq(notificationsFeed.type, "post_mention"),
+        eq(notificationsFeed.targetId, post.id),
+      ))).map((r) => r.userId));
+    await fanOut(recipients.filter((id) => !already.has(id)), (userId) => publishNotification({
+      userId,
+      category: "social",
+      type: "post_mention",
+      title: `${actor.actorName} mentioned you in a post`,
+      body: excerpt(input.caption ?? ""),
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+    }));
+  } catch (err) {
+    logger.warn({ err, postId: input.postId }, "Caption mention notification failed");
+  }
+}
+
 // ─── Thread Cash ──────────────────────────────────────────────────────────────
 
 /** Tell the recipient someone sent them Thread Cash. Idempotent per transfer. */
@@ -535,50 +580,5 @@ export async function notifyNewProduct(input: { productId: string }): Promise<vo
     }));
   } catch (err) {
     logger.warn({ err, productId: input.productId }, "New product notification failed");
-  }
-}
-
-// ─── Caption mentions ─────────────────────────────────────────────────────────
-
-/**
- * "@handle" in a published post's caption notifies each mentioned account
- * (Instagram's "mentioned you in a post"). Only comment mentions notified
- * before. Skips the author, blocked pairs and unknown handles; one row per
- * person per post (a caption edit never re-notifies).
- */
-export async function notifyCaptionMentions(input: { postId: string; authorId: string; caption: string | null | undefined }): Promise<void> {
-  try {
-    const handles = extractMentions(input.caption ?? "");
-    if (handles.length === 0) return;
-    const post = await loadPost(input.postId);
-    if (!post) return;
-    const actor = await actorFields(input.authorId);
-    if (!actor) return;
-    const blocked = await blockedUserIds(input.authorId);
-    const mentioned = await db
-      .select({ clerkId: users.clerkId })
-      .from(users)
-      .where(and(inArray(sql`lower(${users.username})`, handles), isNull(users.deletedAt)));
-    const recipients = mentioned.map((m) => m.clerkId).filter((id) => id !== input.authorId && !blocked.has(id));
-    if (recipients.length === 0) return;
-    const already = new Set((await db.select({ userId: notificationsFeed.userId }).from(notificationsFeed)
-      .where(and(
-        inArray(notificationsFeed.userId, recipients),
-        eq(notificationsFeed.type, "post_mention"),
-        eq(notificationsFeed.targetId, post.id),
-      ))).map((r) => r.userId));
-    await fanOut(recipients.filter((id) => !already.has(id)), (userId) => publishNotification({
-      userId,
-      category: "social",
-      type: "post_mention",
-      title: `${actor.actorName} mentioned you in a post`,
-      body: excerpt(input.caption ?? ""),
-      ...actor,
-      targetId: post.id,
-      targetType: "post",
-      targetImageUrl: postThumbnail(post),
-    }));
-  } catch (err) {
-    logger.warn({ err, postId: input.postId }, "Caption mention notification failed");
   }
 }
