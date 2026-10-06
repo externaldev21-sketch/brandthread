@@ -608,6 +608,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return row.type === 'story_mention'
         ? storyMentionViewerHref(id)
         : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
+    case 'giveaway':
+      return id ? `/giveaway?code=${q(id)}` : null;
     case 'thread_cash_transfer':
       return '/thread-cash';
     case 'product':

@@ -48,7 +48,9 @@ export type PushEventCategory =
   | "subscription"
   | "stock"
   | "fulfillment"
-  | "return";
+  | "return"
+  | "announcement"
+  | "giveaway";
 
 const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
   drop: "drop",
@@ -69,6 +71,11 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
   fulfillment: "fulfillment",
   return: "return",
   returns: "return",
+  // Seller follower broadcasts ("announcement") and giveaway results.
+  announcement: "announcement",
+  announcements: "announcement",
+  giveaway: "giveaway",
+  giveaways: "giveaway",
 };
 
 /**
@@ -119,6 +126,7 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
       stock: "inventory_alerts",
       fulfillment: "new_orders",
       social: "friend_activity",
+      announcement: "seller_announcements",
     };
     return sellerPreferences[category] ?? null;
   }
@@ -129,6 +137,7 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
     social: "friend_activity",
     stock: "price_alerts",
     return: "return_updates",
+    announcement: "seller_announcements",
   };
   return buyerPreferences[category] ?? null;
 }

@@ -1403,6 +1403,12 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drops"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-push-broadcast" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-push-broadcast-results" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-giveaways" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-giveaway-create" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-giveaway-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="giveaway" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
