@@ -43,17 +43,19 @@ vi.mock("@workspace/db", () => {
   const products = table("products");
   const orders = table("orders");
   const posts = table("posts");
+  const notificationsFeed = table("notificationsFeed");
+  const accountMutes = table("accountMutes");
 
   return new Proxy({
     db: {
       select: () => ({
         from: (selectedTable: unknown) => ({
-          where: () => ({
-            limit: async () => selectedTable === conversationParticipants
-              && state.memberConversationId !== null
+          where: () => {
+            const rows = selectedTable === conversationParticipants && state.memberConversationId !== null
               ? [{ userId: state.userId }]
-              : [],
-          }),
+              : [];
+            return { limit: async () => rows, then: (resolve: (v: unknown) => unknown) => resolve(rows) };
+          },
         }),
       }),
       update: (updatedTable: unknown) => {
@@ -77,6 +79,8 @@ vi.mock("@workspace/db", () => {
     products,
     orders,
     posts,
+    notificationsFeed,
+    accountMutes,
   }, {
     get: (target, key) => key in target ? (target as any)[key] : table(String(key)),
   });
@@ -135,7 +139,19 @@ describe("conversation read receipts", () => {
     const body = await response.text();
     expect(response.status, body).toBe(200);
     expect(JSON.parse(body)).toEqual({ ok: true });
-    expect(state.updates).toHaveLength(2);
+    // Participant row, inbound messages, and this reader's own "New message"
+    // Activity rows for the thread (so the badge doesn't double-count).
+    expect(state.updates).toHaveLength(3);
+    const feedUpdate = state.updates.find(
+      (update) => (update.table as { name?: string }).name === "notificationsFeed",
+    );
+    expect(feedUpdate?.values).toMatchObject({ isRead: true });
+    expect(feedUpdate?.where).toEqual([
+      ["userId", state.userId],
+      ["targetType", "conversation"],
+      ["targetId", state.memberConversationId],
+      ["isRead", false],
+    ]);
 
     const participantUpdate = state.updates.find(
       (update) => (update.table as { name?: string }).name === "conversationParticipants",

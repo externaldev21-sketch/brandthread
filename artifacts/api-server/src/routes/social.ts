@@ -1237,7 +1237,11 @@ router.get("/stories/following", async (req, res) => {
   const now  = new Date();
 
   const followingRows = await db.select({ followingId: follows.followingId })
-    .from(follows).where(eq(follows.followerId, myId));
+    .from(follows).where(and(
+      eq(follows.followerId, myId),
+      // Muted accounts (Mute > Stories) leave the tray, still followed.
+      sql`NOT EXISTS (SELECT 1 FROM account_mutes am WHERE am.user_id = ${myId} AND am.muted_user_id = ${follows.followingId} AND am.mute_stories)`,
+    ));
   const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
 
   const rows = await db.select().from(stories)

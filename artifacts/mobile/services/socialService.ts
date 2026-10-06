@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
+import { subscribeUserEvents } from '@/lib/realtime/userEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
@@ -107,13 +108,29 @@ export const MY_COLOR    = MY_AVATAR_COLOR;
 
 // ─── Pub/Sub ─────────────────────────────────────────────────────────────────
 
-type Listener = () => void;
+/** Why listeners are being told to refetch. 'messaging' = a DM changed
+ *  (new message, read receipt, request accepted) — the Thread feed ignores
+ *  those instead of reloading on every chat message. */
+export type SocialChangeReason = 'messaging';
+type Listener = (reason?: SocialChangeReason) => void;
 const listeners = new Set<Listener>();
+let unsubscribeRealtime: (() => void) | null = null;
 export function subscribeSocial(fn: Listener): () => void {
   listeners.add(fn);
-  return () => listeners.delete(fn);
+  // Realtime DM hints (lib/realtime/userEvents.ts): a message, read receipt
+  // or accepted request on the other side refreshes the open inbox/thread
+  // now instead of on the next 12–30s poll.
+  if (!unsubscribeRealtime) {
+    unsubscribeRealtime = subscribeUserEvents((event) => {
+      if (event.type === 'conversation.updated' && event.reason !== 'typing') notify('messaging');
+    });
+  }
+  return () => {
+    listeners.delete(fn);
+    if (listeners.size === 0 && unsubscribeRealtime) { unsubscribeRealtime(); unsubscribeRealtime = null; }
+  };
 }
-function notify() { listeners.forEach(fn => fn()); }
+function notify(reason?: SocialChangeReason) { listeners.forEach(fn => fn(reason)); }
 
 /** Lets a module outside this file tell every subscribeSocial() listener
  *  (e.g. inbox.tsx's `subscribeSocial(() => { loadData(); ... })`) to
@@ -1105,10 +1122,28 @@ export async function getConversations(k: SocialKeys = K()): Promise<Conversatio
   if (_socialUserId === k.userId) await save(k.conversations, remote);
   return remote;
 }
+const lastSeenMessageTs = new Map<string, number>();
+/**
+ * Single-conversation fetch. Only the OPEN thread calls this (on load and on
+ * its focused typing poll), so it also keeps the thread live for both sides:
+ * unread messages that arrived while the chat is open are marked read (the
+ * sender's ticks flip to Seen, the badge doesn't come back after leaving),
+ * and a newer last message makes the thread refetch its messages right away
+ * instead of on the 12s message poll. A pending request is never marked read
+ * (only accepting it does that).
+ */
 export async function getConversation(id: string): Promise<Conversation | null> {
   if (!id) return null;
   const k = K();
   const conversation = await serviceRequest<Conversation>(`/api/conversations/${encodeURIComponent(id)}`);
+  const ts = typeof conversation?.lastMessageTs === 'number' ? conversation.lastMessageTs : 0;
+  const previousTs = lastSeenMessageTs.get(id);
+  lastSeenMessageTs.set(id, ts);
+  if (conversation && (conversation.unreadCount ?? 0) > 0 && !conversation.isRequest) {
+    void markConversationRead(id).catch(() => {});
+  } else if (previousTs !== undefined && ts > previousTs) {
+    notify('messaging');
+  }
   if (_socialUserId === k.userId) {
     const conversations = await load<Conversation[]>(k.conversations, []);
     await save(k.conversations, [
@@ -1255,12 +1290,27 @@ export async function markConversationRead(conversationId: string): Promise<void
   await serviceRequest(`/api/conversations/${encodeURIComponent(conversationId)}/read`, { method: 'PATCH', body: JSON.stringify({}) });
   const convs = await load<Conversation[]>(k.conversations, []);
   const updated = convs.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c);
-  await save(k.conversations, updated); notify();
+  await save(k.conversations, updated); notify('messaging');
 }
+const UUID_RE_CONV = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Archive is per-viewer and server-backed (PATCH /:id/archive) — it used to
+ *  live only in local storage and revert on the next inbox refresh. */
 export async function archiveConversation(conversationId: string): Promise<void> {
+  await setConversationArchived(conversationId, true);
+}
+export async function unarchiveConversation(conversationId: string): Promise<void> {
+  await setConversationArchived(conversationId, false);
+}
+async function setConversationArchived(conversationId: string, archived: boolean): Promise<void> {
   const k = K();
-  const convs = await getConversations(k);
-  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived: true } : c)); notify();
+  if (UUID_RE_CONV.test(conversationId)) {
+    await serviceRequest(`/api/conversations/${encodeURIComponent(conversationId)}/archive`, {
+      method: 'PATCH', body: JSON.stringify({ archived }),
+    });
+  }
+  const convs = await load<Conversation[]>(k.conversations, []);
+  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived: archived } : c));
+  notify('messaging');
 }
 
 /** Search-in-chat (chat details > Search): this conversation's own message
@@ -1566,19 +1616,51 @@ export async function seeLessActor(actorId: string): Promise<void> {
   await serviceRequest('/api/social/see-less', { method: 'POST', body: JSON.stringify({ actorId }) });
   notify();
 }
+// Account mutes are server-side (GET/POST/DELETE /api/social/mutes): the
+// muted account's posts leave the Following feed, their stories leave the
+// tray and their DMs stop notifying — on every device. They used to live only
+// in this device's storage and change nothing server-side (the inbox swipe
+// said "Muted" while every message kept pushing). The local list remains the
+// offline cache and the backend-less preview store.
 export async function getMutedUsers(k: SocialKeys = K()): Promise<MuteRecord[]> {
+  if (k.userId !== 'anon' && !isBuyerDevPreview()) {
+    try {
+      const rows = await serviceRequest<Array<{ mutedUserId: string; name: string; handle: string; createdAt: string }>>('/api/social/mutes', {}, false);
+      if (Array.isArray(rows)) {
+        const mapped: MuteRecord[] = rows.map((r) => ({
+          id: r.mutedUserId,
+          mutedUserId: r.mutedUserId,
+          mutedUserName: r.name,
+          mutedUserHandle: r.handle,
+          mutedUserInitials: r.name.split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase(),
+          mutedUserColor: pickAvatarColor(r.mutedUserId),
+          createdAt: r.createdAt,
+        }));
+        await save(k.mutes, mapped);
+        return mapped;
+      }
+    } catch { /* offline — fall back to the last known list */ }
+  }
   return load<MuteRecord[]>(k.mutes, []);
 }
 export async function muteUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
   const k = K();
-  const mutes = await getMutedUsers(k);
-  if (mutes.some(m => m.mutedUserId === params.userId)) return;
-  mutes.unshift({ id: uid(), mutedUserId: params.userId, mutedUserName: params.name, mutedUserHandle: params.handle, mutedUserInitials: params.initials, mutedUserColor: params.color, createdAt: iso() });
-  await save(k.mutes, mutes); notify();
+  if (k.userId !== 'anon' && !isBuyerDevPreview()) {
+    await serviceRequest('/api/social/mutes', { method: 'POST', body: JSON.stringify({ userId: params.userId }) });
+  }
+  const mutes = await load<MuteRecord[]>(k.mutes, []);
+  if (!mutes.some(m => m.mutedUserId === params.userId)) {
+    mutes.unshift({ id: uid(), mutedUserId: params.userId, mutedUserName: params.name, mutedUserHandle: params.handle, mutedUserInitials: params.initials, mutedUserColor: params.color, createdAt: iso() });
+    await save(k.mutes, mutes);
+  }
+  notify();
 }
 export async function unmuteUser(userId: string): Promise<void> {
   const k = K();
-  const mutes = await getMutedUsers(k);
+  if (k.userId !== 'anon' && !isBuyerDevPreview()) {
+    await serviceRequest(`/api/social/mutes/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+  }
+  const mutes = await load<MuteRecord[]>(k.mutes, []);
   await save(k.mutes, mutes.filter(m => m.mutedUserId !== userId)); notify();
 }
 

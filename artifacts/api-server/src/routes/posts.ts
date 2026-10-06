@@ -382,7 +382,11 @@ router.get("/feed", requireAuth, async (req, res) => {
     const followedIds = db
       .select({ followingId: follows.followingId })
       .from(follows)
-      .where(eq(follows.followerId, clerkId));
+      .where(and(
+        eq(follows.followerId, clerkId),
+        // Muted accounts (Mute > Posts) stay followed but leave this feed.
+        sql`NOT EXISTS (SELECT 1 FROM account_mutes am WHERE am.user_id = ${clerkId} AND am.muted_user_id = ${follows.followingId} AND am.mute_posts)`,
+      ));
 
     const pageRows = await db
       .select({

@@ -117,3 +117,14 @@ export async function serviceRequest<T = unknown>(
   if (reportErrors) dismissNetworkNotice();
   return res.json() as Promise<T>;
 }
+
+/**
+ * The signed-in session token + API base, for the realtime socket
+ * (lib/realtime/userEvents.ts). Null when services aren't configured yet or
+ * nobody is signed in.
+ */
+export async function serviceSession(): Promise<{ token: string; base: string } | null> {
+  if (!_getToken) return null;
+  const token = await _getToken().catch(() => null);
+  return token ? { token, base: process.env.EXPO_PUBLIC_API_BASE_URL ?? "" } : null;
+}

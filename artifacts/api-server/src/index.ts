@@ -23,6 +23,7 @@ import { attachCommunityWebSocket } from "./ws/communityHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
+import { attachUserWebSocket } from "./ws/userHub";
 
 validateEnv();
 
@@ -49,6 +50,8 @@ const server = app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
+  // Per-user change hints for DMs + Activity (/ws/user), same HTTP server.
+  attachUserWebSocket(server);
   // Live-stream WebSocket — attached to this same HTTP server (upgrade
   // requests to /ws/live), not a second port.
   attachLiveWebSocket(server);

@@ -2309,7 +2309,8 @@ export default function FeedScreen({
 
   useEffect(() => {
     void loadFeed(true);
-    const unsub = subscribeSocial(() => { void loadFeed(); });
+    // A DM changing (new message / read receipt) is no reason to reload the feed.
+    const unsub = subscribeSocial((reason) => { if (reason !== 'messaging') void loadFeed(); });
     return unsub;
   }, [loadFeed]);
 
