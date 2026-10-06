@@ -344,14 +344,14 @@ async function signedOutPreview(browser, origin) {
   const after = await fontSizeOf(page, 'Reduce motion');
   check(after > before, `preview: text size applies locally (${before}px → ${after}px)`);
   await shot(page, 'settings-text-size-preview-large.png');
-  await navigate(page, `/buyer-post-viewer?postId=post_trending_1&postCaption=${encodeURIComponent(SPANISH)}&bt_preview=buyer`);
-  await page.getByText('See translation', { exact: true }).first().waitFor({ timeout: 15_000 });
-  await page.waitForTimeout(500);
-  await shot(page, 'settings-translation-preview-link.png');
-  await page.getByText('See translation', { exact: true }).first().click();
-  await page.waitForTimeout(1500);
-  check(page.url().includes('/sign-in'), `preview: See translation opens sign-in instead of calling the API (${new URL(page.url()).pathname})`);
-  await shot(page, 'settings-translation-preview-sign-in.png');
+  // The preview's own feed/Discover/comment data is English-only, so the
+  // preview "See translation" → sign-in path is covered by
+  // components/translation/__tests__/CaptionTranslation.test.tsx.
+  await navigate(page, '/buyer-settings-detail?section=language&bt_preview=buyer');
+  await page.getByText('Auto-translate captions', { exact: true }).first().waitFor({ timeout: 15_000 });
+  await page.getByRole('switch').last().click();
+  await page.waitForTimeout(800);
+  await shot(page, 'settings-translation-preview-local.png');
   const protectedCalls = calls.filter((c) => c.path === '/display-preferences' || c.path === '/translate');
   check(protectedCalls.length === 0, `preview never calls /api/display-preferences or /api/translate (${protectedCalls.length} calls)`);
   await context.close();

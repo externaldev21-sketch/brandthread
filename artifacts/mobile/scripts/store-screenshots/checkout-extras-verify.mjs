@@ -160,6 +160,7 @@ async function buyer(browser, origin, images, { language, step, name }) {
     sessionStorage.setItem('bt:checkout-extras-seeded', '1');
   }, ['bt:checkout:user_jordan:v1', JSON.stringify(session)]);
   page.on('pageerror', (err) => console.log('[pageerror]', err.message));
+  if (process.env.DEBUG_SHOTS) page.on('request', (r) => { if (r.url().startsWith(DEMO_API)) console.log('[api]', r.method(), new URL(r.url()).pathname); });
 
   const accepted = [];
   await context.route((url) => url.origin === DEMO_API && /\/(checkout-profile|buyer\/post-purchase|buyer\/checkout\/payment-intent)/.test(url.pathname), async (route) => {
@@ -194,7 +195,10 @@ async function buyer(browser, origin, images, { language, step, name }) {
 
   await openScreen(page, activity, origin, 'buyer', '/buyer-checkout');
   if (step === 'confirmation') {
-    await page.waitForSelector(tid('post-purchase-offer'), { timeout: 30_000 });
+    await page.waitForSelector(tid('post-purchase-offer'), { timeout: 30_000 }).catch(async (error) => {
+      await page.screenshot({ path: path.join(WORK_DIR, `debug-${name}.png`) });
+      throw error;
+    });
     await waitForQuietNetwork(activity);
     await shot(page, `${name}.png`);
     if (language === 'en') {
