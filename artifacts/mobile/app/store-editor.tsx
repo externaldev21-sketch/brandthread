@@ -1101,7 +1101,7 @@ export default function StoreEditor() {
             style={styles.addSectionBtn}
           >
             <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={styles.addSectionBtnText}>Add Section</Text>
+            <Text style={styles.addSectionBtnText}>Add section</Text>
           </TouchableOpacity>
         </View>
 
@@ -1111,7 +1111,7 @@ export default function StoreEditor() {
             title="No sections yet"
             description="Add sections to build your store homepage."
             action={{
-              label: 'Add Section',
+              label: 'Add section',
               onPress: () => router.push('/store-sections' as never),
               icon: 'plus',
             }}

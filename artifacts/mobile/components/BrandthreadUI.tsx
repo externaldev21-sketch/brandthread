@@ -469,7 +469,7 @@ export function PrimaryButton({
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
-      style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, style]}
+      style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, disabled && { borderWidth: 1, borderColor: palette.border }, style]}
     >
       <LinearGradient
         colors={disabled ? [palette.elevated, palette.elevated] : buttonColors}

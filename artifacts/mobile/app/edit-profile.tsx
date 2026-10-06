@@ -838,7 +838,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.muted,
   },
   rowInput: {
-    flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
+    flex: 1, minWidth: 0, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
     padding: 0, textAlign: 'right',
   },
   charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'right', marginTop: 4 },

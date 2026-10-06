@@ -329,7 +329,7 @@ export default function FollowingScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
 
-  statusLine: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
+  statusLine: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
 
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },

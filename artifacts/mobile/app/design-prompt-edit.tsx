@@ -140,10 +140,10 @@ export default function DesignPromptEditScreen() {
           )}
           <View style={s.uploadActions}>
             <View style={s.uploadBtn}>
-              <Button label={imageUri ? 'Change image' : 'Upload image'} onPress={pickImage} icon="upload" size="small" fullWidth style={s.uploadBtnInner} />
+              <Button label={imageUri ? 'Change' : 'Upload'} onPress={pickImage} icon="upload" size="small" fullWidth style={s.uploadBtnInner} />
             </View>
             <View style={s.uploadBtn}>
-              <Button label="Recent projects" onPress={chooseFromRecent} icon="folder" variant="secondary" size="small" fullWidth style={s.uploadBtnInner} />
+              <Button label="Recent" accessibilityLabel="Recent projects" onPress={chooseFromRecent} icon="folder" variant="secondary" size="small" fullWidth style={s.uploadBtnInner} />
             </View>
           </View>
         </BrandthreadCard>

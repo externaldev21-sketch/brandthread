@@ -299,7 +299,7 @@ export default function StoreFromMoodboardScreen() {
 
   return (
     <View style={mb.root}>
-      <ScreenHeader title="Generate from mood board" />
+      <ScreenHeader title="Mood board" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={mb.scroll}>
         <Text style={mb.subtitle}>

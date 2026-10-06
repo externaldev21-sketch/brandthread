@@ -147,6 +147,8 @@ export function Button({
           isFilled && !isDisabled && styles.raisedShadow,
           fullWidth && styles.fullWidth,
           isDisabled && !isFilled && { opacity: 0.5 },
+          // The disabled fill matches the dark page, so outline it to keep it reading as a button.
+          isDisabled && isFilled && { borderWidth: 1, borderColor: palette.border },
           style,
         ]}
       >
