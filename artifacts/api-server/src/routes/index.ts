@@ -9,7 +9,7 @@ import customersRouter from "./customers";
 import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
 import integrationsRouter from "./integrations";
-import logoRouter from "./logo";
+import logoRouter, { onboardingSampleRouter } from "./logo";
 import mockupRouter from "./mockup";
 import photographyRouter from "./photography";
 import bgRemovalRouter from "./bg-removal";
@@ -155,7 +155,7 @@ router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.
-router.use("/onboarding-sample", logoRouter);
+router.use("/onboarding-sample", onboardingSampleRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);

@@ -1964,6 +1964,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Platform subscription — billed to the seller's own payment method (sellers only).
        *  Completely separate from Stripe Connect (buyer payouts). */
       subscription: {
+        /** The store's plan as the server enforces it (any team member). */
+        entitlement: () => get<{ plan: string; status: string; provider: string }>('/api/seller/subscription/entitlement'),
         /** Returns the seller's current plan, subscription status, renewal date,
          *  and payment-method label. */
         status: () => get<{
