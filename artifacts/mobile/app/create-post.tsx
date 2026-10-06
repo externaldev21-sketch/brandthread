@@ -11,10 +11,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Platform, StatusBar, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { useRole } from '@/contexts/RoleContext';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { getSellerPosts, updateSellerPost, type SellerThreadPost } from '@/services/socialService';
@@ -106,9 +105,8 @@ export default function CreatePostScreen() {
   const isSetup = isSellerSetupOrigin(params.from);
 
   const leave = useCallback(() => {
-    if (isSetup) { router.replace(SELLER_HOME_ROUTE as never); return; }
-    goBackOr(router);
-  }, [isSetup, router]);
+    leaveSetupFlow(router, params.from);
+  }, [params.from, router]);
 
   // A buyer can never be in a Threads flow, however the route was reached.
   useEffect(() => {

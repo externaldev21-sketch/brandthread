@@ -19,7 +19,11 @@ describe('Studio page accepts a closeRequestKey + reports its own open state', (
   it('closeRequestKey closes the page (only when already open), mirroring openRequestKey', () => {
     expect(studio).toContain('closeRequestKey?: number;');
     expect(studio).toContain('closeRequestKey = 0,');
-    expect(studio).toContain('if (closeRequestKey > 0 && open) {');
+    // A request only acts when its key CHANGED since this instance mounted
+    // (the menu remounts after full-screen routes and must not replay a
+    // stale key — see docs/NAVIGATION.md / lib/navigation/studioReturn.ts).
+    expect(studio).toContain('if (closeRequestKey === handledCloseKeyRef.current) return;');
+    expect(studio).toContain('if (openRequestKey === handledOpenKeyRef.current) return;');
   });
 
   it('onOpenChange fires whenever the internal open state changes', () => {

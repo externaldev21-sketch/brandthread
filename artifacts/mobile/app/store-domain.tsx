@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -19,7 +18,7 @@ import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, StatusB
 import { getStorefront, updateDomain } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 import { StoreDomain } from '@/services/storeTypes';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
 type MergedDomain = StoreDomain & { dnsToken?: string };
@@ -39,11 +38,9 @@ export default function StoreDomainScreen() {
   const [verifying, setVerifying] = useState<string | null>(null);
 
   const leaveSetupDestination = () => {
-    if (isSellerSetupOrigin(params.from)) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from);
   };
 
   const load = useCallback(async () => {

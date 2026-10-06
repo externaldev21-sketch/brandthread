@@ -17,9 +17,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
@@ -95,11 +94,9 @@ export default function SellerVerificationScreen() {
   const [cancelling, setCancelling] = useState(false);
 
   function leaveSetupDestination() {
-    if (launchedFromSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from);
   }
 
   // Load current verification status

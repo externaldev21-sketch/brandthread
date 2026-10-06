@@ -95,7 +95,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -115,6 +115,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';
+import { markStudioTileOpened } from '@/lib/navigation/studioReturn';
 import { SCRUB_PX_PER_CARD, indexForDrag } from '@/lib/studioCardCarousel';
 import { useFirstRunTip } from '@/hooks/useFirstRunTip';
 import { isPreviewDemoMode } from '@/lib/devPreview';
@@ -396,6 +397,7 @@ export default function SellerStudioRadialMenu({
   onOpenChange,
 }: SellerStudioRadialMenuProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const { width: windowWidth, height: screenHeight } = useWindowDimensions();
@@ -673,8 +675,17 @@ export default function SellerStudioRadialMenu({
     expand();
   }), [expand]);
 
+  // Only a NEW request (a key that changed since this instance mounted)
+  // opens the page. This component is unmounted on full-screen routes
+  // (add-product, create-post, plans…) and remounted when they pop; without
+  // this guard the mount-time effect saw the stale `openRequestKey > 0`
+  // left over from an earlier open and expanded the menu by itself — which
+  // is how "Cancel on add product dumps me on the Studio menu" happened.
+  const handledOpenKeyRef = useRef(openRequestKey);
   useEffect(() => {
-    if (openRequestKey > 0 && !open) expand();
+    if (openRequestKey === handledOpenKeyRef.current) return;
+    handledOpenKeyRef.current = openRequestKey;
+    if (!open) expand();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequestKey]);
 
@@ -706,8 +717,11 @@ export default function SellerStudioRadialMenu({
   // caller thinks the page is closed and closeRequestKey when it thinks the
   // page is open — onOpenChange below is what keeps that belief in sync
   // with this component's own (otherwise fully internal) `open` state.
+  const handledCloseKeyRef = useRef(closeRequestKey);
   useEffect(() => {
-    if (closeRequestKey > 0 && open) {
+    if (closeRequestKey === handledCloseKeyRef.current) return;
+    handledCloseKeyRef.current = closeRequestKey;
+    if (open) {
       cancelEnter();
       collapse();
     }
@@ -752,6 +766,8 @@ export default function SellerStudioRadialMenu({
       return;
     }
     setNextPushAnimationNone();
+    // Retain explicit legacy origin handoffs and the general pop-to-menu tracking.
+    markStudioTileOpened(pathname, item.route);
     if (item.id === 'payouts') {
       router.push({ pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN } });
     } else if (item.id === 'analytics') {
@@ -763,7 +779,7 @@ export default function SellerStudioRadialMenu({
     } else {
       router.push(item.route as never);
     }
-  }, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading, planError, hasPlan, retryPlan, router]);
+  }, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading, planError, hasPlan, retryPlan, router, pathname]);
 
   // ── Gestures ─────────────────────────────────────────────────────────────────
   // Horizontal = scrub through cards, vertical = dismiss, near-zero movement

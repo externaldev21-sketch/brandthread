@@ -41,9 +41,8 @@ import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESET
 
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
@@ -550,11 +549,11 @@ export default function AddProductScreen() {
 
   function leaveProductFlow() {
     isExitingRef.current = true;
-    if (launchedFromSellerSetup) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Cancel / Discard / Done pop to the exact screen underneath (dashboard,
+    // products tab, setup checklist…); only a cold deep link with no history
+    // falls back to the explicit `from` origin. Never replace() to a tabs
+    // index here — that is what used to strand the seller on the wrong tab.
+    leaveSetupFlow(router, params.from);
   }
 
   function handleExit() {

@@ -1,4 +1,5 @@
 import { goBackOr, type BackCapableRouter } from './goBackOr';
+import { cancelStudioReturn } from './studioReturn';
 
 export const STUDIO_MENU_ORIGIN = 'seller-studio';
 
@@ -13,6 +14,8 @@ export function subscribeStudioMenuReturn(listener: () => void): () => void {
 }
 
 export function returnToStudioMenu(router: BackCapableRouter): void {
+  // The explicit listener restores the menu; don't also replay the generic pop marker.
+  cancelStudioReturn();
   goBackOr(router, '/(tabs)/more');
   for (const listener of [...listeners]) listener();
 }
