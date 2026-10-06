@@ -279,7 +279,7 @@ async function getPublicPostAsBuyerPost(postId: string): Promise<BuyerPost | nul
       authorName: name,
       authorHandle: handle,
       authorInitials: name.split(/\s+/).map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase(),
-      authorColor: '#1a1a1a',
+      authorColor: pickAvatarColor(p.userId),
       authorAccountType: 'buyer',
       feedEligibility: 'profile_only',
       profileVisibility: 'public' as BuyerPost['profileVisibility'],
