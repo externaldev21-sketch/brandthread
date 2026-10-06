@@ -21,6 +21,7 @@ import type {
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -2718,6 +2719,40 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       comments:       (id: string, since?: string) =>
         get<{ comments: any[] }>(`/api/live/${encodeURIComponent(id)}/comments${since ? `?since=${encodeURIComponent(since)}` : ''}`),
     },
+    // ── BEGIN live moderation + co-host (routes/live-moderation.ts, routes/live-cohost.ts) ──
+    liveMod: {
+      get:         (id: string) => get<LiveModerationState>(`/api/live/${encodeURIComponent(id)}/moderation`),
+      saveSettings: (id: string, data: { bannedWords?: string[]; slowModeSeconds?: number; saveAsDefault?: boolean }) =>
+        put<{ bannedWords: string[]; slowModeSeconds: number }>(`/api/live/${encodeURIComponent(id)}/moderation/settings`, data),
+      pin:         (id: string, commentId: string | null) =>
+        post<{ pinnedComment: any }>(`/api/live/${encodeURIComponent(id)}/moderation/pin`, { commentId }),
+      mute:        (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/moderation/mute`, { userId }),
+      unmute:      (id: string, userId: string) => del<any>(`/api/live/${encodeURIComponent(id)}/moderation/mute/${encodeURIComponent(userId)}`),
+      ban:         (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/moderation/ban`, { userId }),
+      unban:       (id: string, userId: string) => del<any>(`/api/live/${encodeURIComponent(id)}/moderation/ban/${encodeURIComponent(userId)}`),
+      removeComment: (id: string, commentId: string) =>
+        del<any>(`/api/live/${encodeURIComponent(id)}/moderation/comments/${encodeURIComponent(commentId)}`),
+      /** Anyone: the pinned comment + slow-mode seconds for the viewer chat header. */
+      pinned:      (id: string) => get<{ pinnedComment: any | null; slowModeSeconds: number }>(`/api/live/${encodeURIComponent(id)}/pinned`),
+      defaults:    () => get<{ bannedWords: string[]; slowModeSeconds: number }>('/api/live/moderation-defaults'),
+      saveDefaults: (data: { bannedWords: string[]; slowModeSeconds: number }) =>
+        put<{ bannedWords: string[]; slowModeSeconds: number }>('/api/live/moderation-defaults', data),
+    },
+    liveCohost: {
+      candidates:  (q: string) => get<{ sellers: LiveCohostCandidate[] }>(`/api/live/cohost-candidates?q=${encodeURIComponent(q)}`),
+      invites:     () => get<{ invites: LiveCohostInvite[] }>('/api/live/cohost-invites'),
+      list:        (id: string) => get<{ cohosts: LiveCohostPerson[] }>(`/api/live/${encodeURIComponent(id)}/cohosts`),
+      invite:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/invite`, { userId }),
+      cancel:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/cancel`, { userId }),
+      respond:     (id: string, accept: boolean) =>
+        post<{ ok: boolean; status: string; channelName?: string; agoraUid?: number; agoraAppId?: string; token?: string }>(
+          `/api/live/${encodeURIComponent(id)}/cohost/respond`, { accept }),
+      token:       (id: string) =>
+        post<{ channelName: string; agoraUid: number; agoraAppId: string; token: string }>(`/api/live/${encodeURIComponent(id)}/cohost/token`, {}),
+      remove:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/remove`, { userId }),
+      leave:       (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/leave`, {}),
+    },
+    // ── END live moderation + co-host ──
     /** AI — brand memory, proactive suggestions */
     ai: {
       brandMemoryRebuild: () => postExpensive<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
