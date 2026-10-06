@@ -14,6 +14,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { broadcastToRoom } from "../ws/liveHub";
+import { startLiveStaleStreamsJob } from "./liveStaleStreams";
 
 const RECOMPUTE_INTERVAL_MS = 10_000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -82,4 +83,7 @@ export function startLiveViewersPresenceJob(): void {
       logger.error({ err, job: "liveViewersPresence" }, "Stale live_viewers cleanup failed"),
     );
   }, CLEANUP_INTERVAL_MS);
+
+  // Host presence: ends lives whose host app is gone (jobs/liveStaleStreams.ts).
+  startLiveStaleStreamsJob();
 }

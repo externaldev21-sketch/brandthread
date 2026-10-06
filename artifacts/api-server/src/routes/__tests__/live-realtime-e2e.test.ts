@@ -18,7 +18,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import express from "express";
 import { eq } from "drizzle-orm";
-import { db, users, liveStreams, liveComments, liveViewers } from "@workspace/db";
+import { db, users, liveStreams, liveComments, liveViewers, products, productVariants } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import WS from "ws";
 
@@ -48,6 +48,9 @@ async function cleanup() {
     await db.delete(liveComments).where(eq(liveComments.streamId, s.id));
   }
   await db.delete(liveStreams).where(eq(liveStreams.sellerId, SELLER));
+  const owned = await db.select({ id: products.id }).from(products).where(eq(products.ownerId, SELLER));
+  for (const p of owned) await db.delete(productVariants).where(eq(productVariants.productId, p.id));
+  await db.delete(products).where(eq(products.ownerId, SELLER));
   await db.delete(users).where(eq(users.clerkId, SELLER));
   await db.delete(users).where(eq(users.clerkId, VIEWER_A));
   await db.delete(users).where(eq(users.clerkId, VIEWER_B));
@@ -197,12 +200,21 @@ describe("Live realtime: WebSocket auth/broadcast + presence viewer counts", () 
     try {
       const incomingA = nextMessage(socketA);
       const incomingB = nextMessage(socketB);
-      const tags = [{ productId: "p1", productName: "Test Product", priceCents: 1999 }];
+      const [product] = await db.insert(products).values({
+        ownerId: SELLER, name: "Test Product", status: "active", images: ["https://img.test/p.jpg"],
+      }).returning({ id: products.id });
+      await db.insert(productVariants).values({ productId: product.id, sku: `e2e-${product.id}`, priceCents: 1999, stock: 3 } as any);
+      // The host sends ids (plus a made-up price from an old client); the
+      // server names and prices the tag from the catalogue.
       const patchRes = await asUser(SELLER, `/api/live/${streamId}/products`, {
         method: "PATCH",
-        body: JSON.stringify({ productTags: tags }),
+        body: JSON.stringify({ productTags: [{ productId: product.id, productName: "Spoofed", priceCents: 1 }] }),
       });
       expect(patchRes.status).toBe(200);
+      const tags = [{
+        productId: product.id, productName: "Test Product", priceCents: 1999,
+        imageUrl: "https://img.test/p.jpg", inStock: true, highlighted: false,
+      }];
       const [eventA, eventB] = await Promise.all([incomingA, incomingB]);
       expect(eventA.type).toBe("products");
       expect(eventA.productTags).toEqual(tags);

@@ -2305,8 +2305,14 @@ export const liveStreams = pgTable('live_streams', {
   // Pinned product (migration 120): the on-screen Buy card.
   pinnedProductId:      text('pinned_product_id'),
   pinUpdatedAt:         timestamp('pin_updated_at', { withTimezone: true }),
+  // Migration 272 — host heartbeat (stale-stream sweep) and heart reactions.
+  hostLastSeenAt:   timestamp('host_last_seen_at', { withTimezone: true }),
+  likeCount:        integer('like_count').notNull().default(0),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  liveHostSeenIdx: index('live_streams_live_host_seen_idx')
+    .on(table.hostLastSeenAt)
+    .where(sql`${table.status} = 'live'`),
   statusViewerIdx: index('live_streams_status_viewer_idx')
     .on(table.status, table.viewerCount, table.startedAt)
     .where(sql`${table.status} = 'live'`),

@@ -80,7 +80,13 @@ function SellerGoLiveNativeScreen() {
     let cancelled = false;
     setProductsLoading(true);
     (api as any).products?.list?.()
-      .then((r: any) => { if (!cancelled) setAllProducts(r?.products ?? []); })
+      // GET /api/products returns a bare array (older builds read `.products`
+      // and always showed an empty picker); only active products can be sold.
+      .then((r: any) => {
+        if (cancelled) return;
+        const list = Array.isArray(r) ? r : (r?.products ?? []);
+        setAllProducts(list.filter((p: any) => !p?.status || p.status === 'active'));
+      })
       .catch(() => {})
       .finally(() => { if (!cancelled) setProductsLoading(false); });
     return () => { cancelled = true; };
@@ -141,11 +147,8 @@ function SellerGoLiveNativeScreen() {
         title: title.trim(),
         description: description.trim() || undefined,
         ...(typeof launch.scheduledLiveId === 'string' && launch.scheduledLiveId ? { scheduledLiveId: launch.scheduledLiveId } : {}),
-        productTags: featuredProducts.map(p => ({
-          productId: p.id,
-          productName: p.name,
-          priceCents: p.priceCents ?? 0,
-        })),
+        // The server prices and names each product from the catalogue.
+        productTags: featuredProducts.map(p => ({ productId: p.id })),
       }) as any;
 
       router.replace({
@@ -353,8 +356,8 @@ function SellerGoLiveNativeScreen() {
                       activeOpacity={0.7}
                       style={[s.pickerRow, tagged && s.pickerRowActive]}
                     >
-                      {p.imageUrl ? (
-                        <Image source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
+                      {(p.imageUrl ?? p.images?.[0]) ? (
+                        <Image source={{ uri: p.imageUrl ?? p.images?.[0] }} style={s.pickerRowThumb} />
                       ) : (
                         <View style={[s.pickerRowThumb, s.pickerRowThumbPlaceholder]}>
                           <Feather name="image" size={16} color="rgba(255,255,255,0.4)" />
@@ -362,7 +365,11 @@ function SellerGoLiveNativeScreen() {
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={s.pickerRowName} numberOfLines={1}>{p.name}</Text>
-                        <Text style={s.pickerRowPrice}>${((p.priceCents ?? 0) / 100).toFixed(2)}</Text>
+                        {/* The seller product list carries no price; the live
+                            card is priced server-side from the variants. */}
+                        {typeof p.priceCents === 'number' && (
+                          <Text style={s.pickerRowPrice}>${(p.priceCents / 100).toFixed(2)}</Text>
+                        )}
                       </View>
                       <View style={[s.checkbox, tagged && s.checkboxActive]}>
                         {tagged && <Feather name="check" size={13} color="#000" />}

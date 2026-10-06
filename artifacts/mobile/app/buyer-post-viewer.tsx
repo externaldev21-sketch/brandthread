@@ -486,7 +486,7 @@ export default function BuyerPostViewer() {
           ) : null}
           <View style={{ flex: 1 }} />
           {!isOwner && (
-            <TouchableOpacity accessibilityLabel="Report post" accessibilityRole="button"
+            <TouchableOpacity
               style={s.engageBtn}
               hitSlop={ENGAGE_SLOP.report}
               accessibilityRole="button"

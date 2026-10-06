@@ -76,6 +76,8 @@ function BuyerLiveNativeScreen() {
   const [stream, setStream]               = useState<any>(null);
   const [loading, setLoading]             = useState(true);
   const [ended, setEnded]                 = useState(false);
+  // From the server's `ended` broadcast; null until we know.
+  const [replayStatus, setReplayStatus]   = useState<'ready' | 'pending' | 'unavailable' | null>(null);
   const [comments, setComments]           = useState<Comment[]>([]);
   const [commentText, setCommentText]     = useState('');
   const [productTags, setProductTags]     = useState<ProductTag[]>([]);
@@ -149,6 +151,21 @@ function BuyerLiveNativeScreen() {
       handleLeave(true);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
+    } else if (event.type === 'ended') {
+      setReplayStatus(event.replayStatus ?? null);
+      setEnded(true);
+    } else if (event.type === 'gift') {
+      // A viewer's Thread Cash gift, announced by the server (not typed by
+      // anyone), shown in the chat for the host and every viewer.
+      const amount = `$${(event.gift.amountCents / 100).toFixed(2)}`;
+      setComments(prev => [...prev, {
+        id: `gift-${Date.now()}-${event.gift.fromUserId}`,
+        user_id: event.gift.fromUserId,
+        display_name: event.gift.displayName,
+        message: `sent ${amount} Thread Cash`,
+        created_at: new Date().toISOString(),
+      }].slice(-80));
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [user?.id, mod.handleEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -209,7 +226,10 @@ function BuyerLiveNativeScreen() {
             },
             onUserOffline: (a: any, b?: number) => {
               const uid: number = typeof a === 'number' ? a : (b as number);
-              if (hostUidRef.current == null || uid === hostUidRef.current) setEnded(true);
+              if (hostUidRef.current != null && uid !== hostUidRef.current) return;
+              void (api as any).live.get(params.streamId)
+                .then((d: any) => { if (d?.stream?.status !== 'live') setEnded(true); })
+                .catch(() => {});
             },
             onJoinChannelSuccess: () => {},
             onError: (err: any) => console.warn('[Agora viewer]', err),
@@ -457,7 +477,11 @@ function BuyerLiveNativeScreen() {
           <Feather name="video-off" size={32} color={LIVE_RED} />
         </View>
         <Text style={[s.endedTitle, { color: FG }]}>Stream ended</Text>
-        <Text style={[s.endedSub, { color: MUTED }]}>The replay will appear in the feed shortly.</Text>
+        {replayStatus !== 'unavailable' && (
+          <Text style={[s.endedSub, { color: MUTED }]}>
+            {replayStatus === 'ready' ? 'The replay is in the feed.' : 'The replay will appear in the feed shortly.'}
+          </Text>
+        )}
         <PressableScale onPress={() => goBackOr(router)} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
           <Text style={s.backBtnText}>Back to feed</Text>
         </PressableScale>

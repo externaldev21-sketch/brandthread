@@ -42,7 +42,12 @@ export type LiveSocketEvent =
   | { type: 'cohosts'; cohosts: any[] }
   | { type: 'cohost_removed'; userId: string }
   /** Synthesised client-side when the server closes this socket with 4003 (host banned this viewer). */
-  | { type: 'removed' };
+  | { type: 'removed' }
+  /** The stream ended (host ended it, restarted, or went silent). */
+  | { type: 'ended'; reason?: 'host' | 'restarted' | 'host_silent' | 'expired'; replayStatus?: 'ready' | 'pending' | 'unavailable'; replayPostId?: string | null }
+  | { type: 'likes'; likeCount: number; userId?: string; added?: number }
+  /** A viewer sent the host Thread Cash. */
+  | { type: 'gift'; gift: { fromUserId: string; displayName: string; amountCents: number } };
 
 interface UseLiveSocketOptions {
   streamId: string | undefined;
