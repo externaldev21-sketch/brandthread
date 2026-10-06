@@ -10,7 +10,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS } from '@/lib/theme';
+import { useRole } from '@/contexts/RoleContext';
 
 interface LanguageOption {
   code: string;
@@ -35,6 +36,8 @@ const LANGUAGES: LanguageOption[] = [
 export default function LanguagesScreen() {
   const colors = useColors();
   const api = useApi();
+  const { role } = useRole();
+  const isSeller = role === 'seller';
   const [storeLanguage, setStoreLanguage] = useState<string>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -83,9 +86,11 @@ export default function LanguagesScreen() {
                 <Feather name="globe" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.currentLabel, { color: colors.primary }]}>Store language</Text>
+                <Text style={[s.currentLabel, { color: colors.primary }]}>{isSeller ? 'Store language' : 'Language'}</Text>
                 <Text style={[s.currentValue, { color: colors.primary }]}>
-                  {currentLang?.name ?? 'English'} — {currentLang?.nativeName ?? 'English'}
+                  {currentLang && currentLang.nativeName !== currentLang.name
+                    ? `${currentLang.name} — ${currentLang.nativeName}`
+                    : currentLang?.name ?? 'English'}
                 </Text>
               </View>
             </View>
@@ -93,9 +98,11 @@ export default function LanguagesScreen() {
 
           {/* Language list */}
           <View style={s.section}>
-            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Published languages</Text>
+            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Primary language</Text>
             <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-              Select your store's primary language. Buyers will see content in this language.
+              {isSeller
+                ? "Select your store's primary language. Buyers will see content in this language."
+                : 'Select the language you want to use.'}
             </Text>
 
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -117,15 +124,17 @@ export default function LanguagesScreen() {
                       <View style={s.langNameRow}>
                         <Text style={[s.langName, { color: colors.foreground }]}>{lang.name}</Text>
                         {isSelected && (
-                          <View style={[s.defaultBadge, { backgroundColor: SUCCESS_DIM }]}>
-                            <Text style={[s.defaultBadgeText, { color: SUCCESS }]}>Default</Text>
+                          <View style={[s.defaultBadge, { borderColor: colors.border }]}>
+                            <Text style={[s.defaultBadgeText, { color: colors.foreground }]}>Default</Text>
                           </View>
                         )}
                       </View>
                       <Text style={[s.langNative, { color: colors.mutedForeground }]}>{lang.nativeName}</Text>
-                      <Text style={[s.langMarket, { color: colors.mutedForeground }]} numberOfLines={1}>
-                        {lang.marketShare}
-                      </Text>
+                      {isSeller && (
+                        <Text style={[s.langMarket, { color: colors.mutedForeground }]} numberOfLines={1}>
+                          {lang.marketShare}
+                        </Text>
+                      )}
                     </View>
                     {isSaving ? (
                       <ActivityIndicator size="small" color={colors.primary} />
@@ -140,11 +149,13 @@ export default function LanguagesScreen() {
             </View>
           </View>
 
-          <View style={s.section}>
-            <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
-              To translate your product descriptions and policies for international buyers, enable multi-language support from your plan settings.
-            </Text>
-          </View>
+          {isSeller && (
+            <View style={s.section}>
+              <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
+                To translate your product descriptions and policies for international buyers, enable multi-language support from your plan settings.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -165,9 +176,10 @@ const s = StyleSheet.create({
   langRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
   langNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   langName: { fontSize: 14, fontFamily: FONT.semibold },
-  defaultBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  defaultBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2 },
+  // Force LTR alignment so RTL native names (Arabic) stack left like every other row.
+  langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2, textAlign: 'left', writingDirection: 'ltr', alignSelf: 'stretch' },
   langMarket: { fontSize: 11, fontFamily: FONT.regular },
   footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 });

@@ -153,7 +153,7 @@ export default function InviteManufacturerScreen() {
                   {[
                     ['lock', 'Private: only you can see their profile'],
                     ['message-circle', 'One ongoing conversation for the whole job'],
-                    ['credit-card', 'Pay their sample and bulk cards by card or Apple Pay'],
+                    ['credit-card', 'Pay for samples and bulk orders by card or Apple Pay'],
                   ].map(([icon, label]) => (
                     <View key={label} style={s.point}><Feather name={icon as any} size={14} color={FG} /><Text style={s.pointText}>{label}</Text></View>
                   ))}

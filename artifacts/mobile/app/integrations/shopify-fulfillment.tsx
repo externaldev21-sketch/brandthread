@@ -14,7 +14,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
-import { COMP, FS } from '@/lib/theme';
+import { COMP, FS, SP } from '@/lib/theme';
 
 export default function ShopifyFulfillmentScreen() {
   const colors = useColors();
@@ -78,7 +78,7 @@ export default function ShopifyFulfillmentScreen() {
     return (
       <View style={{ flex: 1 }}>
         <ScreenHeader title="Fulfillment connections" />
-        <View style={{ padding: 20, gap: 16 }}>
+        <View style={{ padding: SP.md, gap: 16 }}>
           <LoadingSkeleton height={92} />
           <LoadingSkeleton height={160} />
         </View>
@@ -89,11 +89,11 @@ export default function ShopifyFulfillmentScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Fulfillment connections" />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 60 }}>
         <BrandthreadCard>
           <View style={styles.rowHeader}>
-            <View style={[styles.iconWrap, { backgroundColor: '#95BF4722' }]}>
-              <Feather name="shopping-bag" size={18} color="#5E8E3E" />
+            <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>
+              <Feather name="shopping-bag" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Fulfill orders through my Shopify store</Text>
@@ -132,9 +132,9 @@ export default function ShopifyFulfillmentScreen() {
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Using Tapstitch, Printful, or Printify?</Text>
           </View>
           {[
-            'Turn this on and connect (or reuse) your Shopify store.',
-            'Keep your fulfillment app (Tapstitch, Printful, Printify, …) installed and configured on that Shopify store, same as today.',
-            'When a Brandthread order for a linked product is paid, we create it in your Shopify store — your fulfillment app picks it up and ships it automatically, and tracking flows back here.',
+            'Turn this on and connect your Shopify store.',
+            'Keep your fulfillment app installed on that store.',
+            'Paid orders are sent to Shopify, your app ships them, and tracking syncs back here.',
           ].map((step, i) => (
             <View key={i} style={styles.stepRow}>
               <View style={[styles.stepBadge, { backgroundColor: `${colors.primary}18` }]}>
@@ -143,9 +143,6 @@ export default function ShopifyFulfillmentScreen() {
               <Text style={[styles.explainerStep, { color: colors.mutedForeground }]}>{step}</Text>
             </View>
           ))}
-          <Text style={[styles.footNote, { color: colors.mutedForeground }]}>
-            Tapstitch doesn't offer a direct API — this is how orders reach it (and any other Shopify fulfillment app) from Brandthread.
-          </Text>
         </BrandthreadCard>
 
         {status?.connected && (
@@ -176,7 +173,6 @@ const styles = StyleSheet.create({
   stepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   stepBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   explainerStep: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  footNote: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 4, fontStyle: 'italic' },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: COMP.minTouchTarget, paddingVertical: 16 },
   disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 });
