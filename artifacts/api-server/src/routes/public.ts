@@ -6,6 +6,7 @@ import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
 import { locationsByPlaceId } from "../lib/places";
 import { publicCoverFields } from "../lib/profileCover";
+import { resolveDevice } from "../lib/sellerInsights";
 import { db, readDb, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, storeVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
@@ -1646,6 +1647,9 @@ router.post("/sellers/:sellerId/store-visits", async (req, res): Promise<void> =
   const source = STORE_VISIT_SOURCES.has(rawSource) ? rawSource : "external";
   const rawProductId = typeof req.body?.productId === "string" ? req.body.productId : null;
   const productId = rawProductId && UUID_RE.test(rawProductId) ? rawProductId : null;
+  // Which client the visit came from (Audience report's device split): the
+  // app declares it, a browser is sniffed from its User-Agent.
+  const device = resolveDevice(req.body?.device, req.get("user-agent"));
   // Optional — a signed-out shopper still counts; getAuth() never throws when
   // there is no session, it just returns a null userId.
   const { userId: viewerUserId } = getAuth(req);
@@ -1666,6 +1670,7 @@ router.post("/sellers/:sellerId/store-visits", async (req, res): Promise<void> =
       productId,
       source,
       viewerUserId: viewerUserId ?? null,
+      device,
     });
     res.status(204).end();
   } catch (err) {
