@@ -34,6 +34,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { DEFAULT_PRODUCT_SORT, PRODUCT_SORT_OPTIONS, productSortLabel, productSortQuery, type ProductSortKey } from '@/lib/sellerLists/productSort';
+import { productEmptyCopy } from '@/lib/sellerLists/emptyCopy';
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -369,16 +371,10 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
 
 // ─── Sort Modal ───────────────────────────────────────────────────────────────
 
-type SortKey = 'name' | 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'sales';
-
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'newest', label: 'Newest first' },
-  { key: 'oldest', label: 'Oldest first' },
-  { key: 'name', label: 'Name A-Z' },
-  { key: 'price_asc', label: 'Price: low to high' },
-  { key: 'price_desc', label: 'Price: high to low' },
-  { key: 'sales', label: 'Best selling' },
-];
+// Options, labels and their sortBy/sortDir live in lib/sellerLists/productSort.ts
+// (the sheet drives the real getProducts query — nothing is re-sorted here).
+type SortKey = ProductSortKey;
+const SORT_OPTIONS = PRODUCT_SORT_OPTIONS;
 
 function SortModal({
   visible, current, onSelect, onClose,
@@ -447,7 +443,7 @@ export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
-  const [sort, setSort] = useState<SortKey>('newest');
+  const [sort, setSort] = useState<SortKey>(DEFAULT_PRODUCT_SORT);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
@@ -525,7 +521,7 @@ export default function ProductsScreen() {
     }
     setLoading(true);
     try {
-      const result = await getProducts({ filter, text: debouncedQuery || undefined });
+      const result = await getProducts({ filter, text: debouncedQuery || undefined, ...productSortQuery(sort) });
       if (previewOnlyRef.current) {
         setProducts([]);
         setStats(EMPTY_STATS);
@@ -538,7 +534,7 @@ export default function ProductsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [filter, debouncedQuery, loadStats, previewDemo, previewOnly]);
+  }, [filter, debouncedQuery, sort, loadStats, previewDemo, previewOnly]);
 
   // Re-apply the ?filter= deep link every time this screen is focused (not
   // just on first mount) — the seller tab bar keeps this screen mounted
@@ -667,6 +663,8 @@ export default function ProductsScreen() {
   // Sorted products
   const sortedProducts = useMemo(() => {
     if (previewOnly && !previewDemo) return [];
+    // Real products retain the query's sort; URL-only fixtures are local.
+    if (!previewDemo) return products;
     const arr = [...products];
     switch (sort) {
       case 'name': return arr.sort((a, b) => a.name.localeCompare(b.name));
@@ -689,7 +687,7 @@ export default function ProductsScreen() {
     { label: 'Out of Stock', value: 'out-of-stock' },
   ];
 
-  const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
+  const currentSortLabel = productSortLabel(sort);
   // The selected status chip already shows Active/Draft/etc. as selected.
   // Highlight the separate filter control only for choices outside that row.
   const hasActiveFilter = filter !== 'all' && !filterPills.some(pill => pill.value === filter);
@@ -766,19 +764,6 @@ export default function ProductsScreen() {
     )
   ), [sortedProducts.length, SUBTLE]);
 
-  // Rich, per-filter empty states instead of one generic message.
-  const emptyCopy: Record<ProductFilter, { icon: keyof typeof Feather.glyphMap; title?: string; message: string }> = {
-    'all': { icon: 'package', title: 'No products yet', message: 'Add your first product to start selling.' },
-    'active': { icon: 'check-circle', message: 'No active products yet. Publish a draft to see it here.' },
-    'draft': { icon: 'edit-2', message: 'No draft products yet. Start one and finish it later.' },
-    'scheduled': { icon: 'clock', message: 'Nothing scheduled. Set a publish date on a draft to line it up.' },
-    'archived': { icon: 'archive', message: 'No archived products. Archived items are hidden from your storefront.' },
-    'pre-order': { icon: 'calendar', message: 'No pre-order products yet.' },
-    'pre-made': { icon: 'box', message: 'No pre-made products yet.' },
-    'low-stock': { icon: 'alert-triangle', message: 'Nothing running low. You\'re fully stocked.' },
-    'out-of-stock': { icon: 'x-circle', message: 'Nothing is out of stock right now.' },
-  };
-
   // Belt-and-suspenders alongside contentContainerStyle's paddingBottom below:
   // FlashList's web renderer doesn't always honor a large contentContainerStyle
   // bottom padding, letting the last row sit under the floating tab bar — a
@@ -786,21 +771,24 @@ export default function ProductsScreen() {
   // extends past the bar.
   const ListFooter = useMemo(() => <View style={{ height: tabBar.occupiedHeight }} />, [tabBar.occupiedHeight]);
 
+  // One honest title per filter (lib/sellerLists/emptyCopy.ts); only All
+  // and Active offer "Add product", which opens add-product as a modal over
+  // this tab — its Cancel lands back here (from=products).
   const ListEmpty = useMemo(() => {
-    const copy = emptyCopy[filter] ?? emptyCopy.all;
+    const copy = productEmptyCopy(filter, debouncedQuery);
     return (
       <View style={s.emptyWrap}>
         <EmptyState
           icon={copy.icon}
           title={copy.title}
-          message={copy.message}
-          // Every filter's empty state gets a real next step, not just "all".
-          actionLabel="Add your first product"
-          onAction={() => router.push('/add-product' as never)}
+          actionLabel={copy.action ? 'Add product' : undefined}
+          actionSize="slim"
+          onAction={copy.action ? () => router.push('/add-product?from=products' as never) : undefined}
+          testID="products-empty"
         />
       </View>
     );
-  }, [router, filter]);
+  }, [router, filter, debouncedQuery]);
 
   return (
     <View style={[s.root, { paddingTop: topInset + 12, backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
@@ -813,11 +801,7 @@ export default function ProductsScreen() {
         ]}
         titleAccessibilityLabel="Products, choose a view"
         actions={[
-          {
-            icon: 'plus',
-            onPress: () => router.push('/add-product' as never),
-            accessibilityLabel: 'Add product',
-          },
+          { icon: 'plus', onPress: () => router.push('/add-product?from=products' as never), accessibilityLabel: 'Add product' },
           {
             icon: 'more-horizontal',
             onPress: () => showActionSheet('Products', 'Choose an action', [

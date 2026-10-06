@@ -1421,14 +1421,12 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="store-setup-socials" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
-        {/* `?presentation=modal` (the seller profile's Products empty state):
-            slides up as a modal over the profile, so closing it lands back
-            on the profile. Every other entry point keeps the push. */}
+        {/* Creation flows slide up; the profile retains its explicit modal. */}
         <Stack.Screen name="add-product" options={({ route }) => {
             const asModal = (route.params as { presentation?: string } | undefined)?.presentation === 'modal';
             return asModal
               ? { headerShown: false, presentation: 'modal', animation: 'slide_from_bottom', contentStyle: OPAQUE_SCREEN_CONTENT }
-              : { headerShown: false, animation: consumeAnimationOverride('ios_from_right') };
+              : { headerShown: false, presentation: 'fullScreenModal', animation: consumeAnimationOverride('slide_from_bottom'), contentStyle: OPAQUE_SCREEN_CONTENT };
           }} />
         <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />

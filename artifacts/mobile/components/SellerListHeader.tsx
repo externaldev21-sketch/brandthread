@@ -15,11 +15,13 @@
  * screen's own root background shows straight through.
  */
 import React, { useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FilterChip, PressableScale, SearchBar } from '@/components/BrandthreadUI';
+import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
+import { ChipRail } from '@/components/ChipRail';
+import { ArrowUpDownIcon } from '@/components/icons/ArrowUpDownIcon';
 import { hapticSelection } from '@/lib/haptics';
 
 export interface SellerListHeaderAction {
@@ -209,27 +211,17 @@ export function SellerListHeader({
           onPress={onSortPress}
           accessibilityLabel={sortAccessibilityLabel}
         >
-          <Feather name="chevrons-down" size={14} color={theme.muted} />
+          {/* Sort, not "expand": arrow-up-down reads as sorting at a glance;
+              the old double-chevron read as "show more". */}
+          <ArrowUpDownIcon size={14} color={theme.muted} />
         </PressableScale>
       </View>
 
-      {/* Status chips — horizontal scroll, edge-to-edge. `pillsRow`'s own
-          horizontal padding is what lets the last chip clip naturally at
-          the screen edge as a scroll affordance — no gradient overlay on
-          top of the chips (a previous `GRAD_DARK_FADE` scrim here went
-          fully opaque at its own edge, painting a solid black block over
-          the last chip instead of fading it). */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pillsRow}>
-        {chips.map((chip) => (
-          <FilterChip
-            key={chip.key}
-            label={chip.label}
-            active={chip.active}
-            onPress={chip.onPress}
-            count={chip.count}
-          />
-        ))}
-      </ScrollView>
+      {/* Status chips — a swipeable rail (components/ChipRail.tsx): native
+          momentum + snap, no indicator, 16px gutter at both ends, tap
+          scrolls the chip into view, count badge hidden at 0. Only this
+          row scrolls; the search bar and its two buttons stay fixed. */}
+      <ChipRail chips={chips} testID="seller-list-chip-rail" />
     </View>
   );
 }
@@ -289,12 +281,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: theme.border,
-  },
-  pillsRow: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    paddingTop: 2,
-    gap: SP.xs,
   },
   titleMenu: {
     position: 'absolute',

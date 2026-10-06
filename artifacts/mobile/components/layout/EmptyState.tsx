@@ -38,10 +38,14 @@ export function EmptyState({
    *  slim white fit-to-text pill (black text, 36px, equal side padding);
    *  default `button`. */
   actionStyle = 'button',
+  /** `slim` = a compact fit-to-text pill (36pt tall, 16px sides) for a
+   *  secondary next step; default keeps the original 44pt pill. */
+  actionSize = 'default',
 }: {
   icon: keyof typeof Feather.glyphMap;
   title?: string;
-  message: string;
+  /** Omit for a title-only empty state (no filler sentence). */
+  message?: string;
   actionLabel?: string;
   onAction?: () => void;
   variant?: 'empty' | 'error';
@@ -52,6 +56,7 @@ export function EmptyState({
    *  (Dev: one badge for every empty state). */
   illustration?: ThreadMotif;
   actionStyle?: 'button' | 'text' | 'pill';
+  actionSize?: 'default' | 'slim';
 }) {
   const { theme } = useAppTheme();
   const textAction = actionStyle === 'text';
@@ -84,14 +89,16 @@ export function EmptyState({
           style={
             textAction ? styles.actionText
               : pillAction ? [styles.actionPill, { backgroundColor: theme.text }]
-              : [styles.actionBtn, { backgroundColor: theme.accent }]
+              : [styles.actionBtn, actionSize === 'slim' && styles.actionBtnSlim, { backgroundColor: theme.accent }]
           }
+          hitSlop={actionSize === 'slim' ? { top: 4, bottom: 4 } : undefined}
           testID={testID ? `${testID}-action` : undefined}
         >
           <Text
             style={[
               styles.actionLabel,
               pillAction && styles.actionPillLabel,
+              actionSize === 'slim' && styles.actionLabelSlim,
               { color: textAction ? theme.accentLight : pillAction ? theme.background : theme.onAccent },
             ]}
             numberOfLines={1}
@@ -136,6 +143,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginTop: SP.xs,
   },
+  actionBtnSlim: {
+    minHeight: 36,
+    paddingHorizontal: SP.md,
+    paddingVertical: 0,
+    alignItems: 'center',
+  },
   actionText: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },
   // Slim white fit-to-text pill: 36px tall, equal 16px side padding, black
   // text — never stretched, never a fixed width.
@@ -152,4 +165,5 @@ const styles = StyleSheet.create({
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
+  actionLabelSlim: { fontSize: FS.sm },
 });

@@ -75,18 +75,29 @@ export default function SwipeActionRow({
     onPanResponderTerminate: reset,
   }), [disabled, onAction, translateX]);
 
+  // The action panel sits behind the row at the right edge. Rows that are
+  // inset cards (Orders) leave a gutter and a bottom margin around the card,
+  // so at rest the panel must be invisible — otherwise its color shows as a
+  // bar along the screen edge. It fades in only while the row is swiped.
+  const actionOpacity = translateX.interpolate({
+    inputRange: [-ACTION_WIDTH, -1, 0],
+    outputRange: [1, 1, 0],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.clip}>
-      <AnimatedPressable
-        // Only visible while the row is actually swiped: at rest it would show as a coloured sliver in the card's margin.
-        style={[styles.action, { backgroundColor: color, opacity: translateX.interpolate({ inputRange: [-ACTION_WIDTH, -1, 0], outputRange: [1, 1, 0], extrapolate: 'clamp' }) }]}
-        onPress={() => { void runAction(); }}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? label}
-      >
-        <Feather name={icon} size={18} color={theme.onAccent} />
-        <Text style={[styles.actionText, { color: theme.onAccent }]}>{label}</Text>
-      </AnimatedPressable>
+      <Animated.View style={[styles.action, { backgroundColor: color, opacity: actionOpacity }]}>
+        <Pressable
+          style={styles.actionHit}
+          onPress={() => { void runAction(); }}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel ?? label}
+        >
+          <Feather name={icon} size={18} color={theme.onAccent} />
+          <Text style={[styles.actionText, { color: theme.onAccent }]}>{label}</Text>
+        </Pressable>
+      </Animated.View>
       <Animated.View
         style={{ transform: [{ translateX }] }}
         {...panResponder.panHandlers}
@@ -97,7 +108,6 @@ export default function SwipeActionRow({
   );
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const styles = StyleSheet.create({
   clip: {
@@ -110,6 +120,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     width: ACTION_WIDTH,
+  },
+  actionHit: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.xs,
