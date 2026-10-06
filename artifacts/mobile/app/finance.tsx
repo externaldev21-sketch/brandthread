@@ -13,6 +13,7 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import { FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
+import { currentPlanSummary } from '@/lib/currentPlan';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import { zeroFinanceSummary } from '@/lib/financeSummary';
@@ -134,6 +135,8 @@ export default function FinanceScreen() {
      { label: 'Net (recent)',  value: formatCents(totalNet), positive: totalNet >= 0, highlight: true },
   ];
 
+  const subPlan = currentPlanSummary(subStatus ?? { plan: null, status: null, amountCents: 0 });
+
   const documents = [
     ...(!isReadOnly && !isSignedOutSellerPreview ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
     ...(!isSignedOutSellerPreview ? [{ label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) }] : []),
@@ -178,11 +181,14 @@ export default function FinanceScreen() {
           <View style={styles.subCardLeft}>
             <Text style={[styles.subCardLabel, { color: colors.mutedForeground }]}>Platform subscription</Text>
             <Text style={[styles.subCardPlan, TABULAR_NUMS, { color: colors.foreground }]}>
-              {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'pro' ? 'Pro' : 'Starter'}
-              {' '}
-              <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
-                 {subStatus.amountCents > 0 ? `${formatCents(subStatus.amountCents)}/mo` : formatCents(2900) + '/mo'}
-              </Text>
+              {/* Real plan + charge from the API; no subscription = "No plan", never a $29 fallback (QA-0093). */}
+              {subPlan.name}
+              {subPlan.priceLabel ? ' ' : null}
+              {subPlan.priceLabel ? (
+                <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
+                   {subPlan.priceLabel}
+                </Text>
+              ) : null}
             </Text>
             {subStatus.trialEnd ? (
               <Text style={[styles.subCardMeta, { color: colors.info }]}>Trial ends {subStatus.trialEnd}</Text>
@@ -206,7 +212,7 @@ export default function FinanceScreen() {
                 {subStatus.status === 'trialing' ? 'Trial'
                   : subStatus.status === 'active' ? 'Active'
                   : subStatus.status === 'past_due' ? 'Past due'
-                  : 'Manage'}
+                  : subPlan.hasPlan ? 'Manage' : 'Choose a plan'}
               </Text>
             </View>
             <Feather name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginTop: 8 }} />
