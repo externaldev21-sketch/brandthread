@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { statusBadgeRepeatsHeadline } from '@/lib/buyerOrderCardStatus';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
@@ -104,6 +105,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
   const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
   const autoRefunded = !!order.delivery?.autoRefund;
   const headline = deliveryHeadline(order);
+  // Show the status once: hide the pill when the headline already says it.
+  const showBadge = !statusBadgeRepeatsHeadline({ status: order.status, hasHeadline: !!headline, autoRefunded });
   const thumbs = order.lineItems.slice(0, 4);
 
   return (
@@ -117,11 +120,13 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           <Text style={styles.sellerName}>{order.sellerName}</Text>
           <Text style={styles.orderMeta}>{order.orderNumber} · {fmtDate(order.createdAt)}</Text>
         </View>
-        <StatusBadge
-          label={autoRefunded ? (order.delivery?.autoRefund?.partial ? 'PARTIAL REFUND' : 'REFUNDED') : statusBadgeLabel(order.status)}
-          variant={autoRefunded ? 'neutral' : statusBadgeVariant(order.status)}
-          small
-        />
+        {showBadge && (
+          <StatusBadge
+            label={autoRefunded ? (order.delivery?.autoRefund?.partial ? 'PARTIAL REFUND' : 'REFUNDED') : statusBadgeLabel(order.status)}
+            variant={autoRefunded ? 'neutral' : statusBadgeVariant(order.status)}
+            small
+          />
+        )}
       </View>
 
       {/* Delivery headline — "Arriving Oct 15" / "Delivered" / "Refunded" */}
@@ -383,7 +388,7 @@ export default function BuyerOrdersScreen() {
   return (
     <BrandthreadScreen noSafeBottom noSafeTop>
       {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
-      <Header title="My Orders" largeTitle showBack={false} />
+      <Header title="My orders" largeTitle showBack={false} />
 
       {/* Filter chips — horizontal scroll, edge-to-edge. The screen's own
           gutter (`centeredPadding`) on the content container is what lets

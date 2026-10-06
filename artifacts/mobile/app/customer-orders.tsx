@@ -8,7 +8,6 @@ import {
   ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Button } from '@/components/ui/Button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { FS } from '@/lib/theme';
@@ -19,6 +18,7 @@ import { formatCents } from '@/lib/money';
 import { useUser } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { EmptyState } from '@/components/layout/EmptyState';
 
 type Customer = {
   id: string;
@@ -109,19 +109,36 @@ export default function CustomerOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={customer?.name ?? 'Customer Orders'} onBack={() => goBackOr(router, '/customers')} />
+      <ScreenHeader title={customer?.name ?? 'Customer orders'} onBack={() => goBackOr(router, '/customers')} />
 
-      {loading ? (
+      {!customerId ? (
+        // Opened without a customer id (deep link / stale route): there is
+        // nothing to load, so show not-found immediately instead of a spinner.
+        <View style={s.center}>
+          <EmptyState
+            icon="user-x"
+            title="Customer not found"
+            message="This customer may have been removed or the link is incomplete."
+            actionLabel="Go back"
+            onAction={() => goBackOr(router, '/customers')}
+            testID="customer-orders-not-found"
+          />
+        </View>
+      ) : loading ? (
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : error ? (
         <View style={s.center}>
-          <Feather name="alert-circle" size={28} color={colors.mutedForeground} />
-          <Text style={[s.errorText, { color: colors.mutedForeground }]}>
-            Couldn't load this customer. Check your connection and try again.
-          </Text>
-          <Button label="Retry" variant="secondary" size="small" style={s.retryBtn} onPress={() => { setLoading(true); load(); }} />
+          <EmptyState
+            variant="error"
+            icon="alert-circle"
+            title="Couldn't load this customer"
+            message="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => { setLoading(true); load(); }}
+            testID="customer-orders-error"
+          />
         </View>
       ) : (
         <ScrollView
@@ -233,8 +250,6 @@ const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
-  retryBtn:     { marginTop: 8 },
 
   custCard:     { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },

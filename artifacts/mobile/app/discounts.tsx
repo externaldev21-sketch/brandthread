@@ -365,7 +365,12 @@ export default function DiscountsScreen() {
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          // Empty/error: centre the shared EmptyState in the visible area like
+          // every other list screen, instead of pinning it under the header.
+          contentContainerStyle={[{ padding: SP.md, paddingBottom: insets.bottom + 40 }, (loadError || discounts.length === 0) && { flexGrow: 1, justifyContent: 'center' }]}
+        >
 
           {loadError ? (
             <EmptyState
@@ -380,7 +385,7 @@ export default function DiscountsScreen() {
             <EmptyState
               icon="tag"
               title="No discount codes yet"
-              message="Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item."
+              message="Offer buyers a percentage off, a fixed amount, free shipping or a free item."
               actionLabel="Create code"
               onAction={openNewModal}
             />

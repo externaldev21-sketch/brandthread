@@ -144,6 +144,11 @@ export function Button({
           { height, borderRadius: RADII.pill, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
+          // A disabled filled button's `palette.elevated` fill is near-identical
+          // to the black screen background, so it read as bare grey text (QA
+          // audit: "Create group", "Save schedule", "Start giveaway"). A silver
+          // hairline keeps the button shape visible while it stays disabled.
+          isFilled && isDisabled && { borderWidth: 1, borderColor: palette.border },
           isFilled && !isDisabled && styles.raisedShadow,
           fullWidth && styles.fullWidth,
           isDisabled && !isFilled && { opacity: 0.5 },

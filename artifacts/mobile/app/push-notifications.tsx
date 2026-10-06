@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { useRole } from '@/contexts/RoleContext';
 
 interface ToggleRow {
   key: string;
@@ -22,11 +23,21 @@ interface ToggleGroup {
   rows: ToggleRow[];
 }
 
-const GROUPS: ToggleGroup[] = [
+const ACCOUNT_GROUP: ToggleGroup = {
+  title: 'Account notifications',
+  rows: [
+    { key: 'securityUpdates', label: 'Security updates', default: true },
+    { key: 'mfa', label: 'Multi-factor authentication', default: true },
+  ],
+};
+
+// Store-operations pushes (orders, fulfillment, domain/payment alerts) only
+// make sense for a seller account; buyers get shopping-side categories.
+const SELLER_GROUPS: ToggleGroup[] = [
   {
     title: 'Mobile notifications',
     rows: [
-      { key: 'criticalAlerts', label: 'Critical alerts', description: 'Issues like an expiring domain or a payment failure', default: true },
+      { key: 'criticalAlerts', label: 'Critical alerts', description: 'Expiring domain or failed payment', default: true },
       { key: 'fulfillments', label: 'Fulfillments', default: true },
       { key: 'newOrders', label: 'New orders', default: true },
       { key: 'setupTips', label: 'Setup tips', default: true },
@@ -40,20 +51,29 @@ const GROUPS: ToggleGroup[] = [
       { key: 'badgeNewOrders', label: 'New orders', default: false },
     ],
   },
+  ACCOUNT_GROUP,
+];
+
+const BUYER_GROUPS: ToggleGroup[] = [
   {
-    title: 'Account notifications',
+    title: 'Mobile notifications',
     rows: [
-      { key: 'securityUpdates', label: 'Security updates', default: true },
-      { key: 'mfa', label: 'Multi-factor authentication', default: true },
+      { key: 'orderUpdates', label: 'Order updates', description: 'Shipping, delivery, and return updates', default: true },
+      { key: 'messages', label: 'Messages', default: true },
+      { key: 'newDrops', label: 'Drops from brands you follow', default: true },
+      { key: 'socialActivity', label: 'Followers and likes', default: true },
     ],
   },
+  ACCOUNT_GROUP,
 ];
 
 export default function PushNotificationsScreen() {
   const colors = useColors();
+  const { role } = useRole();
+  const GROUPS = role === 'buyer' ? BUYER_GROUPS : SELLER_GROUPS;
   const [values, setValues] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    GROUPS.forEach((g) => g.rows.forEach((r) => { initial[r.key] = r.default; }));
+    [...SELLER_GROUPS, ...BUYER_GROUPS].forEach((g) => g.rows.forEach((r) => { initial[r.key] = r.default; }));
     return initial;
   });
 
@@ -67,7 +87,7 @@ export default function PushNotificationsScreen() {
       <ScreenHeader title="Push notifications" />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: SPACING.md + 4, paddingBottom: 60, paddingHorizontal: SPACING.md + 4 }}
+        contentContainerStyle={{ paddingTop: SPACING.md + 4, paddingBottom: 60, paddingHorizontal: SPACING.md }}
         showsVerticalScrollIndicator={false}
       >
         {GROUPS.map((group) => (
@@ -82,6 +102,7 @@ export default function PushNotificationsScreen() {
                   <ListRow
                     title={row.label}
                     subtitle={row.description}
+                    subtitleNumberOfLines={2}
                     toggle={{ value: values[row.key], onChange: () => toggle(row.key) }}
                   />
                   {i !== group.rows.length - 1 && (

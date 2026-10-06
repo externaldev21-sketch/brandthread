@@ -72,7 +72,13 @@ export function SellerThreadCashCard({
             {formatCents(balanceCents ?? 0)}
           </Text>
           <Text style={[styles.subtitle, { color: theme.muted }]}>
-            {cashOutValueCents != null ? `Cash out for ${formatCents(cashOutValueCents)}` : ' '}
+            {/* Seller-earned Thread Cash (Live gifts, message payments) is cashable
+                — server: api-server/src/lib/threadCash/cashOut.ts — unlike a
+                buyer's reward credit, so say where it comes from rather than
+                offering a "$0.00" cash-out. */}
+            {balanceCents
+              ? (cashOutValueCents != null ? `Cash out for ${formatCents(cashOutValueCents)}` : ' ')
+              : 'Earned from Live gifts and messages'}
           </Text>
         </>
       )}
@@ -127,6 +133,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, borderRadius: RADIUS.pill, marginTop: SP.md,
   },
-  cashOutBtnDisabled: { borderWidth: 1, backgroundColor: 'transparent' },
+  cashOutBtnDisabled: { borderWidth: 1, backgroundColor: 'transparent', opacity: 0.5 },
   cashOutBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });

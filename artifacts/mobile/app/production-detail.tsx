@@ -13,8 +13,10 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deriveCardState, formatMoney, formatTimestamp, localTimeLabel, orderStatusLabel, orderTypeLabel } from '@workspace/manufacturer-flow';
-import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { SecondaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import ProductionTimeline from '@/components/manufacturer/ProductionTimeline';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -45,7 +47,13 @@ export default function ProductionDetailScreen() {
   const [actionError, setActionError] = useState('');
 
   const load = useCallback(async (refresh = false) => {
-    if (!id) return;
+    // Opened without an order id (bad/incomplete deep link): nothing to
+    // fetch, so resolve straight to "not found" instead of spinning forever.
+    if (!id) {
+      setLoadError('not_found');
+      setLoading(false);
+      return;
+    }
     if (refresh) setRefreshing(true);
     try {
       const [timeline, order] = await Promise.all([getOrderTimeline(id), getProductionOrder(id).catch(() => undefined)]);
@@ -65,9 +73,10 @@ export default function ProductionDetailScreen() {
 
   useEffect(() => {
     void load();
+    if (!id) return;
     const timer = setInterval(() => void load(true), 15_000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, id]);
 
   const order = data?.order;
   const isBulkAwaiting = order?.orderType === 'bulk' && order.status === 'pending_payment' && order.manufacturerPayoutReady;
@@ -137,12 +146,26 @@ export default function ProductionDetailScreen() {
       <View style={styles.root}>
         {header}
         <View style={styles.center}>
-          <EmptyState
-            icon={loadError === 'not_found' ? 'package' : 'wifi-off'}
-            title={loadError === 'not_found' ? 'Order not found' : 'Tracker unavailable'}
-            description={loadError === 'not_found' ? 'This order may have been removed, or it belongs to another account.' : 'Check your connection and try again.'}
-          />
-          {loadError !== 'not_found' && <SecondaryButton label="Try again" onPress={() => { setLoading(true); void load(); }} />}
+          {loadError === 'not_found' ? (
+            <EmptyState
+              icon="package"
+              title="Order not found"
+              message="This order may have been removed, or it belongs to another account."
+              actionLabel="Go back"
+              onAction={() => goBackOr(router, '/manufacturer-hub')}
+              testID="tracker-not-found"
+            />
+          ) : (
+            <EmptyState
+              variant="error"
+              icon="wifi-off"
+              title="Tracker unavailable"
+              message="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={() => { setLoading(true); void load(); }}
+              testID="tracker-error"
+            />
+          )}
         </View>
       </View>
     );

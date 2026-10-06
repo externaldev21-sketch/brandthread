@@ -43,7 +43,7 @@ import { liveShopSelection } from '@/lib/live/liveShop';
 import type { LiveStream } from '@/lib/live/types';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
-  LiveViewerCount, LiveViewerStack, type LiveHeartLayerHandle,
+  LiveViewerStack, type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
@@ -198,8 +198,9 @@ function LivePage({
           onOpenHost={onOpenHost}
         />
         <View style={styles.topRight}>
+          {/* Count lives once, in the host pill's LIVE row — not repeated
+              here next to the avatars. */}
           <LiveViewerStack viewers={stream.topViewers} />
-          <LiveViewerCount count={viewerCount} />
           <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
             <Feather name="x" size={22} color="#fff" />
           </Pressable>
@@ -399,8 +400,9 @@ export default function LiveScreen() {
             onFollow={pager.setFollowing}
             onOpenCreator={id => openHost(id)}
           />
-          <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 8 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" testID="live-close">
-            <Feather name="x" size={22} color="#888" />
+          <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 6 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
+            {/* Same close control as a live page's (white, same spot). */}
+            <Feather name="x" size={22} color="#fff" />
           </Pressable>
         </>
       ) : ready ? (

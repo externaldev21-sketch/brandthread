@@ -147,6 +147,7 @@ vi.mock('@/services/orderService', () => ({
   createPackagePreset: (...args: unknown[]) => createPackagePresetMock(...args),
   deletePackagePreset: (...args: unknown[]) => deletePackagePresetMock(...args),
   updateFulfillmentChecklist: (...args: unknown[]) => updateFulfillmentChecklistMock(...args),
+  getParcelSuggestion: () => Promise.resolve(null),
 }));
 
 vi.mock('@/lib/packingSlip', () => ({

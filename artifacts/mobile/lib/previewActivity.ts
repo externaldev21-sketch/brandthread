@@ -414,3 +414,36 @@ export function getPreviewSuggestedPeople(): PreviewSuggestedPerson[] {
   }));
   return cachedSuggestions;
 }
+
+// Demo-only "Suggested for you" cast for Activity. Every PEOPLE entry above
+// already appears in the demo feed (liked, followed, commented…), and
+// Activity never suggests someone already in the feed (see
+// excludeActivityActors in lib/activity.ts) — so the demo needs suggestions
+// from outside that cast, each with a mutual from it.
+const DEMO_SUGGESTED = [
+  { userId: 'preview-seller-11', name: 'Lumen Atelier', initials: 'LA', poster: 5, reason: 'Followed by Atelier Noire + 4 others' },
+  { userId: 'preview-seller-12', name: 'Sable House', initials: 'SH', poster: 6, reason: 'Followed by Maison Vela + 1 other' },
+  { userId: 'preview-seller-13', name: 'Rhea Collective', initials: 'RC', poster: 8, reason: 'Followed by Orison' },
+];
+let cachedDemoSuggestions: PreviewSuggestedPerson[] | null = null;
+
+/**
+ * Activity's seeded "Suggested for you": the public suggestions in a fresh
+ * preview (no feed to overlap with), the demo-only cast with `demo=1`.
+ */
+export function getPreviewActivitySuggestedPeople(): PreviewSuggestedPerson[] {
+  if (!isPreviewDemoMode()) return getPreviewSuggestedPeople();
+  if (!cachedDemoSuggestions) {
+    cachedDemoSuggestions = DEMO_SUGGESTED.map((person) => ({
+      userId: person.userId,
+      name: person.name,
+      handle: `@${person.name.toLowerCase().replace(/\s+/g, '')}`,
+      initials: person.initials,
+      color: pickAvatarColor(person.userId),
+      avatarUrl: posterUri(person.poster),
+      reason: person.reason,
+      isFollowing: false,
+    }));
+  }
+  return cachedDemoSuggestions;
+}

@@ -9,6 +9,7 @@ import type { StoryMentionItem } from '@/services/socialTypes';
 
 const RING_SIZE = 64;
 const RING_WIDTH = 2.5;
+const ITEM_MAX_WIDTH = 104;
 
 function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles: ReturnType<typeof makeStyles>; theme: AppThemePreset }) {
   const inner = RING_SIZE - RING_WIDTH * 2 - 4;
@@ -75,9 +76,11 @@ export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
         {rings.map((ring) => {
           const label = ringLabel(ring.tagger);
           return (
+            // The flex sizing lives on a plain View: PressableScale applies
+            // its `style` to an inner view, not the flex child of the row.
+            <View key={ring.key} style={styles.item}>
             <PressableScale
-              key={ring.key}
-              style={styles.item}
+              style={styles.itemTap}
               onPress={() => onOpen(ring.startStoryId)}
               accessibilityRole="button"
               accessibilityLabel={`${label} mentioned you in a story, ${ring.seen ? 'seen' : 'new'}`}
@@ -89,6 +92,7 @@ export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
                 {label}
               </Text>
             </PressableScale>
+            </View>
           );
         })}
       </ScrollView>
@@ -107,8 +111,13 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   title: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.md, letterSpacing: -0.2 },
   seeAll: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm },
-  scroll: { paddingHorizontal: SP.md, gap: SP.md },
-  item: { width: RING_SIZE + 8, alignItems: 'center' },
+  // flexGrow: when the rings fit on screen, the spare width is shared out
+  // between them (up to ITEM_MAX_WIDTH each) so handles use it instead of
+  // truncating next to empty space; when they don't fit, each ring keeps its
+  // base width and the row scrolls as before.
+  scroll: { paddingHorizontal: SP.md, gap: SP.md, flexGrow: 1 },
+  item: { flexGrow: 1, flexBasis: RING_SIZE + 8, minWidth: RING_SIZE + 8, maxWidth: ITEM_MAX_WIDTH },
+  itemTap: { width: '100%', alignItems: 'center' },
   ring: {
     width: RING_SIZE,
     height: RING_SIZE,
@@ -134,6 +143,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     justifyContent: 'center',
   },
   countText: { color: theme.background, fontFamily: FONT.bold, fontSize: 10 },
-  label: { marginTop: SP.xs + 2, maxWidth: RING_SIZE + 8, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta },
+  label: { marginTop: SP.xs + 2, maxWidth: '100%', color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta },
   labelUnseen: { color: theme.text },
 });

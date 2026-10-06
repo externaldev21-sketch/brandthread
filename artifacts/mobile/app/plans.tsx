@@ -64,7 +64,6 @@ import {
 } from '@/lib/paywallRetentionConfig';
 import { SellerPaywallHeadline } from '@/components/paywall/SellerPaywallHeadline';
 import { SellerPaywallBullets } from '@/components/paywall/SellerPaywallBullets';
-import { SellerPaywallSocialProof } from '@/components/paywall/SellerPaywallSocialProof';
 import { SellerPlanSelector, type PlanPricing } from '@/components/paywall/SellerPlanSelector';
 import { SellerTrialTimeline, type TrialTimelineStep } from '@/components/paywall/SellerTrialTimeline';
 import { SellerPaywallCTA } from '@/components/paywall/SellerPaywallCTA';
@@ -407,8 +406,6 @@ export default function PlansScreen() {
 
         <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
 
-        <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
-
         <SellerPlanSelector
           theme={theme}
           plans={SELLER_PLANS}
@@ -521,7 +518,9 @@ export default function PlansScreen() {
 
 // ─── Phone-framed dashboard preview ────────────────────────────────────────
 // A static, lightweight illustration of the seller dashboard "in action" —
-// no image asset required, matches the monochrome design system.
+// no image asset required, matches the monochrome design system. Stat values
+// are abstract placeholder bars, never concrete figures, so a fresh account
+// isn't shown revenue/orders it doesn't have.
 function DashboardPreview({ theme, styles }: { theme: ReturnType<typeof useAppTheme>['theme']; styles: ReturnType<typeof createStyles> }) {
   const bars = [0.4, 0.65, 0.5, 0.85, 0.7, 1, 0.55];
   return (
@@ -531,11 +530,11 @@ function DashboardPreview({ theme, styles }: { theme: ReturnType<typeof useAppTh
         <View style={styles.phoneStatRow}>
           <View style={styles.phoneStatCard}>
             <Text style={styles.phoneStatLabel}>Revenue</Text>
-            <Text style={styles.phoneStatValue}>$4,210</Text>
+            <View style={styles.phoneStatValueBar} />
           </View>
           <View style={styles.phoneStatCard}>
             <Text style={styles.phoneStatLabel}>Orders</Text>
-            <Text style={styles.phoneStatValue}>86</Text>
+            <View style={[styles.phoneStatValueBar, { width: '45%' }]} />
           </View>
         </View>
         <View style={styles.phoneChart}>
@@ -589,7 +588,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   phoneStatRow: { flexDirection: 'row', gap: 8 },
   phoneStatCard: { flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 8, gap: 2 },
   phoneStatLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
-  phoneStatValue: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text },
+  phoneStatValueBar: { height: 10, width: '70%', borderRadius: 3, backgroundColor: theme.text, opacity: 0.85, marginTop: 4 },
   phoneChart: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 6,

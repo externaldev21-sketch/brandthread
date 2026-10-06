@@ -18,6 +18,8 @@ import { FS } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -293,6 +295,13 @@ export default function PaymentsScreen() {
   const colors = useColors();
   const api    = useApi();
   const router = useRouter();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
+  // ?bt_preview=seller with no real signed-in account: there is no token to
+  // read drop payouts with, so GET /api/drops would 401 and surface a
+  // misleading "couldn't load" pill. Resolve straight to the honest empty
+  // state instead (same guard as app/finance.tsx / app/payouts.tsx).
+  const isPreviewMode = isSellerDevPreview();
+  const skipProtectedReads = isPreviewMode && (!userId || !isAuthLoaded || !isSignedIn);
   const [drops,   setDrops]   = useState<Drop[]>([]);
   const [loading, setLoading] = useState(true);
   // A failed fetch must never silently masquerade as "no drops yet" — track
@@ -348,6 +357,14 @@ export default function PaymentsScreen() {
   }, [api, drops, showToast]);
 
   const load = useCallback(async () => {
+    if (skipProtectedReads) {
+      setDrops([]);
+      setBroadcastStates({});
+      setBroadcastPreviews({});
+      setLoadError(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
     setBroadcastPreviews({});
@@ -401,7 +418,7 @@ export default function PaymentsScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [api]);
+  }, [api, skipProtectedReads]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
@@ -470,7 +487,7 @@ export default function PaymentsScreen() {
 
         {!loading && loadError ? (
           <View style={styles.retryWrap}>
-            <RetryRow label="Couldn't load drops" onRetry={load} />
+            <RetryRow label="Couldn't load drop payouts" onRetry={load} />
           </View>
         ) : !loading && drops.length === 0 ? (
           <EmptyState

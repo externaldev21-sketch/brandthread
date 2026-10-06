@@ -14,6 +14,9 @@ import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function ShippingLabelRedirect() {
   const { theme } = useAppTheme();
@@ -21,8 +24,29 @@ export default function ShippingLabelRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(orderId ? `/fulfill-order?orderId=${orderId}&step=3` : '/(tabs)/orders');
+    // Only a real order can be deep-linked into the label step. Without one,
+    // stay here and say so instead of silently dropping the seller on the
+    // Orders list (which read as "the label screen is broken").
+    if (orderId) router.replace(`/fulfill-order?orderId=${orderId}&step=3`);
   }, [orderId, router]);
+
+  if (!orderId) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <ScreenHeader title="Shipping label" onBack={() => goBackOr(router, '/(tabs)/orders')} />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <EmptyState
+            icon="tag"
+            title="No order selected"
+            message="Open an order to buy and print its shipping label."
+            actionLabel="Back to orders"
+            onAction={() => goBackOr(router, '/(tabs)/orders')}
+            testID="shipping-label-no-order"
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>

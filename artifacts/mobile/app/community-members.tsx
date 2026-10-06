@@ -18,6 +18,8 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
@@ -67,6 +69,7 @@ export default function CommunityMembersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -84,10 +87,13 @@ export default function CommunityMembersScreen() {
   const isStaff = community?.kind === 'user' && (role === 'owner' || role === 'admin');
 
   const loadAll = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    if (!id) { setError("This group couldn't be found."); setLoading(false); return; }
+    // No id, or the server says the group doesn't exist: a not-found state
+    // with a way out (Go back / Browse groups), never a Retry that can't help.
+    if (!id) { setNotFound(true); setLoading(false); return; }
     const gen = ++generation.current;
     if (mode === 'refresh') setRefreshing(true); else setLoading(true);
     setError(null);
+    setNotFound(false);
     setNeedsSignIn(false);
     try {
       const c = await client.get(id);
@@ -103,7 +109,9 @@ export default function CommunityMembersScreen() {
     } catch (e) {
       if (gen !== generation.current) return;
       const info = describeCommunityError(e, "Couldn't load members. Check your connection and try again.");
-      if (info.authRequired) setNeedsSignIn(true); else setError(info.message);
+      if (info.authRequired) setNeedsSignIn(true);
+      else if (info.status === 404) setNotFound(true);
+      else setError(info.message);
     } finally {
       if (gen === generation.current) { setLoading(false); setRefreshing(false); }
     }
@@ -327,6 +335,20 @@ export default function CommunityMembersScreen() {
               </View>
             </View>
           ))}
+        </View>
+      );
+    }
+    if (notFound) {
+      return (
+        <View style={styles.notFoundWrap}>
+          <EmptyState
+            icon="users"
+            title="Group not found"
+            message="This group may have been deleted, or the link is wrong."
+            actionLabel="Go back"
+            // Back where they came from; with no history, the groups list.
+            onAction={() => goBackOr(router, '/community')}
+          />
         </View>
       );
     }
@@ -590,6 +612,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   searchWrap: { paddingHorizontal: SP.md, paddingTop: SP.md },
   pad: { paddingHorizontal: SP.md, paddingTop: SP.sm },
+  notFoundWrap: { flex: 1, justifyContent: 'center' },
   count: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.xs },
   notice: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 19, marginVertical: SP.sm },
   section: { marginTop: SP.md },

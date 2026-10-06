@@ -44,12 +44,13 @@ import { useUser } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { EmptyState, SkeletonBlock } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -71,7 +72,7 @@ import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
-  isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri,
+  isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewActivitySuggestedPeople, previewActorAvatarUri,
   isPreviewActivityId, markPreviewActivityDismissed,
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
@@ -91,6 +92,8 @@ import {
   activityMessage,
   applyRead,
   buildActivitySections,
+  chipRowGap,
+  excludeActivityActors,
   createReadTracker,
   createDeferredDelete,
   ACTIVITY_UNDO_MS,
@@ -123,11 +126,11 @@ type Styles = ReturnType<typeof makeStyles>;
 // Yesterday / Last 7 days / Last 30 days) — see docs/activity-flows.md §1
 // for why this is derived here rather than in lib/activity.ts's own
 // (already-tested) New/Today/This week/This month/Earlier bucket keys.
-type DisplaySectionKey = 'highlights' | 'today' | 'yesterday' | 'last_7_days' | 'last_30_days';
+type DisplaySectionKey = 'highlights' | 'today' | 'yesterday' | 'last_7_days' | 'last_30_days' | 'earlier';
 type ListSection = { key: DisplaySectionKey; title: string; items: ActivityRow[]; data: ActivityRow[] };
 const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
   highlights: 'Highlights', today: 'Today', yesterday: 'Yesterday',
-  last_7_days: 'Last 7 days', last_30_days: 'Last 30 days',
+  last_7_days: 'Last 7 days', last_30_days: 'Last 30 days', earlier: 'Earlier',
 };
 
 // ─── Filter chips ───────────────────────────────────────────────────────────
@@ -154,27 +157,41 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
   onSelect: (key: ActivityChip) => void;
   styles: Styles;
 }) {
+  // Gap chosen from the measured chip widths so the row never ends with a
+  // chip flush against the screen edge and the next one fully hidden — the
+  // next chip always visibly peeks in when the row scrolls (lib/activity.ts).
+  const [rowWidth, setRowWidth] = useState(0);
+  const [chipWidths, setChipWidths] = useState<Record<string, number>>({});
+  const widths = ACTIVITY_CHIPS.map((c) => chipWidths[c.key] ?? 0);
+  const gap = widths.every((w) => w > 0) ? chipRowGap(widths, rowWidth, SP.md) : SP.sm;
   return (
     // A plain View wrapper with an explicit height, not just the ScrollView's
     // own style — a horizontal ScrollView with no non-zero cross-axis height
     // of its own can collapse to nothing in this screen's flex column,
     // letting the SectionList below render through/over it.
-    <View style={styles.chipRow}>
+    <View style={styles.chipRow} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
-        contentContainerStyle={styles.chipScrollContent}
+        contentContainerStyle={[styles.chipScrollContent, { gap }]}
       >
         {ACTIVITY_CHIPS.map((chip) => (
-          <ActivityFilterChip
+          <View
             key={chip.key}
-            chip={chip.key}
-            label={chip.label}
-            selected={chip.key === selected}
-            onSelect={onSelect}
-          />
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              setChipWidths((prev) => (prev[chip.key] === w ? prev : { ...prev, [chip.key]: w }));
+            }}
+          >
+            <ActivityFilterChip
+              chip={chip.key}
+              label={chip.label}
+              selected={chip.key === selected}
+              onSelect={onSelect}
+            />
+          </View>
         ))}
       </ScrollView>
       {/* No edge-fade overlay on top of the chips: `chipScrollContent`'s own
@@ -390,11 +407,6 @@ const ActivityRowView = React.memo(function ActivityRowView({
   return (
     <SwipeableActions actions={swipeActions}>
     <View style={styles.row}>
-      {/* Unread dot — LinkedIn-style leading dot in the row's own 16pt
-          gutter (https://mobbin.com/screens/e455bcf1-7b85-4c0b-b4fd-76df1241fd5f),
-          white not blue: monochrome brand. Absolutely positioned, so rows
-          never shift when it appears or clears. */}
-      {unread ? <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} /> : null}
       {/*
         The Follow back / Following control is a real interactive element,
         so it must be a sibling of the row's own tap target rather than
@@ -444,6 +456,15 @@ const ActivityRowView = React.memo(function ActivityRowView({
           ) : null}
         </View>
       </Pressable>
+
+      {/* Unread dot — inside the content area (not out in the 16pt screen
+          gutter), just ahead of the row's trailing pill/thumbnail. White
+          not blue: monochrome brand. */}
+      {unread ? (
+        <View style={showFollowControl || trailingThumb ? styles.unreadDotAnchor : styles.unreadDotTrailing} pointerEvents="none">
+          <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} />
+        </View>
+      ) : null}
 
       {showFollowControl ? (
         // The shared Follow pill (components/search/PersonRow) — same one the
@@ -495,13 +516,13 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
   onDismiss: (person: SuggestedPerson) => void;
 }) {
   const { theme } = useAppTheme();
-  const actor: ActivityActor = { id: person.userId, name: person.name, initials: person.initials, color: person.color };
+  const actor: ActivityActor = { id: person.userId, name: person.name, initials: person.initials, color: person.color, avatarUrl: person.avatarUrl ?? undefined };
   return (
     <View style={styles.suggestedRow}>
       <Avatar actor={actor} size={44} styles={styles} />
       <View style={styles.center}>
         <Text style={styles.message} numberOfLines={1}>{person.name}</Text>
-        <Text style={styles.detail} numberOfLines={1}>{person.reason}</Text>
+        <Text style={styles.detail} numberOfLines={2}>{person.reason}</Text>
       </View>
       <PressableScale
         style={[styles.followBtn, followState === 'done' ? styles.followBtnFollowing : styles.followBtnNotFollowing]}
@@ -568,14 +589,17 @@ export default function ActivityCenterScreen() {
   // BuyerTabBar) is rendered above this screen even though it's a pushed
   // stack route, not a buyer-tab route itself — confirmed live: the last row
   // was sitting under it.
-  // withTabBarInset: false — the list itself only reserves a small clearance
-  // (not the full tab-bar height) so its rows scroll IN UNDER the glass
-  // zone, like iOS, and are visible (softly, through blur) right up to the
-  // bar instead of stopping in an empty reserved gap above it.
-  const screenPadding = useScreenPadding({ withTabBarInset: false });
+  // Rows still scroll IN UNDER the glass zone while scrolling (the list is
+  // full height), but the list's end clears the bar — the last row (e.g. the
+  // final "Suggested for you" person) used to stop under it. Buyers get the buyer
+  // bar's height (the (buyer)/activity tab and the root route both show
+  // it); sellers on the root route get the floating SellerGlobalTabBar's.
+  const sellerTabBarInset = useSellerTabBarInset();
+  const buyerTabBarInset = useBuyerTabBarInset();
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>(true, false);
   const router = useRouter();
   const { role } = useRole();
+  const listBottomInset = (role === 'seller' ? sellerTabBarInset : buyerTabBarInset) + SP.md;
   const api = useApi();
   const { user } = useUser();
   // "Story mentions" rail above the feed (Activity is the same screen for
@@ -747,7 +771,7 @@ export default function ActivityCenterScreen() {
   // Seeded suggestions, with anyone already followed this preview session
   // (lib/previewFollowStore) shown as "Following" instead of "Follow" again.
   const showPreviewSuggestions = useCallback(() => {
-    const people = getPreviewSuggestedPeople();
+    const people = getPreviewActivitySuggestedPeople();
     setSuggested(people);
     setSuggestedFollowState((prev) => {
       const next = { ...prev };
@@ -874,6 +898,9 @@ export default function ActivityCenterScreen() {
     }
   }, [addUnreadDots, hasMore, loadingMore, status]);
 
+  // Nobody already in the loaded feed is suggested (lib/activity.ts).
+  const visibleSuggested = useMemo(() => excludeActivityActors(suggested, items), [suggested, items]);
+
   const readIds = useMemo(() => new Set(items.filter((item) => item.isRead).map((item) => item.id)), [items]);
 
   // Client-side filtering of the already-loaded page — pagination
@@ -897,6 +924,8 @@ export default function ActivityCenterScreen() {
     actionLabel: chipEmpty.action?.label,
     onAction: chipEmpty.action ? handleEmptyAction : undefined,
     testID: `activity-empty-${chip}`,
+    // Followed by "Suggested for you": no extra bottom padding of its own.
+    style: visibleSuggested.length > 0 ? styles.emptyStateAboveSuggestions : undefined,
   };
 
   const sections: ListSection[] = useMemo(() => {
@@ -922,14 +951,14 @@ export default function ActivityCenterScreen() {
 
     // Today / Yesterday / Last 7 days / Last 30 days: New+Today fold into
     // Today; the "this week" bucket (1-6 days old) splits by calendar day
-    // into Yesterday vs the rest of Last 7 days; This month + Earlier both
-    // fold into Last 30 days (see docs/activity-flows.md §1).
+    // into Yesterday vs the rest of Last 7 days; This month is Last 30 days
+    // and anything older is Earlier (see docs/activity-flows.md §1).
     const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const yesterdayStart = dayStart(new Date(now - 24 * 60 * 60 * 1000));
     const todayStart = dayStart(new Date(now));
 
     const buckets: Record<Exclude<DisplaySectionKey, 'highlights'>, ActivityRow[]> = {
-      today: [], yesterday: [], last_7_days: [], last_30_days: [],
+      today: [], yesterday: [], last_7_days: [], last_30_days: [], earlier: [],
     };
     for (const section of raw) {
       for (const row of section.items) {
@@ -940,15 +969,19 @@ export default function ActivityCenterScreen() {
           const createdDay = dayStart(new Date(row.createdAt));
           if (createdDay >= yesterdayStart && createdDay < todayStart) buckets.yesterday.push(row);
           else buckets.last_7_days.push(row);
-        } else {
+        } else if (section.key === 'this_month') {
           buckets.last_30_days.push(row);
+        } else {
+          // Older than 30 days (lib/activity's "Earlier" bucket) never sits
+          // under "Last 30 days".
+          buckets.earlier.push(row);
         }
       }
     }
 
     const result: ListSection[] = [];
     if (highlights.length > 0) result.push({ key: 'highlights', title: DISPLAY_TITLES.highlights, items: highlights, data: highlights });
-    (['today', 'yesterday', 'last_7_days', 'last_30_days'] as const).forEach((key) => {
+    (['today', 'yesterday', 'last_7_days', 'last_30_days', 'earlier'] as const).forEach((key) => {
       if (buckets[key].length > 0) result.push({ key, title: DISPLAY_TITLES[key], items: buckets[key], data: buckets[key] });
     });
     return result;
@@ -1255,7 +1288,7 @@ export default function ActivityCenterScreen() {
         </View>
       )}
       <SuggestedForYouSection
-        people={suggested}
+        people={visibleSuggested}
         followStates={suggestedFollowState}
         styles={styles}
         onFollow={(p) => { void handleSuggestedFollow(p); }}
@@ -1317,7 +1350,10 @@ export default function ActivityCenterScreen() {
             <StoryMentionsRail items={storyMentions} onOpen={openStoryMention} onSeeAll={openAllStoryMentions} />
           ) : null}
           ListEmptyComponent={(
-            <View style={styles.stateWrap}>
+            // With suggestions below, the empty state takes its natural
+            // height so "Suggested for you" follows at normal section spacing
+            // (centering it in the full viewport left a ~140pt gap).
+            <View style={visibleSuggested.length > 0 ? undefined : styles.stateWrap}>
               {/* A filter with nothing in it says so specifically, per role,
                   with one next step where there's a real one (item 85). */}
               {chip === 'all' ? (
@@ -1330,8 +1366,8 @@ export default function ActivityCenterScreen() {
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: screenPadding.bottom + SP.xl },
-            sections.length === 0 && styles.listContentEmpty,
+            { paddingBottom: listBottomInset },
+            sections.length === 0 && visibleSuggested.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
           initialNumToRender={12}
@@ -1470,13 +1506,27 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     // absolute` sibling above a plain static one regardless of DOM order.
     backgroundColor: theme.background,
   },
-  // Sits in the row's left gutter (16pt padding), vertically centred, so the
-  // avatar/text never move. Theme text colour — white, not an accent.
+  // Inline before the trailing pill/thumbnail (inside the 16pt gutter, not
+  // out in it). Theme text colour — white, not an accent.
+  // Zero-width anchor that cancels its own row gap, so the dot sits in the
+  // existing 12pt gap before the trailing pill/thumbnail and never takes
+  // width from the text (which would push a timestamp onto its own line).
+  unreadDotAnchor: {
+    width: 0,
+    marginLeft: -(SP.sm + 4),
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  // No trailing pill/thumbnail: the dot is the row's last item, in flow, so
+  // it stays inside the content edge instead of drifting into the gutter.
+  unreadDotTrailing: {
+    width: 6,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
   unreadDot: {
     position: 'absolute',
-    left: 5,
-    top: '50%',
-    marginTop: -3,
+    left: 3,
     width: 6,
     height: 6,
     borderRadius: 3,
@@ -1659,6 +1709,9 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   footer: {
     paddingVertical: SP.lg,
+  },
+  emptyStateAboveSuggestions: {
+    paddingBottom: SP.sm,
   },
 
   suggestedSection: {

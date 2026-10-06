@@ -81,7 +81,6 @@ export function LiveHostPill({
         hitSlop={6}
         testID="live-follow"
       >
-        {following && <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />}
         {following
           ? <Feather name="check" size={14} color="#fff" />
           : <Text style={styles.followText}>Follow</Text>}
@@ -100,7 +99,9 @@ export function LiveViewerStack({ viewers }: { viewers: LiveViewerAvatar[] }) {
         <View key={v.id} style={[styles.viewerDot, { backgroundColor: v.color, marginLeft: i === 0 ? 0 : -8, zIndex: 3 - i }]}>
           {v.uri
             ? <CachedImage source={{ uri: v.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            : <Text style={styles.viewerInitials}>{v.initials}</Text>}
+            // One letter: two bold initials don't fit a 24pt circle and ran
+            // into the next avatar ("MWAIDD").
+            : <Text style={styles.viewerInitials} numberOfLines={1} allowFontScaling={false}>{(v.initials || '?').slice(0, 1).toUpperCase()}</Text>}
         </View>
       ))}
     </View>
@@ -414,7 +415,7 @@ const styles = StyleSheet.create({
   // screens once the viewer stack + count + close button reached their
   // combined natural width.
   hostPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 3, paddingRight: 4, paddingVertical: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 3, paddingRight: 6, paddingVertical: 3,
     borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250, flexShrink: 1, minWidth: 0,
   },
   hostTap: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
@@ -429,7 +430,12 @@ const styles = StyleSheet.create({
     minWidth: 58, height: 32, paddingHorizontal: 12, borderRadius: RADIUS.pill,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 32 },
+  // Its own outlined circle, so the "Following" check reads as a separate
+  // button inside the pill rather than a merged/clipped piece of it.
+  followBtnOn: {
+    backgroundColor: 'rgba(255,255,255,0.16)', overflow: 'hidden', minWidth: 32, paddingHorizontal: 0, width: 32,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)',
+  },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
   // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each
@@ -442,7 +448,7 @@ const styles = StyleSheet.create({
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
   },
-  viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
+  viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
   viewerCountPill: { marginLeft: 6 },
   viewerCountText: { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 },
 

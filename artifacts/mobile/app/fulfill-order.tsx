@@ -22,6 +22,8 @@ import { FONT, FS, SP, RADIUS, ICON, MUTED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
 import { formatCents } from '@/lib/money';
@@ -70,6 +72,9 @@ export default function FulfillOrderScreen() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  // A thrown fetch (network/server) is a retryable failure; a missing id or
+  // an empty response is "not found" — the two get different states below.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [step, setStep] = useState<Step>(initialStep);
 
   // Step 1 — checklist
@@ -121,6 +126,7 @@ export default function FulfillOrderScreen() {
       return;
     }
     setLoading(true);
+    setLoadFailed(false);
     try {
       const [raw, presetList] = await Promise.all([
         api.orders.get(orderId),
@@ -148,6 +154,7 @@ export default function FulfillOrderScreen() {
     } catch (err) {
       if (__DEV__) console.warn('[fulfill-order] failed to load', err);
       setOrder(null);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -406,9 +413,28 @@ export default function FulfillOrderScreen() {
   if (!order) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Fulfill Order" />
+        <ScreenHeader title="Fulfill order" onBack={() => goBackOr(router, '/(tabs)/orders')} />
         <View style={s.centered}>
-          <Text style={s.errorText}>Couldn't load this order.</Text>
+          {loadFailed ? (
+            <EmptyState
+              variant="error"
+              icon="alert-circle"
+              title="Couldn't load this order"
+              message="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={() => void load()}
+              testID="fulfill-order-error"
+            />
+          ) : (
+            <EmptyState
+              icon="package"
+              title="Order not found"
+              message="This order may have been removed or the link is incomplete."
+              actionLabel="Back to orders"
+              onAction={() => goBackOr(router, '/(tabs)/orders')}
+              testID="fulfill-order-not-found"
+            />
+          )}
         </View>
       </View>
     );
@@ -732,7 +758,6 @@ const createStyles = (theme: { background: string; card: string; border: string;
     root: { flex: 1, backgroundColor: 'transparent' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     centeredInline: { alignItems: 'center', gap: SP.sm, paddingVertical: SP.lg },
-    errorText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
     content: { flex: 1 },
     mutedText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
     linkText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ACCENT },

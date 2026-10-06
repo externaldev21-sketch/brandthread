@@ -14,7 +14,8 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
 import { useApi } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
@@ -74,7 +75,7 @@ export default function PayoutsScreen() {
   const api    = useApi();
   // ?bt_preview=seller with no real signed-in account: no token to fetch
   // real payout data with — resolve straight to the honest empty/no-history
-  // state (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
+  // state (same convention as the isPreviewMode guard in app/(tabs)/orders.tsx).
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
@@ -124,7 +125,10 @@ export default function PayoutsScreen() {
 
   const load = useCallback(async () => {
     if (isPreview) {
-      setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
+      // Demo preview: the same balance Finance shows (lib/previewSellerFinance.ts).
+      setBalance(isPreviewDemoMode()
+        ? buildDemoSellerFinance().balance
+        : { available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
       setPayouts([]);
       setLoadError(false);
       setLoading(false);
@@ -203,9 +207,10 @@ export default function PayoutsScreen() {
 
   const availFmt   = balance?.available?.formatted ?? '$0.00';
   const pendFmt    = balance?.pending?.formatted   ?? '$0.00';
-  const nextDate   = balance?.nextPayout
-    ? fmtDate(balance.nextPayout.arrivalDate)
-    : '—';
+  // Never a bare dash placeholder: say plainly when nothing is scheduled.
+  const nextPayoutLabel = balance?.nextPayout?.arrivalDate
+    ? `Next payout ${fmtDate(balance.nextPayout.arrivalDate)}`
+    : 'No payout scheduled';
 
   if (!isPreview && isLoadingRole) {
     return (
@@ -266,7 +271,7 @@ export default function PayoutsScreen() {
         ) : (
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
-        <Text style={styles.balanceHeroSub}>{loadError ? '—' : `Next payout ${nextDate}`}</Text>
+        {!loadError && !loading && <Text style={styles.balanceHeroSub}>{nextPayoutLabel}</Text>}
         <View style={styles.balanceDivider} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>

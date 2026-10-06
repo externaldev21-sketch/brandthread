@@ -34,6 +34,7 @@ import { ApiError } from '@/lib/networkNotice';
 import { activityHref, groupedPeopleTitle, GROUPED_PEOPLE_MAX_IDS } from '@/lib/activity';
 import { getPreviewActivity, isPreviewActivityEnabled, previewActorAvatarUri } from '@/lib/previewActivity';
 import { getPreviewFollowing } from '@/lib/previewFollowStore';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getGroupedActivityActors, type GroupedActivityActor } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
 
@@ -167,6 +168,7 @@ export default function ActivityPeopleScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const handleRetry = useCallback(() => { void load(); }, [load]);
+  const handleGoBack = useCallback(() => goBackOr(router, '/activity-center'), [router]);
 
   // Same destination as tapping a single-person Activity row.
   const handleOpen = useCallback((actor: GroupedActivityActor) => {
@@ -268,12 +270,21 @@ export default function ActivityPeopleScreen() {
           ]}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              <EmptyState
-                icon="users"
-                message={query
-                  ? 'No one here matches that name.'
-                  : "No one to show here. People you've blocked don't appear in this list."}
-              />
+              {query ? (
+                <EmptyState icon="search" title="No results" message="No one here matches that name." />
+              ) : ids.length === 0 ? (
+                // Opened without a grouped row behind it (no ids): there is
+                // no list to show, so offer the way back to Activity.
+                <EmptyState
+                  icon="users"
+                  title="Nothing to show"
+                  message="This list isn't available."
+                  actionLabel="Go back"
+                  onAction={handleGoBack}
+                />
+              ) : (
+                <EmptyState icon="users" title="No people" message="No one is left on this list." />
+              )}
             </View>
           )}
         />

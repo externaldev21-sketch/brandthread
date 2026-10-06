@@ -27,6 +27,7 @@ import { useAuth } from '@clerk/expo';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
 import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState as LayoutEmptyState } from '@/components/layout/EmptyState';
 import Composer from '@/components/ui/Composer';
 import OrderCardBubble from '@/components/manufacturer/OrderCardBubble';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
@@ -345,6 +346,27 @@ export default function ManufacturerMessagesScreen() {
       }
     />
   );
+
+  // No thread/manufacturer named, or nobody signed in to load it for (e.g.
+  // the signed-out web preview, which never calls these protected APIs):
+  // the loader effect above never runs, so show not-found immediately
+  // instead of an endless "Loading conversation…".
+  if (!params.threadId && !params.mfrId || (authLoaded && !isSignedIn)) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <ScreenHeader title={mfrName} onBack={() => goBackOr(router)} />
+        <LayoutEmptyState
+          icon="message-circle"
+          title="Conversation not found"
+          message="This conversation may have been deleted or the link is incomplete."
+          actionLabel="Go back"
+          onAction={() => goBackOr(router)}
+          style={{ flex: 1, justifyContent: 'center' }}
+          testID="manufacturer-thread-not-found"
+        />
+      </View>
+    );
+  }
 
   if (loading) {
     return (
