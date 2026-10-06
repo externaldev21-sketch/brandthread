@@ -334,6 +334,11 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
     SCREEN_PROMPTS['home'] ??
     [];
   const pills = prompts.slice(0, 4);
+  // At 375pt the 22pt headline overflows by a word and orphans "today?" on
+  // line 2 (audit QA-0906/0907) — step down one size on narrow phones so it
+  // stays on one line.
+  const { width } = useWindowDimensions();
+  const narrow = width < 390;
 
   return (
     <View style={[styles.emptyState, isTablet && styles.emptyStateTablet]}>
@@ -341,7 +346,9 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
           fills; a translucent-white glow circle read as a grey chip behind
           the mark. Plain white/silver logo only. */}
       <BrandthreadLogo size={isTablet ? 64 : 52} animated />
-      <Text style={styles.emptyTitle}>What are we building today?</Text>
+      <Text style={[styles.emptyTitle, narrow && styles.emptyTitleNarrow]}>
+        What are we building today?
+      </Text>
       <Text style={styles.emptySubtitle}>
         Ask about your brand, products, content, store, or performance.
       </Text>
@@ -957,6 +964,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontSize: FS.xl,
     fontFamily: FONT.semibold,
     textAlign: 'center',
+  },
+  emptyTitleNarrow: {
+    fontSize: FS.lg,
   },
   emptySubtitle: {
     color: colors.mutedForeground,

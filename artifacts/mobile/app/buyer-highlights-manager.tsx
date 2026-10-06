@@ -305,7 +305,7 @@ export default function BuyerHighlightsManager() {
       <FlatList
         data={highlights}
         keyExtractor={h => h.id}
-        contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={highlights.length > 0 ? undefined : { padding: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
           <EmptyState
             icon="bookmark"
@@ -316,7 +316,13 @@ export default function BuyerHighlightsManager() {
         }
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
-        style={{ backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}
+        // The bordered card wraps the rows only, inset by the 16pt gutter and
+        // sized to its content — never a full-bleed panel around the empty
+        // state (audit QA-0439/1114).
+        style={highlights.length > 0 ? {
+          flexGrow: 0, margin: SPACING.md, marginBottom: insets.bottom + SPACING.md,
+          backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+        } : undefined}
       />
 
       <HLFormModal

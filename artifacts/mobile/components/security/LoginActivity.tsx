@@ -24,6 +24,7 @@ import { RADII } from '@/constants/radii';
 import { apiErrorMessage } from '@/lib/safety';
 import type { AccountSession } from '@/lib/safetyTypes';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { deviceLabelFromUserAgent } from '@/lib/deviceLabel';
 
 /**
  * Dev-preview has no real Clerk session list to show (and this app's audit/
@@ -38,6 +39,16 @@ const PREVIEW_CURRENT_SESSION: AccountSession = {
   browser: null, isMobile: false, location: null, ipAddress: null,
   lastActiveAt: new Date().toISOString(), createdAt: new Date().toISOString(),
 };
+
+/**
+ * The preview row's title: the browser's own device name ("iPhone · Safari")
+ * rather than "This device" twice — once as title, once as the badge.
+ */
+function previewCurrentSession(): AccountSession {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+  const device = deviceLabelFromUserAgent(ua) ?? 'This browser';
+  return { ...PREVIEW_CURRENT_SESSION, device, isMobile: /iPhone|Android phone/.test(device) };
+}
 
 function lastActiveLabel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -80,7 +91,7 @@ export default function LoginActivity() {
     // at all) would otherwise reach the real, backend-less
     // /api/auth/sessions endpoint and log a console 404.
     if (isSellerDevPreview() || isBuyerDevPreview()) {
-      setSessions([PREVIEW_CURRENT_SESSION]);
+      setSessions([previewCurrentSession()]);
       setLoading(false);
       setRefreshing(false);
       return;

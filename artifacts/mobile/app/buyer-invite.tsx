@@ -119,8 +119,12 @@ export default function BuyerInviteScreen() {
           {/* Invite code card */}
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>Your invite code</Text>
+            {/* No placeholder dashes with a live Copy/Share: until a code
+                exists, say so and offer a retry (audit QA-0453). */}
+            {invite ? (
+            <>
             <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.8}>
-              <Text style={styles.codeText}>{invite?.code ?? '------'}</Text>
+              <Text style={styles.codeText}>{invite.code}</Text>
               <View style={styles.copyPill}>
                 <Feather
                   name={copied ? 'check' : 'copy'}
@@ -133,10 +137,26 @@ export default function BuyerInviteScreen() {
               </View>
             </TouchableOpacity>
             <Text style={styles.codeSub}>Tap to copy</Text>
+            </>
+            ) : (
+              <View style={styles.codeMissing}>
+                <Text style={styles.codeMissingText}>We couldn’t load your invite code.</Text>
+                <TouchableOpacity
+                  style={styles.copyPill}
+                  onPress={() => { void load(); }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading your invite code"
+                >
+                  <Feather name="refresh-cw" size={14} color={PURPLE} />
+                  <Text style={styles.copyPillText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Share button */}
-          <PrimaryButton label="Share invite link" icon="share-2" onPress={shareInvite} style={{ marginHorizontal: SP.md, marginBottom: SP.md }} />
+          <PrimaryButton label="Share invite link" icon="share-2" onPress={shareInvite} disabled={!invite} style={[{ marginHorizontal: SP.md, marginBottom: SP.md }, !invite && { borderWidth: 1, borderColor: BORDER }]} />
 
           {/* Stats */}
           <View style={styles.statsCard}>
@@ -258,6 +278,17 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     fontSize:   FS.xs,
     fontFamily: FONT.semibold,
     color:      theme.accent,
+  },
+  codeMissing: {
+    alignItems: 'center',
+    gap:        SP.sm,
+    paddingVertical: SP.xs,
+  },
+  codeMissingText: {
+    fontSize:   FS.sm,
+    fontFamily: FONT.medium,
+    color:      MUTED,
+    textAlign:  'center',
   },
   codeSub: {
     marginTop:  SP.xs,

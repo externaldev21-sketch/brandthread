@@ -174,8 +174,8 @@ export default function BuyerFriendRequestsScreen() {
       return (
         <EmptyState
           icon="inbox"
-          title="No new followers"
-          description="When someone follows you, they'll appear here."
+          title="No incoming requests"
+          description="When someone follows you, you can follow them back from here."
         />
       );
     }

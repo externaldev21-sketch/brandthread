@@ -51,7 +51,9 @@ export default function BuyerLiveScreen() {
       <NativeOnlyFeature
         icon="video-off"
         title="Live video is available in the mobile app"
-        description="Live video works in the Brandthread app. Product pages and standard checkout remain available on web."
+        description="Open Brandthread on iOS or Android to watch live. Product pages and checkout still work on web."
+        headerTitle="Live"
+        showWebHint={false}
       />
     );
   }
