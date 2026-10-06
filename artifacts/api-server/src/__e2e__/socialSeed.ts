@@ -8,10 +8,10 @@
 import { inArray, or, sql } from "drizzle-orm";
 import {
   db, users, follows, posts, products, productVariants, postTaggedProducts,
-  conversations, conversationParticipants, messages, interactions, savedItems, notificationsFeed,
+  conversations, conversationParticipants, messages, interactions, savedItems, notificationsFeed, stories,
 } from "@workspace/db";
 
-export type SeedResult = { postIds: string[]; productId: string; conversationId: string };
+export type SeedResult = { postIds: string[]; productId: string; conversationId: string; storyIds: string[] };
 
 export async function seedSocialE2e(opts: { buyer: string; seller: string; mediaBase: string }): Promise<SeedResult> {
   const { buyer, seller, mediaBase } = opts;
@@ -23,6 +23,7 @@ export async function seedSocialE2e(opts: { buyer: string; seller: string; media
   await db.delete(interactions).where(inArray(interactions.userId, ids));
   await db.execute(sql`DELETE FROM conversations c WHERE EXISTS (SELECT 1 FROM conversation_participants p WHERE p.conversation_id = c.id AND p.user_id IN (${buyer}, ${seller}))`);
   await db.delete(posts).where(inArray(posts.userId, ids));
+  await db.delete(stories).where(inArray(stories.authorId, ids));
   await db.execute(sql`DELETE FROM product_variants WHERE product_id IN (SELECT id FROM products WHERE owner_id = ${seller})`);
   await db.delete(products).where(inArray(products.ownerId, ids));
   await db.delete(follows).where(or(inArray(follows.followerId, ids), inArray(follows.followingId, ids)));
@@ -75,5 +76,18 @@ export async function seedSocialE2e(opts: { buyer: string; seller: string; media
   ]);
   await db.insert(messages).values({ conversationId: conv.id, senderId: buyer, body: "Does it run true to size?" } as any);
 
-  return { postIds, productId: product.id, conversationId: conv.id };
+  // Two live stories from the seller (the tray + viewer + reply flows).
+  const storyIds: string[] = [];
+  for (const [i, file] of ["fashion_runway_06", "fashion_runway_07"].entries()) {
+    const [story] = await db.insert(stories).values({
+      authorId: seller, authorName: "Atelier North", authorHandle: "@ateliernorth", authorInitials: "AN",
+      authorColor: "#333338", authorAccountType: "seller",
+      media: [{ id: `seed-slide-${i}`, type: "photo", backgroundColor: "#000000", duration: 5, imageUri: `${mediaBase}/${file}.jpg` }],
+      createdAt: new Date(now.getTime() - (2 - i) * 60_000),
+      expiresAt: new Date(now.getTime() + 20 * 3_600_000),
+    } as any).returning({ id: stories.id });
+    storyIds.push(story.id);
+  }
+
+  return { postIds, productId: product.id, conversationId: conv.id, storyIds };
 }
