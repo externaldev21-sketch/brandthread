@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 /**
@@ -23,12 +23,12 @@ export function SellerDashboardSetupCard({
   hasSetupChecklist: boolean;
 }) {
   return (
-    <PressableScale
-      onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}
+    // A plain View, not a pressable: the card used to be a <button> wrapping
+    // the "Add a product" <button>, which is invalid HTML on web (nested
+    // button). The one button below now carries the card's own action.
+    <View
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
-      accessibilityRole="button"
-      accessibilityLabel="List your first product to start selling"
     >
       <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
         <Feather name="plus-circle" size={20} color={theme.accent} />
@@ -37,8 +37,8 @@ export function SellerDashboardSetupCard({
       <Text style={[styles.body, { color: theme.muted }]}>
         Your sales, orders, and store activity will show up here as soon as your first product goes live.
       </Text>
-      <PrimaryButton label="Add a product" icon="plus" small onPress={onAddProduct} style={styles.button} />
-    </PressableScale>
+      <PrimaryButton label="Add a product" icon="plus" small onPress={hasSetupChecklist ? onOpenSetup : onAddProduct} style={styles.button} />
+    </View>
   );
 }
 
