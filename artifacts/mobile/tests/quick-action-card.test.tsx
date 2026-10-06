@@ -14,7 +14,8 @@ const { nativeComponent } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-native', () => ({
+vi.mock('react-native', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-native')>(),
   ActivityIndicator: nativeComponent('ActivityIndicator'),
   Animated: {
     Value: class {

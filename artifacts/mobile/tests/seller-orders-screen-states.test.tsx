@@ -17,7 +17,8 @@ const { nativeComponent } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-native', () => ({
+vi.mock('react-native', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-native')>(),
   Alert: { alert: vi.fn() },
   FlatList: nativeComponent('FlatList'),
   Modal: nativeComponent('Modal'),
@@ -161,7 +162,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   getOnAccentTextStyle: () => ({ color: '#000' }),
 }));
 
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/theme')>(),
   FONT: { regular: 'System', medium: 'System', semibold: 'System', bold: 'System' },
   FS: { xs: 12, sm: 14, md: 16, base: 15, lg: 20, xl: 24, xxl: 32 },
   SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40 },

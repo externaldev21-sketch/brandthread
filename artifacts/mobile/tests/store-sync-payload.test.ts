@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe('buildStorefrontSyncPayload', () => {
-  it('maps title/theme/logo/sections/seo and never sends description, tagline or keywords', async () => {
+  it('maps title/theme/logo/sections and the approved structured SEO settings', async () => {
     const store = await getStorefront();
     store.settings.storeName = 'Atelier Noire';
     store.branding.logoUri = 'https://cdn.example/logo.png';
@@ -71,7 +71,10 @@ describe('buildStorefrontSyncPayload', () => {
     expect(payload.title).toBe('Atelier Noire');
     expect(payload).not.toHaveProperty('description');
     expect(payload.branding).toEqual({ logoUrl: 'https://cdn.example/logo.png' });
-    expect(payload.seo).toEqual({ metaTitle: 'Atelier Noire — knitwear', metaDescription: 'Hand-dyed knitwear.' });
+    expect(payload.seo).toEqual({
+      metaTitle: 'Atelier Noire — knitwear', metaDescription: 'Hand-dyed knitwear.',
+      keywords: [], productSeoDefaults: store.seo.productSeoDefaults, sitemapEnabled: store.seo.sitemapEnabled,
+    });
     expect(payload.theme).toMatchObject({
       primaryColor: store.branding.colors.primary,
       fontFamily: store.branding.typography.headingFont,

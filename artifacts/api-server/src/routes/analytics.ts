@@ -364,13 +364,15 @@ router.get("/home", async (req, res) => {
              count(o.id)::int AS order_count
       FROM generate_series(
         ${start}::timestamp,
-        ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+        ${end}::timestamp - interval '1 microsecond',
         ${sql.raw(`interval '${step}'`)}
       ) AS series(bucket)
       LEFT JOIN orders o
         ON o.owner_id = ${ownerId}
         AND o.created_at >= series.bucket
         AND o.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+        AND o.created_at >= ${start}
+        AND o.created_at < ${end}
         AND o.status != 'cancelled'
         AND o.paid_at IS NOT NULL
       GROUP BY series.bucket
@@ -381,13 +383,15 @@ router.get("/home", async (req, res) => {
              count(v.id)::int AS visitor_count
       FROM generate_series(
         ${start}::timestamp,
-        ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+        ${end}::timestamp - interval '1 microsecond',
         ${sql.raw(`interval '${step}'`)}
       ) AS series(bucket)
       LEFT JOIN storefront_visits v
         ON v.seller_id = ${ownerId}
         AND v.created_at >= series.bucket
         AND v.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+        AND v.created_at >= ${start}
+        AND v.created_at < ${end}
       GROUP BY series.bucket
       ORDER BY series.bucket
     `),

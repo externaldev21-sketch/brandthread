@@ -4,7 +4,8 @@
  * invite by username, open a creator to pause/remove/override.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
@@ -109,7 +110,7 @@ export default function SellerCreatorProgramScreen() {
                     {p.enabled ? `${pct(p.commissionPercent)} commission · ${p.windowDays}-day window` : 'Off. Creators can\'t join or earn.'}
                   </Text>
                 </View>
-                <Switch
+                <HapticSwitch
                   value={p.enabled}
                   onValueChange={toggle}
                   trackColor={{ true: theme.success, false: theme.border }}

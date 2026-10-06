@@ -41,7 +41,8 @@ const { nativeComponent } = vi.hoisted(() => ({
 }));
 
 const noopAnimation = { start: (cb?: () => void) => cb?.() };
-vi.mock('react-native', () => ({
+vi.mock('react-native', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-native')>(),
   Animated: {
     View: nativeComponent('Animated.View'),
     Value: class { interpolate() { return 0; } },

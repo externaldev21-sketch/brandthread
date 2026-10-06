@@ -44,8 +44,12 @@ vi.mock("../../middlewares/requireAuth", () => ({
     next();
   },
 }));
+vi.mock("@clerk/express", () => ({
+  getAuth: (req: any) => ({ userId: req.clerkUserId ?? null }),
+}));
 
-vi.mock("drizzle-orm", () => {
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("drizzle-orm")>();
   const eq    = (...a: unknown[]) => ({ op: "eq", a });
   const and   = (...a: unknown[]) => ({ op: "and", a });
   const inArray = (...a: unknown[]) => ({ op: "inArray", a });
@@ -57,7 +61,7 @@ vi.mock("drizzle-orm", () => {
   const lt    = (...a: unknown[]) => ({ op: "lt", a });
   const gte   = (...a: unknown[]) => ({ op: "gte", a });
   const or    = (...a: unknown[]) => ({ op: "or", a });
-  return { eq, and, inArray, count, sql, desc, lte, lt, gte, or };
+  return { ...actual, eq, and, inArray, count, sql, desc, lte, lt, gte, or };
 });
 
 vi.mock("@workspace/db", () => {
@@ -67,11 +71,13 @@ vi.mock("@workspace/db", () => {
   // PATCH calls .limit() twice: first for sellerExists, second for the post fetch.
   // We unify by making patchExisting carry accountType so both callers are satisfied.
   const chainSelect = {
+    then: (resolve: (rows: unknown[]) => void) => resolve([{ ...state.patchExisting, value: 0 }]),
     from: () => chainSelect,
     where: () => chainSelect,
     limit: async () => [state.patchExisting],
     innerJoin: () => chainSelect,
     orderBy: () => chainSelect,
+    groupBy: () => chainSelect,
   };
   const chainInsert = {
     values: () => ({
@@ -185,6 +191,12 @@ beforeAll(async () => {
     next();
   });
   app.use("/api/posts", postsRouter);
+  // Surface the route exception instead of hiding it behind Express's HTML
+  // fallback (these tests are JSON API clients).
+  app.use((error: Error, _req: unknown, res: express.Response, _next: unknown) => {
+    console.error("Post validation test route error:", error);
+    res.status(500).json({ error: error.message });
+  });
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

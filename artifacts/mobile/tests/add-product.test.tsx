@@ -16,7 +16,8 @@ const {
   saveDraftMock: vi.fn(),
 }));
 
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
@@ -27,6 +28,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ...actual,
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Image: nativeComponent('Image'),
@@ -123,6 +125,8 @@ vi.mock('expo-file-system', () => ({
 }));
 
 vi.mock('expo-router', () => ({
+  usePathname: () => '/add-product',
+  useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, [callback]),
   useRouter: () => ({ back: routerBackMock }),
   useLocalSearchParams: () => ({}),
   useNavigation: () => ({
@@ -162,12 +166,14 @@ vi.mock('@/components/StyleTagsPicker', () => ({
   default: () => null,
 }));
 
-vi.mock('@/components/BrandthreadUI', () => {
+vi.mock('@/components/BrandthreadUI', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/BrandthreadUI')>();
   const React = require('react') as typeof import('react');
   const native = (name: string) => (props: Record<string, unknown>) =>
     React.createElement(name, props, props.children as React.ReactNode);
 
   return {
+    ...actual,
     BrandthreadCard: native('BrandthreadCard'),
     GradientCard: native('GradientCard'),
     PrimaryButton: native('PrimaryButton'),

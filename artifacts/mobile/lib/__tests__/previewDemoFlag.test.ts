@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
+vi.mock('../buildFlags', () => ({ NAVIGATION_ISOLATION_TEST: true, DEV_SELLER_PREVIEW: false }));
 
 function fakeStorage(initial: Record<string, string>) {
   const data = new Map(Object.entries(initial));
@@ -34,8 +35,12 @@ describe('preview demo flag', () => {
     expect(storage.has('bt_preview_demo')).toBe(false);
   });
 
-  it('keeps demo mode for the load that asked for it', async () => {
+  it('never persists demo mode even when the current URL asks for it', async () => {
     const storage = await loadPage('?bt_preview=seller&demo=1', { bt_preview_demo: '1' });
-    expect(storage.getItem('bt_preview_demo')).toBe('1');
+    expect(storage.getItem('bt_preview_demo')).toBe(null);
+    const { isPreviewDemoMode } = await import('../devPreview');
+    expect(isPreviewDemoMode()).toBe(true);
+    window.location.search = '?bt_preview=seller';
+    expect(isPreviewDemoMode()).toBe(false);
   });
 });

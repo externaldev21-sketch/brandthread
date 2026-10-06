@@ -88,6 +88,9 @@ vi.mock("../../lib/stripe", () => ({
 }));
 
 // ─── requireAuth stub — injects clerkUserId ───────────────────────────────────
+vi.mock("@clerk/express", () => ({
+  getAuth: (req: any) => ({ userId: req.clerkUserId ?? null }),
+}));
 
 const SELLER_ID = `ad-test-seller-${crypto.randomBytes(4).toString("hex")}`;
 const OTHER_ID  = `ad-test-other-${crypto.randomBytes(4).toString("hex")}`;

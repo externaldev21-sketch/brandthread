@@ -36,7 +36,8 @@ const {
 
 // ─── react-native ──────────────────────────────────────────────────────────
 
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -68,6 +69,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ...actual,
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     AccessibilityInfo: { isReduceMotionEnabled: () => Promise.resolve(false) },
@@ -108,7 +110,8 @@ vi.mock('react-native', () => {
   };
 });
 
-vi.mock('react-native-svg', () => {
+vi.mock('react-native-svg', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native-svg')>();
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -116,6 +119,7 @@ vi.mock('react-native-svg', () => {
     return MockNativeComponent;
   };
   return {
+    ...actual,
     default: nativeComponent('Svg'),
     Defs: nativeComponent('Defs'),
     G: nativeComponent('G'),
@@ -136,6 +140,7 @@ vi.mock('expo-image', () => ({
 
 vi.mock('react-native-reanimated', () => ({
   default: {
+    createAnimatedComponent: (Component: unknown) => Component,
     View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
   },
   Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v, bezier: (..._points: number[]) => (t: number) => t },

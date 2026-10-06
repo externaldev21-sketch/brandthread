@@ -1,6 +1,7 @@
 import { configDefaults, defineConfig } from "vitest/config";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 // Imported by relative path (not the `@workspace/db/testing` package
 // specifier) so Vite's esbuild-based config loader inlines and transpiles
 // this TS module tree itself, rather than handing a bare specifier to plain
@@ -8,6 +9,7 @@ import { fileURLToPath } from "node:url";
 // imports these files use everywhere else in the monorepo.
 import {
   ensureDatabaseExists,
+  isolateTestDatabaseRun,
   resolveTestDatabaseUrl,
   runDrizzlePushAgainst,
   runMigrationsAgainst,
@@ -32,6 +34,11 @@ if (!resolution.ok && resolution.fatal) {
 let exclude: string[] = [];
 
 if (resolution.ok) {
+  // Explicit TEST_DATABASE_URL remains authoritative. Derived runs get a fresh
+  // database so a partial older schema never requires destructive repair.
+  if (resolution.derivedFrom === "derived") {
+    resolution.url = isolateTestDatabaseRun(resolution.url, randomUUID().replaceAll("-", ""));
+  }
   // Preserve the real DATABASE_URL (if any) under a different name so
   // vitest.global-setup.ts can assert we never ended up pointed back at it.
   if (process.env.DATABASE_URL) {

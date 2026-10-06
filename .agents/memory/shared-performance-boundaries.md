@@ -19,6 +19,12 @@ Frozen retained screens do not reliably run React effect cleanup immediately on 
 
 **How to apply:** Stop loops on blur, create a fresh loop on focus, and also clean up on unmount. Keep boot UI outside navigation supported.
 
+Focus listeners must use the same navigation context instance as the active router, including its vendored React Navigation instance.
+
+**Why:** Expo Router's SDK 57 navigator does not populate the context from a separately installed `@react-navigation/native`; a loop using that context treats retained screens as outside navigation.
+
+**How to apply:** Use the router's exported navigation context and test both blur/focus cleanup and navigator-free boot rendering.
+
 Capture development console errors as well as page exceptions during performance tests. React invalid nested-button warnings can create an Expo error overlay that intercepts subsequent navigation taps even without a page exception. Repeated locale formatting in large list grouping can also dominate CPU and garbage collection; reuse formatters and format per bucket rather than per record.
 
 **Why:** Browser profiling distinguished these preview-specific costs from network latency.

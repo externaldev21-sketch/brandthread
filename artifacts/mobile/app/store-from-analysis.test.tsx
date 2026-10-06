@@ -131,7 +131,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/theme')>(),
   BG: '#09090B',
   SCREEN_BG: 'transparent',
   CARD: '#18181B',
@@ -175,6 +176,7 @@ vi.mock('@/components/BrandthreadUI', () => {
 
   return {
     BrandthreadCard: native('BrandthreadCard'),
+    PressableScale: native('PressableScale'),
     PrimaryButton: native('PrimaryButton'),
     SecondaryButton: native('SecondaryButton'),
     StatusBadge: ({ label }: { label: string }) => React.createElement('Text', null, label),

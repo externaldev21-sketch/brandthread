@@ -18,6 +18,7 @@ const {
   })}`);
 
   const apiMock = {
+    auth: { me: vi.fn(async () => ({ ageBand: '18_plus' })) },
     finance: {
       balance: vi.fn(),
       transactions: vi.fn(),
@@ -50,7 +51,8 @@ const {
   };
 });
 
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
@@ -61,6 +63,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ...actual,
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: vi.fn() },
     AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
@@ -77,8 +80,8 @@ vi.mock('react-native', () => {
       Value: class { constructor(_v?: number) {} setValue() {} interpolate() { return 0; } },
       View: nativeComponent('Animated.View'),
       event: () => () => {},
-      timing: () => ({ start: (cb?: () => void) => cb?.() }),
-      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      timing: () => ({ start: (cb?: (result: { finished: boolean }) => void) => cb?.({ finished: true }), stop() {} }),
+      sequence: () => ({ start: (cb?: (result: { finished: boolean }) => void) => cb?.({ finished: true }), stop() {} }),
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),

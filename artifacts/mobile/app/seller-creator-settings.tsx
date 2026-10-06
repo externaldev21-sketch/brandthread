@@ -1,6 +1,7 @@
 /** Creator program settings (seller). Route: /seller-creator-settings */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
@@ -100,7 +101,7 @@ export default function SellerCreatorSettingsScreen() {
             <Field label="Minimum payout" value={minPayout} onChange={setMinPayout} suffix="USD" />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.lg }}>
               <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Approve applications automatically</Text>
-              <Switch value={autoApprove} onValueChange={setAutoApprove} trackColor={{ true: theme.success, false: theme.border }} accessibilityLabel="Approve applications automatically" />
+              <HapticSwitch value={autoApprove} onValueChange={setAutoApprove} trackColor={{ true: theme.success, false: theme.border }} accessibilityLabel="Approve applications automatically" />
             </View>
             {msg ? <Text style={{ fontFamily: FONT.medium, color: theme.error, marginBottom: SP.sm }}>{msg}</Text> : null}
             <ActionButton label="Save" loading={saving} onPress={save} />

@@ -34,7 +34,8 @@ vi.mock("@workspace/db", () => {
   };
 });
 
-vi.mock("../../lib/push", () => ({
+vi.mock("../../lib/push", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../lib/push")>(),
   normalizePushEventCategory: () => "message",
   sendPushToUser: vi.fn(async (_userId: string, payload: any) => { pushes.push(payload); }),
 }));

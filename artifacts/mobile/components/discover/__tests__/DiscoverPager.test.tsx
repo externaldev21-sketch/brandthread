@@ -22,7 +22,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // ─── react-native ─────────────────────────────────────────────────────────────
 
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const React = require('react') as typeof import('react');
   const el = (name: string) => {
     function C(props: Record<string, unknown>, ref: unknown) {
@@ -53,6 +54,7 @@ vi.mock('react-native', () => {
   }
 
   return {
+    ...actual,
     Platform: { OS: 'ios', select: (obj: any) => obj.ios ?? obj.default },
     Dimensions: { get: () => ({ width: 390, height: 844 }) },
     StyleSheet: {

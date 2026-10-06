@@ -5,6 +5,10 @@ import { afterAll } from "vitest";
 // guarantee suite (lib/delivery/__tests__) sets "hold" explicitly and
 // policy.test.ts pins the default.
 process.env.PAYOUT_MODE ??= "immediate";
+// Non-moderation integration suites must not call a live, paid AI provider
+// just because the workspace has credentials. Moderation suites explicitly
+// enable screening through their provider seams or environment fixtures.
+process.env.MEDIA_MODERATION_ENABLED = "false";
 import pg from "pg";
 import { purgeTestData } from "@workspace/db/testing";
 

@@ -10,3 +10,9 @@ Vitest does not apply Metro's `.native` and `.web` suffix resolution when a scre
 Expo Router can also try to bundle test files placed under `app/`, which imports Vitest into the running application. Metro's block list must exclude `*.test.ts(x)` files while Vitest remains configured to discover them.
 
 **How to apply:** When adding renderer coverage for a screen that imports a suffix-only Expo module, preserve the native and web implementations and add a neutral tooling fallback rather than changing runtime imports to one platform. Keep test files blocked from Metro even if existing tests live under the route tree.
+
+Externalized native SDK packages may load React Native through Node's own resolver, bypassing a Vite alias for `react-native`. Renderer tests should isolate the SDK/OS boundary as well as the host primitives, and retain new exports when partially mocking shared UI modules.
+
+**Why:** A root React Native alias alone still allowed Expo native globals and Flow syntax to prevent suite collection; sparse mocks also hid newly shared components.
+
+**How to apply:** Use test-only boundary implementations or explicit provider mocks. Keep production Metro resolution untouched and continue testing real screen logic.

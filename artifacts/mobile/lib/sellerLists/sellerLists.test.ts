@@ -62,9 +62,10 @@ describe('orderEmptyCopy', () => {
 });
 
 describe('product sort', () => {
-  it('lists exactly the five options Dev specified, in order', () => {
+  it('keeps the five requested options plus the existing Name sort', () => {
     expect(PRODUCT_SORT_OPTIONS.map((o) => o.label)).toEqual([
       'Newest', 'Oldest', 'Price: high to low', 'Price: low to high', 'Best selling',
+      'Name: A–Z',
     ]);
   });
 

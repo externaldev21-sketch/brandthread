@@ -10,7 +10,8 @@ vi.mock("../../stripe", async (importOriginal) => {
   const { fake, TEST_WEBHOOK_SECRET } = await import("../../money/__tests__/fakeStripe");
   return { ...actual, stripe: fake.stripe, requireStripe: () => fake.stripe, STRIPE_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET };
 });
-vi.mock("../../push", () => ({
+vi.mock("../../push", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../push")>(),
   normalizePushEventCategory: () => "orders",
   sendPushToUser: async () => {},
   stableNotificationId: (...parts: string[]) => parts.join(":"),

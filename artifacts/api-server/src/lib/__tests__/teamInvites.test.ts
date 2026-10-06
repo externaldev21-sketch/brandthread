@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+vi.mock("@replit/connectors-sdk", () => ({
+  ReplitConnectors: class {
+    async listConnections() { return []; }
+  },
+}));
 import {
   resetTeamInviteReminderTracking,
   sendTeamInviteEmail,

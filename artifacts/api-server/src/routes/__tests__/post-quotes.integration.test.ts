@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import express from "express";
+import { setMediaModerationProvider, setTextModerationProvider } from "../../lib/mediaModeration";
 import crypto from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -47,6 +48,10 @@ async function seedPost(userId: string, extra: Record<string, unknown> = {}) {
 }
 
 beforeAll(async () => {
+  // Quote visibility tests exercise the real moderation path with a
+  // deterministic provider, never the workspace's live paid AI endpoint.
+  setMediaModerationProvider(async () => ({ flags: {}, scores: {} }));
+  setTextModerationProvider(async () => ({ flags: {}, scores: {} }));
   await db.insert(users).values([
     { clerkId: seller, email: `${seller}@t.local`, name: "Seller", displayName: "Nova Studio", username: id("s").replace(/-/g, "_"), role: "seller", accountType: "seller" },
     { clerkId: buyer, email: `${buyer}@t.local`, name: "Buyer", displayName: "Buyer B", username: id("b").replace(/-/g, "_"), role: "buyer", accountType: "buyer" },
@@ -57,6 +62,10 @@ beforeAll(async () => {
   await db.insert(blocks).values({ blockerId: seller, blockedId: blockedUser });
   await db.insert(blocks).values({ blockerId: viewer, blockedId: other });
   await db.insert(follows).values({ followerId: viewer, followingId: seller });
+  await db.insert(follows).values([
+    { followerId: viewer, followingId: buyer },
+    { followerId: buyer, followingId: viewer },
+  ]);
   const { default: router } = await import("../posts");
   const app = express();
   app.use(express.json());
@@ -67,6 +76,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  setMediaModerationProvider();
+  setTextModerationProvider();
   await db.delete(notificationsFeed).where(inArray(notificationsFeed.userId, userIds));
   if (created.length) await db.delete(interactions).where(inArray(interactions.postId, created));
   await db.delete(interactions).where(inArray(interactions.userId, userIds));
@@ -188,7 +199,9 @@ describe("quote payloads on reads", () => {
     const q = await quote(buyer, original, { caption: "read me" });
     created.push(q.body.id);
 
-    const detail = await call(`/api/posts/${q.body.id}`, null);
+    // Buyer profile posts are friend-only; a public URL never reveals them.
+    expect((await call(`/api/posts/${q.body.id}`, null)).status).toBe(404);
+    const detail = await call(`/api/posts/${q.body.id}`, buyer);
     expect(detail.status).toBe(200);
     expect(detail.body.quotedPost.id).toBe(original);
 
@@ -213,7 +226,7 @@ describe("quote payloads on reads", () => {
     created.push(q.body.id);
 
     await db.update(posts).set({ postStatus: "deleted" }).where(eq(posts.id, original));
-    const soft = await call(`/api/posts/${q.body.id}`, null);
+    const soft = await call(`/api/posts/${q.body.id}`, buyer);
     expect(soft.body.quotedPost).toEqual({ unavailable: true });
 
     // Hard delete: FK is ON DELETE SET NULL, the quote itself survives.
@@ -222,7 +235,7 @@ describe("quote payloads on reads", () => {
     const [row] = await db.select().from(posts).where(eq(posts.id, q.body.id));
     expect(row.quotedPostId).toBeNull();
     expect(row.repostKind).toBe("quote");
-    const hard = await call(`/api/posts/${q.body.id}`, null);
+    const hard = await call(`/api/posts/${q.body.id}`, buyer);
     expect(hard.body.quotedPost).toEqual({ unavailable: true });
   });
 

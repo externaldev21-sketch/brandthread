@@ -1,5 +1,7 @@
 import { useContext, useEffect, type DependencyList } from 'react';
-import { NavigationContext } from '@react-navigation/native';
+// Use the same vendored context as Expo Router's navigator. A second React
+// Navigation package instance cannot observe the screen's focus/blur events.
+import { NavigationContext } from 'expo-router/react-navigation';
 import type { Animated } from 'react-native';
 
 /**

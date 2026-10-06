@@ -12,7 +12,7 @@
  * `&demo=1` (preview only) shows the UI with sample people and no network.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +20,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { Button } from '@/components/ui';
 import { Avatar } from '@/components/ui/Avatar';
-import { Toast } from '@/components/BrandthreadUI';
+import { HapticSwitch, Toast } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type ContactMatch } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -263,7 +263,7 @@ export default function FindFriendsContacts() {
               <Text style={s.rowName}>Let friends find me</Text>
               <Text style={s.optSub}>People with your email or phone can find you. You can turn this off any time.</Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={optedIn}
               disabled={optBusy}
               onValueChange={(v) => { void toggleOptIn(v); }}

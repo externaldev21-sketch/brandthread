@@ -15,13 +15,14 @@ import {
 const state = vi.hoisted(() => ({ userId: "" }));
 
 vi.mock("@clerk/express", () => ({
-  getAuth: () => ({ userId: state.userId || null }),
+  getAuth: (req: any) => ({ userId: req.header("x-test-user-id") || null }),
   clerkClient: { users: { getUser: vi.fn() } },
 }));
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, res: any, next: any) => {
-    if (!state.userId) { res.status(401).json({ error: "Unauthorized" }); return; }
-    req.clerkUserId = state.userId;
+    const userId = req.header("x-test-user-id");
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    req.clerkUserId = userId;
     next();
   },
 }));
@@ -51,7 +52,7 @@ async function call(userId: string | null, method: string, path: string, body?: 
   state.userId = userId ?? "";
   const res = await fetch(`${baseUrl}${path}`, {
     method,
-    headers: { "content-type": "application/json", "x-forwarded-for": ip },
+    headers: { "content-type": "application/json", "x-forwarded-for": ip, ...(userId ? { "x-test-user-id": userId } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();

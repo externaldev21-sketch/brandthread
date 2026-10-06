@@ -6,6 +6,24 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "react-native": new URL("./tests/shims/react-native.tsx", import.meta.url).pathname,
+      "@expo/vector-icons": new URL("./tests/shims/vector-icons.tsx", import.meta.url).pathname,
+      "expo-constants": new URL("./tests/shims/expo-constants.ts", import.meta.url).pathname,
+      "expo-image": new URL("./tests/shims/expo-image.tsx", import.meta.url).pathname,
+      "expo-asset": new URL("./tests/shims/expo-asset.ts", import.meta.url).pathname,
+      "expo-secure-store": new URL("./tests/shims/secure-store.ts", import.meta.url).pathname,
+      "expo-file-system": new URL("./tests/shims/file-system.ts", import.meta.url).pathname,
+      "expo-sharing": new URL("./tests/shims/sharing.ts", import.meta.url).pathname,
+      "expo-linear-gradient": new URL("./tests/shims/expo-ui.tsx", import.meta.url).pathname,
+      "expo-blur": new URL("./tests/shims/expo-ui.tsx", import.meta.url).pathname,
+      "expo-video": new URL("./tests/shims/expo-ui.tsx", import.meta.url).pathname,
+      "expo-haptics": new URL("./tests/shims/haptics.ts", import.meta.url).pathname,
+      "@clerk/expo": new URL("./tests/shims/clerk.tsx", import.meta.url).pathname,
+      "@react-native-async-storage/async-storage": new URL("./tests/shims/async-storage.ts", import.meta.url).pathname,
+      "@react-navigation/native": new URL("./tests/shims/navigation.ts", import.meta.url).pathname,
+      "expo-router/react-navigation": new URL("./tests/shims/navigation.ts", import.meta.url).pathname,
+      "expo-crypto": new URL("./tests/shims/crypto.ts", import.meta.url).pathname,
+      "react-native-safe-area-context": new URL("./tests/shims/safe-area.tsx", import.meta.url).pathname,
       "@/lib/revenueCat": new URL("./lib/revenueCat.web.tsx", import.meta.url).pathname,
       // FlashList needs native layout; tests render every row instead.
       "@shopify/flash-list": new URL("./tests/shims/flash-list.tsx", import.meta.url).pathname,
@@ -25,6 +43,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["./tests/nativeAssetSetup.ts"],
     include: ["**/*.test.ts", "**/*.test.tsx"],
   },
 });

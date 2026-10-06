@@ -113,7 +113,8 @@ vi.mock('@/hooks/useHeaderTopInset', () => ({
   useHeaderTopInset: () => 0,
 }));
 
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/theme')>(),
   BG: '#09090b',
   SCREEN_BG: 'transparent',
   CARD: '#18181b',
@@ -166,6 +167,7 @@ vi.mock('@/components/BrandthreadUI', () => {
 
   return {
     BrandthreadCard: native('BrandthreadCard'),
+    PressableScale: native('PressableScale'),
     PrimaryButton: native('PrimaryButton'),
     SecondaryButton: native('SecondaryButton'),
     StatusBadge: native('StatusBadge'),

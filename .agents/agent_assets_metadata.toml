@@ -145,3 +145,17 @@ mtime_ms = 1790895781353
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/aaa71c83-07cc-420a-aaf1-0955f2634196/f45f13db-1bf7-43ee-8cdf-b009c9cb0b77"
 storage_version_token = "1790895933784336"
 content_type = "text/csv"
+
+[[outputs]]
+id = "3hBJQz9zw_iBVyXfdMTjt"
+uri = "file://reports/test-failures-baseline.html"
+type = "html"
+title = "Failing test suites: baseline"
+description = "File-by-file failures and observed errors from the initial mobile and API runs."
+logical_id = "5d5baeda-408d-4bc4-8579-fba941dbc01a"
+content_hash = "sha256:492ba0e1d567c4bf6272e55b93c87501a12cdc5f32743140179002e870d66b3d"
+size = 81445
+mtime_ms = 1791326858082
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/5d5baeda-408d-4bc4-8579-fba941dbc01a/fe27fe67-4e5b-4837-a2d8-c06bfdc15103"
+storage_version_token = "1791326859380539"
+content_type = "text/html"

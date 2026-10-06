@@ -19,7 +19,8 @@ const { nativeComponent, prefs } = vi.hoisted(() => ({
   prefs: { get: vi.fn(), update: vi.fn() },
 }));
 
-vi.mock('react-native', () => ({
+vi.mock('react-native', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-native')>(),
   ActivityIndicator: nativeComponent('ActivityIndicator'),
   ScrollView: nativeComponent('ScrollView'),
   View: nativeComponent('View'),
@@ -38,7 +39,9 @@ vi.mock('@/components/ui/Card', () => ({ Card: nativeComponent('Card') }));
 vi.mock('@/components/ui/RetryRow', () => ({ RetryRow: nativeComponent('RetryRow') }));
 vi.mock('@/constants/typography', () => ({ TYPE_SCALE: { footnote: {} } }));
 vi.mock('@/constants/spacing', () => ({ SPACING: { md: 16, sm: 8, xxs: 2 } }));
-vi.mock('@/lib/theme', () => ({ FONT: { semibold: 'Inter' } }));
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/theme')>(),
+}));
 
 import NotificationsSettingsScreen from '@/app/notifications-settings';
 

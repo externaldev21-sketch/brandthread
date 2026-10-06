@@ -129,19 +129,21 @@ describe("GET /api/analytics/home — headline == sum(buckets), every range", ()
 
 describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for a deterministic UTC seller)", () => {
   it("places an order just before local midnight in TODAY's last bucket, not tomorrow's", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T23:59:30Z"));
     const now = new Date();
     const todayMidnightUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    // 23:58 today (still "today" for a tz=0 seller) — only meaningful when
-    // run before 23:58 UTC; guarded so this never flakes near midnight.
+    // A settled sale immediately before midnight, not a future sale that
+    // should be absent from the current-hour chart.
     const lateToday = new Date(todayMidnightUtc.getTime() + 23 * 60 * 60 * 1000 + 58 * 60 * 1000);
-    if (lateToday.getTime() > now.getTime()) {
+    try {
       await makeOrder({ totalCents: 1234, createdAt: lateToday });
       const response = await fetch(`${base}/api/analytics/home?range=today&tz=0`);
       const body = await response.json() as any;
       expect(body.totalCents).toBeGreaterThanOrEqual(1234);
       expect(body.totalCents).toBe(sumBuckets(body, "totalCents"));
       await db.delete(orders).where(eq(orders.ownerId, sellerId));
-    }
+    } finally { vi.useRealTimers(); }
   });
 
   it("places an order on the most recent Sunday in the WEEK range (Sunday-first, not ISO Monday-first)", async () => {
@@ -160,7 +162,7 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
 
     // The day BEFORE the most recent Sunday belongs to LAST week, and must
     // never be counted in this week's total.
-    const lastSaturdayUtc = new Date(mostRecentSundayUtc.getTime() - 60 * 60 * 1000);
+    const lastSaturdayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - dayOfWeek) - 60 * 60 * 1000);
     const priorOrderId = await makeOrder({ totalCents: 9999, createdAt: lastSaturdayUtc });
     const response2 = await fetch(`${base}/api/analytics/home?range=week&tz=0`);
     const body2 = await response2.json() as any;
@@ -182,7 +184,7 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
 
     // The LAST day of the previous month must never be counted, even though
     // it could fall within a rolling 30-day window.
-    const lastDayOfPrevMonthUtc = new Date(firstOfMonthUtc.getTime() - 60 * 60 * 1000);
+    const lastDayOfPrevMonthUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) - 60 * 60 * 1000);
     const priorOrderId = await makeOrder({ totalCents: 8800, createdAt: lastDayOfPrevMonthUtc });
     const response2 = await fetch(`${base}/api/analytics/home?range=month&tz=0`);
     const body2 = await response2.json() as any;
@@ -204,7 +206,7 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
 
     // Dec 31 of LAST year must never be counted, even though a trailing
     // 12-month window would include it most of the year.
-    const dec31LastYearUtc = new Date(jan1Utc.getTime() - 60 * 60 * 1000);
+    const dec31LastYearUtc = new Date(Date.UTC(now.getUTCFullYear(), 0, 1) - 60 * 60 * 1000);
     const priorOrderId = await makeOrder({ totalCents: 7700, createdAt: dec31LastYearUtc });
     const response2 = await fetch(`${base}/api/analytics/home?range=year&tz=0`);
     const body2 = await response2.json() as any;
@@ -215,17 +217,17 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
   });
 
   it("an order just before midnight for a UTC-8 seller still lands in TODAY, even though the server is already tomorrow", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T07:59:30Z"));
     // Build "now" in UTC, then construct a timestamp that is 23:59 local for
     // a UTC-8 (tz offset -480) seller but already past UTC midnight on the
     // server. tz=-480 means local = UTC - 8h, so local 23:59 on day D is
     // UTC 07:59 on day D+1.
     const now = new Date();
     const serverTodayUtcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    // Only run this deterministically when "now" (UTC) is itself already
-    // past 08:00 UTC, so the constructed sellerLocalLateNight timestamp is
-    // safely in the past relative to "now" and doesn't depend on wall-clock
-    // timing at test run.
-    if (now.getUTCHours() >= 9) {
+    // The server is on Tuesday but this seller is still on Monday.
+    // At/after 08:00 UTC the same fixture would instead be yesterday locally.
+    try {
       const sellerLocalLateNightUtc = new Date(serverTodayUtcMidnight.getTime() + 7 * 60 * 60 * 1000 + 59 * 60 * 1000);
       await makeOrder({ totalCents: 5500, createdAt: sellerLocalLateNightUtc });
 
@@ -235,7 +237,7 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
       expect(body.totalCents).toBe(sumBuckets(body, "totalCents"));
 
       await db.delete(orders).where(eq(orders.ownerId, sellerId));
-    }
+    } finally { vi.useRealTimers(); }
   });
 });
 

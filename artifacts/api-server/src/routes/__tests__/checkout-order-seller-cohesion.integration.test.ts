@@ -33,7 +33,8 @@ vi.mock("../../lib/stripe", () => ({
   STRIPE_WEBHOOK_SECRET: "test-secret",
   stripe: { webhooks: { constructEvent: vi.fn(() => state.event) } },
 }));
-vi.mock("../../lib/push", () => ({
+vi.mock("../../lib/push", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../lib/push")>(),
   normalizePushEventCategory: vi.fn(() => "orders"),
   sendPushToUser: vi.fn(async () => {}),
 }));

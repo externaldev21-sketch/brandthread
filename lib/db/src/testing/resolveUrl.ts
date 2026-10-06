@@ -38,6 +38,14 @@ export function deriveTestDatabaseUrl(databaseUrl: string): string {
   return parsed.toString();
 }
 
+/** A fresh derived database per run; never repair/reset a partial older one. */
+export function isolateTestDatabaseRun(databaseUrl: string, runId: string): string {
+  if (!/^[a-zA-Z0-9_]{1,40}$/.test(runId)) throw new Error("Invalid test database run identifier");
+  const parsed = new URL(databaseUrl);
+  parsed.pathname = `/brandthread_test_${runId}`;
+  return parsed.toString();
+}
+
 /**
  * Resolves which Postgres URL the test run should use.
  *
