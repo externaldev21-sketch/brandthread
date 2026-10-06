@@ -90,7 +90,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/call-screen.tsx',
   'app/camera-capture.tsx',
   'app/community-guidelines.tsx',
-  'app/conversation-details.tsx',
   'app/conversation-search.tsx',
   'app/design-canvas.tsx',
   'app/design-project.tsx',

@@ -76,9 +76,11 @@ export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
         {rings.map((ring) => {
           const label = ringLabel(ring.tagger);
           return (
+            // The flex sizing lives on a plain View: PressableScale applies
+            // its `style` to an inner view, not the flex child of the row.
+            <View key={ring.key} style={styles.item}>
             <PressableScale
-              key={ring.key}
-              style={styles.item}
+              style={styles.itemTap}
               onPress={() => onOpen(ring.startStoryId)}
               accessibilityRole="button"
               accessibilityLabel={`${label} mentioned you in a story, ${ring.seen ? 'seen' : 'new'}`}
@@ -90,6 +92,7 @@ export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
                 {label}
               </Text>
             </PressableScale>
+            </View>
           );
         })}
       </ScrollView>
@@ -113,7 +116,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // truncating next to empty space; when they don't fit, each ring keeps its
   // base width and the row scrolls as before.
   scroll: { paddingHorizontal: SP.md, gap: SP.md, flexGrow: 1 },
-  item: { flexGrow: 1, flexBasis: RING_SIZE + 8, minWidth: RING_SIZE + 8, maxWidth: ITEM_MAX_WIDTH, alignItems: 'center' },
+  item: { flexGrow: 1, flexBasis: RING_SIZE + 8, minWidth: RING_SIZE + 8, maxWidth: ITEM_MAX_WIDTH },
+  itemTap: { width: '100%', alignItems: 'center' },
   ring: {
     width: RING_SIZE,
     height: RING_SIZE,

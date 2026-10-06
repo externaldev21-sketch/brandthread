@@ -41,7 +41,11 @@ export function LiveEmptyState({
         <Text style={[styles.heroSub, { color: theme.muted }]}>
           {error
             ? 'We couldn’t load live streams. Check your connection and try again.'
-            : 'Live shopping drops in and out through the day. Set a reminder and we’ll tell you when it starts.'}
+            // Only point at reminders when there's an upcoming live below
+            // with a Remind button to set one.
+            : upcoming.length > 0
+              ? 'Live shopping drops in and out through the day. Set a reminder on an upcoming live below.'
+              : 'Live shopping drops in and out through the day.'}
         </Text>
         {error && onRetry && (
           <Pressable onPress={onRetry} style={[styles.retry, { borderColor: theme.border }]} accessibilityRole="button">

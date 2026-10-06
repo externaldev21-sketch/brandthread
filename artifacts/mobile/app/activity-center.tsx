@@ -920,6 +920,8 @@ export default function ActivityCenterScreen() {
     actionLabel: chipEmpty.action?.label,
     onAction: chipEmpty.action ? handleEmptyAction : undefined,
     testID: `activity-empty-${chip}`,
+    // Followed by "Suggested for you": no extra bottom padding of its own.
+    style: visibleSuggested.length > 0 ? styles.emptyStateAboveSuggestions : undefined,
   };
 
   const sections: ListSection[] = useMemo(() => {
@@ -1347,7 +1349,7 @@ export default function ActivityCenterScreen() {
             // With suggestions below, the empty state takes its natural
             // height so "Suggested for you" follows at normal section spacing
             // (centering it in the full viewport left a ~140pt gap).
-            <View style={visibleSuggested.length > 0 ? styles.emptyWithSuggestions : styles.stateWrap}>
+            <View style={visibleSuggested.length > 0 ? undefined : styles.stateWrap}>
               {/* A filter with nothing in it says so specifically, per role,
                   with one next step where there's a real one (item 85). */}
               {chip === 'all' ? (
@@ -1686,8 +1688,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   footer: {
     paddingVertical: SP.lg,
   },
-  emptyWithSuggestions: {
-    paddingTop: SP.xl,
+  emptyStateAboveSuggestions: {
+    paddingBottom: SP.sm,
   },
 
   suggestedSection: {

@@ -44,14 +44,17 @@ describe('messaging screens never hit the real API in dev-preview, however Clerk
     const src = read('app/conversation-details.tsx');
     expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';");
     expect(src).toContain(
-      'const isPreview = isPreviewConversationId(params.id) || isSellerDevPreview() || isBuyerDevPreview();',
+      'const isPreview = isPreviewConversationId(conversationId ?? undefined) || isSellerDevPreview() || isBuyerDevPreview();',
     );
   });
 
   it('conversation-group-create: dev-preview shows the honest empty directory instead of calling the real follow graph', () => {
     const src = read('app/conversation-group-create.tsx');
-    expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';");
+    expect(src).toContain("import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';");
     expect(src).toContain('if (isSellerDevPreview() || isBuyerDevPreview()) {');
-    expect(src).toContain('setCandidates([]);');
+    // Demo preview lists the seeded "Following" accounts; fresh preview stays empty.
+    expect(src).toContain('setCandidates(isPreviewDemoMode() ? PREVIEW_FOLLOWING : []);');
+    // Creating the group never calls the protected endpoint in preview.
+    expect(src).toContain('if (isSellerDevPreview() || isBuyerDevPreview()) return;');
   });
 });

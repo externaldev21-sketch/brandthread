@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { inboxPillColors } from '@/components/inbox/InboxPillRow';
-import { DEFAULT_THEME } from '@/contexts/AppThemeContext';
+import { inboxPillColors } from '@/components/inbox/inboxPillColors';
+// Monochrome default theme values (contexts/AppThemeContext.tsx MONOCHROME).
+const DEFAULT_THEME = { background: '#000000', accent: '#FFFFFF', onAccent: '#000000', border: '#C0C0C047', borderSubtle: '#C0C0C024', muted: '#C0C0C0' };
 
 describe('inboxPillColors', () => {
   it('fills the ACTIVE pill (visible against the monochrome background)', () => {

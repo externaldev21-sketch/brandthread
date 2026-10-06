@@ -4,35 +4,13 @@ import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { inboxPillColors } from '@/components/inbox/inboxPillColors';
+
+export { inboxPillColors };
 
 export type InboxTab = 'inbox' | 'requests';
 
 type Theme = ReturnType<typeof useAppTheme>['theme'];
-
-/**
- * Colors for one Inbox/Requests pill. The selected pill is a filled accent
- * pill (same treatment as the shared Chip) — never `cardElevated`, which is
- * identical to the screen background in the default monochrome theme and so
- * made the *active* tab look like plain text while the inactive one kept its
- * outline. Both states share one size/border width so siblings stay equal.
- */
-export function inboxPillColors(theme: Pick<Theme, 'accent' | 'onAccent' | 'border' | 'borderSubtle' | 'muted'>, active: boolean) {
-  return active
-    ? {
-      backgroundColor: theme.accent,
-      borderColor: theme.accent,
-      label: theme.onAccent,
-      countBackground: `${theme.onAccent}26`,
-      countLabel: theme.onAccent,
-    }
-    : {
-      backgroundColor: 'transparent',
-      borderColor: theme.border,
-      label: theme.muted,
-      countBackground: theme.borderSubtle,
-      countLabel: theme.muted,
-    };
-}
 
 /** Threads-style Inbox / Requests chips with an optional leading filter pill. */
 export function InboxPillRow({
