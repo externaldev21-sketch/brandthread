@@ -21,6 +21,12 @@ import {
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { generatePolicyDraft, getStorefront } from '@/services/storeService';
 import { useApi } from '@/lib/api';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+
+// Signed-out web preview has no session: never call the protected policies
+// or AI endpoints there (a hung request left the list spinning forever) —
+// use the local storeService copy and the local template instead.
+const inDevPreview = () => isSellerDevPreview() || isBuyerDevPreview();
 
 export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' | 'pre_order';
 
@@ -64,6 +70,7 @@ export default function StorePoliciesScreen() {
     setLoading(true);
     try {
       // Try real API first
+      if (inDevPreview()) throw new Error('preview');
       const data = await (api.seller as any).getPolicies() as any;
       setPolicies(Array.isArray(data.policies) ? data.policies : []);
     } catch {
@@ -102,6 +109,7 @@ export default function StorePoliciesScreen() {
     try {
       // Try AI via backend
       try {
+        if (inDevPreview()) throw new Error('preview');
         const resp = await api.ai.chat({
           messages: [{
             role: 'user',
@@ -138,6 +146,7 @@ export default function StorePoliciesScreen() {
       ];
       // Try real API
       try {
+        if (inDevPreview()) throw new Error('preview');
         await (api.seller as any).savePolicies(updated);
         setPolicies(updated);
       } catch {

@@ -9,6 +9,7 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadCard, SearchBar, SectionHeader, FilterChip, FormInput,
@@ -49,6 +50,7 @@ export default function HelpScreen() {
   const { user } = useUser();
   const { theme } = useAppTheme();
   const s = useMemo(() => createStyles(theme), [theme]);
+  const tabBarInset = useSellerTabBarInset();
   const scrollRef = useRef<ScrollView>(null);
   const [contactY, setContactY] = useState(0);
 
@@ -115,7 +117,7 @@ export default function HelpScreen() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ padding: SP.md, paddingBottom: 100, gap: SP.lg }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: Math.max(100, tabBarInset + SP.lg), gap: SP.lg }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

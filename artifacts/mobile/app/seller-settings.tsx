@@ -150,7 +150,6 @@ export default function SellerSettingsScreen() {
     <View style={s.page}>
       <ScreenHeader
         title="Settings"
-        variant="modal"
         onBack={() => { hapticLight(); goBackOr(router); }}
       />
 
@@ -178,7 +177,9 @@ export default function SellerSettingsScreen() {
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
-                destructive={item.destructive}
+                // Signing out loses nothing, so it stays monochrome; red is kept
+                // for the genuinely destructive delete row.
+                destructive={item.destructive && item.action !== 'sign-out'}
                 soon={item.soon}
                 badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : undefined}
                 last={i === group.items.length - 1}

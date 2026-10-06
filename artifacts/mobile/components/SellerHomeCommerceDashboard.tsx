@@ -129,6 +129,17 @@ const PERIOD_LABEL: Record<SellerDashboardRange, string> = {
   all: '',
 };
 
+// Scope suffix for the Orders tile: it counts orders in the selected range,
+// while "N orders to ship" below is every open order — without the scope the
+// two numbers read as contradictory.
+const ORDERS_TILE_SCOPE: Record<SellerDashboardRange, string> = {
+  today: 'today',
+  week: 'this week',
+  month: 'this month',
+  year: 'this year',
+  all: 'all time',
+};
+
 // Range-aware empty-chart copy — "No sales yet" alone reads the same for
 // every range; naming the range itself (Shopify's own zero-state pattern)
 // makes it clear which window is empty rather than implying the WHOLE store
@@ -682,7 +693,7 @@ export default function SellerHomeCommerceDashboard({
     const delta = compactDelta(agg.current, agg.previous);
     return {
       key,
-      label: metricLabelText[key],
+      label: key === 'orders' ? `${metricLabelText[key]} ${ORDERS_TILE_SCOPE[range]}` : metricLabelText[key],
       value: formatMetricValue(key, agg.current),
       deltaLabel: delta.label,
       deltaDirection: delta.direction,

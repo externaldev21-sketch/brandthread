@@ -35,8 +35,9 @@ describe('Feed gesture guide content', () => {
     expect(guide).toContain("title: 'Drag the bar'");
   });
 
-  it('dims/blurs the feed behind it', () => {
-    expect(guide).toContain('<BlurView');
+  it('covers the feed with an opaque surface (no translucent overlay)', () => {
+    expect(guide).not.toContain('<BlurView');
     expect(guide).toContain('styles.dim');
+    expect(guide).toContain('dim: { backgroundColor: BG }');
   });
 });

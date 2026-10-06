@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   BrandthreadScreen, BrandthreadHeader, GradientCard,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
@@ -126,8 +127,8 @@ export default function UploadSketchScreen() {
   // ─── Results ─────────────────────────────────────────────────────────────────
   if (step === 'results' && results) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Cleaned designs" onBack={() => setStep('style')} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Cleaned designs" onBack={() => setStep('style')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -205,14 +206,14 @@ export default function UploadSketchScreen() {
   // ─── Style selection ──────────────────────────────────────────────────────────
   if (step === 'style') {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {isGenerating && (
           <View style={s.loadingOverlay}>
             <ActivityIndicator size="large" color={PURPLE} />
             <Text style={s.loadingText}>Generating designs…</Text>
           </View>
         )}
-        <BrandthreadHeader title="Choose style" onBack={() => setStep('upload')} />
+        <ScreenHeader title="Choose style" onBack={() => setStep('upload')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -266,8 +267,8 @@ export default function UploadSketchScreen() {
 
   // ─── Upload step ──────────────────────────────────────────────────────────────
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.content}

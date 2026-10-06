@@ -3,7 +3,7 @@
  * or @handles. Guests save their list on this device; signed-in users sync
  * their list through the account API.
  */
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
@@ -18,6 +18,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { apiErrorMessage } from '@/lib/safety';
 import {
   addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord,
@@ -31,7 +32,17 @@ export default function MutedWordsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const tabBarInset = useSellerTabBarInset();
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
+  // If Clerk never hydrates (no live session, e.g. the signed-out web
+  // preview) fall back to the on-device guest list instead of spinning.
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+  useEffect(() => {
+    if (clerkLoaded) return;
+    const t = setTimeout(() => setAuthTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, [clerkLoaded]);
+  const authLoaded = clerkLoaded || authTimedOut;
   const api = useApi();
   const inputRef = useRef<TextInput>(null);
   const loadGeneration = useRef(0);
@@ -147,7 +158,7 @@ export default function MutedWordsScreen() {
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader title="Muted words" />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + SP.xxl + tabBarInset }} keyboardShouldPersistTaps="handled">
         <Text style={s.lead}>
           {guestMode
             ? 'Posts in your feed and comments with these words are hidden on this device. Nobody is notified.'
@@ -161,7 +172,7 @@ export default function MutedWordsScreen() {
             style={s.input}
             value={draft}
             onChangeText={(value) => setDraft(value.slice(0, MAX_LENGTH))}
-            placeholder="Add a word, phrase, #hashtag or @handle"
+            placeholder="Add a word or #hashtag"
             placeholderTextColor={theme.subtle}
             autoCapitalize="none"
             autoCorrect={false}

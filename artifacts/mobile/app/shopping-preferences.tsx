@@ -20,6 +20,7 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -80,6 +81,7 @@ export default function ShoppingPreferences() {
   const s = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
@@ -126,7 +128,7 @@ export default function ShoppingPreferences() {
         showsVerticalScrollIndicator={false}
       >
         {/* Sizes */}
-        <Text style={s.sectionTitle}>Your Sizes</Text>
+        <Text style={s.sectionTitle}>Your sizes</Text>
         <Text style={s.sectionDesc}>Used for size recommendations and filtering.</Text>
         <View style={s.card}>
           <SizeSelector label="Tops" options={TOPS} selected={settings.sizeTops} onSelect={v => patch({ sizeTops: v })} />
@@ -137,7 +139,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Fit */}
-        <Text style={s.sectionTitle}>Preferred Fit</Text>
+        <Text style={s.sectionTitle}>Preferred fit</Text>
         <Text style={s.sectionDesc}>We'll show you cuts that match your style.</Text>
         <View style={s.card}>
           {FIT_OPTIONS.map((opt, i) => (
@@ -234,7 +236,7 @@ export default function ShoppingPreferences() {
       </ScrollView>
 
       {/* Save button */}
-      <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md + tabBarInset }]}>
         <TouchableOpacity onPress={save} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
             <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save Preferences</Text>

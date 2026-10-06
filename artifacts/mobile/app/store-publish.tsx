@@ -19,6 +19,7 @@ import { getStorefront, validateStore, publishStore, unpublishStore, StoreValida
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 const ERROR_ROUTES: Record<string, string> = {
   'Store name is required.': '/store-settings',
@@ -38,6 +39,7 @@ export default function StorePublishScreen() {
   const RED_DIM = `${RED}20`;
   const pub = useMemo(() => makePubStyles({ FG, MUTED, SUCCESS, RED }), [FG, MUTED, SUCCESS, RED]);
   const router = useRouter();
+  const tabBarInset = useSellerTabBarInset();
   const api = useApi();
   const params = useLocalSearchParams<{ from?: string }>();
   const [store, setStore] = useState<Storefront | null>(null);
@@ -166,7 +168,7 @@ export default function StorePublishScreen() {
     <View style={pub.root}>
       <ScreenHeader title="Publish Store" onBack={leaveSetupDestination} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={pub.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[pub.scroll, { paddingBottom: 60 + tabBarInset }]}>
 
         {/* Validation Card */}
         <BrandthreadCard style={pub.card}>
@@ -258,7 +260,7 @@ export default function StorePublishScreen() {
                 onPress={handleSharePreview}
                 disabled={sharingPreview}
                 icon={shareCopied ? 'check' : 'link'}
-                style={{ flex: 1 }}
+                style={{ flex: 1, paddingHorizontal: SP.md }}
               />
               {!previewRevoked && (
                 <TouchableOpacity onPress={handleRevokePreview} disabled={revokingPreview} style={pub.revokeBtn}>

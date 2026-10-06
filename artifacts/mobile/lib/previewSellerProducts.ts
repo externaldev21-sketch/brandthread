@@ -135,8 +135,8 @@ export function getPreviewSellerProducts(): Product[] {
   return [
     buildProduct({
       index: 1,
-      name: 'Classic Crew Tee',
-      category: 'T-shirt',
+      name: 'Tailored Long Coat',
+      category: 'Jacket',
       priceCents: 3800,
       posterIndex: 0,
       variants: [
@@ -147,15 +147,15 @@ export function getPreviewSellerProducts(): Product[] {
     }),
     buildProduct({
       index: 2,
-      name: 'Heavyweight Hoodie',
-      category: 'Hoodie',
+      name: 'Silver Sculpted Gown',
+      category: 'Dress',
       priceCents: 7800,
       posterIndex: 1,
       lowStockThreshold: 8,
       variants: [
-        { size: 'S', color: 'Grey', qty: 12 },
-        { size: 'M', color: 'Grey', qty: 4 },
-        { size: 'L', color: 'Grey', qty: 16 },
+        { size: 'S', color: 'Silver', qty: 12 },
+        { size: 'M', color: 'Silver', qty: 4 },
+        { size: 'L', color: 'Silver', qty: 16 },
       ],
     }),
     buildProduct({
@@ -165,27 +165,27 @@ export function getPreviewSellerProducts(): Product[] {
       priceCents: 24000,
       posterIndex: 2,
       variants: [
-        { size: 'M', color: 'Navy', qty: 0 },
-        { size: 'L', color: 'Navy', qty: 0 },
+        { size: 'M', color: 'Black', qty: 0 },
+        { size: 'L', color: 'Black', qty: 0 },
       ],
     }),
     buildProduct({
       index: 4,
-      name: 'Relaxed Denim',
-      category: 'Denim',
+      name: 'Ivory Draped Dress',
+      category: 'Dress',
       priceCents: 9200,
       posterIndex: 3,
       lowStockThreshold: 6,
       variants: [
-        { size: '30', color: 'Indigo', qty: 22 },
-        { size: '32', color: 'Indigo', qty: 3 },
-        { size: '34', color: 'Indigo', qty: 9 },
+        { size: 'S', color: 'Ivory', qty: 22 },
+        { size: 'M', color: 'Ivory', qty: 3 },
+        { size: 'L', color: 'Ivory', qty: 9 },
       ],
     }),
     buildProduct({
       index: 5,
-      name: 'Studio Sweatpants',
-      category: 'Sweatpants',
+      name: 'Wide Pleated Trousers',
+      category: 'Other',
       priceCents: 5600,
       posterIndex: 4,
       singleStock: 47,

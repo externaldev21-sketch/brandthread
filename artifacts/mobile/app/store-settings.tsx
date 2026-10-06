@@ -12,6 +12,7 @@ import {
   BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, PressableScale, LoadingSkeleton,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { ListRow } from '@/components/ui/ListRow';
 import { hapticToggle } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
@@ -60,6 +61,7 @@ function langLabel(code: string): string {
 export default function StoreSettingsScreen() {
   const colors = useColors();
   const ss = React.useMemo(() => makeStyles(colors), [colors]);
+  const tabBarInset = useSellerTabBarInset();
   const [form, setForm] = useState<StoreSettings>({
     storeName: '',
     storeUrl: '',
@@ -114,6 +116,7 @@ export default function StoreSettingsScreen() {
             label={saving ? 'Saving...' : 'Save'}
             onPress={handleSave}
             loading={saving}
+            disabled={loading}
             small
             style={{ minWidth: 72 }}
           />
@@ -127,7 +130,7 @@ export default function StoreSettingsScreen() {
           <LoadingSkeleton height={100} />
         </View>
       ) : (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[ss.scroll, { paddingBottom: 60 + tabBarInset }]}>
 
         {/* STORE IDENTITY */}
         <SectionHeader title="STORE IDENTITY" style={ss.sectionHeader} />
@@ -145,7 +148,7 @@ export default function StoreSettingsScreen() {
           <FieldRow ss={ss} label="Store URL">
             <View style={ss.urlRow}>
               <TextInput
-                style={[ss.input, { flex: 1 }]}
+                style={[ss.input, { flex: 1, minWidth: 0 }]}
                 value={form.storeUrl}
                 onChangeText={v => patch({ storeUrl: v })}
                 placeholder="yourstore"
@@ -272,6 +275,7 @@ export default function StoreSettingsScreen() {
           <SwitchRow
             label="Require Account"
             description="Buyers must create an account to check out"
+            descriptionLines={2}
             value={form.checkoutRequireAccount}
             onValueChange={v => patch({ checkoutRequireAccount: v })}
           />
@@ -314,13 +318,14 @@ function FieldRow({ ss, label, children }: { ss: ReturnType<typeof makeStyles>; 
   );
 }
 
-function SwitchRow({ label, description, value, onValueChange }: {
-  label: string; description: string; value: boolean; onValueChange: (v: boolean) => void;
+function SwitchRow({ label, description, descriptionLines, value, onValueChange }: {
+  label: string; description: string; descriptionLines?: number; value: boolean; onValueChange: (v: boolean) => void;
 }) {
   return (
     <ListRow
       title={label}
       subtitle={description}
+      subtitleNumberOfLines={descriptionLines}
       toggle={{ value, onChange: onValueChange }}
       style={{ minHeight: 48 }}
     />
@@ -344,7 +349,7 @@ function makeStyles(colors: Colors) {
       minHeight: 44,
     },
     urlRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-    urlSuffix: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
+    urlSuffix: { flexShrink: 0, fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     statusChip: {
       paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.pill,

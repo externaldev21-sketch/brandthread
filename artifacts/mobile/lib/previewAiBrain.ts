@@ -25,8 +25,8 @@
  */
 import { isPreviewDemoMode } from './devPreview';
 
-/** The demo catalog's standout item — matches lib/previewSellerProducts.ts's "Heavyweight Hoodie" (highest-priced, featured across other preview surfaces this session, e.g. Boost's demo target). */
-const DEMO_BEST_SELLER = 'Heavyweight Hoodie';
+/** The demo catalog's standout item — matches lib/previewSellerProducts.ts's "Silver Sculpted Gown" (highest-priced, featured across other preview surfaces this session, e.g. Boost's demo target). */
+const DEMO_BEST_SELLER = 'Silver Sculpted Gown';
 const DEMO_BEST_SELLER_PRICE = '$78.00';
 
 function matches(text: string, ...patterns: RegExp[]): boolean {

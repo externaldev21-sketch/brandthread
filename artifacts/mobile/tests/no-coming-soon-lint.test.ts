@@ -73,7 +73,6 @@ const COMING_SOON_ALLOWLIST = new Set([
   'app/(buyer)/inbox.tsx',
   'app/(tabs)/feed.tsx',
   'app/(tabs)/following.tsx',
-  'app/automation.tsx',
   'app/buyer-drop-detail.tsx',
   'app/buyer-report.tsx',
   'app/buyer-settings-detail.tsx',

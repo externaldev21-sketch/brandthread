@@ -37,6 +37,7 @@ import { generatePhotoshootShot, createBrandAsset } from '@/services/designServi
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 const MAX_REFS = 6; // seller-facing cap. NOTE: combined with product photos,
 // the real generate call can still be rejected by the backend's own,
@@ -56,6 +57,7 @@ export default function AIPhotoshootScreen() {
   useHideTabBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
 
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -344,7 +346,7 @@ export default function AIPhotoshootScreen() {
       <AiToolProgressBar step={1} />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + 260 }]}
+        contentContainerStyle={[s.content, { paddingBottom: SP.xl }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -464,7 +466,9 @@ export default function AIPhotoshootScreen() {
         </View>
       </ScrollView>
 
-      <AiButtonDock bottomInset={COMP.tabBarH + insets.bottom}>
+      {/* In-flow footer below the ScrollView, so Generate never floats over
+          the scene/model options. The tab bar is hidden here (useHideTabBar). */}
+      <AiButtonDock bottomInset={tabBarInset || insets.bottom} style={{ position: 'relative', overflow: 'hidden' }}>
         <AiPrimaryButton
           label="Generate"
           icon="zap"

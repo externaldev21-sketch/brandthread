@@ -24,10 +24,10 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, OVERLAY,
+  FONT, FS, SP, RADIUS, ICON, OVERLAY, COMP,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput,
 } from '@/components/BrandthreadUI';
 import { replaceBackground } from '@/services/designService';
@@ -243,8 +243,8 @@ export default function DesignBgReplaceScreen({
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Background Tools" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Background Tools" onBack={() => goBackOr(router)} />
       {embedded && (
         <View style={s.modeWrap}>
           <View style={s.modeRow}>
@@ -309,7 +309,7 @@ export default function DesignBgReplaceScreen({
               ))}
             </View>
             <View style={s.hexRow}>
-              <Text style={s.hexLabel}>Custom hex</Text>
+              <Text style={[s.hexLabel, s.hexLabelInline]} numberOfLines={1}>Custom hex</Text>
               <TextInput
                 value={customColor}
                 onChangeText={(t) => { setCustomColor(t); setSelectedSwatchHex(t); }}
@@ -487,6 +487,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   swatchSelected:     { borderColor: PURPLE },
   hexRow:             { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md },
   hexLabel:           { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, width: 56 },
+  hexLabelInline:     { width: 'auto' },
   hexInput:           { flex: 1, height: 40, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   gradientGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
   gradCard:           { width: '48%', borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1.5, borderColor: BORDER, position: 'relative' },
@@ -505,8 +506,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scenePillText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   scenePillTextActive:{ color: PURPLE_LIGHT },
   scenePrompt:        { marginTop: SP.md },
-  generateBtn:        { marginTop: SP.md },
-  generateInner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.md },
+  // Standard primary-button height — GradientCard's own card padding plus the
+  // inner padding made this ~88px tall.
+  generateBtn:        { marginTop: SP.md, height: COMP.buttonH, paddingVertical: 0, justifyContent: 'center' },
+  generateInner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   generateText:       { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFF' },
   resultPlaceholder:  { height: 240, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
   resultLabel:        { fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE_LIGHT },

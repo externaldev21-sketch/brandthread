@@ -11,6 +11,10 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
+import { useSellerShell } from '@/contexts/SellerShellContext';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 interface LanguageOption {
   code: string;
@@ -35,12 +39,23 @@ const LANGUAGES: LanguageOption[] = [
 export default function LanguagesScreen() {
   const colors = useColors();
   const api = useApi();
+  const { isActiveSeller } = useSellerShell();
+  // Buyers have no store: they pick their app language (stored locally with
+  // the rest of their buyer settings) and never hit the seller settings API.
+  const isBuyer = !isActiveSeller && !isSellerDevPreview();
+  const tabBarInset = useSellerTabBarInset();
   const [storeLanguage, setStoreLanguage] = useState<string>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
+    if (isBuyer) {
+      const settings = await loadBuyerSettings();
+      setStoreLanguage(LANGUAGES.find(l => l.name === settings.language)?.code ?? 'en');
+      setLoading(false);
+      return;
+    }
     try {
       const data = await api.seller.getSettings() as any;
       setStoreLanguage(data.settings?.storeLanguage ?? 'en');
@@ -51,14 +66,18 @@ export default function LanguagesScreen() {
     }
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [isBuyer]));
 
   async function selectLanguage(code: string) {
     if (code === storeLanguage) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSaving(code);
     try {
-      await api.seller.updateSettings({ storeLanguage: code }) as any;
+      if (isBuyer) {
+        await patchBuyerSettings({ language: LANGUAGES.find(l => l.code === code)?.name ?? 'English' });
+      } else {
+        await api.seller.updateSettings({ storeLanguage: code }) as any;
+      }
       setStoreLanguage(code);
     } catch {
       Alert.alert('Error', 'Could not save language preference. Please try again.');
@@ -75,7 +94,7 @@ export default function LanguagesScreen() {
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 60 + tabBarInset }} showsVerticalScrollIndicator={false}>
           {/* Current language banner */}
           <View style={s.section}>
             <View style={[s.currentCard, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
@@ -83,7 +102,7 @@ export default function LanguagesScreen() {
                 <Feather name="globe" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.currentLabel, { color: colors.primary }]}>Store language</Text>
+                <Text style={[s.currentLabel, { color: colors.primary }]}>{isBuyer ? 'App language' : 'Store language'}</Text>
                 <Text style={[s.currentValue, { color: colors.primary }]}>
                   {currentLang?.name ?? 'English'} — {currentLang?.nativeName ?? 'English'}
                 </Text>
@@ -93,10 +112,14 @@ export default function LanguagesScreen() {
 
           {/* Language list */}
           <View style={s.section}>
-            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Published languages</Text>
-            <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-              Select your store's primary language. Buyers will see content in this language.
-            </Text>
+            {isBuyer ? null : (
+              <>
+                <Text style={[s.sectionTitle, { color: colors.foreground }]}>Published languages</Text>
+                <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
+                  Select your store's primary language. Buyers will see content in this language.
+                </Text>
+              </>
+            )}
 
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {LANGUAGES.map((lang, i) => {
@@ -123,9 +146,11 @@ export default function LanguagesScreen() {
                         )}
                       </View>
                       <Text style={[s.langNative, { color: colors.mutedForeground }]}>{lang.nativeName}</Text>
-                      <Text style={[s.langMarket, { color: colors.mutedForeground }]} numberOfLines={1}>
-                        {lang.marketShare}
-                      </Text>
+                      {isBuyer ? null : (
+                        <Text style={[s.langMarket, { color: colors.mutedForeground }]} numberOfLines={1}>
+                          {lang.marketShare}
+                        </Text>
+                      )}
                     </View>
                     {isSaving ? (
                       <ActivityIndicator size="small" color={colors.primary} />
@@ -140,11 +165,13 @@ export default function LanguagesScreen() {
             </View>
           </View>
 
+          {isBuyer ? null : (
           <View style={s.section}>
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
               To translate your product descriptions and policies for international buyers, enable multi-language support from your plan settings.
             </Text>
           </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -167,7 +194,7 @@ const s = StyleSheet.create({
   langName: { fontSize: 14, fontFamily: FONT.semibold },
   defaultBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
   defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2 },
+  langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2, textAlign: 'left', alignSelf: 'flex-start' },
   langMarket: { fontSize: 11, fontFamily: FONT.regular },
   footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 });

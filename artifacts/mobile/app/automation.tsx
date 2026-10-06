@@ -1,36 +1,15 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { EmptyState } from '@/components/BrandthreadUI';
+import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
+/**
+ * Automations aren't built yet and nothing in the app links here. The route
+ * stays registered only so an old deep link backs out to where the user came
+ * from (or the seller dashboard) instead of a placeholder screen.
+ */
 export default function AutomationScreen() {
   const router = useRouter();
-
-  return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Automation" subtitle="Set it and forget it — your brand runs itself" />
-      <View style={styles.body}>
-        <EmptyState
-          icon="cpu"
-          title="Automations are coming"
-          description="Soon you'll set restock alerts, win-backs and more."
-          action={{
-            label: 'Back to dashboard',
-            onPress: () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              goBackOr(router);
-            },
-          }}
-        />
-      </View>
-    </View>
-  );
+  useEffect(() => { goBackOr(router, '/(tabs)/' as never); }, [router]);
+  return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-});

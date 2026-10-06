@@ -21,6 +21,7 @@ import { useApi } from '@/lib/api';
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 type MergedDomain = StoreDomain & { dnsToken?: string };
 
@@ -53,6 +54,10 @@ export default function StoreDomainScreen() {
     // Merge: local BT subdomain + real API custom domains
     const btDomain = localDomains.find(d => d.type === 'brandthread');
     if (btDomain) setSubdomainInput(btDomain.subdomain ?? s.settings.storeUrl ?? '');
+    // Show the local subdomain right away; the custom-domain fetch below may be slow.
+    setDomains(localDomains);
+    // Signed-out web preview: custom domains come from a protected API.
+    if (isSellerDevPreview() || isBuyerDevPreview()) return;
 
     try {
       const apiDomains = await (api as any).store.domains() as any[];
@@ -249,7 +254,7 @@ export default function StoreDomainScreen() {
         {!adding ? (
           <TouchableOpacity style={dm.addDomainBtn} onPress={() => setAdding(true)}>
             <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={dm.addDomainText}>+ Connect Custom Domain</Text>
+            <Text style={dm.addDomainText}>Connect custom domain</Text>
           </TouchableOpacity>
         ) : (
           <BrandthreadCard style={dm.card}>

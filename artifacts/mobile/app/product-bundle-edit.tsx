@@ -17,7 +17,7 @@ import {
   TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -30,7 +30,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import {
-  BrandthreadHeader, PrimaryButton, SecondaryButton,
+  PrimaryButton, SecondaryButton,
   BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
@@ -187,11 +187,8 @@ export default function ProductBundleEditScreen() {
   if (loading) return <BrandedLoadingState message="Loading bundle…" />;
 
   return (
-    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
-      <BrandthreadHeader
-        title={isNew ? 'New Bundle' : 'Edit Bundle'}
-        onBack={() => goBackOr(router)}
-      />
+    <View style={s.root}>
+      <ScreenHeader title={isNew ? 'New Bundle' : 'Edit Bundle'} />
 
       <ScrollView
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
@@ -221,10 +218,10 @@ export default function ProductBundleEditScreen() {
         />
 
         <Text style={s.fieldLabel}>Bundle price</Text>
-        <View style={s.priceRow}>
+        <View style={[s.input, s.priceRow]}>
           <Text style={s.dollarSign}>$</Text>
           <TextInput
-            style={[s.input, { flex: 1 }]}
+            style={s.priceInput}
             value={priceStr}
             onChangeText={setPriceStr}
             placeholder="0.00"
@@ -260,6 +257,8 @@ export default function ProductBundleEditScreen() {
         {/* Items */}
         <View style={s.itemsHeader}>
           <Text style={s.sectionTitle}>Products in bundle</Text>
+          {/* Items can only be added once the bundle exists (see addItem). */}
+          {!isNew && (
           <TouchableOpacity
             style={s.addItemBtn}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
@@ -268,6 +267,7 @@ export default function ProductBundleEditScreen() {
             <Feather name="plus" size={14} color={PURPLE_LIGHT} />
             <Text style={s.addItemBtnText}>Add product</Text>
           </TouchableOpacity>
+          )}
         </View>
 
         {isNew && items.length === 0 && (
@@ -342,14 +342,16 @@ export default function ProductBundleEditScreen() {
 
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  content:      { padding: SP.lg, gap: SP.md },
+  content:      { padding: SP.md, gap: SP.md },
   sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.xs },
   fieldLabel:   { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 4 },
   fieldHint:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 17 },
   input:        { height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   multiline:    { height: 88, paddingTop: SP.sm, textAlignVertical: 'top' },
+  // '$' sits inside the field as a prefix.
   priceRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  dollarSign:   { fontFamily: FONT.bold, fontSize: FS.md, color: FG, paddingBottom: 2 },
+  dollarSign:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  priceInput:   { flex: 1, height: '100%', fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   savingsCard:  { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, padding: SP.sm, gap: 2 },
   savingsLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   savingsAmount:{ fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT },

@@ -24,10 +24,11 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { productDetailHref } from '@/lib/profileNavigation';
 import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
-import { InteractionLayer, ProfileButton, ProfileGlassButton } from '@/components/profile/ProfileControls';
+import { InteractionLayer, ProfileButton } from '@/components/profile/ProfileControls';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 const GAP = SP.sm;
 
@@ -43,11 +44,10 @@ export default function ProfileProductsScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const topInset = useHeaderTopInset();
   const layout = useProfileLayout();
   const params = useLocalSearchParams<{ sellerId?: string; sellerName?: string; isOwner?: string }>();
   const sellerId = typeof params.sellerId === 'string' ? params.sellerId : '';
-  const sellerName = typeof params.sellerName === 'string' && params.sellerName ? params.sellerName : 'this seller';
+  const sellerName = typeof params.sellerName === 'string' && params.sellerName ? params.sellerName : '';
   const isOwner = params.isOwner === 'true';
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
@@ -154,16 +154,9 @@ export default function ProfileProductsScreen() {
 
   const header = (
     <View
-      style={[styles.header, { paddingTop: topInset + SP.sm }]}
+      style={styles.header}
       onLayout={(event) => setHeaderHeight(Math.round(event.nativeEvent.layout.height))}
     >
-      <View style={styles.headerRow}>
-        <ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>{isOwner ? 'Your shop' : 'Shop'}</Text>
-          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">{isOwner ? 'Live listings' : sellerName}</Text>
-        </View>
-      </View>
       {!loading && !error ? (
         <Text style={styles.count}>
           {products.length}{hasMore ? '+' : ''} product{products.length === 1 && !hasMore ? '' : 's'}
@@ -190,15 +183,23 @@ export default function ProfileProductsScreen() {
         testID="shop-empty-state"
         icon={empty.icon as never}
         title={empty.title}
-        message={isOwner ? empty.message : `${sellerName} has no live listings right now.`}
+        message={isOwner ? empty.message : `${sellerName || 'This shop'} has no live listings right now.`}
         actionLabel={empty.cta?.label}
         onAction={empty.cta ? () => router.push(empty.cta!.route as never) : undefined}
       />
     );
   }
 
+  // Opened without a seller (stale link): nothing to load, so not a network error.
+  if (!sellerId) {
+    return <MissingItemState headerTitle="Shop" title="Shop not found" icon="shopping-bag" onAction={goBack} />;
+  }
+
   return (
     <View style={styles.root}>
+      <View style={styles.headerWrap}>
+        <ScreenHeader title={isOwner ? 'Your shop' : sellerName || 'Shop'} onBack={goBack} />
+      </View>
       <View
         style={[styles.column, { width: layout.columnWidth }]}
         onLayout={(event) => setViewportHeight(Math.round(event.nativeEvent.layout.height))}
@@ -229,11 +230,8 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background, alignItems: 'center' },
     column: { flex: 1 },
-    header: { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
-    headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-    headerCopy: { flex: 1, minWidth: 0 },
-    eyebrow: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.6, textTransform: 'uppercase', color: theme.muted },
-    title: { fontFamily: FONT.bold, fontSize: FS.xxl, lineHeight: 32, letterSpacing: -0.5, color: theme.text },
+    headerWrap: { alignSelf: 'stretch' },
+    header: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.md, gap: SP.sm },
     count: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
     ownerRow: { flexDirection: 'row', gap: SP.sm },
     pad: { paddingHorizontal: SP.md },

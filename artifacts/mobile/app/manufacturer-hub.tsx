@@ -549,7 +549,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         </View>
 
         {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.edgeBleed} contentContainerStyle={s.categoryRow}>
           {CATEGORY_CHIPS.map((category) => (
             <FilterChip key={category} label={category} active={filters.category === category} onPress={() => toggleCategory(category)} />
           ))}
@@ -724,7 +724,9 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
               description={favoritesOnly ? 'Save manufacturers from Discover and they will appear here.' : 'Try adjusting your search or filters.'}
               action={favoritesOnly
                 ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
-                : { label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }}
+                : activeFilterCount(filters) > 0
+                  ? { label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }
+                  : undefined}
             />
           )
         }
@@ -1773,7 +1775,9 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   rfqSecondaryRow: { flexDirection: 'row', gap: SP.sm },
   rfqSecondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs, height: 40, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
   rfqSecondaryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
-  categoryRow:  { gap: SP.sm, paddingRight: SP.md },
+  categoryRow:  { gap: SP.sm, paddingHorizontal: SP.md },
+  // Lets a horizontal row inside the padded intro scroll to the screen edge instead of clipping 16pt short.
+  edgeBleed:    { marginHorizontal: -SP.md },
   sectionHeaderTight: { marginBottom: SP.xs },
   featuredSection: { gap: SP.xs },
   featuredRow:  { gap: SP.sm, paddingRight: SP.md },

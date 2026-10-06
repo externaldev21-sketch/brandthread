@@ -80,6 +80,10 @@ export default function StorePreview() {
   // it reads as "nothing to preview yet", not as a broken screen.
   const [authRequired, setAuthRequired] = useState(false);
   const [device, setDevice] = useState<DeviceMode>('mobile');
+  // Measured height of the area below the bar — the window-based estimate
+  // ignores the header inset, so the frame's bottom (last row of cards)
+  // ran off-screen.
+  const [clipHeight, setClipHeight] = useState<number | null>(null);
   // Guards against overlapping calls: useFocusEffect can re-fire in quick
   // succession (focus/blur churn, StrictMode's double-invoke in dev), and
   // without this a second in-flight call's state updates could land after
@@ -157,7 +161,7 @@ export default function StorePreview() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height - insets.top - insets.bottom - 52;
+  const screenHeight = clipHeight ?? Dimensions.get('window').height - insets.top - insets.bottom - 52;
   const containerWidth = device === 'desktop' ? DESKTOP_WIDTH : screenWidth;
   const scale = device === 'desktop' ? screenWidth / DESKTOP_WIDTH : 1;
   const desktopInjectedJS = "var m=document.querySelector('meta[name=viewport]'); if(m){m.setAttribute('content','width=" + DESKTOP_WIDTH + "');} true;";
@@ -223,7 +227,13 @@ export default function StorePreview() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={[styles.webviewClip, { height: screenHeight }]}>
+        <View
+          style={[styles.webviewClip, { flex: 1 }]}
+          onLayout={(e) => {
+            const h = Math.floor(e.nativeEvent.layout.height);
+            if (h > 0 && h !== clipHeight) setClipHeight(h);
+          }}
+        >
           <View
             style={{
               width: containerWidth,

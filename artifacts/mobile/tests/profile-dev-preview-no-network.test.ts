@@ -25,7 +25,8 @@ describe('profile screens never hit the real API in dev-preview, however Clerk i
     // each have their own identical guard.
     expect(src.match(/if \(!authLoaded \|\| !userId \|\| isSellerDevPreview\(\)\) return;/g)?.length).toBe(8);
     expect(src).toContain('if (authLoaded && userId && !isSellerDevPreview()) void loadPage();');
-    expect(src).toContain('if (authLoaded && (!userId || isSellerDevPreview())) { setPostsLoading(false); setStatsInitialLoading(false); }');
+    // Preview never loads Clerk, so it settles without waiting on authLoaded.
+    expect(src).toContain('if ((authLoaded && !userId) || isSellerDevPreview()) { setPostsLoading(false); setStatsInitialLoading(false); }');
   });
 
   it('(buyer)/profile.tsx: loadCounts, the saved-items/orders load, the story ring and Thread Cash all also check isBuyerDevPreview()', () => {

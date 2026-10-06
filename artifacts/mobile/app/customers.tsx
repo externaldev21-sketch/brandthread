@@ -207,8 +207,8 @@ export default function CustomersScreen() {
           // Dev's explicit call: Customers gets no action button, ever —
           // there's nothing a seller can "do" from an empty customer list
           // (see the fresh-preview empty-state action audit in this PR's
-          // description).
-          compact
+          // description). Not `compact`: with no button there's nothing to
+          // clear the tab bar for, and compact drops the message line.
         />
       ) : (
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>

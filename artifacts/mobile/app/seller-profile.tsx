@@ -49,6 +49,7 @@ import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { MissingItemState } from '@/components/states/MissingItemState';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { ListRow } from '@/components/ui/ListRow';
@@ -514,6 +515,11 @@ export default function SellerProfileScreen() {
     if (router.canGoBack()) goBackOr(router);
     else router.replace('/' as never);
   }, [router]);
+
+  // ── No seller id and not the own-profile route: nothing to load ────────────
+  if (!routeSellerId && !loadOwnProfile) {
+    return <MissingItemState headerTitle="Profile" icon="user-x" title="Profile not found" message="This link is missing the seller it belongs to." />;
+  }
 
   // ── Error: the profile itself couldn't load ────────────────────────────────
   if (profileError && !seller) {

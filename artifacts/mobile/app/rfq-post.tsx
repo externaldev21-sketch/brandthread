@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -27,6 +28,9 @@ import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from
 
 const MAX_TARGETS = 10;
 
+// Example deadline a month out, in the yyyy-mm-dd form the field parses.
+const DEADLINE_EXAMPLE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+
 const GARMENT_TYPES = [
   'T-Shirts', 'Hoodies & Fleece', 'Denim', 'Knitwear', 'Woven Tops', 'Outerwear',
   'Activewear', 'Headwear', 'Bags & Accessories', 'Other',
@@ -37,6 +41,7 @@ export default function RfqPostScreen() {
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const { manufacturerId: preselectId } = useLocalSearchParams<{ manufacturerId?: string }>();
 
   const [garmentType, setGarmentType] = useState('');
@@ -122,7 +127,7 @@ export default function RfqPostScreen() {
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Request for Quotation" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Request for quotation" onBack={() => goBackOr(router)} />
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + SP.xl }]} showsVerticalScrollIndicator={false}>
         <Text style={s.sectionLabel}>What are you sourcing?</Text>
         <View style={s.chipRow}>
@@ -140,7 +145,7 @@ export default function RfqPostScreen() {
           <FormInput label="Quantity" value={quantity} onChange={setQuantity} placeholder="500" keyboardType="numeric" style={[s.field, s.half]} />
           <FormInput label="Target price / unit" value={targetPrice} onChange={setTargetPrice} placeholder="$6.50" keyboardType="decimal-pad" style={[s.field, s.half]} />
         </View>
-        <FormInput label="Deadline (optional)" value={deadline} onChange={setDeadline} placeholder="YYYY-MM-DD" style={s.field} />
+        <FormInput label="Deadline (optional)" value={deadline} onChange={setDeadline} placeholder={`e.g. ${DEADLINE_EXAMPLE}`} style={s.field} />
 
         <View style={s.sectionHeaderRow}>
           <Text style={s.sectionLabel}>Send to manufacturers</Text>
@@ -187,7 +192,7 @@ export default function RfqPostScreen() {
           })
         )}
       </ScrollView>
-      <View style={[s.footer, { paddingBottom: insets.bottom + SP.sm }]}>
+      <View style={[s.footer, { paddingBottom: (tabBarInset || insets.bottom) + SP.sm }]}>
         <PrimaryButton
           label={submitting ? 'Sending…' : `Send RFQ to ${selected.size || ''} ${selected.size === 1 ? 'manufacturer' : 'manufacturers'}`.trim()}
           onPress={handleSubmit}

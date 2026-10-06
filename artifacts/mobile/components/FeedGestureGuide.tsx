@@ -1,15 +1,14 @@
 /**
  * FeedGestureGuide — first-time buyer coach screen for the video feed.
- * Modeled on Instagram's "Watching stories" coach mark: a dim/blurred
- * overlay, a title and subtitle, four animated gesture rows, and
+ * Modeled on Instagram's "Watching stories" coach mark: an opaque black
+ * surface (no translucent overlay), a title and subtitle, four animated gesture rows, and
  * "Tap to keep watching". Any tap dismisses it; shown once per account
  * (see FEED_GESTURE_GUIDE_SEEN_KEY / dismissFeedGestureGuide below).
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
+import { BG, FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 
 export {
   FEED_GESTURES_TIP_VERSION,
@@ -124,11 +123,6 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
       testID="feed-gesture-guide"
     >
       <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Tap to keep watching">
-        <BlurView
-          intensity={Platform.OS === 'ios' ? 46 : 60}
-          tint="dark"
-          style={StyleSheet.absoluteFill}
-        />
         <View style={[StyleSheet.absoluteFill, styles.dim]} />
         <View style={styles.content} pointerEvents="none">
           <Text style={styles.title}>Watching Threads</Text>
@@ -160,7 +154,8 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
 
 const styles = StyleSheet.create({
   root: { zIndex: 9999, elevation: 9999 },
-  dim: { backgroundColor: 'rgba(0,0,0,0.38)' },
+  // Solid surface: the feed must not show through the coach mark.
+  dim: { backgroundColor: BG },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
   subtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },

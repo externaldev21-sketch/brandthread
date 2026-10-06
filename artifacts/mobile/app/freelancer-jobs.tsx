@@ -21,6 +21,8 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { EmptyState } from '@/components/layout';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending:     { label: 'Pending',     color: ORANGE,  bg: ORANGE_DIM },
@@ -37,6 +39,8 @@ export default function FreelancerJobsScreen() {
   const router = useRouter();
   const [data, setData] = useState<JobsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [isPreview] = useState(() => isSellerDevPreview() || isBuyerDevPreview());
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'hiring' | 'gigs'>('hiring');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -51,7 +55,9 @@ export default function FreelancerJobsScreen() {
   const load = useCallback(
     async (isRefresh = false) => {
       const generation = ++loadGeneration.current;
-      if (!authLoaded) return;
+      // The signed-out web preview may never finish loading Clerk; it must not
+      // call the protected jobs API either, so resolve straight to empty.
+      if (!authLoaded && !isPreview) return;
       if (!userId) {
         setData(null);
         setLoading(false);
@@ -63,6 +69,7 @@ export default function FreelancerJobsScreen() {
         const res = await api.freelancerJobs.list();
         if (loadGeneration.current !== generation) return;
         setData(res);
+        setLoadFailed(false);
         // Sensible default tab on first load: freelancers with gigs but no hires
         if (!defaultedTab.current) {
           defaultedTab.current = true;
@@ -72,6 +79,7 @@ export default function FreelancerJobsScreen() {
         }
       } catch {
         // Keep existing data visible when a refresh cannot complete.
+        if (loadGeneration.current === generation) setLoadFailed(true);
       } finally {
         if (loadGeneration.current === generation) {
           setLoading(false);
@@ -79,7 +87,7 @@ export default function FreelancerJobsScreen() {
         }
       }
     },
-    [api, authLoaded, userId],
+    [api, authLoaded, userId, isPreview],
   );
 
   useFocusEffect(
@@ -237,7 +245,7 @@ export default function FreelancerJobsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Freelance Jobs" subtitle="Escrow-protected gigs" />
+      <ScreenHeader title="Freelance jobs" />
 
       {showTabs && (
         <View style={styles.tabsRow}>
@@ -275,6 +283,15 @@ export default function FreelancerJobsScreen() {
           <View style={styles.centerBox}>
             <ActivityIndicator color={colors.primary} />
           </View>
+        ) : loadFailed && !data ? (
+          <EmptyState
+            variant="error"
+            icon="alert-triangle"
+            title="Couldn't load jobs"
+            message="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => { setLoading(true); load(); }}
+          />
         ) : jobs.length === 0 ? (
           <View style={styles.centerBox}>
             <Feather name="briefcase" size={26} color={SUBTLE} />

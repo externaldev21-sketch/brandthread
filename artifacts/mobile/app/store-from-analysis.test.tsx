@@ -131,6 +131,10 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
+vi.mock('@/components/ScreenHeader', () => ({
+  ScreenHeader: () => null,
+}));
+
 vi.mock('@/lib/theme', () => ({
   BG: '#09090B',
   SCREEN_BG: 'transparent',

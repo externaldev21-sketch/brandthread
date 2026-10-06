@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -29,6 +30,7 @@ export default function StoreThemePicker() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const [themes, setThemes] = useState<StoreTheme[]>([]);
   const [currentThemeId, setCurrentThemeId] = useState<string | null>(null);
   const [previewingThemeId, setPreviewingThemeId] = useState<string | null>(null);
@@ -132,7 +134,7 @@ export default function StoreThemePicker() {
             {'  ·  '}
             {item.supportedModes.join(', ')}
           </Text>
-          <Text style={styles.themeBestFor} numberOfLines={1}>{item.bestFor}</Text>
+          <Text style={styles.themeBestFor} numberOfLines={2}>{item.bestFor}</Text>
 
           <View style={styles.themeActions}>
             <TouchableOpacity
@@ -177,7 +179,7 @@ export default function StoreThemePicker() {
         numColumns={1}
         contentContainerStyle={[
           styles.gridContent,
-          { paddingBottom: insets.bottom + (previewingTheme ? 380 : 24) },
+          { paddingBottom: insets.bottom + (previewingTheme ? 380 : 24) + tabBarInset },
         ]}
         renderItem={renderThemeCard}
         showsVerticalScrollIndicator={false}
@@ -312,6 +314,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   gridContent: {
     paddingTop: SP.sm,
+    paddingHorizontal: SP.md,
   },
   themeCard: {
     flex: 1,
@@ -348,7 +351,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: `${SUCCESS}26`,
+    backgroundColor: theme.background,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -356,7 +359,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   currentBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: SUCCESS,
+    color: FG,
     letterSpacing: 0.5,
   },
   previewingBadge: {

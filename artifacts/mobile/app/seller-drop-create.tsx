@@ -28,6 +28,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -169,6 +170,7 @@ export default function SellerDropCreate() {
   const api = useApi();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const topInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { dropId } = useLocalSearchParams<{ dropId?: string }>();
@@ -419,7 +421,7 @@ export default function SellerDropCreate() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.root, { backgroundColor: theme.background }]}>
         <ScreenHeader title={isEdit ? 'Edit drop' : 'New drop'} />
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xxl, gap: SP.lg }}>
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xxl + tabBarInset, gap: SP.lg }}>
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: theme.muted }]}>DROP NAME</Text>
@@ -515,9 +517,6 @@ export default function SellerDropCreate() {
               <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }} numberOfLines={1}>{timezone}</Text>
               <Feather name="chevron-down" size={14} color={theme.muted} />
             </TouchableOpacity>
-            <Text style={[styles.hint, { color: theme.muted }]}>
-              This is the wall-clock time in the timezone above — buyers see it converted to their own countdown.
-            </Text>
           </View>
 
           <View style={styles.field}>

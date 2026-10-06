@@ -16,6 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { useApi } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, apiErrorMessage } from '@/lib/freelancer';
 import {
@@ -32,6 +33,7 @@ export default function FreelancerApplyScreen() {
   const api = useApi();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -274,7 +276,7 @@ export default function FreelancerApplyScreen() {
         </ScrollView>
 
         {/* Footer buttons */}
-        <View style={[styles.footer, { paddingBottom: SP.lg + 8 + insets.bottom }]}>
+        <View style={[styles.footer, { paddingBottom: tabBarInset ? tabBarInset + SP.sm : SP.lg + 8 + insets.bottom }]}>
           {step > 0 && (
             <TouchableOpacity
               style={styles.backBtn}

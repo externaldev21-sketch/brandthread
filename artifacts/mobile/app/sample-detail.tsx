@@ -374,6 +374,7 @@ export default function SampleDetailScreen() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Review form state
@@ -405,9 +406,10 @@ export default function SampleDetailScreen() {
   // wiped the whole screen to skeletons, reset scroll position and dropped
   // keyboard focus on every poll tick, even mid-typing in the review form.
   const load = useCallback(async (isInitialLoad = false) => {
-    if (!id) return;
+    // No id never fetches, so resolve straight to the not-found state.
+    if (!id) { setLoading(false); return; }
     const generation = ++loadGeneration.current;
-    if (isInitialLoad) setLoading(true);
+    if (isInitialLoad) { setLoading(true); setLoadError(false); }
     try {
       const s = await getSample(id);
       if (s && generation === loadGeneration.current) {
@@ -417,7 +419,7 @@ export default function SampleDetailScreen() {
         setSample(null);
       }
     } catch {
-      if (generation === loadGeneration.current && isInitialLoad) setSample(null);
+      if (generation === loadGeneration.current && isInitialLoad) { setSample(null); setLoadError(true); }
     } finally {
       if (generation === loadGeneration.current) setLoading(false);
     }
@@ -644,6 +646,22 @@ export default function SampleDetailScreen() {
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
           <LoadingSkeleton height={160} style={s.skeleton} />
+        </View>
+      </BrandthreadScreen>
+    );
+  }
+
+  if (!sample && loadError) {
+    return (
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Sample Details" onBack={() => goBackOr(router)} />
+        <View style={s.centered}>
+          <EmptyState
+            icon="alert-circle"
+            title="Couldn't load this sample"
+            description="Check your connection and try again."
+            action={{ label: 'Retry', onPress: () => { void load(true); } }}
+          />
         </View>
       </BrandthreadScreen>
     );

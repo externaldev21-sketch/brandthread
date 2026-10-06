@@ -27,8 +27,9 @@ export function SellerDashboardSetupCard({
       onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
-      accessibilityRole="button"
-      accessibilityLabel="List your first product to start selling"
+      // Not a "button": the card holds the real "Add a product" button, and on
+      // web a button-role card renders as <button> nesting another <button>.
+      accessibilityRole="none"
     >
       <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
         <Feather name="plus-circle" size={20} color={theme.accent} />

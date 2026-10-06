@@ -372,6 +372,17 @@ function defaultStorefront(): Storefront {
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
+// Lazily imported (devPreview pulls in react-native) so narrowly-mocked tests
+// of this module keep working — same pattern as productService.
+async function inSignedOutPreview(): Promise<boolean> {
+  try {
+    const { isSellerDevPreview, isBuyerDevPreview } = await import('@/lib/devPreview');
+    return isSellerDevPreview() || isBuyerDevPreview();
+  } catch {
+    return false;
+  }
+}
+
 export async function getStorefront(): Promise<Storefront> {
   try {
     // Load from AsyncStorage first (local truth for complex UI state)
@@ -395,21 +406,24 @@ export async function getStorefront(): Promise<Storefront> {
       migratedToThread = true;
     }
 
-    // Overlay server-side published state (non-blocking)
-    try {
-      const remote = await api.store.get();
-      if (remote?.status === 'published') {
-        local.publishStatus = 'published';
-        local.publishedAt = remote.publishedAt ?? local.publishedAt;
-      } else if (remote?.status === 'draft' && local.publishStatus === 'published') {
-        local.publishStatus = 'unpublished';
-      }
-      local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
-      // Sync server title/slug if we don't have one locally
-      if (!local.settings.storeUrl && remote?.slug) {
-        local.settings.storeUrl = `${remote.slug}.brandthread.app`;
-      }
-    } catch { /* no-op — API may not be reachable */ }
+    // Overlay server-side published state (non-blocking). The signed-out web
+    // preview has no session, so it never calls the protected store API.
+    if (!(await inSignedOutPreview())) {
+      try {
+        const remote = await api.store.get();
+        if (remote?.status === 'published') {
+          local.publishStatus = 'published';
+          local.publishedAt = remote.publishedAt ?? local.publishedAt;
+        } else if (remote?.status === 'draft' && local.publishStatus === 'published') {
+          local.publishStatus = 'unpublished';
+        }
+        local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
+        // Sync server title/slug if we don't have one locally
+        if (!local.settings.storeUrl && remote?.slug) {
+          local.settings.storeUrl = `${remote.slug}.brandthread.app`;
+        }
+      } catch { /* no-op — API may not be reachable */ }
+    }
 
     if (!raw || migratedToThread) await AsyncStorage.setItem(STORE_KEY, JSON.stringify(local));
     return local;
