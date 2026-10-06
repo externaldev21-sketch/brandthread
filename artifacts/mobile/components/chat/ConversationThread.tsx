@@ -676,7 +676,10 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // Seller side: a request the seller SENT keeps the ordinary composer (the
   // server only blocks the recipient from replying); only the recipient
   // gets the accept/delete/block panel. The buyer side is unchanged.
-  const isRequestSender = isSeller && isRequestMode && !!conv?.requestedBy && conv.requestedBy === myId;
+  // (Seeded preview threads mark "me" with the legacy 'me' id, same as their
+  // own messages — see isOwn below.)
+  const isRequestSender = isSeller && isRequestMode && !!conv?.requestedBy
+    && (conv.requestedBy === myId || conv.requestedBy === MY_USER_ID);
   const requestLocked = isRequestMode && !isRequestSender;
   const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending && !requestLocked;
 
@@ -2536,11 +2539,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       {/* Seller side: the sender's own view of a pending request — they keep
           the composer, plus this one line. */}
       {isRequestSender && !messaging.blockedByMe && !messaging.unavailable && (
-        <View style={s.disabledBanner} testID="conversation-sent-request-banner">
+        <View style={s.sentRequestBanner} testID="conversation-sent-request-banner">
           <Feather name="clock" size={ICON.sm} color={theme.muted} />
-          <Text style={[s.disabledBannerText, { color: theme.muted }]}>
-            Sent as a message request
-          </Text>
+          <Text style={s.sentRequestBannerText}>Sent as a message request</Text>
         </View>
       )}
 
@@ -3143,43 +3144,49 @@ function RequestActionPanel({
         Accepting lets them see when you’ve read their messages and message you freely.
       </Text>
       <View style={rs.actionsRow}>
-        <PressableScale
-          rippleEnabled={false}
-          style={rs.actionBtn}
-          onPress={onBlock}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Block ${name}`}
-          testID="conversation-request-block"
-        >
-          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
-        </PressableScale>
-        <PressableScale
-          rippleEnabled={false}
-          style={rs.actionBtn}
-          onPress={onDelete}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete request from ${name}`}
-          testID="conversation-request-delete"
-        >
-          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
-        </PressableScale>
-        <PressableScale
-          rippleEnabled={false}
-          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.accent }]}
-          onPress={onAccept}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Accept message request from ${name}`}
-          testID="conversation-request-accept"
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.onAccent} size="small" />
-          ) : (
-            <Text style={[rs.actionText, rs.acceptText, { color: theme.onAccent }]}>Accept</Text>
-          )}
-        </PressableScale>
+        <View style={rs.actionCell}>
+          <PressableScale
+            rippleEnabled={false}
+            style={rs.actionBtn}
+            onPress={onBlock}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Block ${name}`}
+            testID="conversation-request-block"
+          >
+            <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+          </PressableScale>
+        </View>
+        <View style={rs.actionCell}>
+          <PressableScale
+            rippleEnabled={false}
+            style={rs.actionBtn}
+            onPress={onDelete}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete request from ${name}`}
+            testID="conversation-request-delete"
+          >
+            <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+          </PressableScale>
+        </View>
+        <View style={rs.actionCell}>
+          <PressableScale
+            rippleEnabled={false}
+            style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.accent }]}
+            onPress={onAccept}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Accept message request from ${name}`}
+            testID="conversation-request-accept"
+          >
+            {loading ? (
+              <ActivityIndicator color={theme.onAccent} size="small" />
+            ) : (
+              <Text style={[rs.actionText, rs.acceptText, { color: theme.onAccent }]}>Accept</Text>
+            )}
+          </PressableScale>
+        </View>
       </View>
     </View>
   );
@@ -3195,8 +3202,13 @@ const requestPanelStyles = StyleSheet.create({
   title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
   subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
   actionsRow: { flexDirection: 'row', gap: SP.sm },
+  // PressableScale applies `style` only to its inner view, never to the
+  // outer node that takes part in this row — so the equal thirds live on a
+  // plain wrapping View (same fix as headerCenterWrap).
+  actionCell: { flex: 1, minWidth: 0 },
   actionBtn: {
-    flex: 1,
+    alignSelf: 'stretch',
+    paddingHorizontal: 12,
     height: 44,
     borderRadius: RADIUS.pill,
     alignItems: 'center',
@@ -3413,6 +3425,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: `${theme.warning}1F`,
     borderBottomWidth: 1,
     borderBottomColor: `${theme.warning}4D`,
+  },
+  // Seller side: the sender's own view of a pending request — neutral, no tint.
+  sentRequestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  sentRequestBannerText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: theme.muted,
   },
   disabledBannerText: {
     flex: 1,

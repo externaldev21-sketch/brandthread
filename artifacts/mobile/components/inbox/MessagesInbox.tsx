@@ -88,6 +88,7 @@ import {
 } from '@/lib/previewNotes';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
+import { EmptyStateBadge } from '@/components/layout/EmptyStateBadge';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE, SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
@@ -1465,9 +1466,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       // DMs from here (buyers message them first), so no button.
       return (
         <View style={s.inboxEmptyWrap} testID="inbox-empty-state">
-          <View style={[s.inboxEmptyBadge, { backgroundColor: theme.cardElevated }]}>
-            <Feather name="mail" size={30} color={theme.text} />
-          </View>
+          <EmptyStateBadge icon="mail" style={s.inboxEmptyBadgeSpacing} />
           <Text style={[s.inboxEmptyTitle, { color: theme.text }]}>No messages yet</Text>
           <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
             Messages from buyers show up here
@@ -1477,9 +1476,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     }
     return (
       <View style={s.inboxEmptyWrap}>
-        <View style={[s.inboxEmptyBadge, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="mail" size={30} color={theme.text} />
-        </View>
+        {/* The one shared empty-state badge (Dev: same badge in every empty state). */}
+        <EmptyStateBadge icon="mail" style={s.inboxEmptyBadgeSpacing} />
         <Text style={[s.inboxEmptyTitle, { color: theme.text }]}>Keep it real in DMs</Text>
         <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
           Send a message to someone in your network
@@ -2153,14 +2151,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     paddingBottom: SP.lg,
     gap: SP.sm,
   },
-  inboxEmptyBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SP.sm,
-  },
+  inboxEmptyBadgeSpacing: { marginBottom: SP.sm },
   inboxEmptyTitle: {
     fontSize: FS.lg,
     fontFamily: FONT.bold,

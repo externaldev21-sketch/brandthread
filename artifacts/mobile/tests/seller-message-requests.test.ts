@@ -85,7 +85,8 @@ describe('seller thread (shared ConversationThread, seller variant): request mod
 
   it('derives isRequestMode and isRequestSender from conv.isRequest/requestedBy', () => {
     expect(convSrc).toContain('const isRequestMode = conv?.isRequest === true;');
-    expect(convSrc).toContain('const isRequestSender = isSeller && isRequestMode && !!conv?.requestedBy && conv.requestedBy === myId;');
+    expect(convSrc).toContain('const isRequestSender = isSeller && isRequestMode && !!conv?.requestedBy');
+    expect(convSrc).toContain('&& (conv.requestedBy === myId || conv.requestedBy === MY_USER_ID);');
     expect(convSrc).toContain('const requestLocked = isRequestMode && !isRequestSender;');
   });
 
