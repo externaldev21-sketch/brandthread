@@ -94,6 +94,9 @@ import freelancersRouter from "./freelancers";
 import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
+import promotionsRouter from "./promotions";
+import featuredSlotsRouter from "./featured-slots";
+import adminPromotionsRouter from "./admin-promotions";
 import adCampaignsRouter from "./ad-campaigns";
 import iapPromotionsRouter from "./iap-promotions";
 import metaAdsRouter from "./meta-ads";
@@ -263,6 +266,9 @@ router.use("/live",                      tc, liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
+router.use("/promotions",                promotionsRouter); // viewer-scoped Sponsored delivery; no tc
+router.use("/featured-slots",            tc, featuredSlotsRouter); // /active is public; seller routes require auth
+router.use("/admin/promotions",          adminPromotionsRouter); // platform admins only
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/iap-promotions",            tc, iapPromotionsRouter);
 router.use("/meta-ads",                  tc, metaAdsRouter);

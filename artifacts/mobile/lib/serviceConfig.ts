@@ -77,6 +77,19 @@ export function configureServices(getToken: GetToken): void {
 }
 
 /**
+ * Whether a signed-in session token is available right now. Optional surfaces
+ * (Sponsored placement) use this to avoid calling protected APIs signed out.
+ */
+export async function hasServiceToken(): Promise<boolean> {
+  if (!_getToken) return false;
+  try {
+    return !!(await _getToken());
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Make an authenticated GET/POST/PATCH request to the Brandthread API.
  * Throws if services haven't been configured yet.
  */
