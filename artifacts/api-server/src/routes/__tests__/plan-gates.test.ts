@@ -42,10 +42,10 @@ describe("paid route mounts", () => {
       'router.use("/team",                      teamRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/live",                      tc, liveRouter);',
+      'router.use("/live",                      tc, self, liveRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);',
+      'router.use("/boosts",                    tc, writes("marketing"), requirePlan("pro"), boostsRouter);',
     );
   });
 

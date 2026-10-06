@@ -12,7 +12,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  (req as any).clerkUserId = userId;
+  // A team member acting on another store: teamContext() (mounted before
+  // most seller routers) already pointed req.clerkUserId at that store's
+  // owner. Routers then run requireAuth again internally; resetting the id
+  // to the caller here used to silently undo the store switch, so a
+  // permitted manager's reads and writes landed on their OWN (usually empty)
+  // store. Keep the owner when the context belongs to this same caller,
+  // unless the route acts for the caller personally (actAsSelf()).
+  const ctx = (req as any).teamContext as { actorClerkId: string; storeOwnerId: string } | undefined;
+  (req as any).clerkUserId = ctx && ctx.actorClerkId === userId && !(req as any).actAsSelf
+    ? ctx.storeOwnerId
+    : userId;
   next();
 }
 

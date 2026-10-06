@@ -42,8 +42,11 @@ const ROLE_ORDER: Record<TeamRole, number> = {
   viewer: 0,
   staff: 1,
   orders: 1,
-  marketing: 1,
-  finance: 1,
+  // Marketing and finance members hold no orders/fulfilment permission
+  // (ROLE_PERMISSIONS below), so they must not pass the staff-ranked gates
+  // on order status, tracking, labels and shipping zones.
+  marketing: 0,
+  finance: 0,
   manager: 2,
   admin: 2,
   owner: 3,
@@ -392,5 +395,71 @@ export function requirePayoutsRead(): RequestHandler<any, any, any, any> {
       currentRole: role,
       message: "This action requires payouts access. Ask the store owner to change your access.",
     });
+  };
+}
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Mount-level gate for seller routers whose mutations predate team roles:
+ * reads stay open to every member of the store (they already pass
+ * teamContext()), while any write requires `permission` — so a `viewer` or
+ * a `marketing` member can no longer publish the store, change returns or
+ * buy boosts on someone else's store.
+ */
+export function requirePermissionForWrites(permission: Permission): RequestHandler<any, any, any, any> {
+  const gate = requirePermission(permission);
+  return async (req, res, next) => {
+    if (SAFE_METHODS.has(req.method) || (req as any).actAsSelf) {
+      next();
+      return;
+    }
+    await gate(req, res, next);
+  };
+}
+
+/** Same as requirePermissionForWrites, for owner-only writes (identity verification). */
+export function requireOwnerForWrites(): RequestHandler<any, any, any, any> {
+  const gate = requireRole("owner");
+  return async (req, res, next) => {
+    if (SAFE_METHODS.has(req.method)) {
+      next();
+      return;
+    }
+    await gate(req, res, next);
+  };
+}
+
+/**
+ * The route acts for the signed-in person themself, not for the store they
+ * have selected — a buyer-side action (commenting in a Live, joining a
+ * waitlist, writing a review, validating a discount code at checkout) by
+ * someone who also works on another store's team. Restores req.clerkUserId
+ * to the caller and tells requireAuth not to switch it back. Mount after
+ * teamContext().
+ */
+export function actAsSelf(): RequestHandler<any, any, any, any> {
+  return (req, _res, next) => {
+    (req as any).actAsSelf = true;
+    const actor = (req as any).actorClerkId as string | undefined;
+    if (actor) (req as any).clerkUserId = actor;
+    next();
+  };
+}
+
+/**
+ * actAsSelf() for only some paths of a mixed router (relative to its mount),
+ * e.g. a buyer joining a product waitlist on a router that otherwise serves
+ * the seller's waitlist dashboard. Mount before requirePermissionForWrites.
+ */
+export function actAsSelfFor(paths: Array<string | RegExp>): RequestHandler<any, any, any, any> {
+  const self = actAsSelf();
+  return (req, res, next) => {
+    const matches = paths.some((p) => (typeof p === "string" ? req.path === p : p.test(req.path)));
+    if (matches) {
+      self(req, res, next);
+      return;
+    }
+    next();
   };
 }

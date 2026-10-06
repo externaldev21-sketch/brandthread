@@ -65,7 +65,14 @@ import disputesRouter from "./disputes";
 import financeRouter from "./finance";
 import taxesRouter from "./taxes";
 import teamRouter from "./team";
-import { requireRole, teamContext } from "../middlewares/requireRole";
+import {
+  actAsSelf,
+  actAsSelfFor,
+  requireOwnerForWrites,
+  requirePermissionForWrites,
+  requireRole,
+  teamContext,
+} from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
 
 /** Lazily-resolved team context for routes that don't mount it themselves.
@@ -73,6 +80,13 @@ import notificationEventsRouter from "./notification-events";
  *  this at the index level alongside a route that already mounts it internally
  *  is a safe no-op on the second call. */
 const tc = teamContext();
+// Write gates for seller routers whose mutations predate team roles (see
+// requirePermissionForWrites). Reads stay open to every member of the store.
+const writes = requirePermissionForWrites;
+// Routers that act for the signed-in person (buyer-side actions, a creator's
+// own posts/lives/reviews, freelancer profiles, the AI assistant's own chat
+// history) rather than for the store they selected.
+const self = actAsSelf();
 import storeRouter from "./store";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
@@ -158,10 +172,10 @@ router.use("/auth",            authRouter);
 router.use("/onboarding-sample", logoRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
-router.use("/customers",       tc, customersRouter);
+router.use("/customers",       tc, writes("customers"), customersRouter);
 router.use("/drops",           tc, dropsRouter);
 router.use("/analytics",       tc, analyticsRouter);
-router.use("/integrations",    tc, integrationsRouter);
+router.use("/integrations",    tc, writes("products"), integrationsRouter);
 router.use("/shopify",         tc, shopifyRouter);
 // ─── Growth-plan-gated AI design routes ───────────────────────────────────────
 router.use("/logo",            tc, requirePlan("growth"), logoRouter);
@@ -172,24 +186,24 @@ router.use("/lifestyle",       tc, requirePlan("growth"), lifestyleRouter);
 router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
 // Specific manufacturer sub-paths BEFORE the catch-all manufacturersRouter
 router.use("/manufacturers/public",          manufacturerPublicRouter);
-router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
+router.use("/manufacturers/connect",         tc, writes("products"), manufacturerConnectRouter);
 // Growth-plan-gated Manufacturer Hub
 // Order cards + tracker (auth handled per route; falls through otherwise)
 router.use("/manufacturers",   tc, manufacturerFlowRouter);
 router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
-router.use("/seller-hub",      tc, sellerHubRouter);
+router.use("/seller-hub",      tc, writes("products"), sellerHubRouter);
 router.use("/push",            pushRouter);
 router.use("/notification-prefs", notificationPrefsRouter);
-router.use("/ai",              tc, aiRouter);
+router.use("/ai",              tc, self, aiRouter);
 
 // ─── Buyer & Seller Connect / Subscription routes ─────────────────────────────
 // Mount specific sub-paths before the catch-all /buyer router so they don't
 // get swallowed by buyerRouter's lack of those handlers.
 // Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
 // scoped to the actual buyer, not the team store owner.
-router.use("/waitlist",                  tc, waitlistRouter);
-router.use("/bundles",                   tc, bundlesRouter);
+router.use("/waitlist",                  tc, actAsSelfFor(["/join", "/leave", /^\/check\//]), writes("products"), waitlistRouter);
+router.use("/bundles",                   tc, writes("products"), bundlesRouter);
 router.use("/buyer/products",            buyerProductsRouter);
 router.use("/buyer/recently-viewed",     recentlyViewedRouter);
 router.use("/first-run-tips",            firstRunTipsRouter);
@@ -208,13 +222,13 @@ router.use("/communities",               communitiesRouter);
 router.use("/brandthread-agent",         brandthreadAgentRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
 router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
-router.use("/seller/verification",       tc, sellerVerificationRouter);
-router.use("/seller",                    tc, sellerProfileRouter);
-router.use("/reviews",                   tc, reviewsRouter);
+router.use("/seller/verification",       tc, requireOwnerForWrites(), sellerVerificationRouter);
+router.use("/seller",                    tc, actAsSelfFor(["/tutorial/seen", "/onboarding/data"]), writes("products"), sellerProfileRouter);
+router.use("/reviews",                   tc, self, reviewsRouter);
 // Comments are attributed to the person writing them, so they are mounted
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
-router.use("/posts",                     tc, postsRouter);
+router.use("/posts",                     tc, self, postsRouter);
 router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
@@ -223,49 +237,49 @@ router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
 router.use("/referrals",                 referralsRouter);
-router.use("/shipping-rates",            tc, shippingRatesRouter);
+router.use("/shipping-rates",            tc, writes("orders"), shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
-router.use("/discount-codes",            tc, discountCodesRouter);
-router.use("/returns",                   tc, returnsRouter);
-router.use("/sample-orders",             tc, sampleOrdersRouter);
-router.use("/drop-wallets",              tc, dropWalletRouter);
-router.use("/disputes",                  tc, disputesRouter);
+router.use("/discount-codes",            tc, actAsSelfFor(["/validate"]), discountCodesRouter);
+router.use("/returns",                   tc, writes("orders"), returnsRouter);
+router.use("/sample-orders",             tc, writes("products"), sampleOrdersRouter);
+router.use("/drop-wallets",              tc, writes("payouts"), dropWalletRouter);
+router.use("/disputes",                  tc, writes("orders"), disputesRouter);
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
-router.use("/taxes",                     tc, taxesRouter);
+router.use("/taxes",                     tc, writes("payouts"), taxesRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the
 // actual caller before any store-context rewrite.
 router.use("/team",                      teamRouter);
-router.use("/store/ai",                  tc, storeAiRouter);
-router.use("/store",                     tc, storeRouter);
+router.use("/store/ai",                  tc, writes("products"), storeAiRouter);
+router.use("/store",                     tc, writes("products"), storeRouter);
 router.use("/design-studio",             requireAuth, tc, designStudioRouter);
-router.use("/shopify-imports",           tc, shopifyImportRouter);
+router.use("/shopify-imports",           tc, writes("products"), shopifyImportRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────
 // Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't
 // swallowed by /freelancers/:id.
-router.use("/freelancers/connect",       tc, freelancerConnectRouter);
-router.use("/freelancers",               tc, freelancersRouter);
-router.use("/freelancer-jobs",           tc, freelancerJobsRouter);
+router.use("/freelancers/connect",       tc, self, freelancerConnectRouter);
+router.use("/freelancers",               tc, self, freelancersRouter);
+router.use("/freelancer-jobs",           tc, self, freelancerJobsRouter);
 
 // ─── New seller settings + buyer payments routes ──────────────────────────────
-router.use("/seller/locations",          tc, sellerLocationsRouter);
-router.use("/seller/metafields",         tc, sellerMetafieldsRouter);
-router.use("/seller/settings",           tc, sellerSettingsExtRouter);
+router.use("/seller/locations",          tc, writes("products"), sellerLocationsRouter);
+router.use("/seller/metafields",         tc, writes("products"), sellerMetafieldsRouter);
+router.use("/seller/settings",           tc, writes("products"), sellerSettingsExtRouter);
 router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
-router.use("/live",                      tc, liveRouter);
+router.use("/live",                      tc, self, liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
-router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
+router.use("/boosts",                    tc, writes("marketing"), requirePlan("pro"), boostsRouter);
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
-router.use("/meta-ads",                  tc, metaAdsRouter);
-router.use("/seller/vacation",          tc, vacationRouter);
-router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
+router.use("/meta-ads",                  tc, writes("marketing"), metaAdsRouter);
+router.use("/seller/vacation",          tc, writes("products"), vacationRouter);
+router.use("/seller/notification-prefs", tc, self, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 
