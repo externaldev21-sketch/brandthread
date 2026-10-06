@@ -61,6 +61,7 @@ import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 const MAX_COMMENT_LENGTH = 1000;
 // Links the comment list's KeyboardGestureArea to the composer's TextInput
@@ -1085,6 +1086,21 @@ export default function BuyerPostCommentsScreen() {
   }, []);
 
   const composerLocked = meta.commentsDisabled || !meta.canComment;
+
+  // Opened directly with no post (deep link / typed route): there is no
+  // media to sit above the sheet and no thread to load, so present a full
+  // screen with the shared header instead of a sheet over a black void.
+  if (isMissingParam(params.postId)) {
+    return (
+      <UnavailableScreen
+        title="Comments"
+        heading="Post not found"
+        message="This post may have been deleted or the link may have expired."
+        icon="message-circle"
+        testID="buyer-post-comments-unavailable"
+      />
+    );
+  }
 
   return (
     <View style={s.overlay}>

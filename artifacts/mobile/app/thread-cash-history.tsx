@@ -12,6 +12,9 @@ import { Feather } from '@expo/vector-icons';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import { fmtDate } from '@/lib/format';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { getPreviewSellerThreadCashBalanceCents, getPreviewSellerThreadCashHistory } from '@/lib/previewSellerThreadCash';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -43,11 +46,22 @@ export default function ThreadCashHistoryScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const balance = useSellerThreadCashBalance();
-  const { history, loading, error, reload } = useSellerThreadCashHistory(100);
+  const seller = useSellerThreadCashHistory(100);
+  // The shared hook only falls back to the preview fixture for the seller
+  // preview; a buyer-preview visit (no backend either) would otherwise read
+  // as a load error. Same fixture, same demo gating: fresh preview → honest
+  // empty state, demo opt-in → the seeded ledger.
+  const buyerPreviewFallback = isBuyerDevPreview() && seller.error;
+  const history = buyerPreviewFallback ? getPreviewSellerThreadCashHistory() : seller.history;
+  const { loading, reload } = seller;
+  const error = buyerPreviewFallback ? false : seller.error;
+  const balanceCents = buyerPreviewFallback || (isBuyerDevPreview() && balance.error)
+    ? getPreviewSellerThreadCashBalanceCents()
+    : balance.balanceCents;
 
   // History is newest-first; walk backward from the current balance so each
   // row shows the balance immediately AFTER that entry took effect.
-  let running = balance.balanceCents ?? 0;
+  let running = balanceCents ?? 0;
   const rows = history.map((entry) => {
     const balanceAfter = running;
     running -= entry.amountCents;
@@ -60,9 +74,13 @@ export default function ThreadCashHistoryScreen() {
 
       <View style={[styles.balanceRow, { borderBottomColor: theme.borderSubtle }]}>
         <ThreadCashBillIcon size={16} />
-        <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-history-balance">
-          {balance.loading ? '···' : formatCents(balance.balanceCents ?? 0)} balance
-        </Text>
+        {balance.loading ? (
+          <SkeletonBlock width={96} height={14} />
+        ) : (
+          <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-history-balance">
+            {formatCents(balanceCents ?? 0)} balance
+          </Text>
+        )}
       </View>
 
       {loading ? (
@@ -76,7 +94,7 @@ export default function ThreadCashHistoryScreen() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon="dollar-sign"
-          title="No Thread Cash yet"
+          title="No Thread Cash activity yet"
           message="Live gifts and message payments from buyers will show up here."
         />
       ) : (
@@ -95,7 +113,7 @@ export default function ThreadCashHistoryScreen() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.label, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
                   <Text style={[styles.date, { color: theme.subtle }]} numberOfLines={1}>
-                    {new Date(entry.createdAt).toLocaleDateString()}
+                    {fmtDate(entry.createdAt)}
                     {entry.note ? ` · ${entry.note}` : ''}
                   </Text>
                 </View>
@@ -120,7 +138,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1 },
   balanceRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.md, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   balanceText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   list: { paddingHorizontal: SP.md },

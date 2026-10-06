@@ -2,7 +2,7 @@
  * Buyer Settings Hub — its own screen, separate from Seller Settings.
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,6 +16,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { getMyProfile } from '@/services/socialService';
+import type { BuyerSocialProfile } from '@/services/socialTypes';
+import { previewBuyerIdentity } from '@/lib/previewBuyerIdentity';
 
 export default function BuyerSettingsScreen() {
   const colors = useColors();
@@ -28,8 +31,24 @@ export default function BuyerSettingsScreen() {
   const [signOutVisible, setSignOutVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
-  const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
+  const [social, setSocial] = useState<BuyerSocialProfile | null>(null);
+  useEffect(() => {
+    // Local-storage read only (no network) — same source as the profile tab.
+    getMyProfile().then(setSocial).catch(() => {});
+  }, [user?.id]);
+
+  // Real identity first (buyer profile → Clerk), then the demo buyer under
+  // &demo=1. Never the generic "Your Brandthread profile" + "BT" placeholder
+  // when a name exists.
+  const demo = user?.id ? null : previewBuyerIdentity();
+  const profileName = social?.name || user?.fullName || user?.username || demo?.name || 'Your profile';
+  const profileHandle = (social?.username || user?.username || demo?.username || '').replace(/^@/, '') || undefined;
+  const profileInitials = profileName === 'Your profile'
+    ? 'BT'
+    : profileName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'BT';
+  // Short enough to fit on one line at 375pt — the card's built-in fallback
+  // ("Manage your account and preferences") truncated there.
+  const profileSubtitle = user?.primaryEmailAddress?.emailAddress || 'Account and preferences';
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,7 +100,8 @@ export default function BuyerSettingsScreen() {
         <SettingsProfileCard
           eyebrow="Buyer account"
           name={profileName}
-          subtitle={user?.primaryEmailAddress?.emailAddress}
+          handle={profileHandle}
+          subtitle={profileSubtitle}
           initials={profileInitials}
           onPress={() => router.push('/(buyer)/edit-profile' as never)}
         />
@@ -90,7 +110,9 @@ export default function BuyerSettingsScreen() {
 
         {groups.map((group) => (
           <View key={group.title} style={s.group}>
-            <SectionHeader title={group.title.toUpperCase()} />
+            {/* One term for signing out: the catalog's "Log out" group holds
+                the single "Sign out" row. */}
+            <SectionHeader title={(group.title === 'Log out' ? 'Sign out' : group.title).toUpperCase()} />
             <Card style={s.card}>
               {group.items.map((item, i) => (
                 <React.Fragment key={item.label}>
@@ -98,6 +120,7 @@ export default function BuyerSettingsScreen() {
                     icon={item.icon}
                     title={item.label}
                     subtitle={item.description}
+                    subtitleNumberOfLines={2}
                     destructive={item.destructive}
                     value={item.soon ? 'Soon' : undefined}
                     chevron={!item.soon}

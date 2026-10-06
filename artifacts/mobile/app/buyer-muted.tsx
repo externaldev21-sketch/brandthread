@@ -64,7 +64,7 @@ export default function MutedAccountsScreen() {
 
       <View style={styles.intro}>
         <Text style={styles.introText}>
-          Muted accounts won't know they've been muted. You'll remain friends and can still message them.
+          Muted accounts won't know they've been muted. They'll still follow you and you can still message them.
         </Text>
       </View>
 

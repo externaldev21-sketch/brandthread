@@ -23,6 +23,7 @@ import {
 import { getVersions, restoreVersion, duplicateProject } from '@/services/designService';
 import { DesignVersion } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 function formatDate(iso: string): string {
   try {
@@ -137,9 +138,21 @@ export default function DesignVersionsScreen() {
     </BrandthreadCard>
   );
 
+  // No project open (direct link / preview) → nothing to list or save.
+  if (isMissingParam(projectId)) {
+    return (
+      <UnavailableScreen
+        title="Version history"
+        heading="No project open"
+        message="Open a project to see its saved versions."
+        icon="clock"
+      />
+    );
+  }
+
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Version History" />
+      <ScreenHeader title="Version history" />
 
       {loading ? (
         <View style={styles.centered}>

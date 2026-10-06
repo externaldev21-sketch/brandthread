@@ -5,7 +5,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
   AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator,
-  useWindowDimensions,
+  useWindowDimensions, type LayoutChangeEvent,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -2115,6 +2115,14 @@ export default function FeedScreen({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
+  // Measured height of the absolutely-positioned top bar overlay (status
+  // area + header row + tabs) so the first-load FeedSkeleton starts below
+  // it instead of under the status bar/header (QA-0441/0442).
+  const [topBarHeight, setTopBarHeight] = useState(0);
+  const onTopBarLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = Math.round(e.nativeEvent.layout.height);
+    setTopBarHeight(prev => (prev === h ? prev : h));
+  }, []);
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const pageWidth = viewportSize.width || windowWidth;
@@ -3055,7 +3063,7 @@ export default function FeedScreen({
        * was already mounted underneath it the whole time. */}
       {feedLoading && displayItems.length === 0 && (
         <FeedSkeleton
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+          style={{ position: 'absolute', top: topBarHeight || buyerHeaderHeight, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
       )}
       {/*
@@ -3286,7 +3294,7 @@ export default function FeedScreen({
 
       {/* ─ Top bar overlay ─ */}
       {isCreatorFeed ? (
-        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
+        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none" onLayout={onTopBarLayout}>
           <View style={styles.buyerTopRow}>
             <TouchableOpacity
               style={styles.buyerTopBtn}
@@ -3341,6 +3349,7 @@ export default function FeedScreen({
             },
           ]}
           pointerEvents="box-none"
+          onLayout={onTopBarLayout}
         >
           {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
               style: LIVE and cart on the left, a centered "Following | Threads"
@@ -3451,7 +3460,7 @@ export default function FeedScreen({
           </View>
         </View>
       ) : (
-      <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
+      <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none" onLayout={onTopBarLayout}>
         {showSearch ? (
           <View style={styles.searchRow}>
             <TextInput

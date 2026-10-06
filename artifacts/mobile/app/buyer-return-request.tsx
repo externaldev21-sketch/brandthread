@@ -46,6 +46,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { Button } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import { activeReturnFor, isReturnEligible, returnSubmitError } from '@/lib/returns';
@@ -107,7 +108,7 @@ function makeRadioStyles(theme: AppThemePreset) {
   });
 }
 
-type Phase = 'loading' | 'error' | 'not_found' | 'ineligible' | 'existing' | 'form' | 'submitted';
+type Phase = 'loading' | 'error' | 'not_found' | 'notfound' | 'ineligible' | 'existing' | 'form' | 'submitted';
 
 export default function BuyerReturnRequestScreen() {
   const { theme } = useAppTheme();
@@ -133,7 +134,7 @@ export default function BuyerReturnRequestScreen() {
     // No order id (opened directly / incomplete link) is "not found" — never
     // the connection-error state, which is reserved for a request that
     // actually failed.
-    if (!orderId) { setPhase('not_found'); return; }
+    if (isMissingParam(orderId)) { setPhase('notfound'); return; }
     setPhase('loading');
     try {
       const [loaded, existing] = await Promise.all([
@@ -228,6 +229,20 @@ export default function BuyerReturnRequestScreen() {
         {header}
         <View style={s.centered}><ActivityIndicator color={theme.text} size="large" /></View>
       </BrandthreadScreen>
+    );
+  }
+
+  // Missing or unknown order id — not a connectivity problem, so don't
+  // blame the connection.
+  if (phase === 'notfound') {
+    return (
+      <UnavailableScreen
+        title="Request a return"
+        heading="Order not found"
+        message="Open a return request from one of your orders."
+        icon="package"
+        fallback="/(buyer)/orders"
+      />
     );
   }
 

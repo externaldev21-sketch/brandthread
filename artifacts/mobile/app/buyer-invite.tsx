@@ -146,19 +146,22 @@ export default function BuyerInviteScreen() {
 
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>Your invite code</Text>
-            <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
-              <Text style={styles.codeText}>{invite?.code ?? '------'}</Text>
+            {invite ? <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
+              <Text style={styles.codeText}>{invite.code}</Text>
               <View style={styles.copyPill}>
                 <Feather name="copy" size={14} color={theme.text} />
                 <Text style={styles.copyPillText}>Copy</Text>
               </View>
-            </PressableScale>
+            </PressableScale> : <PressableScale style={styles.codeRow} onPress={() => { void load(); }} accessibilityLabel="Retry loading your invite code">
+              <Text style={styles.codeText}>Couldn't load your code. Retry</Text>
+            </PressableScale>}
           </View>
 
           <PrimaryButton
             label="Share invite link"
             icon="share-2"
             onPress={shareInvite}
+            disabled={!invite}
             style={{ marginHorizontal: SP.md, marginTop: SP.md }}
           />
 

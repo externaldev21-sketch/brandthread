@@ -30,3 +30,8 @@ export function describeUserAgent(ua: string | null | undefined): DeviceDescript
 
   return { device, browser, isMobile };
 }
+
+export function deviceLabelFromUserAgent(ua: string | null | undefined): string | null {
+  const { device, browser } = describeUserAgent(ua);
+  return [device === 'Web browser' ? null : device, browser].filter(Boolean).join(' · ') || null;
+}

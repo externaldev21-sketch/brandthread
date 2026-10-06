@@ -6,11 +6,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 interface NativeOnlyFeatureProps {
   title: string;
   description: string;
   icon?: keyof typeof Feather.glyphMap;
+  /**
+   * Opt-in: render the shared ScreenHeader (back arrow + this title) above
+   * the message. Omitted → the original headerless layout, unchanged.
+   */
+  headerTitle?: string;
+  /**
+   * The small "Open Brandthread on iOS or Android…" footnote on web.
+   * Pass false when `description` already says it (one message, not two).
+   */
+  showWebHint?: boolean;
 }
 
 /**
@@ -21,19 +32,21 @@ export default function NativeOnlyFeature({
   title,
   description,
   icon = 'smartphone',
+  headerTitle,
+  showWebHint = true,
 }: NativeOnlyFeatureProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
 
-  return (
+  const body = (
     <View
       style={[
         styles.root,
         {
           backgroundColor: colors.background,
-          paddingTop: headerTopInset + 24,
+          paddingTop: (headerTitle ? 0 : headerTopInset) + 24,
           paddingBottom: insets.bottom + 24,
         },
       ]}
@@ -53,11 +66,19 @@ export default function NativeOnlyFeature({
       >
         <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Go back</Text>
       </TouchableOpacity>
-      {Platform.OS === 'web' && (
+      {Platform.OS === 'web' && showWebHint && (
         <Text style={[styles.hint, { color: colors.mutedForeground }]}>
           Open Brandthread on iOS or Android to use this feature.
         </Text>
       )}
+    </View>
+  );
+
+  if (!headerTitle) return body;
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader title={headerTitle} />
+      {body}
     </View>
   );
 }

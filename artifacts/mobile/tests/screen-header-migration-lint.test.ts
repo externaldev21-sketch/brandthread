@@ -51,7 +51,6 @@ function rel(full: string): string {
 // here in the same change that migrates it.
 const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(buyer)/activity.tsx',
-  'app/(buyer)/cart.tsx',
   'app/(buyer)/discover-feed.tsx',
   'app/(buyer)/discover.tsx',
   'app/(buyer)/feed.tsx',
@@ -82,10 +81,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/buyer-drop-detail.tsx',
   'app/buyer-live.tsx',
   'app/buyer-login-activity.tsx',
-  'app/buyer-other-profile.tsx',
   'app/buyer-post-comments.tsx',
   'app/buyer-product-detail.tsx',
-  'app/buyer-search.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
   'app/story-mention-viewer.tsx',
@@ -124,6 +121,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/profile-videos.tsx',
   'app/return-request.tsx',
   'app/seller-conversation.tsx',
+  'app/seller-drop-preview.tsx',
   'app/seller-go-live.tsx',
   // Renders the shared components/inbox/MessagesInbox.tsx (TabPageHeader, like (buyer)/inbox).
   'app/seller-inbox.tsx',

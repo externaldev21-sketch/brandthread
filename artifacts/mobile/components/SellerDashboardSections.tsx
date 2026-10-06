@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   listRight: {
-    maxWidth: '38%',
+    maxWidth: '60%',
     flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
@@ -294,7 +294,10 @@ const styles = StyleSheet.create({
     minHeight: 34,
   },
   listValue: {
-    flexShrink: 1,
+    // Never squeezed: a money value ("$318.00") was being clipped to ~46px
+    // on web next to the status badge + chevron (adjustsFontSizeToFit is
+    // native-only). The title column (flex: 1, wraps to 2 lines) gives way.
+    flexShrink: 0,
     fontSize: 15,
     fontFamily: FONT.semibold,
     color: FG,

@@ -27,7 +27,7 @@ const ROWS: Row[] = [
   { label: 'Biometric unlock', icon: 'unlock', sub: 'Face ID, Touch ID or device biometrics', route: '/biometric-unlock' },
   { label: "Where you're logged in", icon: 'smartphone', sub: 'Review active sessions', route: '/buyer-login-activity' },
   { label: 'Download your information', icon: 'download', sub: 'Get a copy of your data', route: '/buyer-download-data' },
-  { label: 'Ad and recommendation preferences', icon: 'sliders', sub: 'Control personalisation', route: '/buyer-settings-detail?section=content' },
+  { label: 'Ad and recommendation preferences', icon: 'sliders', sub: 'Control personalization', route: '/buyer-settings-detail?section=content' },
   { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account and data', route: '/delete-account', destructive: true },
 ];
 
@@ -62,6 +62,7 @@ export default function BuyerAccountCenter() {
                 icon={row.icon}
                 title={row.label}
                 subtitle={row.sub}
+                subtitleNumberOfLines={2}
                 destructive={row.destructive}
                 chevron
                 onPress={() => row.route && router.push(row.route as never)}

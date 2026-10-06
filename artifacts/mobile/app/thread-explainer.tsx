@@ -31,6 +31,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ONBOARDING_OWNER_KEY } from './_layout';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 const EXPLAINER_SEEN_PREFIX = 'thread_explainer_seen:';
 const { width: SW } = Dimensions.get('window');
@@ -73,6 +74,10 @@ export default function ThreadExplainerScreen() {
   const router = useRouter();
   const { isSignedIn, userId } = useAuth();
 
+  // Called unconditionally (it is a hook) — it used to be called inline in
+  // the JSX after the `!checked` early return, which changed the hook count
+  // between renders the moment the explainer revealed itself.
+  const headerTopInset = useHeaderTopInset();
   const [checked, setChecked] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY  = useRef(new Animated.Value(24)).current;
@@ -80,6 +85,23 @@ export default function ThreadExplainerScreen() {
   // Check if the signed-in buyer has already seen this explainer.
   // If so, redirect them immediately to the buyer feed.
   useEffect(() => {
+    // Dev-web preview has no Clerk session, so the signed-out branch below
+    // bounced every preview visit to /onboarding (whose intro animation is
+    // all the audit ever captured: a wordmark and a squiggle). The buyer
+    // preview is a buyer by definition — show the explainer itself; the
+    // seller preview goes to the seller home, like a real seller would.
+    if (isBuyerDevPreview()) {
+      setChecked(true);
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(slideY, { toValue: 0, damping: 18, stiffness: 110, useNativeDriver: true }),
+      ]).start();
+      return;
+    }
+    if (isSellerDevPreview()) {
+      router.replace('/(tabs)/' as never);
+      return;
+    }
     if (!isSignedIn || !userId) {
       // Not signed in — redirect to onboarding
       router.replace('/onboarding' as never);
@@ -132,7 +154,7 @@ export default function ThreadExplainerScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: useHeaderTopInset() }]}>
+    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: headerTopInset }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Background gradient */}

@@ -13,7 +13,6 @@ import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
 import { hapticSuccess } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
@@ -37,7 +36,7 @@ const FIELDS: FieldDef[] = [
   { key: 'username', label: 'Username',  placeholder: '@username',          icon: 'at-sign' },
   { key: 'email',    label: 'Email',     placeholder: 'your@email.com',     icon: 'mail',    keyboardType: 'email-address', editable: false },
   { key: 'phone',    label: 'Phone',     placeholder: 'Add phone number',   icon: 'phone',   keyboardType: 'phone-pad' },
-  { key: 'birthday', label: 'Birthday',  placeholder: 'Set in Login methods', icon: 'calendar', editable: false },
+  { key: 'birthday', label: 'Birthday',  placeholder: 'Not set', icon: 'calendar', editable: false },
   { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',     icon: 'smile' },
 ];
 
@@ -108,11 +107,11 @@ export default function BuyerPersonalDetails() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Personal Details" />
+      <ScreenHeader title="Personal details" />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
         <Text style={s.sectionDesc}>
-          Keep your details up to date. Email and birthday are managed by your sign-in provider.
+          Keep your details up to date. Change your email and birthday in Login methods.
         </Text>
 
         <Card style={s.card}>
@@ -171,8 +170,10 @@ const makeStyles = (palette: ReturnType<typeof useColors>, theme: ReturnType<typ
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
   rowLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: palette.mutedForeground, width: 72 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md },
-  input: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
+  // minWidth 0: a web <input> otherwise keeps its intrinsic width and pushes
+  // longer placeholders past the row's right padding.
+  input: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
   inputDisabled: { color: palette.mutedForeground },
-  note: { flexDirection: 'row', gap: 8, marginTop: SPACING.md, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
-  noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
+  note: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md },
+  noteText: { ...TYPE_SCALE.body, color: palette.mutedForeground, flex: 1 },
 });

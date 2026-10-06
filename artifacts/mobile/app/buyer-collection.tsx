@@ -23,6 +23,8 @@ import { getCollectionItems, updateCollection, deleteCollection, moveSavedItemTo
 import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
@@ -46,6 +48,7 @@ export default function BuyerCollection() {
   const [collection, setCollection] = useState<SavedCollection | null>(null);
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -53,8 +56,9 @@ export default function BuyerCollection() {
   const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async (silent = false) => {
-    if (!collectionId) return;
+    if (isMissingParam(collectionId) || isBuyerDevPreview()) return;
     if (!silent) setLoading(true);
+    setLoadError(false);
     try {
       const data = await getCollectionItems(collectionId);
       setCollection(data.collection);
@@ -62,6 +66,7 @@ export default function BuyerCollection() {
       setLoadFailed(false);
     } catch (error) {
       setLoadFailed(true);
+      setLoadError(true);
       reportNetworkError(error, () => load());
     } finally {
       setLoading(false);
@@ -192,6 +197,20 @@ export default function BuyerCollection() {
           {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
         </View>
       </TouchableOpacity>
+    );
+  }
+
+  // Opened without a collection id (or in the account-less preview, where no
+  // collection exists) — nothing to load.
+  if (isMissingParam(collectionId) || isBuyerDevPreview()) {
+    return (
+      <UnavailableScreen
+        title="Collection"
+        heading="Collection not found"
+        message="Open a collection from your saved items."
+        icon="folder"
+        fallback="/buyer-saved"
+      />
     );
   }
 

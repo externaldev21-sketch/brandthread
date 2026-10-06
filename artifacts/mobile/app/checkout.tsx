@@ -31,7 +31,9 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { Redirect } from 'expo-router';
+import { useRole } from '@/contexts/RoleContext';
 import { formatCents } from '@/lib/money';
 import { ApiError } from '@/lib/networkNotice';
 import { Button, OptionSheet } from '@/components/ui';
@@ -78,7 +80,13 @@ function previewTrackingAfter(view: ConversionTrackingView, patch: Record<string
   return next;
 }
 
-export default function CheckoutScreen() {
+export default function CheckoutRoute() {
+  const { role } = useRole();
+  if (role === 'buyer' || isBuyerDevPreview()) return <Redirect href="/buyer-checkout" />;
+  return <CheckoutScreen />;
+}
+
+function CheckoutScreen() {
   const colors = useColors();
   const api = useApi();
   const router = useRouter();

@@ -18,6 +18,41 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { PREVIEW_CHECKOUT_ADDRESS, PREVIEW_CHECKOUT_CONTACT } from '@/lib/previewCheckout';
+
+/**
+ * Sample addresses for the populated buyer demo (`?bt_preview=buyer&demo=1`)
+ * only — the same "Jordan Reyes" the demo checkout pre-fills. A fresh preview
+ * and every real account start with none.
+ */
+const PREVIEW_DEMO_ADDRESSES = [
+  {
+    id: 'preview-address-home',
+    label: 'Home',
+    recipientName: `${PREVIEW_CHECKOUT_ADDRESS.firstName} ${PREVIEW_CHECKOUT_ADDRESS.lastName}`,
+    street: PREVIEW_CHECKOUT_ADDRESS.line1,
+    line2: 'Apt 4B',
+    city: PREVIEW_CHECKOUT_ADDRESS.city,
+    state: PREVIEW_CHECKOUT_ADDRESS.state,
+    postalCode: PREVIEW_CHECKOUT_ADDRESS.postalCode,
+    country: PREVIEW_CHECKOUT_ADDRESS.country,
+    phone: PREVIEW_CHECKOUT_CONTACT.phone,
+    isDefault: true,
+  },
+  {
+    id: 'preview-address-work',
+    label: 'Work',
+    recipientName: `${PREVIEW_CHECKOUT_ADDRESS.firstName} ${PREVIEW_CHECKOUT_ADDRESS.lastName}`,
+    street: '85 Broad Street',
+    line2: 'Floor 12',
+    city: 'New York',
+    state: 'NY',
+    postalCode: '10004',
+    country: 'US',
+    isDefault: false,
+  },
+];
 
 export default function BuyerAddressesScreen() {
   const { theme } = useAppTheme();
@@ -48,9 +83,17 @@ export default function BuyerAddressesScreen() {
   const [phone, setPhone] = useState('');
   const [isDefault, setIsDefault] = useState(false);
 
+  // Signed-out buyer preview: no account, so never call the protected
+  // address API — edits stay on this screen. Demo seeds sample addresses.
+  const localPreview = !userId && isBuyerDevPreview();
+
   const load = async () => {
     if (!userId) {
-      setAddresses([]);
+      if (localPreview && isPreviewDemoMode()) {
+        setAddresses(prev => (prev.length ? prev : PREVIEW_DEMO_ADDRESSES));
+      } else if (!localPreview) {
+        setAddresses([]);
+      }
       setLoadError('');
       setLoading(false);
       return;
@@ -118,6 +161,18 @@ export default function BuyerAddressesScreen() {
       isDefault
     };
 
+    if (localPreview) {
+      const id = editingId ?? `preview-address-${Date.now()}`;
+      setAddresses(prev => {
+        const next = isCreating ? [...prev, { id, ...body }] : prev.map(a => (a.id === id ? { ...a, ...body } : a));
+        return isDefault ? next.map(a => ({ ...a, isDefault: a.id === id })) : next;
+      });
+      hapticSuccess();
+      handleCancel();
+      setSaving(false);
+      return;
+    }
+
     try {
       if (isCreating) {
         await api.buyer.addresses.create(body);
@@ -140,6 +195,7 @@ export default function BuyerAddressesScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
           hapticDestructiveConfirm();
+          if (localPreview) { setAddresses(prev => prev.filter(a => a.id !== id)); return; }
           await api.buyer.addresses.delete(id);
           await load();
         } catch {
@@ -152,6 +208,7 @@ export default function BuyerAddressesScreen() {
   const handleSetDefault = async (id: string) => {
     try {
       hapticToggle();
+      if (localPreview) { setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id }))); return; }
       await api.buyer.addresses.setDefault(id);
       await load();
     } catch {

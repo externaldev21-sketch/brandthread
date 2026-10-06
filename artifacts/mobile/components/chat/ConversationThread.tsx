@@ -339,6 +339,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
   const [conv, setConv] = useState<Conversation | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
@@ -447,6 +448,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // ── Load conversation + messages ────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
+    setLoadFailed(false);
     // The dev-web ?bt_preview=buyer bypass never signs in through Clerk (see
     // lib/devPreview.ts / the buyer inbox's own identical guard), so
     // `userId` is null here in that mode — check for a seeded preview
@@ -554,6 +556,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         }
       }
     } catch (e) {
+      const status = (e as { status?: number } | null)?.status;
+      setLoadFailed(status !== 404 && status !== 403);
       console.error('Failed to load conversation', e);
     } finally {
       setIsLoading(false);
@@ -663,7 +667,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // everywhere this screen shows the counterpart — header, request-mode
   // profile header, media-sheet copy, etc.
-  const displayName = participant?.nickname || participant?.name || params.participantName || 'Unknown';
+  const displayName = participant?.nickname || participant?.name || params.participantName || '';
   // Chat details > Theme: a conversation-level property — same background
   // and bubble colors for both participants. Null = Brandthread's existing
   // default monochrome look, completely unchanged.
@@ -2278,6 +2282,18 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
           onCancel={() => setReplyTo(null)}
         />
       ) : null;
+
+  if (!isLoading && !conv) {
+    return <View style={s.root}>
+      <ScreenHeader title="Messages" onBack={() => goBackOr(router, isSeller ? '/seller-inbox' : '/(buyer)/inbox')} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 }}>
+        <Text style={{ color: theme.text }}>{loadFailed ? "Couldn't load this conversation." : 'Conversation not found'}</Text>
+        {loadFailed ? <PressableScale onPress={() => { void loadData(); }} accessibilityRole="button" accessibilityLabel="Retry loading conversation">
+          <Text style={{ color: theme.text }}>Try again</Text>
+        </PressableScale> : null}
+      </View>
+    </View>;
+  }
 
   return (
     <KeyboardAvoidingView

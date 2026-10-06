@@ -7,7 +7,7 @@
  * (https://mobbin.com/screens/8f7bd3a9-1ab5-4288-9827-55d517cebb84).
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP, FONT } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -15,26 +15,48 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { DiscoverBrandCard } from './DiscoverBrandCard';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 
-const CARD_WIDTH = 130;
+const CARD_GAP = 12;
+const CARD_TARGET = 130;
+
+/**
+ * Card width derived from the screen width so the rail always shows whole
+ * cards plus a clear ~half-card peek at the screen edge — a fixed 130pt card
+ * left the third card cut off by just a few px at 430pt (QA-1038).
+ */
+function railCardWidth(screenWidth: number): number {
+  const avail = screenWidth - SP.md;
+  const whole = Math.max(2, Math.round(avail / (CARD_TARGET + CARD_GAP) - 0.5));
+  return Math.floor((avail - CARD_GAP * whole) / (whole + 0.5));
+}
 
 export function DiscoverTrendingBrandsRail({ brands, onSeeAll }: { brands: BrandCardData[]; onSeeAll?: () => void }) {
   const { theme } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const cardWidth = railCardWidth(width);
   if (brands.length === 0) return null;
   return (
-    <View style={{ marginVertical: SP.md, paddingHorizontal: SP.md }}>
+    <View style={{ marginVertical: SP.md }}>
       {onSeeAll ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: SP.md }}>
           <Text style={[TYPE_SCALE.headline, { color: theme.text }]}>Trending Brands</Text>
           <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all trending brands" hitSlop={12} noMinHeight>
             <Text style={[TYPE_SCALE.footnote, { color: theme.text, fontFamily: FONT.semibold }]}>See all</Text>
           </PressableScale>
         </View>
       ) : (
-        <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: 10 }]}>Trending Brands</Text>
+        <Text style={[TYPE_SCALE.headline, { color: theme.text, marginBottom: 10, paddingHorizontal: SP.md }]}>Trending Brands</Text>
       )}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
+      {/* Edge-to-edge scroller (gutter on the content, not the clip box) so
+          the peeking card is cut by the screen edge, and snaps per card. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.track}
+        snapToInterval={cardWidth + CARD_GAP}
+        decelerationRate="fast"
+      >
         {brands.map((brand) => (
-          <View key={brand.id} style={{ width: CARD_WIDTH }}>
+          <View key={brand.id} style={{ width: cardWidth }}>
             <DiscoverBrandCard brand={brand} />
           </View>
         ))}
@@ -44,5 +66,5 @@ export function DiscoverTrendingBrandsRail({ brands, onSeeAll }: { brands: Brand
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: 'row', gap: 12 },
+  track: { flexDirection: 'row', gap: CARD_GAP, paddingHorizontal: SP.md },
 });

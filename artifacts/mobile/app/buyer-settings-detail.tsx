@@ -188,7 +188,10 @@ export default function BuyerSettingsDetail() {
       Alert.alert('Could not update setting', 'Try again.');
     }
   }, [api, section, settings]);
-  const items = useMemo(() => settings ? cfg.items(settings, router, remote, display) : [], [cfg, settings, router, remote, display]);
+  const [sensitivePicker, setSensitivePicker] = useState(false);
+  const items = useMemo(() => settings ? cfg.items(settings, router, remote, display).map(item =>
+    item.label === 'Sensitive content' ? { ...item, action: () => setSensitivePicker(true) } : item
+  ) : [], [cfg, settings, router, remote, display]);
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
@@ -243,6 +246,22 @@ export default function BuyerSettingsDetail() {
       selectedId={display.prefs.translationLanguage}
       onSelect={(id) => { setTranslationSheet(false); display.set({ translationLanguage: id }); }}
     />
+    {settings ? <OptionSheet
+      visible={sensitivePicker}
+      onClose={() => setSensitivePicker(false)}
+      title="Sensitive content"
+      options={[
+        { id: 'less', label: 'Less', description: 'See less sensitive content' },
+        { id: 'standard', label: 'Standard', description: 'The default for most people' },
+        { id: 'more', label: 'More', description: 'See more sensitive content' },
+      ]}
+      selectedId={settings.sensitiveContent}
+      onSelect={(id) => {
+        setSensitivePicker(false);
+        void patchBuyerSettings({ sensitiveContent: id as BuyerSettingsState['sensitiveContent'] })
+          .then(setSettings).catch(() => Alert.alert('Could not update setting', 'Try again.'));
+      }}
+    /> : null}
   </View>;
 }
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
