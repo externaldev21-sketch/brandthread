@@ -27,9 +27,9 @@ import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/s
 import { SheetRise } from '@/components/motion/SheetRise';
 
 const MENU_TABS: { type: MenuType; label: string }[] = [
-  { type: 'main', label: 'Main Menu' },
-  { type: 'mobile', label: 'Mobile Menu' },
-  { type: 'footer', label: 'Footer Menu' },
+  { type: 'main', label: 'Main menu' },
+  { type: 'mobile', label: 'Mobile menu' },
+  { type: 'footer', label: 'Footer menu' },
 ];
 
 const LINK_TARGETS: { value: MenuItemTarget; label: string }[] = [
@@ -319,7 +319,6 @@ export default function StoreNavScreen() {
         title="Navigation"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
-      <Text style={styles.headerSubtitle}>Set up your store's navigation menus.</Text>
 
       {/* Menu Tab Selector */}
       <View style={styles.tabRow}>
@@ -351,7 +350,7 @@ export default function StoreNavScreen() {
             icon="menu"
             title="No items yet"
             description="Add your first menu item."
-            action={{ label: '+ Add Item', onPress: () => openNewItem(null), icon: 'plus' }}
+            action={{ label: 'Add item', onPress: () => openNewItem(null), icon: 'plus' }}
             style={styles.emptyState}
           />
         )}
@@ -365,17 +364,10 @@ export default function StoreNavScreen() {
         {activeMenu && (
           <TouchableOpacity style={styles.addItemBtn} onPress={() => openNewItem(null)}>
             <Feather name="plus" size={ICON.sm} color={PURPLE} />
-            <Text style={styles.addItemBtnText}>+ Add Menu Item</Text>
+            <Text style={styles.addItemBtnText}>Add menu item</Text>
           </TouchableOpacity>
         )}
 
-        {/* Footer note */}
-        <View style={styles.footerNote}>
-          <Feather name="info" size={ICON.xs} color={MUTED} />
-          <Text style={styles.footerNoteText}>
-            Changes to navigation take effect immediately on your published store.
-          </Text>
-        </View>
       </ScrollView>
 
       {/* Item Editor Modal */}
@@ -528,16 +520,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flex: 1,
     backgroundColor: 'transparent',
   },
-  headerSubtitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
   tabRow: {
     flexDirection: 'row',
     paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
     gap: SP.sm,
     marginBottom: SP.sm,
   },
@@ -648,24 +634,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
     color: PURPLE,
-  },
-  footerNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SP.xs,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.sm,
-    marginTop: SP.sm,
-  },
-  footerNoteText: {
-    flex: 1,
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    lineHeight: 16,
   },
   // Modal
   modalOverlay: {

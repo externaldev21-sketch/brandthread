@@ -23,6 +23,7 @@ import {
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import {
   getStorefront, updateSection, toggleSection, deleteSection,
   duplicateSection, reorderSections, undoLastAction, redoLastAction,
@@ -43,7 +44,7 @@ const TABS: { value: EditorMode; label: string }[] = [
   { value: 'branding', label: 'Branding' },
   { value: 'header', label: 'Header' },
   { value: 'footer', label: 'Footer' },
-  { value: 'product_page', label: 'Product Page' },
+  { value: 'product_page', label: 'Product page' },
   { value: 'collection_page', label: 'Collection' },
 ];
 
@@ -1061,14 +1062,14 @@ export default function StoreEditor() {
           <TouchableOpacity onPress={() => handleDuplicate(section.id)} style={sectionStyles.actionBtn}>
             <Text style={sectionStyles.actionBtnText}>Duplicate</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(section.id, section.label)} style={[sectionStyles.actionBtn, sectionStyles.deleteBtn]}>
-            <Text style={[sectionStyles.actionBtnText, { color: RED }]}>Delete</Text>
+          <TouchableOpacity onPress={() => handleDelete(section.id, section.label)} style={sectionStyles.actionBtn}>
+            <Text style={sectionStyles.actionBtnText}>Delete</Text>
           </TouchableOpacity>
           <View style={sectionStyles.orderBtns}>
-            <TouchableOpacity onPress={() => handleMoveUp(section.id)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+            <TouchableOpacity onPress={() => handleMoveUp(section.id)} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
               <Feather name="chevron-up" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleMoveDown(section.id)} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+            <TouchableOpacity onPress={() => handleMoveDown(section.id)} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
               <Feather name="chevron-down" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
           </View>
@@ -1145,7 +1146,7 @@ export default function StoreEditor() {
   return (
     <View style={styles.root}>
       <ScreenHeader
-        title="Edit Store"
+        title="Edit store"
         subtitle={savingStatus !== 'idle' ? saveStatusText() : undefined}
         onBack={() => goBackOr(router)}
         rightElement={
@@ -1164,40 +1165,20 @@ export default function StoreEditor() {
             >
               <Feather name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : SUBTLE} />
             </TouchableOpacity>
-            {/*
-              Save/View were previously full-text buttons ("Save Draft",
-              "Preview") sitting alongside Undo/Redo and Publish — five
-              controls crammed into the header's right slot squeezed the
-              "Edit Store" title down to a sliver (half-done audit: title
-              text clipped to 29px when it needs 91px). Icon-only buttons
-              here (matching the design-system's compact action-button
-              style used elsewhere in this header) free up that width
-              without dropping any functionality; accessibilityLabel keeps
-              each control's purpose available to assistive tech.
-              Renaming "Preview" away from a bare icon also incidentally
-              removes the app's one visible "Preview" label on this screen
-              — the no-demo-wording detector matches that word generically
-              because a fresh install must never look like it's showing a
-              harness preview/demo state, and this button's actual job
-              (open the live storefront preview) reads just as clearly as
-              an eye icon.
-            */}
+            {/* Save draft and View storefront live in one overflow menu so
+                the header keeps at most undo/redo, More and Publish. */}
             <TouchableOpacity
-              onPress={handleSaveDraft}
+              onPress={() => showActionSheet(undefined, undefined, [
+                { text: 'Save draft', onPress: handleSaveDraft },
+                { text: 'View live storefront', onPress: () => router.push('/store-preview' as never) },
+                { text: 'Cancel', style: 'cancel' },
+              ])}
               disabled={savingStatus === 'saving'}
               style={styles.headerBtn}
               accessibilityRole="button"
-              accessibilityLabel="Save draft"
+              accessibilityLabel="More actions"
             >
-              <Feather name="save" size={ICON.sm} color={FG} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/store-preview' as never)}
-              style={styles.headerBtn}
-              accessibilityRole="button"
-              accessibilityLabel="View live storefront"
-            >
-              <Feather name="eye" size={ICON.sm} color={FG} />
+              <Feather name="more-horizontal" size={ICON.sm} color={FG} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/store-publish' as never)}
@@ -1213,6 +1194,7 @@ export default function StoreEditor() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
         contentContainerStyle={styles.tabBar}
       >
         {TABS.map(tab => (
@@ -1257,7 +1239,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   undoBtnDisabled: { opacity: 0.4 },
-  // Icon-only (Save/View) — same compact footprint as undoBtn, distinct
+  // Icon-only (More) — same compact footprint as undoBtn, distinct
   // name to keep intent clear at each call site.
   headerBtn: {
     width: 32, height: 32, borderRadius: RADIUS.sm,
@@ -1309,7 +1291,6 @@ const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const BORDER = theme.border;
   const FG = theme.text;
   const MUTED = theme.muted;
-  const RED = theme.error;
   return StyleSheet.create({
   row: {
     backgroundColor: CARD, borderRadius: RADIUS.md,
@@ -1343,11 +1324,11 @@ const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.sm, paddingBottom: SP.sm, gap: SP.sm,
   },
   actionBtn: {
-    paddingHorizontal: SP.sm, paddingVertical: 5,
+    minHeight: 36, justifyContent: 'center',
+    paddingHorizontal: SP.md, paddingVertical: SP.xs,
     borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
     borderWidth: 1, borderColor: BORDER,
   },
-  deleteBtn: { borderColor: RED + '44' },
   actionBtnText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   orderBtns: {
     marginLeft: 'auto' as any, flexDirection: 'row', gap: SP.xs,

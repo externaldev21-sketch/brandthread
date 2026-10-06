@@ -856,7 +856,7 @@ export default function StoreGenerateScreen() {
         </BrandthreadCard>
 
         <PrimaryButton
-          label="Generate My Store →"
+          label="Generate my store →"
           onPress={handleGenerate}
           style={st.generateBtn}
         />
@@ -885,13 +885,12 @@ export default function StoreGenerateScreen() {
   return (
     <View style={[st.root, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
-        title="Generate My Store"
-        subtitle={`Step ${step} of ${TOTAL_STEPS}`}
+        title="Generate my store"
         onBack={handleBack}
         rightElement={
           <TouchableOpacity onPress={handleSaveAndExit} style={st.saveExitBtn} activeOpacity={0.7}>
             <Text style={st.saveExitText}>
-              {saving ? 'Saving…' : saveFailed ? 'Retry' : 'Save & Exit'}
+              {saving ? 'Saving…' : saveFailed ? 'Retry' : 'Save & exit'}
             </Text>
           </TouchableOpacity>
         }
@@ -952,49 +951,53 @@ export default function StoreGenerateScreen() {
 
       {/* Bottom nav */}
       <View style={[st.bottomNav, { paddingBottom: insets.bottom + SP.sm }]}>
-        <TouchableOpacity
-          onPress={handleBack}
-          style={st.navBackBtn}
-          activeOpacity={0.7}
-        >
-          <Feather name="arrow-left" size={ICON.sm} color={FG} />
-          <Text style={st.navBackText}>Back</Text>
-        </TouchableOpacity>
+        <View style={st.navSide}>
+          <TouchableOpacity
+            onPress={handleBack}
+            style={st.navBackBtn}
+            activeOpacity={0.7}
+          >
+            <Feather name="arrow-left" size={ICON.sm} color={FG} />
+            <Text style={st.navBackText}>Back</Text>
+          </TouchableOpacity>
+        </View>
 
         <Text style={st.navStepText}>Step {step} of {TOTAL_STEPS}</Text>
 
-        {step < TOTAL_STEPS ? (
-          <TouchableOpacity
-            onPress={continueEnabled ? handleContinue : undefined}
-            style={[st.navContinueBtn, !continueEnabled && st.navContinueBtnDisabled]}
-            activeOpacity={continueEnabled ? 0.8 : 1}
-          >
-            <LinearGradient
-              colors={continueEnabled ? [...theme.primaryGradient] : [CARD_ELEVATED, CARD_ELEVATED]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={st.navContinueGrad}
+        <View style={[st.navSide, st.navSideEnd]}>
+          {step < TOTAL_STEPS ? (
+            <TouchableOpacity
+              onPress={continueEnabled ? handleContinue : undefined}
+              style={[st.navContinueBtn, !continueEnabled && st.navContinueBtnDisabled]}
+              activeOpacity={continueEnabled ? 0.8 : 1}
             >
-              <Text style={[st.navContinueText, continueEnabled && getOnAccentTextStyle(theme)]}>Continue</Text>
-              <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
-            </LinearGradient>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            onPress={handleGenerate}
-            style={st.navContinueBtn}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[...theme.primaryGradient]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={st.navContinueGrad}
+              <LinearGradient
+                colors={continueEnabled ? [...theme.primaryGradient] : [CARD_ELEVATED, CARD_ELEVATED]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={st.navContinueGrad}
+              >
+                <Text style={[st.navContinueText, continueEnabled ? getOnAccentTextStyle(theme) : { color: theme.muted }]}>Continue</Text>
+                <Feather name="arrow-right" size={ICON.sm} color={continueEnabled ? theme.onAccent : theme.muted} />
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={handleGenerate}
+              style={st.navContinueBtn}
+              activeOpacity={0.8}
             >
-              <Text style={[st.navContinueText, getOnAccentTextStyle(theme)]}>Generate →</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+              <LinearGradient
+                colors={[...theme.primaryGradient]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={st.navContinueGrad}
+              >
+                <Text style={[st.navContinueText, getOnAccentTextStyle(theme)]}>Generate →</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -1029,8 +1032,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
     backgroundColor: SURFACE,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   saveExitBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   saveExitText: { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
@@ -1313,6 +1314,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderTopWidth: 1,
     borderTopColor: BORDER,
   },
+  // Equal-width sides keep the step label centered whatever the buttons' widths.
+  navSide: { flex: 1, alignItems: 'flex-start' },
+  navSideEnd: { alignItems: 'flex-end' },
   navBackBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, padding: SP.xs },
   navBackText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   navStepText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },

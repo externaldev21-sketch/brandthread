@@ -111,7 +111,7 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 export default function StoreFromMoodboardScreen() {
   const { theme } = useAppTheme();
   const mb = makeStyles(theme);
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { primary: PURPLE, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { user, isLoaded: isUserLoaded } = useUser();
   const [imageUris, setImageUris] = useState<string[]>([]);
@@ -120,6 +120,9 @@ export default function StoreFromMoodboardScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
+  // Only a cached analysis that was actually found shows the restore spinner;
+  // a fresh account (or a user still loading) has nothing to restore.
+  const [hasCachedAnalysis, setHasCachedAnalysis] = useState(false);
   const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<MoodboardAnalysisResult | null>(null);
@@ -159,6 +162,7 @@ export default function StoreFromMoodboardScreen() {
       try {
         const raw = await AsyncStorage.getItem(cacheKey);
         if (!raw) return;
+        if (isMounted) setHasCachedAnalysis(true);
 
         const cached: unknown = JSON.parse(raw);
         if (!isMoodboardAnalysisCache(cached)) {
@@ -186,7 +190,10 @@ export default function StoreFromMoodboardScreen() {
       } catch {
         // This cache only prevents repeat work. Ignore malformed or unavailable storage.
       } finally {
-        if (isMounted) setRestoringAnalysis(false);
+        if (isMounted) {
+          setRestoringAnalysis(false);
+          setHasCachedAnalysis(false);
+        }
       }
     };
 
@@ -292,22 +299,12 @@ export default function StoreFromMoodboardScreen() {
 
   return (
     <View style={mb.root}>
-      <ScreenHeader title="Generate from Mood Board" />
+      <ScreenHeader title="Generate from mood board" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={mb.scroll}>
         <Text style={mb.subtitle}>
           Upload 2–8 images that represent your brand aesthetic. AI will suggest colors, typography, and a theme.
         </Text>
-
-        {/* AI badge */}
-        <BrandthreadCard style={[mb.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
-          <View style={mb.bannerRow}>
-            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={[mb.bannerText, { color: PURPLE_LIGHT }]}>
-              We'll pull your colors, type and vibe from your mood board.
-            </Text>
-          </View>
-        </BrandthreadCard>
 
         {/* Image Count */}
         <Text style={mb.countLabel}>{imageUris.length} of {MAX_IMAGES} images</Text>
@@ -342,7 +339,7 @@ export default function StoreFromMoodboardScreen() {
         </View>
 
         <PrimaryButton
-          label={analyzing ? 'Analyzing...' : 'Analyze Mood Board'}
+          label={analyzing ? 'Analyzing...' : 'Analyze mood board'}
           onPress={handleAnalyze}
           loading={analyzing}
           disabled={imageUris.length < 2 || restoringAnalysis || preparingImages}
@@ -350,7 +347,7 @@ export default function StoreFromMoodboardScreen() {
           style={mb.analyzeBtn}
         />
 
-        {(preparingImages || analyzing || restoringAnalysis) && (
+        {(preparingImages || analyzing || (restoringAnalysis && hasCachedAnalysis)) && (
           <View style={mb.loadingRow}>
             <ActivityIndicator color={PURPLE} />
             <Text style={mb.loadingText}>
