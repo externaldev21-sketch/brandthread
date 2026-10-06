@@ -17,7 +17,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
-  ORANGE, RED, FONT, FS, SP, RADIUS,
+  ORANGE, RED, FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
@@ -116,7 +116,7 @@ export default function VacationModeScreen() {
     <View style={s.root}>
       <ScreenHeader title="Vacation Mode" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 80 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md }}>
 
         {/* Status hero card */}
         <View style={[s.statusCard, { borderColor: vacationMode ? ORANGE : SUCCESS }]}>

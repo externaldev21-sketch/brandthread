@@ -229,7 +229,9 @@ export default function StoreDomainScreen() {
           <BrandthreadCard style={dm.card}>
             <View style={dm.urlInputRow}>
               <TextInput
-                style={[dm.input, { flex: 1 }]}
+                // minWidth 0: on web a TextInput keeps its intrinsic width under
+                // flex: 1 and pushes the .brandthread.app suffix off the card.
+                style={[dm.input, { flex: 1, minWidth: 0 }]}
                 value={subdomainInput}
                 onChangeText={setSubdomainInput}
                 placeholder="yourstore"
@@ -249,12 +251,10 @@ export default function StoreDomainScreen() {
                 ? <StatusBadge label="Active" variant="success" small />
                 : <StatusBadge label="Not claimed" variant="neutral" small />}
             </View>
-            <View style={dm.actionRow}>
-              {btState?.status === 'active' && btState.url ? (
-                <SecondaryButton label="Copy link" small accent={MUTED} onPress={handleCopySubdomain} style={{ flex: 1 }} />
-              ) : null}
-              <PrimaryButton label={saving ? 'Saving...' : 'Save Subdomain'} onPress={handleSaveSubdomain} loading={saving} disabled={!canSave} small style={{ flex: 1 }} />
-            </View>
+            {btState?.status === 'active' && btState.url ? (
+              <SecondaryButton label="Copy link" small accent={MUTED} onPress={handleCopySubdomain} style={{ marginBottom: SP.sm }} />
+            ) : null}
+            <PrimaryButton label={saving ? 'Saving...' : 'Save Subdomain'} onPress={handleSaveSubdomain} loading={saving} disabled={!canSave} small />
           </BrandthreadCard>
         )}
 
