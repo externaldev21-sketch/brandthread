@@ -6,6 +6,8 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db, products, productVariants, shopifyProductLinks } from "@workspace/db";
 import { ShopifyAdminClient } from "./adminClient";
+import { getVerifiedPlanAccess } from "../planAccess";
+import { remainingProductCapacity } from "../productCapacity";
 import { toBrandthreadProduct, deterministicSku } from "../shopifyImport";
 
 export type ImportSummary = {
@@ -36,6 +38,7 @@ export async function importShopifyProducts(params: {
 }): Promise<ImportSummary> {
   const client = new ShopifyAdminClient(params.shopDomain, params.accessToken);
   const summary: ImportSummary = { imported: 0, updated: 0, skipped: [] };
+  const productLimit = (await getVerifiedPlanAccess(params.ownerId)).limits.products;
 
   const existingLinks = await db.select().from(shopifyProductLinks)
     .where(and(eq(shopifyProductLinks.ownerId, params.ownerId), inArray(shopifyProductLinks.shopifyProductId, params.shopifyProductIds)));
@@ -97,15 +100,23 @@ export async function importShopifyProducts(params: {
       }
 
       // ── Create new ──────────────────────────────────────────────────────
-      const [createdProduct] = await db.insert(products).values({
-        ownerId: params.ownerId,
-        name: normalized.name,
-        description: normalized.description,
-        category: normalized.category,
-        status: params.publishStatus,
-        images: normalized.images,
-        tags: normalized.tags,
-      }).returning({ id: products.id });
+      // Counts toward the plan's product cap exactly like manual creation.
+      const createdProduct = await db.transaction(async (tx) => {
+        const remaining = await remainingProductCapacity(tx, params.ownerId, productLimit);
+        if (remaining !== null && remaining <= 0) {
+          throw new Error(`Your plan allows ${productLimit} products. Upgrade to import more.`);
+        }
+        const [row] = await tx.insert(products).values({
+          ownerId: params.ownerId,
+          name: normalized.name,
+          description: normalized.description,
+          category: normalized.category,
+          status: params.publishStatus,
+          images: normalized.images,
+          tags: normalized.tags,
+        }).returning({ id: products.id });
+        return row;
+      });
 
       const variantMap: Record<string, string> = {};
       for (let i = 0; i < normalized.variants.length; i += 1) {

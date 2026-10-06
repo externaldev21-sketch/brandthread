@@ -7,6 +7,8 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
+import { getVerifiedPlanAccess } from "../lib/planAccess";
+import { remainingProductCapacity } from "../lib/productCapacity";
 import { generateText } from "@workspace/integrations-openai-ai-server/text";
 import {
   ShopifyImportError,
@@ -116,6 +118,9 @@ async function processJob(jobId: string, ownerId: string): Promise<void> {
     await updateJob(jobId, ownerId, { ...stageUpdate("analyzing_brand") });
     const ai = await generatedStore(catalog.storeName, catalog.aboutCopy, normalized, catalog.collections);
     await updateJob(jobId, ownerId, { ...stageUpdate("creating_listings") });
+    // Imports count toward the plan's product cap exactly like manual
+    // creation (they used to bypass it — 250 per batch on Starter).
+    const productLimit = (await getVerifiedPlanAccess(ownerId)).limits.products;
 
     await db.transaction(async (tx) => {
       // Serialize imports for one seller/source across separate jobs as well as
@@ -136,6 +141,8 @@ async function processJob(jobId: string, ownerId: string): Promise<void> {
           });
       }
       let importedThisBatch = 0;
+      let skippedForPlanLimit = 0;
+      let remaining = await remainingProductCapacity(tx, ownerId, productLimit);
       const destinationProductIds = new Map<string, string>();
       for (const item of normalized) {
         const [existing] = await tx.select({
@@ -151,6 +158,10 @@ async function processJob(jobId: string, ownerId: string): Promise<void> {
         if (existing) {
           destinationProductIds.set(item.sourceProductId, existing.productId);
           continue;
+        }
+        if (remaining !== null) {
+          if (remaining <= 0) { skippedForPlanLimit++; continue; }
+          remaining--;
         }
         const [product] = await tx.insert(products).values({
           ownerId, name: item.name, description: item.description, category: item.category,
@@ -210,12 +221,15 @@ async function processJob(jobId: string, ownerId: string): Promise<void> {
           theme: THREAD_THEME, branding, sections, seo,
         });
       }
-      const hasMore = Boolean(catalog.nextCursor);
+      // At the plan's product cap there is nothing more to continue with.
+      const hasMore = Boolean(catalog.nextCursor) && skippedForPlanLimit === 0;
       await tx.update(shopifyImportJobs).set({
         status: hasMore ? "needs_continuation" : "complete",
         stage: "building_storefront", nextCursor: catalog.nextCursor, hasMore,
-        errorCode: failedCount > 0 ? "PARTIAL_IMPORT" : null,
-        errorMessage: failedCount > 0 ? "Some products could not be imported. The successful products are saved and you can continue." : null,
+        errorCode: skippedForPlanLimit > 0 ? "PLAN_PRODUCT_LIMIT" : failedCount > 0 ? "PARTIAL_IMPORT" : null,
+        errorMessage: skippedForPlanLimit > 0
+          ? `Your plan allows ${productLimit} products, so ${skippedForPlanLimit} more weren't imported. Upgrade to import the rest.`
+          : failedCount > 0 ? "Some products could not be imported. The successful products are saved and you can continue." : null,
         importedCount: job.importedCount + importedThisBatch,
         failedCount: job.failedCount + failedCount,
         updatedAt: new Date(),

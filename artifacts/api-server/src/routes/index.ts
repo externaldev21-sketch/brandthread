@@ -12,7 +12,7 @@ import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
 import analyticsInsightsRouter from "./analytics-insights";
 import integrationsRouter from "./integrations";
-import logoRouter from "./logo";
+import logoRouter, { onboardingSampleRouter } from "./logo";
 import mockupRouter from "./mockup";
 import photographyRouter from "./photography";
 import bgRemovalRouter from "./bg-removal";
@@ -241,7 +241,7 @@ router.use("/auth",            authRouter);
 router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.
-router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), logoRouter);
+router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), onboardingSampleRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);

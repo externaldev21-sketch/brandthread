@@ -4,16 +4,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { auth, api } = vi.hoisted(() => ({
-  auth: { isLoaded: true, isSignedIn: false, userId: null as string | null },
-  api: {
-    team: { context: vi.fn() },
-    seller: { subscription: { status: vi.fn() } },
-  },
-}));
+const { auth, api } = vi.hoisted(() => {
+  // The hook reads the plan from /entitlement; one mock stands for both
+  // plan endpoints so the "never called signed out" assertions cover them.
+  const planRequest = vi.fn();
+  return {
+    auth: { isLoaded: true, isSignedIn: false, userId: null as string | null },
+    api: {
+      team: { context: vi.fn() },
+      seller: { subscription: { status: planRequest, entitlement: planRequest } },
+    },
+  };
+});
 
 vi.mock('@clerk/expo', () => ({ useAuth: () => auth }));
-vi.mock('@/lib/api', () => ({ useApi: () => api }));
+vi.mock('@/lib/api', () => ({
+  useApi: () => api,
+  getStoreContext: () => null,
+  subscribeStoreContext: () => () => {},
+}));
 
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { useSubscriptionPlan, invalidatePlanCache } from '@/hooks/useSubscriptionPlan';

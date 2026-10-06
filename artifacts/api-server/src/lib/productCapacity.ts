@@ -1,14 +1,15 @@
-import { products } from "@workspace/db";
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
-
 /**
- * Same plan-limit rule as `hasProductCapacity` in routes/products.ts: live
- * (non-archived, non-deleted) products plus `requested` must fit under the
- * plan's limit. Takes the per-owner advisory lock so concurrent requests
- * cannot both slip under the cap.
+ * How many more products a seller's plan allows (Starter caps the catalogue;
+ * see planCatalogue.ts). Counts the same rows POST /api/products counts —
+ * every non-archived, non-deleted product, drafts included — under the same
+ * advisory lock, so imports and manual creation can't race past the cap.
+ * Call inside a transaction; returns null when the plan has no limit.
  */
-export async function hasProductCapacity(tx: any, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
-  if (limit === null) return true;
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { products } from "@workspace/db";
+
+export async function remainingProductCapacity(tx: any, ownerId: string, limit: number | null): Promise<number | null> {
+  if (limit === null) return null;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"product-limit:" + ownerId}))`);
   const [result] = await tx
     .select({ count: sql<number>`count(*)::int` })
@@ -18,5 +19,10 @@ export async function hasProductCapacity(tx: any, ownerId: string, limit: number
       ne(products.status, "archived"),
       isNull(products.deletedAt),
     ));
-  return (result?.count ?? 0) + requested <= limit;
+  return Math.max(0, limit - (result?.count ?? 0));
+}
+
+export async function hasProductCapacity(tx: any, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
+  const remaining = await remainingProductCapacity(tx, ownerId, limit);
+  return remaining === null || requested <= remaining;
 }
