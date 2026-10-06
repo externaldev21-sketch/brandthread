@@ -99,6 +99,16 @@ const TIME_CHIPS = Array.from({ length: 48 }, (_, i) => {
   return { value, label };
 });
 
+// Date/time chips draw 40pt tall (1pt border, which hitSlop is measured
+// inside of): pad 3pt above/below to reach 44pt. Their horizontal scrollers
+// clip content, so each carries CHIP_SLOP_Y of vertical padding cancelled by
+// an equal negative margin (chipScroll) — no visual or layout change.
+const CHIP_SLOP_Y = 3;
+const CHIP_HIT_SLOP = { top: CHIP_SLOP_Y, bottom: CHIP_SLOP_Y, left: 0, right: 0 };
+// Pre-order / Pre-made segments and the timezone button: 38pt tall with a
+// 1pt border → 44pt (4pt each way, within the 8pt gaps around them).
+const SEGMENT_HIT_SLOP = { top: 4, bottom: 4, left: 0, right: 0 };
+
 function Chip({ label, active, onPress, theme }: { label: string; active: boolean; onPress: () => void; theme: any }) {
   return (
     <TouchableOpacity
@@ -107,6 +117,7 @@ function Chip({ label, active, onPress, theme }: { label: string; active: boolea
         styles.chip,
         { borderColor: active ? theme.accent : theme.border, backgroundColor: active ? theme.accent : theme.card },
       ]}
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
     >
@@ -129,17 +140,17 @@ function DateTimeChipPicker({
 
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
         {DAY_CHIPS.map(c => (
           <Chip key={c.value} label={c.label} active={dateValue === c.value} onPress={() => onDateChange(c.value)} theme={theme} />
         ))}
       </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { marginTop: 8 }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={[styles.chipRow, { marginTop: 8 }]}>
         {TIME_CHIPS.map(c => (
           <Chip key={c.value} label={c.label} active={timeValue === c.value} onPress={() => onTimeChange(c.value)} theme={theme} />
         ))}
       </ScrollView>
-      <TouchableOpacity onPress={() => setCustomOpen(v => !v)} style={styles.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={() => setCustomOpen(v => !v)} style={styles.customToggle} hitSlop={{ top: 10, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityState={{ expanded: showCustom }}>
         <Feather name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={theme.muted} />
         <Text style={[styles.customToggleText, { color: theme.muted }]}>Enter an exact date & time</Text>
       </TouchableOpacity>
@@ -446,6 +457,9 @@ export default function SellerDropCreate() {
                     isEdit && { opacity: 0.6 },
                   ]}
                   onPress={() => setType(t)}
+                  hitSlop={SEGMENT_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: type === t, disabled: isEdit }}
                 >
                   <Text style={[styles.segmentText, { color: type === t ? theme.onAccent : theme.text }]}>
                     {t === 'pre-order' ? 'Pre-order' : 'Pre-made'}
@@ -510,6 +524,9 @@ export default function SellerDropCreate() {
             <TouchableOpacity
               style={[styles.tzButton, { borderColor: theme.border, backgroundColor: theme.card }]}
               onPress={() => setTzPickerOpen(true)}
+              hitSlop={SEGMENT_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={`Timezone: ${timezone}`}
             >
               <Feather name="globe" size={14} color={theme.muted} />
               <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }} numberOfLines={1}>{timezone}</Text>
@@ -523,7 +540,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>SET AN END TIME</Text>
-              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} />
+              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} accessibilityLabel="Set an end time" />
             </View>
             {hasEndDate && (
               <View style={{ marginTop: 8 }}>
@@ -541,7 +558,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>EARLY ACCESS FOR FOLLOWERS</Text>
-              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} />
+              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} accessibilityLabel="Early access for followers" />
             </View>
             {earlyAccessEnabled && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
@@ -692,7 +709,8 @@ const styles = StyleSheet.create({
   secondaryBtn: { flexDirection: 'row', minHeight: 46, borderWidth: 1, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: 8 },
   tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   tzRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },
-  chipRow: { flexDirection: 'row', gap: 8, paddingRight: SP.md },
+  chipScroll: { marginVertical: -CHIP_SLOP_Y },
+  chipRow: { flexDirection: 'row', gap: 8, paddingRight: SP.md, paddingVertical: CHIP_SLOP_Y },
   chip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   customToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },

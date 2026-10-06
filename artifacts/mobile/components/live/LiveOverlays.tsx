@@ -16,6 +16,7 @@ import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { minHitSlop } from '@/lib/hitSlop';
 import { Glass } from '@/components/ui/Glass';
 import Composer from '@/components/ui/Composer';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -41,6 +42,14 @@ export function LiveHostAvatar({ host, size }: { host: LiveHost; size: number })
   );
 }
 
+// Host profile tap area is ~35pt tall inside the pill → pad to 44 vertically.
+const HOST_TAP_HIT_SLOP = minHitSlop({ height: 35 });
+// Pinned product "Buy" pill is 32pt tall (centred in a 64pt card).
+const BUY_HIT_SLOP = minHitSlop({ height: 32 });
+// Comment-bar quick icons are 34×40 boxes laid edge to edge; the drawn icons
+// (20–24pt) are centred, so 5pt of side slop never reaches a neighbour's glyph.
+const QUICK_ICON_HIT_SLOP = minHitSlop({ width: 34, height: 40 });
+
 export function LiveHostPill({
   host, viewerCount, following, onFollow, onOpenHost,
 }: {
@@ -52,10 +61,16 @@ export function LiveHostPill({
 }) {
   return (
     <View style={styles.hostPill} testID="live-host-pill">
-      <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
+      {/* The pill's rounded clip lives on this background layer only (not on
+          hostPill itself) so the profile/follow buttons' hitSlop can extend
+          past the 41pt-tall pill on web without being clipped. */}
+      <View style={styles.hostPillClip} pointerEvents="none">
+        <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
+      </View>
       <Pressable
         onPress={onOpenHost}
         style={styles.hostTap}
+        hitSlop={HOST_TAP_HIT_SLOP}
         accessibilityRole="button"
         accessibilityLabel={`${host.name}${host.verified ? ', verified' : ''}. ${formatViewerCount(viewerCount)} watching. Open profile`}
       >
@@ -218,6 +233,7 @@ export function LivePinnedProductCard({
       <Pressable
         onPress={() => { hapticLight(); onBuy(); }}
         style={styles.buyBtn}
+        hitSlop={BUY_HIT_SLOP}
         accessibilityRole="button"
         accessibilityLabel={`Buy ${product.name}`}
         testID="live-buy"
@@ -384,17 +400,17 @@ export function LiveCommentBar({
       rightAccessory={hasQuick ? (
         <>
           {onGift && (
-            <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={4} testID="live-gift">
+            <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={QUICK_ICON_HIT_SLOP} testID="live-gift">
               <ThreadCashBill width={24} />
             </Pressable>
           )}
           {onShare && (
-            <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
+            <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={QUICK_ICON_HIT_SLOP} testID="live-comment-share">
               <Feather name="share" size={20} color={theme.text} />
             </Pressable>
           )}
           {onMore && (
-            <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
+            <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={QUICK_ICON_HIT_SLOP} testID="live-comment-more">
               <Feather name="more-horizontal" size={20} color={theme.text} />
             </Pressable>
           )}
@@ -415,8 +431,9 @@ const styles = StyleSheet.create({
   // combined natural width.
   hostPill: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 3, paddingRight: 4, paddingVertical: 3,
-    borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250, flexShrink: 1, minWidth: 0,
+    borderRadius: RADIUS.pill, maxWidth: 250, flexShrink: 1, minWidth: 0,
   },
+  hostPillClip: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: RADIUS.pill, overflow: 'hidden' },
   hostTap: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
   hostText: { flexShrink: 1, minWidth: 0 },
   hostNameRow: { flexDirection: 'row', alignItems: 'center' },

@@ -16,6 +16,7 @@
  */
 import * as React from 'react';
 import View from 'react-native-web/dist/exports/View';
+import StyleSheet from 'react-native-web/dist/exports/StyleSheet';
 
 export function normalizeSlop(hitSlop) {
   if (hitSlop == null) return null;
@@ -30,23 +31,47 @@ export function normalizeSlop(hitSlop) {
   return { top, bottom, left, right };
 }
 
-function slopChild(slop) {
+// An absolutely-positioned child is placed relative to its parent's padding
+// box, but native hitSlop extends from the outer (border) edge — add the
+// touchable's own border widths so a bordered chip gets the full slop.
+function borderWidths(style) {
+  let flat;
+  try {
+    flat = StyleSheet.flatten(typeof style === 'function' ? style({ pressed: false, hovered: false, focused: false }) : style) || {};
+  } catch {
+    flat = {};
+  }
+  const all = typeof flat.borderWidth === 'number' ? flat.borderWidth : 0;
+  const pick = (v) => (typeof v === 'number' ? v : all);
+  return { top: pick(flat.borderTopWidth), bottom: pick(flat.borderBottomWidth), left: pick(flat.borderLeftWidth), right: pick(flat.borderRightWidth) };
+}
+
+function slopChild(slop, border) {
   return React.createElement(View, {
     key: '__hitslop',
     'aria-hidden': true,
     dataSet: { hitslop: '1' },
-    style: { position: 'absolute', top: -slop.top, bottom: -slop.bottom, left: -slop.left, right: -slop.right },
+    style: {
+      position: 'absolute',
+      top: -(slop.top + border.top),
+      bottom: -(slop.bottom + border.bottom),
+      left: -(slop.left + border.left),
+      right: -(slop.right + border.right),
+    },
   });
 }
 
 export function withWebHitSlop(Component, { functionChildren }) {
   function WithHitSlop(props, ref) {
     const { hitSlop, children, ...rest } = props;
-    const slop = rest.disabled ? null : normalizeSlop(hitSlop);
+    // Kept on disabled controls too, as native does — the press is ignored
+    // either way, and the tap area doesn't jump when the control enables.
+    const slop = normalizeSlop(hitSlop);
     if (!slop) return React.createElement(Component, { ...rest, ref }, children);
+    const border = borderWidths(rest.style);
     const content = functionChildren
-      ? (state) => [slopChild(slop), React.createElement(React.Fragment, { key: '__content' }, typeof children === 'function' ? children(state) : children)]
-      : [slopChild(slop), React.createElement(React.Fragment, { key: '__content' }, children)];
+      ? (state) => [slopChild(slop, border), React.createElement(React.Fragment, { key: '__content' }, typeof children === 'function' ? children(state) : children)]
+      : [slopChild(slop, border), React.createElement(React.Fragment, { key: '__content' }, children)];
     return React.createElement(Component, { ...rest, ref }, content);
   }
   const Wrapped = React.memo(React.forwardRef(WithHitSlop));

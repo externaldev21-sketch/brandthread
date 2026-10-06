@@ -391,7 +391,15 @@ export default function AIPhotoshootScreen() {
                 );
               })}
             </View>
-            <TouchableOpacity style={s.uploadInsteadRow} onPress={pickUploadInsteadOfProduct} accessibilityRole="button">
+            <TouchableOpacity
+              style={s.uploadInsteadRow}
+              onPress={pickUploadInsteadOfProduct}
+              accessibilityRole="button"
+              // 17pt-tall text link: 8pt up into its top margin, the rest down
+              // into the divider's margin — but not over the uploaded-photo
+              // tiles when they sit directly beneath it.
+              hitSlop={uploadedProductUris.length > 0 ? UPLOAD_INSTEAD_HIT_SLOP_ABOVE_TILES : UPLOAD_INSTEAD_HIT_SLOP}
+            >
               <Feather name="upload" size={ICON.sm} color={MUTED} />
               <Text style={s.uploadInsteadText}>Upload photos instead</Text>
             </TouchableOpacity>
@@ -425,14 +433,14 @@ export default function AIPhotoshootScreen() {
 
         <View style={s.chipRow}>
           {SCENE_STYLES.slice(0, 6).map((opt) => (
-            <TouchableOpacity key={opt.value} style={[s.chip, sceneStyle === opt.value && s.chipActive]} onPress={() => setSceneStyle(opt.value)}>
+            <TouchableOpacity key={opt.value} style={[s.chip, sceneStyle === opt.value && s.chipActive]} hitSlop={CHIP_HIT_SLOP} accessibilityRole="button" accessibilityState={{ selected: sceneStyle === opt.value }} onPress={() => setSceneStyle(opt.value)}>
               <Text style={[s.chipText, sceneStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
         <View style={s.chipRow}>
           {MODEL_STYLES.slice(0, 5).map((opt) => (
-            <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} onPress={() => setModelStyle(opt.value)}>
+            <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} hitSlop={CHIP_HIT_SLOP} accessibilityRole="button" accessibilityState={{ selected: modelStyle === opt.value }} onPress={() => setModelStyle(opt.value)}>
               <Text style={[s.chipText, modelStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
             </TouchableOpacity>
           ))}
@@ -443,7 +451,7 @@ export default function AIPhotoshootScreen() {
             <Text style={s.optionLabel}>Aspect ratio</Text>
             <View style={s.chipRow}>
               {RATIOS.map((r) => (
-                <TouchableOpacity key={r.value} style={[s.chip, ratio === r.value && s.chipActive]} onPress={() => setRatio(r.value)}>
+                <TouchableOpacity key={r.value} style={[s.chip, ratio === r.value && s.chipActive]} hitSlop={CHIP_HIT_SLOP} accessibilityRole="button" accessibilityState={{ selected: ratio === r.value }} onPress={() => setRatio(r.value)}>
                   <Text style={[s.chipText, ratio === r.value && s.chipTextActive]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -455,7 +463,7 @@ export default function AIPhotoshootScreen() {
             <Text style={s.optionLabel}>Number of shots</Text>
             <View style={s.chipRow}>
               {SHOT_COUNTS.map((n) => (
-                <TouchableOpacity key={n} style={[s.chip, shotCount === n && s.chipActive]} onPress={() => setShotCount(n)}>
+                <TouchableOpacity key={n} style={[s.chip, shotCount === n && s.chipActive]} hitSlop={CHIP_HIT_SLOP} accessibilityRole="button" accessibilityState={{ selected: shotCount === n }} onPress={() => setShotCount(n)}>
                   <Text style={[s.chipText, shotCount === n && s.chipTextActive]}>{n}</Text>
                 </TouchableOpacity>
               ))}
@@ -514,6 +522,14 @@ function ProductPickerModal({ visible, loading, products, onClose, onSelect }: {
     </View>
   );
 }
+
+// Option chips draw 32pt tall in wrapping rows with 8pt gaps: pad vertically
+// and up to 3pt sideways past the 1pt border (never reaching a neighbouring
+// chip) so every chip, even the narrow "1"/"2" shot counts, gets a 44pt tap
+// area. hitSlop is measured from inside the border, hence the +1.
+const CHIP_HIT_SLOP = { top: 7, bottom: 7, left: 4, right: 4 };
+const UPLOAD_INSTEAD_HIT_SLOP = { top: 8, bottom: 19, left: 0, right: 0 };
+const UPLOAD_INSTEAD_HIT_SLOP_ABOVE_TILES = { top: 8, bottom: 0, left: 0, right: 0 };
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },

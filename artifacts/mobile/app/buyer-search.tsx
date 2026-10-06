@@ -578,7 +578,9 @@ export default function BuyerSearchScreen() {
           onPress={() => goBackOr(router)}
           accessibilityRole="button"
           accessibilityLabel="Back"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // 26×28 chevron → 44×44 tap area; only 8pt toward the search field
+          // (the header's gap) so it never covers the field itself.
+          hitSlop={{ top: 8, bottom: 8, left: 10, right: 8 }}
           testID="buyer-search-back"
         >
           <Feather name="chevron-left" size={26} color={fg} />
@@ -623,6 +625,9 @@ export default function BuyerSearchScreen() {
             onPress={() => router.push('/(buyer)/friends' as never)}
             accessibilityRole="button"
             accessibilityLabel="Add friends"
+            // 24×24 icon → 44×44 tap area; 8pt toward the field (the header's
+            // gap), the rest into the right gutter.
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 12 }}
             testID="buyer-search-add-person"
             style={styles.headerSideButton}
           >

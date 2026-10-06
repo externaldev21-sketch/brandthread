@@ -38,6 +38,7 @@ import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { minHitSlop } from '@/lib/hitSlop';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -839,6 +840,9 @@ interface SectionHeaderProps {
   style?: StyleProp<ViewStyle>;
 }
 
+// Text-height action link (~16pt, e.g. "+ Add options"): pad to 44×44.
+const SECTION_ACTION_HIT_SLOP = minHitSlop({ width: 28, height: 16 });
+
 export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   const { theme } = useAppTheme();
   return (
@@ -850,7 +854,7 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
         <PressableScale
           onPress={action.onPress}
           accessibilityLabel={action.label}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={SECTION_ACTION_HIT_SLOP}
           // Keeps the action's own box the height of its text — PressableScale
           // otherwise enforces a 44pt minimum touch target on its rendered
           // box, which is taller than the title's row and reads as the

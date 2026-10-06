@@ -47,6 +47,11 @@ import {
 // rather than ship fabricated personal usage stats. Re-add it once a real
 // backing endpoint exists.
 
+// Plan/Billing tabs draw 34pt tall (the active one's 2pt underline border
+// sits inside that, and hitSlop is measured inside the border): pad 6pt
+// above/below so both reach 44pt.
+const TAB_HIT_SLOP = { top: 6, bottom: 6, left: 0, right: 0 };
+
 export default function SubscriptionScreen() {
   const { theme } = useAppTheme();
   const {
@@ -290,6 +295,9 @@ export default function SubscriptionScreen() {
             testID={`seller-subscription-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
             onPress={() => { haptic(); setActiveTab(t); }}
+            hitSlop={TAB_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeTab === t }}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t.charAt(0).toUpperCase() + t.slice(1)}

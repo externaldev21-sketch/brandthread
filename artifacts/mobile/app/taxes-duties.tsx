@@ -6,6 +6,7 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
+import { minHitSlop } from '@/lib/hitSlop';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
 
@@ -111,6 +112,7 @@ export default function TaxesDutiesScreen() {
               value={stripeTaxEnabled}
               onValueChange={handleToggleTax}
               disabled={savingTax || loading}
+              accessibilityLabel="Automatic tax at checkout"
             />
           </View>
 
@@ -145,6 +147,7 @@ export default function TaxesDutiesScreen() {
               value={chargeShippingTax}
               onValueChange={handleToggleShipping}
               disabled={savingShipping || loading || !stripeTaxEnabled}
+              accessibilityLabel="Charge tax on shipping cost"
             />
           </View>
           {!stripeTaxEnabled && (
@@ -160,7 +163,7 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax regions and registrations</Text>
-            <TouchableOpacity onPress={openStripeTaxRegistrations} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
+            <TouchableOpacity onPress={openStripeTaxRegistrations} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]} hitSlop={minHitSlop({ height: 34 - 2 }) /* minus 1pt borders: web slop sits inside the border box */} accessibilityRole="button">
               <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Open Stripe</Text>
             </TouchableOpacity>
           </View>

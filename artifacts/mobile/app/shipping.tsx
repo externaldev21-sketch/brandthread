@@ -564,6 +564,9 @@ export default function ShippingScreen() {
             <TouchableOpacity
               onPress={() => { setShipFromDraft(shipFromCountry); setShipFromEditing(true); }}
               style={[styles.countryPill, { borderColor: colors.border }]}
+              hitSlop={COUNTRY_PILL_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={`Home country: ${shipFromCountry}. Edit`}
             >
               <Text style={[styles.countryPillText, { color: colors.foreground }]}>{shipFromCountry}</Text>
               <Feather name="edit-2" size={12} color={colors.mutedForeground} />
@@ -578,6 +581,8 @@ export default function ShippingScreen() {
         <TouchableOpacity
           onPress={() => openNewZone('country')}
           activeOpacity={0.75}
+          hitSlop={SECTION_ADD_BTN_HIT_SLOP}
+          accessibilityRole="button"
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
           <Feather name="plus" size={14} color={colors.primary} />
@@ -705,6 +710,8 @@ export default function ShippingScreen() {
         <TouchableOpacity
           onPress={openNewPreset}
           activeOpacity={0.75}
+          hitSlop={SECTION_ADD_BTN_HIT_SLOP}
+          accessibilityRole="button"
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
           <Feather name="plus" size={14} color={colors.primary} />
@@ -1013,6 +1020,13 @@ export default function ShippingScreen() {
     </View>
   );
 }
+
+// Tap-area padding (hitSlop, measured inside each 1pt border) — drawn
+// controls unchanged. The 34pt ship-from pill pads 6pt above/below. The 27pt
+// "Add Zone"/"Add Package" buttons pad mostly upward into the previous
+// section's 24pt bottom margin, only 3pt down toward the subtitle text.
+const COUNTRY_PILL_HIT_SLOP = { top: 6, bottom: 6, left: 0, right: 0 };
+const SECTION_ADD_BTN_HIT_SLOP = { top: 16, bottom: 3, left: 0, right: 0 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

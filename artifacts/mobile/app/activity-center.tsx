@@ -76,6 +76,7 @@ import {
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
 import { Chip } from '@/components/ui/Chip';
+import { minHitSlop } from '@/lib/hitSlop';
 import {
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_CHIPS,
@@ -129,6 +130,9 @@ const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
   highlights: 'Highlights', today: 'Today', yesterday: 'Yesterday',
   last_7_days: 'Last 7 days', last_30_days: 'Last 30 days',
 };
+
+// A row's tap area is drawn ≥40pt tall inside 16pt row padding → pad to 44.
+const ROW_TAP_HIT_SLOP = minHitSlop({ height: 40 });
 
 // ─── Filter chips ───────────────────────────────────────────────────────────
 // A horizontally scrolling row of pill chips below the header — Threads'
@@ -415,6 +419,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         onPress={() => onPress(row)}
         onLongPress={longPress}
         testID={`activity-row-${row.key}`}
+        hitSlop={ROW_TAP_HIT_SLOP}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
       >

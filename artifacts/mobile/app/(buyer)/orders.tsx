@@ -208,7 +208,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} hitSlop={ORDER_ACTION_HIT_SLOP} accessibilityRole="button">
           <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
         </TouchableOpacity>
         {order.trackingNumber && (
@@ -216,6 +216,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+            hitSlop={ORDER_ACTION_HIT_SLOP}
+            accessibilityRole="button"
           >
             <Feather name="map-pin" size={12} color={theme.secondary} />
             <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
@@ -474,6 +476,11 @@ function OrderCardGap() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
+// Order-card action buttons draw 36pt tall (1pt border, which hitSlop is
+// measured inside of); pad vertically to 44pt — 8pt margin above, the card's
+// 16pt padding below, so nothing else is covered.
+const ORDER_ACTION_HIT_SLOP = { top: 5, bottom: 5, left: 0, right: 0 };
 
 function cardStyles(theme: AppThemePreset) {
   return StyleSheet.create({

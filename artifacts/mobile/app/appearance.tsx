@@ -115,6 +115,8 @@ export default function AppearanceScreen() {
           <HapticSwitch
             value={followsTheme}
             onValueChange={toggleFollowTheme}
+            accessibilityLabel="Follow app theme"
+            accessibilityHint={`Automatically matches your icon to ${theme.name}`}
           />
         </View>
 

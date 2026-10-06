@@ -9,6 +9,9 @@ import type { StoryMentionItem } from '@/services/socialTypes';
 
 const RING_SIZE = 64;
 const RING_WIDTH = 2.5;
+// "See all" is a ~16pt-tall text link: pad to 44 tall without changing
+// layout. Slightly less below so the slop stops short of the rings.
+const SEE_ALL_HIT_SLOP = { top: 16, bottom: 12, left: 8, right: 8 };
 
 function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles: ReturnType<typeof makeStyles>; theme: AppThemePreset }) {
   const inner = RING_SIZE - RING_WIDTH * 2 - 4;
@@ -59,7 +62,7 @@ export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
         <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>Story mentions</Text>
         <Pressable
           onPress={onSeeAll}
-          hitSlop={8}
+          hitSlop={SEE_ALL_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel="See all story mentions"
           testID="story-mentions-see-all"
