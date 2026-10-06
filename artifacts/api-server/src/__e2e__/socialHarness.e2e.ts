@@ -67,6 +67,15 @@ describe("social e2e harness", () => {
     try { fs.unlinkSync(STOP_FILE); } catch { /* not present */ }
     server = outer.listen(PORT, "127.0.0.1");
     await new Promise<void>((resolve) => server!.once("listening", () => resolve()));
+    // Realtime channel, if this branch has it — same e2e token scheme.
+    // (Path built at runtime so branches without ws/userHub still typecheck.)
+    const userHubPath = ["..", "ws", "userHub"].join("/");
+    const userHub = (await import(/* @vite-ignore */ userHubPath).catch(() => null)) as
+      | { attachUserWebSocket: (s: Server, o: { verifyToken: (t: string | null | undefined) => Promise<string | null> }) => unknown }
+      | null;
+    userHub?.attachUserWebSocket(server!, {
+      verifyToken: async (token) => (token && token.startsWith("e2e:") ? token.slice(4) : null),
+    });
     // eslint-disable-next-line no-console
     console.log(`[social-e2e] API on http://127.0.0.1:${PORT} — buyer=${E2E_BUYER} seller=${E2E_SELLER}`);
     while (!fs.existsSync(STOP_FILE)) await new Promise((r) => setTimeout(r, 500));
