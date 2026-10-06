@@ -15,6 +15,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
 import { FONT, FS, SP, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED, SCREEN_BG } from '@/lib/theme';
 import type { ReviewItem } from '@/components/ProductReviewsSection';
+import { EmptyState } from '@/components/layout';
+import { MissingItemState } from '@/components/states/MissingItemState';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 type StarFilter = 5 | 4 | 3 | 2 | 1 | null;
 
@@ -26,6 +29,9 @@ export default function ProductReviewsScreen() {
   const [avgRating, setAvgRating] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const tabBarInset = useSellerTabBarInset();
   const [photosOnly, setPhotosOnly] = useState(false);
   const [starFilter, setStarFilter] = useState<StarFilter>(null);
   const [sizeFilter, setSizeFilter] = useState<string | null>(null);
@@ -33,6 +39,8 @@ export default function ProductReviewsScreen() {
   useEffect(() => {
     if (!productId) return;
     let active = true;
+    setLoading(true);
+    setLoadError(false);
     api.reviews.forProduct(productId)
       .then(data => {
         if (!active) return;
@@ -40,9 +48,10 @@ export default function ProductReviewsScreen() {
         setAvgRating(data.avgRating ?? 0);
         setTotalCount(data.totalCount ?? 0);
       })
+      .catch(() => { if (active) setLoadError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [productId, api]);
+  }, [productId, api, retryKey]);
 
   const sizes = useMemo(
     () => [...new Set(reviews.map(r => r.sizeBought).filter((v): v is string => !!v))],
@@ -55,11 +64,28 @@ export default function ProductReviewsScreen() {
     (!sizeFilter || r.sizeBought === sizeFilter),
   );
 
+  // Opened without a product (stale link): there is nothing to fetch, so
+  // never sit on the spinner.
+  if (!productId) {
+    return <MissingItemState headerTitle="Reviews" title="Product not found" icon="star" />;
+  }
+
   return (
     <View style={s.root}>
       <ScreenHeader title={productName || 'Reviews'} subtitle={totalCount > 0 ? `${avgRating.toFixed(1)} · ${totalCount} reviews` : undefined} />
       {loading ? (
         <View style={s.center}><ActivityIndicator /></View>
+      ) : loadError ? (
+        <EmptyState
+          variant="error"
+          icon="alert-circle"
+          title="Couldn't load reviews"
+          message="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => setRetryKey(k => k + 1)}
+        />
+      ) : reviews.length === 0 ? (
+        <EmptyState icon="star" title="No reviews yet" message="Reviews from buyers will show up here." />
       ) : (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
@@ -87,7 +113,7 @@ export default function ProductReviewsScreen() {
           <FlatList
             data={filtered}
             keyExtractor={item => item.id}
-            contentContainerStyle={{ padding: SP.md }}
+            contentContainerStyle={{ padding: SP.md, paddingBottom: SP.md + tabBarInset }}
             ListEmptyComponent={<View style={s.center}><Text style={s.muted}>No matching reviews</Text></View>}
             renderItem={({ item }) => (
               <View style={s.card}>

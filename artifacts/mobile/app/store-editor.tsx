@@ -23,6 +23,7 @@ import {
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import {
   getStorefront, updateSection, toggleSection, deleteSection,
   duplicateSection, reorderSections, undoLastAction, redoLastAction,
@@ -179,6 +180,7 @@ export default function StoreEditor() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const params = useLocalSearchParams<{ sectionId?: string }>();
   const scrollRef = useRef<ScrollView>(null);
   const sectionPanelRef = useRef<View>(null);
@@ -1093,7 +1095,7 @@ export default function StoreEditor() {
       // 120px on this outer container — not just the scroll content — keeps
       // the list's actual rendered height short enough to clear the bar
       // even before any scrolling, for every list length.
-      <View style={{ flex: 1, paddingBottom: 120 }}>
+      <View style={{ flex: 1, paddingBottom: tabBarInset }}>
         <View style={styles.sectionsTopRow}>
           <TouchableOpacity
             onPress={() => router.push('/store-sections' as never)}
@@ -1155,14 +1157,14 @@ export default function StoreEditor() {
               disabled={!undoAvailable}
               style={[styles.undoBtn, !undoAvailable && styles.undoBtnDisabled]}
             >
-              <Feather name="corner-up-left" size={ICON.sm} color={undoAvailable ? FG : SUBTLE} />
+              <Feather name="corner-up-left" size={ICON.sm} color={undoAvailable ? FG : MUTED} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleRedo}
               disabled={!redoAvailable}
               style={[styles.undoBtn, !redoAvailable && styles.undoBtnDisabled]}
             >
-              <Feather name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : SUBTLE} />
+              <Feather name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : MUTED} />
             </TouchableOpacity>
             {/*
               Save/View were previously full-text buttons ("Save Draft",
@@ -1213,6 +1215,7 @@ export default function StoreEditor() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.tabBarScroll}
         contentContainerStyle={styles.tabBar}
       >
         {TABS.map(tab => (
@@ -1272,6 +1275,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   headerBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+  // Without flexGrow: 0 a horizontal ScrollView on web stretches to fill the
+  // column, leaving a tall blank band above the tab content.
+  tabBarScroll: { flexGrow: 0, flexShrink: 0 },
   tabBar: { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: 4 },
   tab: {
     paddingHorizontal: SP.md, paddingVertical: SP.sm,

@@ -829,7 +829,9 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
   rowLabel: {
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 100,
+    // minWidth (not a fixed width) keeps the label column aligned without
+    // wrapping longer labels like "Brand name" / "Banner / cover".
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, minWidth: 100, flexShrink: 0,
   },
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
   rowValue: {

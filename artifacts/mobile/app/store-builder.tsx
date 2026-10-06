@@ -10,7 +10,6 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
@@ -31,6 +30,7 @@ import {
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -239,32 +239,19 @@ export default function StoreBuilderScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
+      <ScreenHeader title="Store Builder" onBack={leaveSetupDestination} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
       >
-        {/* HEADER */}
-        <LinearGradient
-          colors={[...theme.primaryGradient]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[s.header, { paddingTop: topInset + SP.md }]}
-        >
-          <TouchableOpacity
-            onPress={leaveSetupDestination}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.75}
-            style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
-          >
-            <Feather name="arrow-left" size={ICON.sm} color={theme.onAccent} />
-          </TouchableOpacity>
-          <Text style={s.headerSubtitle}>Store Builder</Text>
-          <Text style={s.headerHeading}>Build your brand's home.</Text>
-          <Text style={s.headerDesc}>
+        {/* INTRO — the shared header above carries back + title */}
+        <View style={s.header}>
+          <Text style={[s.headerHeading, { color: FG }]}>Build your brand's home.</Text>
+          <Text style={[s.headerDesc, { color: MUTED }]}>
             Every Brandthread store begins with one focused, fashion-first storefront system.
           </Text>
-        </LinearGradient>
+        </View>
 
         <View style={s.content}>
           {/* CURRENT STORE STATUS CARD */}
@@ -582,7 +569,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   header: {
     paddingHorizontal: SP.md,
-    paddingBottom: SP.xl,
+    paddingTop: SP.md,
   },
   headerSubtitle: {
     fontSize: FS.sm,

@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -79,6 +80,7 @@ export default function StoreSectionsScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const [adding, setAdding] = useState<string | null>(null);
 
   async function handleAdd(sectionType: string) {
@@ -102,13 +104,13 @@ export default function StoreSectionsScreen() {
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
 
-      <Text style={styles.subtitle}>Choose a section to add to your homepage.</Text>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + SP.xl }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + SP.xl + tabBarInset }]}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Scrolls with the list so cards never slide under a pinned line. */}
+        <Text style={styles.subtitle}>Choose a section to add to your homepage.</Text>
         {SECTION_CATALOG.map((group) => (
           <View key={group.category} style={styles.group}>
             <SectionHeader title={group.category} style={styles.sectionHeader} />
@@ -183,8 +185,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: MUTED,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
   },
   scrollContent: {
     paddingHorizontal: SP.md,

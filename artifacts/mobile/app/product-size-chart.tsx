@@ -10,7 +10,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator } from 'react-native';
+  TextInput, Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +20,8 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { BrandthreadHeader, PrimaryButton } from '@/components/BrandthreadUI';
+import { PrimaryButton } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ export default function ProductSizeChartScreen() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
+  const { width: windowWidth } = useWindowDimensions();
 
   const [loading, setLoading]     = useState(true);
   const [saving,  setSaving]      = useState(false);
@@ -185,13 +187,16 @@ export default function ProductSizeChartScreen() {
     );
   }
 
+  // Measurement columns share the width left after the Size and delete
+  // columns so the default 4-column table fits a phone; from 5 columns on they
+  // stop shrinking and the table scrolls horizontally (indicator shown).
+  const tableWidth = Math.min(windowWidth, 1080) - SP.lg * 2;
+  const colWidth = Math.max(56, Math.floor((tableWidth - 60 - 36) / Math.max(columns.length, 1)));
+  const tableScrolls = 60 + 36 + colWidth * columns.length > tableWidth;
+
   return (
-    <View style={[s.root, { paddingTop: headerTopInset }]}>
-      <BrandthreadHeader
-        title="Size Chart"
-        subtitle={productName ?? undefined}
-        onBack={() => goBackOr(router)}
-      />
+    <View style={s.root}>
+      <ScreenHeader title="Size Chart" />
 
       <ScrollView
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 120 }]}
@@ -243,16 +248,16 @@ export default function ProductSizeChartScreen() {
 
         {/* Table */}
         {rows.length > 0 && columns.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: SP.md }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={tableScrolls} style={{ marginTop: SP.md }}>
             <View>
               {/* Header row */}
               <View style={t.headerRow}>
-                <View style={[t.cell, t.sizeCell, t.headerCell]}>
+                <View style={[t.cell, t.sizeCell, t.headerCell, { backgroundColor: 'transparent' }]}>
                   <Text style={t.headerText}>Size</Text>
                 </View>
                 {columns.map((col, ci) => (
-                  <View key={ci} style={[t.cell, t.headerCell]}>
-                    <Text style={t.headerText}>{col}</Text>
+                  <View key={ci} style={[t.cell, t.headerCell, { width: colWidth }]}>
+                    <Text style={t.headerText} numberOfLines={1}>{col}</Text>
                   </View>
                 ))}
                 <View style={[t.cell, t.actionCell]} />
@@ -271,7 +276,7 @@ export default function ProductSizeChartScreen() {
                     />
                   </View>
                   {columns.map((_, ci) => (
-                    <View key={ci} style={t.cell}>
+                    <View key={ci} style={[t.cell, { width: colWidth }]}>
                       <TextInput
                         style={t.cellInput}
                         value={row.values[ci] ?? ''}

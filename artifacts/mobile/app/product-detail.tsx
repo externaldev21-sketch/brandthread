@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -27,6 +26,8 @@ import { Product, ProductVariant, ProductStatus } from '@/services/productTypes'
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -63,7 +64,6 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
 
@@ -124,12 +124,16 @@ export default function ProductDetailScreen() {
     setActiveTab(tab);
   }, []);
 
+  // No id at all (stale / hand-typed link): nothing to load, so never show
+  // a network error for it.
+  if (!id) {
+    return <MissingItemState headerTitle="Product" title="Product not found" icon="package" />;
+  }
+
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
-        <View style={s.header}>
-          <LoadingSkeleton height={36} style={{ width: 200 }} />
-        </View>
+      <View style={s.root}>
+        <ScreenHeader title="Product" />
         <View style={{ padding: SP.md, gap: SP.md }}>
           <LoadingSkeleton height={200} />
           <LoadingSkeleton height={80} />
@@ -139,21 +143,15 @@ export default function ProductDetailScreen() {
     );
   }
 
+  // Loaded fine but the API has no such product.
+  if (!product && !loadError && userId) {
+    return <MissingItemState headerTitle="Product" title="Product not found" icon="package" />;
+  }
+
   if (!product) {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
-        <View style={s.header}>
-          <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
-            style={s.backBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Back"
-          >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </PressableScale>
-          <Text style={s.headerTitle} numberOfLines={1}>Product</Text>
-          <View style={s.headerRight} />
-        </View>
+      <View style={s.root}>
+        <ScreenHeader title="Product" />
         <EmptyState
           icon="alert-circle"
           title="Couldn't load this product"
@@ -168,21 +166,11 @@ export default function ProductDetailScreen() {
   const coverImage = product.media.find(m => m.isCover) ?? product.media[0];
 
   return (
-    <View style={[s.root, { paddingTop: headerTopInset }]}>
+    <View style={s.root}>
       {/* ── Fixed Header ── */}
-      <View style={s.header}>
-        {/* Fix 3: back button uses goBackOr(router) */}
-        <PressableScale
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
-          style={s.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </PressableScale>
-
-        <Text style={s.headerTitle} numberOfLines={1}>{product.name}</Text>
-
+      <ScreenHeader
+        title={product.name}
+        rightElement={
         <View style={s.headerRight}>
           {/* Fix 7: edit button navigates to /add-product with editId param */}
           <PressableScale
@@ -239,7 +227,8 @@ export default function ProductDetailScreen() {
             <Feather name="more-horizontal" size={ICON.md} color={FG} />
           </PressableScale>
         </View>
-      </View>
+        }
+      />
 
       {/* ── Tab Bar ── */}
       <View style={s.tabBarWrap}>

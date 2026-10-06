@@ -27,6 +27,7 @@ import { useApi } from '@/lib/api';
 import { clearAccountLifecycleState } from '@/lib/accountService';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 
@@ -38,6 +39,7 @@ export default function DeleteAccountScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
+  const tabBarInset = useSellerTabBarInset();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -125,7 +127,7 @@ export default function DeleteAccountScreen() {
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader title="Delete account" onBack={goBack} />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl + tabBarInset }} keyboardShouldPersistTaps="handled">
         {step === 'overview' ? (
           <>
             <View style={s.heroIcon}><Feather name="trash-2" size={24} color={theme.error} /></View>

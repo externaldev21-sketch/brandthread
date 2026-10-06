@@ -2,7 +2,7 @@
  * Brandthread — Login Methods
  * Shows all connected sign-in methods for the current account.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
 } from 'react-native';
@@ -18,6 +18,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { FONT } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -55,6 +56,17 @@ export default function LoginMethods() {
   const [passwordSetupError, setPasswordSetupError] = useState('');
   const [passwordSetupSaving, setPasswordSetupSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // Clerk may never hydrate (no live session, e.g. the signed-out web
+  // preview) — stop spinning after a few seconds and offer a retry.
+  useEffect(() => {
+    if (isLoaded) return;
+    const t = setTimeout(() => setLoadTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, [isLoaded, loadAttempt]);
+  const loadFailed = (isLoaded && !user) || (!isLoaded && loadTimedOut);
 
   const externalAccounts = user?.externalAccounts ?? [];
   const hasGoogle  = externalAccounts.some(a => a.provider === 'google');
@@ -282,9 +294,19 @@ export default function LoginMethods() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Login Methods" />
+      <ScreenHeader title="Login methods" />
 
-      {!isLoaded ? (
+      {loadFailed ? (
+        <EmptyState
+          variant="error"
+          icon="alert-circle"
+          title="Couldn't load your login methods"
+          message="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => { setLoadTimedOut(false); setLoadAttempt((n) => n + 1); }}
+          style={{ flex: 1 }}
+        />
+      ) : !isLoaded ? (
         <View style={s.loading}>
           <ActivityIndicator color={colors.primary} />
         </View>

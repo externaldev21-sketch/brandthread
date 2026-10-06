@@ -104,7 +104,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={s.stepperRow}>
-      <Text style={s.stepperLabel}>{label}</Text>
+      <Text style={s.stepperLabel} numberOfLines={1}>{label}</Text>
       <View style={s.stepperControl}>
         <TouchableOpacity
           style={s.stepperBtn}
@@ -2404,8 +2404,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Fixed width: on web a TextInput is an <input> with a ~170px intrinsic
+  // width, which squeezed the label into two lines ("In / stock").
   stepperInput: {
-    minWidth: 32, fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
+    width: 48, minWidth: 32, fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
     paddingVertical: 0,
   },
 

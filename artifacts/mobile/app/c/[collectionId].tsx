@@ -20,6 +20,7 @@ import {
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ResponsiveContainer } from '@/components/layout';
 import { formatCents } from '@/lib/money';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -64,6 +65,7 @@ export default function PublicCollectionScreen() {
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!collectionId) { setState({ kind: 'not_found' }); return; }
@@ -71,9 +73,11 @@ export default function PublicCollectionScreen() {
     setState({ kind: 'loading' });
     fetchPublicCollection(collectionId)
       .then(data => { if (!cancelled) setState({ kind: 'ready', data }); })
-      .catch((err) => { if (!cancelled) setState(err?.status === 404 ? { kind: 'not_found' } : { kind: 'error' }); });
+      // 401/403 from the public endpoint also mean "not viewable" (private or
+      // unknown id), not a connection problem.
+      .catch((err) => { if (!cancelled) setState([401, 403, 404].includes(err?.status) ? { kind: 'not_found' } : { kind: 'error' }); });
     return () => { cancelled = true; };
-  }, [collectionId]);
+  }, [collectionId, reloadKey]);
 
   if (state.kind === 'loading') {
     return (
@@ -83,22 +87,27 @@ export default function PublicCollectionScreen() {
     );
   }
 
-  if (state.kind === 'not_found' || state.kind === 'error') {
+  if (state.kind === 'not_found') {
     return (
-      <View style={[styles.root, styles.center, { paddingTop: headerTopInset }]}>
-        <Feather name={state.kind === 'not_found' ? 'folder' : 'alert-circle'} size={40} color={MUTED} />
-        <Text style={styles.messageTitle}>
-          {state.kind === 'not_found' ? 'Collection not found' : 'Something went wrong'}
-        </Text>
-        <Text style={styles.messageDesc}>
-          {state.kind === 'not_found'
-            ? 'This collection may be private or no longer exists.'
-            : 'Please check your connection and try again.'}
-        </Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/' as never)}>
-          <Text style={styles.primaryBtnText}>Open Brandthread</Text>
-        </TouchableOpacity>
-      </View>
+      <MissingItemState
+        headerTitle="Collection"
+        icon="folder"
+        title="Collection not found"
+        message="This collection may be private or no longer exists."
+      />
+    );
+  }
+
+  if (state.kind === 'error') {
+    return (
+      <MissingItemState
+        headerTitle="Collection"
+        icon="alert-circle"
+        title="Something went wrong"
+        message="Please check your connection and try again."
+        actionLabel="Retry"
+        onAction={() => setReloadKey(k => k + 1)}
+      />
     );
   }
 
