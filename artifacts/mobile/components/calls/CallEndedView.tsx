@@ -1,9 +1,11 @@
 /**
  * CallEndedView — Instagram's "call ended + rating" screen. Terminal, not
  * minimizable, so the top-right icon is a close "X" (not the chevron the
- * other three surfaces use). Tapping a rating icon gives visual + haptic
- * confirmation and auto-dismisses after a beat; there's no backend yet to
- * persist the rating (follow-up for a later PR — see the report).
+ * other three surfaces use). Tapping a rating icon saves it to the call
+ * record (POST /api/call/dm/calls/:id/rating), gives visual + haptic
+ * confirmation and auto-dismisses after a beat. The rating is only asked for
+ * calls that actually connected; a declined / missed / failed call says what
+ * happened instead.
  *
  * Instagram shows a privacy-policy line at the very bottom of this screen;
  * that's Instagram-specific legal copy with no Brandthread equivalent, so
@@ -14,6 +16,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCallSession } from '@/lib/calls/CallSessionContext';
+import { useApi } from '@/lib/api';
+import { endedSubtitle } from '@/lib/calls/dmCallClient';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { CallAvatarCircle } from './CallAvatarCircle';
 import { BigCircleButton, CallScreenShell, TopBarIconButton, formatCallDuration } from './CallControls';
@@ -23,6 +27,7 @@ const AUTO_DISMISS_MS = 1100;
 export function CallEndedView() {
   const { theme } = useAppTheme();
   const { session, clearEndedCall } = useCallSession();
+  const api = useApi();
   const [rating, setRating] = useState<'good' | 'not-good' | null>(null);
 
   useEffect(() => {
@@ -35,6 +40,8 @@ export function CallEndedView() {
   if (!session) return null;
   const { peer, connectedAt, endedAt } = session;
   const durationSec = connectedAt && endedAt ? Math.max(0, Math.round((endedAt - connectedAt) / 1000)) : null;
+  const connected = !!connectedAt;
+  const isRealCall = !session.callId.startsWith('preview_') && !session.callId.startsWith('pending_');
 
   function dismiss() {
     clearEndedCall();
@@ -44,6 +51,9 @@ export function CallEndedView() {
     if (rating) return;
     setRating(value);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (session && isRealCall) {
+      void api.call.dm.rate(session.callId, value === 'good' ? 'good' : 'not_good').catch(() => {});
+    }
   }
 
   return (
@@ -58,7 +68,7 @@ export function CallEndedView() {
           avatarUri={peer.avatarUri}
           size={90}
           title={peer.name}
-          subtitle="Call ended"
+          subtitle={endedSubtitle(session)}
         />
         {durationSec != null && (
           <Text style={[TYPE_SCALE.body, TABULAR_NUMS, { color: theme.muted }]}>
@@ -66,6 +76,7 @@ export function CallEndedView() {
           </Text>
         )}
 
+        {connected && (
         <View style={styles.ratingBlock}>
           <Text style={[TYPE_SCALE.callout, styles.ratingPrompt, { color: theme.muted }]}>
             How was the quality of your call?
@@ -87,6 +98,7 @@ export function CallEndedView() {
             />
           </View>
         </View>
+        )}
       </View>
     </CallScreenShell>
   );

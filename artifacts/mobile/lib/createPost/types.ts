@@ -35,6 +35,9 @@ export interface SlideDraft {
 
 export interface VideoDraft {
   uri: string;
+  /** Server-copied, account-owned remix clip; avoid uploading it again. */
+  objectPath?: string;
+  remixOfPostId?: string;
   mimeType?: string | null;
   /** Source length in seconds. */
   duration: number;

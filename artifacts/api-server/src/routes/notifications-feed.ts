@@ -347,6 +347,9 @@ type PublishInput = {
   pushKind?: "transactional" | "promotional";
   /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
   pushExplicitRequest?: boolean;
+  pushPriority?: "default" | "normal" | "high";
+  pushInterruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
+  extraData?: Record<string, unknown>;
 };
 
 /** conversation_participants.muted_until in the future (Chat details > Mute). */
@@ -374,11 +377,14 @@ async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory
       targetType: n.targetType,
       cta: n.cta,
       commentId: n.commentId,
+      ...(n.extraData ?? {}),
     },
     sound: n.pushSound,
     channelId: n.pushChannelId,
     kind: n.pushKind,
     explicitRequest: n.pushExplicitRequest,
+    priority: n.pushPriority,
+    interruptionLevel: n.pushInterruptionLevel,
   }, pushCategory, n.analyticsOwnerId);
 }
 
@@ -442,18 +448,24 @@ export async function publishNotification(n: PublishInput): Promise<void> {
       title: n.title,
       body: n.body ?? "",
       data: {
-        notificationId: notification.id,
         type: n.type,
         category: n.category,
         targetId: n.targetId,
         targetType: n.targetType,
         cta: n.cta,
         commentId: n.commentId,
+        actorName: n.actorName,
+        // Extra push-only keys; they may override the feed row's targetType/
+        // targetId (e.g. an incoming call pushes the call, the feed row opens the chat).
+        ...(n.extraData ?? {}),
+        notificationId: notification.id,
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
       kind: n.pushKind,
       explicitRequest: n.pushExplicitRequest,
+      ...(n.pushPriority ? { priority: n.pushPriority } : {}),
+      ...(n.pushInterruptionLevel ? { interruptionLevel: n.pushInterruptionLevel } : {}),
     }, pushCategory, n.analyticsOwnerId);
   }
 }

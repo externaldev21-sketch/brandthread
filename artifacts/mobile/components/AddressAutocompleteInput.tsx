@@ -32,6 +32,7 @@ import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { useCheckoutT } from '@/components/checkout/CheckoutLanguage';
 
 export interface AddressSelection {
   line1: string;
@@ -75,6 +76,8 @@ export function AddressAutocompleteInput({
 }) {
   const api = useApi();
   const { theme } = useAppTheme();
+  // The buyer checkout's language when used there (English elsewhere).
+  const t = useCheckoutT();
   const styles = makeStyles(theme);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [status, setStatus] = useState<AddressSearchStatus>('idle');
@@ -151,13 +154,13 @@ export function AddressAutocompleteInput({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>Street address</Text>
+      <Text style={styles.label}>{t('Street address')}</Text>
       <View style={styles.inputWrap}>
         <Feather name="search" size={17} color={theme.muted} />
         <TextInput
           value={value}
           onChangeText={handleChangeText}
-          placeholder="Start typing your address"
+          placeholder={t('Start typing your address')}
           placeholderTextColor={theme.subtle}
           autoCapitalize="words"
           autoComplete="street-address"

@@ -2,11 +2,9 @@
  * 1:1 DM calling — shared types.
  *
  * Mirrors the same "one provider interface, swappable implementation" shape
- * as lib/live/types.ts. PR1 only ships `previewCallProvider` (a fully
- * simulated call, no network/media) so the whole Instagram-mirror UI can be
- * built and screenshotted without real Agora credentials. PR2 adds
- * `agoraCallProvider`, which adapts the already-working Agora engine logic
- * in app/call-screen.tsx to this same interface — no UI changes needed.
+ * as lib/live/types.ts: `agoraCallProvider` (real — server call state +
+ * Agora media) for every account, `previewCallProvider` (simulated) only for
+ * the `&demo=1` web preview.
  */
 
 export type CallMode = 'voice' | 'video';
@@ -65,6 +63,8 @@ export interface CallSession {
   /** Wall-clock ms when the call ended. Only set once status === 'ended'. */
   endedAt?: number;
   endReason?: CallEndReason;
+  /** Why a call couldn't be placed or answered (shown on the ended screen). */
+  failureMessage?: string;
 }
 
 /** A single call-log entry rendered as a bubble in the conversation thread. */

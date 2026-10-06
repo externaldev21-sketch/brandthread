@@ -33,6 +33,7 @@ import { PostPicker } from '@/components/create-post/PostPicker';
 import { CarouselEditor } from '@/components/create-post/CarouselEditor';
 import { VideoEditor } from '@/components/create-post/VideoEditor';
 import { PostScreen, type PublishState } from '@/components/create-post/PostScreen';
+import { remixClipToVideoClip, remixErrorMessage } from '@/lib/remix';
 
 type Step = 'capture' | 'gallery' | 'edit' | 'post';
 
@@ -68,11 +69,12 @@ export default function CreatePostScreen() {
   const router = useRouter();
   const api = useApi();
   const { role, isLoaded: roleLoaded } = useRole();
-  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string }>();
+  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string; remixOf?: string }>();
   const isSeller = role === 'seller' && params.accountType !== 'buyer';
   const roleKey = isSeller ? 'seller' : 'buyer';
   const modes = CREATE_MODES_BY_ROLE[roleKey];
   const editId = typeof params.editId === 'string' ? params.editId : undefined;
+  const remixOf = typeof params.remixOf === 'string' ? params.remixOf : undefined;
   const isWeb = Platform.OS === 'web';
   // Camera-first on native and web; a browser without a camera still has
   // the roll shortcut and permission placeholder. Keep a direct-gallery opt-out.
@@ -107,6 +109,26 @@ export default function CreatePostScreen() {
   const leave = useCallback(() => {
     leaveSetupFlow(router, params.from);
   }, [params.from, router]);
+
+  useEffect(() => {
+    if (!remixOf || editId) return;
+    let live = true;
+    api.remix.clip(remixOf).then((clip) => {
+      if (!live) return;
+      const source = remixClipToVideoClip(clip);
+      const duration = Math.min(Math.max(0.1, source.duration), MAX_VIDEO_SECONDS);
+      setMedia({ kind: 'video', video: {
+        uri: source.uri, objectPath: source.objectPath, remixOfPostId: remixOf,
+        duration, speed: 1, trimStart: 0, trimEnd: duration, coverOffset: 0,
+      } });
+      setStep('edit');
+    }).catch((error) => {
+      if (!live) return;
+      Alert.alert('Remix unavailable', remixErrorMessage(error) ?? "Couldn't load this video. Try again.");
+      leave();
+    });
+    return () => { live = false; };
+  }, [api, editId, leave, remixOf]);
 
   // A buyer can never be in a Threads flow, however the route was reached.
   useEffect(() => {

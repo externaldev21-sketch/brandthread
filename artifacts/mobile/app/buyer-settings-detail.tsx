@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, SP } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -9,13 +9,48 @@ import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Card, ListRow } from '@/components/ui';
+import { Card, ListRow, OptionSheet } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import {
+  COMMENT_AUDIENCE_OPTIONS, CommentAudience, DEFAULT_INTERACTION_SETTINGS, InteractionSettings,
+  InteractionSettingsPatch, REMIX_AUDIENCE_OPTIONS, RemixAudience, activeSnoozeUntil, applyInteractionPatch,
+  commentAudienceLabel, peopleCountLabel, remixAudienceLabel, snoozeLabel,
+} from '@/lib/interactionSettings';
+import { useDisplayPrefs } from '@/contexts/DisplayPrefsContext';
+import { DisplayPrefs, TEXT_SIZE_OPTIONS, TextSize, textSizeLabel } from '@/lib/displayPrefs';
+import { TRANSLATION_LANGUAGES, translationLanguageName } from '@/lib/translation';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
-type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
+type Item = {
+  label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void;
+  /** A switch backed by the server (account interaction settings), not the local buyer settings. */
+  remoteToggle?: { value: boolean; onChange: (value: boolean) => void };
+};
 
-type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>) => Item[] };
+/** Server-backed values for the story, comments and sharing sections (GET /api/interaction-settings, blocks). */
+type Remote = {
+  interaction: InteractionSettings;
+  storyHiddenCount: number;
+  blockedCount: number;
+  pendingTagCount: number;
+  setInteraction: (patch: InteractionSettingsPatch) => void;
+  pickCommentAudience: () => void;
+  pickRemixAudience: () => void;
+};
+
+/** Account display preferences (GET/PATCH /api/display-preferences; local only in the signed-out preview). */
+type Display = {
+  prefs: DisplayPrefs;
+  set: (patch: Partial<DisplayPrefs>) => void;
+  pickTextSize: () => void;
+  pickTranslationLanguage: () => void;
+};
+
+type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>, remote?: Remote, display?: Display) => Item[] };
+
+/** Sections whose rows show server-backed values. */
+const REMOTE_SECTIONS = new Set(['story', 'comments', 'sharing', 'tags', 'suggested']);
 
 const CONFIG: Record<string, Config> = {
   activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: () => [
@@ -24,17 +59,17 @@ const CONFIG: Record<string, Config> = {
   archive: { title: 'Archive', items: () => [{ label: 'Posts archive', icon: 'grid' }, { label: 'Stories archive', icon: 'clock' }, { label: 'Live archive', icon: 'video' }] },
   qr: { title: 'QR code', intro: 'Your unique profile code. Share it so people can find you on Brandthread.', items: (_s, router) => [{ label: 'Share QR code', icon: 'share-2', action: () => router?.push('/buyer-qr-code' as never) }] },
   'close-friends': { title: 'Close Friends', intro: 'Only people you add can see Close Friends stories and posts.', items: (_s, router) => [{ label: 'Manage close friends', icon: 'user-plus', action: () => router?.push('/buyer-close-friends' as never) }] },
-  story: { title: 'Story and live', items: s => [{ label: 'Allow story replies', icon: 'message-circle', value: s.storyReplies }, { label: 'Allow sharing to messages', toggle: 'storySharing' }, { label: 'Hide story from people', icon: 'eye-off', value: '0 people' }, { label: 'Close Friends', icon: 'star' }] },
+  story: { title: 'Story and live', items: (s, router, r) => [{ label: 'Allow story replies', icon: 'message-circle', value: s.storyReplies }, { label: 'Allow sharing to messages', toggle: 'storySharing' }, ...(r ? [{ label: 'Hide story from people', icon: 'eye-off' as const, value: peopleCountLabel(r.storyHiddenCount), action: () => router?.push('/buyer-story-hidden' as never) }] : []), { label: 'Close Friends', icon: 'star', action: () => router?.push('/buyer-close-friends' as never) }] },
   messages: { title: 'Messages and story replies', items: s => [{ label: 'Message requests', toggle: 'messageRequests' }, { label: 'Read receipts', toggle: 'readReceipts' }, { label: 'Show activity status', toggle: 'activityStatus' }, { label: 'Who can add you to groups', value: s.groupAdds }, { label: 'Story replies', value: s.storyReplies }] },
-  tags: { title: 'Tags and mentions', items: s => [{ label: 'Who can mention you', value: s.allowMentions }, { label: 'Who can tag you', value: s.allowTags }, { label: 'Manually approve tags', toggle: 'manualTagApproval' }, { label: 'Pending tags', value: '0' }] },
-  comments: { title: 'Comments', items: () => [{ label: 'Allow comments from', value: 'Everyone' }, { label: 'Block comments from', value: '0 people' }, { label: 'Hide offensive comments', icon: 'shield' }, { label: 'Filter specific words', icon: 'filter' }] },
-  sharing: { title: 'Sharing and remixes', items: s => [{ label: 'Allow people to share your posts to stories', toggle: 'storySharing' }, { label: 'Allow reposts', value: 'On' }, { label: 'Allow remixes of videos', value: 'Friends' }, { label: 'Allow downloads of your content', value: 'Off' }] },
+  tags: { title: 'Tags and mentions', items: (s, router, r) => [{ label: 'Who can mention you', value: s.allowMentions }, { label: 'Who can tag you', value: s.allowTags }, ...(r ? [{ label: 'Manually approve tags', remoteToggle: { value: r.interaction.manualTagApproval, onChange: (v: boolean) => r.setInteraction({ manualTagApproval: v }) } }, { label: 'Pending tags', value: String(r.pendingTagCount), action: () => router?.push('/buyer-pending-tags' as never) }] : [])] },
+  comments: { title: 'Comments', items: (_s, router, r) => [...(r ? [{ label: 'Allow comments from', value: commentAudienceLabel(r.interaction.commentAudience), action: r.pickCommentAudience }, { label: 'Block comments from', value: peopleCountLabel(r.blockedCount), action: () => router?.push('/buyer-blocked' as never) }] : []), { label: 'Hide offensive comments', icon: 'shield' }, { label: 'Filter specific words', icon: 'filter' }] },
+  sharing: { title: 'Sharing and remixes', items: (s, _router, r) => [{ label: 'Allow people to share your posts to stories', toggle: 'storySharing' }, ...(r ? [{ label: 'Allow reposts', remoteToggle: { value: r.interaction.allowReposts, onChange: (v: boolean) => r.setInteraction({ allowReposts: v }) } }, { label: 'Allow remixes of videos', value: remixAudienceLabel(r.interaction.remixAudience), action: r.pickRemixAudience }, { label: 'Allow downloads of your content', remoteToggle: { value: r.interaction.allowDownloads, onChange: (v: boolean) => r.setInteraction({ allowDownloads: v }) } }] : [])] },
   'hidden-words': { title: 'Hidden Words', intro: 'Automatically filter comments and message requests containing offensive or custom words.', items: s => [{ label: 'Hide offensive comments', toggle: 'hiddenWords' }, { label: 'Advanced comment filtering', toggle: 'hiddenWords' }, { label: 'Custom words and phrases', value: 'Manage list' }] },
   muted: { title: 'Muted accounts', items: () => [{ label: 'No muted accounts', sub: 'People you mute will appear here.', icon: 'volume-x' }] },
   restricted: { title: 'Restricted accounts', items: () => [{ label: 'No restricted accounts', sub: 'Restricted people cannot see when you are online or when you read their messages.', icon: 'user-x' }] },
   favorites: { title: 'Favorites', intro: 'Follow sellers and brands to see more from them in Discover.', items: () => [] },
   content: { title: 'Content preferences', items: s => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', icon: 'refresh-cw' }] },
-  suggested: { title: 'Suggested content', items: s => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Snooze suggested posts', value: 'Off' }, { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
+  suggested: { title: 'Suggested content', items: (s, _router, r) => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, ...(r ? [{ label: 'Snooze suggested posts', sub: 'Show only accounts you follow in your feed for 30 days', value: snoozeLabel(r.interaction.suggestedSnoozedUntil), action: () => r.setInteraction({ snoozeSuggested: !activeSnoozeUntil(r.interaction.suggestedSnoozedUntil) }) }] : []), { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
   payments: { title: 'Addresses and payments', items: () => [{ label: 'Shipping addresses', icon: 'map-pin', value: '1 saved' }, { label: 'Payment methods', icon: 'credit-card', value: 'Manage' }, { label: 'Autofill checkout info', icon: 'zap', value: 'On' }, { label: 'Purchase protection', icon: 'shield', value: 'Brandthread protected' }] },
   notifications: { title: 'Push notifications', intro: 'Choose which updates Brandthread may send to this device.', items: (s, router) => [
     { label: 'New drops', sub: 'Drops from sellers you follow', toggle: 'dropAlerts' },
@@ -43,8 +78,8 @@ const CONFIG: Record<string, Config> = {
     { label: 'Friend activity', sub: 'Requests, follows, and social activity', toggle: 'friendActivity' },
     { label: 'Email & in-app', sub: 'Choose what reaches your inbox and your activity feed', icon: 'mail', action: () => router?.push('/notification-channels' as never) },
   ] },
-  accessibility: { title: 'Accessibility', items: s => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, { label: 'Text size', value: 'Default' }, { label: 'High contrast icons', value: 'Off' }] },
-  language: { title: 'Language', items: s => [{ label: 'App language', value: s.language }, { label: 'Translation language', value: 'English' }, { label: 'Auto-translate captions', value: 'On' }] },
+  accessibility: { title: 'Accessibility', items: (s, _router, _r, d) => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, ...(d ? [{ label: 'Text size', value: textSizeLabel(d.prefs.textSize), action: d.pickTextSize }, { label: 'High contrast icons', remoteToggle: { value: d.prefs.highContrastIcons, onChange: (v: boolean) => d.set({ highContrastIcons: v }) } }] : [])] },
+  language: { title: 'Language', items: (s, _router, _r, d) => [{ label: 'App language', value: s.language }, ...(d ? [{ label: 'Translation language', value: translationLanguageName(d.prefs.translationLanguage), action: d.pickTranslationLanguage }, { label: 'Auto-translate captions', remoteToggle: { value: d.prefs.autoTranslateCaptions, onChange: (v: boolean) => d.set({ autoTranslateCaptions: v }) } }] : [])] },
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
   appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
   'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
@@ -60,10 +95,42 @@ export default function BuyerSettingsDetail() {
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [interaction, setInteractionState] = useState<InteractionSettings | null>(null);
+  const [storyHiddenCount, setStoryHiddenCount] = useState(0);
+  const [blockedCount, setBlockedCount] = useState(0);
+  const [pendingTagCount, setPendingTagCount] = useState(0);
+  const [audienceSheet, setAudienceSheet] = useState(false);
+  const [remixSheet, setRemixSheet] = useState(false);
+  const [textSizeSheet, setTextSizeSheet] = useState(false);
+  const [translationSheet, setTranslationSheet] = useState(false);
+  const displayPrefs = useDisplayPrefs();
+  const updateDisplayPrefs = displayPrefs.update;
+  const display = useMemo<Display>(() => ({
+    prefs: displayPrefs.prefs,
+    set: (patch) => { updateDisplayPrefs(patch).catch(() => Alert.alert('Could not update setting', 'Try again.')); },
+    pickTextSize: () => setTextSizeSheet(true),
+    pickTranslationLanguage: () => setTranslationSheet(true),
+  }), [displayPrefs.prefs, updateDisplayPrefs]);
   const cfg = CONFIG[section] ?? CONFIG.content;
+  const previewOnly = isBuyerDevPreview();
   const load = useCallback(async () => {
     setLoadError(false);
     try {
+      if (REMOTE_SECTIONS.has(section)) {
+        if (previewOnly) {
+          // Signed-out web preview: never call protected APIs; a fresh account's values, edited locally.
+          setInteractionState(prev => prev ?? { ...DEFAULT_INTERACTION_SETTINGS });
+        } else {
+          const [remote, blocks] = await Promise.all([
+            api.interactionSettings.get(),
+            section === 'comments' ? api.social.blocks() : Promise.resolve(null),
+          ]);
+          setInteractionState(remote.settings);
+          setStoryHiddenCount(remote.storyHiddenCount);
+          setPendingTagCount(remote.pendingTagCount ?? 0);
+          if (blocks) setBlockedCount(blocks.length);
+        }
+      }
       const local = await loadBuyerSettings();
       if (section === 'notifications') {
         const remote = await api.notificationPrefs.get();
@@ -80,8 +147,27 @@ export default function BuyerSettingsDetail() {
     } finally {
       setLoading(false);
     }
-  }, [api, section]);
-  useEffect(() => { load(); }, [load]);
+  }, [api, section, previewOnly]);
+  // Reloads on focus so counts edited on the hidden-story or blocked screens are current.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const setInteraction = useCallback(async (patch: InteractionSettingsPatch) => {
+    const prior = interaction;
+    if (!prior) return;
+    setInteractionState(applyInteractionPatch(prior, patch));
+    if (previewOnly) return;
+    try {
+      const { settings: saved } = await api.interactionSettings.update(patch);
+      setInteractionState(saved);
+    } catch {
+      setInteractionState(prior);
+      Alert.alert('Could not update setting', 'Try again.');
+    }
+  }, [api, interaction, previewOnly]);
+  const remote = useMemo<Remote | undefined>(() => interaction ? {
+    interaction, storyHiddenCount, blockedCount, pendingTagCount, setInteraction,
+    pickCommentAudience: () => setAudienceSheet(true),
+    pickRemixAudience: () => setRemixSheet(true),
+  } : undefined, [interaction, storyHiddenCount, blockedCount, pendingTagCount, setInteraction]);
   const toggle = useCallback(async (key: ToggleKey, value: boolean) => {
     const prior = settings;
     if (prior) setSettings({ ...prior, [key]: value });
@@ -102,22 +188,22 @@ export default function BuyerSettingsDetail() {
       Alert.alert('Could not update setting', 'Try again.');
     }
   }, [api, section, settings]);
-  const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
+  const items = useMemo(() => settings ? cfg.items(settings, router, remote, display) : [], [cfg, settings, router, remote, display]);
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {
-        const isActionable = !!item.toggle || !!item.action;
+        const isActionable = !!item.toggle || !!item.remoteToggle || !!item.action;
         return <React.Fragment key={`${item.label}-${i}`}>
           <ListRow
             icon={item.icon}
             title={item.label}
             subtitle={item.sub}
-            value={!item.toggle ? item.value : undefined}
-            chevron={!item.toggle && !!item.action}
-            toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : undefined}
+            value={!item.toggle && !item.remoteToggle ? item.value : undefined}
+            chevron={!item.toggle && !item.remoteToggle && !!item.action}
+            toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : item.remoteToggle}
             onPress={isActionable && item.action ? item.action : undefined}
             disabled={!isActionable}
           />
@@ -125,6 +211,38 @@ export default function BuyerSettingsDetail() {
         </React.Fragment>;
       })}</Card> : null}
     </ScrollView>
+    {interaction ? <OptionSheet
+      visible={audienceSheet}
+      onClose={() => setAudienceSheet(false)}
+      title="Allow comments from"
+      options={COMMENT_AUDIENCE_OPTIONS}
+      selectedId={interaction.commentAudience}
+      onSelect={(id) => { setAudienceSheet(false); void setInteraction({ commentAudience: id as CommentAudience }); }}
+    /> : null}
+    {interaction ? <OptionSheet
+      visible={remixSheet}
+      onClose={() => setRemixSheet(false)}
+      title="Allow remixes of videos"
+      options={REMIX_AUDIENCE_OPTIONS}
+      selectedId={interaction.remixAudience}
+      onSelect={(id) => { setRemixSheet(false); void setInteraction({ remixAudience: id as RemixAudience }); }}
+    /> : null}
+    <OptionSheet
+      visible={textSizeSheet}
+      onClose={() => setTextSizeSheet(false)}
+      title="Text size"
+      options={TEXT_SIZE_OPTIONS}
+      selectedId={display.prefs.textSize}
+      onSelect={(id) => { setTextSizeSheet(false); display.set({ textSize: id as TextSize }); }}
+    />
+    <OptionSheet
+      visible={translationSheet}
+      onClose={() => setTranslationSheet(false)}
+      title="Translation language"
+      options={TRANSLATION_LANGUAGES.map(l => ({ id: l.code, label: l.name, description: l.nativeName }))}
+      selectedId={display.prefs.translationLanguage}
+      onSelect={(id) => { setTranslationSheet(false); display.set({ translationLanguage: id }); }}
+    />
   </View>;
 }
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({

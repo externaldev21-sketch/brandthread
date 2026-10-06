@@ -110,7 +110,7 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
     thumbnailPath = composed.thumbnailPath;
   } else {
     const { video } = media;
-    const uploadedClip = await api.posts.uploadVideoChunked(
+    const uploadedClip = video.objectPath ? { objectPath: video.objectPath } : await api.posts.uploadVideoChunked(
       { uri: video.uri, mimeType: video.mimeType },
       { signal, onProgress: (f) => onProgress(f * UPLOAD_SHARE, 'uploading') },
     );
@@ -137,6 +137,7 @@ export async function publishCreatePost({ api, input, editId, onProgress, signal
   onProgress(COMPOSE_END, 'saving');
   const values = {
     contentType,
+    remixOfPostId: media.kind === 'video' ? media.video.remixOfPostId : undefined,
     caption: details.caption,
     hashtags: extractHashtags(details.caption),
     mediaUris: mediaUrls,

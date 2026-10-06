@@ -60,6 +60,7 @@ import { activeMentionQuery, insertMentionHandle, type CommentMentionRef } from 
 import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { TranslationLink, useCaptionTranslation } from '@/components/translation/CaptionTranslation';
 
 const MAX_COMMENT_LENGTH = 1000;
 // Links the comment list's KeyboardGestureArea to the composer's TextInput
@@ -278,6 +279,7 @@ function CommentRow({
   const isCreator = !!postAuthorId && comment.author.userId === postAuthorId;
   /** Optimistic comments carry a tmp_ prefix — show a subtle pending indicator */
   const isPending = comment.id.startsWith('tmp_');
+  const translation = useCaptionTranslation(comment.body);
 
   return (
     <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending, highlighted && s.commentRowHighlighted]} testID={highlighted ? 'comment-deep-link-highlight' : undefined}>
@@ -313,7 +315,7 @@ function CommentRow({
           ) : null}
 
           <MentionText
-            body={comment.body}
+            body={translation.text}
             mentions={comment.mentions}
             style={[s.commentText, comment.pendingReview && s.commentTextHeld]}
             onPressMention={onPressMention}
@@ -333,6 +335,8 @@ function CommentRow({
             </View>
           ) : null}
         </PressableScale>
+
+        <TranslationLink translation={translation} style={s.translationLink} />
 
         {/* Time and Reply are two plain-text-height children of the same
             centered flex row — no per-item padding/margin, no minHeight box
@@ -973,7 +977,7 @@ export default function BuyerPostCommentsScreen() {
       setReplyingTo(parent);
       const code = apiErrorCode(error);
       setSendError(
-        code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED'
+        code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED' || code === 'COMMENTS_LIMITED'
           ? apiErrorMessage(error, 'This comment can’t be posted.')
           : 'Could not post comment. Tap to retry.',
       );
@@ -1437,6 +1441,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE_WASH, marginLeft: 2 },
   commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
+  translationLink: { alignSelf: 'flex-start', marginTop: 2, color: MUTED },
   reviewPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
     marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.pill,

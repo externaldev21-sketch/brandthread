@@ -11,10 +11,14 @@ import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LEGAL_DOCUMENTS } from '@/content/legal';
 import { FONT, FS } from '@/lib/theme';
+import { templateParts } from '@/lib/checkoutI18n';
+import { useCheckoutLanguage, useCheckoutT } from './CheckoutLanguage';
 
 export function CheckoutTermsLine({ actionLabel = 'placing your order' }: { actionLabel?: string }) {
   const { theme } = useAppTheme();
   const router = useRouter();
+  const language = useCheckoutLanguage();
+  const t = useCheckoutT();
   const link = (label: string, route: string) => (
     <Text
       style={[styles.link, { color: theme.text }]}
@@ -25,6 +29,20 @@ export function CheckoutTermsLine({ actionLabel = 'placing your order' }: { acti
       {label}
     </Text>
   );
+  if (actionLabel === 'placing your order') {
+    // The checkout's language (lib/checkoutI18n.ts): links fill the template's slots.
+    const links: Record<string, React.ReactNode> = {
+      terms: link(t('Terms of Service'), LEGAL_DOCUMENTS.terms.route),
+      privacy: link(t('Privacy Policy'), LEGAL_DOCUMENTS.privacy.route),
+    };
+    return (
+      <Text style={[styles.text, { color: theme.muted }]} testID="checkout-terms-line">
+        {templateParts(language, 'By placing your order you agree to the {terms} and {privacy}.').map((part, index) => (
+          'slot' in part ? <React.Fragment key={index}>{links[part.slot]}</React.Fragment> : <React.Fragment key={index}>{part.text}</React.Fragment>
+        ))}
+      </Text>
+    );
+  }
   return (
     <Text style={[styles.text, { color: theme.muted }]} testID="checkout-terms-line">
       By {actionLabel} you agree to the {link('Terms of Service', LEGAL_DOCUMENTS.terms.route)} and {link('Privacy Policy', LEGAL_DOCUMENTS.privacy.route)}.

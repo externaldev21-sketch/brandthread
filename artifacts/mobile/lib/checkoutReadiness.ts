@@ -139,6 +139,8 @@ export interface CheckoutDisplayTotals {
   orderTotalCents: number;
   /** What the card is charged (and what "Place order · $X" shows). */
   totalCents: number;
+  /** The buyer's tips (in-app checkout, sellers that accept tips); already in totalCents. */
+  tipCents?: number;
 }
 
 /**

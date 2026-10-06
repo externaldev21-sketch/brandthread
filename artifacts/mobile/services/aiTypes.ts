@@ -112,6 +112,12 @@ export interface AIChatRequest {
   context: AIScreenContext;
   brandMemory?: BrandMemorySummary;
   maxTokens?: number;
+  /**
+   * The device's AI Settings. The server enforces its stored per-account
+   * copy and only lets these tighten it (see api-server lib/aiSettings.ts),
+   * which covers a toggle changed while offline.
+   */
+  aiSettings?: AISettings;
 }
 
 export interface AIChatResponse {

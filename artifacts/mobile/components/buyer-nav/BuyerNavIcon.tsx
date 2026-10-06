@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import { DisplayRuntimeContext } from '@/lib/jsx/displayElements';
+import { HIGH_CONTRAST_STROKE_BONUS, contrastIconColor } from '@/lib/displayPrefs';
 
 export type BuyerNavIconName =
   | 'home' | 'discover' | 'inbox' | 'search' | 'profile' | 'activity'
@@ -14,10 +16,10 @@ export type BuyerNavIconName =
  */
 export function BuyerNavIcon({
   name,
-  color,
+  color: baseColor,
   focused = false,
   size = 24,
-  strokeWidth = 1.8,
+  strokeWidth: baseStrokeWidth = 1.8,
 }: {
   name: BuyerNavIconName;
   color: string;
@@ -25,6 +27,10 @@ export function BuyerNavIcon({
   size?: number;
   strokeWidth?: number;
 }) {
+  // High-contrast icons (Accessibility settings): full-contrast tint, heavier stroke.
+  const { highContrastIcons, iconForeground } = useContext(DisplayRuntimeContext);
+  const color = highContrastIcons ? contrastIconColor(baseColor, iconForeground) as string : baseColor;
+  const strokeWidth = highContrastIcons ? baseStrokeWidth + HIGH_CONTRAST_STROKE_BONUS : baseStrokeWidth;
   const common = { stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
   switch (name) {

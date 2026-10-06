@@ -56,6 +56,12 @@ export interface Cart {
   items: CartItem[];
   savedItems: SavedCartItem[];
   updatedAt: string;
+  /**
+   * Signed-in only: true while this local copy holds a change the server
+   * has not acknowledged yet (services/cartService.ts write-through sync).
+   * A pending local cart is never overwritten by the server's older copy.
+   */
+  syncPending?: boolean;
 }
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────

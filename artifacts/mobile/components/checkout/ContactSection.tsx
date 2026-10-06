@@ -8,6 +8,7 @@ import type { CheckoutContact } from '@/services/cartTypes';
 import { getCheckoutContactErrors } from '@/lib/checkoutReadiness';
 import { SP } from '@/lib/theme';
 import { CheckoutField, CheckoutSection } from './CheckoutPrimitives';
+import { useCheckoutT } from './CheckoutLanguage';
 
 export function ContactSection({
   contact, onChange, showErrors, first,
@@ -18,13 +19,14 @@ export function ContactSection({
   first?: boolean;
 }) {
   const errors = getCheckoutContactErrors(contact);
+  const t = useCheckoutT();
   return (
-    <CheckoutSection title="Contact" first={first} testID="checkout-contact">
+    <CheckoutSection title={t('Contact')} first={first} testID="checkout-contact">
       <CheckoutField
-        label="Email"
+        label={t('Email')}
         value={contact.email ?? ''}
         onChangeText={email => onChange({ ...contact, email: email.trim() })}
-        error={errors.email}
+        error={errors.email ? t(errors.email) : undefined}
         showError={showErrors}
         placeholder="name@example.com"
         keyboardType="email-address"
@@ -37,12 +39,12 @@ export function ContactSection({
       />
       <View style={styles.last}>
         <CheckoutField
-          label="Phone"
+          label={t('Phone')}
           value={contact.phone ?? ''}
           onChangeText={phone => onChange({ ...contact, phone })}
-          error={errors.phone}
+          error={errors.phone ? t(errors.phone) : undefined}
           showError={showErrors}
-          hint="For delivery updates only"
+          hint={t('For delivery updates only')}
           placeholder="(555) 555-0142"
           keyboardType="phone-pad"
           autoComplete="tel"

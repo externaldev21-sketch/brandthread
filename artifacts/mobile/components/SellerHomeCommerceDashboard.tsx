@@ -80,6 +80,7 @@ import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProdu
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { SellerDashboardAISuggestions } from '@/components/SellerDashboardAISuggestions';
 import {
   BG,
   FG,
@@ -916,6 +917,10 @@ export default function SellerHomeCommerceDashboard({
                   </View>
                 )}
               </View>
+
+              {/* AI suggestions from the seller's own data; renders nothing
+                  when AI Settings turns them off or there are none. */}
+              <SellerDashboardAISuggestions theme={theme} refreshKey={retryTick + storeContextTick} style={styles.section} />
 
               {!newSeller && topProducts && topProducts.length > 0 && (
                 <View style={styles.section}>

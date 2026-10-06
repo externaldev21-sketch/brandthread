@@ -102,7 +102,7 @@ describe('checkout screen structure', () => {
 
   it('renders the price breakdown exactly once and puts the live total in the Pay button', () => {
     expect(screen.match(/<OrderSummarySection\b/g)).toHaveLength(1);
-    expect(screen).toContain('`Pay ${formatCents(totals.totalCents)}`');
+    expect(screen).toContain("t('Pay {amount}', { amount: formatCents(totals.totalCents) })");
   });
 
   it('shows a real delivery window, never "Rate set by seller"', () => {
@@ -183,7 +183,7 @@ describe('order confirmation actions', () => {
 
   it('pins ONE primary button (Track order, or Check order status while finalizing)', () => {
     expect(actions.match(/<Button\b/g)).toHaveLength(2); // the finalizing and the confirmed branch, one each
-    expect(actions).toContain('label="Track order"');
+    expect(actions).toContain("label={t('Track order')}");
     expect(actions).not.toContain('View receipt');
     expect(actions).not.toContain('Continue shopping');
     expect(actions).not.toContain('Create an account');
@@ -191,9 +191,9 @@ describe('order confirmation actions', () => {
 
   it('moves View receipt, Continue shopping and Create an account into the scroll content as text rows', () => {
     const content = confirmation.slice(0, confirmation.indexOf('export function OrderConfirmationActions'));
-    expect(content).toContain('label="View receipt"');
-    expect(content).toContain('label="Continue shopping"');
-    expect(content).toMatch(/label="Create an account[^"]*"\s+onPress=\{[^}]+\}\s+subtle/);
+    expect(content).toContain("label={t('View receipt')}");
+    expect(content).toContain("label={t('Continue shopping')}");
+    expect(content).toMatch(/label=\{t\('Create an account[^']*'\)\}\s+onPress=\{[^}]+\}\s+subtle/);
     expect(content).not.toMatch(/<Button[^>]*View receipt/);
   });
 });

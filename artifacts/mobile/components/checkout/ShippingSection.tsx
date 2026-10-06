@@ -20,6 +20,7 @@ import { COUNTRIES, US_STATES, normalizeUsState } from '@/lib/addressRegions';
 import type { CheckoutAddress } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CheckoutField, CheckoutSection, OptionRow, PickerField, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
+import { useCheckoutT } from './CheckoutLanguage';
 
 export type CheckoutAddressDraft = Partial<CheckoutAddress> & { saveAddress?: boolean; label?: string };
 
@@ -68,6 +69,8 @@ export function ShippingSection({
   const hasSaved = savedAddresses.length > 0;
   const usingNew = !address.id;
   const errors = getCheckoutAddressErrors(address);
+  const t = useCheckoutT();
+  const err = (message?: string) => (message ? t(message) : undefined);
   const country = (address.country || 'US').toUpperCase();
   const set = (patch: CheckoutAddressDraft) => onChange({ ...address, ...patch, id: undefined });
 
@@ -84,10 +87,10 @@ export function ShippingSection({
   const form = (
     <View style={hasSaved ? styles.formUnderRows : undefined} testID="checkout-address-form">
       <CheckoutField
-        label="Full name"
+        label={t('Full name')}
         value={nameText}
         onChangeText={text => { setNameText(text); set(splitFullName(text)); }}
-        error={errors.firstName}
+        error={err(errors.firstName)}
         showError={showErrors}
         autoCapitalize="words"
         autoComplete="name"
@@ -104,9 +107,9 @@ export function ShippingSection({
           postalCode: selected.postalCode, country: selected.country,
         })}
       />
-      {showErrors && errors.line1 ? <Text style={styles.inlineError}>{errors.line1}</Text> : null}
+      {showErrors && errors.line1 ? <Text style={styles.inlineError}>{t(errors.line1)}</Text> : null}
       <CheckoutField
-        label="Apt, suite, etc. (optional)"
+        label={t('Apt, suite, etc. (optional)')}
         value={address.line2 ?? ''}
         onChangeText={line2 => set({ line2 })}
         textContentType="streetAddressLine2"
@@ -115,10 +118,10 @@ export function ShippingSection({
         testID="checkout-line2"
       />
       <CheckoutField
-        label="City"
+        label={t('City')}
         value={address.city ?? ''}
         onChangeText={city => set({ city })}
-        error={errors.city}
+        error={err(errors.city)}
         showError={showErrors}
         autoCapitalize="words"
         textContentType="addressCity"
@@ -127,22 +130,22 @@ export function ShippingSection({
       <View style={styles.twoCol}>
         {country === 'US' ? (
           <PickerField
-            label="State"
+            label={t('State')}
             value={normalizeUsState(address.state ?? '')}
             options={US_STATES}
             onChange={state => set({ state })}
-            error={errors.state}
+            error={err(errors.state)}
             showError={showErrors}
-            placeholder="Select"
+            placeholder={t('Select')}
             style={styles.col}
             testID="checkout-state"
           />
         ) : (
           <CheckoutField
-            label="State / Province"
+            label={t('State / Province')}
             value={address.state ?? ''}
             onChangeText={state => set({ state })}
-            error={errors.state}
+            error={err(errors.state)}
             showError={showErrors}
             autoCapitalize="words"
             textContentType="addressState"
@@ -151,10 +154,10 @@ export function ShippingSection({
           />
         )}
         <CheckoutField
-          label={country === 'US' ? 'ZIP code' : 'Postal code'}
+          label={t(country === 'US' ? 'ZIP code' : 'Postal code')}
           value={address.postalCode ?? ''}
           onChangeText={postalCode => set({ postalCode })}
-          error={errors.postalCode}
+          error={err(errors.postalCode)}
           showError={showErrors}
           autoCapitalize="characters"
           keyboardType={country === 'US' ? 'number-pad' : 'default'}
@@ -165,24 +168,24 @@ export function ShippingSection({
         />
       </View>
       <PickerField
-        label="Country"
+        label={t('Country')}
         value={country}
         options={COUNTRIES}
         onChange={next => set({ country: next, ...(next !== country ? { state: '' } : {}) })}
-        error={errors.country}
+        error={err(errors.country)}
         showError={showErrors}
         testID="checkout-country"
       />
       {canSaveAddresses ? (
         <View style={styles.saveRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.saveTitle}>Save to my addresses</Text>
-            <Text style={styles.saveHint}>Use it again next time</Text>
+            <Text style={styles.saveTitle}>{t('Save to my addresses')}</Text>
+            <Text style={styles.saveHint}>{t('Use it again next time')}</Text>
           </View>
           <HapticSwitch
             value={address.saveAddress !== false}
             onValueChange={saveAddress => set({ saveAddress })}
-            accessibilityLabel="Save to my addresses"
+            accessibilityLabel={t('Save to my addresses')}
           />
         </View>
       ) : null}
@@ -190,7 +193,7 @@ export function ShippingSection({
   );
 
   return (
-    <CheckoutSection title="Shipping address" testID="checkout-shipping">
+    <CheckoutSection title={t('Shipping address')} testID="checkout-shipping">
       {hasSaved ? (
         <View accessibilityRole="radiogroup">
           {savedAddresses.map(saved => (
@@ -198,7 +201,7 @@ export function ShippingSection({
               key={saved.id}
               selected={address.id === saved.id}
               onPress={() => onSelectSaved(saved)}
-              title={saved.recipientName || saved.label || 'Saved address'}
+              title={saved.recipientName || saved.label || t('Saved address')}
               lines={savedLines(saved)}
               testID={`checkout-saved-address-${saved.id}`}
             />
@@ -206,7 +209,7 @@ export function ShippingSection({
           <OptionRow
             selected={usingNew}
             onPress={() => { if (!usingNew) onChange({ country: 'US', saveAddress: true }); }}
-            title="Use a new address"
+            title={t('Use a new address')}
             last={!usingNew}
             testID="checkout-new-address"
           />

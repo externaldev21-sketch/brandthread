@@ -16,7 +16,15 @@ import { Feather } from '@expo/vector-icons';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP } from '../lib/theme';
 import { AISettings } from '../services/aiTypes';
-import { getAISettings, saveAISettings, clearSession } from '../services/aiService';
+import {
+  getAISettings,
+  saveAISettings,
+  pushAISettings,
+  syncAISettingsFromServer,
+  clearSession,
+} from '../services/aiService';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { clearAuditLog } from '../services/aiAuditLog';
 import { useColors } from '@/hooks/useColors';
 import { HapticSwitch } from '@/components/BrandthreadUI';
@@ -198,16 +206,40 @@ export default function AiSettingsScreen() {
   const colors = useColors();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
   const [settings, setSettings] = useState<AISettings | null>(null);
+  const { getToken, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  // Dev/web preview stays purely local — it never calls protected APIs.
+  const isPreview = isSellerDevPreview() || isBuyerDevPreview();
+  const canSync = !isPreview && isAuthLoaded && !!isSignedIn;
+  const touchedRef = React.useRef(false);
+
+  // Device cache first (instant, offline), then the account copy.
+  useEffect(() => {
+    getAISettings().then(local => {
+      if (!touchedRef.current) setSettings(local);
+    });
+  }, []);
 
   useEffect(() => {
-    getAISettings().then(setSettings);
-  }, []);
+    if (!canSync) return;
+    let cancelled = false;
+    (async () => {
+      const token = await getToken().catch(() => null);
+      const remote = await syncAISettingsFromServer(token);
+      if (!cancelled && remote && !touchedRef.current) setSettings(remote);
+    })();
+    return () => { cancelled = true; };
+  }, [canSync, getToken]);
 
   const update = (fn: (s: AISettings) => AISettings) => {
     if (!settings) return;
+    touchedRef.current = true;
     const updated = fn(settings);
     setSettings(updated);
-    saveAISettings(updated);
+    if (!canSync) {
+      saveAISettings(updated);
+      return;
+    }
+    pushAISettings(updated, () => getToken());
   };
 
   const handleClearHistory = () => {

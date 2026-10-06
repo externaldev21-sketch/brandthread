@@ -250,10 +250,17 @@ export async function getProduct(id: string): Promise<Product | undefined> {
 // Convenience alias
 export const getProductById = getProduct;
 
-export async function createProduct(data: Partial<Product>): Promise<Product> {
+/**
+ * `opts.id`: keep an id the server already assigned (app/add-product.tsx
+ * mirrors a product it just created via POST /api/products into this local
+ * store, which the Products tab and product detail read) instead of minting
+ * a local one. An existing local row with that id is replaced, never duplicated.
+ */
+export async function createProduct(data: Partial<Product>, opts?: { id?: string }): Promise<Product> {
   await ensureInitialized();
 
-  const id = uid();
+  const id = opts?.id ?? uid();
+  if (opts?.id) _products = _products.filter(p => p.id !== opts.id);
   const defaultInventory = {
     productId: id,
     trackQuantity: true,
@@ -574,6 +581,11 @@ export async function getTaggableProducts(forDraftContent = false): Promise<Prod
 export async function getProductStats() {
   await ensureInitialized();
   const list = (await demoActive()) ? [..._products, ...(await ensurePreviewProducts())] : _products;
+  return summarizeProducts(list);
+}
+
+/** The Products tab's summary counts for any product list. */
+export function summarizeProducts(list: Product[]) {
   return {
     total: list.length,
     active: list.filter(p => p.status === 'active').length,

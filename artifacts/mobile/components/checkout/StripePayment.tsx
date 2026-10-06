@@ -223,6 +223,7 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
     const tax = next ? next.groups.reduce((sum, group) => sum + group.taxCents, 0) : 0;
     const ship = next ? next.groups.reduce((sum, group) => sum + group.shippingCents, 0) : shippingCents;
     const discount = next ? next.groups.reduce((sum, group) => sum + group.discountCents, 0) : 0;
+    const tip = next ? next.groups.reduce((sum, group) => sum + (group.tipCents ?? 0), 0) : 0;
     const total = next ? next.amountCents : amountCents;
     const item = (label: string, cents: number, pending = false): PlatformPayTypes.ImmediateCartSummaryItem => ({
       paymentType: PlatformPay.PaymentType.Immediate as PlatformPayTypes.PaymentType.Immediate,
@@ -235,6 +236,7 @@ export function ExpressPay({ amountCents, subtotalCents, shippingCents, quote, c
       ...(discount > 0 ? [item('Discount', -discount)] : []),
       item('Shipping', ship),
       item('Tax', tax, !next),
+      ...(tip > 0 ? [item('Tip', tip)] : []),
       item('Brandthread', total, !next),
     ];
   }, [stripe, amountCents, subtotalCents, shippingCents]);

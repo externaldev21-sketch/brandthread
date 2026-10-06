@@ -46,6 +46,7 @@ import { CaptionsOverlay, type CaptionSegment } from '@/components/social/Captio
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useCaptionsPreference, useReadyCaptionTrack } from '@/lib/captions';
 import { LocationTag } from '@/components/social/LocationTag';
+import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
 
 function PostVideo({ uri, onWatched, captions }: { uri: string; onWatched?: () => void; captions?: CaptionSegment[] }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; p.timeUpdateEventInterval = 0.25; });
@@ -363,7 +364,7 @@ export default function BuyerPostViewer() {
 
         {/* Caption */}
         {caption ? (
-          <Text style={s.caption}><CaptionSpans text={caption} /></Text>
+          <TranslatableCaption text={caption} style={s.caption} linkStyle={s.translationLink} renderText={(value) => <CaptionSpans text={value} />} />
         ) : null}
 
         {/* Quoted original (only present on quote reposts — no layout change otherwise) */}
@@ -575,6 +576,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM },
   editBtnText: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE },
   caption: { paddingHorizontal: SP.md, paddingTop: SP.sm, fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 22 },
+  translationLink: { paddingHorizontal: SP.md, color: MUTED },
   timestamp: { paddingHorizontal: SP.md, paddingTop: SP.xs, fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   engagementBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
   engageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: SP.xs },

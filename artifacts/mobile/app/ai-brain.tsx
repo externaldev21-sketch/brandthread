@@ -35,7 +35,8 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -48,6 +49,7 @@ import {
   AIScreenContext,
   AIMessage,
   AISession,
+  AISettings,
   SCREEN_PROMPTS,
   contextLabel,
 } from '@/services/aiTypes';
@@ -61,7 +63,16 @@ import {
   clearSession,
   applyAction,
   undoAction,
+  getAISettings,
+  syncAISettingsFromServer,
 } from '@/services/aiService';
+import {
+  AI_DISABLED_MESSAGE,
+  actionConfirmationReason,
+  confirmationCopy,
+  isAIDisabledError,
+  normalizeAISettings,
+} from '@/services/aiSettingsPolicy';
 import { getStoreContext } from '@/lib/api';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
@@ -77,6 +88,7 @@ import {
 /** Maps raw errors from services/aiService.ts to human copy. Never show server/vendor text. */
 function humanizeAiError(rawMessage?: string): string {
   const msg = rawMessage ?? '';
+  if (msg === AI_DISABLED_MESSAGE) return AI_DISABLED_MESSAGE;
   if (/sign in to use brandthread ai|authentication error/i.test(msg)) {
     return 'Sign in to use Brandthread AI.';
   }
@@ -324,16 +336,18 @@ interface EmptyStateProps {
   context: AIScreenContext;
   onPillPress: (text: string) => void;
   isTablet: boolean;
+  /** False while the assistant is turned off — prompt chips would only be refused. */
+  showPrompts?: boolean;
 }
 
-function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
+function EmptyState({ context, onPillPress, isTablet, showPrompts = true }: EmptyStateProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const prompts =
     SCREEN_PROMPTS[context.screen as keyof typeof SCREEN_PROMPTS] ??
     SCREEN_PROMPTS['home'] ??
     [];
-  const pills = prompts.slice(0, 4);
+  const pills = showPrompts ? prompts.slice(0, 4) : [];
 
   return (
     <View style={[styles.emptyState, isTablet && styles.emptyStateTablet]}>
@@ -365,6 +379,24 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
         ))}
       </View>
     </View>
+  );
+}
+
+// ─── Assistant turned off ─────────────────────────────────────────────────────
+
+/**
+ * Shown in place of the composer while "Enable AI assistant" is off in AI
+ * Settings — nothing can be sent from this screen until it is turned back on.
+ */
+function AssistantDisabledPanel({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <SafeAreaView edges={['bottom']} style={styles.disabledPanel} testID="ai-disabled-panel">
+      <Text style={styles.disabledTitle}>Brandthread AI is turned off</Text>
+      <Text style={styles.disabledBody}>Turn on Enable AI assistant in AI Settings to chat.</Text>
+      <Button label="Open AI Settings" variant="secondary" size="compact" onPress={onOpenSettings} />
+    </SafeAreaView>
   );
 }
 
@@ -409,7 +441,7 @@ export default function AiBrainScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
-  const params = useLocalSearchParams<{ context?: string }>();
+  const params = useLocalSearchParams<{ context?: string; prompt?: string }>();
 
   const parsedContext: AIScreenContext = useMemo(() => {
     try {
@@ -423,6 +455,15 @@ export default function AiBrainScreen() {
 
   const [session, setSession] = useState<AISession | null>(null);
   const [inputText, setInputText] = useState('');
+  // A `prompt` param (e.g. "Ask AI" on a dashboard suggestion) pre-fills the
+  // composer; the seller still reviews and sends it themselves.
+  const appliedPromptRef = useRef<string | null>(null);
+  useEffect(() => {
+    const p = typeof params.prompt === 'string' ? params.prompt.trim() : '';
+    if (!p || appliedPromptRef.current === p) return;
+    appliedPromptRef.current = p;
+    setInputText(p.slice(0, 2000));
+  }, [params.prompt]);
   const [isGenerating, setIsGenerating] = useState(false);
   /**
    * When a request fails we keep the error alongside the preserved input
@@ -433,6 +474,42 @@ export default function AiBrainScreen() {
   const [streamingText, setStreamingText] = useState<string>('');
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
+
+  // ─── AI Settings ────────────────────────────────────────────────────────────
+  // Read from the device cache every time the screen is focused (so a change
+  // made in AI Settings applies on return), then from the account once
+  // signed in. Dev/web preview never calls the server.
+  const [aiSettings, setAiSettings] = useState<AISettings | null>(null);
+  const isPreview = isSellerDevPreview() || isBuyerDevPreview();
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getAISettings().then(s => { if (!cancelled) setAiSettings(s); });
+      return () => { cancelled = true; };
+    }, []),
+  );
+
+  useEffect(() => {
+    if (isPreview || !isAuthLoaded || !isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      const token = await getToken().catch(() => null);
+      const remote = await syncAISettingsFromServer(token);
+      if (!cancelled && remote) setAiSettings(remote);
+    })();
+    return () => { cancelled = true; };
+  }, [isPreview, isAuthLoaded, isSignedIn, getToken]);
+
+  const assistantDisabled = aiSettings !== null && !aiSettings.enabled;
+  const openAiSettings = useCallback(() => router.push('/ai-settings' as any), [router]);
+
+  /** The server (or service) refused because the assistant is off — reflect it. */
+  const handleDisabledError = useCallback((text: string) => {
+    setAiSettings(prev => ({ ...(prev ?? normalizeAISettings(undefined)), enabled: false }));
+    setErrorMsg(null);
+    setInputText(text);
+  }, []);
 
   // Track the last user/store context so we can reload on switch.
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
@@ -466,6 +543,9 @@ export default function AiBrainScreen() {
     async (override?: string) => {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
+      // "Enable AI assistant" is off — nothing is sent (the service and the
+      // server refuse as well); the disabled panel links to AI Settings.
+      if (assistantDisabled) return;
 
       // Dev/web preview (checked first, before anything Clerk-related):
       // real production Clerk is never reachable from a preview host (see
@@ -488,6 +568,8 @@ export default function AiBrainScreen() {
             (textSoFar) => setStreamingText(textSoFar),
           );
           setSession(result.session);
+        } catch (err: unknown) {
+          if (isAIDisabledError(err)) handleDisabledError(text);
         } finally {
           setIsGenerating(false);
           setStreamingText('');
@@ -525,6 +607,8 @@ export default function AiBrainScreen() {
             (textSoFar) => setStreamingText(textSoFar),
           );
           setSession(result.session);
+        } catch (err: unknown) {
+          if (isAIDisabledError(err)) handleDisabledError(text);
         } finally {
           setIsGenerating(false);
           setStreamingText('');
@@ -553,7 +637,9 @@ export default function AiBrainScreen() {
         setSession(result.session);
       } catch (err: unknown) {
         const isAbort = (err as Error)?.name === 'AbortError';
-        if (!isAbort) {
+        if (isAIDisabledError(err)) {
+          handleDisabledError(text);
+        } else if (!isAbort) {
           setErrorMsg(humanizeAiError((err as Error)?.message));
           // Restore user text so they can retry without retyping.
           setInputText(text);
@@ -563,7 +649,7 @@ export default function AiBrainScreen() {
         setStreamingText('');
       }
     },
-    [inputText, isGenerating, session, getToken, userId, storeContext, isAuthLoaded, isSignedIn],
+    [inputText, isGenerating, session, getToken, userId, storeContext, isAuthLoaded, isSignedIn, assistantDisabled, handleDisabledError],
   );
 
   // ─── Pill tap (sends immediately, matching the reference apps) ──────────────
@@ -649,20 +735,24 @@ export default function AiBrainScreen() {
         setSession({ ...updated });
       };
 
-      if (msg.actionCard.isDestructive) {
+      // Confirm-before-action toggles from AI Settings decide whether this
+      // card needs an explicit confirmation step before it is applied.
+      const reason = actionConfirmationReason(msg.actionCard, aiSettings ?? normalizeAISettings(undefined));
+      if (reason) {
+        const copy = confirmationCopy(reason, msg.actionCard.title);
         Alert.alert(
-          'Apply action',
-          `Are you sure you want to apply "${msg.actionCard.title}"? This action is irreversible.`,
+          copy.heading,
+          copy.message,
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Apply', style: 'destructive', onPress: doApply },
+            { text: 'Apply', style: reason === 'destructive' ? 'destructive' : 'default', onPress: doApply },
           ],
         );
       } else {
         doApply();
       }
     },
-    [session, userId, storeContext],
+    [session, userId, storeContext, aiSettings],
   );
 
   const handleDismiss = useCallback(
@@ -820,6 +910,7 @@ export default function AiBrainScreen() {
                       context={parsedContext}
                       onPillPress={handlePillPress}
                       isTablet={isTablet}
+                      showPrompts={!assistantDisabled}
                     />
                   </View>
                 ) : null
@@ -827,6 +918,9 @@ export default function AiBrainScreen() {
             />
 
             {/* ── Input row ───────────────────────────────────────────────── */}
+            {assistantDisabled ? (
+              <AssistantDisabledPanel onOpenSettings={openAiSettings} />
+            ) : (
             <Composer
               testID="ai-composer"
               value={inputText}
@@ -843,6 +937,7 @@ export default function AiBrainScreen() {
                   : 'Preparing your session…'
               }
             />
+            )}
         </>
       </KeyboardAvoidingView>
     </View>
@@ -1168,5 +1263,28 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     marginTop: 8,
+  },
+  // Monochrome, outline-only — same treatment as the composer area it replaces.
+  disabledPanel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    paddingBottom: SP.sm,
+    gap: SP.sm,
+    alignItems: 'center',
+  },
+  disabledTitle: {
+    color: colors.foreground,
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
+    textAlign: 'center',
+  },
+  disabledBody: {
+    color: colors.mutedForeground,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

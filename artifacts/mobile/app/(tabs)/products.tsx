@@ -24,7 +24,8 @@ import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
-import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
+import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct, summarizeProducts } from '@/services/productService';
+import { localPreviewSaves } from '@/lib/sellerProductPreview';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { FormInput } from '@/components/BrandthreadUI';
@@ -467,7 +468,12 @@ export default function ProductsScreen() {
       return;
     }
     if (previewOnly || previewOnlyRef.current) {
-      setStats(EMPTY_STATS);
+      // Signed-out preview: counts for the products saved on this device only.
+      try {
+        setStats(Platform.OS === 'web' ? summarizeProducts(localPreviewSaves(await getProducts())) : EMPTY_STATS);
+      } catch {
+        setStats(EMPTY_STATS);
+      }
       return;
     }
     try {
@@ -513,7 +519,7 @@ export default function ProductsScreen() {
       setLoading(false);
       return;
     }
-    if (previewOnly || previewOnlyRef.current) {
+    if ((previewOnly || previewOnlyRef.current) && Platform.OS !== 'web') {
       setProducts([]);
       setStats(EMPTY_STATS);
       setLoading(false);
@@ -522,12 +528,13 @@ export default function ProductsScreen() {
     setLoading(true);
     try {
       const result = await getProducts({ filter, text: debouncedQuery || undefined, ...productSortQuery(sort) });
-      if (previewOnlyRef.current) {
+      if (previewOnlyRef.current && Platform.OS !== 'web') {
         setProducts([]);
         setStats(EMPTY_STATS);
         return;
       }
-      setProducts(Array.isArray(result) ? result : []);
+      const list = Array.isArray(result) ? result : [];
+      setProducts(previewOnlyRef.current ? localPreviewSaves(list) : list);
       await loadStats();
     } catch {
       setProducts([]);
@@ -556,10 +563,6 @@ export default function ProductsScreen() {
   function refresh() { loadProducts(); }
 
   async function handleDuplicate(id: string) {
-    if (previewOnly) {
-      showPreviewOnlyFeedback();
-      return;
-    }
     await duplicateProduct(id);
     Alert.alert('Duplicated', 'Product duplicated as a draft.');
     refresh();
@@ -577,10 +580,6 @@ export default function ProductsScreen() {
   }
 
   async function handleDelete(product: Product) {
-    if (previewOnly) {
-      showPreviewOnlyFeedback();
-      return;
-    }
     Alert.alert(
       'Delete product?',
       'You can undo this for a short time.',
@@ -612,10 +611,6 @@ export default function ProductsScreen() {
 
   // Swipe quick-action: archives (or unarchives) without opening the sheet.
   async function handleQuickArchive(product: Product) {
-    if (previewOnly) {
-      showPreviewOnlyFeedback();
-      return;
-    }
     const wasArchived = product.status === 'archived';
     setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, status: wasArchived ? 'active' : 'archived' } : p)));
     try {
@@ -629,7 +624,7 @@ export default function ProductsScreen() {
 
   async function handleRefresh() {
     if (previewOnly) {
-      if (previewDemo) await loadProducts();
+      if (previewDemo || Platform.OS === 'web') await loadProducts();
       else {
         setProducts([]);
         setStats(EMPTY_STATS);
@@ -662,7 +657,7 @@ export default function ProductsScreen() {
 
   // Sorted products
   const sortedProducts = useMemo(() => {
-    if (previewOnly && !previewDemo) return [];
+    if (previewOnly && !previewDemo && Platform.OS !== 'web') return [];
     // Real products retain the query's sort; URL-only fixtures are local.
     if (!previewDemo) return products;
     const arr = [...products];
@@ -692,8 +687,10 @@ export default function ProductsScreen() {
   // Highlight the separate filter control only for choices outside that row.
   const hasActiveFilter = filter !== 'all' && !filterPills.some(pill => pill.value === filter);
 
+  // Product detail reads the same device product store, so a signed-out
+  // preview's saved product opens there too.
   const openProduct = useCallback((product: Product) => {
-    if (previewOnly && !previewDemo) {
+    if (previewOnly && !previewDemo && Platform.OS !== 'web') {
       showPreviewOnlyFeedback();
       return;
     }

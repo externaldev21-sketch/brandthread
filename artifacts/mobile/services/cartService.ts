@@ -172,33 +172,96 @@ export async function getBuyerProduct(productId: string): Promise<BuyerProduct |
 }
 
 // ─── DB sync ──────────────────────────────────────────────────────────────────
+//
+// Root cause of "Add to cart leaves the cart empty" (signed-in buyers): every
+// cart write fired a fire-and-forget POST /api/buyer/cart/sync, and every
+// cart read (the Cart screen's, and addToCart()'s own) did GET
+// /api/buyer/cart and, whenever the server had ANY rows, replaced the local
+// items wholesale with the server's. Nothing ordered the two requests and
+// nothing remembered that the local copy held a change the server hadn't
+// acknowledged, so the GET fired by tapping "View bag" (or a sync that
+// failed/never landed) handed back the server's copy from before the add
+// and silently threw the just-added line away. When the server's rows were
+// all legacy pre-cents lines (filtered out below) the result was literally
+// an empty cart.
+//
+// Now: a local write is marked `syncPending` until the server acknowledges
+// it; syncs run one at a time in write order (each one pushes whatever is
+// newest locally); reads wait for queued syncs first; and a still-pending
+// local cart (e.g. the sync failed offline) is never overwritten by the
+// server — it is re-pushed instead.
 
-async function syncToDb(items: any[], savedItems: any[], expectedUserId: string): Promise<void> {
-  // Guard: if the account has changed since saveCart() was called, discard this
-  // sync so user A's cart payload is never POSTed using user B's Clerk token.
-  if (_cartUserId !== expectedUserId) return;
+/** Serializes write-through syncs so an older full-replace can never land after a newer one. */
+let _syncChain: Promise<void> = Promise.resolve();
+
+function scheduleSync(k: CartKeys): Promise<void> {
+  const run = _syncChain.then(() => pushLocalCart(k));
+  _syncChain = run.catch(() => {});
+  return run;
+}
+
+async function readLocalCart(k: CartKeys): Promise<Cart | null> {
+  try {
+    const raw = await safeGetItem(k.cart);
+    return raw ? normalizeCart(JSON.parse(raw) as Cart) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function pushLocalCart(k: CartKeys): Promise<void> {
+  // Guard: if the account has changed since the write, drop this sync so
+  // user A's cart payload is never POSTed using user B's Clerk token.
+  if (_cartUserId !== k.userId) return;
+  const cart = await readLocalCart(k);
+  // Nothing to push, or an earlier queued sync already pushed this version.
+  if (!cart || !cart.syncPending) return;
   try {
     await serviceRequest('/api/buyer/cart/sync', {
       method: 'POST',
-      body: JSON.stringify({ items, savedItems }),
+      body: JSON.stringify({ items: cart.items, savedItems: cart.savedItems }),
     });
-  } catch { /* ignore — local is source of truth */ }
+  } catch {
+    return; // stays pending — retried on the next read or write
+  }
+  if (_cartUserId !== k.userId) return;
+  // Only clear the marker when nothing newer was written while in flight.
+  const latest = await readLocalCart(k);
+  if (latest && latest.syncPending && latest.updatedAt === cart.updatedAt) {
+    await safeSetItem(k.cart, JSON.stringify({ ...latest, syncPending: false }));
+  }
+}
+
+/**
+ * Pure merge rule for a signed-in cart read (exported for tests): the
+ * server's copy wins only when the local copy has nothing unacknowledged.
+ */
+export function resolveRemoteCart(
+  local: Cart,
+  remote: { items: any[]; savedItems: any[] } | null,
+): { cart: Cart; adoptedRemote: boolean } {
+  if (!remote || local.syncPending) return { cart: local, adoptedRemote: false };
+  if (remote.items.length === 0 && remote.savedItems.length === 0) return { cart: local, adoptedRemote: false };
+  return {
+    cart: {
+      ...local,
+      items: remote.items.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents)),
+      savedItems: remote.savedItems.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents)),
+      syncPending: false,
+    },
+    adoptedRemote: true,
+  };
 }
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
 async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
-  let cart: Cart;
-  try {
-    const raw = await safeGetItem(k.cart);
-    if (raw) {
-      cart = normalizeCart(JSON.parse(raw) as Cart);
-    } else {
-      cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
-    }
-  } catch {
-    cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
-  }
+  // Signed-in: let any queued write-through sync finish first, so the GET
+  // below can never read the server's copy from before the buyer's latest
+  // change (see the DB sync note above).
+  if (k.userId !== 'anon') await _syncChain;
+
+  const cart: Cart = (await readLocalCart(k)) ?? { id: uid(), items: [], savedItems: [], updatedAt: now() };
 
   // A guest (never signed in — k.userId === 'anon') has no server-side cart
   // to confirm against: /api/buyer/cart requires auth and would always fail
@@ -210,20 +273,28 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
     return { cart, remoteConfirmed: true };
   }
 
+  // A local change the server never acknowledged (its sync failed): the
+  // local copy is the truth — re-push it instead of letting the server's
+  // older copy overwrite it.
+  if (cart.syncPending) {
+    void scheduleSync(k);
+    return { cart, remoteConfirmed: true };
+  }
+
   // Signed-in: attempt to load from DB and merge if DB has data.
   // Uses the already-captured k so the continuation can't pick up a changed userId.
   let remoteConfirmed = false;
   try {
-    const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
+    const remote = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
     remoteConfirmed = true;
-    if (items.length > 0 || savedItems.length > 0) {
-      // DB has data — use it and update local cache.
-      // Guard: skip cache write if account switched while the request was in-flight.
-      if (_cartUserId === k.userId) {
-        cart.items = items.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
-        cart.savedItems = savedItems.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
-        await safeSetItem(k.cart, JSON.stringify(cart));
-      }
+    const resolved = resolveRemoteCart(cart, remote);
+    // Guard: skip cache write if account switched while the request was in-flight.
+    if (resolved.adoptedRemote && _cartUserId === k.userId) {
+      // A write that landed while the GET was in flight wins over it.
+      const latest = await readLocalCart(k);
+      if (latest && latest.updatedAt !== cart.updatedAt) return { cart: latest, remoteConfirmed };
+      await safeSetItem(k.cart, JSON.stringify(resolved.cart));
+      return { cart: resolved.cart, remoteConfirmed };
     }
   } catch { /* remoteConfirmed stays false — see getCartForScreen() */ }
 
@@ -263,9 +334,12 @@ async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
   // to an in-memory store for the rest of this tab's session so the write
   // (and everything that reads it back) always succeeds from the buyer's
   // perspective, even when the browser won't actually persist it.
+  // Signed-in: mark the write unacknowledged until the server confirms it
+  // (pushLocalCart clears it), so no read can replace it with an older copy.
+  if (k.userId !== 'anon') cart.syncPending = true;
   await safeSetItem(k.cart, JSON.stringify(cart));
-  // Pass k.userId so syncToDb can drop the request if the account switches before it fires.
-  void syncToDb(cart.items, cart.savedItems, k.userId);
+  // Queued, in write order; k.userId lets the sync drop itself if the account switches first.
+  if (k.userId !== 'anon') void scheduleSync(k);
 }
 
 // ─── Cart operations ──────────────────────────────────────────────────────────

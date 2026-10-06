@@ -19,14 +19,12 @@ describe('browser preview safe areas and Expo Go startup', () => {
     expect(sellerBar).toContain('bottom: metrics.bottomOffset');
     expect(tabBarParts).toContain('minWidth: 44');
     expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
-    expect(cookieConsent).toContain('const BANNER_BOTTOM = 72 + SP.md;');
-    expect(cookieConsent).toContain('bottom:BANNER_BOTTOM');
-    // The cookie banner's bottom offset is derived from the same tab bar
-    // metrics both bars use (occupiedHeight), rather than a hardcoded value
-    // tuned for phone proportions only — see WebAppShell / desktop web pass.
-    expect(cookieConsent).toContain('tabBarInset + SP.sm');
-    expect(cookieConsent).toContain('useTabBarMetrics().occupiedHeight');
-    expect(cookieConsent).toContain('{ bottom: tabBarInset + SP.sm }');
+    // The cookie consent sheet is a docked flex sibling of the app (QA-0234),
+    // never an absolute overlay: the app — and both floating tab bars — sit
+    // fully above it, so it can't cover fields or the tab bar at any size.
+    expect(cookieConsent).toContain('<View style={s.app}>{children}</View>');
+    expect(cookieConsent).not.toContain("position:'absolute'");
+    expect(cookieConsent).not.toContain("position: 'absolute'");
   });
 
   it('does not statically load the unavailable keyboard-controller native module', () => {

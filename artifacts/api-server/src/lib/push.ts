@@ -30,6 +30,10 @@ export interface PushPayload {
   kind?: "transactional" | "promotional";
   /** The user asked for this exact push (e.g. a per-drop "notify me"). */
   explicitRequest?: boolean;
+  /** Expo delivery priority; 'high' wakes the device (incoming calls). Omitted = Expo default. */
+  priority?: "default" | "normal" | "high";
+  /** iOS interruption level; 'time-sensitive' breaks through Focus (incoming calls). */
+  interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
 }
 
 export type NotificationEventType = "receipt" | "open" | "tap";
@@ -116,6 +120,8 @@ export interface ExpoPushMessage {
   sound: string | null;
   badge?: number;
   channelId?: string;
+  priority?: "default" | "normal" | "high";
+  interruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
 }
 
 export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
@@ -160,6 +166,8 @@ export function buildExpoPushMessages(
     sound: payload.sound ?? "default",
     badge: payload.badge,
     channelId: payload.channelId,
+    ...(payload.priority ? { priority: payload.priority } : {}),
+    ...(payload.interruptionLevel ? { interruptionLevel: payload.interruptionLevel } : {}),
   }));
 }
 

@@ -221,12 +221,13 @@ const ElementsPaymentController = React.forwardRef<PaymentControllerApi>(functio
 
 // ─── Apple Pay / Google Pay ──────────────────────────────────────────────────
 
-function sheetLines(amountCents: number, shippingCents: number, taxCents: number) {
-  // Items + tax + the shipping rate add up to exactly the amount.
+function sheetLines(amountCents: number, shippingCents: number, taxCents: number, tipCents = 0) {
+  // Items + tax + tip + the shipping rate add up to exactly the amount.
   return {
     lineItems: [
-      { name: 'Items', amount: Math.max(0, amountCents - shippingCents - taxCents) },
+      { name: 'Items', amount: Math.max(0, amountCents - shippingCents - taxCents - tipCents) },
       ...(taxCents > 0 ? [{ name: 'Tax', amount: taxCents }] : []),
+      ...(tipCents > 0 ? [{ name: 'Tip', amount: tipCents }] : []),
     ],
     shippingRates: [{ id: 'seller-shipping', displayName: 'Shipping', amount: shippingCents }],
   };
@@ -276,8 +277,9 @@ function ElementsExpressPay({ amountCents, shippingCents, quote, createIntent, o
           priced.current = next;
           const ship = next.groups.reduce((sum, group) => sum + group.shippingCents, 0);
           const tax = next.groups.reduce((sum, group) => sum + group.taxCents, 0);
+          const tip = next.groups.reduce((sum, group) => sum + (group.tipCents ?? 0), 0);
           elements.update({ amount: Math.max(MIN_CARD_CHARGE_CENTS_CLIENT, next.amountCents) });
-          event.resolve(sheetLines(next.amountCents, ship, tax));
+          event.resolve(sheetLines(next.amountCents, ship, tax, tip));
         }}
         onConfirm={async event => {
           if (!stripe || !elements) {

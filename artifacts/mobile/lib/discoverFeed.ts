@@ -60,6 +60,8 @@ export interface DiscoverBrandCard {
   verified: boolean;
   imageUri?: string;
   followersLabel?: string;
+  /** The signed-in viewer already follows this brand — seeds the card's Follow button. */
+  isFollowing?: boolean;
 }
 
 export interface DiscoverPersonSuggestion {
@@ -211,9 +213,11 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
   // composition the old "From Brands You Follow" rail used (no dedicated
   // endpoint exists yet: api.social.following() then api.publicSellers.get()
   // per seller).
+  const followedIds = new Set<string>();
   if (isSignedIn) {
     try {
       const following = await api.social.following();
+      for (const f of Array.isArray(following) ? following : []) if (f?.userId) followedIds.add(f.userId);
       const sellers = (Array.isArray(following) ? following : []).slice(0, 8);
       await Promise.all(sellers.map(async (f: any) => {
         try {
@@ -225,6 +229,7 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
             verified: !!data.profile.verified,
             imageUri: (data.products ?? [])[0]?.images?.[0],
             followersLabel: 'Following',
+            isFollowing: true,
           });
         } catch {
           // One follow failing to resolve shouldn't drop the rest.
@@ -250,6 +255,7 @@ export async function composeDiscoverBrands({ api, isSignedIn }: { api: any; isS
         name: row.brand ?? 'Brand',
         verified: !!row.verified,
         imageUri: row.imageUri ?? undefined,
+        isFollowing: followedIds.has(row.brandId),
       });
       namesSeen.add(name);
     }
