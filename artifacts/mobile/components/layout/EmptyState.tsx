@@ -32,10 +32,14 @@ export function EmptyState({
   illustration,
   /** `text` = Instagram-style link action (accent text, no pill); default `button`. */
   actionStyle = 'button',
+  /** `slim` = a compact fit-to-text pill (36pt tall, 16px sides) for a
+   *  secondary next step; default keeps the original 44pt pill. */
+  actionSize = 'default',
 }: {
   icon: keyof typeof Feather.glyphMap;
   title?: string;
-  message: string;
+  /** Omit for a title-only empty state (no filler sentence). */
+  message?: string;
   actionLabel?: string;
   onAction?: () => void;
   variant?: 'empty' | 'error';
@@ -44,6 +48,7 @@ export function EmptyState({
   compact?: boolean;
   illustration?: ThreadMotif;
   actionStyle?: 'button' | 'text';
+  actionSize?: 'default' | 'slim';
 }) {
   const { theme } = useAppTheme();
   const textAction = actionStyle === 'text';
@@ -64,17 +69,18 @@ export function EmptyState({
             ("No posts yet") already says it, and reclaiming its height is
             what lets the CTA below clear a floating tab bar without
             scrolling on a screen with a tall header above it. */}
-        {compact ? null : <Text style={[styles.message, { color: theme.muted }]}>{message}</Text>}
+        {compact || !message ? null : <Text style={[styles.message, { color: theme.muted }]}>{message}</Text>}
       </View>
       {actionLabel && onAction && (
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           onPress={onAction}
-          style={textAction ? styles.actionText : [styles.actionBtn, { backgroundColor: theme.accent }]}
+          style={textAction ? styles.actionText : [styles.actionBtn, actionSize === 'slim' && styles.actionBtnSlim, { backgroundColor: theme.accent }]}
+          hitSlop={actionSize === 'slim' ? { top: 4, bottom: 4 } : undefined}
           testID={testID ? `${testID}-action` : undefined}
         >
-          <Text style={[styles.actionLabel, { color: textAction ? theme.accentLight : theme.onAccent }]}>{actionLabel}</Text>
+          <Text style={[styles.actionLabel, actionSize === 'slim' && styles.actionLabelSlim, { color: textAction ? theme.accentLight : theme.onAccent }]}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -122,9 +128,16 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     marginTop: SP.xs,
   },
+  actionBtnSlim: {
+    minHeight: 36,
+    paddingHorizontal: SP.md,
+    paddingVertical: 0,
+    alignItems: 'center',
+  },
   actionText: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },
   actionLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
+  actionLabelSlim: { fontSize: FS.sm },
 });

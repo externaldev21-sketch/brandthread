@@ -86,9 +86,13 @@ describe('Products empty state has no preview wording', () => {
     expect(emptyCopySection.toLowerCase()).not.toContain('preview');
   });
 
-  it('uses the requested "No products yet" copy with the Add your first product action', () => {
-    expect(productsSource).toContain('No products yet');
-    expect(productsSource).toContain('Add your first product to start selling.');
-    expect(productsSource).toContain("actionLabel=\"Add your first product\"");
+  it('uses per-filter copy: "No products yet" + a slim "Add product" only on All / Active', () => {
+    // Dev (products/orders polish): copy lives in lib/sellerLists/emptyCopy.ts.
+    const copy = readFileSync(resolve(__dirname, '..', 'lib/sellerLists/emptyCopy.ts'), 'utf8');
+    expect(productsSource).toContain('productEmptyCopy(filter, debouncedQuery)');
+    expect(productsSource).toContain("actionLabel={copy.action ? 'Add product' : undefined}");
+    expect(productsSource).toContain('actionSize="slim"');
+    expect(copy).toContain("all: { icon: 'package', title: 'No products yet', action: 'add-product' }");
+    expect(copy).toContain("archived: { icon: 'archive', title: 'No archived products' }");
   });
 });
