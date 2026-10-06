@@ -11,9 +11,7 @@
  *        npx vitest run --config vitest.harness.config.ts
  *   2. Expo web:  EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:5055 \
  *        EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Y2xlcmsuYnJhbmR0aHJlYWQudGVzdCQ \
- *        npx expo start --web --port 8081 --no-dev
- *        (--no-dev: a production-mode bundle, so the dev-web preview shortcuts
- *        in lib/devPreview.ts never stand in for the real API)
+ *        npx expo start --web --port 8081
  *   3. BASE_URL=http://127.0.0.1:8081 npx playwright test -c e2e/playwright.config.ts e2e/social-*.spec.ts
  */
 import type { Browser, Page } from '@playwright/test';
