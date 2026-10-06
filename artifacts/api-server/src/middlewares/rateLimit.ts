@@ -21,7 +21,8 @@ export type RateLimitPolicyName =
   | "follow"
   | "report"
   | "feed-event"
-  | "post-interact";
+  | "post-interact"
+  | "gift-card-lookup";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -173,6 +174,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: scaled(240),
     windowMs: 60_000,
     message: "You're doing that too fast. Please wait a moment and try again.",
+  },
+  // Brute-force guard for gift card codes: every code lookup, claim and
+  // checkout redemption by code counts (lib/giftCards/checkout.ts).
+  "gift-card-lookup": {
+    id: "gift-card-lookup",
+    limit: 15,
+    windowMs: 15 * 60_000,
+    message: "Too many gift card code attempts. Please wait a few minutes and try again.",
   },
 };
 

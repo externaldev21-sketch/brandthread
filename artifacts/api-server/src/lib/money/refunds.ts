@@ -40,6 +40,7 @@ import {
 } from "./stateMachines";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "./stripeMoney";
 import { restoreStockForOrder } from "../stockReservation";
+import { restoreGiftCardsOnFullRefund } from "../giftCards/payout";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
@@ -452,6 +453,10 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
           logger.error({ err: error, refundId: refund.id, orderId: locked.id }, "Thread Cash top-up reversal failed; needs review");
         }
       }
+    }
+    // A full refund also gives any gift card used on the order its balance back.
+    if (fullyRefunded) {
+      await restoreGiftCardsOnFullRefund(tx, stripeClient, { orderId: locked.id, sellerId, refundId: refund.id });
     }
     if (locked.drop_id) await maybeCompleteDrop(tx, locked.drop_id);
 

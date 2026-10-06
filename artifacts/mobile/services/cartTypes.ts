@@ -176,6 +176,8 @@ export interface CheckoutSession {
   savedAddresses: CheckoutAddress[];
   deliveryGroups: CheckoutDeliveryGroup[];
   discounts: CheckoutDiscount[];
+  /** Store gift card chosen per seller (one per seller group). */
+  giftCards?: Record<string, { cardId: string; last4: string | null }>;
   loyaltyRedemption?: CheckoutLoyaltyRedemption;
   threadCashRedemption?: CheckoutThreadCashRedemption;
   tax?: CheckoutTax;
