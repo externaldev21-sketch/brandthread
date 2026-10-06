@@ -13,7 +13,7 @@ import type { SuggestedCreator, UpcomingLive } from '@/lib/live/types';
 import { LiveHostAvatar } from './LiveOverlays';
 
 export function LiveEmptyState({
-  upcoming, suggested, error, topInset, bottomInset, onRemind, onFollow, onOpenCreator, onRetry,
+  upcoming, suggested, error, topInset, bottomInset, onRemind, onFollow, onOpenCreator, onRetry, onBrowse,
 }: {
   upcoming: UpcomingLive[];
   suggested: SuggestedCreator[];
@@ -24,6 +24,8 @@ export function LiveEmptyState({
   onFollow: (hostId: string, following: boolean) => void;
   onOpenCreator: (hostId: string) => void;
   onRetry?: () => void;
+  /** Optional "Browse feed" CTA shown in the (non-error) hero. */
+  onBrowse?: () => void;
 }) {
   const { theme } = useAppTheme();
   const now = Date.now();
@@ -41,8 +43,16 @@ export function LiveEmptyState({
         <Text style={[styles.heroSub, { color: theme.muted }]}>
           {error
             ? 'We couldn’t load live streams. Check your connection and try again.'
-            : 'Live shopping drops in and out through the day. Set a reminder and we’ll tell you when it starts.'}
+            : upcoming.length > 0
+              // Only promise a reminder when a "Remind me" row exists below.
+              ? 'Live shopping drops in and out through the day. Set a reminder and we’ll tell you when it starts.'
+              : 'Live shopping drops in and out through the day. Check back soon.'}
         </Text>
+        {!error && onBrowse && (
+          <Pressable onPress={onBrowse} style={[styles.browse, { backgroundColor: theme.accent }]} accessibilityRole="button" testID="live-empty-browse">
+            <Text style={[styles.retryText, { color: theme.onAccent }]}>Browse feed</Text>
+          </Pressable>
+        )}
         {error && onRetry && (
           <Pressable onPress={onRetry} style={[styles.retry, { borderColor: theme.border }]} accessibilityRole="button">
             <Text style={[styles.retryText, { color: theme.text }]}>Try again</Text>
@@ -119,6 +129,7 @@ const styles = StyleSheet.create({
   heroSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, textAlign: 'center', marginTop: SP.xs, maxWidth: 300 },
   retry: { marginTop: SP.md, borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2 },
   retryText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  browse: { marginTop: SP.md, minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, alignItems: 'center', justifyContent: 'center' },
   section: { marginTop: SP.lg, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.base, marginBottom: 2 },
   upRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: RADIUS.md, padding: 10 },

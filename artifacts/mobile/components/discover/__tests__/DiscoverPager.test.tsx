@@ -194,6 +194,12 @@ vi.mock('@/components/BrandthreadUI', () => ({
   },
 }));
 
+vi.mock('@/components/ScreenHeader', () => ({
+  ScreenHeader: ({ title }: { title: string }) => require('react').createElement('Text', {}, title),
+}));
+vi.mock('@/lib/devPreview', () => ({ isPreviewDemoMode: () => false }));
+vi.mock('@/lib/previewCatalog', () => ({ isPreviewCatalogEnabled: () => false, getPreviewCatalog: () => [] }));
+vi.mock('@/hooks/useHeaderTopInset', () => ({ useHeaderTopInset: () => 0 }));
 vi.mock('@/components/buy-now/BuyNowFlow', () => ({
   BuyNowFlow: () => require('react').createElement('BuyNowFlow'),
 }));
@@ -319,6 +325,9 @@ describe('DiscoverPager — empty state', () => {
     const r = await render(<DiscoverPager />);
     const texts = textContent(r);
     expect(texts.some(t => t.toLowerCase().includes('no trending products'))).toBe(true);
+    // Empty is not an error: no Retry, a browse CTA instead.
+    expect(r.root.findAllByProps({ accessibilityLabel: 'Retry' })).toHaveLength(0);
+    expect(r.root.findAllByProps({ accessibilityLabel: 'Browse Discover' }).length).toBeGreaterThan(0);
     r.unmount();
   });
 });

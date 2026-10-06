@@ -80,6 +80,10 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   const cellHeight = Math.round((cell * 4) / 3);
   const big = cell * 2 + GAP;
   const bigHeight = cellHeight * 2 + GAP;
+  // Half-width cells for a re-packed 2-column trailing row (see
+  // balanceTrailingRow) — same 3:4 ratio, spans the full grid width.
+  const half = Math.floor((cell * 3 + GAP * 2 - GAP) / 2);
+  const halfHeight = Math.round((half * 4) / 3);
 
   const flatIndexOf = useMemo(() => {
     const map = new Map<string, number>();
@@ -143,8 +147,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
                 <DiscoverTileView
                   key={post.id}
                   post={post}
-                  width={cell}
-                  height={cellHeight}
+                  width={row.cols === 2 ? half : cell}
+                  height={row.cols === 2 ? halfHeight : cellHeight}
                   onPress={() => onTilePress(post, flatIndexOf.get(post.id) ?? 0)}
                   onLongPress={() => onTileLongPress(post)}
                 />

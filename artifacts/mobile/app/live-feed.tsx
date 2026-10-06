@@ -281,6 +281,7 @@ export default function LiveFeedScreen() {
               onRemind={() => {}}
               onFollow={() => {}}
               onOpenCreator={() => {}}
+              onBrowse={close}
             />
             <Pressable onPress={close} style={[styles.emptyClose, { top: topInset + 8 }]} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads">
               <Feather name="x" size={22} color="#888" />
@@ -578,6 +579,9 @@ function LiveRoomPage({
             <PressableScale
               onPress={() => { hapticLight(); setFollowing(v => !v); }}
               style={[styles.followBtn, following && styles.followBtnActive]}
+              // Visual 30pt pill inside the capsule (QA-0482/0483); the auto
+              // hit-slop still pads the tap area to 44pt.
+              noMinHeight
               accessibilityRole="button"
               accessibilityLabel={following ? `Following ${room.brandName}` : `Follow ${room.brandName}`}
             >
@@ -735,7 +739,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
   },
   hostPill: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    // Sized to its content (avatar, name, Follow) rather than stretching to
+    // the close button (QA-1175); flexShrink lets a long name truncate.
+    flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(0,0,0,0.38)', borderRadius: RADIUS.pill,
     // 8pt of capsule padding all round — the capsule's height is driven by
     // its tallest child (the Follow button), never a fixed height.
@@ -774,8 +780,10 @@ const styles = StyleSheet.create({
   // never straddling its edge, whatever the capsule's actual height is.
   roomTitle: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.82)', fontFamily: FONT.medium, fontSize: 12,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    // Solid white + a stronger shadow so it stays readable over bright
+    // video frames without adding a translucent scrim (QA-1175).
+    color: '#fff', fontFamily: FONT.semibold, fontSize: 13,
+    textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
 
   rail: { position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: 14 },

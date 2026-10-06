@@ -223,7 +223,11 @@ export function ShopTagPill({
         </ReanimatedAnimated.View>
         <ReanimatedAnimated.View
           pointerEvents={expanded ? 'auto' : 'none'}
-          style={[styles.expanded, expandedStyle]}
+          // Laid out at the full expanded width (not the animating pill
+          // width) so the price ("$480.00 +1") is never squeezed/clipped
+          // inside its own box while the pill grows; the pill's own
+          // overflow:hidden does the reveal instead (QA-1111).
+          style={[styles.expanded, { right: undefined, width: expandedWidth }, expandedStyle]}
         >
           <View style={styles.thumb}>
             {tag.imageUri ? (
