@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
@@ -291,6 +293,9 @@ export default function BuyerConversationScreen() {
   // in-flight Accept, so the Accept/Block/Delete row can't double-fire.
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Why `conv` is still null after loading: an unknown thread vs. a real
+  // load failure (which keeps a retry).
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -402,6 +407,7 @@ export default function BuyerConversationScreen() {
       setIsLoading(false);
       return;
     }
+    setLoadFailed(false);
     try {
       let loadedConv: Conversation | null = null;
       let unreadBeforeRead = 0;
@@ -490,6 +496,8 @@ export default function BuyerConversationScreen() {
       }
     } catch (e) {
       console.error('Failed to load conversation', e);
+      const status = (e as { status?: number } | null)?.status;
+      if (status !== 404 && status !== 403) setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -595,7 +603,8 @@ export default function BuyerConversationScreen() {
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // everywhere this screen shows the counterpart — header, request-mode
   // profile header, media-sheet copy, etc.
-  const displayName = participant?.nickname || participant?.name || params.participantName || 'Unknown';
+  // Empty (not "Unknown") while the thread is still loading.
+  const displayName = participant?.nickname || participant?.name || params.participantName || '';
   // Chat details > Theme: a conversation-level property — same background
   // and bubble colors for both participants. Null = Brandthread's existing
   // default monochrome look, completely unchanged.
@@ -2105,6 +2114,34 @@ export default function BuyerConversationScreen() {
         />
       ) : null;
 
+  // No thread to show (no id/participant, or an unknown thread): the shared
+  // header + a not-found state instead of "Unknown" over a blank pane.
+  if ((isMissingParam(params.id) && isMissingParam(params.participantId)) || (!isLoading && !conv && !loadFailed)) {
+    return (
+      <UnavailableScreen
+        title="Messages"
+        heading="Conversation not found"
+        message="This conversation is unavailable or was deleted."
+        icon="message-circle"
+        fallback="/(buyer)/inbox"
+      />
+    );
+  }
+  if (!isLoading && !conv && loadFailed) {
+    return (
+      <View style={s.root}>
+        <ScreenHeader title="Messages" onBack={() => goBackOr(router, '/(buyer)/inbox')} />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <ErrorState
+            message="Couldn’t load this conversation."
+            retryLabel="Try again"
+            onRetry={() => { setIsLoading(true); void loadData(); }}
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={s.root}
@@ -2342,6 +2379,9 @@ export default function BuyerConversationScreen() {
         }
         renderItem={renderItem}
         contentContainerStyle={s.listContent}
+        ListEmptyComponent={!isLoading && conv && !isAgentConv ? (
+          <Text style={s.emptyThreadHint} testID="conversation-empty">No messages yet</Text>
+        ) : null}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -3157,6 +3197,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   listContent: {
     paddingVertical: SP.sm,
     paddingBottom: SP.md,
+  },
+  emptyThreadHint: {
+    textAlign: 'center',
+    marginTop: SP.xl,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: theme.muted,
   },
 
   // Date separator — plain small gray centered text, no pill (IG-style).

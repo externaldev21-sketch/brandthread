@@ -27,6 +27,7 @@ import {
 } from '@/lib/theme';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 const REFUND_REASONS = [
   'Order not received',
@@ -70,7 +71,7 @@ export default function BuyerRefundRequestScreen() {
   }
 
   useEffect(() => {
-    if (!orderId) return;
+    if (isMissingParam(orderId)) { setLoading(false); return; }
     getBuyerOrder(orderId).then(o => {
       setOrder(o ?? null);
       setLoading(false);
@@ -106,16 +107,30 @@ export default function BuyerRefundRequestScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request Refund" />
+        <ScreenHeader title="Request refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>
       </View>
+    );
+  }
+
+  // No order id, or an id that resolves to nothing: there is nothing to
+  // refund, so show a not-found state instead of an empty form.
+  if (!order) {
+    return (
+      <UnavailableScreen
+        title="Request refund"
+        heading="Order not found"
+        message="Open a refund request from one of your orders."
+        icon="package"
+        fallback="/(buyer)/orders"
+      />
     );
   }
 
   if (submitted) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request Refund" />
+        <ScreenHeader title="Request refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
           <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
           <Text style={s.successTitle}>Refund Request Submitted</Text>
@@ -130,7 +145,7 @@ export default function BuyerRefundRequestScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
-        title="Request Refund"
+        title="Request refund"
         subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
       />
 

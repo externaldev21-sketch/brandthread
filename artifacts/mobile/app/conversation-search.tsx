@@ -19,6 +19,7 @@ import { searchConversationMessages } from '@/services/socialService';
 import type { Message } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 export default function ConversationSearchScreen() {
   const { theme } = useAppTheme();
@@ -56,6 +57,19 @@ export default function ConversationSearchScreen() {
     }
   }
 
+  // Opened without a conversation id — there is no chat to search.
+  if (isMissingParam(params.id)) {
+    return (
+      <UnavailableScreen
+        title="Search in chat"
+        heading="Conversation not found"
+        message="Open search from a chat's details to search its messages."
+        icon="message-circle"
+        fallback={params.role === 'seller' ? '/seller-inbox' : '/(buyer)/inbox'}
+      />
+    );
+  }
+
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
       <View style={[s.header, { paddingTop: headerTopPad + SP.xs, borderBottomColor: theme.border }]}>
@@ -91,9 +105,7 @@ export default function ConversationSearchScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
           ListEmptyComponent={query.trim() ? (
             <Text style={[s.empty, { color: theme.muted }]}>No messages found</Text>
-          ) : (
-            <Text style={[s.empty, { color: theme.muted }]}>Search this conversation’s messages</Text>
-          )}
+          ) : null}
           renderItem={({ item }) => (
             <View style={[s.resultRow, { borderBottomColor: theme.border }]} testID="conversation-search-result">
               <Text style={[s.resultFrom, { color: theme.text }]}>{item.fromName}</Text>

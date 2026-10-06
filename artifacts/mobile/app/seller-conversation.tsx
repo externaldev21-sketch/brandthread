@@ -23,6 +23,9 @@ import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import {
   acceptSellerConversationRequest, scheduleDeleteSellerConversationRequest,
   undoDeleteSellerConversationRequest, blockSellerConversationRequestUser,
@@ -263,6 +266,9 @@ export default function SellerConversationScreen() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  // Why `conv` is still null after loading: an unknown thread vs. a real
+  // load failure (which keeps a retry).
+  const [loadError, setLoadError] = useState<'notfound' | 'failed' | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
@@ -366,9 +372,12 @@ export default function SellerConversationScreen() {
   }, [api, id]);
 
   const loadAll = useCallback(async (generation: number) => {
-    if (!id) { setIsLoading(false); return; }
+    if (!id || isMissingParam(id)) { setIsLoading(false); return; }
+    setLoadError(null);
     if (isSellerPreviewConversationId(id)) {
-      setConv(getSellerPreviewConversation(id) as unknown as ConvView);
+      const previewConv = getSellerPreviewConversation(id);
+      if (!previewConv) setLoadError('notfound');
+      setConv(previewConv as unknown as ConvView);
       setMessaging({ blockedByMe: false, unavailable: false });
       await loadMessages(generation);
       if (generationRef.current === generation) setIsLoading(false);
@@ -398,6 +407,10 @@ export default function SellerConversationScreen() {
       }
     } catch (e) {
       console.error('Failed to load conversation', e);
+      if (generationRef.current === generation) {
+        const status = (e as { status?: number } | null)?.status;
+        setLoadError(status === 404 || status === 403 ? 'notfound' : 'failed');
+      }
     } finally {
       if (generationRef.current === generation) setIsLoading(false);
     }
@@ -508,7 +521,8 @@ export default function SellerConversationScreen() {
   }, [threadCashSendEnabled, other?.userId, id, api]);
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // in the header, matching buyer-conversation.tsx.
-  const displayName = other?.nickname || other?.name || 'Buyer';
+  // Empty (not a placeholder "Buyer") while the thread is still loading.
+  const displayName = other?.nickname || other?.name || '';
   // Chat details > Theme: a conversation-level property — same background
   // and bubble colors for both participants. Null = the app's existing
   // default monochrome look, completely unchanged.
@@ -1518,6 +1532,34 @@ export default function SellerConversationScreen() {
         />
       );
 
+  // No thread id, or a thread that doesn't exist — never a placeholder
+  // "Buyer" title over an empty pane.
+  if (isMissingParam(id) || (!isLoading && !conv && loadError !== 'failed')) {
+    return (
+      <UnavailableScreen
+        title="Messages"
+        heading="Conversation not found"
+        message="This conversation is unavailable or was deleted."
+        icon="message-circle"
+        fallback="/seller-inbox"
+      />
+    );
+  }
+  if (!isLoading && !conv && loadError === 'failed') {
+    return (
+      <View style={s.root}>
+        <ScreenHeader title="Messages" onBack={() => goBackOr(router, '/seller-inbox')} />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <ErrorState
+            message="Couldn’t load this conversation."
+            retryLabel="Try again"
+            onRetry={() => { setIsLoading(true); loadAll(++generationRef.current); }}
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={s.root}
@@ -1716,6 +1758,7 @@ export default function SellerConversationScreen() {
           )}
           renderItem={renderItem}
           contentContainerStyle={s.listContent}
+          ListEmptyComponent={<Text style={s.emptyThreadHint} testID="seller-conversation-empty">No messages yet</Text>}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
@@ -2422,6 +2465,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   orderBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
 
   listContent: { paddingVertical: SP.sm, paddingBottom: SP.md },
+  emptyThreadHint: { textAlign: 'center', marginTop: SP.xl, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   dateWrap: { alignItems: 'center', marginVertical: SP.md },
   datePill: {
     backgroundColor: CARD, borderRadius: RADIUS.pill,
