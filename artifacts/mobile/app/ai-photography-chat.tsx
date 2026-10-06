@@ -333,7 +333,6 @@ export default function AIPhotographyChatScreen() {
     >
       <ScreenHeader
         title="AI Product Photography"
-        subtitle="AI-generated photos"
         rightElement={
           <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
             <Text style={[styles.statusText, { color: colors.foreground }]}>Online</Text>

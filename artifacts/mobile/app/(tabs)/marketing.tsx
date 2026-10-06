@@ -16,6 +16,7 @@ import type { AdCampaign } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -80,7 +81,8 @@ export default function MarketingScreen() {
   const [reloadToken, setReloadToken] = useState(0);
   const retryAll = useCallback(() => setReloadToken((n) => n + 1), []);
 
-  const bottomPad = Platform.OS === 'web' ? 34 : 0;
+  // Content ends above the floating tab bar (shared app-wide rule).
+  const tabBarClearance = useTabBarClearance(2);
 
   useFocusEffect(
     useCallback(() => {
@@ -130,7 +132,7 @@ export default function MarketingScreen() {
     <ScrollView
       ref={scrollResetRef}
       style={[styles.container, { backgroundColor: 'transparent' }]}
-      contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
+      contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Stats Row — flat, no card/border boxes; a single hairline divider

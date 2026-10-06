@@ -133,7 +133,7 @@ export default function AnalyticsProductsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Product Analytics" subtitle="All time" />
+      <ScreenHeader title="Product Analytics" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={3} listRows={4} />
       ) : loadError && !data ? (

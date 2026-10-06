@@ -848,7 +848,6 @@ export default function BuyerOrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={`Order ${order.orderNumber}`}
-        subtitle={order.sellerName}
         onBack={() => goBackOr(router, '/(buyer)/orders')}
       />
 

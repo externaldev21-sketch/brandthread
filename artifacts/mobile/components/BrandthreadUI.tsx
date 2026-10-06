@@ -34,8 +34,9 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { useSettled } from '@/lib/animationUtils';
-import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
+import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { EmptyStateBadge, EMPTY_STATE_BADGE_SIZE } from '@/components/layout/EmptyStateBadge';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
@@ -449,10 +450,11 @@ interface PrimaryButtonProps {
   small?: boolean;
   style?: StyleProp<ViewStyle>;
   colors?: readonly [string, string, ...string[]];
+  testID?: string;
 }
 
 export function PrimaryButton({
-  label, onPress, icon, loading, disabled, small, style, colors,
+  label, onPress, icon, loading, disabled, small, style, colors, testID,
 }: PrimaryButtonProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
@@ -469,20 +471,26 @@ export function PrimaryButton({
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
-      style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, style]}
+      // The button's own height is the variant height (52 / 44 small) unless
+      // the caller's `style` sets a slimmer one — so PressableScale's forced
+      // 44pt minimum is skipped here (its auto hit-slop still pads the TAP
+      // area back up to 44pt; only the drawn box gets slimmer).
+      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, style]}
+      noMinHeight
+      testID={testID}
     >
       <LinearGradient
         colors={disabled ? [palette.elevated, palette.elevated] : buttonColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={[pbS.inner, { height: h }]}
+        style={[pbS.inner, { height: '100%' }]}
       >
         {loading ? (
           <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
         ) : (
           <>
             {icon && <Feather name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
-            <Text style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]}>{label}</Text>
+            <Text style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]} numberOfLines={1}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -490,8 +498,17 @@ export function PrimaryButton({
   );
 }
 
+// Equal inner padding on both sides (Dev's text-fit rule: >= 12px in a
+// button) so a button sized to its own content never runs its label into
+// the rounded edge — the outer `overflow: 'hidden'` used to clip the last
+// glyph of "Add a product" on the Dashboard's setup card, whose label ended
+// flush with the gradient's right edge. A full-width button is unaffected
+// (its label was already centred with room to spare). The gradient fills
+// the outer box's height (`height: '100%'`) so a caller can pass a slimmer
+// `height` in `style` and the fill follows.
+const BUTTON_INNER_PADDING_X = SP.md;
 const pbS = StyleSheet.create({
-  inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X },
   label: { fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
@@ -523,13 +540,13 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]}>{label}</Text>
+      <Text style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]} numberOfLines={1}>{label}</Text>
     </PressableScale>
   );
 }
 
 const sbS = StyleSheet.create({
-  root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
+  root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X,
            borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: 'rgba(199,205,213,0.08)' },
   label: { fontFamily: FONT.semibold },
 });
@@ -559,10 +576,10 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
       }}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, opacity: disabled ? 0.4 : 1 }, style]}
+      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: BUTTON_INNER_PADDING_X, opacity: disabled ? 0.4 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
-      <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }}>{label}</Text>
+      <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }} numberOfLines={1}>{label}</Text>
     </PressableScale>
   );
 }
@@ -756,27 +773,49 @@ interface EmptyStateProps {
   compact?: boolean;
   /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
   illustration?: ThreadMotif;
+  /** Diameter of the shared badge (default 64 — the one badge size every
+   *  empty state in the app uses). */
+  circleSize?: number;
+  /** 'fill' (default): the full-width PrimaryButton. 'pill': a slim white
+   *  pill sized to its own text (36px tall, equal 16px side padding) — Dev's
+   *  spec for the lighter empty states (Content Analytics' "Create post"). */
+  actionVariant?: 'fill' | 'pill';
+  testID?: string;
 }
 
-export function EmptyState({ icon, title, description, action, secondaryAction, style, compact = false, illustration }: EmptyStateProps) {
+
+export function EmptyState({
+  icon, title, description, action, secondaryAction, style, compact = false, illustration,
+  circleSize = EMPTY_STATE_BADGE_SIZE, actionVariant = 'fill', testID,
+}: EmptyStateProps) {
   const { theme } = useAppTheme();
   const colors = useColors();
+  // `illustration` is accepted for API compatibility; every empty state now
+  // draws the one shared badge (components/layout/EmptyStateBadge.tsx).
+  void illustration;
   return (
-    <View style={[esS.root, compact && esS.rootCompact, style]}>
+    <View style={[esS.root, compact && esS.rootCompact, style]} testID={testID}>
       {!compact && <View style={esS.illustration} {...a11yHidden(true)}>
-        <View style={[esS.artCircle, { borderColor: theme.border }]}>
-          {illustration ? (
-            <ThreadIllustration motif={illustration} size={56} color={theme.muted} strokeWidth={4} />
-          ) : (
-            <Feather name={icon} size={34} color={theme.muted} />
-          )}
-        </View>
+        <EmptyStateBadge icon={icon} size={circleSize} testID={testID ? `${testID}-badge` : undefined} />
       </View>}
       <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
       {!!description && (
         <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
       )}
-      {action && (
+      {action && actionVariant === 'pill' && (
+        <PressableScale
+          onPress={() => { hapticLight(); action.onPress(); }}
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          style={[esS.pill, { backgroundColor: theme.text }]}
+          noMinHeight
+          testID={testID ? `${testID}-action` : undefined}
+        >
+          {action.icon && <Feather name={action.icon} size={ICON.sm} color={theme.background} />}
+          <Text style={[esS.pillLabel, { color: theme.background }]} numberOfLines={1}>{action.label}</Text>
+        </PressableScale>
+      )}
+      {action && actionVariant === 'fill' && (
         <View style={esS.actions}>
           <PrimaryButton label={action.label} onPress={action.onPress} icon={action.icon} style={esS.btn} />
           {secondaryAction && (
@@ -791,12 +830,15 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
 const esS = StyleSheet.create({
   root:    { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.sm },
   rootCompact: { paddingVertical: SP.lg },
-  illustration: { width: 150, height: 128, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
-  artCircle: { width: 96, height: 96, borderRadius: 48, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  illustration: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
   desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 21 },
   actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },
   btn:     { width: '100%' },
+  // Slim, fit-to-text pill: 36px tall, equal 16px side padding, black text
+  // on the theme's white (see actionVariant 'pill').
+  pill:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, paddingHorizontal: SP.md, borderRadius: 18, alignSelf: 'center' },
+  pillLabel: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });
 
 export function BrandedLoader({ label = 'Stitching things together…', style }: {

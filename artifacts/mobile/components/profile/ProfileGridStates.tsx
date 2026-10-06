@@ -10,6 +10,9 @@ import { ProfileGridSkeleton } from './ProfileVideoGrid';
 import type { ProfileLayout } from './profileLayout';
 import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
 
+/** Gap between the tab row and the top of every profile empty state. */
+export const EMPTY_STATE_TOP_GAP = 32;
+
 /**
  * Three hairline-bordered ghost tiles standing in for the grid this empty
  * state will fill in — the middle one carries the CTA icon — instead of a
@@ -68,14 +71,21 @@ export function ProfileGridPlaceholder({
   testID?: string;
   /** Tighter icon/padding — for a screen tight on height above a floating tab bar. */
   compact?: boolean;
-  /** `text` = Instagram-style link action instead of a pill button. */
-  actionStyle?: 'button' | 'text';
+  /** `text` = Instagram-style link action; `pill` = slim white fit-to-text
+   *  pill; default `button`. */
+  actionStyle?: 'button' | 'text' | 'pill';
   /** The posts grid's empty state: three ghost tiles above the copy, instead
    * of a lone icon with no relation to the grid it's standing in for. */
   showGridPreview?: boolean;
 }) {
   const areaHeight = useContext(ProfileEmptyAreaContext);
-  const fill = areaHeight ? { minHeight: areaHeight, justifyContent: 'center' as const } : null;
+  // The empty area still reserves the full visible gap (so the list never
+  // ends under the floating tab bar), but the empty state itself sits a
+  // fixed ~32px under the tab row — the same spot on every tab, never
+  // floating mid-screen or down by the bar (Dev).
+  const fill = areaHeight
+    ? { minHeight: areaHeight, justifyContent: 'flex-start' as const, paddingTop: EMPTY_STATE_TOP_GAP }
+    : { justifyContent: 'flex-start' as const, paddingTop: EMPTY_STATE_TOP_GAP };
   if (loading) {
     return (
       <ProfileGridSkeleton columns={layout.gridColumns} width={layout.tileWidth} height={layout.tileHeight} rows={2} />

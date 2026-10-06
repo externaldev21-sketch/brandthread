@@ -1389,8 +1389,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
-                  paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm,
-                  borderBottomWidth: 1, borderBottomColor: border },
+                  paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm },
+                  // ^ no divider under the header (app-wide header rule)
   backBtn:      { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: card,
                   borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: foreground, letterSpacing: -0.2 },

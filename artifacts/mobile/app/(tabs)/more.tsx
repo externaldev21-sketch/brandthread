@@ -25,6 +25,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -110,6 +111,8 @@ const SECTIONS: { key: string; title: string; icon: keyof typeof Feather.glyphMa
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MoreScreen() {
+  // Content ends above the floating tab bar (shared app-wide rule).
+  const tabBarClearance = useTabBarClearance(2);
   const scrollResetRef = useScrollReset<ScrollView>();
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
@@ -194,7 +197,7 @@ export default function MoreScreen() {
       <ScrollView
         ref={scrollResetRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
       >
         {/* USER HEADER */}
         <GradientCard

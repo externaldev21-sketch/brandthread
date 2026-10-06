@@ -56,7 +56,7 @@ export function Header({
   transparent = false,
   belowTitle,
   rightElement,
-  dividerVariant = 'default',
+  dividerVariant = 'none',
 }: {
   title: string;
   subtitle?: string;
@@ -78,12 +78,10 @@ export function Header({
    */
   rightElement?: React.ReactNode;
   /**
-   * Pushed-screen (showBack) header only. 'default' keeps the existing
-   * scroll-driven `theme.border` hairline (opaque once `largeTitle` content
-   * scrolls under it, or always-on for a plain header with no `scrollY`).
-   * 'subtle' pins it to a fixed 6%-white line instead — for a header whose
-   * content below it already has its own divider, so the header's own line
-   * doesn't read as a second, heavier one. 'none' omits it entirely.
+   * Pushed-screen (showBack) header only. Defaults to 'none' — Dev's
+   * app-wide rule: bare back arrow + title, no divider line under the
+   * header. 'default' (scroll-driven `theme.border` hairline) and 'subtle'
+   * (fixed 6%-white line) remain as explicit opt-ins.
    */
   dividerVariant?: 'default' | 'subtle' | 'none';
 }) {

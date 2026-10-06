@@ -132,7 +132,6 @@ export default function AnalyticsMarketingScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="Marketing Analytics"
-        subtitle={filter?.dateRange.label ?? '30 days'}
         rightElement={<HeaderPillButton label="Marketing" onPress={() => router.navigate('/(tabs)/marketing' as never)} />}
       />
       {loading ? (

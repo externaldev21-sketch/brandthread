@@ -2616,7 +2616,6 @@ export default function BuyerConversationScreen() {
             <View style={s.productPicker}>
               <ScreenHeader
                 title="Attach to message"
-                subtitle={`Choose from ${displayName}'s store`}
                 variant="modal"
                 onBack={() => setShowAttachmentPicker(false)}
               />

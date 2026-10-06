@@ -1165,7 +1165,9 @@ function makeStyles(ck: CheckoutColors) {
     header: {
       flexDirection: 'row', alignItems: 'center',
       paddingHorizontal: SP.xs, paddingBottom: SP.xs,
-      backgroundColor: ck.bg, borderBottomWidth: 1, borderBottomColor: ck.divider,
+      // No divider under the header (app-wide header rule) — the solid
+      // ck.bg fill alone separates it from the content scrolling under it.
+      backgroundColor: ck.bg,
       zIndex: 2,
     },
     headerTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },

@@ -203,8 +203,15 @@ describe('navigation animation override plumbing', () => {
       'design-ai-photoshoot', 'customer-accounts',
     ];
     destinations.forEach((name) => {
+      // A function options either way — add-product's also reads its route
+      // params (`?presentation=modal` from the seller profile's Products
+      // empty state) before falling back to the same override.
       const marker = `<Stack.Screen name="${name}" options={() => (`;
-      expect(rootLayout, `${name} should use a function options reading consumeAnimationOverride`).toContain(marker);
+      const paramMarker = `<Stack.Screen name="${name}" options={({ route }) => {`;
+      expect(
+        rootLayout.includes(marker) || rootLayout.includes(paramMarker),
+        `${name} should use a function options reading consumeAnimationOverride`,
+      ).toBe(true);
     });
     // Every one of those destinations' animation key must route through the
     // override, not just carry a plain static string.

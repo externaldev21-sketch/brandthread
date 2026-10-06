@@ -90,7 +90,6 @@ export default function AIMockupChatScreen() {
     >
       <ScreenHeader
         title="AI Clothing Mockups"
-        subtitle="AI-generated mockups"
         rightElement={
           <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
             <Text style={[styles.statusText, { color: colors.foreground }]}>Online</Text>
