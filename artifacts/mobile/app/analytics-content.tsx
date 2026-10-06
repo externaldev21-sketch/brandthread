@@ -194,7 +194,6 @@ export default function AnalyticsContentScreen() {
           description="Post a Thread to see how it performs."
           action={{ label: 'Create post', onPress: () => router.push('/create-post' as never) }}
           actionVariant="pill"
-          circleSize={77}
           style={{ marginTop: SP.lg }}
           testID="content-analytics-empty"
         />

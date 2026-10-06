@@ -113,7 +113,6 @@ export default function BuyerProblemReportScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
         title="Report a problem"
-        subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
         onBack={() => goBackOr(router)}
       />
 

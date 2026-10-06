@@ -87,6 +87,7 @@ import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
+import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
@@ -115,12 +116,41 @@ function dismissKeyboardUnlessTextInput(e: { nativeEvent?: { target?: unknown } 
   Keyboard.dismiss();
 }
 
-function IsolatedStackScene({ children }: { children: React.ReactNode }) {
+function IsolatedStackScene({
+  children,
+  routeName,
+  presentation,
+}: {
+  children: React.ReactNode;
+  routeName?: string;
+  presentation?: string;
+}) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, any>;
+  // Nothing may sit under or behind the floating seller tab bar (Dev's
+  // app-wide rule). The tab group's own screens pad their scroll content
+  // with useTabBarClearance(); every PUSHED seller screen the bar floats
+  // over gets the same clearance once, here, as a bottom margin on its
+  // content box — so its scroll views, sticky footers and absolutely-
+  // positioned bottom bars all end above the bar without touching each
+  // screen. A margin (not padding) on purpose: an absolutely-positioned
+  // `bottom: 0` child measures from its parent's padding box, so only a
+  // smaller box lifts it. Skipped where the bar never floats: the tab
+  // group (handles its own), full-screen routes the bar slides away on,
+  // and modal-presented routes (presented above the bar).
+  const { isActiveSeller } = useSellerShell();
+  const sellerBarShown = isActiveSeller || PREVIEW_ROLE === 'seller';
+  const barFloatsOverScene = sellerBarShown
+    && !!routeName
+    && routeName !== '(tabs)'
+    && !SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(routeName)
+    && (!presentation || presentation === 'card');
+  const bottomClearance = useSceneBottomClearance(barFloatsOverScene);
   return (
     <View style={{ flex: 1, backgroundColor: palette.background ?? '#0A0A0B' }}>
-      {children}
+      <View style={{ flex: 1, marginBottom: bottomClearance }} testID={bottomClearance > 0 ? 'scene-bottom-clearance' : undefined}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -1205,8 +1235,10 @@ function RootLayoutNav() {
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
-        screenLayout={({ children }) => (
-          <IsolatedStackScene>{children}</IsolatedStackScene>
+        screenLayout={({ children, route, options }) => (
+          <IsolatedStackScene routeName={route.name} presentation={(options as { presentation?: string } | undefined)?.presentation}>
+            {children}
+          </IsolatedStackScene>
         )}
         screenOptions={{
           headerShown: false,
@@ -1260,7 +1292,15 @@ function RootLayoutNav() {
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="add-product" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
+        {/* `?presentation=modal` (the seller profile's Products empty state):
+            slides up as a modal over the profile, so closing it lands back
+            on the profile. Every other entry point keeps the push. */}
+        <Stack.Screen name="add-product" options={({ route }) => {
+            const asModal = (route.params as { presentation?: string } | undefined)?.presentation === 'modal';
+            return asModal
+              ? { headerShown: false, presentation: 'modal', animation: 'slide_from_bottom', contentStyle: OPAQUE_SCREEN_CONTENT }
+              : { headerShown: false, animation: consumeAnimationOverride('ios_from_right') };
+          }} />
         <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1470,6 +1510,9 @@ function RootLayoutNav() {
       </Stack>
         </View>
       </Pressable>
+      {/* Solid strip over the status bar / notch — nothing scrolls under it
+          (components/layout/ScreenChrome.tsx). */}
+      <StatusBarMask />
       <SellerBarGate />
       <AuthGate />
       <ServiceConfigurer />

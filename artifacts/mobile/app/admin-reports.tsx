@@ -144,7 +144,6 @@ export default function ReviewQueueScreen() {
     <View style={s.root}>
       <ScreenHeader
         title="Review queue"
-        subtitle={summary ? `${summary.open} open · ${summary.heldByFilter} held by filter · ${summary.resolvedToday} resolved today` : undefined}
         actions={[{
           icon: 'book-open',
           onPress: () => router.push('/community-guidelines' as never),

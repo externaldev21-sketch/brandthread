@@ -140,23 +140,28 @@ export function ProfileEditMessagesRow({
   const hitSlop = { top: 3, bottom: 3, left: 3, right: 3 };
   return (
     <View style={styles.editMessagesRow}>
-      <PressableScale
-        onPress={() => { hapticLight(); onEdit(); }}
-        onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
-        accessibilityRole="button"
-        accessibilityLabel="Edit profile"
-        accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
-        testID="profile-edit-details"
-        hitSlop={hitSlop}
-        style={[styles.editBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-      >
-        {(state) => (
-          <>
-            <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
-            <Text style={[styles.editMessagesLabel, { color: theme.text }]} numberOfLines={1}>Edit</Text>
-          </>
-        )}
-      </PressableScale>
+      {/* Two EQUAL columns (Dev): Edit and Messages each sit in a flex:1
+          wrapper — see the comment below for why the wrapper, not the
+          PressableScale, carries the flex. Same 39pt height. */}
+      <View style={styles.editBtnWrap}>
+        <PressableScale
+          onPress={() => { hapticLight(); onEdit(); }}
+          onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
+          accessibilityRole="button"
+          accessibilityLabel="Edit profile"
+          accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
+          testID="profile-edit-details"
+          hitSlop={hitSlop}
+          style={[styles.editBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          {(state) => (
+            <>
+              <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+              <Text style={[styles.editMessagesLabel, { color: theme.text }]} numberOfLines={1}>Edit</Text>
+            </>
+          )}
+        </PressableScale>
+      </View>
       {/* PressableScale forwards a plain-object `style` only to its INNER
           Animated.View, never to the outer Pressable that actually
           participates in this row's flex layout (see its own comment) — so
@@ -543,12 +548,12 @@ export function ShopPill({
 // ─── Chips ────────────────────────────────────────────────────────────────────
 
 /** Small non-interactive pill (role, plan, "Follows you"…). */
-export function ProfileChip({ label, icon, tone = 'muted' }: { label: string; icon?: FeatherName; tone?: 'muted' | 'accent' | 'warning' }) {
+export function ProfileChip({ label, icon, tone = 'muted', size = 'md' }: { label: string; icon?: FeatherName; tone?: 'muted' | 'accent' | 'warning'; size?: 'md' | 'sm' }) {
   const { theme } = useAppTheme();
   const color = tone === 'accent' ? theme.accent : tone === 'warning' ? theme.warning : theme.muted;
   return (
-    <View style={[styles.chip, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: theme.cardGlass }]}>
-      {icon ? <Feather name={icon} size={11} color={color} /> : null}
+    <View style={[styles.chip, size === 'sm' && styles.chipSm, { borderColor: tone === 'muted' ? theme.border : `${color}66`, backgroundColor: theme.cardGlass }]}>
+      {icon ? <Feather name={icon} size={size === 'sm' ? 10 : 11} color={color} /> : null}
       <Text style={[styles.chipText, { color }]} numberOfLines={1}>{label}</Text>
     </View>
   );
@@ -581,8 +586,9 @@ const styles = StyleSheet.create({
   // leaving Messages' own `flex: 1` (below) with no extra space to grow
   // into and rendering it barely wider than Edit instead of filling the row.
   editMessagesRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%' },
+  editBtnWrap: { flex: 1 },
   editBtn: {
-    height: 39, borderRadius: RADIUS.sm, borderWidth: 1,
+    width: '100%', height: 39, borderRadius: RADIUS.sm, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: SP.lg, overflow: 'hidden',
   },
@@ -661,6 +667,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
   },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
+  // ~10% more compact (padding only — the 11pt text is the type floor).
+  chipSm: { paddingHorizontal: 9, paddingVertical: 3, gap: 3 },
 
   rail: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.md },
 });

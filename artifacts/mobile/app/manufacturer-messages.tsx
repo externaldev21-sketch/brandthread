@@ -326,7 +326,6 @@ export default function ManufacturerMessagesScreen() {
   const header = (
     <ScreenHeader
       title={mfrName}
-      subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
       onBack={() => goBackOr(router)}
       rightElement={
         <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>

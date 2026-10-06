@@ -278,8 +278,9 @@ test.describe('Seller Dashboard + Content Analytics fixes @ 393x852', () => {
       await expect(empty).toContainText('No views yet');
       await expect(empty).toContainText('Post a Thread to see how it performs.');
       expect(await empty.textContent()).not.toMatch(/Seller/);
-      const circle = await empty.evaluate((el: HTMLElement) => { const c = el.querySelector('[aria-hidden="true"] > div') as HTMLElement; return c ? c.getBoundingClientRect().width : 0; });
-      expect(Math.round(circle)).toBe(77);
+      // The shared empty-state badge (64px, smaller than the old 96px circle).
+      const badge = await page.getByTestId('content-analytics-empty-badge').boundingBox();
+      expect(Math.round(badge!.width)).toBe(64);
       const fit = await buttonFit(page, '[data-testid="content-analytics-empty-action"]');
       expect(fit).not.toBeNull();
       expect(fit!.text).toBe('Create post');

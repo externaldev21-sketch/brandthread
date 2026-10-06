@@ -34,8 +34,9 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { useSettled } from '@/lib/animationUtils';
-import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
+import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { EmptyStateBadge, EMPTY_STATE_BADGE_SIZE } from '@/components/layout/EmptyStateBadge';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
@@ -772,7 +773,8 @@ interface EmptyStateProps {
   compact?: boolean;
   /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
   illustration?: ThreadMotif;
-  /** Diameter of the icon circle (default 96). The glyph scales with it. */
+  /** Diameter of the shared badge (default 64 — the one badge size every
+   *  empty state in the app uses). */
   circleSize?: number;
   /** 'fill' (default): the full-width PrimaryButton. 'pill': a slim white
    *  pill sized to its own text (36px tall, equal 16px side padding) — Dev's
@@ -781,25 +783,20 @@ interface EmptyStateProps {
   testID?: string;
 }
 
-const EMPTY_STATE_CIRCLE_SIZE = 96;
 
 export function EmptyState({
   icon, title, description, action, secondaryAction, style, compact = false, illustration,
-  circleSize = EMPTY_STATE_CIRCLE_SIZE, actionVariant = 'fill', testID,
+  circleSize = EMPTY_STATE_BADGE_SIZE, actionVariant = 'fill', testID,
 }: EmptyStateProps) {
   const { theme } = useAppTheme();
   const colors = useColors();
-  const scale = circleSize / EMPTY_STATE_CIRCLE_SIZE;
+  // `illustration` is accepted for API compatibility; every empty state now
+  // draws the one shared badge (components/layout/EmptyStateBadge.tsx).
+  void illustration;
   return (
     <View style={[esS.root, compact && esS.rootCompact, style]} testID={testID}>
-      {!compact && <View style={[esS.illustration, { height: Math.max(circleSize + 32, 96) }]} {...a11yHidden(true)}>
-        <View style={[esS.artCircle, { width: circleSize, height: circleSize, borderRadius: circleSize / 2, borderColor: theme.border }]}>
-          {illustration ? (
-            <ThreadIllustration motif={illustration} size={Math.round(56 * scale)} color={theme.muted} strokeWidth={4} />
-          ) : (
-            <Feather name={icon} size={Math.round(34 * scale)} color={theme.muted} />
-          )}
-        </View>
+      {!compact && <View style={esS.illustration} {...a11yHidden(true)}>
+        <EmptyStateBadge icon={icon} size={circleSize} testID={testID ? `${testID}-badge` : undefined} />
       </View>}
       <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
       {!!description && (
@@ -833,8 +830,7 @@ export function EmptyState({
 const esS = StyleSheet.create({
   root:    { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.sm },
   rootCompact: { paddingVertical: SP.lg },
-  illustration: { width: 150, height: 128, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
-  artCircle: { width: 96, height: 96, borderRadius: 48, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  illustration: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
   desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 21 },
   actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },
