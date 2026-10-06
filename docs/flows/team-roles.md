@@ -17,7 +17,7 @@ flowchart LR
   C[Client: lib/api.ts<br/>X-Store-Context: own / membership id] --> TC[teamContext — routes/index.ts mount]
   TC -->|resolveTeamContext: active membership → actorRole,<br/>req.clerkUserId = store owner| G{write?}
   G -->|GET / HEAD| R[router]
-  G -->|POST/PUT/PATCH/DELETE| P[requirePermissionForWrites permission<br/>or route-level requireRole / requirePermission]
+  G -->|POST/PUT/PATCH/DELETE| P[teamRouteRules writes permission<br/>or route-level requireRole / requirePermission]
   P -->|role lacks it| X[403 PERMISSION_REQUIRED / ROLE_REQUIRED]
   P -->|ok| R
   R --> RA[router-level requireAuth<br/>keeps the store owner for this caller]
@@ -25,7 +25,7 @@ flowchart LR
   H --> OW[Owner sees the change on the same screens]
 ```
 
-Buyer-side or personal actions taken by someone who also works on a team (Live chat, reviews, posts, waitlists, discount validation at checkout, AI assistant history, freelancer profile, notification prefs) are marked `actAsSelf()`. They always act as the signed-in person.
+The rules live in `middlewares/teamRouteRules.ts`. `teamContext()` is already mounted on every seller router, and it applies the rule for the mount it runs on (`req.baseUrl`), so `routes/index.ts` is unchanged. Buyer-side or personal actions by someone who also works on a team (Live chat, reviews, posts, waitlists, discount validation at checkout, AI assistant history, freelancer profile, notification prefs) are `self` rules. They always act as the signed-in person.
 
 ## Permission map (server, `middlewares/requireRole.ts` → `ROLE_PERMISSIONS`)
 
@@ -46,10 +46,10 @@ Buyer-side or personal actions taken by someone who also works on a team (Live c
 
 | # | Break | Fix |
 |---|---|---|
-| 1 | **P0.** `teamContext()` at the mount switched `req.clerkUserId` to the store owner, then each router's own `requireAuth` reset it to the caller. A permitted manager's reads and writes hit **their own empty store** in about 35 routers. Tests stubbed `requireAuth`, which hid it. | `requireAuth` keeps the owner when the team context belongs to the same caller, unless the route is `actAsSelf()`. |
-| 2 | Once break 1 is fixed, routers with **no write gate** would let a `viewer` publish the store, change returns and disputes, buy boosts, launch Meta ads, change taxes, and so on. | `requirePermissionForWrites` on those mounts (table above). |
+| 1 | **P0.** `teamContext()` at the mount switched `req.clerkUserId` to the store owner, then each router's own `requireAuth` reset it to the caller. A permitted manager's reads and writes hit **their own empty store** in about 35 routers. Tests stubbed `requireAuth`, which hid it. | `requireAuth` keeps the owner when the team context belongs to the same caller, unless the route acts as self. |
+| 2 | Once break 1 is fixed, routers with **no write gate** would let a `viewer` publish the store, change returns and disputes, buy boosts, launch Meta ads, change taxes, and so on. | `writes` rules in `teamRouteRules.ts` (table above). |
 | 3 | `marketing` and `finance` ranked as staff, so they passed order status, tracking, label and shipping-zone gates without any orders permission. | Ranked 0 (like viewer) for the legacy hierarchy. Their capability gates are unchanged. |
-| 4 | Fixing break 1 alone would have made a team member's Live chat, reviews, posts, waitlist joins and discount validation act **as the owner**. The client sends `X-Store-Context` on every request. | `actAsSelf()` / `actAsSelfFor()` on those routes, which keeps today's behaviour. |
+| 4 | Fixing break 1 alone would have made a team member's Live chat, reviews, posts, waitlist joins and discount validation act **as the owner**. The client sends `X-Store-Context` on every request. | `self` / `selfPaths` rules keep today's behaviour. |
 
 ## Tests
 
