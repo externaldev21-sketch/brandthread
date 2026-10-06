@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, Alert,
+  StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -16,8 +17,14 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, StatusBadge } from '@/components/BrandthreadUI';
-import { getStorefront, updateDomain } from '@/services/storeService';
-import { useApi } from '@/lib/api';
+import { getStorefront } from '@/services/storeService';
+import { useApi, type StoreSubdomainState } from '@/lib/api';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import {
+  DEMO_STORE_SUBDOMAIN, EMPTY_STORE_SUBDOMAIN, canSaveSubdomain, initialSubdomainInput,
+  normalizeSubdomainInput, subdomainErrorMessage,
+} from '@/lib/storeSubdomain';
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
@@ -37,6 +44,13 @@ export default function StoreDomainScreen() {
   const [subdomainInput, setSubdomainInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
+  // Brandthread subdomain — server-owned (GET/PUT /api/store/subdomain).
+  const [btState, setBtState] = useState<StoreSubdomainState | null>(null);
+  const [btLoading, setBtLoading] = useState(true);
+  const [btLoadFailed, setBtLoadFailed] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  // Signed-out dev web preview: never call protected APIs.
+  const inPreview = isSellerDevPreview();
 
   const leaveSetupDestination = () => {
     if (isSellerSetupOrigin(params.from)) {
@@ -46,14 +60,25 @@ export default function StoreDomainScreen() {
     goBackOr(router);
   };
 
+  const loadSubdomain = useCallback(async () => {
+    setBtLoading(true);
+    setBtLoadFailed(false);
+    try {
+      const next = inPreview
+        ? (isPreviewDemoMode() ? DEMO_STORE_SUBDOMAIN : EMPTY_STORE_SUBDOMAIN)
+        : await api.store.subdomain();
+      setBtState(next);
+      setSubdomainInput(initialSubdomainInput(next));
+      setAvailabilityError(null);
+    } catch {
+      setBtLoadFailed(true);
+    } finally {
+      setBtLoading(false);
+    }
+  }, [api, inPreview]);
+
   const load = useCallback(async () => {
-    const s = await getStorefront();
-    const localDomains = s.domains;
-
-    // Merge: local BT subdomain + real API custom domains
-    const btDomain = localDomains.find(d => d.type === 'brandthread');
-    if (btDomain) setSubdomainInput(btDomain.subdomain ?? s.settings.storeUrl ?? '');
-
+    if (inPreview) { setDomains([]); return; }
     try {
       const apiDomains = await (api as any).store.domains() as any[];
       const customFromApi: MergedDomain[] = (apiDomains ?? []).map((d: any) => ({
@@ -65,32 +90,70 @@ export default function StoreDomainScreen() {
         isPrimary:          false,
         dnsToken:           d.verifyToken,
       }));
-      setDomains([...(btDomain ? [btDomain] : []), ...customFromApi]);
+      setDomains(customFromApi);
       await completeSetupTaskWhen(
         'connect_domain',
         customFromApi.some(domain => domain.verificationStatus === 'verified'),
       );
     } catch {
-      setDomains(localDomains);
+      // Device-only entries were never DNS-checked by the server: never show them as verified.
+      const s = await getStorefront();
+      setDomains(s.domains
+        .filter(d => d.type === 'custom')
+        .map(d => ({ ...d, verificationStatus: 'pending' as const, sslStatus: 'pending' as const })));
     }
-  }, [api]);
+  }, [api, inPreview]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { load(); loadSubdomain(); }, [load, loadSubdomain]));
 
-  const btDomain = domains.find(d => d.type === 'brandthread');
   const customDomains = domains.filter(d => d.type === 'custom') as MergedDomain[];
 
+  // Live availability check (debounced) for a changed subdomain.
+  useEffect(() => {
+    const value = normalizeSubdomainInput(subdomainInput);
+    setAvailabilityError(null);
+    if (inPreview || !btState || !value || value === btState.subdomain) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      api.store.subdomainAvailability(value)
+        .then(r => { if (!cancelled && !r.available) setAvailabilityError(r.message ?? 'That subdomain is not available.'); })
+        .catch(() => { /* the claim itself re-validates on Save */ });
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [api, inPreview, btState, subdomainInput]);
+
+  const canSave = canSaveSubdomain({
+    loading: btLoading, loadFailed: btLoadFailed, saving,
+    input: subdomainInput, state: btState, unavailable: !!availabilityError,
+  });
+
   const handleSaveSubdomain = async () => {
-    if (!btDomain) return;
+    if (!canSave) return;
+    const value = normalizeSubdomainInput(subdomainInput);
     setSaving(true);
     try {
-      await updateDomain(btDomain.id, { subdomain: subdomainInput, verificationStatus: 'verified' });
-      await load();
+      const next = inPreview
+        ? { ...(btState ?? EMPTY_STORE_SUBDOMAIN), subdomain: value, assignedSlug: value, status: 'active' as const, suggestion: null, url: `https://${value}.brandthread.app` }
+        : await api.store.claimSubdomain(value);
+      setBtState(next);
+      setSubdomainInput(initialSubdomainInput(next));
       Alert.alert('Saved', 'Subdomain updated.');
-    } catch {
-      Alert.alert('Error', 'Failed to update subdomain.');
+    } catch (err) {
+      const message = subdomainErrorMessage(err);
+      setAvailabilityError(message);
+      Alert.alert('Error', message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCopySubdomain = async () => {
+    if (!btState?.url) return;
+    try {
+      await Clipboard.setStringAsync(btState.url);
+      Alert.alert('Copied', btState.url);
+    } catch {
+      Alert.alert("Couldn't copy", btState.url);
     }
   };
 
@@ -154,7 +217,15 @@ export default function StoreDomainScreen() {
 
         {/* Brandthread Subdomain */}
         <SectionHeader title="BRANDTHREAD SUBDOMAIN" style={dm.sh} />
-        {btDomain && (
+        {btLoadFailed ? (
+          <BrandthreadCard style={dm.card}>
+            <ErrorState message="Couldn't load your subdomain." onRetry={loadSubdomain} />
+          </BrandthreadCard>
+        ) : btLoading && !btState ? (
+          <BrandthreadCard style={dm.card}>
+            <ActivityIndicator color={MUTED} />
+          </BrandthreadCard>
+        ) : (
           <BrandthreadCard style={dm.card}>
             <View style={dm.urlInputRow}>
               <TextInput
@@ -164,17 +235,26 @@ export default function StoreDomainScreen() {
                 placeholder="yourstore"
                 placeholderTextColor={SUBTLE}
                 autoCapitalize="none"
+                autoCorrect={false}
+                editable={!btLoading && !saving}
               />
               <Text style={dm.urlSuffix}>.brandthread.app</Text>
             </View>
             {subdomainInput ? (
-              <Text style={dm.urlPreview}>https://{subdomainInput}.brandthread.app</Text>
+              <Text style={dm.urlPreview}>https://{normalizeSubdomainInput(subdomainInput)}.brandthread.app</Text>
             ) : null}
+            {availabilityError ? <Text style={dm.noteText}>{availabilityError}</Text> : null}
             <View style={dm.badgeRow}>
-              {verificationBadge(btDomain.verificationStatus)}
-              {btDomain.isPrimary && <StatusBadge label="★ Primary" variant="purple" small />}
+              {btState?.status === 'active'
+                ? <StatusBadge label="Active" variant="success" small />
+                : <StatusBadge label="Not claimed" variant="neutral" small />}
             </View>
-            <PrimaryButton label={saving ? 'Saving...' : 'Save Subdomain'} onPress={handleSaveSubdomain} loading={saving} small />
+            <View style={dm.actionRow}>
+              {btState?.status === 'active' && btState.url ? (
+                <SecondaryButton label="Copy link" small accent={MUTED} onPress={handleCopySubdomain} style={{ flex: 1 }} />
+              ) : null}
+              <PrimaryButton label={saving ? 'Saving...' : 'Save Subdomain'} onPress={handleSaveSubdomain} loading={saving} disabled={!canSave} small style={{ flex: 1 }} />
+            </View>
           </BrandthreadCard>
         )}
 

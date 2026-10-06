@@ -761,6 +761,23 @@ export interface LocalUserProfile {
   suspendedAt?: string | null;
 }
 
+/** GET/PUT /api/store/subdomain. 'active' = claimed server-side (platform-owned host). */
+export interface StoreSubdomainState {
+  subdomain: string | null;
+  status: 'active' | 'unclaimed';
+  assignedSlug: string;
+  suggestion: string | null;
+  url: string | null;
+  claimedAt: string | null;
+}
+
+export interface StoreSubdomainAvailability {
+  subdomain: string;
+  available: boolean;
+  reason?: 'required' | 'too_short' | 'too_long' | 'invalid_characters' | 'hyphen_edge' | 'reserved' | 'taken';
+  message?: string;
+}
+
 export interface ShopifyImportJob {
   id: string;
   sourceUrl: string;
@@ -2647,6 +2664,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       previewHtml:  () => getText('/api/store/preview'),
       sharePreview: () => post<{ token: string; url: string; expiresAt: string; ttlSeconds: number }>('/api/store/share-preview', {}),
       revokePreview: () => del<{ ok: boolean; revokedAt: string }>('/api/store/share-preview'),
+      // Brandthread subdomain (<name>.brandthread.app) — claimed server-side.
+      subdomain: () => get<StoreSubdomainState>('/api/store/subdomain'),
+      subdomainAvailability: (name: string) =>
+        get<StoreSubdomainAvailability>(`/api/store/subdomain/availability?name=${encodeURIComponent(name)}`),
+      claimSubdomain: (subdomain: string) => put<StoreSubdomainState>('/api/store/subdomain', { subdomain }),
     },
     shopifyImports: {
       start: (url: string) => post<ShopifyImportJob>('/api/shopify-imports', { url }),

@@ -3,7 +3,9 @@
 // Mock generation is separated into pure functions — never placed in UI code.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import { api, ShopifyImportJob } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
   StoreCollection, StorePage, StorePolicy, StoreMenu, StoreMenuItem,
@@ -418,14 +420,16 @@ export async function getStorefront(): Promise<Storefront> {
   }
 }
 
-async function saveStorefront(store: Storefront): Promise<Storefront> {
-  store.lastEditedAt = new Date().toISOString();
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
-
-  // Fire-and-forget sync to real API (best-effort, never blocks UI)
-  api.store.save({
+/**
+ * Server payload for PUT /api/store. Only fields the local model actually
+ * owns are sent: the local Storefront has no description / tagline /
+ * target-audience / SEO keywords, so they are omitted (the server keeps its
+ * stored values for omitted fields and merges partial branding/seo objects)
+ * instead of being overwritten with the store name or blanks.
+ */
+export function buildStorefrontSyncPayload(store: Storefront): Record<string, unknown> {
+  return {
     title:       store.settings.storeName || store.settings.storeUrl || undefined,
-    description: store.settings.storeName || undefined,
     theme: {
       primaryColor:    store.branding.colors.primary,
       secondaryColor:  store.branding.colors.secondary,
@@ -436,9 +440,7 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
       borderRadius:    store.branding.cornerRadius === 'sharp' ? 0 : store.branding.cornerRadius === 'pill' ? 24 : 8,
     },
     branding: {
-      tagline:        store.settings.storeName ?? '',
       logoUrl:        store.branding.logoUri ?? '',
-      targetAudience: '',
     },
     sections: store.sections.map(s => ({
       type: s.type, title: s.label, enabled: s.enabled, settings: s.settings,
@@ -446,9 +448,65 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
     seo: {
       metaTitle:       store.seo.homepageTitle,
       metaDescription: store.seo.homepageDescription,
-      keywords:        [],
     },
-  } as Record<string, unknown>).catch(() => {/* no-op */});
+  };
+}
+
+// ─── Server sync status ──────────────────────────────────────────────────────
+// Local saves stay instant (callers get the saved Storefront back right away);
+// the server PUT runs in the background. A failed PUT is no longer swallowed:
+// it is recorded here, and the seller is told once per failure streak (until
+// a later sync succeeds) that their changes didn't reach the server.
+export type StoreSyncStatus = { state: 'idle' | 'syncing' | 'synced' | 'failed'; error?: string };
+let _syncStatus: StoreSyncStatus = { state: 'idle' };
+const _syncListeners = new Set<(s: StoreSyncStatus) => void>();
+let _syncFailureNotified = false;
+
+export function getStoreSyncStatus(): StoreSyncStatus { return _syncStatus; }
+export function subscribeStoreSyncStatus(listener: (s: StoreSyncStatus) => void): () => void {
+  _syncListeners.add(listener);
+  return () => { _syncListeners.delete(listener); };
+}
+function setSyncStatus(next: StoreSyncStatus) {
+  _syncStatus = next;
+  _syncListeners.forEach(l => { try { l(next); } catch { /* listener errors are not sync errors */ } });
+}
+
+/** PUT the storefront to the server; resolves true on success. Never throws. */
+export async function syncStorefrontToServer(store: Storefront): Promise<boolean> {
+  // Signed-out dev web preview has no session — never call the protected API.
+  if (isSellerDevPreview()) return true;
+  setSyncStatus({ state: 'syncing' });
+  try {
+    await api.store.save(buildStorefrontSyncPayload(store));
+    _syncFailureNotified = false;
+    setSyncStatus({ state: 'synced' });
+    return true;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err ?? '');
+    setSyncStatus({ state: 'failed', error: message });
+    if (!_syncFailureNotified) {
+      _syncFailureNotified = true;
+      Alert.alert(
+        "Store changes didn't sync",
+        "They're saved on this device but didn't reach Brandthread, so your live store may be out of date.",
+        [
+          { text: 'OK', style: 'cancel' },
+          { text: 'Retry', onPress: () => { void getStorefront().then(syncStorefrontToServer); } },
+        ],
+      );
+    }
+    return false;
+  }
+}
+
+async function saveStorefront(store: Storefront): Promise<Storefront> {
+  store.lastEditedAt = new Date().toISOString();
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+
+  // Background sync to the real API — doesn't block the UI, but failures are
+  // surfaced (see syncStorefrontToServer) instead of silently swallowed.
+  void syncStorefrontToServer(store);
 
   return store;
 }
