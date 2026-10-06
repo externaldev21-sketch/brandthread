@@ -14,6 +14,7 @@
 /** Notification `type` values that are promotional. Add new marketing types here. */
 export const PROMOTIONAL_PUSH_TYPES: ReadonlySet<string> = new Set([
   "drop_live", // seller -> follower drop broadcast
+  "seller_broadcast", // seller -> follower push broadcast (Marketing > Push), QA-0148
   "new_product", // "a brand you follow just listed ..."
   "price_drop", // price-drop nudge on saved items
   "back_in_stock", // restock nudge on saved items
