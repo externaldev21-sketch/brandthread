@@ -221,9 +221,9 @@ router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
-router.use("/social/mutes",              accountMutesRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
+router.use("/social/mutes",              accountMutesRouter); // account mutes (GET/POST/DELETE); social routers above define no /mutes route
 router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint

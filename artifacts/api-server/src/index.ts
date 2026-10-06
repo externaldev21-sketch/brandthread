@@ -20,10 +20,10 @@ import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
-import { attachUserWebSocket } from "./ws/userHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
+import { attachUserWebSocket } from "./ws/userHub";
 
 validateEnv();
 
@@ -50,13 +50,13 @@ const server = app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
+  // Per-user change hints for DMs + Activity (/ws/user), same HTTP server.
+  attachUserWebSocket(server);
   // Live-stream WebSocket — attached to this same HTTP server (upgrade
   // requests to /ws/live), not a second port.
   attachLiveWebSocket(server);
   // Community chat realtime channel (/ws/community), same HTTP server.
   attachCommunityWebSocket(server);
-  // Per-user change hints for DMs + Activity (/ws/user), same HTTP server.
-  attachUserWebSocket(server);
 
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)
