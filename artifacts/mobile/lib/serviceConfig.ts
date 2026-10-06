@@ -99,14 +99,12 @@ export async function serviceRequest<T = unknown>(
   options: RequestInit = {},
   reportErrors = true,
 ): Promise<T> {
-  if (isSellerDevPreview() || !_getToken) {
+  if (!_getToken) {
     const preview = await signedOutPreviewAnswer<T>(versionApiPath(path), options.method ?? 'GET');
     if (preview) return preview.data;
   }
-  if (isSellerDevPreview()) {
-    throw new ApiError(403, JSON.stringify({
-      error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
-    }));
+  if (!_getToken && isSellerDevPreview()) {
+    await signedOutGate<T>(versionApiPath(path), options.method ?? 'GET', async () => null);
   }
   await whenConfigured();
   // Same signed-out guard as lib/api.ts: no session never reaches a protected endpoint.

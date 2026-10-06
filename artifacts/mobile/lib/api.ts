@@ -94,12 +94,6 @@ export const API_BASE_URL = BASE;
  */
 const REQUEST_TIMEOUT_MS = 15_000;
 
-function rejectSellerPreviewApiRequest(): void {
-  if (!isSellerDevPreview()) return;
-  throw new ApiError(403, JSON.stringify({
-    error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
-  }));
-}
 
 /**
  * AI generation endpoints (mockup/photography/logo/background-removal) can
@@ -536,11 +530,10 @@ async function doRequest<T = any>(
   reportErrors = true,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
-  rejectSellerPreviewApiRequest();
-  await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
   const signedOut = await signedOutGate<T>(resolvedPath, options.method ?? 'GET', getToken);
   if (signedOut) return signedOut.data;
+  await waitOutRateLimit();
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
   const cacheKey = isRead && options.cache !== 'no-store' && !asText
     ? await apiCacheKey(resolvedPath, getCacheScope)
@@ -637,7 +630,6 @@ async function uploadImage<T = any>(
     throw new Error("Could not read the selected image.");
   }
   const imageBlob = await source.blob();
-  rejectSellerPreviewApiRequest();
   const contentType = image.mimeType || imageBlob.type || "image/jpeg";
   const token = await getCachedToken(getToken);
   let res: Response;
@@ -676,7 +668,6 @@ async function uploadVideo<T = any>(
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the recorded video.");
   const videoBlob = await source.blob();
-  rejectSellerPreviewApiRequest();
   const contentType = video.mimeType || videoBlob.type || "video/mp4";
   const token = await getCachedToken(getToken);
   let res: Response;
@@ -727,10 +718,10 @@ async function uploadVideoWithProgress<T = any>(
   getCacheScope: GetCacheScope = () => 'anonymous',
   onProgress?: (fraction: number) => void,
 ): Promise<T> {
+  await signedOutGate(versionApiPath(path), 'POST', getToken);
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the selected video.");
   const videoBlob = await source.blob();
-  rejectSellerPreviewApiRequest();
   const contentType = video.mimeType || videoBlob.type || "video/mp4";
   const token = await getCachedToken(getToken);
   const result = await new Promise<{ status: number; text: string }>((resolve, reject) => {
@@ -773,10 +764,10 @@ async function uploadVideoChunked(
   getToken: GetToken,
   opts: { onProgress?: (fraction: number) => void; signal?: { aborted: boolean } } = {},
 ): Promise<{ objectPath: string; contentType: string; size: number }> {
+  await signedOutGate(versionApiPath('/api/posts/uploads/init'), 'POST', getToken);
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the selected video.");
   const blob = await source.blob();
-  rejectSellerPreviewApiRequest();
   const contentType = (video.mimeType || blob.type || "video/mp4").split(";")[0];
   const authHeaders = async () => {
     const token = await getCachedToken(getToken);

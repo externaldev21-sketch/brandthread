@@ -629,7 +629,6 @@ router.post("/", requireAuth, async (req, res) => {
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
     sound, visibility, taggedProductIds, isDraft, scheduledAt, quotedPostId, surface: requestedSurface,
     slides: requestedSlides,
-    sound, visibility, taggedProductIds, isDraft, scheduledAt,
     remixOfPostId, taggedUserIds: requestedTaggedUserIds,
   } = req.body as {
     surface?:           string;

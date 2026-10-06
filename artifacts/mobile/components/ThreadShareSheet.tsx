@@ -80,7 +80,6 @@ export function ThreadShareSheet({
   // "Remix" — offered only when the server says the author allows this viewer
   // to remix (GET /api/remix/posts/:id) and the viewer can publish video.
   const [remixAllowed, setRemixAllowed] = useState(false);
-  const router = useRouter();
   const abortRef = useRef<AbortController | null>(null);
   const actionInFlightRef = useRef(false);
 

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -45,10 +45,15 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
     const value: CookieConsent = { version: COOKIE_CONSENT_VERSION, timestamp: Date.now(), necessary: true, ...choices };
     await AsyncStorage.setItem(KEY, JSON.stringify(value)); setConsent(value); setCustomizing(false);
   }, []);
+  const openPreferences = useCallback(() => {
+    setAnalytics(consent?.analytics ?? false);
+    setMarketing(consent?.marketing ?? false);
+    setCustomizing(true);
+  }, [consent]);
+  const value = useMemo(() => ({ consent, saveConsent, openPreferences }), [consent, saveConsent, openPreferences]);
   if (Platform.OS !== 'web') return <>{children}</>;
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
-  const openPreferences = () => { setAnalytics(consent?.analytics ?? false); setMarketing(consent?.marketing ?? false); setCustomizing(true); };
   const showSheet = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);
   // A bottom sheet docked to the window's bottom edge that takes its own
   // height out of the layout (a flex sibling, not an absolute overlay), so
@@ -60,7 +65,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   // (mobbin.com/screens/ebf2fdf2-414d-4d73-b9b8-94ad2392ab22): copy, then
   // two equal-width pill buttons.
   return (
-    <Context.Provider value={{ consent, saveConsent, openPreferences }}>
+    <Context.Provider value={value}>
       <View style={s.root}>
         <View style={s.app}>{children}</View>
         {showSheet && (

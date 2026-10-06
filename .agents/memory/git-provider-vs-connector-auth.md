@@ -26,3 +26,15 @@ Pace connector Git-object uploads rather than assuming GitHub's provider quota i
 **Why:** Six parallel blob-upload workers triggered the connector proxy's per-workspace limit: a 429 response reported 11 requests against a 10-requests-per-second allowance.
 
 **How to apply:** Prefer sequential uploads with spacing and bounded retries that honor Retry-After. Blob creation is content-addressed and safely repeatable; do not blindly retry ambiguous commit or reference creation.
+
+Exact Git-data commit transfers must preserve the message's terminal newline.
+
+**Why:** GitHub produced a different commit hash when an otherwise identical local commit message was sent without its final newline; supplying the newline reproduced the local hash. Returned message text can omit it.
+
+**How to apply:** Compare the resulting hash, tree and sole parent against the locally prepared object, rather than treating matching displayed titles as proof.
+
+Prefer small, bottom-up directory trees for large repository snapshots.
+
+**Why:** One large flat tree request returned 502, while directory-by-directory construction succeeded and reproduced the expected local tree hashes.
+
+**How to apply:** Verify each constructed tree against its local counterpart and retain a resumable, secret-free upload ledger; do not change the desired snapshot to work around a transport failure.

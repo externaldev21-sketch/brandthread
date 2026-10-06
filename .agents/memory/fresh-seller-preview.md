@@ -16,3 +16,9 @@ The first-product card begins with its title, then explanatory text, then its bu
 **Why:** The owner explicitly rejected the top circled-plus tile. This does not apply to the existing plus icon inside the button.
 
 **How to apply:** Preserve this content order when importing future Dashboard styling; do not reserve blank space for the removed tile.
+
+A development host or preview-role flag does not establish that the caller is signed out. A real authenticated session must use its actual account data.
+
+**Why:** Combining an older unconditional preview rejection with a newer signed-out policy blocked authenticated requests before their token could be checked.
+
+**How to apply:** Authenticate before selecting local preview answers. Keep protected signed-out mutations blocked, native preview data empty, and web demo fixtures dependent on the current URL.

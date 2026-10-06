@@ -62,7 +62,6 @@ export default function StoreSettingsScreen() {
   const router = useRouter();
   const colors = useColors();
   const ss = React.useMemo(() => makeStyles(colors), [colors]);
-  const router = useRouter();
   const [form, setForm] = useState<StoreSettings>({
     storeName: '',
     storeUrl: '',

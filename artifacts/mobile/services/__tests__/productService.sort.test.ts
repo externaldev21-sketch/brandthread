@@ -100,6 +100,7 @@ describe("getProducts honours the Products sort sheet", () => {
   });
 
   const expected: Record<ProductSortKey, string[]> = {
+    name: ["A-old", "B-mid", "C-new"],
     newest: ["C-new", "B-mid", "A-old"],
     oldest: ["A-old", "B-mid", "C-new"],
     price_desc: ["A-old", "C-new", "B-mid"],

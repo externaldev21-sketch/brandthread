@@ -42,12 +42,21 @@ export const DisplayRuntimeContext = createContext<DisplayRuntime>(DEFAULT_DISPL
 type AnyProps = Record<string, any>;
 type AnyComponent = (props: AnyProps) => unknown;
 
+function renderBase(Base: unknown, props: AnyProps) {
+  // React's keyed wrapper props can have a non-enumerable warning getter.
+  // The list key belongs to the wrapper, not its single inner element.
+  if (!Object.prototype.hasOwnProperty.call(props, 'key')) return jsx(Base as never, props);
+  const forwarded = { ...props };
+  delete forwarded.key;
+  return jsx(Base as never, forwarded);
+}
+
 function makeScaledText(Base: unknown, name: string): AnyComponent {
   const Scaled = (props: AnyProps) => {
     const { textScale } = useContext(DisplayRuntimeContext);
-    if (textScale === 1) return jsx(Base as never, props);
+    if (textScale === 1) return renderBase(Base, props);
     const style = scaleTextStyle(props.style, textScale);
-    return jsx(Base as never, style === props.style ? props : { ...props, style });
+    return renderBase(Base, style === props.style ? props : { ...props, style });
   };
   (Scaled as { displayName?: string }).displayName = name;
   return Scaled;
@@ -60,13 +69,13 @@ function contrastIcon(Icon: object): AnyComponent {
   if (!Wrapped) {
     Wrapped = (props: AnyProps) => {
       const { highContrastIcons, iconForeground } = useContext(DisplayRuntimeContext);
-      if (!highContrastIcons) return jsx(Icon as never, props);
+      if (!highContrastIcons) return renderBase(Icon, props);
       // vector-icons lets a style colour win over the `color` prop.
       const styleColor = props.style ? flattenStyle(props.style).color : undefined;
       const current = styleColor ?? props.color;
       const next = contrastIconColor(current, iconForeground);
-      if (next === current) return jsx(Icon as never, props);
-      return jsx(Icon as never, {
+      if (next === current) return renderBase(Icon, props);
+      return renderBase(Icon, {
         ...props,
         color: next,
         ...(styleColor !== undefined ? { style: [props.style, { color: next }] } : null),
