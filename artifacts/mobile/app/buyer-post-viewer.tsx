@@ -10,7 +10,7 @@ import {
   TextInput, Modal, Share, Animated, useWindowDimensions, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
@@ -350,7 +350,7 @@ export default function BuyerPostViewer() {
 
         {/* Engagement bar */}
         <View style={s.engagementBar}>
-          <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
+          <TouchableOpacity style={s.engageBtn} onPress={handleLike} accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'} accessibilityState={{ selected: liked }} testID={liked ? 'post-viewer-unlike' : 'post-viewer-like'}>
             <Feather name="heart" size={22} color={liked ? RED : FG} />
             <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
@@ -377,14 +377,24 @@ export default function BuyerPostViewer() {
           <TouchableOpacity
             style={s.engageBtn}
             onPress={handleRepost}
+            accessibilityRole="button"
+            accessibilityLabel={reposted ? 'Undo repost' : 'Repost'}
+            testID={reposted ? 'post-viewer-unrepost' : 'post-viewer-repost'}
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
             onPress={handleSaveToggle}
+            accessibilityRole="button"
+            accessibilityLabel={saved ? 'Remove from saved' : 'Save'}
+            testID={saved ? 'post-viewer-unsave' : 'post-viewer-save'}
           >
-            <Feather name="bookmark" size={22} color={saved ? PURPLE : FG} />
+            {/* Filled when saved (same treatment as the Friends feed) — in the
+                monochrome theme a colour change alone was invisible. */}
+            {saved
+              ? <FontAwesome name="bookmark" size={22} color={PURPLE} />
+              : <Feather name="bookmark" size={22} color={FG} />}
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
           {!isOwner && (
