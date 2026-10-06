@@ -45,7 +45,7 @@ const SELLER_CORE_GLOBS = [
   'app/analytics-store.tsx',
   'app/analytics-product-stats.tsx',
   'app/analytics-audience.tsx',
-  'app/analytics-best-time.tsx',
+  'app/analytics-advanced.tsx',
   'app/analytics-goals.tsx',
   'app/analytics-export.tsx',
   'app/post-analytics.tsx',

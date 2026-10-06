@@ -5,7 +5,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { formatCents } from '@/lib/money';
-import { getContentApi, type InsightRange } from './sellerInsightsService';
 import {
   AnalyticsOverview, SalesAnalytics, ProductAnalytics, CustomerAnalytics,
   ContentAnalytics, StoreAnalytics, MarketingAnalytics, InventoryAnalytics,
@@ -141,49 +140,7 @@ function unavailable(name: string): never {
   throw new Error(`${name} analytics are not available yet.`);
 }
 
-export async function getContentAnalytics(filter?: AnalyticsFilterState): Promise<ContentAnalytics> {
-  const key = filter?.dateRange.key;
-  const range: InsightRange = key === '7d' ? '7d' : key === '90d' ? '90d' : '30d';
-  const { totals: t, posts } = await getContentApi(range);
-  const count = (k: string, label: string, v: number) => metric(k, label, v, 'number');
-  const rows = posts.map(p => ({
-    postId: p.postId, type: p.type, thumbnailUrl: p.thumbnailUrl ?? undefined, caption: p.caption || 'Untitled post',
-    views: p.views, likes: p.likes, comments: p.comments, saves: p.saves, shares: p.shares,
-    productClicks: p.productClicks,
-    // The screen renders revenue in whole dollars.
-    revenue: Math.round(p.revenueCents / 100),
-    // Completion needs media duration, which is not recorded; there is no
-    // honest value to show, so it is reported as 0 here and flagged in the PR.
-    completionRate: p.completionRate ?? 0,
-    publishedAt: p.publishedAt,
-  }));
-  const withMetric = (k: string, label: string, formatted: string, value: number): AnalyticsMetric =>
-    ({ key: k, label, value, formatted, unit: 'number' });
-  return {
-    views: count('views', 'Views', t.views),
-    uniqueViewers: count('unique_viewers', 'Unique Viewers', t.uniqueViewers),
-    likes: count('likes', 'Likes', t.likes),
-    comments: count('comments', 'Comments', t.comments),
-    saves: count('saves', 'Saves', t.saves),
-    shares: count('shares', 'Shares', t.shares),
-    profileVisits: count('profile_visits', 'Profile Visits', t.profileVisits),
-    productClicks: count('product_clicks', 'Product Clicks', t.productClicks),
-    addToCarts: count('add_to_carts', 'Add to Bag', t.addToCarts),
-    purchases: count('purchases', 'Purchases', t.purchases),
-    revenueAttributed: metric('revenue_attributed', 'Attributed Revenue', cents(t.revenueCents, 'attributed revenue'), 'currency'),
-    avgWatchTime: t.avgWatchSeconds === null
-      ? withMetric('avg_watch_time', 'Avg. Watch Time', '\u2014', 0)
-      : withMetric('avg_watch_time', 'Avg. Watch Time', t.avgWatchSeconds.toFixed(1), t.avgWatchSeconds),
-    completionRate: t.completionRate === null
-      ? withMetric('completion_rate', 'Completion', '\u2014', 0)
-      : metric('completion_rate', 'Completion', t.completionRate, 'percent'),
-    followerGrowth: count('follower_growth', 'New Followers', t.followerGrowth),
-    topVideos: rows.filter(r => r.type === 'video').slice(0, 10),
-    topSlideshows: rows.filter(r => r.type === 'slideshow').slice(0, 10),
-    highestRevenuePosts: rows.filter(r => r.revenue > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 10),
-    retention: [],
-  };
-}
+export async function getContentAnalytics(_filter?: AnalyticsFilterState): Promise<ContentAnalytics> { return unavailable('Content'); }
 export async function getStoreAnalytics(_filter?: AnalyticsFilterState): Promise<StoreAnalytics> { return unavailable('Store'); }
 export async function getMarketingAnalytics(_filter?: AnalyticsFilterState): Promise<MarketingAnalytics> { return unavailable('Marketing'); }
 export async function getInventoryAnalytics(_filter?: AnalyticsFilterState): Promise<InventoryAnalytics> { return unavailable('Inventory'); }

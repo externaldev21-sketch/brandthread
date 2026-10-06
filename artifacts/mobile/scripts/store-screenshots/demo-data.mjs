@@ -1239,6 +1239,9 @@ export function respond({ method, path, query, role, options = {} }) {
     };
   }
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
+  // Shared first-run-tips seen-state read on every seller screen; nothing seen,
+  // nothing skipped (tips stay off in previews unless ?tips=1 — see lib/firstRunTips/rules.ts).
+  if (p === '/first-run-tips/seen') return { seenTipIds: [], skipAll: false };
   // Seller dashboard's secondary (range-independent) fetch group, plus
   // lib/appStartPrefetch.ts's warmSellerTabs() app-boot prefetch — without
   // these seeded, api.products.list()/api.inventory.list()/api.analytics

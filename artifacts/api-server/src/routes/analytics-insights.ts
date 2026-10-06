@@ -1,37 +1,44 @@
 /**
- * Seller analytics insights — product funnel, thread/video stats, audience,
- * best time to post, monthly goals and CSV/PDF export.
+ * Seller analytics reports — product stats, threads and videos, audience,
+ * goals, advanced (Pro) and CSV/PDF export.
  *
  * Mounted at /api/analytics/insights (team-context aware, so a team member with
  * the analytics permission sees the owner's store). Every query is scoped to the
  * resolved seller id and only ever returns aggregates; audience buckets below
  * the k-anonymity threshold are hidden.
+ *
+ * Ranges are the Dashboard pills (today | week | month | year | all), with
+ * `tz` = minutes east of UTC so windows land on the seller's local calendar.
+ * Every headline total, its previous-period figure and its chart buckets come
+ * from the same [start, end) window and the same predicates.
  */
 import { Router } from "express";
 import PDFDocument from "pdfkit";
 import { z } from "@workspace/api-zod";
-import { db, sellerGoals } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/requireAuth";
+import { db, sellerGoalTargets, orders, users } from "@workspace/db";
+import { and, eq, sql } from "drizzle-orm";
+import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
 import { parseTzOffsetMinutes } from "../lib/analyticsTime";
 import {
   GOAL_METRICS,
+  GOAL_PERIODS,
   K_ANONYMITY_MIN,
-  MIN_EVENTS_FOR_RECOMMENDATION,
-  RANGE_DAYS,
   applyKAnonymity,
-  buildHeatmap,
-  emptyGrid,
+  deltaPct,
   funnelRates,
   goalPacing,
+  goalWindow,
   locationLabel,
-  monthWindow,
   parseInsightRange,
+  rangeLabel,
   rangeWindow,
-  rankSlots,
+  type BucketStep,
   type ExportTable,
+  type GoalMetric,
+  type GoalPeriod,
   type InsightRange,
+  type RangeWindow,
 } from "../lib/sellerInsights";
 import { toCSV } from "./seller-export";
 
@@ -42,206 +49,151 @@ router.use(requirePermission("analytics"));
 type Rows = Record<string, any>[];
 const rowsOf = (result: unknown): Rows => ((result as { rows?: Rows }).rows ?? []) as Rows;
 const PAID = sql`o.status != 'cancelled' AND o.paid_at IS NOT NULL`;
+const ts = (d: Date) => sql`${d.toISOString()}::timestamp`;
+const between = (col: ReturnType<typeof sql>, w: { start: Date; end: Date }) => sql`${col} >= ${ts(w.start)} AND ${col} < ${ts(w.end)}`;
+const n = (v: unknown) => Number(v ?? 0) || 0;
 
-function ctx(req: any) {
-  const sellerId = req.clerkUserId as string;
-  const range = parseInsightRange(req.query?.range ?? req.body?.range);
-  const tz = parseTzOffsetMinutes(req.query?.tz ?? req.body?.tz);
-  const now = new Date();
-  const { start, end } = rangeWindow(range, now, tz);
-  return { sellerId, range, tz, now, start, end };
+/** First order date (or account creation) — the "All" range starts here. */
+async function allTimeAnchor(sellerId: string): Promise<Date | null> {
+  const [[firstOrder], [user]] = await Promise.all([
+    db.select({ at: sql<Date | null>`min(created_at)` }).from(orders).where(and(eq(orders.ownerId, sellerId), sql`status != 'cancelled'`)),
+    db.select({ at: users.createdAt }).from(users).where(eq(users.clerkId, sellerId)).limit(1),
+  ]);
+  const a = firstOrder?.at ? new Date(firstOrder.at) : null;
+  const b = user?.at ? new Date(user.at) : null;
+  if (a && b) return a < b ? a : b;
+  return a ?? b;
 }
 
-// ─── Loaders (shared by the JSON endpoints and the exporter) ─────────────────
+interface Ctx { sellerId: string; tz: number; now: Date; window: RangeWindow }
 
-export async function loadProductStats(sellerId: string, start: Date, end: Date) {
+async function ctx(req: any, rangeRaw?: unknown, tzRaw?: unknown): Promise<Ctx> {
+  const sellerId = req.clerkUserId as string;
+  const range = parseInsightRange(rangeRaw ?? req.query?.range);
+  const tz = parseTzOffsetMinutes(tzRaw ?? req.query?.tz);
+  const now = new Date();
+  const anchor = range === "all" ? await allTimeAnchor(sellerId) : null;
+  return { sellerId, tz, now, window: rangeWindow(range, now, tz, anchor) };
+}
+
+const windowJson = (w: RangeWindow) => ({ range: w.range, start: w.start.toISOString(), end: w.end.toISOString(), step: w.step });
+
+/**
+ * generate_series over the window: one row per bucket, LEFT JOINed by callers.
+ * The step is one of four fixed literals (never user input).
+ */
+function series(w: { start: Date; end: Date; step: BucketStep }) {
+  const step = sql.raw(`interval '${w.step}'`);
+  return sql`generate_series(${ts(w.start)}, ${ts(w.end)} - ${step}, ${step}) AS series(bucket)`;
+}
+const inBucket = (col: ReturnType<typeof sql>, step: BucketStep) =>
+  sql`${col} >= series.bucket AND ${col} < series.bucket + ${sql.raw(`interval '${step}'`)}`;
+
+// ─── Product stats ───────────────────────────────────────────────────────────
+
+async function productCounts(sellerId: string, w: { start: Date; end: Date }) {
   const [viewRows, cartRows, saleRows] = await Promise.all([
     // Product views reuse store_visits (product_id set); only products that
     // really belong to this seller count, whatever product_id a client sent.
     db.execute(sql`
-      SELECT v.product_id, p.name, count(*)::int AS views,
-             count(DISTINCT v.viewer_user_id)::int AS unique_viewers
-      FROM store_visits v
-      JOIN products p ON p.id = v.product_id AND p.owner_id = ${sellerId}
-      WHERE v.seller_id = ${sellerId} AND v.product_id IS NOT NULL
-        AND v.created_at >= ${start.toISOString()}::timestamp AND v.created_at < ${end.toISOString()}::timestamp
-      GROUP BY v.product_id, p.name`),
+      SELECT v.product_id, count(*)::int AS views, count(DISTINCT v.viewer_user_id)::int AS unique_viewers
+      FROM store_visits v JOIN products p ON p.id = v.product_id AND p.owner_id = ${sellerId}
+      WHERE v.seller_id = ${sellerId} AND v.product_id IS NOT NULL AND ${between(sql`v.created_at`, w)}
+      GROUP BY v.product_id`),
     db.execute(sql`
-      SELECT e.product_id, p.name, count(*)::int AS add_to_carts,
-             count(DISTINCT e.viewer_key)::int AS unique_carters
-      FROM seller_product_events e
-      JOIN products p ON p.id = e.product_id AND p.owner_id = ${sellerId}
-      WHERE e.seller_id = ${sellerId} AND e.event_type = 'add_to_cart'
-        AND e.created_at >= ${start.toISOString()}::timestamp AND e.created_at < ${end.toISOString()}::timestamp
-      GROUP BY e.product_id, p.name`),
+      SELECT e.product_id, count(*)::int AS add_to_carts
+      FROM seller_product_events e JOIN products p ON p.id = e.product_id AND p.owner_id = ${sellerId}
+      WHERE e.seller_id = ${sellerId} AND e.event_type = 'add_to_cart' AND ${between(sql`e.created_at`, w)}
+      GROUP BY e.product_id`),
     db.execute(sql`
-      SELECT pv.product_id, p.name,
-             count(DISTINCT o.id)::int AS purchases,
+      SELECT pv.product_id, count(DISTINCT o.id)::int AS purchases,
              coalesce(sum(oi.quantity), 0)::int AS units,
              coalesce(sum(oi.quantity * oi.price_cents), 0)::int AS revenue_cents
       FROM orders o
       JOIN order_items oi ON oi.order_id = o.id
       JOIN product_variants pv ON pv.id = oi.variant_id
       JOIN products p ON p.id = pv.product_id AND p.owner_id = ${sellerId}
-      WHERE o.owner_id = ${sellerId} AND ${PAID}
-        AND o.created_at >= ${start.toISOString()}::timestamp AND o.created_at < ${end.toISOString()}::timestamp
-      GROUP BY pv.product_id, p.name`),
+      WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+      GROUP BY pv.product_id`),
   ]);
-
-  const byId = new Map<string, any>();
-  const row = (id: string, name: string) => {
+  const byId = new Map<string, { views: number; uniqueViewers: number; addToCarts: number; purchases: number; units: number; revenueCents: number }>();
+  const row = (id: string) => {
     let r = byId.get(id);
-    if (!r) {
-      r = { productId: id, name, views: 0, uniqueViewers: 0, addToCarts: 0, purchases: 0, units: 0, revenueCents: 0 };
-      byId.set(id, r);
-    }
+    if (!r) { r = { views: 0, uniqueViewers: 0, addToCarts: 0, purchases: 0, units: 0, revenueCents: 0 }; byId.set(id, r); }
     return r;
   };
-  for (const r of rowsOf(viewRows)) Object.assign(row(r.product_id, r.name), { views: r.views, uniqueViewers: r.unique_viewers });
-  for (const r of rowsOf(cartRows)) row(r.product_id, r.name).addToCarts = r.add_to_carts;
-  for (const r of rowsOf(saleRows)) Object.assign(row(r.product_id, r.name), { purchases: r.purchases, units: r.units, revenueCents: r.revenue_cents });
-
-  const products = [...byId.values()]
-    .map((p) => ({ ...p, ...funnelRates(p) }))
-    .sort((a, b) => b.revenueCents - a.revenueCents || b.views - a.views || a.name.localeCompare(b.name))
-    .slice(0, 100);
-  const totals = products.reduce(
-    (t, p) => ({
-      views: t.views + p.views, addToCarts: t.addToCarts + p.addToCarts, purchases: t.purchases + p.purchases,
-      units: t.units + p.units, revenueCents: t.revenueCents + p.revenueCents,
-    }),
+  for (const r of rowsOf(viewRows)) Object.assign(row(r.product_id), { views: n(r.views), uniqueViewers: n(r.unique_viewers) });
+  for (const r of rowsOf(cartRows)) row(r.product_id).addToCarts = n(r.add_to_carts);
+  for (const r of rowsOf(saleRows)) Object.assign(row(r.product_id), { purchases: n(r.purchases), units: n(r.units), revenueCents: n(r.revenue_cents) });
+  const totals = [...byId.values()].reduce(
+    (t, p) => ({ views: t.views + p.views, addToCarts: t.addToCarts + p.addToCarts, purchases: t.purchases + p.purchases, units: t.units + p.units, revenueCents: t.revenueCents + p.revenueCents }),
     { views: 0, addToCarts: 0, purchases: 0, units: 0, revenueCents: 0 },
   );
-  return { totals: { ...totals, ...funnelRates(totals) }, products };
+  return { byId, totals };
 }
 
-export async function loadAudience(sellerId: string, start: Date, end: Date) {
-  const buyerKey = sql`coalesce(o.buyer_id, lower(o.guest_email), 'order:' || o.id::text)`;
-  const [buyerRows, viewerRows, countryRows, regionRows] = await Promise.all([
+export async function loadProductStats(sellerId: string, w: RangeWindow) {
+  const [current, previous, bucketRows] = await Promise.all([
+    productCounts(sellerId, w),
+    w.previous ? productCounts(sellerId, w.previous) : null,
     db.execute(sql`
-      WITH cur AS (
-        SELECT DISTINCT ${buyerKey} AS k FROM orders o
-        WHERE o.owner_id = ${sellerId} AND ${PAID} AND o.created_at >= ${start.toISOString()}::timestamp AND o.created_at < ${end.toISOString()}::timestamp
-      )
-      SELECT count(*)::int AS total,
-             count(*) FILTER (WHERE EXISTS (
-               SELECT 1 FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID}
-                 AND o.created_at < ${start.toISOString()}::timestamp AND ${buyerKey} = cur.k))::int AS returning
-      FROM cur`),
-    db.execute(sql`
-      WITH cur AS (
-        SELECT DISTINCT viewer_user_id AS k FROM store_visits
-        WHERE seller_id = ${sellerId} AND viewer_user_id IS NOT NULL AND created_at >= ${start.toISOString()}::timestamp AND created_at < ${end.toISOString()}::timestamp
-      )
-      SELECT count(*)::int AS total,
-             count(*) FILTER (WHERE EXISTS (
-               SELECT 1 FROM store_visits s WHERE s.seller_id = ${sellerId}
-                 AND s.viewer_user_id = cur.k AND s.created_at < ${start.toISOString()}::timestamp))::int AS returning
-      FROM cur`),
-    db.execute(sql`
-      SELECT upper(trim(o.shipping_address->>'country')) AS country, count(DISTINCT ${buyerKey})::int AS people
-      FROM orders o
-      WHERE o.owner_id = ${sellerId} AND ${PAID} AND o.created_at >= ${start.toISOString()}::timestamp AND o.created_at < ${end.toISOString()}::timestamp
-        AND coalesce(trim(o.shipping_address->>'country'), '') != ''
-      GROUP BY 1`),
-    db.execute(sql`
-      SELECT upper(trim(o.shipping_address->>'country')) AS country,
-             upper(trim(o.shipping_address->>'state')) AS region, count(DISTINCT ${buyerKey})::int AS people
-      FROM orders o
-      WHERE o.owner_id = ${sellerId} AND ${PAID} AND o.created_at >= ${start.toISOString()}::timestamp AND o.created_at < ${end.toISOString()}::timestamp
-        AND coalesce(trim(o.shipping_address->>'country'), '') != ''
-        AND coalesce(trim(o.shipping_address->>'state'), '') != ''
-      GROUP BY 1, 2`),
+      SELECT series.bucket,
+        (SELECT count(*)::int FROM store_visits v JOIN products p ON p.id = v.product_id AND p.owner_id = ${sellerId}
+          WHERE v.seller_id = ${sellerId} AND v.product_id IS NOT NULL AND ${inBucket(sql`v.created_at`, w.step)}) AS views,
+        (SELECT count(DISTINCT o.id)::int FROM orders o JOIN order_items oi ON oi.order_id = o.id
+          JOIN product_variants pv ON pv.id = oi.variant_id JOIN products p ON p.id = pv.product_id AND p.owner_id = ${sellerId}
+          WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${inBucket(sql`o.created_at`, w.step)}) AS purchases
+      FROM ${series(w)} ORDER BY series.bucket`),
   ]);
-
-  const split = (r: Record<string, any> | undefined) => {
-    const total = Number(r?.total ?? 0);
-    const ret = Number(r?.returning ?? 0);
-    const newer = total - ret;
-    // Both halves describe groups of people; a half under k is hidden, and so is
-    // the total when hiding one half would let the other be subtracted out.
-    const shownNew = newer >= K_ANONYMITY_MIN;
-    const shownRet = ret >= K_ANONYMITY_MIN;
-    const suppressed = !(shownNew && shownRet);
+  const ids = [...current.byId.keys()];
+  const meta = ids.length === 0 ? [] : rowsOf(await db.execute(sql`
+    SELECT p.id, p.name, p.images, coalesce(sum(pv.stock), 0)::int AS stock
+    FROM products p LEFT JOIN product_variants pv ON pv.product_id = p.id
+    WHERE p.owner_id = ${sellerId} AND p.id IN (${sql.join(ids.map((id) => sql`${id}::uuid`), sql`, `)})
+    GROUP BY p.id`));
+  const metaById = new Map(meta.map((m) => [String(m.id), m]));
+  const products = ids.map((id) => {
+    const c = current.byId.get(id)!;
+    const m = metaById.get(id);
+    const images = Array.isArray(m?.images) ? (m!.images as unknown[]) : [];
     return {
-      suppressed,
-      total: suppressed && total < K_ANONYMITY_MIN ? null : total,
-      new: shownNew ? newer : null,
-      returning: shownRet ? ret : null,
+      productId: id,
+      name: String(m?.name ?? "Product"),
+      imageUrl: typeof images[0] === "string" ? (images[0] as string) : null,
+      stock: n(m?.stock),
+      ...c,
+      ...funnelRates(c),
     };
-  };
-
-  const clean = (r: Rows) => r.flatMap((x) => {
-    const l = locationLabel({ country: x.country, state: x.region });
-    return l ? [{ country: l.country, region: l.region, people: Number(x.people) }] : [];
-  });
-  const countries = applyKAnonymity(clean(rowsOf(countryRows)));
-  const regions = applyKAnonymity(clean(rowsOf(regionRows)));
+  })
+    .sort((a, b) => b.revenueCents - a.revenueCents || b.views - a.views || a.name.localeCompare(b.name))
+    .slice(0, 100);
+  const t = current.totals;
+  const p = previous?.totals ?? null;
   return {
-    minGroupSize: K_ANONYMITY_MIN,
-    buyers: split(rowsOf(buyerRows)[0]),
-    viewers: split(rowsOf(viewerRows)[0]),
-    topCountries: countries.shown.sort((a, b) => b.people - a.people || a.country.localeCompare(b.country)).slice(0, 10)
-      .map((c) => ({ country: c.country, people: c.people })),
-    topRegions: regions.shown.sort((a, b) => b.people - a.people || `${a.country}${a.region}`.localeCompare(`${b.country}${b.region}`)).slice(0, 10)
-      .map((c) => ({ country: c.country, region: c.region, people: c.people })),
-    hiddenLocations: countries.hiddenBuckets,
+    totals: { ...t, uniqueViewers: [...current.byId.values()].reduce((a, r) => a + r.uniqueViewers, 0), ...funnelRates(t) },
+    previous: p,
+    deltas: {
+      viewsPct: deltaPct(t.views, p?.views),
+      addToCartsPct: deltaPct(t.addToCarts, p?.addToCarts),
+      purchasesPct: deltaPct(t.purchases, p?.purchases),
+      revenuePct: deltaPct(t.revenueCents, p?.revenueCents),
+    },
+    buckets: rowsOf(bucketRows).map((r) => ({ bucket: new Date(r.bucket).toISOString(), views: n(r.views), purchases: n(r.purchases) })),
+    products,
   };
 }
 
-export async function loadBestTime(sellerId: string, start: Date, end: Date, tz: number) {
-  const res = await db.execute(sql`
-    SELECT extract(dow FROM t + (${tz} * interval '1 minute'))::int AS dow,
-           extract(hour FROM t + (${tz} * interval '1 minute'))::int AS hr,
-           count(*)::int AS n
-    FROM (
-      SELECT i.created_at AS t
-      FROM interactions i JOIN posts p ON p.id = i.post_id
-      WHERE p.user_id = ${sellerId} AND i.user_id != ${sellerId}
-        AND i.type IN ('view', 'like', 'comment', 'repost', 'share', 'shop_click', 'add_to_bag')
-        AND i.created_at >= ${start.toISOString()}::timestamp AND i.created_at < ${end.toISOString()}::timestamp
-      UNION ALL
-      SELECT v.created_at FROM store_visits v
-      WHERE v.seller_id = ${sellerId} AND v.created_at >= ${start.toISOString()}::timestamp AND v.created_at < ${end.toISOString()}::timestamp
-    ) ev
-    GROUP BY 1, 2`);
-  const grid = emptyGrid();
-  let total = 0;
-  for (const r of rowsOf(res)) {
-    if (r.dow >= 0 && r.dow <= 6 && r.hr >= 0 && r.hr <= 23) { grid[r.dow][r.hr] = r.n; total += r.n; }
-  }
-  return {
-    grid,
-    totalEvents: total,
-    minEventsForRecommendation: MIN_EVENTS_FOR_RECOMMENDATION,
-    recommended: rankSlots(grid),
-  };
-}
+// ─── Threads and videos ──────────────────────────────────────────────────────
 
 const VALID_SECONDS = sql`i.value ~ '^[0-9]+(\\.[0-9]+)?$'`;
 
-export async function loadContent(sellerId: string, start: Date, end: Date) {
-  const inRange = sql`i.created_at >= ${start.toISOString()}::timestamp AND i.created_at < ${end.toISOString()}::timestamp AND i.user_id != p.user_id`;
-  const [postRows, totalRows, saveRows, orderRows, followRows, profileRows] = await Promise.all([
-    db.execute(sql`
-      SELECT p.id, p.media_type, p.thumbnail_url, p.caption, coalesce(p.published_at, p.created_at) AS published_at,
-        count(i.id) FILTER (WHERE i.type = 'view')::int AS views,
-        count(i.id) FILTER (WHERE i.type = 'like')::int AS likes,
-        count(i.id) FILTER (WHERE i.type = 'comment')::int AS comments,
-        count(i.id) FILTER (WHERE i.type IN ('share', 'repost'))::int AS shares,
-        count(i.id) FILTER (WHERE i.type = 'shop_click')::int AS clicks
-      FROM posts p
-      LEFT JOIN interactions i ON i.post_id = p.id AND ${inRange}
-      WHERE p.user_id = ${sellerId} AND p.post_status = 'published'
-      GROUP BY p.id
-      HAVING count(i.id) > 0
-      ORDER BY views DESC, p.id
-      LIMIT 500`),
+async function contentTotals(sellerId: string, w: { start: Date; end: Date }) {
+  const inRange = sql`${between(sql`i.created_at`, w)} AND i.user_id != p.user_id`;
+  const [totalRows, commentRows, saveRows, orderRows, followRows, profileRows] = await Promise.all([
     db.execute(sql`
       SELECT count(*) FILTER (WHERE i.type = 'view')::int AS views,
         count(DISTINCT i.user_id) FILTER (WHERE i.type = 'view')::int AS unique_viewers,
         count(*) FILTER (WHERE i.type = 'like')::int AS likes,
-        count(*) FILTER (WHERE i.type = 'comment')::int AS comments,
         count(*) FILTER (WHERE i.type IN ('share', 'repost'))::int AS shares,
         count(*) FILTER (WHERE i.type = 'shop_click')::int AS clicks,
         count(*) FILTER (WHERE i.type = 'add_to_bag')::int AS carts,
@@ -250,74 +202,316 @@ export async function loadContent(sellerId: string, start: Date, end: Date) {
       FROM interactions i JOIN posts p ON p.id = i.post_id
       WHERE p.user_id = ${sellerId} AND p.post_status = 'published' AND ${inRange}`),
     db.execute(sql`
-      SELECT s.target_id, count(*)::int AS n
-      FROM saved_items s JOIN posts p ON p.id::text = s.target_id
-      WHERE s.item_type = 'post' AND p.user_id = ${sellerId}
-        AND s.created_at >= ${start.toISOString()}::timestamp AND s.created_at < ${end.toISOString()}::timestamp
-      GROUP BY s.target_id`),
+      SELECT count(*)::int AS n FROM post_comments c JOIN posts p ON p.id = c.post_id
+      WHERE p.user_id = ${sellerId} AND c.author_id != p.user_id AND c.moderation_status = 'visible' AND ${between(sql`c.created_at`, w)}`),
     db.execute(sql`
-      SELECT o.source_post_id, count(*)::int AS purchases, coalesce(sum(o.total_cents), 0)::int AS revenue_cents
-      FROM orders o
-      WHERE o.owner_id = ${sellerId} AND o.source_post_id IS NOT NULL AND ${PAID}
-        AND o.created_at >= ${start.toISOString()}::timestamp AND o.created_at < ${end.toISOString()}::timestamp
-      GROUP BY o.source_post_id`),
-    db.execute(sql`SELECT count(*)::int AS n FROM follows WHERE following_id = ${sellerId} AND created_at >= ${start.toISOString()}::timestamp AND created_at < ${end.toISOString()}::timestamp`),
-    db.execute(sql`SELECT count(*)::int AS n FROM store_visits WHERE seller_id = ${sellerId} AND source = 'profile' AND product_id IS NULL AND created_at >= ${start.toISOString()}::timestamp AND created_at < ${end.toISOString()}::timestamp`),
+      SELECT count(*)::int AS n FROM saved_items s JOIN posts p ON p.id::text = s.target_id
+      WHERE s.item_type = 'post' AND p.user_id = ${sellerId} AND ${between(sql`s.created_at`, w)}`),
+    db.execute(sql`
+      SELECT count(*)::int AS purchases, coalesce(sum(o.total_cents), 0)::int AS revenue_cents
+      FROM orders o WHERE o.owner_id = ${sellerId} AND o.source_post_id IS NOT NULL AND ${PAID} AND ${between(sql`o.created_at`, w)}`),
+    db.execute(sql`SELECT count(*)::int AS n FROM follows WHERE following_id = ${sellerId} AND ${between(sql`created_at`, w)}`),
+    db.execute(sql`SELECT count(*)::int AS n FROM store_visits WHERE seller_id = ${sellerId} AND source = 'profile' AND product_id IS NULL AND ${between(sql`created_at`, w)}`),
   ]);
-
-  const saves = new Map(rowsOf(saveRows).map((r) => [String(r.target_id), Number(r.n)]));
-  const sales = new Map(rowsOf(orderRows).map((r) => [String(r.source_post_id), r]));
-  const kind = (t: string) => (t === "video" ? "video" : t === "slideshow" ? "slideshow" : "image");
-  const posts = rowsOf(postRows).map((r) => ({
-    postId: String(r.id),
-    type: kind(r.media_type) as "video" | "slideshow" | "image",
-    thumbnailUrl: r.thumbnail_url ?? null,
-    caption: r.caption ?? "",
-    views: r.views, likes: r.likes, comments: r.comments, saves: saves.get(String(r.id)) ?? 0,
-    shares: r.shares, productClicks: r.clicks,
-    purchases: Number(sales.get(String(r.id))?.purchases ?? 0),
-    revenueCents: Number(sales.get(String(r.id))?.revenue_cents ?? 0),
-    // Completion needs the media duration, which is not stored anywhere yet.
-    completionRate: null as number | null,
-    publishedAt: new Date(r.published_at).toISOString(),
-  }));
-  // Orders attributed to a post that had no in-range interactions still count.
-  const attributed = rowsOf(orderRows);
   const t = rowsOf(totalRows)[0] ?? {};
+  const o = rowsOf(orderRows)[0] ?? {};
   return {
-    totals: {
-      views: Number(t.views ?? 0), uniqueViewers: Number(t.unique_viewers ?? 0), likes: Number(t.likes ?? 0),
-      comments: Number(t.comments ?? 0), shares: Number(t.shares ?? 0), productClicks: Number(t.clicks ?? 0),
-      addToCarts: Number(t.carts ?? 0),
-      saves: [...saves.values()].reduce((a, b) => a + b, 0),
-      purchases: attributed.reduce((a, r) => a + Number(r.purchases), 0),
-      revenueCents: attributed.reduce((a, r) => a + Number(r.revenue_cents), 0),
-      avgWatchSeconds: Number(t.watch_samples ?? 0) > 0 ? Math.round(Number(t.avg_watch) * 10) / 10 : null,
-      completionRate: null as number | null,
-      followerGrowth: Number(rowsOf(followRows)[0]?.n ?? 0),
-      profileVisits: Number(rowsOf(profileRows)[0]?.n ?? 0),
-    },
-    posts,
-    completionNote: "Completion rate needs each post's media duration, which is not recorded yet.",
+    views: n(t.views), uniqueViewers: n(t.unique_viewers), likes: n(t.likes), comments: n(rowsOf(commentRows)[0]?.n),
+    shares: n(t.shares), saves: n(rowsOf(saveRows)[0]?.n), productClicks: n(t.clicks), addToCarts: n(t.carts),
+    purchases: n(o.purchases), revenueCents: n(o.revenue_cents),
+    avgWatchSeconds: n(t.watch_samples) > 0 ? Math.round(Number(t.avg_watch) * 10) / 10 : null,
+    followerGrowth: n(rowsOf(followRows)[0]?.n), profileVisits: n(rowsOf(profileRows)[0]?.n),
   };
 }
 
-export async function loadGoal(sellerId: string, tz: number, now = new Date()) {
-  const [goal] = await db.select().from(sellerGoals).where(eq(sellerGoals.sellerId, sellerId)).limit(1);
-  if (!goal) return null;
-  const month = monthWindow(now, tz);
-  const res = await db.execute(sql`
-    SELECT coalesce(sum(o.total_cents), 0)::int AS revenue, count(*)::int AS orders
-    FROM orders o
-    WHERE o.owner_id = ${sellerId} AND ${PAID} AND o.created_at >= ${month.start.toISOString()}::timestamp AND o.created_at < ${month.end.toISOString()}::timestamp`);
-  const r = rowsOf(res)[0] ?? {};
-  const actual = Number(goal.metric === "revenue" ? r.revenue : r.orders) || 0;
+export async function loadContent(sellerId: string, w: RangeWindow) {
+  const inRange = sql`${between(sql`i.created_at`, w)} AND i.user_id != p.user_id`;
+  const [totals, previous, postRows, commentRows, saveRows, orderRows, bucketRows] = await Promise.all([
+    contentTotals(sellerId, w),
+    w.previous ? contentTotals(sellerId, w.previous) : null,
+    db.execute(sql`
+      SELECT p.id, p.media_type, p.thumbnail_url, p.media_url, p.caption, coalesce(p.published_at, p.created_at) AS published_at,
+        count(i.id) FILTER (WHERE i.type = 'view')::int AS views,
+        count(i.id) FILTER (WHERE i.type = 'like')::int AS likes,
+        count(i.id) FILTER (WHERE i.type IN ('share', 'repost'))::int AS shares,
+        count(i.id) FILTER (WHERE i.type = 'shop_click')::int AS clicks,
+        avg(i.value::numeric) FILTER (WHERE i.type = 'watch_time' AND ${VALID_SECONDS}) AS avg_watch
+      FROM posts p LEFT JOIN interactions i ON i.post_id = p.id AND ${inRange}
+      WHERE p.user_id = ${sellerId} AND p.post_status = 'published'
+      GROUP BY p.id HAVING count(i.id) > 0
+      ORDER BY views DESC, p.id LIMIT 200`),
+    db.execute(sql`
+      SELECT c.post_id, count(*)::int AS n FROM post_comments c JOIN posts p ON p.id = c.post_id
+      WHERE p.user_id = ${sellerId} AND c.author_id != p.user_id AND c.moderation_status = 'visible' AND ${between(sql`c.created_at`, w)}
+      GROUP BY c.post_id`),
+    db.execute(sql`
+      SELECT s.target_id, count(*)::int AS n FROM saved_items s JOIN posts p ON p.id::text = s.target_id
+      WHERE s.item_type = 'post' AND p.user_id = ${sellerId} AND ${between(sql`s.created_at`, w)}
+      GROUP BY s.target_id`),
+    db.execute(sql`
+      SELECT o.source_post_id, count(*)::int AS purchases, coalesce(sum(o.total_cents), 0)::int AS revenue_cents
+      FROM orders o WHERE o.owner_id = ${sellerId} AND o.source_post_id IS NOT NULL AND ${PAID} AND ${between(sql`o.created_at`, w)}
+      GROUP BY o.source_post_id`),
+    db.execute(sql`
+      SELECT series.bucket,
+        (SELECT count(*)::int FROM interactions i JOIN posts p ON p.id = i.post_id
+          WHERE p.user_id = ${sellerId} AND i.user_id != p.user_id AND i.type = 'view' AND ${inBucket(sql`i.created_at`, w.step)}) AS views,
+        (SELECT count(*)::int FROM interactions i JOIN posts p ON p.id = i.post_id
+          WHERE p.user_id = ${sellerId} AND i.user_id != p.user_id AND i.type = 'like' AND ${inBucket(sql`i.created_at`, w.step)}) AS likes
+      FROM ${series(w)} ORDER BY series.bucket`),
+  ]);
+  const comments = new Map(rowsOf(commentRows).map((r) => [String(r.post_id), n(r.n)]));
+  const saves = new Map(rowsOf(saveRows).map((r) => [String(r.target_id), n(r.n)]));
+  const sales = new Map(rowsOf(orderRows).map((r) => [String(r.source_post_id), r]));
+  const kind = (t: string) => (t === "video" ? "video" : t === "slideshow" ? "slideshow" : "image");
+  const posts = rowsOf(postRows).map((r) => {
+    const id = String(r.id);
+    const type = kind(r.media_type) as "video" | "slideshow" | "image";
+    return {
+      postId: id, type,
+      thumbnailUrl: r.thumbnail_url ?? (type === "image" ? r.media_url ?? null : null),
+      caption: r.caption ?? "",
+      views: n(r.views), likes: n(r.likes), comments: comments.get(id) ?? 0, saves: saves.get(id) ?? 0, shares: n(r.shares),
+      productClicks: n(r.clicks),
+      purchases: n(sales.get(id)?.purchases), revenueCents: n(sales.get(id)?.revenue_cents),
+      avgWatchSeconds: r.avg_watch === null || r.avg_watch === undefined ? null : Math.round(Number(r.avg_watch) * 10) / 10,
+      publishedAt: new Date(r.published_at).toISOString(),
+    };
+  });
+  const p = previous;
   return {
-    metric: goal.metric as "revenue" | "orders",
-    target: goal.targetValue,
-    actual,
-    month: { start: month.start.toISOString(), end: month.end.toISOString(), daysInMonth: month.daysInMonth },
-    ...goalPacing(actual, goal.targetValue, now, month),
+    totals,
+    previous: p,
+    deltas: {
+      viewsPct: deltaPct(totals.views, p?.views),
+      likesPct: deltaPct(totals.likes, p?.likes),
+      commentsPct: deltaPct(totals.comments, p?.comments),
+      sharesPct: deltaPct(totals.shares, p?.shares),
+      savesPct: deltaPct(totals.saves, p?.saves),
+      followerGrowthPct: deltaPct(totals.followerGrowth, p?.followerGrowth),
+      revenuePct: deltaPct(totals.revenueCents, p?.revenueCents),
+    },
+    buckets: rowsOf(bucketRows).map((r) => ({ bucket: new Date(r.bucket).toISOString(), views: n(r.views), likes: n(r.likes) })),
+    byType: (["video", "image", "slideshow"] as const).map((type) => {
+      const rows = posts.filter((x) => x.type === type);
+      return { type, posts: rows.length, views: rows.reduce((a, x) => a + x.views, 0) };
+    }),
+    posts,
+  };
+}
+
+// ─── Audience ────────────────────────────────────────────────────────────────
+
+const buyerKey = sql`coalesce(o.buyer_id, lower(o.guest_email), 'order:' || o.id::text)`;
+
+function split(r: Record<string, any> | undefined) {
+  const total = n(r?.total);
+  const ret = n(r?.returning);
+  const newer = total - ret;
+  // Both halves describe groups of people; a half under k is hidden, and so is
+  // the total when hiding one half would let the other be subtracted out.
+  const shownNew = newer >= K_ANONYMITY_MIN;
+  const shownRet = ret >= K_ANONYMITY_MIN;
+  const suppressed = !(shownNew && shownRet);
+  return {
+    suppressed,
+    total: suppressed && total < K_ANONYMITY_MIN ? null : total,
+    new: shownNew ? newer : null,
+    returning: shownRet ? ret : null,
+  };
+}
+
+export async function loadAudience(sellerId: string, w: RangeWindow) {
+  const [followerTotalRow, followerGainRow, prevGainRow, followerBuckets, buyerRows, viewerRows, countryRows, regionRows, deviceRows] = await Promise.all([
+    db.execute(sql`SELECT count(*)::int AS n FROM follows WHERE following_id = ${sellerId}`),
+    db.execute(sql`SELECT count(*)::int AS n FROM follows WHERE following_id = ${sellerId} AND ${between(sql`created_at`, w)}`),
+    w.previous ? db.execute(sql`SELECT count(*)::int AS n FROM follows WHERE following_id = ${sellerId} AND ${between(sql`created_at`, w.previous)}`) : null,
+    db.execute(sql`
+      SELECT series.bucket, count(f.follower_id)::int AS gained
+      FROM ${series(w)}
+      LEFT JOIN follows f ON f.following_id = ${sellerId} AND ${inBucket(sql`f.created_at`, w.step)}
+      GROUP BY series.bucket ORDER BY series.bucket`),
+    db.execute(sql`
+      WITH cur AS (
+        SELECT DISTINCT ${buyerKey} AS k FROM orders o
+        WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+      )
+      SELECT count(*)::int AS total,
+             count(*) FILTER (WHERE EXISTS (
+               SELECT 1 FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID}
+                 AND o.created_at < ${ts(w.start)} AND ${buyerKey} = cur.k))::int AS returning
+      FROM cur`),
+    db.execute(sql`
+      WITH cur AS (
+        SELECT DISTINCT viewer_user_id AS k FROM store_visits
+        WHERE seller_id = ${sellerId} AND viewer_user_id IS NOT NULL AND ${between(sql`created_at`, w)}
+      )
+      SELECT count(*)::int AS total,
+             count(*) FILTER (WHERE EXISTS (
+               SELECT 1 FROM store_visits s WHERE s.seller_id = ${sellerId}
+                 AND s.viewer_user_id = cur.k AND s.created_at < ${ts(w.start)}))::int AS returning
+      FROM cur`),
+    db.execute(sql`
+      SELECT upper(trim(o.shipping_address->>'country')) AS country, count(DISTINCT ${buyerKey})::int AS people
+      FROM orders o
+      WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+        AND coalesce(trim(o.shipping_address->>'country'), '') != ''
+      GROUP BY 1`),
+    db.execute(sql`
+      SELECT upper(trim(o.shipping_address->>'country')) AS country,
+             upper(trim(o.shipping_address->>'state')) AS region, count(DISTINCT ${buyerKey})::int AS people
+      FROM orders o
+      WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+        AND coalesce(trim(o.shipping_address->>'country'), '') != ''
+        AND coalesce(trim(o.shipping_address->>'state'), '') != ''
+      GROUP BY 1, 2`),
+    db.execute(sql`
+      SELECT device, count(*)::int AS visits FROM store_visits
+      WHERE seller_id = ${sellerId} AND ${between(sql`created_at`, w)}
+      GROUP BY device`),
+  ]);
+
+  const clean = (r: Rows) => r.flatMap((x) => {
+    const l = locationLabel({ country: x.country, state: x.region });
+    return l ? [{ country: l.country, region: l.region, people: n(x.people) }] : [];
+  });
+  const countries = applyKAnonymity(clean(rowsOf(countryRows)));
+  const regions = applyKAnonymity(clean(rowsOf(regionRows)));
+  const deviceCounts = new Map(rowsOf(deviceRows).map((r) => [r.device === null ? "unknown" : String(r.device), n(r.visits)]));
+  const deviceTotal = [...deviceCounts.values()].reduce((a, b) => a + b, 0);
+  const gained = n(rowsOf(followerGainRow)[0]?.n);
+  const prevGained = prevGainRow ? n(rowsOf(prevGainRow)[0]?.n) : null;
+  return {
+    minGroupSize: K_ANONYMITY_MIN,
+    followers: {
+      total: n(rowsOf(followerTotalRow)[0]?.n),
+      gained,
+      previousGained: prevGained,
+      gainedPct: deltaPct(gained, prevGained),
+    },
+    buckets: rowsOf(followerBuckets).map((r) => ({ bucket: new Date(r.bucket).toISOString(), followers: n(r.gained) })),
+    buyers: split(rowsOf(buyerRows)[0]),
+    viewers: split(rowsOf(viewerRows)[0]),
+    topCountries: countries.shown.sort((a, b) => b.people - a.people || a.country.localeCompare(b.country)).slice(0, 10)
+      .map((c) => ({ country: c.country, people: c.people })),
+    topRegions: regions.shown.sort((a, b) => b.people - a.people || `${a.country}${a.region}`.localeCompare(`${b.country}${b.region}`)).slice(0, 10)
+      .map((c) => ({ country: c.country, region: c.region, people: c.people })),
+    hiddenLocations: countries.hiddenBuckets,
+    devices: (["ios", "android", "web", "unknown"] as const)
+      .map((device) => ({ device, visits: deviceCounts.get(device) ?? 0, sharePct: deviceTotal > 0 ? Math.round(((deviceCounts.get(device) ?? 0) / deviceTotal) * 1000) / 10 : 0 }))
+      .filter((d) => d.visits > 0),
+    deviceVisits: deviceTotal,
+  };
+}
+
+// ─── Goals ───────────────────────────────────────────────────────────────────
+
+async function goalActual(sellerId: string, metric: GoalMetric, w: { start: Date; end: Date }): Promise<number> {
+  switch (metric) {
+    case "revenue": return n(rowsOf(await db.execute(sql`SELECT coalesce(sum(o.total_cents), 0)::int AS v FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`))[0]?.v);
+    case "orders": return n(rowsOf(await db.execute(sql`SELECT count(*)::int AS v FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`))[0]?.v);
+    case "units": return n(rowsOf(await db.execute(sql`SELECT coalesce(sum(oi.quantity), 0)::int AS v FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`))[0]?.v);
+    case "visits": return n(rowsOf(await db.execute(sql`SELECT count(*)::int AS v FROM storefront_visits WHERE seller_id = ${sellerId} AND ${between(sql`created_at`, w)}`))[0]?.v);
+    case "followers": return n(rowsOf(await db.execute(sql`SELECT count(*)::int AS v FROM follows WHERE following_id = ${sellerId} AND ${between(sql`created_at`, w)}`))[0]?.v);
+  }
+}
+
+export async function loadGoals(sellerId: string, tz: number, now = new Date()) {
+  const rows = await db.select().from(sellerGoalTargets).where(eq(sellerGoalTargets.sellerId, sellerId)).orderBy(sellerGoalTargets.createdAt);
+  return Promise.all(rows.map(async (g) => {
+    const metric = g.metric as GoalMetric;
+    const period = g.period as GoalPeriod;
+    const window = goalWindow(period, now, tz);
+    const actual = await goalActual(sellerId, metric, window);
+    return {
+      id: g.id, metric, period, target: g.targetValue, actual,
+      window: { start: window.start.toISOString(), end: window.end.toISOString() },
+      ...goalPacing(actual, g.targetValue, now, window),
+    };
+  }));
+}
+
+// ─── Advanced (Pro) ──────────────────────────────────────────────────────────
+
+async function advancedTotals(sellerId: string, w: { start: Date; end: Date }) {
+  const [r] = rowsOf(await db.execute(sql`
+    SELECT count(*)::int AS orders,
+           coalesce(sum(o.total_cents), 0)::int AS revenue_cents,
+           coalesce(sum(o.refunded_cents), 0)::int AS refunded_cents,
+           count(*) FILTER (WHERE o.refunded_cents > 0)::int AS refunded_orders,
+           count(*) FILTER (WHERE o.discount_amount_cents > 0)::int AS discounted_orders,
+           coalesce(sum(o.discount_amount_cents), 0)::int AS discount_cents,
+           count(*) FILTER (WHERE o.source_post_id IS NOT NULL)::int AS thread_orders,
+           coalesce(sum(o.total_cents) FILTER (WHERE o.source_post_id IS NOT NULL), 0)::int AS thread_revenue_cents,
+           count(DISTINCT ${buyerKey})::int AS buyers,
+           (SELECT coalesce(sum(oi.quantity), 0)::int FROM order_items oi JOIN orders o2 ON o2.id = oi.order_id
+             WHERE o2.owner_id = ${sellerId} AND o2.status != 'cancelled' AND o2.paid_at IS NOT NULL AND ${between(sql`o2.created_at`, w)}) AS units,
+           (SELECT count(*)::int FROM storefront_visits WHERE seller_id = ${sellerId} AND ${between(sql`created_at`, w)}) AS visits
+    FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}`));
+  const orders = n(r?.orders);
+  return {
+    orders, revenueCents: n(r?.revenue_cents), refundedCents: n(r?.refunded_cents), refundedOrders: n(r?.refunded_orders),
+    discountedOrders: n(r?.discounted_orders), discountCents: n(r?.discount_cents),
+    threadOrders: n(r?.thread_orders), threadRevenueCents: n(r?.thread_revenue_cents), buyers: n(r?.buyers), units: n(r?.units), visits: n(r?.visits),
+    averageOrderCents: orders > 0 ? Math.round(n(r?.revenue_cents) / orders) : 0,
+    unitsPerOrder: orders > 0 ? Math.round((n(r?.units) / orders) * 100) / 100 : 0,
+    conversionPct: n(r?.visits) > 0 ? Math.round((orders / n(r?.visits)) * 1000) / 10 : 0,
+    refundRatePct: orders > 0 ? Math.round((n(r?.refunded_orders) / orders) * 1000) / 10 : 0,
+  };
+}
+
+export async function loadAdvanced(sellerId: string, w: RangeWindow) {
+  const [totals, previous, repeatRows, customerRows, bucketRows] = await Promise.all([
+    advancedTotals(sellerId, w),
+    w.previous ? advancedTotals(sellerId, w.previous) : null,
+    db.execute(sql`
+      WITH cur AS (
+        SELECT ${buyerKey} AS k, count(*)::int AS c FROM orders o
+        WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)} GROUP BY 1)
+      SELECT count(*)::int AS buyers,
+             count(*) FILTER (WHERE c > 1 OR EXISTS (
+               SELECT 1 FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND o.created_at < ${ts(w.start)} AND ${buyerKey} = cur.k))::int AS repeat
+      FROM cur`),
+    db.execute(sql`
+      SELECT ${buyerKey} AS k, max(coalesce(u.display_name, u.name, c.name)) AS name,
+             count(*)::int AS orders, coalesce(sum(o.total_cents), 0)::int AS total_cents, max(o.created_at) AS last_order_at
+      FROM orders o
+      LEFT JOIN users u ON u.clerk_id = o.buyer_id
+      LEFT JOIN customers c ON c.id = o.customer_id
+      WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${between(sql`o.created_at`, w)}
+      GROUP BY 1 ORDER BY total_cents DESC, orders DESC LIMIT 5`),
+    db.execute(sql`
+      SELECT series.bucket,
+             count(o.id)::int AS orders,
+             coalesce(sum(o.total_cents), 0)::int AS revenue_cents
+      FROM ${series(w)}
+      LEFT JOIN orders o ON o.owner_id = ${sellerId} AND o.status != 'cancelled' AND o.paid_at IS NOT NULL AND ${inBucket(sql`o.created_at`, w.step)}
+      GROUP BY series.bucket ORDER BY series.bucket`),
+  ]);
+  const rep = rowsOf(repeatRows)[0] ?? {};
+  const buyers = n(rep.buyers);
+  const p = previous;
+  return {
+    totals: { ...totals, repeatBuyers: n(rep.repeat), repeatBuyerPct: buyers > 0 ? Math.round((n(rep.repeat) / buyers) * 1000) / 10 : 0 },
+    previous: p,
+    deltas: {
+      averageOrderPct: deltaPct(totals.averageOrderCents, p?.averageOrderCents),
+      conversionPct: deltaPct(totals.conversionPct, p?.conversionPct),
+      refundRatePct: deltaPct(totals.refundRatePct, p?.refundRatePct),
+      revenuePct: deltaPct(totals.revenueCents, p?.revenueCents),
+    },
+    channels: [
+      { channel: "threads", orders: totals.threadOrders, revenueCents: totals.threadRevenueCents },
+      { channel: "store", orders: totals.orders - totals.threadOrders, revenueCents: totals.revenueCents - totals.threadRevenueCents },
+    ],
+    buckets: rowsOf(bucketRows).map((r) => ({
+      bucket: new Date(r.bucket).toISOString(), orders: n(r.orders), revenueCents: n(r.revenue_cents),
+      averageOrderCents: n(r.orders) > 0 ? Math.round(n(r.revenue_cents) / n(r.orders)) : 0,
+    })),
+    topCustomers: rowsOf(customerRows).map((r) => ({
+      name: typeof r.name === "string" && r.name.trim() ? r.name : "Customer",
+      orders: n(r.orders), totalCents: n(r.total_cents), lastOrderAt: new Date(r.last_order_at).toISOString(),
+    })),
   };
 }
 
@@ -329,149 +523,204 @@ function fail(res: any, req: any, err: unknown, what: string) {
 }
 
 router.get("/products", async (req, res) => {
-  const { sellerId, range, start, end } = ctx(req);
   try {
-    res.json({ range, days: RANGE_DAYS[range], ...(await loadProductStats(sellerId, start, end)) });
+    const c = await ctx(req);
+    res.json({ window: windowJson(c.window), ...(await loadProductStats(c.sellerId, c.window)) });
   } catch (err) { fail(res, req, err, "product stats"); }
 });
 
 router.get("/content", async (req, res) => {
-  const { sellerId, range, start, end } = ctx(req);
   try {
-    res.json({ range, ...(await loadContent(sellerId, start, end)) });
+    const c = await ctx(req);
+    res.json({ window: windowJson(c.window), ...(await loadContent(c.sellerId, c.window)) });
   } catch (err) { fail(res, req, err, "content stats"); }
 });
 
 router.get("/audience", async (req, res) => {
-  const { sellerId, range, start, end } = ctx(req);
   try {
-    res.json({ range, ...(await loadAudience(sellerId, start, end)) });
+    const c = await ctx(req);
+    res.json({ window: windowJson(c.window), ...(await loadAudience(c.sellerId, c.window)) });
   } catch (err) { fail(res, req, err, "audience"); }
 });
 
-router.get("/best-time", async (req, res) => {
-  const { sellerId, range, start, end, tz } = ctx(req);
+router.get("/advanced", requirePlan("pro"), async (req, res) => {
   try {
-    res.json({ range, tzOffsetMinutes: tz, ...(await loadBestTime(sellerId, start, end, tz)) });
-  } catch (err) { fail(res, req, err, "best time to post"); }
+    const c = await ctx(req);
+    res.json({ window: windowJson(c.window), ...(await loadAdvanced(c.sellerId, c.window)) });
+  } catch (err) { fail(res, req, err, "advanced analytics"); }
 });
 
+const MAX_GOALS = 10;
 const goalSchema = z.object({
   metric: z.enum(GOAL_METRICS),
+  period: z.enum(GOAL_PERIODS).default("month"),
   target: z.number().int().positive(),
 }).superRefine((g, c) => {
   const max = g.metric === "revenue" ? 1_000_000_000 : 1_000_000; // revenue in cents
   if (g.target > max) c.addIssue({ code: "custom", path: ["target"], message: "Target is too large" });
 });
+const GOAL_INPUT_ERROR = "Choose a metric, a period and a positive whole-number target";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 router.get("/goals", async (req, res) => {
-  const { sellerId, tz } = ctx(req);
   try {
-    res.json({ goal: await loadGoal(sellerId, tz) });
-  } catch (err) { fail(res, req, err, "goal"); }
+    const c = await ctx(req);
+    res.json({ goals: await loadGoals(c.sellerId, c.tz, c.now) });
+  } catch (err) { fail(res, req, err, "goals"); }
 });
 
-router.put("/goals", async (req, res) => {
-  const { sellerId, tz } = ctx(req);
+router.post("/goals", async (req, res) => {
   const parsed = goalSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Choose revenue or orders and a positive whole-number target", code: "VALIDATION_ERROR" });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: GOAL_INPUT_ERROR, code: "VALIDATION_ERROR" }); return; }
   try {
-    await db.insert(sellerGoals)
-      .values({ sellerId, metric: parsed.data.metric, targetValue: parsed.data.target })
-      .onConflictDoUpdate({
-        target: sellerGoals.sellerId,
-        set: { metric: parsed.data.metric, targetValue: parsed.data.target, updatedAt: new Date() },
-      });
-    res.json({ goal: await loadGoal(sellerId, tz) });
+    const c = await ctx(req, undefined, req.body?.tz);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(sellerGoalTargets).where(eq(sellerGoalTargets.sellerId, c.sellerId));
+    if (count >= MAX_GOALS) { res.status(400).json({ error: `You can keep up to ${MAX_GOALS} goals`, code: "GOAL_LIMIT" }); return; }
+    const [row] = await db.insert(sellerGoalTargets)
+      .values({ sellerId: c.sellerId, metric: parsed.data.metric, period: parsed.data.period, targetValue: parsed.data.target })
+      .returning({ id: sellerGoalTargets.id });
+    const goals = await loadGoals(c.sellerId, c.tz, c.now);
+    res.status(201).json({ goal: goals.find((g) => g.id === row.id) ?? null, goals });
   } catch (err) { fail(res, req, err, "goal"); }
 });
 
-router.delete("/goals", async (req, res) => {
-  const { sellerId } = ctx(req);
+router.put("/goals/:id", async (req, res) => {
+  const id = String(req.params.id);
+  const parsed = goalSchema.safeParse(req.body);
+  if (!UUID_RE.test(id)) { res.status(404).json({ error: "Goal not found" }); return; }
+  if (!parsed.success) { res.status(400).json({ error: GOAL_INPUT_ERROR, code: "VALIDATION_ERROR" }); return; }
   try {
-    await db.delete(sellerGoals).where(eq(sellerGoals.sellerId, sellerId));
+    const c = await ctx(req, undefined, req.body?.tz);
+    const updated = await db.update(sellerGoalTargets)
+      .set({ metric: parsed.data.metric, period: parsed.data.period, targetValue: parsed.data.target, updatedAt: new Date() })
+      .where(and(eq(sellerGoalTargets.id, id), eq(sellerGoalTargets.sellerId, c.sellerId)))
+      .returning({ id: sellerGoalTargets.id });
+    if (updated.length === 0) { res.status(404).json({ error: "Goal not found" }); return; }
+    const goals = await loadGoals(c.sellerId, c.tz, c.now);
+    res.json({ goal: goals.find((g) => g.id === id) ?? null, goals });
+  } catch (err) { fail(res, req, err, "goal"); }
+});
+
+router.delete("/goals/:id", async (req, res) => {
+  const id = String(req.params.id);
+  if (!UUID_RE.test(id)) { res.status(404).json({ error: "Goal not found" }); return; }
+  try {
+    const sellerId = (req as any).clerkUserId as string;
+    const deleted = await db.delete(sellerGoalTargets)
+      .where(and(eq(sellerGoalTargets.id, id), eq(sellerGoalTargets.sellerId, sellerId)))
+      .returning({ id: sellerGoalTargets.id });
+    if (deleted.length === 0) { res.status(404).json({ error: "Goal not found" }); return; }
     res.json({ ok: true });
   } catch (err) { fail(res, req, err, "goal"); }
 });
 
 // ─── Export ──────────────────────────────────────────────────────────────────
 
-const EXPORT_SECTIONS = ["products", "content", "audience", "best_time", "goal"] as const;
-type ExportSectionKey = (typeof EXPORT_SECTIONS)[number];
+export const EXPORT_SECTIONS = ["orders", "products", "analytics", "content", "audience", "goals"] as const;
+export type ExportSectionKey = (typeof EXPORT_SECTIONS)[number];
 const exportSchema = z.object({
-  format: z.enum(["csv", "pdf"]),
-  range: z.enum(["7d", "30d", "90d"]).default("30d"),
+  format: z.enum(["csv", "pdf"]).default("csv"),
+  range: z.enum(["today", "week", "month", "year", "all"]).default("month"),
   sections: z.array(z.enum(EXPORT_SECTIONS)).min(1).max(EXPORT_SECTIONS.length),
   tz: z.number().optional(),
 });
 
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 ? "AM" : "PM"}`;
 const money = (c: number) => (c / 100).toFixed(2);
 const pct = (v: number | null) => (v === null ? "" : v);
+const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
+const GOAL_LABEL: Record<GoalMetric, string> = { revenue: "Revenue", orders: "Orders", visits: "Visits", followers: "New followers", units: "Units sold" };
 
-export async function buildExportTables(sellerId: string, range: InsightRange, tz: number, sections: ExportSectionKey[], now = new Date()): Promise<ExportTable[]> {
-  const { start, end } = rangeWindow(range, now, tz);
+export async function buildExportTables(sellerId: string, w: RangeWindow, tz: number, sections: ExportSectionKey[], now = new Date()): Promise<ExportTable[]> {
   const tables: ExportTable[] = [];
   for (const key of EXPORT_SECTIONS.filter((s) => sections.includes(s))) {
-    if (key === "products") {
-      const d = await loadProductStats(sellerId, start, end);
+    if (key === "orders") {
+      const rows = rowsOf(await db.execute(sql`
+        SELECT o.order_number, o.created_at, o.status, o.paid_at, o.subtotal_cents, o.shipping_cents, o.tax_cents,
+               o.discount_amount_cents, o.total_cents, o.refunded_cents, o.discount_code, o.source_post_id,
+               upper(trim(o.shipping_address->>'country')) AS country, upper(trim(o.shipping_address->>'state')) AS region,
+               (SELECT coalesce(sum(oi.quantity), 0)::int FROM order_items oi WHERE oi.order_id = o.id) AS units
+        FROM orders o WHERE o.owner_id = ${sellerId} AND o.status != 'cancelled' AND ${between(sql`o.created_at`, w)}
+        ORDER BY o.created_at DESC LIMIT 5000`));
       tables.push({
-        title: "Product performance",
-        headers: ["Product", "Views", "Add to cart", "Purchases", "Units", "Revenue", "View to cart %", "Cart to purchase %"],
-        fields: ["name", "views", "addToCarts", "purchases", "units", "revenue", "v2c", "c2p"],
+        title: "Orders",
+        headers: ["Order", "Date", "Status", "Paid", "Units", "Subtotal", "Shipping", "Tax", "Discount", "Total", "Refunded", "Discount code", "Channel", "Country", "Region"],
+        fields: ["order", "date", "status", "paid", "units", "subtotal", "shipping", "tax", "discount", "total", "refunded", "code", "channel", "country", "region"],
+        rows: rows.map((r) => ({
+          order: r.order_number, date: new Date(r.created_at).toISOString(), status: r.status, paid: r.paid_at ? "yes" : "no", units: n(r.units),
+          subtotal: money(n(r.subtotal_cents)), shipping: money(n(r.shipping_cents)), tax: money(n(r.tax_cents)), discount: money(n(r.discount_amount_cents)),
+          total: money(n(r.total_cents)), refunded: money(n(r.refunded_cents)), code: r.discount_code ?? "", channel: r.source_post_id ? "threads" : "store",
+          country: r.country ?? "", region: r.region ?? "",
+        })),
+      });
+    } else if (key === "products") {
+      const d = await loadProductStats(sellerId, w);
+      tables.push({
+        title: "Products",
+        headers: ["Product", "Views", "Unique viewers", "Add to cart", "Purchases", "Units", "Revenue", "View to cart %", "Cart to purchase %", "In stock"],
+        fields: ["name", "views", "uniqueViewers", "addToCarts", "purchases", "units", "revenue", "v2c", "c2p", "stock"],
         rows: d.products.map((p) => ({
-          name: p.name, views: p.views, addToCarts: p.addToCarts, purchases: p.purchases, units: p.units,
-          revenue: money(p.revenueCents), v2c: pct(p.viewToCartPct), c2p: pct(p.cartToPurchasePct),
+          name: p.name, views: p.views, uniqueViewers: p.uniqueViewers, addToCarts: p.addToCarts, purchases: p.purchases, units: p.units,
+          revenue: money(p.revenueCents), v2c: pct(p.viewToCartPct), c2p: pct(p.cartToPurchasePct), stock: p.stock,
+        })),
+      });
+    } else if (key === "analytics") {
+      const rows = rowsOf(await db.execute(sql`
+        SELECT series.bucket,
+          (SELECT count(*)::int FROM storefront_visits v WHERE v.seller_id = ${sellerId} AND ${inBucket(sql`v.created_at`, w.step)}) AS visits,
+          (SELECT count(*)::int FROM store_visits v WHERE v.seller_id = ${sellerId} AND v.product_id IS NOT NULL AND ${inBucket(sql`v.created_at`, w.step)}) AS product_views,
+          (SELECT count(*)::int FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${inBucket(sql`o.created_at`, w.step)}) AS orders,
+          (SELECT coalesce(sum(o.total_cents), 0)::int FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${inBucket(sql`o.created_at`, w.step)}) AS revenue_cents,
+          (SELECT coalesce(sum(o.total_cents - coalesce(o.refunded_cents, 0)), 0)::int FROM orders o WHERE o.owner_id = ${sellerId} AND ${PAID} AND ${inBucket(sql`o.created_at`, w.step)}) AS net_cents,
+          (SELECT count(*)::int FROM follows f WHERE f.following_id = ${sellerId} AND ${inBucket(sql`f.created_at`, w.step)}) AS followers
+        FROM ${series(w)} ORDER BY series.bucket`));
+      tables.push({
+        title: "Analytics",
+        note: `One row per ${w.step.replace("1 ", "")}.`,
+        headers: ["Period start", "Visits", "Product views", "Orders", "Revenue", "Net revenue", "New followers"],
+        fields: ["bucket", "visits", "productViews", "orders", "revenue", "net", "followers"],
+        rows: rows.map((r) => ({
+          bucket: new Date(r.bucket).toISOString(), visits: n(r.visits), productViews: n(r.product_views), orders: n(r.orders),
+          revenue: money(n(r.revenue_cents)), net: money(n(r.net_cents)), followers: n(r.followers),
         })),
       });
     } else if (key === "content") {
-      const d = await loadContent(sellerId, start, end);
+      const d = await loadContent(sellerId, w);
       tables.push({
-        title: "Thread and video performance",
-        note: d.completionNote,
-        headers: ["Post", "Type", "Views", "Likes", "Comments", "Shares", "Product clicks", "Purchases", "Revenue"],
-        fields: ["caption", "type", "views", "likes", "comments", "shares", "productClicks", "purchases", "revenue"],
-        rows: d.posts.map((p) => ({ ...p, revenue: money(p.revenueCents) })),
+        title: "Threads and videos",
+        headers: ["Post", "Type", "Published", "Views", "Likes", "Comments", "Saves", "Shares", "Product clicks", "Purchases", "Revenue", "Avg watch (s)"],
+        fields: ["caption", "type", "published", "views", "likes", "comments", "saves", "shares", "productClicks", "purchases", "revenue", "avgWatch"],
+        rows: d.posts.map((p) => ({ ...p, published: day(p.publishedAt), revenue: money(p.revenueCents), avgWatch: p.avgWatchSeconds ?? "" })),
       });
     } else if (key === "audience") {
-      const d = await loadAudience(sellerId, start, end);
-      const rows: Record<string, unknown>[] = [];
+      const d = await loadAudience(sellerId, w);
+      const rows: Record<string, unknown>[] = [
+        { group: "Followers (total)", people: d.followers.total },
+        { group: "New followers", people: d.followers.gained },
+      ];
       if (d.buyers.new !== null) rows.push({ group: "New buyers", people: d.buyers.new });
       if (d.buyers.returning !== null) rows.push({ group: "Returning buyers", people: d.buyers.returning });
       if (d.viewers.new !== null) rows.push({ group: "New viewers", people: d.viewers.new });
       if (d.viewers.returning !== null) rows.push({ group: "Returning viewers", people: d.viewers.returning });
       for (const c of d.topCountries) rows.push({ group: `Country: ${c.country}`, people: c.people });
       for (const r of d.topRegions) rows.push({ group: `Region: ${r.country} ${r.region}`, people: r.people });
+      for (const dv of d.devices) rows.push({ group: `Device: ${dv.device}`, people: dv.visits });
       tables.push({
         title: "Audience",
-        note: `Groups with fewer than ${K_ANONYMITY_MIN} people are not shown.`,
-        headers: ["Group", "People"], fields: ["group", "people"], rows,
+        note: `Groups with fewer than ${K_ANONYMITY_MIN} people are not shown. Device rows count visits, not people.`,
+        headers: ["Group", "Count"], fields: ["group", "people"], rows,
       });
-    } else if (key === "best_time") {
-      const d = await loadBestTime(sellerId, start, end, tz);
+    } else if (key === "goals") {
+      const goals = await loadGoals(sellerId, tz, now);
+      const f = (metric: GoalMetric, v: number) => (metric === "revenue" ? money(v) : v);
       tables.push({
-        title: "Best time to post",
-        note: d.recommended.length === 0 ? `Not enough engagement yet (${d.totalEvents} of ${d.minEventsForRecommendation} needed).` : undefined,
-        headers: ["Rank", "Day", "Time", "Engagement"], fields: ["rank", "day", "time", "count"],
-        rows: d.recommended.map((s, i) => ({ rank: i + 1, day: DAY_NAMES[s.day], time: hourLabel(s.hour), count: s.count })),
-      });
-    } else if (key === "goal") {
-      const g = await loadGoal(sellerId, tz, now);
-      const isRev = g?.metric === "revenue";
-      const f = (n: number) => (isRev ? money(n) : n);
-      tables.push({
-        title: "Monthly goal",
-        note: g ? undefined : "No goal is set.",
-        headers: ["Metric", "Target", "Actual", "Progress %", "Projected", "Status"],
-        fields: ["metric", "target", "actual", "progress", "projected", "status"],
-        rows: g ? [{
-          metric: g.metric, target: f(g.target), actual: f(g.actual), progress: g.progressPct,
-          projected: g.projected === null ? "" : f(g.projected), status: g.status.replace("_", " "),
-        }] : [],
+        title: "Goals",
+        note: goals.length ? undefined : "No goals are set.",
+        headers: ["Goal", "Period", "Target", "Actual", "Progress %", "Projected", "Status"],
+        fields: ["metric", "period", "target", "actual", "progress", "projected", "status"],
+        rows: goals.map((g) => ({
+          metric: GOAL_LABEL[g.metric], period: g.period, target: f(g.metric, g.target), actual: f(g.metric, g.actual), progress: g.progressPct,
+          projected: g.projected === null ? "" : f(g.metric, g.projected), status: g.status.replace("_", " "),
+        })),
       });
     }
   }
@@ -499,17 +748,19 @@ export function renderPdf(tables: ExportTable[], meta: { rangeLabel: string; gen
         const line = (cells: string[], bold: boolean) => {
           if (doc.y > doc.page.height - 80) doc.addPage();
           const y = doc.y;
-          doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(8).fillColor("#000");
+          doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(7).fillColor("#000");
           let h = 0;
           cells.forEach((c, i) => {
             const before = doc.y;
-            doc.text(c.length > 60 ? `${c.slice(0, 57)}...` : c, 48 + i * colW, y, { width: colW - 6 });
+            doc.text(c.length > 40 ? `${c.slice(0, 37)}...` : c, 48 + i * colW, y, { width: colW - 4 });
             h = Math.max(h, doc.y - before);
           });
           doc.y = y + h + 3;
         };
         line(t.headers, true);
-        for (const r of t.rows.slice(0, 200)) line(t.fields.map((f) => String(r[f] ?? "")), false);
+        for (const r of t.rows.slice(0, 300)) line(t.fields.map((f) => String(r[f] ?? "")), false);
+      } else {
+        doc.font("Helvetica").fontSize(9).fillColor("#555").text("No rows for this range.");
       }
       doc.moveDown(1);
     }
@@ -518,19 +769,17 @@ export function renderPdf(tables: ExportTable[], meta: { rangeLabel: string; gen
 }
 
 router.post("/export", async (req, res) => {
-  const { sellerId } = ctx(req);
   const parsed = exportSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Choose a format, a date range and at least one section", code: "VALIDATION_ERROR" });
     return;
   }
   const { format, range, sections } = parsed.data;
-  const tz = parseTzOffsetMinutes(parsed.data.tz);
   try {
-    const now = new Date();
-    const tables = await buildExportTables(sellerId, range, tz, sections, now);
-    const meta = { rangeLabel: `Last ${RANGE_DAYS[range]} days`, generatedAt: now.toISOString() };
-    const stamp = now.toISOString().slice(0, 10);
+    const c = await ctx(req, range, parsed.data.tz);
+    const tables = await buildExportTables(c.sellerId, c.window, c.tz, sections, c.now);
+    const meta = { rangeLabel: rangeLabel(range as InsightRange), generatedAt: c.now.toISOString() };
+    const stamp = c.now.toISOString().slice(0, 10);
     if (format === "csv") {
       const parts = [`Brandthread analytics export\nRange: ${meta.rangeLabel}\nGenerated: ${meta.generatedAt}\n`];
       for (const t of tables) {

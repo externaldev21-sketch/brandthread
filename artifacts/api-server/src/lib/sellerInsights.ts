@@ -1,31 +1,96 @@
 /**
- * Pure helpers for the seller insights endpoints (product funnel, audience,
- * best time to post, goals, export). No DB / Express imports so every rule here
- * can be unit tested without a database.
+ * Pure helpers for the seller analytics report endpoints (product stats,
+ * threads and videos, audience, goals, advanced, export). No DB / Express
+ * imports so every rule here can be unit tested without a database.
+ *
+ * Ranges are the Dashboard's own pills — Today / Week / Month / Year / All —
+ * and every window is anchored to the seller's LOCAL calendar (tz offset in
+ * minutes east of UTC), reusing the same analyticsTime helpers as
+ * GET /api/analytics/home so the two surfaces can never disagree on what
+ * "today" or "this week" means.
  */
 import crypto from "node:crypto";
-import { DAY_MS } from "./analyticsTime";
+import {
+  DAY_MS,
+  addLocalMonths,
+  capEndAtNow,
+  floorToLocalMonth,
+  floorToLocalStep,
+  floorToLocalWeek,
+  floorToLocalYear,
+  previousPeriod,
+} from "./analyticsTime";
 
 /** Smallest group of people a reported audience bucket may describe. */
 export const K_ANONYMITY_MIN = 5;
 
-export const RANGE_DAYS = { "7d": 7, "30d": 30, "90d": 90 } as const;
-export type InsightRange = keyof typeof RANGE_DAYS;
+export const INSIGHT_RANGES = ["today", "week", "month", "year", "all"] as const;
+export type InsightRange = (typeof INSIGHT_RANGES)[number];
+export type BucketStep = "1 hour" | "1 day" | "1 week" | "1 month";
 
 export function parseInsightRange(raw: unknown): InsightRange {
-  return typeof raw === "string" && raw in RANGE_DAYS ? (raw as InsightRange) : "30d";
+  return typeof raw === "string" && (INSIGHT_RANGES as readonly string[]).includes(raw) ? (raw as InsightRange) : "today";
 }
 
+export interface RangeWindow {
+  range: InsightRange;
+  start: Date;
+  end: Date;
+  step: BucketStep;
+  /** The immediately preceding period of the same length; null for "all". */
+  previous: { start: Date; end: Date } | null;
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
 /**
- * [start, end) window covering the last `days` LOCAL calendar days including
- * today (today is partial), aligned to local midnight in the caller's tz.
+ * [start, end) window for a range in the caller's local calendar, capped at
+ * "now" so no future bucket is ever drawn — identical rules to /analytics/home:
+ *  - today: local calendar day, hourly buckets
+ *  - week:  Sunday-first calendar week, daily buckets
+ *  - month: calendar month, daily buckets
+ *  - year:  calendar year, monthly buckets
+ *  - all:   from `anchor` (first order / account creation) to now; daily,
+ *           weekly or monthly buckets depending on account age.
  */
-export function rangeWindow(range: InsightRange, now: Date, tzOffsetMinutes: number): { start: Date; end: Date } {
-  const days = RANGE_DAYS[range];
-  const localMs = now.getTime() + tzOffsetMinutes * 60_000;
-  const localMidnight = Math.floor(localMs / DAY_MS) * DAY_MS;
-  const start = new Date(localMidnight - (days - 1) * DAY_MS - tzOffsetMinutes * 60_000);
-  return { start, end: new Date(now.getTime() + 1) };
+export function rangeWindow(range: InsightRange, now: Date, tzOffsetMinutes: number, anchor?: Date | null): RangeWindow {
+  const today = floorToLocalStep(now, DAY_MS, tzOffsetMinutes);
+  const todayEnd = capEndAtNow(new Date(today.getTime() + DAY_MS), now, { stepMs: HOUR_MS, tzOffsetMinutes });
+  const weekStart = floorToLocalWeek(now, tzOffsetMinutes);
+  const weekEnd = capEndAtNow(new Date(weekStart.getTime() + WEEK_MS), now, { stepMs: DAY_MS, tzOffsetMinutes });
+  const monthStart = floorToLocalMonth(now, tzOffsetMinutes);
+  const currentMonthEnd = addLocalMonths(monthStart, 1, tzOffsetMinutes);
+  const monthEnd = capEndAtNow(currentMonthEnd, now, { stepMs: DAY_MS, tzOffsetMinutes });
+  const yearStart = floorToLocalYear(now, tzOffsetMinutes);
+  const yearEnd = capEndAtNow(addLocalMonths(yearStart, 12, tzOffsetMinutes), now, { currentBucketEnd: currentMonthEnd, tzOffsetMinutes });
+
+  let start: Date;
+  let end: Date;
+  let step: BucketStep;
+  switch (range) {
+    case "week": start = weekStart; end = weekEnd; step = "1 day"; break;
+    case "month": start = monthStart; end = monthEnd; step = "1 day"; break;
+    case "year": start = yearStart; end = yearEnd; step = "1 month"; break;
+    case "all": {
+      const from = anchor && anchor.getTime() < now.getTime() ? anchor : now;
+      const ageDays = Math.max(0, (now.getTime() - from.getTime()) / DAY_MS);
+      if (ageDays < 60) { start = floorToLocalStep(from, DAY_MS, tzOffsetMinutes); end = todayEnd; step = "1 day"; }
+      else if (ageDays < 365) { start = floorToLocalWeek(from, tzOffsetMinutes); end = weekEnd; step = "1 week"; }
+      else { start = floorToLocalMonth(from, tzOffsetMinutes); end = currentMonthEnd; step = "1 month"; }
+      break;
+    }
+    default: start = today; end = todayEnd; step = "1 hour";
+  }
+  if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 1);
+  return { range, start, end, step, previous: range === "all" ? null : previousPeriod(start, end) };
+}
+
+/** Percentage change vs the previous period, one decimal; null when there is no previous figure to compare against. */
+export function deltaPct(current: number, previous: number | null | undefined): number | null {
+  if (previous === null || previous === undefined || !Number.isFinite(previous) || !Number.isFinite(current)) return null;
+  if (previous === 0) return current === 0 ? 0 : null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
 /** Percentage rounded to one decimal; null when the denominator is 0. Never above 100. */
@@ -41,6 +106,7 @@ export function funnelRates(c: FunnelCounts) {
   return {
     viewToCartPct: conversionPct(c.addToCarts, c.views),
     cartToPurchasePct: conversionPct(c.purchases, c.addToCarts),
+    viewToPurchasePct: conversionPct(c.purchases, c.views),
   };
 }
 
@@ -62,59 +128,52 @@ export function locationLabel(addr: { country?: unknown; state?: unknown } | nul
   return { country, region: regionRaw && regionRaw.length <= 56 ? regionRaw : null };
 }
 
-// ── Best time to post ────────────────────────────────────────────────────────
+// ── Devices ──────────────────────────────────────────────────────────────────
 
-export type HeatGrid = number[][]; // [dayOfWeek 0=Sun..6][hour 0..23]
+export const DEVICES = ["ios", "android", "web"] as const;
+export type Device = (typeof DEVICES)[number];
 
-export function emptyGrid(): HeatGrid {
-  return Array.from({ length: 7 }, () => Array<number>(24).fill(0));
-}
-
-/** Buckets UTC timestamps into local day-of-week x hour counts. */
-export function buildHeatmap(timestamps: Iterable<Date>, tzOffsetMinutes: number): HeatGrid {
-  const grid = emptyGrid();
-  for (const ts of timestamps) {
-    const local = new Date(ts.getTime() + tzOffsetMinutes * 60_000);
-    grid[local.getUTCDay()][local.getUTCHours()] += 1;
-  }
-  return grid;
-}
-
-export interface Slot { day: number; hour: number; count: number }
-
-/** Below this many total engagement events no slot is recommended. */
-export const MIN_EVENTS_FOR_RECOMMENDATION = 30;
-
-/**
- * Top N day/hour slots by engagement. Ties break toward the earlier day then
- * hour so the result is deterministic. Returns [] when the sample is too small
- * to say anything honest.
- */
-export function rankSlots(grid: HeatGrid, n = 3, minTotal = MIN_EVENTS_FOR_RECOMMENDATION): Slot[] {
-  const slots: Slot[] = [];
-  let total = 0;
-  for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) {
-    const count = grid[d]?.[h] ?? 0;
-    total += count;
-    if (count > 0) slots.push({ day: d, hour: h, count });
-  }
-  if (total < minTotal) return [];
-  slots.sort((a, b) => b.count - a.count || a.day - b.day || a.hour - b.hour);
-  return slots.slice(0, n);
+/** The client-declared device when valid, else a User-Agent sniff, else null. */
+export function resolveDevice(declared: unknown, userAgent: unknown): Device | null {
+  if (typeof declared === "string" && (DEVICES as readonly string[]).includes(declared)) return declared as Device;
+  if (typeof userAgent !== "string" || !userAgent) return null;
+  const ua = userAgent.toLowerCase();
+  if (/iphone|ipad|ipod|cfnetwork|darwin/.test(ua) && !/android/.test(ua)) return "ios";
+  if (/android|okhttp/.test(ua)) return "android";
+  if (/mozilla|chrome|safari|firefox|edg/.test(ua)) return "web";
+  return null;
 }
 
 // ── Goals ────────────────────────────────────────────────────────────────────
 
-export const GOAL_METRICS = ["revenue", "orders"] as const;
+export const GOAL_METRICS = ["revenue", "orders", "visits", "followers", "units"] as const;
 export type GoalMetric = (typeof GOAL_METRICS)[number];
+export const GOAL_PERIODS = ["week", "month", "quarter", "year"] as const;
+export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 
-/** Local calendar month [start, end) containing `now`, plus its length in days. */
+/** Local calendar window [start, end) of the period containing `now`. */
+export function goalWindow(period: GoalPeriod, now: Date, tzOffsetMinutes: number): { start: Date; end: Date } {
+  if (period === "week") {
+    const start = floorToLocalWeek(now, tzOffsetMinutes);
+    return { start, end: new Date(start.getTime() + WEEK_MS) };
+  }
+  if (period === "year") {
+    const start = floorToLocalYear(now, tzOffsetMinutes);
+    return { start, end: addLocalMonths(start, 12, tzOffsetMinutes) };
+  }
+  const monthStart = floorToLocalMonth(now, tzOffsetMinutes);
+  if (period === "quarter") {
+    const local = new Date(monthStart.getTime() + tzOffsetMinutes * 60_000);
+    const quarterStartMonth = Math.floor(local.getUTCMonth() / 3) * 3;
+    const start = addLocalMonths(monthStart, quarterStartMonth - local.getUTCMonth(), tzOffsetMinutes);
+    return { start, end: addLocalMonths(start, 3, tzOffsetMinutes) };
+  }
+  return { start: monthStart, end: addLocalMonths(monthStart, 1, tzOffsetMinutes) };
+}
+
+/** Kept for callers that still think in months (export of legacy goals). */
 export function monthWindow(now: Date, tzOffsetMinutes: number) {
-  const local = new Date(now.getTime() + tzOffsetMinutes * 60_000);
-  const y = local.getUTCFullYear();
-  const m = local.getUTCMonth();
-  const start = new Date(Date.UTC(y, m, 1) - tzOffsetMinutes * 60_000);
-  const end = new Date(Date.UTC(y, m + 1, 1) - tzOffsetMinutes * 60_000);
+  const { start, end } = goalWindow("month", now, tzOffsetMinutes);
   return { start, end, daysInMonth: Math.round((end.getTime() - start.getTime()) / DAY_MS) };
 }
 
@@ -124,27 +183,29 @@ export interface GoalPacing {
   expectedToDate: number;
   projected: number | null;
   projectedPct: number | null;
+  daysLeft: number;
   status: "achieved" | "on_track" | "behind" | "not_started";
 }
 
 /**
- * Pace projection: straight-line extrapolation of month-to-date actual over the
- * elapsed fraction of the month. Before any time has elapsed there is no
+ * Pace projection: straight-line extrapolation of period-to-date actual over
+ * the elapsed fraction of the period. Before any time has elapsed there is no
  * projection.
  */
-export function goalPacing(actual: number, target: number, now: Date, month: { start: Date; end: Date }): GoalPacing {
-  const total = month.end.getTime() - month.start.getTime();
-  const elapsed = Math.min(total, Math.max(0, now.getTime() - month.start.getTime()));
+export function goalPacing(actual: number, target: number, now: Date, window: { start: Date; end: Date }): GoalPacing {
+  const total = window.end.getTime() - window.start.getTime();
+  const elapsed = Math.min(total, Math.max(0, now.getTime() - window.start.getTime()));
   const frac = total > 0 ? elapsed / total : 0;
   const progressPct = target > 0 ? Math.round((actual / target) * 1000) / 10 : 0;
   const expectedToDate = Math.round(target * frac);
   const projected = frac > 0 ? Math.round(actual / frac) : null;
   const projectedPct = projected !== null && target > 0 ? Math.round((projected / target) * 1000) / 10 : null;
+  const daysLeft = Math.max(0, Math.ceil((window.end.getTime() - now.getTime()) / DAY_MS));
   let status: GoalPacing["status"];
   if (actual >= target) status = "achieved";
   else if (frac === 0 || (actual === 0 && elapsed < DAY_MS)) status = "not_started";
   else status = projected !== null && projected >= target ? "on_track" : "behind";
-  return { progressPct, remaining: Math.max(0, target - actual), expectedToDate, projected, projectedPct, status };
+  return { progressPct, remaining: Math.max(0, target - actual), expectedToDate, projected, projectedPct, daysLeft, status };
 }
 
 // ── Hashing ──────────────────────────────────────────────────────────────────
@@ -162,4 +223,9 @@ export interface ExportTable {
   headers: string[];
   rows: Record<string, unknown>[];
   note?: string;
+}
+
+/** Human label for a range, used in export headers and filenames. */
+export function rangeLabel(range: InsightRange): string {
+  return { today: "Today", week: "This week", month: "This month", year: "This year", all: "All time" }[range];
 }

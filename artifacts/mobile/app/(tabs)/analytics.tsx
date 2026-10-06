@@ -1,12 +1,16 @@
 /**
  * Analytics — Brandthread Seller App
  * Precise, trustworthy, quick-to-scan seller analytics.
- * Data contract: grossRevenue/storeVisitors from getOverview; daily bars from
- * getSalesAnalytics. No fabricated data, no fabricated trends.
+ * Data contract: everything on this screen (Visits, Revenue, their deltas and
+ * the revenue chart) comes from ONE call to GET /api/analytics/home for the
+ * selected range — the same endpoint and the same Today / Week / Month /
+ * Year / All pills as the Dashboard, so the two never disagree. No
+ * fabricated data, no fabricated trends.
  *
  * Mobbin reference: Stripe Dashboard "Home" KPI + chart layout
  * (https://mobbin.com/screens/f972bbd5-699d-42c3-942e-1cf9f3d25eda) informed
- * the stat-row-above-chart hierarchy and the muted axis labels.
+ * the stat-row-above-chart hierarchy and the muted axis labels; Shopify
+ * Analytics for the Reports rows below the chart.
  */
 import React, { useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
@@ -18,14 +22,14 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { formatCents } from '@/lib/money';
-import {
-  getSalesAnalytics, getFilterState, saveFilterState,
-} from '@/services/analyticsService';
-import {
-  AnalyticsFilterState, AnalyticsPoint, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
-} from '@/services/analyticsTypes';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
+import { bucketLabel } from '@/lib/sellerHomeChartLabels';
 import { AnalyticsBarChart, AnalyticsSkeleton, Card, SectionTitle, StatTile } from '@/components/analytics/AnalyticsKit';
 import { AnalyticsReportsList } from '@/components/analytics/AnalyticsReportsList';
+import { SegmentedPills, useReportBottomInset } from '@/components/analytics/InsightFrame';
+import { previousPeriodLabel } from '@/components/analytics/InsightCharts';
+import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
@@ -39,50 +43,27 @@ interface SummaryData {
   revenueChangePct?: number;
 }
 
-interface DailyBar {
-  date: string;   // ISO date yyyy-mm-dd
-  label: string;  // short date label e.g. "Jul 4"
+interface RevenueBar {
+  label: string;
   cents: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function shortDate(iso: string): string {
-  const d = new Date(iso + 'T00:00:00Z');
-  if (isNaN(d.getTime())) return iso.slice(5, 10);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
-
-/** Returns ISO date strings for the last n days ending today (inclusive). */
-function lastNDays(n: number): string[] {
-  const days: string[] = [];
-  const now = new Date();
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
-}
-
-/** Align API daily points to a fixed date range, filling 0 for missing days. */
-function alignBars(points: AnalyticsPoint[], days: string[]): DailyBar[] {
-  const byDate: Record<string, number> = {};
-  for (const p of points) {
-    const key = typeof p.date === 'string' ? p.date.slice(0, 10) : '';
-    if (key) byDate[key] = (byDate[key] ?? 0) + p.value;
-  }
-  return days.map(iso => ({
-    date: iso,
-    label: shortDate(iso),
-    cents: byDate[iso] ?? 0,
-  }));
+/** Real period-over-period change; undefined when there is nothing to compare against. */
+function changePct(current: number, previous: number, hasPrevious: boolean): number | undefined {
+  if (!hasPrevious || previous <= 0) return undefined;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
 function formatChartDollars(cents: number): string {
   const dollars = cents / 100;
   return dollars >= 1000 ? `$${(dollars / 1000).toFixed(1)}k` : `$${dollars.toFixed(0)}`;
 }
+
+const CHART_TITLE: Record<InsightRange, string> = {
+  today: 'Revenue by hour', week: 'Revenue by day', month: 'Revenue by day', year: 'Revenue by month', all: 'Revenue',
+};
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
@@ -92,58 +73,43 @@ export default function AnalyticsScreen() {
   const { userId } = useAuth();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const scrollResetRef = useScrollReset<ScrollView>();
+  const bottomInset = useReportBottomInset();
 
+  const [range, setRange]           = useState<InsightRange>(DEFAULT_INSIGHT_RANGE);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary]       = useState<SummaryData>({ visits: 0, revenueCents: 0 });
-  const [bars, setBars]             = useState<DailyBar[]>([]);
+  const [bars, setBars]             = useState<RevenueBar[]>([]);
 
-  const filterRef = useRef<AnalyticsFilterState | null>(null);
   const loadGenerationRef = useRef(0);
   const { ref: revenueTileRef, rect: revenueTileRect, onLayout: revenueTileOnLayout } = useMeasuredTarget();
 
-  // Only the 7-day range has real backing data today — see the header note.
-  const activeDays = useCallback((): string[] => lastNDays(7), []);
-
   const load = useCallback(async (isRefresh = false) => {
     const generation = ++loadGenerationRef.current;
-    if (!userId) {
-      setSummary({ visits: 0, revenueCents: 0 });
-      setBars([]);
-      setLoading(false);
-      return;
-    }
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
     try {
-      if (!filterRef.current) {
-        filterRef.current = await getFilterState();
+      // Signed-out web preview never calls the API: fresh = real zeros,
+      // &demo=1 = the Dashboard's own deterministic sample curve.
+      const preview = isSellerDevPreview();
+      if (!preview && !userId) {
+        setSummary({ visits: 0, revenueCents: 0 });
+        setBars([]);
+      } else {
+        const home = preview
+          ? buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh')
+          : await api.analytics.home(range);
+        if (loadGenerationRef.current !== generation) return;
+        const hasPrevious = range !== 'all';
+        setBars(home.buckets.map(b => ({ label: bucketLabel(b.bucket, range), cents: b.totalCents })));
+        setSummary({
+          visits: home.visitorCount,
+          revenueCents: home.totalCents,
+          visitsChangePct: changePct(home.visitorCount, home.previous.visitorCount, hasPrevious),
+          revenueChangePct: changePct(home.totalCents, home.previous.totalCents, hasPrevious),
+        });
       }
-      const days = activeDays();
-      const drOption = DATE_RANGE_OPTIONS.find(d => d.key === '7d') ?? DATE_RANGE_OPTIONS[2];
-      const filter: AnalyticsFilterState = {
-        ...(filterRef.current ?? { comparison: COMPARISON_OPTIONS[0], groupBy: 'daily' }),
-        dateRange: drOption,
-      };
-      filterRef.current = filter;
-      await saveFilterState(filter);
-
-      const [home, sales] = await Promise.allSettled([
-        api.analytics.home('week'),
-        getSalesAnalytics(filter),
-      ]);
-
-      if (loadGenerationRef.current !== generation) return;
-      const homeData = home.status === 'fulfilled' ? home.value : null;
-      const sl = sales.status === 'fulfilled' ? sales.value : null;
-      const rawPoints: AnalyticsPoint[] = sl?.salesChart ?? [];
-      const alignedBars = alignBars(rawPoints, days);
-      setBars(alignedBars);
-      setSummary({
-        visits: homeData?.visitorCount ?? 0,
-        revenueCents: homeData?.totalCents ?? sl?.grossSales?.value ?? 0,
-      });
     } catch {
       // silent read failure: keep whatever state was last set
     }
@@ -152,17 +118,17 @@ export default function AnalyticsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [api, userId, activeDays]);
+  }, [api, userId, range]);
 
   React.useEffect(() => {
     load();
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (loading) {
+  if (loading && bars.length === 0) {
     return (
       <View style={{ flex: 1 }}>
-        <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+        <ScreenHeader title="Analytics" />
         <AnalyticsSkeleton kpiCount={2} listRows={0} />
       </View>
     );
@@ -171,14 +137,16 @@ export default function AnalyticsScreen() {
   // ── Display values ─────────────────────────────────────────────────────────
   const displayRevenue = formatCents(summary.revenueCents);
   const chartPoints = bars.map(b => ({ label: b.label, value: b.cents }));
+  const hasDelta = summary.visitsChangePct !== undefined || summary.revenueChangePct !== undefined;
+  const comparedTo = hasDelta ? previousPeriodLabel(range) : null;
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+      <ScreenHeader title="Analytics" />
       <ScrollView
         ref={scrollResetRef}
         style={s.scroll}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -189,24 +157,25 @@ export default function AnalyticsScreen() {
         }
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+          {/* ── Range (same pills as the Dashboard) ───────────────────────── */}
+          <SegmentedPills options={INSIGHT_RANGES} value={range} onChange={setRange} testID="analytics-range-pills" />
+
           {/* ── Summary stats ──────────────────────────────────────────────── */}
           <View style={s.statsRow}>
             <StatTile label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} />
-            <View ref={revenueTileRef} onLayout={revenueTileOnLayout} collapsable={false}>
+            <View ref={revenueTileRef} onLayout={revenueTileOnLayout} collapsable={false} style={{ flex: 1 }}>
               <StatTile label="Revenue" value={displayRevenue} changePct={summary.revenueChangePct} featured />
             </View>
           </View>
 
-          {/* ── Daily revenue bar chart ────────────────────────────────────── */}
+          {/* ── Revenue chart for the selected range ──────────────────────── */}
           <Card padded>
-            <SectionTitle>Daily Revenue</SectionTitle>
-            <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" />
+            <SectionTitle note={comparedTo ? `Change ${comparedTo}` : undefined}>{CHART_TITLE[range]}</SectionTitle>
+            <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue in this period" />
           </Card>
 
           {/* ── Reports (appended) ─────────────────────────────────────────── */}
           <AnalyticsReportsList />
-
-          <View style={{ height: 120 }} />
         </ResponsiveContainer>
       </ScrollView>
       <FirstRunTip

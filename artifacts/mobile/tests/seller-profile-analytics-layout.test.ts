@@ -93,15 +93,17 @@ describe('seller analytics overview layout', () => {
   // The "14 Days"/"Custom" ranges and the "Leads"/"Traffic sources" cards
   // were non-functional stubs (always empty, no backing API) and were
   // removed as a P0 fix — see docs/polish/punch-list.md, Seller Analytics.
-  // Only the working 7-day range ships now.
-  it('renders only the working 7-day range, real metrics, and the chart', () => {
+  // Every range shown now is a Dashboard range (Today / Week / Month / Year /
+  // All) backed by the same real GET /api/analytics/home call.
+  it('renders only the real Dashboard ranges, real metrics, and the chart', () => {
     expect(analyticsSource).not.toContain("label: '14 Days'");
     expect(analyticsSource).not.toContain("label: 'Custom'");
     expect(analyticsSource).not.toContain('label="Leads"');
-    expect(analyticsSource).toContain('Last 7 days');
+    expect(analyticsSource).toContain('<SegmentedPills options={INSIGHT_RANGES}');
+    expect(analyticsSource).toContain('await api.analytics.home(range)');
     expect(analyticsSource).toContain('label="Visits"');
     expect(analyticsSource).toContain('label="Revenue"');
-    expect(analyticsSource).toContain('Daily Revenue');
+    expect(analyticsSource).toContain('<AnalyticsBarChart');
   });
 
   it('uses zero-safe data and omits fabricated trends and traffic sources', () => {
