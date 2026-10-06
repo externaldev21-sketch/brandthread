@@ -5,13 +5,24 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
+import { formatCents } from '@/lib/money';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { buildDemoSellerFinance } from '@/lib/previewSellerFinance';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
 
 export default function TaxesDutiesScreen() {
   const colors = useColors();
   const api    = useApi();
+  const bottomInset = useSellerTabBarInset();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
+  // Signed-out ?bt_preview=seller: no token for the protected tax endpoints,
+  // so settings stay local and the 1099-K card shows the preview's own totals
+  // (demo orders under &demo=1, an honest $0.00 otherwise).
+  const isPreview = isSellerDevPreview() && (!userId || !isAuthLoaded || !isSignedIn);
 
   const [loading,            setLoading]            = useState(true);
   const [stripeTaxEnabled,   setStripeTaxEnabled]   = useState(false);
@@ -23,6 +34,19 @@ export default function TaxesDutiesScreen() {
   const [savingShipping, setSavingShipping] = useState(false);
 
   const loadConfig = useCallback(async () => {
+    if (isPreview) {
+      const year = new Date().getFullYear();
+      const charges = isPreviewDemoMode()
+        ? buildDemoSellerFinance().transactions.filter((t) => t.type === 'charge' && new Date(t.created).getFullYear() === year)
+        : [];
+      setAnnualReport({
+        year,
+        grossPaymentCents: charges.reduce((sum, t) => sum + t.amount, 0),
+        transactionCount: charges.length,
+      });
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const cfg = await api.taxes.status();
@@ -34,7 +58,7 @@ export default function TaxesDutiesScreen() {
       setAnnualReport(await api.taxes.forms1099());
     } catch { /* keep the explicit unavailable state */ }
     setLoading(false);
-  }, []);
+  }, [api, isPreview]);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
@@ -45,6 +69,7 @@ export default function TaxesDutiesScreen() {
   const handleToggleTax = async (next: boolean) => {
     const previous = stripeTaxEnabled;
     setStripeTaxEnabled(next);
+    if (isPreview) return;
     setSavingTax(true);
     try {
       if (next) {
@@ -66,6 +91,7 @@ export default function TaxesDutiesScreen() {
   const handleToggleShipping = async (next: boolean) => {
     const previous = chargeShippingTax;
     setChargeShippingTax(next);
+    if (isPreview) return;
     setSavingShipping(true);
     try {
       await api.taxes.config({ chargeShippingTax: next });
@@ -94,7 +120,7 @@ export default function TaxesDutiesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Taxes and duties" subtitle="Powered by Stripe Tax" />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: bottomInset + 24 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Collect sales tax ─────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -104,7 +130,7 @@ export default function TaxesDutiesScreen() {
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Automatic tax at checkout</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Stripe Tax calculates and collects sales tax automatically, based on the buyer's destination and your active tax registrations.
+                Stripe Tax calculates and collects sales tax from the buyer's address and your active registrations.
               </Text>
             </View>
             <HapticSwitch
@@ -117,16 +143,10 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.statusRow, { borderColor: colors.border }]}>
             <View style={[styles.dot, { backgroundColor: providerConfigured ? colors.success : colors.mutedForeground }]} />
             <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
-              {providerConfigured ? 'Stripe Tax is configured on your connected account.' : 'Not yet configured — connect Stripe and turn this on to start.'}
+              {providerConfigured ? 'Stripe Tax is set up on your account.' : "Stripe Tax isn't set up on your account."}
             </Text>
           </View>
 
-          <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
-            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
-            <Text style={[styles.infoText, { color: colors.foreground }]}>
-              This calculates and collects tax — it is not proof of nexus, registration, or filing compliance. Product tax codes, registrations, and the checkout address determine the actual taxability; Brandthread does not apply a local rate table or override Stripe's result.
-            </Text>
-          </View>
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
@@ -138,7 +158,7 @@ export default function TaxesDutiesScreen() {
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Charge tax on shipping cost</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                When on, the shipping fee is included in the taxable amount Stripe calculates at checkout.
+                Includes the shipping fee in the taxable amount. Requires automatic tax.
               </Text>
             </View>
             <HapticSwitch
@@ -147,11 +167,6 @@ export default function TaxesDutiesScreen() {
               disabled={savingShipping || loading || !stripeTaxEnabled}
             />
           </View>
-          {!stripeTaxEnabled && (
-            <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 8 }]}>
-              Turn on automatic tax above to set this.
-            </Text>
-          )}
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
@@ -167,9 +182,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available directly in-app yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Managed in Stripe</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Adding, removing, or reviewing where you're registered to collect tax (your nexus) is managed in your Stripe Tax dashboard, not in Brandthread. Tap "Open Stripe" to manage it there.
+                Add or review where you collect tax (your nexus) in your Stripe Tax dashboard.
               </Text>
             </View>
           </View>
@@ -183,9 +198,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Prices are tax-exclusive</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Your listed prices are currently tax-exclusive: calculated tax is added on top at checkout. Switching listings to tax-inclusive pricing isn't supported yet.
+                Tax is added on top of your listed prices at checkout.
               </Text>
             </View>
           </View>
@@ -196,15 +211,12 @@ export default function TaxesDutiesScreen() {
         {/* ── DDP / DAP duties ──────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>International duties</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Delivered Duty Paid (DDP) collects import duties from the buyer at checkout and remits them for you. Delivered At Place (DAP) leaves the buyer responsible for customs duties on delivery.
-          </Text>
-          <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.unavailableCard, { marginTop: 12 }, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Delivered At Place (DAP)</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Brandthread doesn't calculate or collect customs duties at checkout. International orders currently ship DAP by default — buyers may be responsible for duties and import fees charged on delivery.
+                Duties aren't collected at checkout. Buyers may owe duties and import fees on delivery.
               </Text>
             </View>
           </View>
@@ -219,7 +231,7 @@ export default function TaxesDutiesScreen() {
             <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Brandthread does not determine where you have nexus, register you, or file returns. Review marketplace-facilitator treatment and state obligations with a qualified accountant.
+            Brandthread doesn't determine nexus, register you, or file returns. Review your obligations with a qualified accountant.
           </Text>
 
           <View style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -228,10 +240,10 @@ export default function TaxesDutiesScreen() {
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
                 {annualReport
-                  ? `${annualReport.year}: $${(annualReport.grossPaymentCents / 100).toFixed(2)} gross · ${annualReport.transactionCount} transactions`
-                  : 'Annual paid-order totals are unavailable.'}
+                  ? `${annualReport.year}: ${formatCents(Math.round(Number(annualReport.grossPaymentCents) || 0))} gross · ${annualReport.transactionCount} transaction${annualReport.transactionCount === 1 ? '' : 's'}`
+                  : "Couldn't load this year's totals."}
               </Text>
-              {annualReport && (
+              {annualReport?.threshold && (
                 <Text style={[styles.rowDescription, { color: annualReport.threshold?.meetsFederalThreshold ? colors.success : colors.mutedForeground }]}>
                   Federal threshold {annualReport.threshold?.meetsFederalThreshold ? 'exceeded' : 'not exceeded'}: {annualReport.threshold?.summary}.
                 </Text>
@@ -244,7 +256,7 @@ export default function TaxesDutiesScreen() {
             </View>
           </View>
           <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
-            Preparation support only — not tax advice and not a filed form. State thresholds and filing duties may differ; review them with a qualified accountant.
+            Preparation support only, not tax advice or a filed form. State thresholds may differ.
           </Text>
         </View>
 
@@ -255,7 +267,7 @@ export default function TaxesDutiesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
+  section: { paddingHorizontal: 16, paddingVertical: 18 },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 6, marginBottom: 14, lineHeight: 17 },
   rowStart: { flexDirection: 'row', alignItems: 'center' },
@@ -273,6 +285,4 @@ const styles = StyleSheet.create({
   unavailableCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
   disclaimer: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
   rowIcon: { width: 20 },
-  infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginTop: 12 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
 });

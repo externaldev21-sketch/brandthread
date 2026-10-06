@@ -16,6 +16,7 @@ import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,7 @@ export default function ShippingScreen() {
   const params = useLocalSearchParams();
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const api = useApi();
 
   const [sellerReturns, setSellerReturns] = useState<any[]>([]);
@@ -436,20 +438,22 @@ export default function ShippingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Shipping & Fulfillment" onBack={leaveSetupDestination} />
+      <ScreenHeader title="Shipping & fulfillment" onBack={leaveSetupDestination} />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarInset + SP.md, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
 
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Pending', value: String(pendingCount), color: colors.warning },
-          { label: 'In Transit', value: String(inTransitCount), color: colors.primary },
-          { label: 'Delivered', value: String(deliveredCount), color: colors.success },
-          { label: 'Returns', value: String(sellerReturns.length), color: colors.destructive },
+          // Monochrome values (black/white/silver palette) — the label, not a
+          // per-tile accent colour, says what each count is.
+          { label: 'Pending', value: String(pendingCount), color: colors.foreground },
+          { label: 'In transit', value: String(inTransitCount), color: colors.foreground },
+          { label: 'Delivered', value: String(deliveredCount), color: colors.foreground },
+          { label: 'Returns', value: String(sellerReturns.length), color: colors.foreground },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statVal, { color: s.color }]}>{s.value}</Text>
@@ -459,7 +463,7 @@ export default function ShippingScreen() {
       </View>
 
       {/* Shipments */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Active Shipments</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Active shipments</Text>
       {activeShipments.length === 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emptySection}>
@@ -502,7 +506,7 @@ export default function ShippingScreen() {
       ))}
 
       {/* Returns */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Returns & Exchanges</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Returns & exchanges</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {sellerReturns.length === 0 ? (
           <View style={styles.emptySection}>
@@ -536,7 +540,7 @@ export default function ShippingScreen() {
       </View>
 
       {/* Ship-from country */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ship From</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ship from</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
         <View style={styles.shipFromRow}>
           <View style={{ flex: 1 }}>
@@ -574,14 +578,14 @@ export default function ShippingScreen() {
 
       {/* Shipping Zones */}
       <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Shipping Zones</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Shipping zones</Text>
         <TouchableOpacity
           onPress={() => openNewZone('country')}
           activeOpacity={0.75}
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
           <Feather name="plus" size={14} color={colors.primary} />
-          <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Zone</Text>
+          <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add zone</Text>
         </TouchableOpacity>
       </View>
       <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
@@ -662,7 +666,7 @@ export default function ShippingScreen() {
       {/* Rendered rates summary table */}
       {activeZones.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rates Summary</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rates summary</Text>
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.tableRow, styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
               <Text style={[styles.tableHeaderText, { color: colors.mutedForeground, flex: 1.3 }]}>Zone</Text>
@@ -687,12 +691,12 @@ export default function ShippingScreen() {
       {/* Legacy flat rate, shown read-only once zones exist */}
       {zones.length > 0 && legacyRates.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Legacy Flat Rate</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Legacy flat rate</Text>
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.emptySection}>
               <Feather name="info" size={16} color={colors.mutedForeground} />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Your Shipping Zones above are now used at checkout instead of this old flat rate.
+                Your shipping zones above are now used at checkout instead of this old flat rate.
               </Text>
             </View>
           </View>
@@ -701,14 +705,14 @@ export default function ShippingScreen() {
 
       {/* Packaging presets */}
       <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Packaging Presets</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Packaging presets</Text>
         <TouchableOpacity
           onPress={openNewPreset}
           activeOpacity={0.75}
           style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
         >
           <Feather name="plus" size={14} color={colors.primary} />
-          <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Package</Text>
+          <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add package</Text>
         </TouchableOpacity>
       </View>
       <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
@@ -1065,8 +1069,11 @@ const styles = StyleSheet.create({
   action: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 6 },
   actionLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: -6, marginBottom: 12, lineHeight: 17 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
+  // Follows a sectionTitleRow (heading + "Add" pill, centred on one row);
+  // the row's own marginBottom gives the description clear space below the
+  // pill instead of the old negative margin that pulled it up under it.
+  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 12, lineHeight: 17 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, minHeight: 32, marginBottom: SP.sm },
   addRateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
   addRateBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

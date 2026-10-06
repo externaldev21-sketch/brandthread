@@ -75,7 +75,7 @@ export default function PayoutsScreen() {
   const api    = useApi();
   // ?bt_preview=seller with no real signed-in account: no token to fetch
   // real payout data with — resolve straight to the honest empty/no-history
-  // state (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
+  // state (same convention as the isPreviewMode guard in app/(tabs)/orders.tsx).
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
@@ -207,7 +207,7 @@ export default function PayoutsScreen() {
 
   const availFmt   = balance?.available?.formatted ?? '$0.00';
   const pendFmt    = balance?.pending?.formatted   ?? '$0.00';
-  // Never a bare "—" placeholder: say plainly when nothing is scheduled.
+  // Never a bare dash placeholder: say plainly when nothing is scheduled.
   const nextPayoutLabel = balance?.nextPayout?.arrivalDate
     ? `Next payout ${fmtDate(balance.nextPayout.arrivalDate)}`
     : 'No payout scheduled';
