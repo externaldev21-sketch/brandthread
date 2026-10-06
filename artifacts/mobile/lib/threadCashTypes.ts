@@ -25,6 +25,9 @@ export type ThreadCashOpenRedemption = { token: string; amountCents: number; cre
 
 export type ThreadCashStatus = {
   balanceCents: number;
+  /** The part of balanceCents a seller may cash out — Thread Cash earned
+   *  from Live gifts and payments, never reward credit. Older servers omit it. */
+  cashableCents?: number;
   /** Additive (item 109): older servers omit it. */
   openRedemptions?: ThreadCashOpenRedemption[];
   config: ThreadCashConfig;

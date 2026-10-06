@@ -10,7 +10,7 @@
  * artifacts/api-server/src/lib/threadCash/cashOut.ts's rate/fee constants,
  * this sheet reflects it immediately with no app update.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +42,11 @@ export function CashOutSheet({
   const [error, setError] = useState<string | null>(null);
 
   const amountCents = Math.round((parseFloat(amountText.replace(/[^0-9.]/g, '')) || 0) * 100);
+  // One key per cash-out attempt: a retry after a lost response must reuse
+  // it (the server replays the first transfer instead of paying twice); a
+  // new amount or a fresh open of the sheet is a new attempt.
+  const attemptKey = useRef<string | null>(null);
+  useEffect(() => { attemptKey.current = null; }, [visible, amountCents]);
   const canSubmit = amountCents > 0 && amountCents <= balanceCents && !confirming;
 
   useEffect(() => {
@@ -71,7 +76,9 @@ export function CashOutSheet({
     setError(null);
     hapticLight();
     try {
-      const result = await api.threadCash.cashOut({ threadCashCents: amountCents, idempotencyKey: randomUUID() });
+      attemptKey.current ??= randomUUID();
+      const result = await api.threadCash.cashOut({ threadCashCents: amountCents, idempotencyKey: attemptKey.current });
+      attemptKey.current = null;
       hapticSuccess();
       onCashedOut(result);
     } catch (err: any) {

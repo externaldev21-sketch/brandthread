@@ -63,6 +63,38 @@ export async function getBalanceCents(executor: DbExecutor, buyerId: string): Pr
   return Number(row?.total ?? 0);
 }
 
+/**
+ * The part of a balance that may be cashed out to real money: Thread Cash
+ * EARNED from other people (Live gifts, message payments), less what was
+ * already cashed out, capped at the current balance. Platform-funded reward
+ * credit (daily check-ins, streak bonuses, refund credits, admin
+ * adjustments) is spendable in the app but never cashable — cumulative
+ * cash-outs can therefore never exceed cumulative earnings. Any other spend
+ * (checkout redemptions, sends) is assumed to use reward credit first, so a
+ * seller who spends never loses earned money they could still cash out
+ * beyond what the balance itself allows.
+ */
+export async function getCashableBalanceCents(executor: DbExecutor, userId: string): Promise<number> {
+  const [row] = await executor
+    .select({
+      balance: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}), 0)`,
+      earned: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} IN ('live_gift', 'send_received')), 0)`,
+      cashedOut: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} = 'cash_out'), 0)`,
+    })
+    .from(threadCashEntries)
+    .where(eq(threadCashEntries.buyerId, userId));
+  const balance = Number(row?.balance ?? 0);
+  const earnedLeft = Number(row?.earned ?? 0) - Number(row?.cashedOut ?? 0);
+  return Math.max(0, Math.min(balance, earnedLeft));
+}
+
+/** The one lock every balance-reducing write for a user takes, so no two of
+ *  them (send, live gift, redemption, cash-out) can pass a balance check
+ *  concurrently. */
+export function balanceLockKey(userId: string): string {
+  return `thread-cash-balance:${userId}`;
+}
+
 /** Whether a moderator-controlled feature flag is enabled (safe default: off). */
 export async function isFeatureEnabled(key: string, safeDefault = false): Promise<boolean> {
   const result = await pool.query<{ enabled: boolean }>(
@@ -866,11 +898,18 @@ export async function sendLiveGift(
   }
 
   async function lookupByKey(executor: DbExecutor): Promise<{ giftId: string } | null> {
-    const [row] = await executor.select({ id: threadCashEntries.id })
+    const [row] = await executor.select({ id: threadCashEntries.id, buyerId: threadCashEntries.buyerId })
       .from(threadCashEntries)
       .where(and(eq(threadCashEntries.idempotencyKey, idempotencyKey), eq(threadCashEntries.source, "live_gift_sent")))
       .limit(1);
-    return row ? { giftId: row.id } : null;
+    if (!row) return null;
+    // Keys are unique across ALL entries; a key another user (or another
+    // kind of write) already used must never read back as this gift
+    // succeeding — that would report "sent" with nothing debited.
+    if (row.buyerId !== buyerId) {
+      throw new ThreadCashError("This request key was already used. Try again.", 409, "THREAD_CASH_IDEMPOTENCY_KEY_REUSED");
+    }
+    return { giftId: row.id };
   }
 
   try {
@@ -907,6 +946,12 @@ export async function sendLiveGift(
       if (sentTodayFriends + sentTodayGifts + amountCents > config.dailySendCapCents) {
         throw new ThreadCashError("You've reached today's Thread Cash sending limit.", 400, "THREAD_CASH_DAILY_SEND_CAP");
       }
+      // The receive cap is per SELLER across every sender, so it must be
+      // checked under a seller-scoped lock too — the buyer lock alone lets
+      // two different buyers gifting at once both pass it. Lock order is
+      // always buyer-balance → seller-receive (receive locks are never held
+      // while taking a balance lock), so this can't deadlock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-gift-receive:${sellerId}`}))`);
       const receivedTodayBySeller = await liveGiftRollingWindowCents(tx, sellerId, "received");
       if (receivedTodayBySeller + amountCents > config.dailyReceiveCapCents) {
         throw new ThreadCashError("This seller has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
