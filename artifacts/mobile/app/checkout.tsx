@@ -46,6 +46,13 @@ import {
   type ConversionProvider, type ConversionTrackingView, type OfferProductOption, type PostPurchaseOfferResponse,
   type PostPurchaseOfferSettings,
 } from '@/lib/checkoutExtras';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Checkbox rows draw only as tall as their label (~18-20pt); pad the touch
+// area vertically to 44pt without changing layout. The post-purchase row has
+// a text area 12pt below it, so its slop leans upward (onto static subtitle text).
+const TIPPING_ROW_HIT_SLOP = minHitSlop({ height: 20 });
+const POST_PURCHASE_ROW_HIT_SLOP = { top: 14, bottom: 12, left: 0, right: 0 };
 
 const PROVIDERS: ConversionProvider[] = ['meta', 'tiktok', 'ga4'];
 
@@ -275,6 +282,7 @@ export default function CheckoutScreen() {
             accessibilityState={{ checked: tipping }}
             activeOpacity={0.7}
             style={styles.checkRow}
+            hitSlop={TIPPING_ROW_HIT_SLOP}
           >
             {checkbox(tipping)}
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Show tipping options at checkout</Text>
@@ -293,6 +301,7 @@ export default function CheckoutScreen() {
             onPress={toggleOffer}
             activeOpacity={0.7}
             style={styles.radioRow}
+            hitSlop={POST_PURCHASE_ROW_HIT_SLOP}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: offer.enabled, busy: savingOffer }}
             testID="checkout-post-purchase-toggle"

@@ -5,6 +5,10 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// The action is an 18pt-tall text link; pad its touch area (not its box) to 44pt.
+const ACTION_HIT_SLOP = minHitSlop({ width: 40, height: 18 });
 
 /**
  * NOTE: for new screens, prefer the `SectionHeader` exported from
@@ -28,7 +32,7 @@ export function SectionHeader({ title, action, onAction, colors: colorsProp }: S
         <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       </View>
       {action && (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn} accessibilityRole="button" accessibilityLabel={action}>
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn} hitSlop={ACTION_HIT_SLOP} accessibilityRole="button" accessibilityLabel={action}>
           <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.action, { color: colors.primary }]} numberOfLines={1}>{action}</Text>
         </TouchableOpacity>
       )}

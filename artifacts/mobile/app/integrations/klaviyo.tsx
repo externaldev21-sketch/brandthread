@@ -189,7 +189,10 @@ export default function KlaviyoIntegrationScreen() {
               style={styles.helpRow}
               onPress={() => Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267')}
               activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              // 15pt-tall link → 44pt tap area: 13pt up (stops short of the
+              // Connect button 14pt above), 16pt down into the card padding.
+              hitSlop={{ top: 13, bottom: 16, left: 10, right: 10 }}
+              accessibilityRole="link"
             >
               <Feather name="external-link" size={13} color={colors.primary} />
               <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my Private API Key?</Text>

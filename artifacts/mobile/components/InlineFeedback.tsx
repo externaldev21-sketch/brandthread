@@ -184,7 +184,8 @@ export function SectionError({ message, onRetry, style }: SectionErrorProps) {
       <Text style={se.message} numberOfLines={1}>{message}</Text>
       <TouchableOpacity
         onPress={onRetry}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        // The Retry link draws only ~14pt tall; 15pt top/bottom reaches 44pt.
+        hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
         accessibilityRole="button"
         accessibilityLabel={`Retry — ${message}`}
         style={se.retryBtn}

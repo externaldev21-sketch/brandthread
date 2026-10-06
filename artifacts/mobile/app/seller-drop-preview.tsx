@@ -21,6 +21,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
 import { computeCountdownParts } from '@/lib/dropCountdown';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
+import { minHitSlop } from '@/lib/hitSlop';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState as LayoutEmptyState } from '@/components/layout';

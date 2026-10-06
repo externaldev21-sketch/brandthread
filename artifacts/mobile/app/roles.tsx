@@ -6,7 +6,15 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
+import { minHitSlop } from '@/lib/hitSlop';
 import { Alert } from 'react-native';
+
+// 40pt header buttons (8pt apart) → 44×44 touch area.
+const HEADER_BTN_HIT_SLOP = minHitSlop({ width: 40, height: 40 });
+// 34pt toolbar icon buttons sit 8pt apart: 5pt top/bottom, and 4pt on the
+// shared side / 6pt on the outer side so the two slops never overlap → 44×44.
+const SEARCH_BTN_HIT_SLOP = { top: 5, bottom: 5, left: 6, right: 4 };
+const FILTER_BTN_HIT_SLOP = { top: 5, bottom: 5, left: 4, right: 6 };
 
 // Fallback role data if API not connected
 const DEFAULT_ROLES = [
@@ -42,7 +50,9 @@ export default function RolesScreen() {
               onPress={() => { haptic(); router.push('/team' as never); }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              accessibilityRole="button"
               accessibilityLabel="Invite a team member"
+              hitSlop={HEADER_BTN_HIT_SLOP}
             >
               <Feather name="plus" size={17} color={colors.foreground} />
             </TouchableOpacity>
@@ -56,7 +66,9 @@ export default function RolesScreen() {
               }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              accessibilityRole="button"
               accessibilityLabel="About roles"
+              hitSlop={HEADER_BTN_HIT_SLOP}
             >
               <Feather name="more-horizontal" size={17} color={colors.foreground} />
             </TouchableOpacity>
@@ -70,10 +82,24 @@ export default function RolesScreen() {
             <Text style={[styles.allPillText, { color: colors.foreground }]}>All</Text>
           </View>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={haptic}
+            activeOpacity={0.7}
+            style={[styles.iconBtn, { borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel="Search roles"
+            hitSlop={SEARCH_BTN_HIT_SLOP}
+          >
             <Feather name="search" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={haptic}
+            activeOpacity={0.7}
+            style={[styles.iconBtn, { borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel="Filter roles"
+            hitSlop={FILTER_BTN_HIT_SLOP}
+          >
             <Feather name="sliders" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>

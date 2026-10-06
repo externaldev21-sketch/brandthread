@@ -1489,11 +1489,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
           Send a message to someone in your network
         </Text>
-        <PrimaryButton
+        <Button
           label="Send a message"
-          onPress={openCompose}
+          onPress={() => openCompose()}
           style={s.inboxEmptyButton}
-          small
+          size="small"
+          testID="inbox-empty-send-message"
         />
       </View>
     );
@@ -1695,7 +1696,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                   ]}>
                     <Text
                       style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
-                      numberOfLines={1}
+                      numberOfLines={2}
                     >
                       {myNote ? myNote.text : 'Your thoughts go here...'}
                     </Text>
@@ -1746,7 +1747,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                     {note ? (
                       <>
                         <View style={[s.noteBubble, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={1}>
+                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={2}>
                             {note.text}
                           </Text>
                         </View>
@@ -2172,7 +2173,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginBottom: SP.md,
   },
   inboxEmptyButton: {
-    width: '100%',
+    alignSelf: 'center',
   },
 
   // "Suggested" section (people to message) — below the conversation list,

@@ -77,6 +77,7 @@ import {
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
 import { Chip } from '@/components/ui/Chip';
+import { minHitSlop } from '@/lib/hitSlop';
 import {
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_CHIPS,
@@ -134,6 +135,9 @@ const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
   last_7_days: 'Last 7 days', last_30_days: 'Last 30 days', earlier: 'Earlier',
 };
 
+// A row's tap area is drawn ≥40pt tall inside 16pt row padding → pad to 44.
+const ROW_TAP_HIT_SLOP = minHitSlop({ height: 40 });
+
 // ─── Filter chips ───────────────────────────────────────────────────────────
 // A horizontally scrolling row of pill chips below the header — Threads'
 // Activity tab (All / Replies / Mentions… over one feed:
@@ -176,6 +180,10 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
         showsHorizontalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
+        // 5pt top padding offset by a -5 margin: the chips sit exactly where
+        // they did, but the (clipping) ScrollView now has room for their
+        // 44pt touch areas above them.
+        style={styles.chipScroll}
         contentContainerStyle={[styles.chipScrollContent, { gap }]}
       >
         {ACTIVITY_CHIPS.map((chip) => (
@@ -428,6 +436,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
         onPress={() => onPress(row)}
         onLongPress={longPress}
         testID={`activity-row-${row.key}`}
+        hitSlop={ROW_TAP_HIT_SLOP}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
       >
@@ -1445,8 +1454,12 @@ export const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 36 + SP.sm,
     position: 'relative',
   },
+  chipScroll: {
+    marginTop: -5,
+  },
   chipScrollContent: {
     paddingHorizontal: SP.md,
+    paddingTop: 5,
     paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',

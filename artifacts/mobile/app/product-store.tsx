@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
+import { minHitSlop } from '@/lib/hitSlop';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';

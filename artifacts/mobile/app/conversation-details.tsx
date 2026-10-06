@@ -372,6 +372,7 @@ export default function ConversationDetailsScreen() {
               <HapticSwitch
                 value={disappearing}
                 onValueChange={toggleDisappearing}
+                accessibilityLabel="Disappearing messages"
                 testID="chat-details-disappearing-switch"
               />
             )}

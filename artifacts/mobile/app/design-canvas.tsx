@@ -51,6 +51,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
+import { minHitSlop } from '@/lib/hitSlop';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -3298,7 +3299,7 @@ export default function DesignCanvasScreen() {
           sheet's Share tab, reached via the wrench icon in row 2). ── */}
       <View style={[styles.topBar, { paddingTop: headerTopInset + 2 }]}>
         <View style={styles.topGroup}>
-          <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back">
+          <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back" hitSlop={TOP_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Back">
             <Feather name="chevron-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <TouchableOpacity
@@ -3308,7 +3309,7 @@ export default function DesignCanvasScreen() {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setModifyExpanded(v => !v);
             }}
-            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+            hitSlop={{ ...minHitSlop({ height: 27 }), left: 4, right: 8 }}
             testID="btn-modify-toggle"
             accessibilityRole="button"
             accessibilityLabel="Modify"
@@ -3324,6 +3325,10 @@ export default function DesignCanvasScreen() {
             onPress={() => { selectTool('brush'); openSheet('brushLib'); }}
             onLongPress={() => openSheet('brushLib')}
             testID="btn-brush"
+            hitSlop={TOP_BTN_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Brush"
+            accessibilityState={{ selected: activeTopTool === 'brush' }}
           >
             <Feather name="edit-2" size={ICON.sm} color={activeTopTool === 'brush' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3331,6 +3336,10 @@ export default function DesignCanvasScreen() {
             style={[styles.topBtn, activeTopTool === 'smudge' && styles.topBtnActive]}
             onPress={() => selectTool(activeTopTool === 'smudge' ? 'brush' : 'smudge')}
             testID="btn-smudge"
+            hitSlop={TOP_BTN_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Smudge"
+            accessibilityState={{ selected: activeTopTool === 'smudge' }}
           >
             <Feather name="droplet" size={ICON.sm} color={activeTopTool === 'smudge' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3338,6 +3347,10 @@ export default function DesignCanvasScreen() {
             style={[styles.topBtn, activeTopTool === 'eraser' && styles.topBtnActive]}
             onPress={() => selectTool(activeTopTool === 'eraser' ? 'brush' : 'eraser')}
             testID="btn-eraser"
+            hitSlop={TOP_BTN_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Eraser"
+            accessibilityState={{ selected: activeTopTool === 'eraser' }}
           >
             <Feather name="circle" size={ICON.sm} color={activeTopTool === 'eraser' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3345,6 +3358,10 @@ export default function DesignCanvasScreen() {
             style={[styles.topBtn, activeSheet === 'layers' && styles.topBtnActive]}
             onPress={() => activeSheet === 'layers' ? closeSheet() : openSheet('layers')}
             testID="btn-layers"
+            hitSlop={TOP_BTN_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Layers"
+            accessibilityState={{ selected: activeSheet === 'layers' }}
           >
             <Feather name="layers" size={ICON.sm} color={activeSheet === 'layers' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3352,6 +3369,10 @@ export default function DesignCanvasScreen() {
             style={styles.colorSwatch}
             onPress={() => activeSheet === 'color' ? closeSheet() : openSheet('color')}
             testID="btn-color"
+            hitSlop={COLOR_SWATCH_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Color"
+            accessibilityState={{ expanded: activeSheet === 'color' }}
           >
             <View style={[styles.colorSwatchInner, { backgroundColor: drawColor }]} />
           </TouchableOpacity>
@@ -3451,6 +3472,8 @@ export default function DesignCanvasScreen() {
             <TouchableOpacity
               style={[styles.sidebarIconBtn, !undoModelRef.current.canUndo && styles.topBtnDisabled]}
               onPress={handleUndo} testID="btn-undo"
+              hitSlop={SIDEBAR_BTN_HIT_SLOP}
+              accessibilityRole="button"
               accessibilityLabel="Undo"
             >
               <Feather name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
@@ -3458,6 +3481,8 @@ export default function DesignCanvasScreen() {
             <TouchableOpacity
               style={[styles.sidebarIconBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
               onPress={handleRedo} testID="btn-redo"
+              hitSlop={SIDEBAR_BTN_HIT_SLOP}
+              accessibilityRole="button"
               accessibilityLabel="Redo"
             >
               <Feather name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
@@ -5769,6 +5794,14 @@ function SheetHandle() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const { width: SW } = Dimensions.get('window');
+
+// Top-bar icons are 36pt with 2pt gaps: pad 4pt each way (≤4pt sideways so a
+// neighbour's drawn button is barely touched) → 44×44 touch area.
+const TOP_BTN_HIT_SLOP = minHitSlop({ width: 36, height: 36 });
+// 28pt colour swatch with 8pt of clear space to its left → 44×44.
+const COLOR_SWATCH_HIT_SLOP = minHitSlop({ width: 28, height: 28 });
+// 32pt undo/redo with 16pt between them → 44×44 without overlapping.
+const SIDEBAR_BTN_HIT_SLOP = minHitSlop({ width: 32, height: 32 });
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },

@@ -31,8 +31,11 @@ export function SellerDashboardSetupCard({
     <View
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
-      // Not a "button": the card holds the real "Add a product" button, and on
-      // web a button-role card renders as <button> nesting another <button>.
+      // The card stays tappable as a whole, but it holds its own
+      // "Add a product" button — announcing the card as a button too would
+      // nest one button inside another (invalid <button> HTML on web, two
+      // overlapping targets for screen readers). The inner button is the
+      // accessible action; the card reads as its title and copy.
       accessibilityRole="none"
     >
       <PressableScale

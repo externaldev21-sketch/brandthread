@@ -55,6 +55,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { FONT, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { minHitSlop } from '@/lib/hitSlop';
 
 export interface ShopSideTabTag {
   productId: string;
@@ -77,6 +78,7 @@ const SHOP_TAB_EASING = Easing.out(Easing.cubic);
 
 const COLLAPSED_HEIGHT = 32;
 const EXPANDED_HEIGHT = 48;
+const PILL_HIT_SLOP = minHitSlop({ height: COLLAPSED_HEIGHT });
 // Fixed estimate for the collapsed pill's own (fixed-content: bag icon +
 // "Shop") natural width — used only as the animation's FROM value; the
 // resting pill's actual layout is plain flexbox, so this only has to be a
@@ -188,66 +190,73 @@ export function ShopTagPill({
   }));
 
   return (
-    <ReanimatedAnimated.View
-      style={[styles.pill, containerStyle]}
+    // The touchable is the outermost element so it — not the clipped glass
+    // pill inside it — is the one accessible button, and its hitSlop pads
+    // the 32pt-tall resting pill out to a 44pt touch target (the pill's
+    // overflow:hidden would otherwise clip that extra area).
+    <TouchableOpacity
+      style={styles.pillTouch}
+      activeOpacity={0.85}
+      onPress={expanded ? onPress : expand}
+      hitSlop={expanded ? undefined : PILL_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={
         expanded
           ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
           : totalCount > 1 ? `Shop this video, ${totalCount} products` : 'Shop this video'
       }
+      testID="shop-tag-pill"
     >
-      {/* Dark frosted glass, `noBlur` — this pill still sits directly over
-          the playing video (just lower/left now, inside the caption stack,
-          not screen-edge), so a live per-frame backdrop blur here would be
-          the same re-sample-every-frame cost this file's original module
-          comment called out for the old screen-edge tab. Reusing the one
-          shared `<Glass/>` primitive (dark tint, its own built-in ~30-40%
-          black fill + ~22%-opacity hairline border + specular edge) instead
-          of a one-off BlurView/rgba pair keeps this pill visually
-          consistent with every other glass surface in the app rather than
-          inventing a slightly different opacity recipe for just this one. */}
-      <Glass variant="regular" tint="dark" radius={16} noBlur style={StyleSheet.absoluteFill} />
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={0.85}
-        onPress={expanded ? onPress : expand}
-        testID="shop-tag-pill"
-      >
-        <ReanimatedAnimated.View
-          pointerEvents={expanded ? 'none' : 'auto'}
-          style={[styles.collapsed, collapsedStyle]}
-        >
-          <Feather name="shopping-bag" size={13} color={ON_DARK} />
-          <Text style={styles.label}>Shop</Text>
-        </ReanimatedAnimated.View>
-        <ReanimatedAnimated.View
-          pointerEvents={expanded ? 'auto' : 'none'}
-          style={[styles.expanded, expandedStyle]}
-        >
-          <View style={styles.thumb}>
-            {tag.imageUri ? (
-              <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            ) : (
-              <Feather name="shopping-bag" size={13} color="#111111" />
-            )}
-          </View>
-          <Text style={styles.name} numberOfLines={1}>{tag.productName}</Text>
-          <Text style={styles.price} numberOfLines={1}>
-            {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-          </Text>
-          {/* Purely decorative — the whole expanded strip is one tap
-              target (the TouchableOpacity above), see the module comment. */}
-          <Feather name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />
-        </ReanimatedAnimated.View>
-      </TouchableOpacity>
-    </ReanimatedAnimated.View>
+      <ReanimatedAnimated.View style={[styles.pill, containerStyle]}>
+        {/* Dark frosted glass, `noBlur` — this pill still sits directly over
+            the playing video (just lower/left now, inside the caption stack,
+            not screen-edge), so a live per-frame backdrop blur here would be
+            the same re-sample-every-frame cost this file's original module
+            comment called out for the old screen-edge tab. Reusing the one
+            shared `<Glass/>` primitive (dark tint, its own built-in ~30-40%
+            black fill + ~22%-opacity hairline border + specular edge) instead
+            of a one-off BlurView/rgba pair keeps this pill visually
+            consistent with every other glass surface in the app rather than
+            inventing a slightly different opacity recipe for just this one. */}
+        <Glass variant="regular" tint="dark" radius={16} noBlur style={StyleSheet.absoluteFill} />
+        <View style={StyleSheet.absoluteFill}>
+          <ReanimatedAnimated.View
+            pointerEvents={expanded ? 'none' : 'auto'}
+            style={[styles.collapsed, collapsedStyle]}
+          >
+            <Feather name="shopping-bag" size={13} color={ON_DARK} />
+            <Text style={styles.label}>Shop</Text>
+          </ReanimatedAnimated.View>
+          <ReanimatedAnimated.View
+            pointerEvents={expanded ? 'auto' : 'none'}
+            style={[styles.expanded, expandedStyle]}
+          >
+            <View style={styles.thumb}>
+              {tag.imageUri ? (
+                <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <Feather name="shopping-bag" size={13} color="#111111" />
+              )}
+            </View>
+            <Text style={styles.name} numberOfLines={1}>{tag.productName}</Text>
+            <Text style={styles.price} numberOfLines={1}>
+              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+            </Text>
+            {/* Purely decorative — the whole expanded strip is one tap
+                target (the TouchableOpacity above), see the module comment. */}
+            <Feather name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />
+          </ReanimatedAnimated.View>
+        </View>
+      </ReanimatedAnimated.View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  pill: {
+  pillTouch: {
     alignSelf: 'flex-start',
+  },
+  pill: {
     borderRadius: RADII.pill,
     overflow: 'hidden',
   },

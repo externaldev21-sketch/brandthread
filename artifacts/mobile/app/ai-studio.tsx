@@ -11,6 +11,10 @@ import { FONT, FS } from '@/lib/theme';
 import { getProjects, createProject, updateProject } from '@/services/designService';
 import { makeDurableUri } from '@/lib/imageUri';
 import { canvasPixelSize, buildImageLayer } from '@/lib/aiStudioCanvas';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Segmented mode buttons draw 34pt tall; pad the touch area vertically to 44pt.
+const MODE_BTN_HIT_SLOP = minHitSlop({ height: 34 });
 import { DesignProject } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -116,6 +120,7 @@ export default function AIStudioScreen() {
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'ai' && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
+            hitSlop={MODE_BTN_HIT_SLOP}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
           >
             <Feather name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
@@ -124,6 +129,7 @@ export default function AIStudioScreen() {
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'manual' && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
+            hitSlop={MODE_BTN_HIT_SLOP}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('manual'); }}
           >
             <Feather name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />

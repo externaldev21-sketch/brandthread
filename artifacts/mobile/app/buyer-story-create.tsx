@@ -45,6 +45,7 @@ import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
 import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { minHitSlop } from '@/lib/hitSlop';
 import { MediaCropper } from '@/components/media/MediaCropper';
 import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -1126,6 +1127,8 @@ export default function StoryComposer() {
             </Text>
             <TouchableOpacity
               style={[styles.permBtn, { backgroundColor: theme.accent }]}
+              hitSlop={PERM_BTN_HIT_SLOP}
+              accessibilityRole="button"
               onPress={() => {
                 // On native, once the OS prompt has already been declined
                 // it can't be re-shown — the only way back in is Settings.
@@ -1251,6 +1254,7 @@ export default function StoryComposer() {
                 <TouchableOpacity
                   key={m}
                   style={styles.modeItem}
+                  hitSlop={MODE_ITEM_HIT_SLOP}
                   onLayout={(e) => {
                     const { x, width } = e.nativeEvent.layout;
                     setModeLayouts((prev) => ({ ...prev, [m]: { x, width } }));
@@ -2287,6 +2291,11 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+// Invisible a11y touch padding to the 44pt minimum: the ~43pt "Grant
+// access" button and the 32pt-tall POST/STORY/LIVE mode labels.
+const PERM_BTN_HIT_SLOP = minHitSlop({ height: 43 });
+const MODE_ITEM_HIT_SLOP = minHitSlop({ height: 32 });
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   webFallback: { alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: 32 },
