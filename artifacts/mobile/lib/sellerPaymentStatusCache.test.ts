@@ -19,6 +19,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 
 import {
   api,
+  configureApi,
   invalidateSellerPaymentStatusCache,
   SELLER_PAYMENT_STATUS_CACHE_TTL_MS,
   type SellerPaymentStatus,
@@ -39,6 +40,9 @@ describe('seller payment status cache', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-31T12:00:00.000Z'));
     invalidateSellerPaymentStatusCache();
+    // GET /api/buyer/seller-payment-status requires a session (buyer router's
+    // requireAuth), and lib/api.ts never sends protected requests signed out.
+    configureApi(async () => 'token');
     fetchMock.mockReset();
     globalThis.fetch = fetchMock as typeof fetch;
   });

@@ -12,7 +12,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
-import { storeContextHeaders, versionApiPath } from '@/lib/api';
+import { signedOutGate, signedOutPreviewAnswer, storeContextHeaders, versionApiPath } from '@/lib/api';
 import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 import { isSellerDevPreview } from '@/lib/devPreview';
 
@@ -99,12 +99,19 @@ export async function serviceRequest<T = unknown>(
   options: RequestInit = {},
   reportErrors = true,
 ): Promise<T> {
+  if (isSellerDevPreview() || !_getToken) {
+    const preview = await signedOutPreviewAnswer<T>(versionApiPath(path), options.method ?? 'GET');
+    if (preview) return preview.data;
+  }
   if (isSellerDevPreview()) {
     throw new ApiError(403, JSON.stringify({
       error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
     }));
   }
   await whenConfigured();
+  // Same signed-out guard as lib/api.ts: no session never reaches a protected endpoint.
+  const signedOut = await signedOutGate<T>(versionApiPath(path), options.method ?? 'GET', _getToken!);
+  if (signedOut) return signedOut.data;
   const token = await _getToken!();
   // Guest guard (App Store 5.1.1(v)): no account-scoped/paid calls when signed out.
   if (!token && isSignedInOnlyPath(path)) {

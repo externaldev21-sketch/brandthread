@@ -118,6 +118,7 @@ export default function FinanceScreen() {
   const [statementDownloading, setStatementDownloading] = useState(false);
   const [statementError, setStatementError] = useState<string | null>(null);
   const handleDownloadStatement = async () => {
+    if (skipProtectedReads) return;
     if (statementDownloading) return;
     setStatementDownloading(true);
     setStatementError(null);
