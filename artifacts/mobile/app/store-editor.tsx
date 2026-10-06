@@ -45,7 +45,7 @@ const SECTION_LABEL_HIT_SLOP = { top: 8, bottom: 2, left: 0, right: 0 }; // 34pt
 const SECTION_EDIT_HIT_SLOP = { top: 11, bottom: 10, left: 0, right: 0 }; // 23pt Edit/Close pill
 const SECTION_ACTION_HIT_SLOP = { top: 8, bottom: 12, left: 2, right: 2 }; // 26pt bordered Hide/Duplicate/Delete
 const MOVE_UP_HIT_SLOP = { top: 13, bottom: 14, left: 26, right: 2 };      // 16pt chevrons, 4pt apart
-const MOVE_DOWN_HIT_SLOP = { top: 13, bottom: 14, left: 2, right: 26 };
+const MOVE_DOWN_HIT_SLOP = { top: 13, bottom: 14, left: 3, right: 26 };
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';

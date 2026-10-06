@@ -11,7 +11,9 @@ const RING_SIZE = 64;
 const RING_WIDTH = 2.5;
 // "See all" is a ~16pt-tall text link: pad to 44 tall without changing
 // layout. Slightly less below so the slop stops short of the rings.
-const SEE_ALL_HIT_SLOP = { top: 16, bottom: 12, left: 8, right: 8 };
+// ~41×16pt link; less slop upward (the screen's scroll edge sits ~10pt above
+// it and would clip more), the rest below — 44×44 total.
+const SEE_ALL_HIT_SLOP = { top: 10, bottom: 18, left: 8, right: 8 };
 
 function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles: ReturnType<typeof makeStyles>; theme: AppThemePreset }) {
   const inner = RING_SIZE - RING_WIDTH * 2 - 4;

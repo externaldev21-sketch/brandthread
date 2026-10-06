@@ -169,6 +169,10 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
         showsHorizontalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
+        // 5pt top padding offset by a -5 margin: the chips sit exactly where
+        // they did, but the (clipping) ScrollView now has room for their
+        // 44pt touch areas above them.
+        style={styles.chipScroll}
         contentContainerStyle={styles.chipScrollContent}
       >
         {ACTIVITY_CHIPS.map((chip) => (
@@ -1413,8 +1417,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 36 + SP.sm,
     position: 'relative',
   },
+  chipScroll: {
+    marginTop: -5,
+  },
   chipScrollContent: {
     paddingHorizontal: SP.md,
+    paddingTop: 5,
     paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',

@@ -248,7 +248,9 @@ export default function DesignGarmentScreen() {
         {/* ── GARMENT TYPE PICKER ── */}
         <View style={gs.section}>
           <Text style={gs.sectionLabel}>Garment Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md }}>
+          {/* 5pt padding offset by an equal negative margin: the row doesn't move,
+              but the (clipping) ScrollView has room for the pills' 44pt touch areas. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: -5 }} contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md, paddingVertical: 5 }}>
             {GARMENT_TYPES.map(t => (
               <TouchableOpacity
                 key={t.value}
@@ -307,10 +309,17 @@ export default function DesignGarmentScreen() {
         <View style={gs.section}>
           <Text style={gs.sectionLabel}>View</Text>
           <View style={gs.viewTabs}>
-            {availableViews.map((view: string) => (
+            {availableViews.map((view: string, i: number) => (
               <TouchableOpacity
                 key={view}
-                style={[gs.viewTab, currentView === view && gs.viewTabActive]}
+                style={[
+                  gs.viewTab,
+                  // The outer corners round the selected fill directly, so the
+                  // container needs no overflow clip (which cut off hitSlop).
+                  i === 0 && gs.viewTabFirst,
+                  i === availableViews.length - 1 && gs.viewTabLast,
+                  currentView === view && gs.viewTabActive,
+                ]}
                 onPress={() => { Haptics.selectionAsync(); setCurrentView(view); }}
                 hitSlop={VIEW_TAB_HIT_SLOP}
                 accessibilityRole="button"
@@ -447,7 +456,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: SUCCESS, backgroundColor: 'rgba(16,185,129,0.12)', borderStyle: 'dashed' },
   embroideryOverlay: { position: 'absolute', left: '25%', top: '15%', width: '50%', height: '40%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: CYAN, backgroundColor: CYAN_DIM, borderStyle: 'dashed' },
 
-  viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },
+  viewTabFirst: { borderTopLeftRadius: RADIUS.sm - 1, borderBottomLeftRadius: RADIUS.sm - 1 },
+  viewTabLast:  { borderTopRightRadius: RADIUS.sm - 1, borderBottomRightRadius: RADIUS.sm - 1 },
   viewTab:      { flex: 1, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
   // Monochrome rule: the selected segment is a solid white fill with black
   // text, not a tinted grey pill.

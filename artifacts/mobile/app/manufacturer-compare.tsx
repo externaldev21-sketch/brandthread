@@ -98,7 +98,7 @@ export default function ManufacturerCompareScreen() {
         <>
           <View style={s.pickerWrap}>
             <Text style={s.pickerLabel}>Pick {MIN_COMPARE}–{MAX_COMPARE} to compare</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pickerRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll} contentContainerStyle={s.pickerRow}>
               {saved.map((m) => {
                 const active = selected.has(m.id);
                 return (
@@ -158,7 +158,10 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerWrap: { paddingTop: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm },
   pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: SP.md, marginBottom: SP.xs },
-  pickerRow: { paddingHorizontal: SP.md, gap: SP.sm },
+  // 5pt padding offset by an equal negative margin: the row doesn't move, but
+  // the (clipping) ScrollView has room for the chips' 44pt touch areas.
+  pickerScroll: { marginVertical: -5 },
+  pickerRow: { paddingHorizontal: SP.md, gap: SP.sm, paddingVertical: 5 },
   pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   pickerChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },

@@ -327,8 +327,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:          { flex: 1, backgroundColor: 'transparent' },
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
-  tabsScroll:    { flexGrow: 0 },
-  tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
+  // 5pt top padding offset by a -5 margin: the row doesn't move, but the
+  // (clipping) ScrollView has room for the pills' 44pt touch areas.
+  tabsScroll:    { flexGrow: 0, marginTop: -5 },
+  tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm, paddingTop: 5 },
   tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   tabText:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
