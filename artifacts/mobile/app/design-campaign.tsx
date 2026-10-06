@@ -82,6 +82,8 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { pickRouteParam } from '@/lib/routeParamAliases';
+import { adCampaignToFormState } from '@/lib/adCampaignFormState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -241,7 +243,9 @@ const sec = StyleSheet.create({
 export default function CreateAdScreen() {
   useHideTabBar();
   const router    = useRouter();
-  const params    = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
+  const params    = useLocalSearchParams<{ id?: string; campaignId?: string; paymentReturn?: string }>();
+  // Existing campaigns are opened with `?campaignId=` (Marketing tab) or `?id=` (Checkout return).
+  const existingCampaignId = pickRouteParam(params, 'id', 'campaignId');
   const insets    = useSafeAreaInsets();
   const api       = useApi();
   const { theme } = useAppTheme();
@@ -295,6 +299,21 @@ export default function CreateAdScreen() {
 
   const brandName = user?.fullName || (user as any)?.username || 'Your Store';
 
+  // Fill the form from a saved campaign so it opens as it was left.
+  const hydrateFromCampaign = useCallback((c: AdCampaign) => {
+    const f = adCampaignToFormState(c);
+    setHeadline(f.headline);
+    setDescription(f.description);
+    setCtaKind(f.ctaKind);
+    setCtaDestId(f.ctaDestId);
+    if (f.budgetCents != null) setBudgetCents(f.budgetCents);
+    if (f.durationDays != null) setDurationDays(f.durationDays);
+    setMediaKind(f.mediaKind);
+    setLocalPaths(f.mediaPaths);
+    setLocalMimes(f.mediaMimes);
+    setLocalUris(f.mediaUris);
+  }, []);
+
   // ── Create draft on mount ─────────────────────────────────────────────────
   useEffect(() => {
     if (params.paymentReturn === '1' && params.id) return;
@@ -309,15 +328,21 @@ export default function CreateAdScreen() {
     (async () => {
       setLoading(true);
       try {
-        const res = await api.adCampaigns.create();
+        // Opening an existing campaign loads it; never create a blank draft for it.
+        const res = existingCampaignId
+          ? await api.adCampaigns.get(existingCampaignId)
+          : await api.adCampaigns.create();
         setCampaign(res.campaign);
+        if (existingCampaignId) hydrateFromCampaign(res.campaign);
       } catch (e: any) {
         const status = e?.status ?? e?.response?.status;
         const is401  = status === 401 || String(e?.message ?? '').includes('401');
         setInitError(
           is401
             ? 'Your session has expired. Please sign in again to create an ad campaign.'
-            : 'Could not start a new campaign. Please try again.',
+            : existingCampaignId
+              ? 'Could not load this campaign. Please try again.'
+              : 'Could not start a new campaign. Please try again.',
         );
       } finally {
         setLoading(false);
@@ -352,6 +377,7 @@ export default function CreateAdScreen() {
     try {
       const res = await api.adCampaigns.verify(campaignId);
       setCampaign(res.campaign);
+      hydrateFromCampaign(res.campaign);
       if (res.campaign.status === 'active') {
         setSucceeded(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -378,7 +404,7 @@ export default function CreateAdScreen() {
     } finally {
       setVerifying(false);
     }
-  }, [api.adCampaigns]);
+  }, [api.adCampaigns, hydrateFromCampaign]);
 
   // ── Media helpers ─────────────────────────────────────────────────────────
 

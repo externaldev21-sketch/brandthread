@@ -51,6 +51,7 @@ import {
   buildBoostReturnUrl,
 } from '@/services/boostService';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { boostPreselectPostId, findBoostTarget } from '@/lib/boostPreselect';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -440,7 +441,9 @@ export default function BoostScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
-  const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
+  const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string; targetType?: string; targetId?: string; postId?: string }>();
+  // Post analytics opens Boost with `?targetType=post&targetId=<postId>`.
+  const preselectPostId = boostPreselectPostId(params);
 
   const bottomPad = insets.bottom + 90;
   const inSellerPreview = isSellerDevPreview(
@@ -602,6 +605,19 @@ export default function BoostScreen() {
       .catch(() => setSummary(null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
+
+  // ── Preselect the post passed in the route (once, after targets load) ────
+  const preselectConsumed = useRef(false);
+  useEffect(() => {
+    if (preselectConsumed.current || !preselectPostId || loadingTargets) return;
+    const match = findBoostTarget(targets, preselectPostId);
+    if (!match && targets.length === 0) return;
+    preselectConsumed.current = true;
+    if (match) {
+      setSelectedTarget(match);
+      setStep(1);
+    }
+  }, [preselectPostId, targets, loadingTargets]);
 
   // ── Handle Checkout redirect return ──────────────────────────────────────
 

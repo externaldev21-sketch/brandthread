@@ -5,6 +5,7 @@ import {
   Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { pickRouteParam } from '@/lib/routeParamAliases';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -306,7 +307,10 @@ function ProductTile({
 export default function BuyerDropDetail() {
   const colors = useColors();
   const { theme } = useAppTheme();
-  const { dropId, dropName } = useLocalSearchParams<{ dropId: string; dropName?: string }>();
+  const routeParams = useLocalSearchParams<{ dropId?: string; id?: string; dropName?: string }>();
+  // Older drop notifications deep-link with `?id=`; every in-app entry uses `?dropId=`.
+  const dropId = pickRouteParam(routeParams, 'dropId', 'id');
+  const { dropName } = routeParams;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();

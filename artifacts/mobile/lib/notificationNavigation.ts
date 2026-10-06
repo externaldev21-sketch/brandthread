@@ -88,7 +88,7 @@ export function createNotificationResponseHandler(
       return;
     }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
-      router.push(`/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`);
+      router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(data.targetId)}`);
       return;
     }
     // Price drop / back-in-stock alerts are buyer-facing; low-stock alerts on

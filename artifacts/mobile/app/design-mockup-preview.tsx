@@ -7,7 +7,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Dimensions, ActivityIndicator } from 'react-native';
+  Alert, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
@@ -28,6 +28,8 @@ import { getProject, createBrandAsset } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { setPendingMockup } from '@/lib/mockupProductHandoff';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -88,8 +90,23 @@ export default function DesignMockupPreviewScreen() {
     }
   }, [project, saving]);
 
-  const handleAddToProduct = useCallback(() => {
-    Alert.alert('Add to Product', 'Choose an option:', [
+  // Flattens the preview (same capture as Save mockup) and hands it to the
+  // product screen the seller picks, which attaches it as a product photo.
+  const handleAddToProduct = useCallback(async () => {
+    if (!project || !previewShotRef.current) return;
+    try {
+      // A temp file on native (uploaded via fetch like a picked photo); web only supports data URIs.
+      const uri = await captureRef(previewShotRef, { format: 'png', quality: 1, result: Platform.OS === 'web' ? 'data-uri' : 'tmpfile' });
+      setPendingMockup({
+        projectId: project.id,
+        uri: /^(data|file|blob|https?):/.test(uri) ? uri : uri.startsWith('/') ? `file://${uri}` : `data:image/png;base64,${uri}`,
+        name: project.name,
+      });
+    } catch {
+      Alert.alert('Couldn’t capture mockup', 'Something went wrong capturing this preview. Please try again.');
+      return;
+    }
+    showActionSheet('Add to Product', 'Choose an option:', [
       {
         text: 'Existing product',
         onPress: () => router.push(('/(tabs)/products?pickForMockup=1&projectId=' + (project?.id ?? '')) as never),
@@ -98,7 +115,7 @@ export default function DesignMockupPreviewScreen() {
         text: 'Create new product',
         onPress: () => router.push(('/add-product?mockupProjectId=' + (project?.id ?? '')) as never),
       },
-      { text: 'Cancel', style: 'cancel' },
+      { text: 'Cancel', style: 'cancel', onPress: () => setPendingMockup(null) },
     ]);
   }, [project, router]);
 
