@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
@@ -39,7 +39,7 @@ router.get("/", async (req, res) => {
     .from(productVariants)
     .innerJoin(
       products,
-      and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId)),
+      and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId), isNull(products.deletedAt)),
     )
     .orderBy(products.name);
 
@@ -64,35 +64,47 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
     return res.status(400).json({ error: "Provide delta or newStock" });
   }
 
-  // Verify ownership via join
-  const [row] = await db
-    .select({
-      stock: productVariants.stock,
-      threshold: productVariants.lowStockThreshold,
-      productId: products.id,
-      productName: products.name,
-    })
-    .from(productVariants)
-    .innerJoin(
-      products,
-      and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId)),
-    )
-    .where(eq(productVariants.id, variantId));
-
-  if (!row) return res.status(404).json({ error: "Variant not found" });
-
-  const updatedStock =
-    newStock !== undefined ? newStock : row.stock + (delta ?? 0);
-
-  if (updatedStock < 0) {
-    return res.status(400).json({ error: "Stock cannot go below 0" });
+  if (delta !== undefined && !Number.isInteger(delta)) {
+    return res.status(400).json({ error: "delta must be an integer" });
+  }
+  if (newStock !== undefined && (!Number.isInteger(newStock) || newStock < 0)) {
+    return res.status(400).json({ error: "newStock must be a non-negative integer" });
   }
 
-  const [updated] = await db
-    .update(productVariants)
-    .set({ stock: updatedStock, updatedAt: new Date() })
-    .where(eq(productVariants.id, variantId))
-    .returning();
+  // Read and write under a row lock in one transaction. A paid-order webhook
+  // decrements this same row (`stock = stock - qty`); a plain read-then-write
+  // here would overwrite that sale with a stale value and oversell.
+  const outcome = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({
+        stock: productVariants.stock,
+        threshold: productVariants.lowStockThreshold,
+        productId: products.id,
+        productName: products.name,
+      })
+      .from(productVariants)
+      .innerJoin(
+        products,
+        and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId)),
+      )
+      .where(eq(productVariants.id, variantId))
+      .for("update", { of: productVariants });
+    if (!row) return { kind: "not_found" as const };
+
+    const target = newStock !== undefined ? newStock : row.stock + (delta ?? 0);
+    if (target < 0) return { kind: "negative" as const };
+
+    const [updated] = await tx
+      .update(productVariants)
+      .set({ stock: target, updatedAt: new Date() })
+      .where(eq(productVariants.id, variantId))
+      .returning();
+    return { kind: "ok" as const, row, updated, updatedStock: target };
+  });
+
+  if (outcome.kind === "not_found") return res.status(404).json({ error: "Variant not found" });
+  if (outcome.kind === "negative") return res.status(400).json({ error: "Stock cannot go below 0" });
+  const { row, updated, updatedStock } = outcome;
 
   const variantLabel = [updated.size, updated.color].filter(Boolean).join(" / ") || updated.sku;
 

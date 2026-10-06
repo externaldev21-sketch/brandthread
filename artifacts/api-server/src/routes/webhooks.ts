@@ -21,7 +21,7 @@ import {
   activateBoostFromCheckoutSession,
   markBoostCheckoutFailed,
 } from "./boosts";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, sql, inArray } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
@@ -47,8 +47,10 @@ import {
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
 import { productThumbnail } from "../lib/activityEvents";
-import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
+import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed, notifySellerOrderOversold } from "../lib/orderNotifications";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
+import { nextOrderNumber } from "../lib/orderNumber";
+import { notifyStockLevelChanged } from "../lib/stockNotifications";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
 import {
@@ -636,6 +638,43 @@ export async function handleCartPaymentEnded(pi: any, failed: boolean): Promise<
   }
 }
 
+/**
+ * Seller low/out-of-stock alert for each variant a paid order just sold
+ * down. previousStock is reconstructed as (current + quantity sold).
+ */
+async function notifyLowStockAfterOrder(
+  items: Array<{ variantId?: string | null; quantity: number }>,
+): Promise<void> {
+  const sold = new Map<string, number>();
+  for (const item of items) {
+    if (!item.variantId) continue;
+    sold.set(item.variantId, (sold.get(item.variantId) ?? 0) + item.quantity);
+  }
+  if (sold.size === 0) return;
+  const rows = await db
+    .select({
+      variantId: productVariants.id,
+      stock: productVariants.stock,
+      lowStockThreshold: productVariants.lowStockThreshold,
+      productId: products.id,
+      productName: products.name,
+      ownerId: products.ownerId,
+    })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(inArray(productVariants.id, [...sold.keys()]));
+  for (const row of rows) {
+    await notifyStockLevelChanged({
+      productId: row.productId,
+      ownerId: row.ownerId,
+      productName: row.productName,
+      previousStock: row.stock + (sold.get(row.variantId) ?? 0),
+      newStock: row.stock,
+      lowStockThreshold: row.lowStockThreshold ?? 0,
+    });
+  }
+}
+
 export async function handleCheckoutPaid(
   session: any,
   providerEventId?: string,
@@ -871,12 +910,8 @@ export async function handleCheckoutPaid(
       }
     }
 
-    // Step 3: Generate order number
-    const countRes = await tx.execute(
-      sql`SELECT count(*)::int AS c FROM orders WHERE owner_id = ${ownerId}`,
-    );
-    const count: number = (countRes as any).rows?.[0]?.c ?? 0;
-    const orderNumber   = `BT-${String(count + 1).padStart(5, "0")}`;
+    // Step 3: Generate order number (serialised per seller — see lib/orderNumber.ts)
+    const orderNumber = await nextOrderNumber(tx, ownerId);
 
     // Step 4: Insert order — pending if stock OK, refund_pending if oversold
     const dropId: string | null = orderDropId;
@@ -1044,62 +1079,18 @@ export async function handleCheckoutPaid(
     // were committed — inventory stays intact. Stripe refund is issued
     // outside this transaction.
 
-    // ── Low-stock notifications ───────────────────────────────────────────────────
-    // For each decremented variant, check if stock fell below threshold.
-    //
-    // Each alert runs in its own SAVEPOINT (tx.transaction inside the order
-    // transaction). A failed statement — e.g. notifications_feed_low_stock_unique
-    // when this variant already has a low-stock alert from an earlier order —
-    // aborts the whole Postgres transaction; catching the JS error alone is not
-    // enough, and the final COMMIT then silently rolls back: the buyer is
-    // charged but the order, its items and the stock decrement all vanish and
-    // the seller never sees it. The savepoint confines a failure to the alert.
-    if (oversoldItems.length === 0) {
-      for (const item of cartItems) {
-        if (!item.variantId) continue;
-        try {
-          await tx.transaction(async (sp) => {
-            const [variant] = await sp
-              .select({
-                stock: productVariants.stock,
-                lowStockThreshold: productVariants.lowStockThreshold,
-                productName: products.name,
-                ownerId: products.ownerId,
-              })
-              .from(productVariants)
-              .innerJoin(products, eq(products.id, productVariants.productId))
-              .where(eq(productVariants.id, item.variantId as any))
-              .limit(1);
-
-            if (
-              variant &&
-              variant.lowStockThreshold !== null &&
-              variant.lowStockThreshold > 0 &&
-              variant.stock >= 0 &&
-              variant.stock <= variant.lowStockThreshold
-            ) {
-              const isZero = variant.stock === 0;
-              await sp.insert(notificationsFeed).values({
-                id: crypto.randomUUID(),
-                userId: variant.ownerId,
-                type: isZero ? 'out_of_stock' : 'low_stock',
-                title: isZero ? 'Out of stock' : 'Low stock alert',
-                body: isZero
-                  ? `${variant.productName} is now out of stock.`
-                  : `${variant.productName} has only ${variant.stock} units left.`,
-                targetId: item.variantId,
-                targetType: 'variant',
-                isRead: false,
-                createdAt: new Date(),
-              }).onConflictDoNothing();
-            }
-          });
-        } catch {
-          // Non-critical — don't fail the order over a notification error
-        }
-      }
-    }
+    // Low/out-of-stock alerts are sent after this transaction commits (below),
+    // through the same notifyStockLevelChanged path as a manual stock edit, so
+    // they push and re-arm — and a feed-insert conflict can never roll back
+    // the paid order.
   });
+
+  // ── Low-stock notifications (after commit) ────────────────────────────────
+  if (oversoldItems.length === 0 && createdOrderId) {
+    await notifyLowStockAfterOrder(cartItems).catch((err) =>
+      logger.warn({ err, orderId: createdOrderId }, "Low-stock alert after order failed"),
+    );
+  }
 
   // ── Issue Stripe refund for oversold orders ───────────────────────────────
   if (oversoldItems.length > 0) {
@@ -1122,10 +1113,19 @@ export async function handleCheckoutPaid(
         });
         logger.info({ paymentIntentId: piId, stripeSessionId: sessionId }, "Automatic refund issued for oversold order");
         // Until now the buyer only learned this by email.
-        if (buyerId && !refund.duplicate) {
+        if (!refund.duplicate) {
           const [cancelled] = await db.select({ orderNumber: orders.orderNumber })
             .from(orders).where(eq(orders.id, createdOrderId)).limit(1);
           if (cancelled) {
+            await notifySellerOrderOversold({
+              sellerId: ownerId,
+              orderId: createdOrderId,
+              orderNumber: cancelled.orderNumber,
+              refundedCents: refund.amountCents,
+              productNames: oversoldItems,
+            });
+          }
+          if (cancelled && buyerId) {
             await notifyBuyerOrderCancelled({
               buyerId,
               orderId: createdOrderId,

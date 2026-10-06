@@ -14,7 +14,9 @@ import { reversePurchasePointsOnce } from "./loyalty";
 import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/orderStatusPolicy";
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
-import { reserveStockForOrder } from "../lib/stockReservation";
+import { reserveStockForOrder, restoreStockForOrder } from "../lib/stockReservation";
+import { nextOrderNumber } from "../lib/orderNumber";
+import { notifyStockRestored } from "../lib/stockNotifications";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
@@ -207,12 +209,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
 
       const totalCents = subtotalCents + shippingCents;
 
-      // Concurrency-safe, per-owner order number
-      const countRes = await tx.execute(sql`
-        SELECT count(*)::int AS c FROM orders WHERE owner_id = ${ownerId}
-      `);
-      const count: number = (countRes as any).rows?.[0]?.c ?? 0;
-      const orderNumber = `BT-${String(count + 1).padStart(5, "0")}`;
+      // Per-owner order number, serialised per seller (lib/orderNumber.ts)
+      const orderNumber = await nextOrderNumber(tx, ownerId);
 
       // Deduct stock for non-drop orders BEFORE inserting the order, so an
       // oversold cart never creates an order row at all (a drop's stock is
@@ -509,6 +507,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   } else {
     // Build the update payload — include cancellation fields when cancelling
     const updatePayload = buildOrderStatusUpdate(status, reason, notes);
+    let restockedLines: Array<{ variantId: string; quantity: number }> = [];
     // Conditional on the current status, so a concurrent change (or a buyer
     // cancellation) wins cleanly and this request becomes a no-op.
     await db.transaction(async (tx) => {
@@ -521,6 +520,20 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
         ))
         .returning();
 
+      // No payment to refund, but the units were taken off the shelf when
+      // the order was created (manual orders deduct unless they belong to a
+      // drop; checkout orders always deduct) — put them back so buyers can
+      // buy them again. The conditional update above makes this run once.
+      if (status === "cancelled" && transitioned
+        && (!transitioned.dropId || transitioned.stripeCheckoutSessionId)) {
+        const lines = await tx.select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+          .from(orderItems).where(eq(orderItems.orderId, transitioned.id));
+        restockedLines = lines
+          .filter((l): l is { variantId: string; quantity: number } => !!l.variantId)
+          .map((l) => ({ variantId: l.variantId, quantity: l.quantity }));
+        await restoreStockForOrder(tx, restockedLines);
+      }
+
       if (status === "cancelled" && transitioned?.buyerId) {
         await reversePurchasePointsOnce({
           buyerId: transitioned.buyerId,
@@ -531,6 +544,10 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
         }, tx);
       }
     });
+    if (restockedLines.length > 0) {
+      void notifyStockRestored(restockedLines)
+        .catch((err) => req.log.warn({ err, orderId: req.params.id }, "Restock notifications failed"));
+    }
   }
 
   if (!transitioned) {

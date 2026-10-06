@@ -67,6 +67,8 @@ const checkoutItemSchema = z.object({
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
   price: z.number().nonnegative().optional(),
+  // What the app sends (integer cents); `price` (dollars) is the legacy field.
+  priceCents: z.number().int().nonnegative().optional(),
 }).passthrough();
 // Stripe's minimum charge for a USD card payment. Thread Cash is a discount,
 // never a full payment method: applying it can never bring the card charge
@@ -413,11 +415,16 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       });
     }
     const currentPrice = row.priceCents / 100;
-    if (typeof item.price === "number" && Math.abs(item.price - currentPrice) > 0.001) {
+    // Compare in integer cents. The app sends `priceCents`; before this read
+    // it, a changed price was never flagged in the cart (only at payment).
+    const seenCents = typeof item.priceCents === "number"
+      ? item.priceCents
+      : typeof item.price === "number" ? Math.round(item.price * 100) : null;
+    if (seenCents !== null && seenCents !== row.priceCents) {
       issues.push({
         itemId, productName: row.productName, type: "price_changed",
         message: `${row.productName} is now $${currentPrice.toFixed(2)}.`,
-        oldValue: item.price, newValue: currentPrice, canContinue: false,
+        oldValue: seenCents / 100, newValue: currentPrice, canContinue: false,
       });
     }
     subtotalCents += row.priceCents * quantity;

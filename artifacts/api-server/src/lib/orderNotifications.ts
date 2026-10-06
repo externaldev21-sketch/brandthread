@@ -8,6 +8,9 @@
  *                                       item sold out mid-payment and it was
  *                                       auto-refunded
  *   seller · order_cancelled_by_buyer — mirror of the buyer's own cancel
+ *   seller · order_cancelled_sold_out — a paid order oversold and was
+ *                                       auto-refunded (mirror of the buyer's
+ *                                       sold_out cancellation)
  *   seller · return_request_received  — a buyer asked to return an order
  *                                       (item 108; the buyer already got
  *                                       return_requested)
@@ -104,6 +107,34 @@ export async function notifySellerOrderCancelledByBuyer(input: {
     });
   } catch (err) {
     logger.warn({ err, orderId: input.orderId }, "Seller order-cancelled notification failed");
+  }
+}
+
+/**
+ * The seller hears when a paid order was auto-refunded because an item sold
+ * out while the buyer was paying — otherwise the order just appears
+ * cancelled in their list with no explanation.
+ */
+export async function notifySellerOrderOversold(input: {
+  sellerId: string;
+  orderId: string;
+  orderNumber: string;
+  refundedCents: number;
+  productNames: string[];
+}): Promise<void> {
+  try {
+    const items = [...new Set(input.productNames)].join(", ");
+    await publishNotification({
+      userId: input.sellerId,
+      category: "orders",
+      type: "order_cancelled_sold_out",
+      title: `Order #${input.orderNumber} refunded: sold out`,
+      body: `${items || "An item"} sold out before this payment finished, so the buyer was refunded ${formatOrderCents(input.refundedCents)}. Update your stock to avoid this.`,
+      targetId: input.orderId,
+      targetType: "order",
+    });
+  } catch (err) {
+    logger.warn({ err, orderId: input.orderId }, "Seller oversold notification failed");
   }
 }
 
