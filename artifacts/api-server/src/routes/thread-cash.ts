@@ -60,6 +60,7 @@ import {
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
 import { stripe } from "../lib/stripe";
+import { broadcastToRoom } from "../ws/liveHub";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -469,6 +470,17 @@ router.post("/live-gift", async (req, res) => {
     }
     const gift = await sendLiveGift(buyerId, sellerId, streamId, amountCents, idempotencyKey);
     void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents });
+    // Announce it in the room — server-confirmed, unlike a chat line any
+    // viewer could type — so the host and every viewer see the gift land.
+    void db.execute(sql`SELECT display_name, brand_name, username FROM users WHERE clerk_id = ${buyerId} LIMIT 1`)
+      .then((r) => {
+        const u = r.rows[0] as { display_name?: string; brand_name?: string; username?: string } | undefined;
+        broadcastToRoom(streamId, {
+          type: "gift",
+          gift: { fromUserId: buyerId, displayName: u?.display_name || u?.username || "Viewer", amountCents },
+        });
+      })
+      .catch(() => {});
     res.json({ ok: true, giftId: gift.giftId });
   } catch (error) {
     if (error instanceof ThreadCashError) {

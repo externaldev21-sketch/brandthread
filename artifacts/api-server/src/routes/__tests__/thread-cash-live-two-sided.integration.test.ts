@@ -30,6 +30,10 @@ vi.mock("../../middlewares/requireRole", () => ({
   // The seller is acting on their own store; team gating has its own suite.
   requirePermission: () => (_req: any, _res: any, next: () => void) => next(),
 }));
+const roomEvents = vi.hoisted(() => [] as Array<{ streamId: string; payload: any }>);
+vi.mock("../../ws/liveHub", () => ({
+  broadcastToRoom: (streamId: string, payload: any) => { roomEvents.push({ streamId, payload }); },
+}));
 vi.mock("../../lib/stripe", () => ({
   get stripe() { return fakeStripe.client; },
   requireStripe: () => fakeStripe.client,
@@ -126,6 +130,13 @@ describe("Thread Cash in Live — buyer ↔ seller", () => {
     await vi.waitFor(async () => {
       const rows = await db.select().from(notificationsFeed).where(eq(notificationsFeed.userId, SELLER));
       expect(rows.length).toBeGreaterThan(0);
+    });
+    // The host and every viewer see it land in the room (server-confirmed).
+    await vi.waitFor(() => {
+      expect(roomEvents).toContainEqual({
+        streamId: liveId,
+        payload: { type: "gift", gift: { fromUserId: BUYER, displayName: "Viewer", amountCents: 300 } },
+      });
     });
   });
 
