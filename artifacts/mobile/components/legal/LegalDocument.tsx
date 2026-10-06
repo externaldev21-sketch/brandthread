@@ -8,11 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_VERSION,
   type LegalDocId,
@@ -24,6 +23,13 @@ interface LegalDocumentProps {
   docId: LegalDocId;
 }
 
+/** Sentence-case titles for the shared ScreenHeader (the docs' own titles are Title Case). */
+const HEADER_TITLES: Record<LegalDocId, string> = {
+  terms: 'Terms of service',
+  privacy: 'Privacy policy',
+  guidelines: 'Community guidelines',
+};
+
 /**
  * Renders one of the legal documents from content/legal.ts — the single
  * source for the Terms of Service, Privacy Policy and Community Guidelines.
@@ -33,7 +39,6 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const topInset = useHeaderTopInset();
   const bottomInset = insets.bottom;
   const doc = LEGAL_DOCUMENTS[docId];
 
@@ -47,27 +52,17 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
 
   return (
     <View style={styles.root}>
+      {/* Fixed shared header (outside the ScrollView) so the document scrolls
+          beneath it instead of under the status bar. */}
+      <ScreenHeader title={HEADER_TITLES[docId]} onBack={leaveDocument} />
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: topInset + 20, paddingBottom: bottomInset + 36 },
+          { paddingTop: 20, paddingBottom: bottomInset + 36 },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Return to Brandthread"
-            onPress={leaveDocument}
-            style={({ pressed }) => [styles.brandButton, pressed && styles.pressed]}
-          >
-            <View style={styles.brandMark}>
-              <Feather name="arrow-left" size={16} color={theme.onAccent} />
-            </View>
-            <Text style={styles.brandName}>Brandthread</Text>
-          </Pressable>
-        </View>
-
         <View style={styles.switcher} accessibilityRole="tablist">
           {LEGAL_DOCUMENT_ORDER.map((id) => {
             const item = LEGAL_DOCUMENTS[id];
@@ -80,7 +75,7 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
                 onPress={() => { if (!active) router.replace(item.route); }}
                 style={({ pressed }) => [styles.switchItem, active && styles.switchItemActive, pressed && styles.pressed]}
               >
-                <Text style={[styles.switchText, active && styles.switchTextActive]}>{item.shortTitle}</Text>
+                <Text numberOfLines={1} style={[styles.switchText, active && styles.switchTextActive]}>{item.shortTitle}</Text>
               </Pressable>
             );
           })}
@@ -88,7 +83,6 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>{doc.eyebrow}</Text>
-          <Text accessibilityRole="header" style={styles.title}>{doc.title}</Text>
           <Text style={styles.summary}>{doc.summary}</Text>
           <Text style={styles.date}>Effective {EFFECTIVE_DATE} · Version {LEGAL_VERSION}</Text>
         </View>
@@ -130,49 +124,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flex: 1,
     backgroundColor: theme.background,
   },
+  scroll: {
+    flex: 1,
+  },
   content: {
     width: '100%',
     maxWidth: 860,
     alignSelf: 'center',
     paddingHorizontal: 22,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 28,
-  },
-  brandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexShrink: 1,
-    // 44x44 minimum comfortable touch target (COMP.minTouchTarget) — this
-    // used to be sized to its icon (34px), which read as a control under
-    // 44x44 to the audit.
-    minHeight: 44,
-    paddingVertical: 5,
-  },
-  brandMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.accent,
-  },
-  brandMarkText: {
-    color: theme.onAccent,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-  },
-  brandName: {
-    color: theme.text,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-    letterSpacing: -0.3,
   },
   pressed: {
     opacity: 0.7,
@@ -185,10 +144,12 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,
-    alignSelf: 'flex-start',
+    // Full width with equal-width tabs so the whole legal set always fits.
+    alignSelf: 'stretch',
   },
   switchItem: {
-    paddingHorizontal: 16,
+    flex: 1,
+    paddingHorizontal: 12,
     // 44px minimum comfortable touch target (COMP.minTouchTarget); was 34px.
     height: 44,
     borderRadius: 999,
@@ -218,15 +179,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     marginBottom: 14,
-  },
-  title: {
-    color: theme.text,
-    fontFamily: 'Inter_700Bold',
-    // FS.h1 (36) — the largest step on the declared type scale in lib/theme.ts.
-    fontSize: 36,
-    lineHeight: 42,
-    letterSpacing: -1.2,
-    marginBottom: 18,
   },
   summary: {
     color: theme.muted,
