@@ -350,7 +350,7 @@ export default function BuyerPostViewer() {
 
         {/* Engagement bar */}
         <View style={s.engagementBar}>
-          <TouchableOpacity style={s.engageBtn} onPress={handleLike} accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'} accessibilityState={{ selected: liked }} testID={liked ? 'post-viewer-unlike' : 'post-viewer-like'}>
+          <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
             <Feather name="heart" size={22} color={liked ? RED : FG} />
             <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
@@ -376,19 +376,20 @@ export default function BuyerPostViewer() {
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
-            onPress={handleRepost}
-            accessibilityRole="button"
-            accessibilityLabel={reposted ? 'Undo repost' : 'Repost'}
-            testID={reposted ? 'post-viewer-unrepost' : 'post-viewer-repost'}
+            onPress={async () => {
+              // Explicit direction + rollback (handleRepost); this used to
+              // send "remove" for any post the viewer didn't own.
+              await handleRepost();
+            }}
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
-            onPress={handleSaveToggle}
-            accessibilityRole="button"
-            accessibilityLabel={saved ? 'Remove from saved' : 'Save'}
-            testID={saved ? 'post-viewer-unsave' : 'post-viewer-save'}
+            onPress={async () => {
+              // Save AND unsave, with rollback (handleSaveToggle).
+              await handleSaveToggle();
+            }}
           >
             {/* Filled when saved (same treatment as the Friends feed) — in the
                 monochrome theme a colour change alone was invisible. */}
