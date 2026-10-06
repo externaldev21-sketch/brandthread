@@ -51,6 +51,12 @@ async function openAndWait(page, activity, origin, role, target, selector, optio
   for (let attempt = 0; attempt < 4; attempt++) {
     const found = await page.waitForSelector(selector, { timeout: 12_000 }).then(() => true).catch(() => false);
     if (found) return;
+    await options.beforeNavigate?.();
+    await page.evaluate(() => {
+      history.pushState(history.state, '', '/');
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    });
+    await page.waitForTimeout(800);
     await page.evaluate((url) => {
       history.pushState(history.state, '', url);
       window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
@@ -208,7 +214,7 @@ async function buyer(browser, origin, images, { language, step, name }) {
 
   // Seeded once the app has settled on "/" (its cart sync rewrites the
   // demo checkout before then), right before opening the checkout.
-  await openAndWait(page, activity, origin, 'buyer', '/buyer-checkout', tid(step === 'confirmation' ? 'post-purchase-offer' : 'checkout-place-order'), {
+  await openAndWait(page, activity, origin, 'buyer', '/buyer-checkout', step === 'confirmation' ? tid('post-purchase-offer') : 'text=Resumen del pedido', {
     beforeNavigate: () => page.evaluate(([key, value]) => localStorage.setItem(key, value), ['bt:checkout:user_jordan:v1', JSON.stringify(session)]),
   });
   if (step === 'confirmation') {

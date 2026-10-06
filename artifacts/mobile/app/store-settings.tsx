@@ -272,7 +272,7 @@ export default function StoreSettingsScreen() {
         <BrandthreadCard style={ss.card}>
           <ListRow
             title="Checkout"
-            subtitle="Checkout mode, tipping, post-purchase offer, tracking, language"
+            subtitle="Mode, tipping, offers, tracking, language"
             chevron
             onPress={() => router.push('/checkout' as never)}
             style={{ minHeight: 48 }}
