@@ -33,9 +33,14 @@ describe('Every seller list screen uses the shared layout EmptyState', () => {
 });
 
 describe('Orders empty state has a title, matching Products/Collections/Messages', () => {
-  it('shows "No orders yet" with the requested subtitle, no fake numbers', () => {
+  it('shows "No orders yet" (per-filter titles, no filler subtitle), no fake numbers', () => {
+    // Dev (products/orders polish): the empty state names exactly what the
+    // selected filter found, as a single title — copy lives in
+    // lib/sellerLists/emptyCopy.ts, the screen renders orderEmptyCopy().
     const source = read(SCREENS.Orders);
-    expect(source).toContain('title="No orders yet"');
-    expect(source).toContain('message="Orders show up here once a buyer checks out."');
+    expect(source).toContain('orderEmptyCopy(activeFilter, searchQuery)');
+    expect(source).toContain('title={emptyCopy.title}');
+    expect(source).not.toContain('message="Orders show up here once a buyer checks out."');
+    expect(read('lib/sellerLists/emptyCopy.ts')).toContain("all: { icon: 'shopping-bag', title: 'No orders yet' }");
   });
 });

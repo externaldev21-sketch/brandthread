@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
+import { orderEmptyCopy } from '@/lib/sellerLists/emptyCopy';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -1186,6 +1187,7 @@ export default function OrdersScreen() {
     </View>
   ), [filtered.length, activeFilter, sort, currentSortLabel, loadError, updatesPaused, theme.error]);
 
+  const emptyCopy = useMemo(() => orderEmptyCopy(activeFilter, searchQuery), [activeFilter, searchQuery]);
   const ListEmptyComponent = useCallback(() => (
     <View style={s.emptyStateContainer}>
       {loadError ? (
@@ -1195,14 +1197,16 @@ export default function OrdersScreen() {
           variant="error"
         />
       ) : (
+        // One honest title per filter / search (lib/sellerLists/emptyCopy.ts)
+        // — "No orders yet" only when the seller truly has none.
         <EmptyState
-          icon="shopping-bag"
-          title="No orders yet"
-          message="Orders show up here once a buyer checks out."
+          icon={emptyCopy.icon}
+          title={emptyCopy.title}
+          testID="orders-empty"
         />
       )}
     </View>
-  ), [loadError]);
+  ), [loadError, emptyCopy]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 

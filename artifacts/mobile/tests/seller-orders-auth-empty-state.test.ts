@@ -25,9 +25,10 @@ describe('seller orders read state', () => {
 
   it('uses an honest, flat empty state — icon + line only, no button, no card/box behind it', () => {
     expect(ordersSource).toContain('<EmptyState');
-    expect(ordersSource).toContain('icon="shopping-bag"');
-    expect(ordersSource).toContain('title="No orders yet"');
-    expect(ordersSource).toContain('message="Orders show up here once a buyer checks out."');
+    // Per-filter honest titles (lib/sellerLists/emptyCopy.ts) — still flat,
+    // icon + one line, and still no CTA on any Orders empty state.
+    expect(ordersSource).toContain('icon={emptyCopy.icon}');
+    expect(ordersSource).toContain('title={emptyCopy.title}');
     // Dev's repeated, explicit instruction: no CTA on this empty state, and
     // no grey card/box container behind it — flat, directly on the screen
     // background. (Superseded item 40 CTA; see PR for seller-orders-cleanup.)

@@ -1,6 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { StyleSheet, Text } from 'react-native';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
@@ -30,9 +29,6 @@ export function SellerDashboardSetupCard({
       accessibilityRole="button"
       accessibilityLabel="List your first product to start selling"
     >
-      <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
-        <Feather name="plus-circle" size={20} color={theme.accent} />
-      </View>
       <Text style={[styles.title, { color: theme.text }]}>List your first product</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
         Your sales, orders, and store activity will show up here as soon as your first product goes live.
@@ -45,18 +41,13 @@ export function SellerDashboardSetupCard({
 const styles = StyleSheet.create({
   card: {
     padding: SP.lg,
+    // Card opens straight on the title (no icon tile); the title's own line
+    // height already adds a few px above the glyphs, so trim the top.
+    paddingTop: SP.md + SP.xs,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     alignItems: 'flex-start',
     gap: SP.xs,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SP.xs,
   },
   title: {
     fontFamily: FONT.bold,
