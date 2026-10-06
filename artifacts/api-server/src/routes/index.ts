@@ -56,7 +56,6 @@ import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
 import socialRouter from "./social";
-import accountMutesRouter from "./account-mutes";
 import storyMentionsRouter from "./story-mentions";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
@@ -68,6 +67,7 @@ import taxesRouter from "./taxes";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
+import accountMutesRouter from "./account-mutes";
 
 /** Lazily-resolved team context for routes that don't mount it themselves.
  *  `resolveTeamContext` is idempotent (cached on req.teamContext), so applying
@@ -201,6 +201,7 @@ router.use("/buyer/cart",                cartDbRouter);
 router.use("/buyer/checkout/payment-intent", checkoutIntentRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
+router.use("/social/mutes",              accountMutesRouter); // account mutes (GET/POST/DELETE); the /social routers define no /mutes route
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
 // Topic group chats (unlimited members). Public discovery + invite preview are
@@ -223,7 +224,6 @@ router.use("/admin",                     adminRouter); // platform admin dashboa
 router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
-router.use("/social/mutes",              accountMutesRouter); // account mutes (GET/POST/DELETE); social routers above define no /mutes route
 router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
