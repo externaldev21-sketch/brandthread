@@ -73,19 +73,22 @@ export default function BuyerSearchHistoryScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScreenHeader
-        title="Recent Searches"
-        rightElement={
+        title="Recent searches"
+        // Only offered when there is something to clear.
+        rightElement={hasTerms ? (
           <PressableScale
             onPress={() => { hapticSelection(); confirmClearAll(); }}
             disabled={!hasTerms}
             accessibilityRole="button"
             accessibilityLabel="Clear all recent searches"
             accessibilityState={{ disabled: !hasTerms }}
-            style={{ opacity: hasTerms ? 1 : 0.4, paddingHorizontal: 4, paddingVertical: 4 }}
+            // justifyContent: PressableScale's 44pt min height otherwise
+            // pins the label to the top, above the title's center line.
+            style={{ opacity: hasTerms ? 1 : 0.4, paddingHorizontal: 4, paddingVertical: 4, justifyContent: 'center' }}
           >
             <Text style={[TYPE_SCALE.body, { fontFamily: FONT.semibold, color: theme.text }]}>Clear all</Text>
           </PressableScale>
-        }
+        ) : undefined}
       />
       {!loading && !hasTerms ? (
         <EmptyState icon="clock" title="No search history" description="Searches you make will show up here." />

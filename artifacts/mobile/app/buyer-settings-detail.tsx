@@ -9,13 +9,25 @@ import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Card, ListRow } from '@/components/ui';
+import { Card, ListRow, OptionSheet } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
 
-type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>) => Item[] };
+type Ui = { pickSensitiveContent: () => void };
+type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>, ui?: Ui) => Item[] };
+
+/** Stored values are lowercase keys ('standard', 'system'); rows show them capitalized. */
+function displayValue(value?: string): string | undefined {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+const SENSITIVE_OPTIONS: { id: BuyerSettingsState['sensitiveContent']; label: string; description: string }[] = [
+  { id: 'less', label: 'Less', description: 'See less sensitive content' },
+  { id: 'standard', label: 'Standard', description: 'The default for most people' },
+  { id: 'more', label: 'More', description: 'See more sensitive content' },
+];
 
 const CONFIG: Record<string, Config> = {
   activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: () => [
@@ -33,7 +45,7 @@ const CONFIG: Record<string, Config> = {
   muted: { title: 'Muted accounts', items: () => [{ label: 'No muted accounts', sub: 'People you mute will appear here.', icon: 'volume-x' }] },
   restricted: { title: 'Restricted accounts', items: () => [{ label: 'No restricted accounts', sub: 'Restricted people cannot see when you are online or when you read their messages.', icon: 'user-x' }] },
   favorites: { title: 'Favorites', intro: 'Favoriting sellers and brands is coming soon. Follow them for now to see more from them in Discover.', items: () => [] },
-  content: { title: 'Content preferences', items: s => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', icon: 'refresh-cw' }] },
+  content: { title: 'Content preferences', items: (s, _router, ui) => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent, action: ui?.pickSensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', sub: 'Nothing to reset yet', icon: 'refresh-cw' }] },
   suggested: { title: 'Suggested content', items: s => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Snooze suggested posts', value: 'Off' }, { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
   payments: { title: 'Addresses and payments', items: () => [{ label: 'Shipping addresses', icon: 'map-pin', value: '1 saved' }, { label: 'Payment methods', icon: 'credit-card', value: 'Manage' }, { label: 'Autofill checkout info', icon: 'zap', value: 'On' }, { label: 'Purchase protection', icon: 'shield', value: 'Brandthread protected' }] },
   notifications: { title: 'Push notifications', intro: 'Choose which updates Brandthread may send to this device.', items: s => [
@@ -101,7 +113,20 @@ export default function BuyerSettingsDetail() {
       Alert.alert('Could not update setting', 'Try again.');
     }
   }, [api, section, settings]);
-  const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
+  const [sensitivePicker, setSensitivePicker] = useState(false);
+  const ui = useMemo<Ui>(() => ({ pickSensitiveContent: () => setSensitivePicker(true) }), []);
+  const pickSensitive = useCallback(async (value: BuyerSettingsState['sensitiveContent']) => {
+    setSensitivePicker(false);
+    const prior = settings;
+    if (prior) setSettings({ ...prior, sensitiveContent: value });
+    try {
+      setSettings(await patchBuyerSettings({ sensitiveContent: value }));
+    } catch {
+      setSettings(prior);
+      Alert.alert('Could not update setting', 'Try again.');
+    }
+  }, [settings]);
+  const items = useMemo(() => settings ? cfg.items(settings, router, ui) : [], [cfg, settings, router, ui]);
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings-menu')} />
@@ -114,7 +139,7 @@ export default function BuyerSettingsDetail() {
             icon={item.icon}
             title={item.label}
             subtitle={item.sub}
-            value={!item.toggle ? item.value : undefined}
+            value={!item.toggle ? displayValue(item.value) : undefined}
             chevron={!item.toggle && !!item.action}
             toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : undefined}
             onPress={isActionable && item.action ? item.action : undefined}
@@ -124,6 +149,16 @@ export default function BuyerSettingsDetail() {
         </React.Fragment>;
       })}</Card> : null}
     </ScrollView>
+    {settings ? (
+      <OptionSheet
+        visible={sensitivePicker}
+        onClose={() => setSensitivePicker(false)}
+        title="Sensitive content"
+        options={SENSITIVE_OPTIONS}
+        selectedId={settings.sensitiveContent}
+        onSelect={(id) => { void pickSensitive(id as BuyerSettingsState['sensitiveContent']); }}
+      />
+    ) : null}
   </View>;
 }
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({

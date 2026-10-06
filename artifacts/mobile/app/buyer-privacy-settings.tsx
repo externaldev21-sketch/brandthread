@@ -15,17 +15,20 @@ import { getPrivacySettings, updatePrivacySettings } from '@/services/socialServ
 import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 
+// Brandthread's social graph is follow-based (POST /api/social/follow), so
+// the labels speak in follows. The stored keys (friends, friends_of_friends,
+// whoCanSendFriendRequests…) are unchanged.
 const AUDIENCE_LABEL: Record<AudienceOption, string> = {
   everyone: 'Everyone',
-  friends_of_friends: 'Friends of friends',
-  friends: 'Friends only',
+  friends_of_friends: 'Your network',
+  friends: 'Following',
   nobody: 'Nobody',
   only_me: 'Only me',
 };
 
 const AUDIENCE_DESCRIPTION: Record<AudienceOption, string> = {
   everyone: 'Anyone on Brandthread',
-  friends_of_friends: "Your friends, and their friends",
+  friends_of_friends: 'People you follow, and the people they follow',
   friends: 'Only people you follow',
   nobody: 'No one — turns this off entirely',
   only_me: 'Only visible to you',
@@ -127,7 +130,7 @@ export default function BuyerPrivacySettings() {
         <Card style={styles.card}>
           <ListRow
             icon="user-plus"
-            title="Send friend requests"
+            title="Follow you"
             value={AUDIENCE_LABEL[settings.whoCanSendFriendRequests]}
             chevron
             onPress={() => setPicker('whoCanSendFriendRequests')}
@@ -143,7 +146,7 @@ export default function BuyerPrivacySettings() {
           <View style={styles.divider} />
           <ListRow
             icon="users"
-            title="See your friends list"
+            title="See who you follow"
             value={AUDIENCE_LABEL[settings.whoCanSeeFriendsList]}
             chevron
             onPress={() => setPicker('whoCanSeeFriendsList')}
@@ -172,7 +175,8 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="activity"
             title="Activity status"
-            subtitle="Let friends see when you're active"
+            subtitle="Let others see when you're active"
+            subtitleNumberOfLines={2}
             toggle={{ value: settings.activityStatusVisible, onChange: v => update('activityStatusVisible', v) }}
           />
           <View style={styles.divider} />
@@ -180,6 +184,7 @@ export default function BuyerPrivacySettings() {
             icon="check-square"
             title="Read receipts"
             subtitle="Show when you've read messages"
+            subtitleNumberOfLines={2}
             toggle={{ value: settings.readReceiptsEnabled, onChange: v => update('readReceiptsEnabled', v) }}
           />
         </Card>
@@ -191,13 +196,15 @@ export default function BuyerPrivacySettings() {
             icon="search"
             title="Appear in search"
             subtitle="Let others find your profile in search"
+            subtitleNumberOfLines={2}
             toggle={{ value: settings.searchable, onChange: v => update('searchable', v) }}
           />
           <View style={styles.divider} />
           <ListRow
             icon="phone"
             title="Contact discovery"
-            subtitle="Find friends from contacts (no contacts uploaded without permission)"
+            subtitle="Find people you know from your contacts. Nothing is uploaded without your permission."
+            subtitleNumberOfLines={3}
             toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
           />
         </Card>
@@ -208,6 +215,7 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="message-circle"
             title="Who can message you"
+            subtitleNumberOfLines={3}
             subtitle={
               dmPrivacy === 'followers_only'
                 ? 'Only people you follow can message you'
@@ -262,7 +270,7 @@ export default function BuyerPrivacySettings() {
       <OptionSheet
         visible={picker === 'whoCanSendFriendRequests'}
         onClose={() => setPicker(null)}
-        title="Who can send friend requests"
+        title="Who can follow you"
         options={audienceOptions(['everyone', 'friends_of_friends', 'nobody'])}
         selectedId={settings.whoCanSendFriendRequests}
         onSelect={(id) => { update('whoCanSendFriendRequests', id as AudienceOption); setPicker(null); }}
@@ -278,7 +286,7 @@ export default function BuyerPrivacySettings() {
       <OptionSheet
         visible={picker === 'whoCanSeeFriendsList'}
         onClose={() => setPicker(null)}
-        title="Who can see your friends list"
+        title="Who can see who you follow"
         options={audienceOptions(['everyone', 'friends', 'only_me'])}
         selectedId={settings.whoCanSeeFriendsList}
         onSelect={(id) => { update('whoCanSeeFriendsList', id as AudienceOption); setPicker(null); }}

@@ -26,6 +26,9 @@ import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { useUser } from '@clerk/expo';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { getPreviewNotifications } from '@/lib/previewInbox';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -240,6 +243,7 @@ export default function BuyerNotifications() {
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory | undefined>(undefined);
   const [notifLoading, setNotifLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [optionsFor, setOptionsFor] = useState<Notification | null>(null);
 
   // Only the very first load shows the full-screen loader. Focus refocuses and
@@ -249,11 +253,25 @@ export default function BuyerNotifications() {
 
   const loadNotifs = useCallback(async () => {
     if (!hasLoadedOnce.current) setNotifLoading(true);
+    // The signed-out dev preview has no account to fetch for — show its
+    // seeded list (demo) or nothing (fresh) instead of calling the
+    // protected endpoint and waiting on it.
+    if (isBuyerDevPreview()) {
+      setNotifs(getPreviewNotifications());
+      setLoadError(false);
+      hasLoadedOnce.current = true;
+      setNotifLoading(false);
+      return;
+    }
     try {
       const data = await getNotifications();
       setNotifs(data);
+      setLoadError(false);
       void syncNotificationBadge(data);
     } catch (_) {
+      // Only a failed first load is an error state; a failed silent refresh
+      // keeps whatever is already on screen.
+      if (!hasLoadedOnce.current) setLoadError(true);
     } finally {
       hasLoadedOnce.current = true;
       setNotifLoading(false);
@@ -293,7 +311,7 @@ export default function BuyerNotifications() {
     }).catch(() => {
       // In-app navigation must remain available if analytics capture fails.
     });
-    await markNotificationRead(notif.id);
+    if (!isBuyerDevPreview()) await markNotificationRead(notif.id);
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     notifNavigation(notif, router);
   };
@@ -310,10 +328,10 @@ export default function BuyerNotifications() {
     if (!notif) return;
     closeOptions();
     if (notif.isRead) {
-      await markNotificationUnread(notif.id);
+      if (!isBuyerDevPreview()) await markNotificationUnread(notif.id);
       setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: false } : n));
     } else {
-      await markNotificationRead(notif.id);
+      if (!isBuyerDevPreview()) await markNotificationRead(notif.id);
       setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     }
   };
@@ -324,7 +342,7 @@ export default function BuyerNotifications() {
     const notif = optionsFor;
     if (!notif) return;
     closeOptions();
-    await deleteNotification(notif.id);
+    if (!isBuyerDevPreview()) await deleteNotification(notif.id);
     setNotifs(prev => prev.filter(n => n.id !== notif.id));
   };
 
@@ -332,6 +350,10 @@ export default function BuyerNotifications() {
     const notif = optionsFor;
     if (!notif) return;
     closeOptions();
+    if (isBuyerDevPreview()) {
+      setNotifs(prev => prev.map(n => n.category === notif.category ? { ...n, isMuted: true } : n));
+      return;
+    }
     await muteNotificationCategory(notif.category);
     await loadNotifs();
   };
@@ -343,6 +365,10 @@ export default function BuyerNotifications() {
         style: 'destructive',
         onPress: async () => {
           hapticDestructiveConfirm();
+          if (isBuyerDevPreview()) {
+            setNotifs(prev => prev.filter(n => !n.isRead));
+            return;
+          }
           await clearAllReadNotifications();
           await loadNotifs();
         },
@@ -353,7 +379,9 @@ export default function BuyerNotifications() {
 
   const toggleRead = async (notif: Notification) => {
     hapticToggle();
-    if (notif.isRead) {
+    if (isBuyerDevPreview()) {
+      // Signed-out preview: local-only, never the protected endpoints.
+    } else if (notif.isRead) {
       await markNotificationUnread(notif.id);
     } else {
       await markNotificationRead(notif.id);
@@ -481,16 +509,18 @@ export default function BuyerNotifications() {
       )}
 
       {/* LIST */}
-      {notifLoading && (
-        <BrandedLoadingState
-          message="Loading notifications…"
-          style={{ position: 'absolute', top: 80, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+      {notifLoading ? (
+        <BrandedLoadingState message="Loading notifications…" style={{ flex: 1 }} />
+      ) : loadError && notifs.length === 0 ? (
+        <ErrorState
+          message="Couldn't load your notifications."
+          onRetry={() => { hasLoadedOnce.current = false; void loadNotifs(); }}
+          style={{ flex: 1 }}
         />
-      )}
-      {!notifLoading && listData.length === 0 ? (
+      ) : listData.length === 0 ? (
         <EmptyState
           icon="bell"
-          title="Quiet looks good on you."
+          title="No notifications yet"
           description="When someone likes your style, a drop goes live, or an order moves, you’ll hear it here."
           style={{ flex: 1 }}
         />

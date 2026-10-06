@@ -141,7 +141,11 @@ export default function ReportScreen() {
           <Feather name="alert-circle" size={36} color={theme.muted} />
           <Text style={s.doneTitle}>Nothing to report</Text>
           <Text style={s.doneBody}>This content is no longer available.</Text>
-          <PrimaryButton label="Close" onPress={close} style={{ alignSelf: 'stretch', marginTop: SP.lg }} />
+          {/* Wrapper carries the stretch: PrimaryButton applies `style` inside
+              its Pressable, so on its own it shrank to the label's width. */}
+          <View style={{ alignSelf: 'stretch', marginTop: SP.lg }}>
+            <PrimaryButton label="Close" onPress={close} />
+          </View>
         </View>
       </View>
     );

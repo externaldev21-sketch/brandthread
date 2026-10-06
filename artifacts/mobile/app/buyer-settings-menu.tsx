@@ -128,27 +128,29 @@ export default function BuyerSettingsMenuScreen() {
     <View style={[s.page, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Menu" />
 
-      <View style={s.searchWrap}>
-        <View style={[s.searchField, { backgroundColor: theme.cardElevated }]}>
-          <Feather name="search" size={16} color={theme.subtle} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search"
-            placeholderTextColor={theme.subtle}
-            style={[s.searchInput, { color: theme.text }]}
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {query.length > 0 && (
-            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
-              <Feather name="x-circle" size={15} color={theme.subtle} />
-            </Pressable>
-          )}
-        </View>
-      </View>
-
       <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {/* Search scrolls with the rows (Instagram's own pattern) instead of
+            pinning between the header and the list, where a half-scrolled
+            row used to peek out underneath it. */}
+        <View style={s.searchWrap}>
+          <View style={[s.searchField, { backgroundColor: theme.cardElevated }]}>
+            <Feather name="search" size={16} color={theme.subtle} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search"
+              placeholderTextColor={theme.subtle}
+              style={[s.searchInput, { color: theme.text }]}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+                <Feather name="x-circle" size={15} color={theme.subtle} />
+              </Pressable>
+            )}
+          </View>
+        </View>
         {filteredSections.map((section) => (
           <View key={section.title} style={s.section}>
             <Text style={[s.sectionHeader, { color: theme.subtle }]}>{section.title.toUpperCase()}</Text>

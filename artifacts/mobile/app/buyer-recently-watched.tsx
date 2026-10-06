@@ -118,10 +118,14 @@ export default function BuyerRecentlyWatched() {
           keyExtractor={item => item.postId}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xxl }]}
-          ListHeaderComponent={<Text style={styles.intro}>Videos you watched in the last 36 hours</Text>}
+          // The 36-hour note lives in the empty state when there is nothing
+          // yet, so only the populated list repeats it as a header.
+          ListHeaderComponent={visible.items.length > 0
+            ? <Text style={styles.intro}>Videos you watched in the last 36 hours</Text>
+            : null}
           ListEmptyComponent={
             <EmptyState icon="play-circle" title="No recently watched videos"
-              message="Videos you watch will appear here for 36 hours." />
+              message="Watched videos stay here for 36 hours." />
           }
           renderItem={({ item }) => (
             <Pressable onPress={() => openVideo(item)} style={styles.row}
