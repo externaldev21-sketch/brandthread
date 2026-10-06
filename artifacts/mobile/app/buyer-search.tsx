@@ -33,7 +33,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import { FONT, GUTTER, GRID_MAX_WIDTH, RADIUS } from '@/lib/theme';
+import { FONT, GUTTER, GRID_MAX_WIDTH, ICON, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -565,7 +565,7 @@ export default function BuyerSearchScreen() {
     );
   }
 
-  // ── Header: back chevron always visible; the trailing element is either
+  // ── Header: back arrow (same bare arrow as ScreenHeader) always visible; the trailing element is either
   //    an add-person icon (idle, unfocused, empty) or a Cancel button
   //    (focused / typing / submitted) — matching the Mobbin reference's own
   //    Cancel-on-focus behavior. ────────────────────────────────────────
@@ -581,7 +581,7 @@ export default function BuyerSearchScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="buyer-search-back"
         >
-          <Feather name="chevron-left" size={26} color={fg} />
+          <Feather name="arrow-left" size={ICON.md} color={fg} />
         </TouchableOpacity>
         {/* theme-exempt: fixed dark action per spec — see profile.tsx's
             #1f1f1f store-details fill for the same intentional pattern. */}

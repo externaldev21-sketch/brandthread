@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList,
-  Alert, StyleSheet, Dimensions, Share,
+  Alert, StyleSheet, Dimensions, Share, useWindowDimensions,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -196,6 +196,11 @@ export default function FriendsScreen() {
   const { theme } = useAppTheme();
   const palette = useColors();
   const barInset = useBuyerTabBarInset();
+  // Short screens (e.g. 375x667): the illustrated empty state pushed its
+  // "Find friends" CTA under the floating tab bar (QA-0413) — use the
+  // compact (no illustration) variant there.
+  const { height: windowHeight } = useWindowDimensions();
+  const compactEmpty = windowHeight < 740;
   const router  = useRouter();
   const api     = useApi();
   const { userId } = useAuth();
@@ -406,10 +411,13 @@ export default function FriendsScreen() {
               it inside (with the circle's `overflow: hidden`) clipped it down
               to a stray wedge wherever it poked past the circle's edge. */}
           <View style={s.storyCircleWrap}>
-            <View style={[s.storyCircle, { backgroundColor: theme.cardElevated, overflow: 'hidden' }]}>
+            {/* Filled silver initials circle (theme.border reads as a solid
+                mid-grey on the black page) so it never renders as a bare
+                floating letter (QA-0411/0412). */}
+            <View style={[s.storyCircle, { backgroundColor: theme.border, overflow: 'hidden' }]}>
               {myAvatarUrl
-                ? <CachedImage source={{ uri: myAvatarUrl }} style={StyleSheet.absoluteFill} />
-                : <Text style={[TYPE_SCALE.body, s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
+                ? <CachedImage source={{ uri: myAvatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                : <Text style={[TYPE_SCALE.headline, s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
             </View>
             <View style={[s.plusBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
               <Feather name="plus" size={12} color={theme.onAccent} />
@@ -518,11 +526,12 @@ export default function FriendsScreen() {
           title="Find your crew"
           description="Add friends to see what they're copping, saving, and dropping."
           action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}
+          compact={compactEmpty}
         />
       )}
     </>
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, allStoryIds.join(',')]);
+  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, compactEmpty, allStoryIds.join(',')]);
 
   const ListFooter = useMemo(() => (
     friends.length > 0 ? (

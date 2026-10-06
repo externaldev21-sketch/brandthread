@@ -46,6 +46,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { Button } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import { activeReturnFor, isReturnEligible, returnSubmitError } from '@/lib/returns';
@@ -107,7 +108,7 @@ function makeRadioStyles(theme: AppThemePreset) {
   });
 }
 
-type Phase = 'loading' | 'error' | 'ineligible' | 'existing' | 'form' | 'submitted';
+type Phase = 'loading' | 'error' | 'notfound' | 'ineligible' | 'existing' | 'form' | 'submitted';
 
 export default function BuyerReturnRequestScreen() {
   const { theme } = useAppTheme();
@@ -130,14 +131,14 @@ export default function BuyerReturnRequestScreen() {
   const [attempted, setAttempted] = useState(false);
 
   const load = useCallback(async () => {
-    if (!orderId) { setPhase('error'); return; }
+    if (isMissingParam(orderId)) { setPhase('notfound'); return; }
     setPhase('loading');
     try {
       const [loaded, existing] = await Promise.all([
         getBuyerOrder(orderId),
         api.returns.listBuyer().then(rows => activeReturnFor(Array.isArray(rows) ? rows : [], orderId)).catch(() => null),
       ]);
-      if (!loaded) { setPhase('error'); return; }
+      if (!loaded) { setPhase('notfound'); return; }
       setOrder(loaded);
       if (existing?.id) { setExistingReturnId(existing.id); setPhase('existing'); return; }
       setPhase(isReturnEligible(loaded.status) ? 'form' : 'ineligible');
@@ -223,6 +224,20 @@ export default function BuyerReturnRequestScreen() {
         {header}
         <View style={s.centered}><ActivityIndicator color={theme.text} size="large" /></View>
       </BrandthreadScreen>
+    );
+  }
+
+  // Missing or unknown order id — not a connectivity problem, so don't
+  // blame the connection.
+  if (phase === 'notfound') {
+    return (
+      <UnavailableScreen
+        title="Request a return"
+        heading="Order not found"
+        message="Open a return request from one of your orders."
+        icon="package"
+        fallback="/(buyer)/orders"
+      />
     );
   }
 

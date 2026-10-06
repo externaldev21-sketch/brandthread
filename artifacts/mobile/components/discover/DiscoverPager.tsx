@@ -65,6 +65,10 @@ import {
   shouldAnimateCartSuccess,
 } from '@/lib/cartFlight';
 import { BuyNowFlow } from '@/components/buy-now/BuyNowFlow';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewCatalog, isPreviewCatalogEnabled } from '@/lib/previewCatalog';
+import { previewCatalogToDiscoverItems } from '@/lib/discoverFeedPreview';
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 
 // ─── Contract types (mirrors lib/api.ts discover.feed exactly) ────────────────
@@ -144,15 +148,31 @@ export function DiscoverPager() {
   const openCart = useCallback(() => push('/(buyer)/cart' as never), [push]);
 
   // ─ Fetch page ─────────────────────────────────────────────────────────────
+  const demoCatalog = useMemo(
+    () => (isPreviewDemoMode() && isPreviewCatalogEnabled() ? previewCatalogToDiscoverItems(getPreviewCatalog()) : null),
+    [],
+  );
   const fetchPage = useCallback(async (offset: number, append: boolean) => {
     if (append) setLoadingMore(true);
     else { setLoading(true); setError(null); }
     try {
       const result = await api.discover.feed({ limit: DISCOVER_PAGE_LIMIT, offset });
       const rows = Array.isArray(result?.items) ? result.items : [];
+      // Demo mode (&demo=1) only: an empty first page falls back to the
+      // shared preview catalog so the demo shows trending products.
+      if (!append && rows.length === 0 && demoCatalog) {
+        setItems(demoCatalog);
+        setNextOffset(null);
+        return;
+      }
       setItems(prev => (append ? [...prev, ...rows] : rows));
       setNextOffset(result?.nextOffset ?? null);
     } catch {
+      if (!append && demoCatalog) {
+        setItems(demoCatalog);
+        setNextOffset(null);
+        return;
+      }
       if (!append) setError('Could not load Discover. Tap to retry.');
       // A failed "load more" silently stops paginating rather than replacing
       // the feed the buyer is already swiping through.
@@ -160,7 +180,7 @@ export function DiscoverPager() {
       if (append) setLoadingMore(false);
       else setLoading(false);
     }
-  }, [api]);
+  }, [api, demoCatalog]);
 
   useEffect(() => { fetchPage(0, false); }, [fetchPage]);
 
@@ -260,12 +280,26 @@ export function DiscoverPager() {
       {loading ? (
         <DiscoverSkeleton cardWidth={cardWidth} />
       ) : showError ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <EmptyState icon="wifi-off" title="Couldn't load" description={error!} action={{ label: 'Retry', onPress: handleRetry }} compact />
+        // Real load failure: shared header + Retry (QA-0526/1247).
+        <View style={{ flex: 1 }}>
+          <ScreenHeader title="Trending" onBack={back} />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <EmptyState icon="wifi-off" title="Couldn't load" description={error!} action={{ label: 'Retry', onPress: handleRetry }} compact />
+          </View>
         </View>
       ) : showEmpty ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <EmptyState icon="compass" title="No trending products" description="Nothing is trending right now." action={{ label: 'Retry', onPress: handleRetry }} compact />
+        // Genuinely empty (not an error): no Retry — point at Discover instead.
+        <View style={{ flex: 1 }}>
+          <ScreenHeader title="Trending" onBack={back} />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <EmptyState
+              icon="compass"
+              title="No trending products"
+              description="Nothing is trending right now."
+              action={{ label: 'Browse Discover', onPress: () => push('/(buyer)/discover' as never) }}
+              compact
+            />
+          </View>
         </View>
       ) : (
         <>
@@ -485,6 +519,10 @@ function DiscoverCard({
   onAddToCart: (startX: number, startY: number) => void;
   onBuyNow: () => void;
 }) {
+  // Start the card below the status bar and the floating back/cart chrome
+  // (topBar sits at headerTopInset + 8, ~40pt tall) — the rank pill and
+  // brand name used to render under the notch.
+  const chromeTop = useHeaderTopInset() + 60;
   const imageStyle = useAnimatedStyle(() => {
     const center = index * snapInterval;
     const distance = scrollX.value - center;
@@ -519,7 +557,7 @@ function DiscoverCard({
   const heroUri = pickImage(item);
 
   return (
-    <View style={{ width: cardWidth }}>
+    <View style={{ width: cardWidth, paddingTop: chromeTop }}>
       <View style={styles.brandRow}>
         {item.rank <= 3 && (
           <View style={styles.rankBadge}>

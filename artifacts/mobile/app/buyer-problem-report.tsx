@@ -22,7 +22,6 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
   SUCCESS, ON_DARK,
-  ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
@@ -209,7 +208,7 @@ export default function BuyerProblemReportScreen() {
 
         {/* Dispute note */}
         <View style={s.disputeNote}>
-          <Feather name="info" size={13} color={ORANGE} />
+          <Feather name="info" size={13} color={MUTED} />
           <Text style={s.disputeNoteText}>
             If the seller doesn't resolve your issue, your report may escalate to a dispute. We will contact you if further information is needed.
           </Text>
@@ -246,8 +245,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   switchSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, padding: SP.sm, backgroundColor: theme.accentDim, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.accent, alignSelf: 'flex-start' },
   contactBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accentLight },
-  disputeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: ORANGE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', padding: SP.sm, marginBottom: SP.md },
-  disputeNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE, flex: 1, lineHeight: 17 },
+  disputeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
+  disputeNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, flex: 1, lineHeight: 17 },
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },

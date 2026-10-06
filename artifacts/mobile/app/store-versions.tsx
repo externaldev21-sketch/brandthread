@@ -88,8 +88,13 @@ export default function StoreVersionsScreen() {
   return (
     <View style={vs.root}>
       <ScreenHeader
-        title="Version History"
-        actions={[{ icon: 'plus', onPress: () => setCreating(true), accessibilityLabel: 'Save version' }]}
+        title="Version history"
+        // One save action at a time: the empty state carries its own
+        // "Save current version" CTA, so the header + only shows once
+        // there's a list (and not while the label form is already open).
+        actions={versions.length > 0 && !creating
+          ? [{ icon: 'plus', onPress: () => setCreating(true), accessibilityLabel: 'Save current version' }]
+          : undefined}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={vs.scroll}>
@@ -117,7 +122,7 @@ export default function StoreVersionsScreen() {
             icon="clock"
             title="No versions yet"
             description="Versions are saved automatically when you publish, change themes, or apply AI changes. You can also save manually."
-            action={{ label: 'Save Current Version', onPress: () => setCreating(true), icon: 'plus' }}
+            action={creating ? undefined : { label: 'Save current version', onPress: () => setCreating(true), icon: 'plus' }}
             style={vs.emptyState}
           />
         ) : (

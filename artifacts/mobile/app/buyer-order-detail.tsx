@@ -43,6 +43,7 @@ import {
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ResponsiveContainer } from '@/components/layout';
 import { OrderProgressTimeline } from '@/components/orders/OrderProgressTimeline';
@@ -794,10 +795,24 @@ export default function BuyerOrderDetailScreen() {
 
   // ── Render states ────────────────────────────────────────────────────────────
 
+  // Opened without an order id (deep link / typed route): nothing to fetch,
+  // so say so instead of spinning forever.
+  if (isMissingParam(id)) {
+    return (
+      <UnavailableScreen
+        title="Order details"
+        heading="Order not found"
+        message="This order link is missing or no longer valid."
+        icon="package"
+        fallback="/(buyer)/orders"
+      />
+    );
+  }
+
   if (visibleLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
+        <ScreenHeader title="Order details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.accent} size="large" />
         </View>
@@ -808,7 +823,7 @@ export default function BuyerOrderDetailScreen() {
   if (fetchError && !order) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
+        <ScreenHeader title="Order details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
           <Feather name="wifi-off" size={40} color={theme.muted} />
           <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
@@ -823,7 +838,7 @@ export default function BuyerOrderDetailScreen() {
   if (!order) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Order Details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
+        <ScreenHeader title="Order details" onBack={() => goBackOr(router, '/(buyer)/orders')} />
         <View style={{ flex: 1 }} />
       </BrandthreadScreen>
     );

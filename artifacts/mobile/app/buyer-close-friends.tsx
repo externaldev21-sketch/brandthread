@@ -17,7 +17,7 @@ import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ListRow, StickyBottomCTA } from '@/components/ui';
+import { Button, ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -31,6 +31,8 @@ export default function BuyerCloseFriends() {
   const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [closeFriends, setCloseFriends] = useState<Set<string>>(new Set());
+  // Last-saved selection, so Save only enables once something changed.
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -38,6 +40,7 @@ export default function BuyerCloseFriends() {
     Promise.all([getAcceptedFriends(), getCloseFriendIds()]).then(([list, ids]) => {
       setFriends(list);
       setCloseFriends(new Set(ids));
+      setSavedIds(new Set(ids));
     });
   }, []));
 
@@ -45,6 +48,9 @@ export default function BuyerCloseFriends() {
     f.name.toLowerCase().includes(query.toLowerCase()) ||
     f.handle.toLowerCase().includes(query.toLowerCase())
   );
+
+  const dirty = closeFriends.size !== savedIds.size
+    || Array.from(closeFriends).some(id => !savedIds.has(id));
 
   // Key on userId (e.g. "u_maya") so isCloseFriendOf() can match correctly
   function toggle(userId: string) {
@@ -57,7 +63,7 @@ export default function BuyerCloseFriends() {
   }
 
   async function handleSave() {
-    if (saving) return;
+    if (saving || !dirty) return;
     setSaving(true);
     try {
       await saveCloseFriendIds(Array.from(closeFriends));
@@ -129,22 +135,36 @@ export default function BuyerCloseFriends() {
         renderItem={renderFriend}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 120 }}
         ListEmptyComponent={
-          <EmptyState
-            icon="users"
-            title={friends.length === 0 ? 'No friends yet' : 'No results'}
-            description={friends.length === 0
-              ? 'Add friends to create a close friends list.'
-              : 'Try a different search term.'}
-            action={friends.length === 0
-              ? { label: 'Find friends', onPress: () => router.push('/buyer-friend-requests' as never) }
-              : undefined}
-          />
+          <View>
+            <EmptyState
+              icon="users"
+              title={friends.length === 0 ? 'No friends yet' : 'No results'}
+              description={friends.length === 0
+                ? 'Add friends to create a close friends list.'
+                : 'Try a different search term.'}
+              style={friends.length === 0 ? { paddingBottom: 0 } : undefined}
+            />
+            {/* Shared ui Button, not EmptyState's built-in action: that one's
+                label carries the on-accent text shadow, which blurs dark text
+                on the white pill (audit QA-0950). */}
+            {friends.length === 0 && (
+              <Button
+                label="Find friends"
+                onPress={() => router.push('/buyer-friend-requests' as never)}
+                fullWidth
+                style={{ marginTop: SPACING.md, alignSelf: 'center', maxWidth: 326 }}
+              />
+            )}
+          </View>
         }
         ItemSeparatorComponent={() => <View style={s.separator} />}
       />
 
       {/* Save */}
-      <StickyBottomCTA label="Save" onPress={() => { void handleSave(); }} loading={saving} />
+      {/* Nothing to save with no friends; otherwise disabled until a change. */}
+      {friends.length > 0 && (
+        <StickyBottomCTA label="Save" onPress={() => { void handleSave(); }} loading={saving} disabled={!dirty} />
+      )}
     </View>
   );
 }

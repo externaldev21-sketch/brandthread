@@ -112,11 +112,15 @@ export default function BlockedAndMutedScreen() {
           <PressableScale onPress={() => load(true)} accessibilityRole="button"><Text style={s.retry}>Retry</Text></PressableScale>
         </View>
       ) : null}
+      {/* No count under the error — it would assert "0" for a list that
+          never loaded (audit QA-0247). Error XOR count/empty state. */}
+      {error && tab === 'blocked' ? null : (
       <Text style={s.sectionLabel}>
         {tab === 'blocked'
           ? `${blocked.length} BLOCKED ACCOUNT${blocked.length === 1 ? '' : 'S'}`
           : `${muted.length} MUTED ACCOUNT${muted.length === 1 ? '' : 'S'}`}
       </Text>
+      )}
     </View>
   );
 
@@ -129,6 +133,7 @@ export default function BlockedAndMutedScreen() {
         selectedId={tab}
         onChange={(id) => setTab(id as Tab)}
         testID="blocked-muted-tabs"
+        style={{ marginHorizontal: SPACING.md }}
       />
 
       {loading ? (

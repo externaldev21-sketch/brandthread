@@ -14,6 +14,8 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/Button';
+import { previewBuyerIdentity, profileShareUrl } from '@/lib/previewBuyerIdentity';
 
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
@@ -28,14 +30,18 @@ export default function BuyerQRCode() {
     getMyProfile().then(setProfile);
   }, []);
 
-  const handle = profile?.username ? `@${profile.username}` : null;
-  const canonicalUrl = profile?.username
-    ? `https://brandthread.app/u/${profile.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')}`
-    : null;
+  // Demo preview (&demo=1) has no account profile — use the demo buyer's
+  // identity so the QR code renders; fresh preview stays empty.
+  const demo = previewBuyerIdentity();
+  const username = profile?.username || demo?.username || '';
+  const displayName = profile?.name || demo?.name || '';
+  const canonicalUrl = profileShareUrl(username);
+  const handle = canonicalUrl ? `@${username.replace(/^@/, '')}` : null;
   // Legacy alias — used by existing Share call below; keep for compatibility.
   const qrValue = canonicalUrl ?? 'https://brandthread.app';
 
   async function handleShare() {
+    if (!canonicalUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({
@@ -49,8 +55,8 @@ export default function BuyerQRCode() {
   return (
     <View style={s.page}>
       <ScreenHeader
-        title="QR Code"
-        actions={[{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }]}
+        title="QR code"
+        actions={canonicalUrl ? [{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }] : undefined}
       />
 
       <View style={s.body}>
@@ -79,6 +85,12 @@ export default function BuyerQRCode() {
             <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
               <Feather name="user-x" size={40} color={MUTED} />
               <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
+              <Button
+                label="Set username"
+                variant="secondary"
+                size="small"
+                onPress={() => router.push('/buyer-personal-details' as never)}
+              />
             </View>
           )}
 
@@ -91,32 +103,45 @@ export default function BuyerQRCode() {
             </View>
           ) : null}
 
-          {/* Hint */}
-          <Text style={s.hint}>Point a camera at this code to visit my profile</Text>
+          {/* Hint — only once there is a code to point a camera at */}
+          {canonicalUrl ? <Text style={s.hint}>Point a camera at this code to visit my profile</Text> : null}
         </View>
 
         {/* Share button */}
-        <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={s.shareBtnWrap}>
+        <TouchableOpacity
+          onPress={handleShare}
+          activeOpacity={0.85}
+          disabled={!canonicalUrl}
+          accessibilityState={{ disabled: !canonicalUrl }}
+          style={[s.shareBtnWrap, !canonicalUrl && { opacity: 0.4 }]}
+        >
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shareBtn}>
             <Feather name="share-2" size={18} color={theme.onAccent} />
-            <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR Code</Text>
+            <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR code</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Info rows */}
-        <View style={s.infoCard}>
-          <View style={s.infoRow}>
-            <Feather name="user" size={17} color={PURPLE} />
-            <Text style={s.infoLabel}>Profile</Text>
-            <Text style={s.infoValue}>{profile?.name ?? 'Your Name'}</Text>
+        {/* Info rows — no placeholder name, and no bare-domain link before
+            a username exists */}
+        {displayName || canonicalUrl ? (
+          <View style={s.infoCard}>
+            {displayName ? (
+              <View style={s.infoRow}>
+                <Feather name="user" size={17} color={PURPLE} />
+                <Text style={s.infoLabel}>Profile</Text>
+                <Text style={s.infoValue}>{displayName}</Text>
+              </View>
+            ) : null}
+            {displayName && canonicalUrl ? <View style={s.divider} /> : null}
+            {canonicalUrl ? (
+              <View style={s.infoRow}>
+                <Feather name="link" size={17} color={PURPLE} />
+                <Text style={s.infoLabel}>Link</Text>
+                <Text style={s.infoValue} numberOfLines={1}>{qrValue}</Text>
+              </View>
+            ) : null}
           </View>
-          <View style={s.divider} />
-          <View style={s.infoRow}>
-            <Feather name="link" size={17} color={PURPLE} />
-            <Text style={s.infoLabel}>Link</Text>
-            <Text style={s.infoValue} numberOfLines={1}>{qrValue}</Text>
-          </View>
-        </View>
+        ) : null}
       </View>
     </View>
   );

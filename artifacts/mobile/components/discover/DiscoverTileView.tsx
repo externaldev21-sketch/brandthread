@@ -32,13 +32,14 @@ export function DiscoverTileView({
     >
       {post.imageUri ? (
         // Tiles are 3:4, matching how photos are now saved (cropped by the
-        // creator to 3:4 at post time) — "contain" so a tile never crops
-        // beyond the creator's own chosen crop, even for older content that
-        // predates this system and isn't exactly 3:4.
+        // creator to 3:4 at post time). "cover" so off-ratio (older) content
+        // fills the tile instead of leaving grey/black letterbox bands and
+        // uneven-looking gutters (QA-0269/0909); the full image is one tap
+        // away in the post viewer.
         <CachedImage
           source={{ uri: post.imageUri }}
           style={styles.image}
-          contentFit={post.media === 'video' ? 'cover' : 'contain'}
+          contentFit="cover"
           cachePolicy="memory-disk"
         />
       ) : (

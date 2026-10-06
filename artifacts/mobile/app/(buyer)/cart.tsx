@@ -15,7 +15,8 @@ import {
   ActivityIndicator, Alert, TextInput, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header, StickyFooter } from '@/components/layout';
+import { StickyFooter } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -1014,30 +1015,22 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Pushed-screen header: back chevron + "Cart (N)" + Edit, matching
-          every other stack screen (not the tab-root large-title header) —
-          this is a screen reached from the feed's cart icon or Shop the
+      {/* Pushed-screen header: the shared ScreenHeader (bare back arrow,
+          left-aligned "Cart (N)") + Edit, matching every other stack screen
+          — this is a screen reached from the feed's cart icon or Shop the
           Post, never its own tab (see BUYER_TAB_BAR_HIDDEN_ROUTES). */}
-      <Header
+      <ScreenHeader
         title={`Cart${hasItems ? ` (${cart.items.reduce((sum, i) => sum + i.quantity, 0)})` : ''}`}
-        showBack
-        // Over the page's pure black (no second, lighter band).
-        transparent
         rightElement={hasItems ? (
           <TouchableOpacity
             onPress={() => { Haptics.selectionAsync(); setEditMode(e => !e); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}
-            // Header's compact row already contributes SP.sm (8pt) of its own
-            // paddingHorizontal; this adds the remaining 8pt so Edit's right
-            // inset totals 16pt — the same as the back chevron's left inset.
-            style={s.editBtn}
           >
             <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
           </TouchableOpacity>
         ) : undefined}
-        dividerVariant="subtle"
       />
 
       {!hasItems && !hasSaved && !loadError ? (
@@ -1310,7 +1303,6 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   emptyTitle: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
   emptyDescription: { fontSize: FS.base, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
   emptyCta: { marginTop: SP.md },
-  editBtn: { paddingRight: SP.sm },
   editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   editBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

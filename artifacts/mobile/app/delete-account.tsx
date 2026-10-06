@@ -227,7 +227,9 @@ export default function DeleteAccountScreen() {
               label="Continue"
               onPress={() => { setStep('confirm'); setDeleteError(null); }}
               disabled={!canContinue}
-              style={{ marginTop: SP.lg }}
+              // Disabled fill matches the page — outline it so it still reads
+              // as a full-width button (audit QA-1025), not floating text.
+              style={[{ marginTop: SP.lg }, !canContinue && { borderWidth: 1, borderColor: theme.border }]}
             />
             <SecondaryButton label="Keep my account" onPress={goBack} accent={theme.text} style={{ marginTop: SP.sm }} />
           </>

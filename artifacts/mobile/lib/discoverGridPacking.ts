@@ -6,7 +6,7 @@
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
 export type GridRow =
-  | { key: string; type: 'normal'; tiles: DiscoverPost[] }
+  | { key: string; type: 'normal'; tiles: DiscoverPost[]; cols?: 2 }
   | { key: string; type: 'feature'; big: DiscoverPost; small: DiscoverPost[] }
   | { key: string; type: 'rail'; kind: 'justDropped' | 'highDemand' | 'trendingBrands' | 'shopTheLook' }
   | { key: string; type: 'people' };
@@ -78,5 +78,34 @@ export function buildGridRows(
       tilesSincePeople = 0;
     }
   }
-  return rows;
+  return balanceTrailingRow(rows);
+}
+
+/**
+ * The 3-wide grid used to end on a partial row (1 or 2 tiles followed by
+ * empty black space — QA-0268/0270). Re-pack only the tail, keeping every
+ * post: a trailing pair becomes one 2-column row; a lone trailing tile is
+ * merged with the 3 tiles of the grid row before it into two 2-column rows.
+ * Rails/people rows in between are left where they are.
+ */
+export function balanceTrailingRow(rows: GridRow[]): GridRow[] {
+  const lastIdx = rows.length - 1;
+  const last = rows[lastIdx];
+  if (!last || last.type !== 'normal' || last.tiles.length >= 3) return rows;
+  if (last.tiles.length === 2) {
+    return [...rows.slice(0, lastIdx), { ...last, cols: 2 }];
+  }
+  // One trailing tile — find the previous grid (normal/feature) row.
+  let prevIdx = lastIdx - 1;
+  while (prevIdx >= 0 && rows[prevIdx].type !== 'normal' && rows[prevIdx].type !== 'feature') prevIdx--;
+  const prev = rows[prevIdx];
+  if (!prev || prevIdx !== lastIdx - 1) return rows;
+  const prevTiles = prev.type === 'feature' ? [prev.big, ...prev.small] : prev.type === 'normal' ? prev.tiles : [];
+  if (prevTiles.length !== 3) return rows;
+  const four = [...prevTiles, ...last.tiles];
+  return [
+    ...rows.slice(0, prevIdx),
+    { key: `${prev.key}-a`, type: 'normal', tiles: four.slice(0, 2), cols: 2 },
+    { key: `${prev.key}-b`, type: 'normal', tiles: four.slice(2), cols: 2 },
+  ];
 }

@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { UnavailableScreen } from '@/components/ui/UnavailableScreen';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -723,27 +724,17 @@ export default function BuyerProductDetailScreen() {
   }
 
   if (!product) {
-    // Compact error/not-found state with retry
+    // Not found (or no product id): the shared header + one recovery action
+    // with a neutral icon — no boxed back button, no second "Go back".
     return (
-      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
-          <Feather name="alert-circle" size={ICON.xl} color={RED} />
-          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>Product not found</Text>
-          <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
-            This product may be unavailable or the link may have expired.
-          </Text>
-          <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
-        </View>
-        {/* Back button */}
-        <View style={{ position: 'absolute', left: SP.md, top: headerTopInset + SP.sm }}>
-          <IconButton
-            name="arrow-left"
-            onPress={leaveProduct}
-            accessibilityLabel="Back"
-            variant="filled"
-          />
-        </View>
-      </View>
+      <UnavailableScreen
+        title="Product"
+        heading="Product not found"
+        message="This product may be unavailable or the link may have expired."
+        onAction={leaveProduct}
+        fallback="/(buyer)/discover"
+        testID="buyer-product-not-found"
+      />
     );
   }
 

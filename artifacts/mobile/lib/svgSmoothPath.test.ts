@@ -16,6 +16,17 @@ describe('smoothPath', () => {
     expect(path.startsWith('M0,0')).toBe(true);
     expect(path).toContain('20,0');
   });
+
+  it('never overshoots a segment\'s endpoints (no dip below a zero baseline)', () => {
+    // y grows downward: 100 is the $0 baseline. A spike next to flat zeros
+    // used to pull the neighbouring control points below the baseline.
+    const pts = [{ x: 0, y: 100 }, { x: 10, y: 100 }, { x: 20, y: 0 }, { x: 30, y: 100 }, { x: 40, y: 100 }];
+    const ys = [...smoothPath(pts).matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[2]));
+    for (const y of ys) {
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(100);
+    }
+  });
 });
 
 describe('layoutSeriesPoints', () => {

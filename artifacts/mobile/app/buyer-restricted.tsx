@@ -81,7 +81,6 @@ export default function RestrictedAccountsScreen() {
           <EmptyState
             icon="user-x"
             title="No restricted accounts"
-            description="Restricted accounts will appear here."
             style={{ marginTop: SPACING.lg }}
           />
         }

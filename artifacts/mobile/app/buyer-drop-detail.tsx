@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
   SUCCESS, FONT, FS, SP, RADIUS,
@@ -25,6 +25,10 @@ import {
 } from '@/components/CommerceSignal';
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+import { isWellFormedDropId } from '@/lib/dropId';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
@@ -318,6 +322,7 @@ export default function BuyerDropDetail() {
   const [drop, setDrop] = useState<DropDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [reloadGeneration, setReloadGeneration] = useState(0);
@@ -332,13 +337,16 @@ export default function BuyerDropDetail() {
 
   useEffect(() => {
     let active = true;
-    if (!dropId) {
+    // Missing or malformed id (e.g. /drops/demo): it can never resolve, so
+    // show "not found" without a request instead of a misleading load error.
+    if (isMissingParam(dropId) || !isWellFormedDropId(dropId)) {
       setLoading(false);
-      setLoadError(true);
+      setNotFound(true);
       return () => { active = false; };
     }
     setLoading(true);
     setLoadError(false);
+    setNotFound(false);
     Promise.all([
       api.publicDrops.get(dropId),
       api.publicDrops.notificationStatus(dropId).catch(() => ({ subscribed: false })),
@@ -352,7 +360,12 @@ export default function BuyerDropDetail() {
       setDrop(data as DropDetail);
       setSubscribed(notification.subscribed);
       Animated.timing(entrance, { toValue: 1, duration: 650, useNativeDriver: true }).start();
-    }).catch(() => { if (active) { setDrop(null); setLoadError(true); } })
+    }).catch((err: unknown) => {
+      if (!active) return;
+      setDrop(null);
+      if ((err as { status?: number } | null)?.status === 404) setNotFound(true);
+      else setLoadError(true);
+    })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [dropId, reloadGeneration]);
@@ -436,35 +449,37 @@ export default function BuyerDropDetail() {
     });
   }
 
+  const fallbackTitle = typeof dropName === 'string' && dropName.trim() ? dropName : 'Drop';
+
+  if (notFound) {
+    return (
+      <UnavailableScreen
+        title={fallbackTitle}
+        heading="Drop not found"
+        message="This drop link is invalid or the drop was removed."
+        icon="calendar"
+        fallback="/buyer-drops"
+      />
+    );
+  }
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title={fallbackTitle} onBack={() => goBackOr(router, '/buyer-drops')} />
+        <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>
+      </View>
+    );
   }
   if (!drop) {
     return (
-      <View style={[styles.center, { paddingHorizontal: 32, gap: 16 }]}>
-        <Feather name="alert-triangle" size={32} color={theme.muted} />
-        <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: 17, textAlign: 'center' }}>
-          {loadError ? "Couldn't load this drop." : "This drop isn't available."}
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          {loadError && (
-            <TouchableOpacity
-              onPress={() => setReloadGeneration(g => g + 1)}
-              accessibilityRole="button"
-              accessibilityLabel="Try again"
-              style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: theme.accent }}
-            >
-              <Text style={[{ fontWeight: '600' }, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Try again</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={() => goBackOr(router)}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
-          >
-            <Text style={{ color: theme.text, fontWeight: '600' }}>Back</Text>
-          </TouchableOpacity>
+      <View style={styles.root}>
+        <ScreenHeader title={fallbackTitle} onBack={() => goBackOr(router, '/buyer-drops')} />
+        <View style={styles.center}>
+          <ErrorState
+            message={loadError ? 'Couldn’t load this drop.' : 'This drop isn’t available.'}
+            onRetry={loadError ? () => setReloadGeneration(g => g + 1) : undefined}
+            retryLabel="Try again"
+          />
         </View>
       </View>
     );

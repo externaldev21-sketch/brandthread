@@ -84,12 +84,12 @@ export default function BuyerYourActivity() {
   const activityItems = [
     { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: theme.accent },
     { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: theme.accentLight },
-    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: theme.warning },
+    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: theme.accent },
   ];
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Your Activity" />
+      <ScreenHeader title="Your activity" />
 
       <ScrollView
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + SPACING.xxxl }}
@@ -139,6 +139,7 @@ export default function BuyerYourActivity() {
             iconColor={theme.accent}
             title="Archive"
             subtitle="Posts you've archived from your profile"
+            subtitleNumberOfLines={2}
             chevron
             onPress={() => router.push('/buyer-archive' as never)}
           />
@@ -159,8 +160,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     marginBottom: SPACING.sm,
     marginTop: SPACING.md,
   },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  statCard: { flex: 1, minWidth: '45%', gap: 4 },
+  // Three equal cards across — the 45% min width wrapped Reposts onto its
+  // own full-width row.
+  statsGrid: { flexDirection: 'row', gap: SPACING.sm },
+  statCard: { flex: 1, minWidth: 0, gap: 4 },
   statValue: { ...TYPE_SCALE.title2, color: theme.text },
   statLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: theme.text },
   statSub: { ...TYPE_SCALE.caption, color: theme.muted },

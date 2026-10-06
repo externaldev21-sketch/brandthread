@@ -5,10 +5,23 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { Redirect } from 'expo-router';
+import { useRole } from '@/contexts/RoleContext';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
 
 export default function CheckoutScreen() {
+  const { role, isLoaded } = useRole();
+  // These are the STORE's checkout settings — seller-only. A buyer who opens
+  // /checkout (deep link, typed URL) goes to their own checkout instead,
+  // which shows the cart's checkout or a "Nothing to check out" state.
+  const isBuyer = isBuyerDevPreview() || (role === 'buyer' && !isSellerDevPreview());
+  if (isLoaded && isBuyer) return <Redirect href={'/buyer-checkout' as never} />;
+  return <CheckoutSettings />;
+}
+
+function CheckoutSettings() {
   const colors = useColors();
   const [modeIndex, setModeIndex] = useState(0);
   const [tipping, setTipping] = useState(false);
@@ -29,7 +42,8 @@ export default function CheckoutScreen() {
       <ScreenHeader title="Checkout settings" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <TouchableOpacity onPress={cycleMode} activeOpacity={0.7} style={[styles.selectBox, { borderColor: colors.border, marginBottom: 12 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer accounts</Text>
+          <TouchableOpacity onPress={cycleMode} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`Customer accounts: ${CHECKOUT_MODES[modeIndex]}`} style={[styles.selectBox, { borderColor: colors.border }]}>
             <Text style={[styles.selectValue, { color: colors.foreground }]}>{CHECKOUT_MODES[modeIndex]}</Text>
             <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
@@ -58,7 +72,7 @@ export default function CheckoutScreen() {
             >
               {tipping && <Feather name="check" size={12} color={colors.primaryForeground} />}
             </View>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Show tipping options at checkout</Text>
+            <Text style={[styles.radioLabel, { color: colors.foreground }]}>Show tipping options at checkout</Text>
           </TouchableOpacity>
         </View>
 
@@ -116,7 +130,6 @@ const styles = StyleSheet.create({
   rowStart: { flexDirection: 'row', alignItems: 'center' },
   selectBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md - 2 },
   selectValue: { fontSize: FS.md, fontFamily: FONT.semibold },
-  cardTitle: { fontSize: FS.md, fontFamily: FONT.semibold },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginTop: SP.xs },
   checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   radioRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginBottom: SP.sm + 4 },

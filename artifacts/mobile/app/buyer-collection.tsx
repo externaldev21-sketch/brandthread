@@ -23,6 +23,9 @@ import { getCollectionItems, updateCollection, deleteCollection, moveSavedItemTo
 import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
@@ -44,18 +47,23 @@ export default function BuyerCollection() {
   const [collection, setCollection] = useState<SavedCollection | null>(null);
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!collectionId) return;
+    // Signed-out dev preview has no account (and no collections) behind it —
+    // never call the protected endpoint (same guard as buyer-saved.tsx).
+    if (isMissingParam(collectionId) || isBuyerDevPreview()) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await getCollectionItems(collectionId);
       setCollection(data.collection);
       setItems(data.items);
     } catch (error) {
+      setLoadError(true);
       reportNetworkError(error, load);
     } finally {
       setLoading(false);
@@ -187,6 +195,20 @@ export default function BuyerCollection() {
     );
   }
 
+  // Opened without a collection id (or in the account-less preview, where no
+  // collection exists) — nothing to load.
+  if (isMissingParam(collectionId) || isBuyerDevPreview()) {
+    return (
+      <UnavailableScreen
+        title="Collection"
+        heading="Collection not found"
+        message="Open a collection from your saved items."
+        icon="folder"
+        fallback="/buyer-saved"
+      />
+    );
+  }
+
   return (
     <View style={styles.root}>
       <ScreenHeader
@@ -212,6 +234,8 @@ export default function BuyerCollection() {
 
       {loading ? (
         <View style={styles.gridContent}><GridSkeleton columns={2} cardWidth={TILE_SIZE} rows={3} gap={GAP} /></View>
+      ) : loadError && !collection ? (
+        <ErrorState message="Couldn’t load this collection." onRetry={load} retryLabel="Try again" style={{ marginTop: SP.xxl }} />
       ) : items.length === 0 ? (
         <EmptyState
           icon="folder"

@@ -97,6 +97,9 @@ import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout
 import { FONT, FS, SP } from '@/lib/theme';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
+import { UnavailableScreen } from '@/components/ui/UnavailableScreen';
+import { useRole } from '@/contexts/RoleContext';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -149,6 +152,12 @@ export default function BuyerCheckoutScreen() {
   const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Opened with nothing in the cart (a deep link, the web preview typing the
+  // route, a stale back-stack entry): show an explicit empty state instead of
+  // bouncing — with no history to pop, that bounce replaced to "/" and
+  // landed on the home feed (buyer) or the Dashboard (seller).
+  const [nothingToCheckout, setNothingToCheckout] = useState(false);
+  const { role } = useRole();
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<CheckoutError | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
@@ -183,7 +192,7 @@ export default function BuyerCheckoutScreen() {
       let next = await getCheckoutSession();
       if (!next) {
         const cart = await getCart();
-        if (!cart.items.length) { leaveCheckout(); return; }
+        if (!cart.items.length) { setNothingToCheckout(true); setLoading(false); return; }
         next = await createCheckoutSession(cart, source === 'buynow');
       }
       // Normalize legacy step values
@@ -912,6 +921,22 @@ export default function BuyerCheckoutScreen() {
           style={{ flex: 1 }}
         />
       </View>
+    );
+  }
+
+  if (nothingToCheckout) {
+    // Discover is a buyer-only route; a seller account just goes back.
+    const isSeller = role === 'seller' || isSellerDevPreview();
+    return (
+      <UnavailableScreen
+        title="Checkout"
+        heading="Nothing to check out"
+        message="Your cart is empty."
+        icon="shopping-bag"
+        actionLabel={isSeller ? 'Go back' : 'Continue shopping'}
+        onAction={isSeller ? undefined : () => router.replace('/(buyer)/discover' as never)}
+        testID="checkout-nothing"
+      />
     );
   }
 

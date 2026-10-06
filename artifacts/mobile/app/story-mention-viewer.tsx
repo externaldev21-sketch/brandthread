@@ -442,7 +442,7 @@ export default function StoryMentionViewerScreen() {
           </View>
         </View>
 
-        <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} style={styles.topScrim} />
+        <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topScrim} />
         <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']} style={styles.bottomScrim} />
 
         {/* Progress: one segment per slide of the current story. */}
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   tapRow: { position: 'absolute', top: 0, left: 0, right: 0, height: H * 0.7, flexDirection: 'row' },
   tapLeft: { width: '30%', height: '100%' },
   tapRight: { width: '70%', height: '100%' },
-  topScrim: { position: 'absolute', left: 0, right: 0, top: 0, height: 140, zIndex: 1 },
+  topScrim: { position: 'absolute', left: 0, right: 0, top: 0, height: 180, zIndex: 1 },
   bottomScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 200, zIndex: 1 },
   progressRow: { position: 'absolute', left: 0, right: 0, paddingHorizontal: SP.sm, flexDirection: 'row', gap: 3, zIndex: 10 },
   progressTrack: { flex: 1, height: 3, borderRadius: RADIUS.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.3)' },
@@ -570,7 +570,9 @@ const styles = StyleSheet.create({
   avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm },
   headerText: { flex: 1, marginLeft: SP.sm },
   name: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 14, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  sub: { color: '#D4D4D8', fontFamily: FONT.regular, fontSize: FS.sm, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  // Over bright media (sunset skies): near-white, medium weight and a firmer
+  // shadow so "Mentioned you · 1h ago" stays legible on top of the scrim.
+  sub: { color: '#F4F4F5', fontFamily: FONT.medium, fontSize: FS.sm, textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10 },
   toast: {
     alignSelf: 'center', marginBottom: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm,

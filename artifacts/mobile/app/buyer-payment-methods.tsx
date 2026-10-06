@@ -131,14 +131,13 @@ export default function BuyerPaymentMethodsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.desc}>
-            Payment methods saved from your Brandthread purchases. Cards are stored securely by Stripe.
+            Payment methods saved from your Brandthread purchases.
           </Text>
 
           {paymentMethods.length === 0 ? (
             <EmptyState
               icon="credit-card"
               title="No saved payment methods"
-              description="Payment methods are saved automatically when you complete a purchase. Your card details are stored securely by Stripe — Brandthread never sees your full card number."
               compact
               style={{ marginBottom: SPACING.xl }}
             />

@@ -32,6 +32,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SPACING.xs;
@@ -91,6 +92,15 @@ export default function BuyerSaved() {
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
+    // Signed-out dev preview: there is no account (and no demo saved-items
+    // seed) behind it, so resolve straight to the empty state instead of
+    // calling the protected endpoints and waiting on them.
+    if (isBuyerDevPreview()) {
+      setItems([]);
+      setCollections([]);
+      setLoading(false);
+      return;
+    }
     try {
       const [savedRows, collectionRows] = await Promise.all([getSavedItems(), getCollections()]);
       setItems(savedRows);
