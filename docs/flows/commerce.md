@@ -236,26 +236,26 @@ Each fixed row has a whole-app test that fails on `dev` and passes with the fix.
 
 | # | Flow | Break | Status |
 |---|---|---|---|
-| 1 | Checkout | Stripe webhook auto-registration (`lib/ensureWebhookEvents.ts`) omitted `payment_intent.succeeded/payment_failed/canceled`, which create in-app (PaymentSheet / Apple Pay) orders and release held stock | Fixed — checkout/inventory PR (`ensureWebhookEvents.events.test.ts` pins every handled event to the subscription) |
-| 2 | Inventory | Seller stock adjust read-modify-wrote an absolute value, losing a concurrent sale | Fixed — checkout/inventory PR |
-| 3 | Inventory | Cancelling an unpaid seller-created order never restored its stock | Fixed — checkout/inventory PR |
-| 4 | Orders | Order numbers came from `count(*)+1` with no lock: concurrent orders shared a number | Fixed — checkout/inventory PR |
-| 5 | Inventory | Low-stock alerts from paid orders had no push and could fire only once per product, ever | Fixed — checkout/inventory PR |
-| 6 | Cart | `cart/validate` compared `item.price` but the app sends `priceCents`, so price changes were never flagged | Fixed — checkout/inventory PR |
-| 7 | Checkout | Seller was never told when an order was auto-refunded as oversold | Fixed — checkout/inventory PR |
-| 8 | Inventory | Restock from a cancel/refund never sent back-in-stock alerts | Fixed — checkout/inventory PR |
-| 9 | Disputes | Seller never notified of a chargeback; nothing in the app opened `dispute-detail` | Fixed — money PR |
-| 10 | Disputes | Multi-seller carts: dispute attached to an arbitrary order of the PaymentIntent; other sellers' orders kept paying out | Fixed — money PR |
-| 11 | Disputes | "Accept" only flipped a local row; Stripe was never told | Fixed — money PR |
-| 12 | Disputes | API sent `amount` in dollars while the app reads `amountCents`; tracking evidence sent the description as the tracking number | Fixed — money PR |
-| 13 | Delivery / payout | Seller not told when an order is delivered or when its payout transfer is sent | Fixed — money PR |
-| 14 | Payout | Hold mode (production default) never paid the seller the platform-funded Thread Cash part of an order | Fixed — money PR |
-| 15 | Discounts | `maxUses` only checked against paid orders; concurrent checkouts could redeem past the limit | Fixed — promotions/analytics PR |
-| 16 | Drops | Ended drops were still purchasable; the cart didn't warn about locked drops | Fixed — promotions/analytics PR |
-| 17 | Drops | Notify-me subscribers got no launch push unless the seller separately broadcast to followers | Fixed — promotions/analytics PR |
-| 18 | Analytics | `/dashboard`, `/revenue`, `/products`, `/customers` counted unpaid and refunded orders; `/revenue` daily series capped at 10 rows, `lastMonth` unbounded, buckets in server timezone | Fixed — promotions/analytics PR |
-| 19 | Analytics | `/home` chart dropped the current bucket when the range end was capped mid-bucket (`range=all`), so buckets summed to less than the headline | Fixed — promotions/analytics PR |
-| 20 | Tests | Commerce/money suites red on `dev`: stale expectations (buyer order-confirmed push, active preorder drop, `requirePayoutsRead` mock, immutable ledger cleanup, live-gift caps, webhook secret, analytics boundary timestamps, drops `requireRole`) | Fixed — flow-map PR (+ promotions/analytics PR for the analytics/drops suites) |
+| 1 | Checkout | Stripe webhook auto-registration (`lib/ensureWebhookEvents.ts`) omitted `payment_intent.succeeded/payment_failed/canceled`, which create in-app (PaymentSheet / Apple Pay) orders and release held stock | Fixed — #710 (`ensureWebhookEvents.events.test.ts` pins every handled event to the subscription) |
+| 2 | Inventory | Seller stock adjust read-modify-wrote an absolute value, losing a concurrent sale | Fixed — #710 |
+| 3 | Inventory | Cancelling an unpaid seller-created order never restored its stock | Fixed — #710 |
+| 4 | Orders | Order numbers came from `count(*)+1` with no lock: concurrent orders shared a number | Fixed — #710 |
+| 5 | Inventory | Low-stock alerts from paid orders had no push and could fire only once per product, ever | Fixed — #710 |
+| 6 | Cart | `cart/validate` compared `item.price` but the app sends `priceCents`, so price changes were never flagged | Fixed — #710 |
+| 7 | Checkout | Seller was never told when an order was auto-refunded as oversold | Fixed — #710 |
+| 8 | Inventory | Restock from a cancel/refund never sent back-in-stock alerts | Fixed — #710 |
+| 9 | Disputes | Seller never notified of a chargeback; nothing in the app opened `dispute-detail` | Fixed — #711 |
+| 10 | Disputes | Multi-seller carts: dispute attached to an arbitrary order of the PaymentIntent; other sellers' orders kept paying out | Fixed — #711 |
+| 11 | Disputes | "Accept" only flipped a local row; Stripe was never told | Fixed — #711 |
+| 12 | Disputes | API sent `amount` in dollars while the app reads `amountCents`; tracking evidence sent the description as the tracking number | Fixed — #711 |
+| 13 | Delivery / payout | Seller not told when an order is delivered or when its payout transfer is sent | Fixed — #711 |
+| 14 | Payout | Hold mode (production default) never paid the seller the platform-funded Thread Cash part of an order | Fixed — #711 |
+| 15 | Discounts | `maxUses` only checked against paid orders; concurrent checkouts could redeem past the limit | Fixed — #712 |
+| 16 | Drops | Ended drops were still purchasable; the cart didn't warn about locked drops | Fixed — #712 |
+| 17 | Drops | Notify-me subscribers got no launch push unless the seller separately broadcast to followers | Fixed — #712 |
+| 18 | Analytics | `/dashboard`, `/revenue`, `/products`, `/customers` counted unpaid and refunded orders; `/revenue` daily series capped at 10 rows, `lastMonth` unbounded, buckets in server timezone | Fixed — #712 |
+| 19 | Analytics | `/home` chart dropped the current bucket when the range end was capped mid-bucket (`range=all`), so buckets summed to less than the headline | Fixed — #712 |
+| 20 | Tests | Commerce/money suites red on `dev`: stale expectations (buyer order-confirmed push, active preorder drop, `requirePayoutsRead` mock, immutable ledger cleanup, live-gift caps, webhook secret, analytics boundary timestamps, drops `requireRole`) | Fixed — #709 (+ #712 for the analytics/drops suites) |
 | 21 | Reviews | Reviews posted without `productId` never reached the product page; sellers not alerted to new reviews | Other session — PR #657 (resolves the product server-side) |
 | 22 | Shipping | `package-presets` router never mounted | Other session — PR #699 |
 | 23 | Shipping | Shippo webhook unauthenticated when `SHIPPO_WEBHOOK_SECRET` is unset; label-only orders not polled | Other session — order tracking / auto-refunds |
