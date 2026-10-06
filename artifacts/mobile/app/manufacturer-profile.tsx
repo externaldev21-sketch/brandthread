@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -155,6 +156,19 @@ export default function ManufacturerProfileScreen() {
 
   function handleQuote() {
     router.push(('/quote-request?manufacturerId=' + id) as never);
+  }
+
+  // Opened without an id (deep link / typed route): nothing can load, so
+  // show the shared not-found screen instead of an endless spinner.
+  if (isMissingParam(id)) {
+    return (
+      <UnavailableScreen
+        title="Manufacturer"
+        heading="Manufacturer not found"
+        message="This profile isn't available."
+        icon="briefcase"
+      />
+    );
   }
 
   if (loading) {

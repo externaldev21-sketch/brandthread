@@ -36,6 +36,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -129,6 +130,8 @@ export default function BuyerPostViewer() {
   }>();
 
   const [post, setPost] = useState<BuyerPost | null>(null);
+  // The lookup settled (found or not) — gates the "Post not found" state.
+  const [postLoaded, setPostLoaded] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -163,6 +166,7 @@ export default function BuyerPostViewer() {
       setSaved(found.savedByMe ?? false);
       setEditCaption(found.caption);
     }
+    setPostLoaded(true);
   }, [params.postId]);
 
   useEffect(() => {
@@ -224,6 +228,21 @@ export default function BuyerPostViewer() {
     width: windowWidth,
     height: windowWidth,
   });
+
+  // No post id, or the lookup settled with nothing and the caller passed no
+  // author to show: an honest "Post not found" with the shared header instead
+  // of a made-up author ("Jordan") over an empty media box.
+  if (isMissingParam(params.postId) || (postLoaded && !post && !params.postAuthorName)) {
+    return (
+      <UnavailableScreen
+        title="Post"
+        heading="Post not found"
+        message="This post may have been deleted or the link may have expired."
+        icon="image"
+        testID="buyer-post-viewer-unavailable"
+      />
+    );
+  }
 
   return (
     <View style={s.page}>

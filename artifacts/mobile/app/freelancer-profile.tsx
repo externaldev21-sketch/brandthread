@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 import { useApi, type Freelancer } from '@/lib/api';
 import { serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel, apiErrorMessage, apiErrorCode } from '@/lib/freelancer';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -157,6 +158,19 @@ export default function FreelancerProfileScreen() {
       setHiring(false);
     }
   };
+
+  // Opened without an id (deep link / typed route): nothing can load, so
+  // show the shared not-found screen instead of an endless spinner.
+  if (isMissingParam(id)) {
+    return (
+      <UnavailableScreen
+        title="Freelancer"
+        heading="Freelancer not found"
+        message="This profile isn't available."
+        icon="user-x"
+      />
+    );
+  }
 
   if (loading) {
     return (

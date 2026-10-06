@@ -53,6 +53,9 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
+import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 type ContentTab = 'Posts' | 'Tagged';
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
@@ -103,6 +106,8 @@ export default function BuyerOtherProfileScreen() {
   const [profile, setProfile]           = useState<RemoteProfile | null>(null);
   const [apiLoaded, setApiLoaded]       = useState(false);
   const [loadFailed, setLoadFailed]     = useState(false);
+  // The profile API answered 404 — the account doesn't exist (or is gone).
+  const [notFound, setNotFound]         = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [msgLoading, setMsgLoading]     = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
@@ -154,10 +159,12 @@ export default function BuyerOtherProfileScreen() {
       setProfile(profileData as RemoteProfile);
       setCanonicalUserId(resolvedId);
       setLoadFailed(false);
+      setNotFound(false);
       const stories = await api.social.storiesForUser(resolvedId).catch(() => []);
       setStoryIds((Array.isArray(stories) ? stories : []).map((s: any) => s.id));
-    } catch {
+    } catch (err) {
       setLoadFailed(true);
+      setNotFound((err as { status?: number } | null)?.status === 404);
     } finally {
       setApiLoaded(true);
     }
@@ -427,6 +434,39 @@ export default function BuyerOtherProfileScreen() {
       </View>
     </>
   );
+
+  // No usable user id (missing param, an unresolved `u_` alias, or the
+  // dev-preview where route params are never trusted and nothing is seeded)
+  // or the API said 404: an honest "not found" screen with the shared
+  // header — never a "?" / "Unknown" / "@unknown" placeholder identity with
+  // live-looking Follow / Message buttons.
+  const unresolvable = isMissingParam(params.userId) || !trustRouteParams || userId.startsWith('u_');
+  if (unresolvable || (apiLoaded && notFound && !profile)) {
+    return (
+      <UnavailableScreen
+        title="Profile"
+        heading="Profile not found"
+        message="This account isn't available."
+        icon="user-x"
+        fallback={'/(buyer)/' as never}
+        testID="buyer-other-profile-unavailable"
+      />
+    );
+  }
+  // A real load failure (network / server) for a real id: retry, with the header.
+  if (apiLoaded && loadFailed && !profile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background }} testID="buyer-other-profile-error">
+        <ScreenHeader title="Profile" onBack={goBack} />
+        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 96 }}>
+          <ErrorState
+            message="Couldn't load this profile."
+            onRetry={() => { setApiLoaded(false); void loadProfile(); }}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <>
