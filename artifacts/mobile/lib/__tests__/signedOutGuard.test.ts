@@ -32,6 +32,8 @@ vi.mock('@/lib/previewOrders', () => ({
 vi.mock('../previewOrders', () => ({
   getPreviewSellerOrders: () => (preview.demo ? [{ id: 'preview-order-1', totalCents: 4200 }] : []),
 }));
+// The demo catalog bundles image assets; the guard only needs its shape here.
+vi.mock('../previewSellerProducts', () => ({ getPreviewSellerProducts: () => [] }));
 vi.mock('../devPreview', () => ({
   isSellerDevPreview: () => preview.role === 'seller',
   isBuyerDevPreview: () => preview.role === 'buyer',
