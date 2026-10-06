@@ -2405,6 +2405,7 @@ export default function OnboardingScreen() {
       <WelcomeStep
         onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}
         onSignIn={() => router.replace('/sign-in' as never)}
+        onBrowse={isSignedIn ? undefined : () => router.replace('/(buyer)/discover' as never)}
       />
     );
 

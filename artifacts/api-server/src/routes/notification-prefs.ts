@@ -6,6 +6,9 @@
  * ─────────
  * GET  /api/seller/notification-prefs   → { digest: 'realtime' | 'daily' }
  * PUT  /api/seller/notification-prefs   ← { digest: 'realtime' | 'daily' }
+ *
+ * `promotionalPush` (boolean, default false) is the explicit opt-in for
+ * promotional/marketing pushes (App Store 4.5.4); see lib/pushPolicy.ts.
  */
 
 import { Router } from "express";
@@ -40,6 +43,16 @@ function defaultsFor(accountType: string | null | undefined) {
   return accountType === "seller" ? SELLER_DEFAULTS : BUYER_DEFAULTS;
 }
 
+/** Separate read so a deploy before migration 260 reports false instead of failing the screen. */
+async function readPromoOptIn(clerkId: string): Promise<boolean> {
+  try {
+    const [r] = await db.select({ v: users.promoPushOptIn }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+    return r?.v === true;
+  } catch {
+    return false;
+  }
+}
+
 const HHMM_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 function isValidTimeOfDay(value: unknown): value is string {
@@ -69,6 +82,7 @@ router.get("/", async (req, res) => {
       digest: (row?.digest ?? "realtime") as DigestMode,
       role,
       pushEnabled: row?.pushEnabled ?? true,
+      promotionalPush: await readPromoOptIn(clerkId),
       quietHours: {
         start: row?.quietHoursStart ?? null,
         end: row?.quietHoursEnd ?? null,
@@ -85,10 +99,11 @@ router.get("/", async (req, res) => {
 // ── PUT /api/seller/notification-prefs ───────────────────────────────────────
 router.put("/", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { digest, categories, pushEnabled, quietHours } = req.body as {
+  const { digest, categories, pushEnabled, promotionalPush, quietHours } = req.body as {
     digest?: string;
     categories?: Record<string, unknown>;
     pushEnabled?: unknown;
+    promotionalPush?: unknown;
     quietHours?: { start?: unknown; end?: unknown; timezone?: unknown } | null;
   };
   if (digest !== undefined && !VALID_DIGEST.includes(digest as DigestMode)) {
@@ -100,6 +115,9 @@ router.put("/", async (req, res) => {
   }
   if (pushEnabled !== undefined && typeof pushEnabled !== "boolean") {
     return res.status(400).json({ error: "pushEnabled must be a boolean" });
+  }
+  if (promotionalPush !== undefined && typeof promotionalPush !== "boolean") {
+    return res.status(400).json({ error: "promotionalPush must be a boolean" });
   }
   let quietHoursPatch: { start: string | null; end: string | null; timezone?: string } | undefined;
   if (quietHours !== undefined) {
@@ -121,8 +139,8 @@ router.put("/", async (req, res) => {
       };
     }
   }
-  if (digest === undefined && categories === undefined && pushEnabled === undefined && quietHoursPatch === undefined) {
-    return res.status(400).json({ error: "digest, categories, pushEnabled, or quietHours is required" });
+  if (digest === undefined && categories === undefined && pushEnabled === undefined && promotionalPush === undefined && quietHoursPatch === undefined) {
+    return res.status(400).json({ error: "digest, categories, pushEnabled, promotionalPush, or quietHours is required" });
   }
 
   try {
@@ -149,6 +167,7 @@ router.put("/", async (req, res) => {
       updatedAt: new Date(),
     };
     if (pushEnabled !== undefined) updates.pushEnabled = pushEnabled;
+    if (promotionalPush !== undefined) updates.promoPushOptIn = promotionalPush;
     if (quietHoursPatch !== undefined) {
       updates.quietHoursStart = quietHoursPatch.start;
       updates.quietHoursEnd = quietHoursPatch.end;
@@ -179,6 +198,7 @@ router.put("/", async (req, res) => {
       digest: (saved?.digest ?? digest ?? "realtime") as DigestMode,
       role: current.accountType === "seller" ? "seller" : "buyer",
       pushEnabled: saved?.pushEnabled ?? true,
+      promotionalPush: await readPromoOptIn(clerkId),
       quietHours: {
         start: saved?.quietHoursStart ?? null,
         end: saved?.quietHoursEnd ?? null,

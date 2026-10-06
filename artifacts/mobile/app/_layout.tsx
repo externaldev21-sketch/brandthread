@@ -3,6 +3,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
+import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -594,7 +595,7 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
-  const { addAccount } = useGlobalSearchParams<{ addAccount?: string }>();
+  const { addAccount, returnTo } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string }>();
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
@@ -767,9 +768,9 @@ function AuthGate() {
     const inAddAccountFlow = addAccount === '1' && (inAuthScreen || inOnboarding);
 
     // Allow public access to specific buyer routes for guests
-    const isGuestAllowedRoute =
-      (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
+    // (see lib/guestRoutes.ts — feed, discover, search, stores, products, drops,
+    // public profiles; account-only actions are gated inline at the action)
+    const isGuestAllowedRoute = isGuestBrowseRoute(segments as string[]);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     // PREVIEW_ROLE only reads the query string once, at module load — it
@@ -874,6 +875,12 @@ function AuthGate() {
     // bare "/" boot route to the correct dashboard.
     // Thread explainer is an intentional post-onboarding buyer screen — don't
     // redirect buyers away from it; it handles its own navigation.
+    // A guest who was sent to sign-in from an account-only action returns to it.
+    const returnDest = inAuthScreen ? safeReturnTo(returnTo) : null;
+    if (onboardingDone && returnDest && !inAddAccountFlow) {
+      router.replace(returnDest as never);
+      return;
+    }
     if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer && !inAddAccountFlow) {
       const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
       router.replace(dest as never);
@@ -898,7 +905,7 @@ function AuthGate() {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key]);
+  }, [addAccount, returnTo, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key]);
 
   return null;
 }

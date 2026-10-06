@@ -13,6 +13,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import { storeContextHeaders, versionApiPath } from '@/lib/api';
+import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
 
 type GetToken = () => Promise<string | null>;
 
@@ -86,6 +87,10 @@ export async function serviceRequest<T = unknown>(
 ): Promise<T> {
   await whenConfigured();
   const token = await _getToken!();
+  // Guest guard (App Store 5.1.1(v)): no account-scoped/paid calls when signed out.
+  if (!token && isSignedInOnlyPath(path)) {
+    throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
+  }
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   let res: Response;
   try {

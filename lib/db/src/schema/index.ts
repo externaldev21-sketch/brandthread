@@ -139,6 +139,10 @@ export const users = pgTable('users', {
   // Master push kill switch. false suppresses push sends for every category
   // while leaving the in-app notification feed and per-category prefs intact.
   pushEnabled: boolean('push_enabled').notNull().default(true),
+  // Promotional/marketing push opt-in (App Store 4.5.4). Separate from the
+  // transactional category toggles in notificationPreferences and OFF by
+  // default; enforced server-side in lib/pushPolicy.ts / sendPushToUser.
+  promoPushOptIn: boolean('promo_push_opt_in').notNull().default(false),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
