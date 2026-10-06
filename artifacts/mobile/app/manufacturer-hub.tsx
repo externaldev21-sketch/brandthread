@@ -206,7 +206,6 @@ export default function ManufacturerHub() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={s.tabBarScroll}
           contentContainerStyle={s.tabBarContent}
         >
           {TABS.map(tab => (
@@ -215,9 +214,6 @@ export default function ManufacturerHub() {
               style={s.tabItem}
               onPress={() => handleTabPress(tab.key)}
               activeOpacity={0.7}
-              hitSlop={TAB_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityState={{ selected: activeTab === tab.key }}
             >
               <View style={s.tabInner}>
                 <Feather
@@ -542,11 +538,11 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           </LinearGradient>
         </TouchableOpacity>
         <View style={s.rfqSecondaryRow}>
-          <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/rfq-list' as never)} hitSlop={RFQ_SECONDARY_HIT_SLOP} accessibilityRole="button" testID="button-my-rfqs">
+          <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/rfq-list' as never)} testID="button-my-rfqs">
             <Feather name="file-text" size={ICON.sm} color={theme.accentLight} />
             <Text style={s.rfqSecondaryText}>My RFQs</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} hitSlop={RFQ_SECONDARY_HIT_SLOP} accessibilityRole="button" testID="button-compare-suppliers">
+          <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} testID="button-compare-suppliers">
             <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
             <Text style={s.rfqSecondaryText}>Compare Suppliers</Text>
           </TouchableOpacity>
@@ -636,10 +632,6 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           style={s.searchToggle}
           onPress={() => setSearchActive(v => !v)}
           activeOpacity={0.8}
-          hitSlop={SEARCH_TOGGLE_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel="Search manufacturers"
-          accessibilityState={{ expanded: searchActive }}
         >
           <Feather name="search" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
@@ -657,7 +649,6 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           style={[s.filterBtn, activeFilterCount(filters) > 0 && s.filterBtnActive]}
           onPress={() => setFilterModalVisible(true)}
           activeOpacity={0.8}
-          hitSlop={FILTER_BTN_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel="Filter manufacturers"
           testID="button-directory-filters"
@@ -761,15 +752,6 @@ interface ManufacturerCardProps {
   onQuote: () => void;
 }
 
-// Tap-area padding for the card's small controls (hitSlop is measured from
-// inside a control's border). The heart sits 7pt from the cover's clipped
-// top-right corner, so it extends further down/left instead; the 32pt quote
-// button reaches out to the card edge on its left and only 3pt into the 4pt
-// gap before "Chat now".
-const CARD_SAVE_HIT_SLOP = { top: 7, right: 7, bottom: 9, left: 9 };
-const CARD_QUOTE_HIT_SLOP = { top: 7, bottom: 7, left: 11, right: 3 };
-const CARD_CHAT_HIT_SLOP = { top: 7, bottom: 7, left: 0, right: 0 };
-
 function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, onQuote }: ManufacturerCardProps) {
   const { theme } = useAppTheme();
   const card = useMemo(() => makeCard(theme), [theme]);
@@ -796,7 +778,6 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             onPress={onSave}
             disabled={saving}
             activeOpacity={0.75}
-            hitSlop={CARD_SAVE_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
           >
@@ -846,13 +827,12 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
           style={card.iconAction}
           onPress={onQuote}
           activeOpacity={0.7}
-          hitSlop={CARD_QUOTE_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={`Request a quote from ${mfg.name}`}
         >
           <Feather name="file-text" size={15} color={theme.secondary} />
         </TouchableOpacity>
-        <TouchableOpacity style={[card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onMessage} activeOpacity={0.7} hitSlop={CARD_CHAT_HIT_SLOP} accessibilityRole="button">
+        <TouchableOpacity style={[card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onMessage} activeOpacity={0.7}>
           <Feather name="message-circle" size={ICON.sm} color={theme.onAccent} />
           <Text style={[card.profileBtnText, { color: theme.onAccent }]}>Chat now</Text>
         </TouchableOpacity>
@@ -1741,15 +1721,6 @@ const makeMsgCard = (theme: AppThemePreset) => StyleSheet.create({
 
 // ─── Root styles ─────────────────────────────────────────────────────────────
 
-// Top tabs draw ~35pt tall; the 36pt search/filter squares and 40pt RFQ
-// buttons sit in padded rows. hitSlop (measured from inside any 1pt border)
-// pads each to 44pt; the search/filter pair shares their 8pt gap 4/4.
-const TAB_SLOP_Y = 5;
-const TAB_HIT_SLOP = { top: TAB_SLOP_Y, bottom: TAB_SLOP_Y, left: 0, right: 0 };
-const SEARCH_TOGGLE_HIT_SLOP = { top: 5, bottom: 5, left: 6, right: 4 };
-const FILTER_BTN_HIT_SLOP = { top: 5, bottom: 5, left: 4, right: 6 };
-const RFQ_SECONDARY_HIT_SLOP = { top: 3, bottom: 3, left: 0, right: 0 };
-
 const makeS = (theme: AppThemePreset) => StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   flex:         { flex: 1 },
@@ -1758,12 +1729,8 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   headerTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
   headerActions:{ flexDirection: 'row', gap: SP.sm },
   headerBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.surfaceGlass, position: 'relative', zIndex: 1 },
-  // The tab scroller clips its content, so it carries TAB_SLOP_Y of vertical
-  // padding cancelled by an equal negative margin (no visual/layout change)
-  // to leave room for the tabs' hitSlop.
-  tabBarScroll: { marginVertical: -TAB_SLOP_Y },
-  tabBarContent:{ paddingHorizontal: SP.md, paddingVertical: TAB_SLOP_Y },
+  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.surfaceGlass, position: 'relative' },
+  tabBarContent:{ paddingHorizontal: SP.md },
   tabBarFade:   { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28 },
   tabItem:      { marginRight: SP.sm, alignItems: 'center' },
   tabInner:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingVertical: SP.sm, paddingHorizontal: SP.sm },

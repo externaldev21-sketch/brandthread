@@ -83,7 +83,6 @@ import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
-import { minHitSlop } from '@/lib/hitSlop';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
@@ -3396,10 +3395,7 @@ export default function FeedScreen({
             <TouchableOpacity
               style={styles.topIconBtn}
               activeOpacity={0.7}
-              hitSlop={TOP_ICON_HIT_SLOP}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
-              accessibilityRole="button"
-              accessibilityLabel="Close search"
             >
               <Feather name="x" size={20} color={ON_DARK} />
             </TouchableOpacity>
@@ -3421,10 +3417,8 @@ export default function FeedScreen({
             <TouchableOpacity
               style={styles.topIconBtn}
               activeOpacity={0.7}
-              hitSlop={TOP_ICON_HIT_SLOP}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
-              accessibilityRole="button"
-              accessibilityLabel="Search"
             >
                 <Feather name="search" size={19} color={ON_DARK} />
             </TouchableOpacity>
@@ -3437,7 +3431,7 @@ export default function FeedScreen({
             <TouchableOpacity
               style={styles.cartHeaderBtn}
               activeOpacity={0.7}
-              hitSlop={TOP_ICON_HIT_SLOP}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/(buyer)/cart' as never);
@@ -3467,7 +3461,6 @@ export default function FeedScreen({
               <TouchableOpacity
                 key={key}
                 style={styles.feedTab}
-                hitSlop={FEED_TAB_HIT_SLOP}
                 onPress={() => {
                   setActiveIndex(0);
                   setFeedTab(key);
@@ -3572,11 +3565,6 @@ export default function FeedScreen({
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-
-// Invisible touch-area padding (a11y 44pt minimum) for the seller Home
-// header's 34x34 icon buttons and the ~25pt-tall Following/Threads tabs.
-const TOP_ICON_HIT_SLOP = minHitSlop({ width: 34, height: 34 });
-const FEED_TAB_HIT_SLOP = minHitSlop({ height: 25 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },

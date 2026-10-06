@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { EmptyState, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
@@ -170,7 +169,6 @@ export default function ReviewQueueScreen() {
                 <Pressable
                   key={key}
                   onPress={() => { Haptics.selectionAsync(); setStatus(key); }}
-                  hitSlop={SEGMENT_HIT_SLOP}
                   style={({ pressed }) => [s.segmentItem, active && s.segmentItemActive, pressed && !active && { opacity: 0.7 }]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
@@ -486,9 +484,6 @@ function ReviewSheet({
     </Modal>
   );
 }
-
-// 36pt-tall Open/Resolved segments → invisible 44pt touch height.
-const SEGMENT_HIT_SLOP = minHitSlop({ height: 36 });
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },

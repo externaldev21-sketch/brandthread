@@ -180,7 +180,6 @@ export default function StorePreview() {
               key={mode}
               onPress={() => { Haptics.selectionAsync(); setDevice(mode); }}
               style={[styles.deviceBtn, device === mode && styles.deviceBtnActive]}
-              hitSlop={mode === 'mobile' ? DEVICE_BTN_HIT_SLOP_LEFT : DEVICE_BTN_HIT_SLOP_RIGHT}
               accessibilityLabel={mode === 'mobile' ? 'Mobile preview' : 'Desktop preview'}
               accessibilityRole="button"
               accessibilityState={{ selected: device === mode }}
@@ -249,11 +248,6 @@ export default function StorePreview() {
     </View>
   );
 }
-
-// The 34×30 device buttons sit 3pt apart inside their pill: pad each to 44×44
-// outward (away from its sibling), taking only 1pt of the shared gap.
-const DEVICE_BTN_HIT_SLOP_LEFT = { top: 7, bottom: 7, left: 9, right: 1 };
-const DEVICE_BTN_HIT_SLOP_RIGHT = { top: 7, bottom: 7, left: 1, right: 9 };
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },

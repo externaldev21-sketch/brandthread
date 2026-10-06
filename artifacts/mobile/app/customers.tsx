@@ -14,11 +14,6 @@ import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/layout';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// Sort chips draw 32pt tall with 8pt gaps → vertical-only slop up to 44.
-// Sized from the 30pt padding box: on web the slop sits inside the 1pt border.
-const SORT_CHIP_HIT_SLOP = minHitSlop({ height: 30 });
 
 type ApiCustomer = {
   id: string;
@@ -180,9 +175,6 @@ export default function CustomersScreen() {
               key={opt.key}
               activeOpacity={0.7}
               onPress={() => setSortBy(opt.key)}
-              hitSlop={SORT_CHIP_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
               style={[
                 styles.segChip,
                 {

@@ -25,11 +25,6 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// 'Continue setup →' is a 22pt-tall text link; section headers are 36pt tall.
-const CONTINUE_SETUP_HIT_SLOP = { ...minHitSlop({ height: 22 }), left: 8, right: 8 };
-const SECTION_HEADER_HIT_SLOP = minHitSlop({ height: 36 });
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -241,8 +236,7 @@ export default function MoreScreen() {
           </View>
           <TouchableOpacity
             onPress={() => { hapticPrimaryAction(); router.push('/settings' as any); }}
-            hitSlop={CONTINUE_SETUP_HIT_SLOP}
-            accessibilityRole="button"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.continueSetup}>Continue setup →</Text>
           </TouchableOpacity>
@@ -258,9 +252,6 @@ export default function MoreScreen() {
                 style={styles.sectionHeader}
                 onPress={() => toggleSection(key)}
                 activeOpacity={0.7}
-                hitSlop={SECTION_HEADER_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: !!isOpen }}
               >
                 <View style={styles.sectionHeaderLeft}>
                   <Feather name={icon} size={13} color={theme.subtle} style={styles.sectionIcon} />

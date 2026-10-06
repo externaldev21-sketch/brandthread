@@ -20,14 +20,6 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch} from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// Style/mood chips are 30pt tall in wrapping rows with 8pt gaps — vertical slop only.
-const CHIP_HIT_SLOP = minHitSlop({ height: 30 });
-// Header "Save & Exit" text button (24pt tall); bottom-nav Back (25pt) and Continue/Generate (33pt).
-const SAVE_EXIT_HIT_SLOP = minHitSlop({ height: 24 });
-const NAV_BACK_HIT_SLOP = minHitSlop({ height: 25 });
-const NAV_CONTINUE_HIT_SLOP = minHitSlop({ height: 33 });
 import { saveDraftAnswers, loadDraftAnswers, clearDraftAnswers,
   generateStoreFromAnswers, applyGenerationResult } from '@/services/storeService';
 import { StoreGenerationAnswers, StoreColorPalette,
@@ -215,7 +207,6 @@ export default function StoreGenerateScreen() {
               }}
               activeOpacity={0.8}
               style={st.chipWrapper}
-              hitSlop={CHIP_HIT_SLOP}
             >
               {isPrimary ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
@@ -251,7 +242,6 @@ export default function StoreGenerateScreen() {
                   }}
                   activeOpacity={0.8}
                   style={st.chipWrapper}
-              hitSlop={CHIP_HIT_SLOP}
                 >
                   <View style={[st.chip, isSelected && st.chipSecondarySelected]}>
                     <Text style={[st.chipText, isSelected && st.chipTextSecondary]}>{label}</Text>
@@ -284,7 +274,6 @@ export default function StoreGenerateScreen() {
               }}
               activeOpacity={0.8}
               style={st.chipWrapper}
-              hitSlop={CHIP_HIT_SLOP}
             >
               {isSelected ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
@@ -494,7 +483,6 @@ export default function StoreGenerateScreen() {
                   }}
                   activeOpacity={0.8}
                   style={st.chipWrapper}
-              hitSlop={CHIP_HIT_SLOP}
                 >
                   <View style={[st.chip, isSelected && st.chipSecondarySelected]}>
                     <Text style={[st.chipText, isSelected && st.chipTextSecondary]}>{label}</Text>
@@ -607,7 +595,6 @@ export default function StoreGenerateScreen() {
               }}
               activeOpacity={0.8}
               style={st.chipWrapper}
-              hitSlop={CHIP_HIT_SLOP}
             >
               {isSelected ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
@@ -902,7 +889,7 @@ export default function StoreGenerateScreen() {
         subtitle={`Step ${step} of ${TOTAL_STEPS}`}
         onBack={handleBack}
         rightElement={
-          <TouchableOpacity onPress={handleSaveAndExit} style={st.saveExitBtn} activeOpacity={0.7} hitSlop={SAVE_EXIT_HIT_SLOP} accessibilityRole="button">
+          <TouchableOpacity onPress={handleSaveAndExit} style={st.saveExitBtn} activeOpacity={0.7}>
             <Text style={st.saveExitText}>
               {saving ? 'Saving…' : saveFailed ? 'Retry' : 'Save & Exit'}
             </Text>
@@ -969,9 +956,6 @@ export default function StoreGenerateScreen() {
           onPress={handleBack}
           style={st.navBackBtn}
           activeOpacity={0.7}
-          hitSlop={NAV_BACK_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
         >
           <Feather name="arrow-left" size={ICON.sm} color={FG} />
           <Text style={st.navBackText}>Back</Text>
@@ -984,9 +968,6 @@ export default function StoreGenerateScreen() {
             onPress={continueEnabled ? handleContinue : undefined}
             style={[st.navContinueBtn, !continueEnabled && st.navContinueBtnDisabled]}
             activeOpacity={continueEnabled ? 0.8 : 1}
-            hitSlop={NAV_CONTINUE_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !continueEnabled }}
           >
             <LinearGradient
               colors={continueEnabled ? [...theme.primaryGradient] : [CARD_ELEVATED, CARD_ELEVATED]}
@@ -1003,8 +984,6 @@ export default function StoreGenerateScreen() {
             onPress={handleGenerate}
             style={st.navContinueBtn}
             activeOpacity={0.8}
-            hitSlop={NAV_CONTINUE_HIT_SLOP}
-            accessibilityRole="button"
           >
             <LinearGradient
               colors={[...theme.primaryGradient]}
@@ -1337,13 +1316,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   navBackBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, padding: SP.xs },
   navBackText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   navStepText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  // Rounded clip lives on the gradient (the only drawn layer), not the
-  // touchable, so the button's hitSlop isn't clipped on web.
-  navContinueBtn: {},
+  navContinueBtn: { borderRadius: RADIUS.md, overflow: 'hidden' },
   navContinueBtnDisabled: { opacity: 0.5 },
   navContinueGrad: {
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,

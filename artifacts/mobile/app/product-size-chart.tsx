@@ -205,12 +205,9 @@ export default function ProductSizeChartScreen() {
             {(['inches', 'cm'] as const).map(u => (
               <TouchableOpacity
                 key={u}
-                style={[s.unitBtn, u === 'inches' ? s.unitBtnFirst : s.unitBtnLast, unit === u && s.unitBtnActive]}
+                style={[s.unitBtn, unit === u && s.unitBtnActive]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setUnit(u); }}
                 activeOpacity={0.7}
-                hitSlop={UNIT_BTN_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ selected: unit === u }}
               >
                 <Text style={[s.unitBtnText, unit === u && { color: theme.accentLight }]}>{u}</Text>
               </TouchableOpacity>
@@ -224,12 +221,7 @@ export default function ProductSizeChartScreen() {
           {columns.map((col, idx) => (
             <View key={idx} style={s.chip}>
               <Text style={s.chipText}>{col}</Text>
-              <TouchableOpacity
-                onPress={() => removeColumn(idx)}
-                hitSlop={COLUMN_REMOVE_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${col} column`}
-              >
+              <TouchableOpacity onPress={() => removeColumn(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                 <Feather name="x" size={12} color={theme.muted} />
               </TouchableOpacity>
             </View>
@@ -244,7 +236,7 @@ export default function ProductSizeChartScreen() {
             placeholderTextColor={theme.subtle}
             onSubmitEditing={addColumn}
           />
-          <TouchableOpacity style={s.addBtn} onPress={addColumn} activeOpacity={0.8} hitSlop={ADD_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Add measurement column">
+          <TouchableOpacity style={s.addBtn} onPress={addColumn} activeOpacity={0.8}>
             <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
@@ -291,12 +283,7 @@ export default function ProductSizeChartScreen() {
                     </View>
                   ))}
                   <View style={[t.cell, t.actionCell]}>
-                    <TouchableOpacity
-                      onPress={() => removeRow(ri)}
-                      hitSlop={ROW_REMOVE_HIT_SLOP}
-                      accessibilityRole="button"
-                      accessibilityLabel={row.size ? `Remove size ${row.size}` : 'Remove size row'}
-                    >
+                    <TouchableOpacity onPress={() => removeRow(ri)}>
                       <Feather name="trash-2" size={14} color={theme.error} />
                     </TouchableOpacity>
                   </View>
@@ -316,7 +303,7 @@ export default function ProductSizeChartScreen() {
             placeholderTextColor={theme.subtle}
             onSubmitEditing={addRow}
           />
-          <TouchableOpacity style={s.addBtn} onPress={addRow} activeOpacity={0.8} hitSlop={ADD_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Add size">
+          <TouchableOpacity style={s.addBtn} onPress={addRow} activeOpacity={0.8}>
             <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
@@ -355,32 +342,14 @@ export default function ProductSizeChartScreen() {
 // Theme-aware factories (re-derived per render via useMemo) so every color
 // reacts to all 12 themes instead of a fixed static palette.
 
-// Tap-area padding (hitSlop) for this screen's small controls — the drawn
-// controls are unchanged.
-// • inches/cm segments: 24pt tall → 44pt.
-const UNIT_BTN_HIT_SLOP = { top: 10, bottom: 10, left: 0, right: 0 };
-// • Column chip "x" (12×14): out to the chip's edge plus half the 8pt gap on
-//   the right, back over its own (non-interactive) label on the left.
-const COLUMN_REMOVE_HIT_SLOP = { top: 16, bottom: 14, left: 19, right: 13 };
-// • 40×40 add buttons → 44×44.
-const ADD_BTN_HIT_SLOP = { top: 2, bottom: 2, left: 2, right: 2 };
-// • Table row trash (14×15): fills its 36pt cell; rows sit only 24pt apart,
-//   so vertically it stops at half the gap to the neighbouring rows' buttons.
-const ROW_REMOVE_HIT_SLOP = { top: 4, bottom: 5, left: 11, right: 11 };
-
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
   content:       { padding: SP.lg, gap: SP.md },
   sectionTitle:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
   label:         { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   unitRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  // The segments carry the toggle's outer corner radii themselves instead of
-  // the toggle clipping them (overflow: hidden) — same look, but it no longer
-  // clips the segments' hitSlop on web.
-  unitToggle:    { flexDirection: 'row', gap: 1, backgroundColor: theme.border, borderRadius: RADIUS.sm },
+  unitToggle:    { flexDirection: 'row', gap: 1, backgroundColor: theme.border, borderRadius: RADIUS.sm, overflow: 'hidden' },
   unitBtn:       { paddingHorizontal: SP.md, paddingVertical: SP.xs, backgroundColor: theme.card },
-  unitBtnFirst:  { borderTopLeftRadius: RADIUS.sm, borderBottomLeftRadius: RADIUS.sm },
-  unitBtnLast:   { borderTopRightRadius: RADIUS.sm, borderBottomRightRadius: RADIUS.sm },
   unitBtnActive: { backgroundColor: theme.accentDim },
   unitBtnText:   { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
   chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

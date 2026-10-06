@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { minHitSlop } from '@/lib/hitSlop';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
@@ -597,13 +596,7 @@ export default function EditProfileScreen() {
             <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
-            <TouchableOpacity
-              onPress={handleCopyLink}
-              hitSlop={minHitSlop({ width: 17, height: 19 })}
-              disabled={!username}
-              accessibilityRole="button"
-              accessibilityLabel="Copy profile link"
-            >
+            <TouchableOpacity onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
               <Feather name="copy" size={17} color={theme.muted} />
             </TouchableOpacity>
           </View>

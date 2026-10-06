@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 
 interface Location {
   id: string;
@@ -34,13 +33,6 @@ interface Location {
 }
 
 const TABS = ['All', 'Active', 'Inactive'];
-// 36pt-tall outline button → 44pt touch height.
-const ADD_BTN_HIT_SLOP = minHitSlop({ height: 36 });
-// 29pt segment chips with 2pt gaps: full vertical padding to 44, and 3pt
-// sideways (barely touching a neighbour) so even "All" (39pt) reaches 44.
-const TAB_HIT_SLOP = { ...minHitSlop({ height: 29 }), left: 3, right: 3 };
-// tabsRow's 3pt padding + this = room for the 8pt vertical slop.
-const TAB_SLOP_ROOM = 5;
 
 export default function LocationsScreen() {
   const colors = useColors();
@@ -153,23 +145,14 @@ export default function LocationsScreen() {
                   Using {activeCount} of 10 active location{activeCount !== 1 ? 's' : ''} available on your plan
                 </Text>
               </View>
-              <TouchableOpacity onPress={openAdd} activeOpacity={0.7} style={[s.addBtn, { borderColor: colors.border }]} hitSlop={ADD_BTN_HIT_SLOP} accessibilityRole="button">
+              <TouchableOpacity onPress={openAdd} activeOpacity={0.7} style={[s.addBtn, { borderColor: colors.border }]}>
                 <Text style={[s.addBtnText, { color: colors.foreground }]}>Add location</Text>
               </TouchableOpacity>
             </View>
 
             {/* Tabs */}
             <View style={s.toolbarRow}>
-              {/* The 5pt vertical padding (cancelled by the equal negative
-                  margin, so nothing moves) gives the tabs' hitSlop room inside
-                  the scroll view's clip; without it the web touch area is cut
-                  back to the drawn 29pt. */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ flex: 1, marginVertical: -TAB_SLOP_ROOM }}
-                contentContainerStyle={{ paddingVertical: TAB_SLOP_ROOM }}
-              >
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
                 <View style={[s.tabsRow, { backgroundColor: colors.secondary }]}>
                   {TABS.map((tab) => (
                     <TouchableOpacity
@@ -177,9 +160,6 @@ export default function LocationsScreen() {
                       onPress={() => { Haptics.selectionAsync(); setActiveTab(tab); }}
                       activeOpacity={0.7}
                       style={[s.tabChip, activeTab === tab && { backgroundColor: colors.card }]}
-                      hitSlop={TAB_HIT_SLOP}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: activeTab === tab }}
                     >
                       <Text style={[s.tabText, { color: activeTab === tab ? colors.foreground : colors.mutedForeground }, activeTab === tab && s.tabTextActive]}>
                         {tab}

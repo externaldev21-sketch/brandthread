@@ -201,9 +201,6 @@ export function RightActionRail({
           >
             <TouchableOpacity
               style={styles.followBadgeTouchable}
-              // The badge is drawn at 14pt; pad its touch area to 44×44. Less
-              // slop upward so taps on the avatar above still open the profile.
-              hitSlop={FOLLOW_BADGE_HIT_SLOP}
               activeOpacity={0.8}
               disabled={!!engagement?.following}
               accessibilityRole="button"
@@ -322,8 +319,6 @@ export function RightActionRail({
     </Animated.View>
   );
 }
-
-const FOLLOW_BADGE_HIT_SLOP = { top: 6, bottom: 24, left: 15, right: 15 } as const;
 
 const styles = StyleSheet.create({
   // Corrected pass, smaller than even the pre-#129 numbers per the owner's

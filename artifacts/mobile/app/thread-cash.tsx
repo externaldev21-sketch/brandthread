@@ -207,16 +207,7 @@ export default function ThreadCashScreen() {
             {/* Balance */}
             <BrandthreadCard glow style={styles.balanceCard}>
               {/* Hidden dev-only long-press to replay the money-burst celebration for screenshots. */}
-              {/* To assistive tech this is just the balance illustration (the
-                  long-press is a dev-only easter egg), so it's exposed as a
-                  named image rather than an unnamed control. */}
-              <Pressable
-                onLongPress={previewBurst}
-                disabled={!__DEV__}
-                accessibilityRole="image"
-                accessibilityLabel="Thread Cash"
-                focusable={false}
-              >
+              <Pressable onLongPress={previewBurst} disabled={!__DEV__}>
                 <ThreadCashBillStack width={280} style={styles.balanceStack} />
               </Pressable>
               <Text style={[styles.balanceLabel, { color: theme.muted }]}>Your balance</Text>

@@ -22,7 +22,6 @@ import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { applyPromptEdit } from '@/services/designService';
-import { minHitSlop } from '@/lib/hitSlop';
 import type { AIGenerationResult } from '@/services/designTypes';
 
 const EXAMPLE_PROMPTS = [
@@ -33,12 +32,6 @@ const EXAMPLE_PROMPTS = [
   'Make image look like a campaign photo',
   'Put the model in a studio',
 ];
-
-// Example chips draw 34pt tall; hitSlop pads them to 44pt vertically (the
-// 8pt gaps between chips are left alone).
-// (+1: hitSlop is measured from inside the chip's 1pt border.)
-const EXAMPLE_CHIP_HIT_SLOP = minHitSlop({ height: 34 - 2 });
-const EXAMPLE_CHIP_SLOP_Y = EXAMPLE_CHIP_HIT_SLOP.top ?? 0;
 
 const RECENT_PROJECTS = [
   'Summer Drop Hoodie',
@@ -161,14 +154,11 @@ export default function DesignPromptEditScreen() {
             style={s.promptInput}
           />
           <Text style={s.chipsLabel}>Quick examples</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipsScrollView} contentContainerStyle={s.chipsScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsScroll}>
             {EXAMPLE_PROMPTS.map((ex) => (
               <TouchableOpacity
                 key={ex}
                 onPress={() => setPrompt(ex)}
-                hitSlop={EXAMPLE_CHIP_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ selected: prompt === ex }}
                 style={[s.chip, prompt === ex && s.chipActive]}
                 activeOpacity={0.8}
               >
@@ -255,7 +245,7 @@ function ToggleRow({ label, description, value, onChange }: {
         <Text style={s.toggleLabel}>{label}</Text>
         <Text style={s.toggleDesc}>{description}</Text>
       </View>
-      <HapticSwitch value={value} onValueChange={onChange} accessibilityLabel={label} accessibilityHint={description} />
+      <HapticSwitch value={value} onValueChange={onChange} />
     </View>
   );
 }
@@ -291,11 +281,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mockLabel:              { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   promptInput:            { marginBottom: SP.sm },
   chipsLabel:             { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm },
-  // The scroller clips its content, so it carries EXAMPLE_CHIP_SLOP_Y of
-  // vertical padding (cancelled by an equal negative margin — no visual or
-  // layout change) to leave room for the chips' hitSlop.
-  chipsScrollView:        { marginVertical: -EXAMPLE_CHIP_SLOP_Y },
-  chipsScroll:            { gap: SP.sm, paddingRight: SP.md, paddingVertical: EXAMPLE_CHIP_SLOP_Y },
+  chipsScroll:            { gap: SP.sm, paddingRight: SP.md },
   chip:                   { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   chipActive:             { backgroundColor: PURPLE_DIM, borderColor: theme.accent },
   chipText:               { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },

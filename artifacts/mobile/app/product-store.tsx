@@ -17,7 +17,6 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
-import { minHitSlop } from '@/lib/hitSlop';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
@@ -250,7 +249,7 @@ export default function ProductStoreScreen() {
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.
         </Text>
-        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router, '/(buyer)/discover')} activeOpacity={0.7} hitSlop={minHitSlop({ width: 60, height: 19 })} accessibilityRole="button">
+        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router, '/(buyer)/discover')} activeOpacity={0.7}>
           <Text style={{ color: ACCENT_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
         </TouchableOpacity>
       </View>

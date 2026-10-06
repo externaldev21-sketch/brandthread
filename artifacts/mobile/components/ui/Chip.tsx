@@ -18,7 +18,6 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
-import { minHitSlop } from '@/lib/hitSlop';
 
 export interface ChipProps {
   label: string;
@@ -69,8 +68,6 @@ export function Chip({
       onPress={() => { hapticToggle(); onPress(); }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
-      // Drawn 34pt (32pt quick-reply) tall — pad the touch area to 44pt.
-      hitSlop={isQuickReply ? QUICK_REPLY_HIT_SLOP : CHIP_HIT_SLOP}
       testID={testID}
     >
       <Animated.View
@@ -142,11 +139,6 @@ export function ChipGroup({ options, selectedIds, onChange, multiple = false, st
     </View>
   );
 }
-
-// Width 40 = the narrowest one-word chip ("All"); a 2pt side pad stays
-// inside the 8pt gap between chips.
-const CHIP_HIT_SLOP = minHitSlop({ width: 40, height: 34 });
-const QUICK_REPLY_HIT_SLOP = minHitSlop({ width: 40, height: 32 });
 
 const styles = StyleSheet.create({
   chip: {

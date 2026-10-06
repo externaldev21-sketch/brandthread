@@ -17,13 +17,6 @@ import { formatCents } from '@/lib/money';
 import { getFavoriteManufacturerIds, getManufacturer } from '@/services/manufacturerService';
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// Touch-area extensions up to 44pt — no visual/layout change.
-// Picker chips: 34pt tall with a 1pt border (web slop sits inside the border).
-const PICKER_CHIP_HIT_SLOP = minHitSlop({ height: 32 });
-// "Request quote": 40pt tall inside an 8pt margin, so 2pt slop stays in the column.
-const QUOTE_BTN_HIT_SLOP = minHitSlop({ height: 40 });
 
 const MAX_COMPARE = 4;
 const MIN_COMPARE = 2;
@@ -98,11 +91,11 @@ export default function ManufacturerCompareScreen() {
         <>
           <View style={s.pickerWrap}>
             <Text style={s.pickerLabel}>Pick {MIN_COMPARE}–{MAX_COMPARE} to compare</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll} contentContainerStyle={s.pickerRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pickerRow}>
               {saved.map((m) => {
                 const active = selected.has(m.id);
                 return (
-                  <TouchableOpacity key={m.id} style={[s.pickerChip, active && s.pickerChipActive]} onPress={() => toggle(m.id)} hitSlop={PICKER_CHIP_HIT_SLOP} accessibilityRole="button" accessibilityLabel={m.name} accessibilityState={{ selected: active }} testID={`compare-pick-${m.id}`}>
+                  <TouchableOpacity key={m.id} style={[s.pickerChip, active && s.pickerChipActive]} onPress={() => toggle(m.id)} testID={`compare-pick-${m.id}`}>
                     <Text style={[s.pickerChipText, active && s.pickerChipTextActive]} numberOfLines={1}>{m.name}</Text>
                   </TouchableOpacity>
                 );
@@ -138,7 +131,7 @@ export default function ManufacturerCompareScreen() {
                         </View>
                       );
                     })}
-                    <TouchableOpacity style={s.quoteBtn} onPress={() => router.push(`/quote-request?manufacturerId=${m.id}` as never)} hitSlop={QUOTE_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel={`Request quote from ${m.name}`}>
+                    <TouchableOpacity style={s.quoteBtn} onPress={() => router.push(`/quote-request?manufacturerId=${m.id}` as never)}>
                       <Feather name="file-text" size={13} color={theme.onAccent} />
                       <Text style={s.quoteBtnText}>Request quote</Text>
                     </TouchableOpacity>
@@ -158,10 +151,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerWrap: { paddingTop: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm },
   pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: SP.md, marginBottom: SP.xs },
-  // 5pt padding offset by an equal negative margin: the row doesn't move, but
-  // the (clipping) ScrollView has room for the chips' 44pt touch areas.
-  pickerScroll: { marginVertical: -5 },
-  pickerRow: { paddingHorizontal: SP.md, gap: SP.sm, paddingVertical: 5 },
+  pickerRow: { paddingHorizontal: SP.md, gap: SP.sm },
   pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   pickerChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },

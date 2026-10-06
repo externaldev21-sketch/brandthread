@@ -81,7 +81,6 @@ import type {
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
-import { minHitSlop } from '@/lib/hitSlop';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -89,9 +88,6 @@ import { useHideTabBar } from '@/lib/tabBarVisibility';
 // The server still requires a non-empty `formats` array (see route note above).
 // This design shows a single, true-to-life placement, so we always send this.
 const DEFAULT_FORMATS: AdFormatKind[] = ['portrait_4x5'];
-// CTA chips are 36pt tall in a wrapping row with 8pt gaps — vertical slop only.
-// Sized off the 34pt padding box (web slop layer sits inside the 1pt border).
-const CTA_CHIP_HIT_SLOP = minHitSlop({ height: 34 });
 
 /** Return URL for Stripe Checkout redirect — matches server allowlist. */
 function makeReturnUrl(campaignId: string): string {
@@ -824,7 +820,6 @@ export default function CreateAdScreen() {
                   ]}
                   onPress={() => { Haptics.selectionAsync(); setCtaKind(opt.kind); setCtaDestId(null); }}
                   activeOpacity={0.8}
-                  hitSlop={CTA_CHIP_HIT_SLOP}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
                   accessibilityLabel={opt.label}

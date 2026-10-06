@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { minHitSlop } from '@/lib/hitSlop';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -23,11 +22,6 @@ import {
 } from '@/components/BrandthreadUI';
 import { getThemes, getStorefront, applyTheme } from '@/services/storeService';
 import { StoreTheme, TYPOGRAPHY_STYLES } from '@/services/storeTypes';
-
-// 30pt-tall Preview / Use Theme buttons → 44pt touch height. The 7pt slop
-// stays inside the card's 8pt bottom padding, so the card's overflow clip
-// doesn't cut it off on web.
-const ACTION_BTN_HIT_SLOP = minHitSlop({ height: 30 });
 
 export default function StoreThemePicker() {
   const { theme } = useAppTheme();
@@ -95,9 +89,6 @@ export default function StoreThemePicker() {
       <View style={styles.themeCard}>
         <TouchableOpacity
           activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel={`Preview ${item.name} theme`}
-          accessibilityState={{ selected: isPreviewing }}
           onPress={() => {
             Haptics.selectionAsync();
             setPreviewingThemeId(item.id);
@@ -146,8 +137,6 @@ export default function StoreThemePicker() {
           <View style={styles.themeActions}>
             <TouchableOpacity
               style={styles.previewBtn}
-              accessibilityRole="button"
-              hitSlop={ACTION_BTN_HIT_SLOP}
               onPress={() => {
                 Haptics.selectionAsync();
                 setPreviewingThemeId(item.id);
@@ -161,7 +150,6 @@ export default function StoreThemePicker() {
               style={[styles.useBtn, isCurrent && styles.useBtnDisabled]}
               onPress={() => !isCurrent && handleApply(item.id)}
               disabled={isCurrent || isApplying}
-              hitSlop={ACTION_BTN_HIT_SLOP}
             >
               {isApplying ? (
                 <ActivityIndicator size="small" color={theme.text} />

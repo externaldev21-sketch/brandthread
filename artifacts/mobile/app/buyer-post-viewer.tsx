@@ -36,7 +36,6 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
-import { minHitSlop } from '@/lib/hitSlop';
 
 function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -104,20 +103,6 @@ function previewPost(postId: string | undefined): BuyerPost | null {
     createdAt: seed.createdAt, updatedAt: seed.createdAt,
   };
 }
-
-// Engagement bar: 32pt-tall icon buttons spaced 8pt apart (SP.sm gap). Pad
-// each to 44pt tall; horizontally, split each 8pt gap between neighbours and
-// spend the free space on the outer edges / the flex spacer, so no slop ever
-// covers a neighbouring icon.
-const ENGAGE_V = minHitSlop({ height: 32 });
-const ENGAGE_SLOP = {
-  like: { ...ENGAGE_V, left: 10, right: 3 },    // 34pt wide, 16pt page gutter on the left
-  comment: { ...ENGAGE_V, left: 5, right: 5 },  // 34pt wide
-  repost: { ...ENGAGE_V, left: 4, right: 4 },   // 22pt wide, boxed in by 8pt gaps
-  save: { ...ENGAGE_V, left: 4, right: 18 },    // flex spacer on the right
-  report: { ...ENGAGE_V, left: 20, right: 2 },  // flex spacer on the left
-  share: { ...ENGAGE_V, left: 6, right: 16 },   // 16pt page gutter on the right
-};
 
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
@@ -365,22 +350,12 @@ export default function BuyerPostViewer() {
 
         {/* Engagement bar */}
         <View style={s.engagementBar}>
-          <TouchableOpacity
-            style={s.engageBtn}
-            onPress={handleLike}
-            hitSlop={ENGAGE_SLOP.like}
-            accessibilityRole="button"
-            accessibilityLabel={`Like post, ${likeCount} ${likeCount === 1 ? 'like' : 'likes'}`}
-            accessibilityState={{ selected: liked }}
-          >
+          <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
             <Feather name="heart" size={22} color={liked ? RED : FG} />
             <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
-            hitSlop={ENGAGE_SLOP.comment}
-            accessibilityRole="button"
-            accessibilityLabel={`Comments, ${comments.length}`}
             onPress={() => {
               Haptics.selectionAsync();
               const qs = new URLSearchParams({
@@ -401,10 +376,6 @@ export default function BuyerPostViewer() {
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
-            hitSlop={ENGAGE_SLOP.repost}
-            accessibilityRole="button"
-            accessibilityLabel="Repost"
-            accessibilityState={{ selected: reposted }}
             onPress={async () => {
               // Explicit direction + rollback (handleRepost); this used to
               // send "remove" for any post the viewer didn't own.
@@ -415,10 +386,6 @@ export default function BuyerPostViewer() {
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
-            hitSlop={ENGAGE_SLOP.save}
-            accessibilityRole="button"
-            accessibilityLabel="Save post"
-            accessibilityState={{ selected: saved }}
             onPress={async () => {
               // Save AND unsave, with rollback (handleSaveToggle).
               await handleSaveToggle();
@@ -434,9 +401,6 @@ export default function BuyerPostViewer() {
           {!isOwner && (
             <TouchableOpacity
               style={s.engageBtn}
-              hitSlop={ENGAGE_SLOP.report}
-              accessibilityRole="button"
-              accessibilityLabel="Report post"
               onPress={() => {
                 Haptics.selectionAsync();
                 router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
@@ -445,13 +409,7 @@ export default function BuyerPostViewer() {
               <Feather name="flag" size={22} color={FG} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={s.engageBtn}
-            onPress={handleShare}
-            hitSlop={ENGAGE_SLOP.share}
-            accessibilityRole="button"
-            accessibilityLabel="Share post"
-          >
+          <TouchableOpacity style={s.engageBtn} onPress={handleShare}>
             <Feather name="share-2" size={22} color={FG} />
           </TouchableOpacity>
         </View>

@@ -46,7 +46,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
-import { minHitSlop } from '@/lib/hitSlop';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -98,10 +97,6 @@ function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }:
 
 // ─── Inventory stepper (− / qty / +) — Shopify's own inventory-row control ──
 
-// The drawn −/+ buttons stay 28×28; hitSlop pads the tap area to 44×44
-// (measured from inside their 1pt border, hence 26).
-const STEPPER_BTN_HIT_SLOP = minHitSlop({ width: 26, height: 26 });
-
 function Stepper({ label, value, onChange, min = 0 }: {
   label: string; value: number; onChange: (next: number) => void; min?: number;
 }) {
@@ -115,8 +110,6 @@ function Stepper({ label, value, onChange, min = 0 }: {
           style={s.stepperBtn}
           disabled={value <= min}
           onPress={() => { hapticToggle(); onChange(Math.max(min, value - 1)); }}
-          hitSlop={STEPPER_BTN_HIT_SLOP}
-          accessibilityRole="button"
           accessibilityLabel={`Decrease ${label}`}
         >
           <Feather name="minus" size={14} color={value <= min ? theme.subtle : theme.text} />
@@ -130,13 +123,10 @@ function Stepper({ label, value, onChange, min = 0 }: {
           }}
           keyboardType="numeric"
           textAlign="center"
-          accessibilityLabel={`${label} quantity`}
         />
         <TouchableOpacity
           style={s.stepperBtn}
           onPress={() => { hapticToggle(); onChange(value + 1); }}
-          hitSlop={STEPPER_BTN_HIT_SLOP}
-          accessibilityRole="button"
           accessibilityLabel={`Increase ${label}`}
         >
           <Feather name="plus" size={14} color={theme.text} />
@@ -1152,10 +1142,6 @@ export default function AddProductScreen() {
             <TouchableOpacity
               style={s.photoMoreSlot}
               onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
-              // 40pt-wide tile: widen the tap area into the 8pt gap on its
-              // left only (5 = 4 + its 1pt border), so nothing extends past
-              // the end of the strip.
-              hitSlop={{ left: 5, right: 0, top: 0, bottom: 0 }}
               accessibilityLabel="Add another photo slot"
               accessibilityRole="button"
               testID="add-product-add-slot"
@@ -1358,7 +1344,6 @@ export default function AddProductScreen() {
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Track inventory</Text>
           <HapticSwitch
-            accessibilityLabel="Track inventory"
             value={trackInventory}
             onValueChange={v => {
               updateUnsavedState(setTrackInventory, v);
@@ -1399,7 +1384,6 @@ export default function AddProductScreen() {
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Allow overselling</Text>
           <HapticSwitch
-            accessibilityLabel="Allow overselling"
             value={allowOversell}
             onValueChange={v => {
               updateUnsavedState(setAllowOversell, v);
@@ -1863,7 +1847,6 @@ export default function AddProductScreen() {
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Featured on homepage</Text>
           <HapticSwitch
-            accessibilityLabel="Featured on homepage"
             value={featuredHome}
             onValueChange={v => { setFeaturedHome(v); patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } }); }}
           />
@@ -1891,8 +1874,6 @@ export default function AddProductScreen() {
             <Text style={s.collapsibleHint}>Take orders before the item ships. Only enable if you can fulfil later.</Text>
           </View>
           <HapticSwitch
-            accessibilityLabel="Accept pre-orders"
-            accessibilityHint="Take orders before the item ships. Only enable if you can fulfil later."
             value={isPreOrder}
             onValueChange={v => {
               setIsPreOrder(v);

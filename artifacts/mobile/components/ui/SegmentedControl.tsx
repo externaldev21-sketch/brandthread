@@ -19,7 +19,6 @@ import { RADII } from '@/constants/radii';
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { Glass } from '@/components/ui/Glass';
 import { useHitAreaBoost } from '@/hooks/useHitAreaBoost';
-import { minHitSlop } from '@/lib/hitSlop';
 
 export interface SegmentedControlProps {
   options: { id: string; label: string }[];
@@ -140,9 +139,6 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
             accessibilityState={{ selected }}
             onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
             style={[styles.segment, size === 'compact' && styles.segmentCompact]}
-            // Segments sit inside the pill's border + padding; pad their
-            // touch area vertically to 44pt without changing the pill.
-            hitSlop={minHitSlop({ height: height - 2 - PILL_PADDING * 2 })}
             testID={testID ? `${testID}-${option.id}` : undefined}
           >
             <Text

@@ -27,7 +27,6 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
-import { minHitSlop } from '@/lib/hitSlop';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
 /**
@@ -135,8 +134,6 @@ export function Button({
       onPress={handlePress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      // 'compact' draws 36pt (icon-only: 36×36); pad its touch area to 44pt.
-      hitSlop={size === 'compact' ? (label ? COMPACT_HIT_SLOP : COMPACT_ICON_HIT_SLOP) : undefined}
       testID={testID}
       style={[fullWidth && styles.fullWidth]}
       android_ripple={{ color: isFilled ? '#00000026' : `${theme.accent}2E`, borderless: false }}
@@ -213,9 +210,6 @@ export function StickyBottomCTA({ header, containerStyle, ...buttonProps }: Stic
     </View>
   );
 }
-
-const COMPACT_HIT_SLOP = minHitSlop({ height: 36 });
-const COMPACT_ICON_HIT_SLOP = minHitSlop({ width: 36, height: 36 });
 
 const styles = StyleSheet.create({
   base: {

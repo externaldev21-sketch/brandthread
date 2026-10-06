@@ -12,7 +12,6 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { minHitSlop } from '@/lib/hitSlop';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
@@ -265,8 +264,6 @@ export default function ProductBundleEditScreen() {
             style={s.addItemBtn}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerOpen(o => !o); }}
             activeOpacity={0.7}
-            accessibilityRole="button"
-            hitSlop={minHitSlop({ height: 27 })}
           >
             <Feather name="plus" size={14} color={PURPLE_LIGHT} />
             <Text style={s.addItemBtnText}>Add product</Text>

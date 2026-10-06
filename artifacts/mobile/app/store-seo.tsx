@@ -164,8 +164,6 @@ export default function StoreSEOScreen() {
             </View>
             <HapticSwitch
               value={seo.sitemapEnabled}
-              accessibilityLabel="Sitemap Enabled"
-              accessibilityHint="Include store in search sitemaps"
               onValueChange={v => patch({ sitemapEnabled: v })}
             />
           </View>
@@ -177,8 +175,6 @@ export default function StoreSEOScreen() {
             </View>
             <HapticSwitch
               value={seo.searchVisible}
-              accessibilityLabel="Search Visible"
-              accessibilityHint="Allow search engines to index your store"
               onValueChange={v => patch({ searchVisible: v })}
             />
           </View>

@@ -29,11 +29,6 @@ import { useColors } from '@/hooks/useColors';
 import { EmptyState, SearchBar } from '@/components/BrandthreadUI';
 import { deleteDraft, listDrafts } from '@/services/productService';
 import { ProductDraft } from '@/services/productTypes';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// Sort options draw 40pt tall with a 1pt border (slop is measured from the
-// 38pt padding box on web); pad the touch area vertically to 44pt.
-const SORT_OPTION_HIT_SLOP = minHitSlop({ height: 38 });
 
 type DraftSort = 'lastSaved' | 'name';
 
@@ -197,7 +192,6 @@ export default function DraftsScreen() {
             style={[styles.sortOption, sort === 'lastSaved' && styles.sortOptionActive]}
             onPress={() => setSort('lastSaved')}
             activeOpacity={0.75}
-            hitSlop={SORT_OPTION_HIT_SLOP}
             accessibilityRole="radio"
             accessibilityState={{ selected: sort === 'lastSaved' }}
           >
@@ -210,7 +204,6 @@ export default function DraftsScreen() {
             style={[styles.sortOption, sort === 'name' && styles.sortOptionActive]}
             onPress={() => setSort('name')}
             activeOpacity={0.75}
-            hitSlop={SORT_OPTION_HIT_SLOP}
             accessibilityRole="radio"
             accessibilityState={{ selected: sort === 'name' }}
           >

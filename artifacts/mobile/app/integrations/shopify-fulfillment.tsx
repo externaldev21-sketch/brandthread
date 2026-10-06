@@ -105,8 +105,6 @@ export default function ShopifyFulfillmentScreen() {
               value={Boolean(status?.fulfillmentEnabled)}
               onValueChange={handleToggle}
               disabled={busy}
-              accessibilityLabel="Fulfill orders through my Shopify store"
-              accessibilityHint={status?.connected ? `Connected to ${status.shopDomain}` : 'Not connected'}
             />
           </View>
 

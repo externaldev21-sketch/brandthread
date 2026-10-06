@@ -5,7 +5,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { FONT } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 
 const FEATURES = [
   { icon: 'layout' as const, title: 'Drag-and-drop screens', desc: 'Build your own branded shopping app without code' },
@@ -37,12 +36,7 @@ export default function MobileAppBuilderScreen() {
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
             Turn your storefront into a fully branded iOS & Android app — no code required.
           </Text>
-          <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: primary }]}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            hitSlop={minHitSlop({ height: 43 })}
-          >
+          <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: primary }]} activeOpacity={0.85}>
             <Feather name="zap" size={15} color={colors.primaryForeground} />
             <Text style={[styles.ctaText, { color: colors.primaryForeground }]}>Start building</Text>
           </TouchableOpacity>

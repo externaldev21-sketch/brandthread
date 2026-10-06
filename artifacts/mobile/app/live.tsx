@@ -135,10 +135,7 @@ function LivePage({
       testID={`live-page-${stream.id}`}
     >
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: mediaFade }]}>
-      {/* Gesture surface only (tap / double-tap to like): kept out of the
-          accessibility tree AND the web tab order — react-native-web's
-          Pressable ignores accessible={false} and made it an unnamed tab stop. */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={onVideoPress} accessible={false} tabIndex={-1}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onVideoPress} accessible={false}>
         {video.kind === 'video' ? (
           <>
           {/* Poster underlay: VideoVisual drops its own poster on the

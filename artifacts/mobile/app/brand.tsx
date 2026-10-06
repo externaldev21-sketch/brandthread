@@ -9,7 +9,6 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FS } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 
 const BRAND_CHECKLIST_ITEMS = [
   'Brand name finalized',
@@ -151,7 +150,6 @@ export default function BrandScreen() {
           style={[styles.generateBtn, { backgroundColor: colors.primary, opacity: isGenerating ? 0.7 : 1 }]}
           onPress={handleGenerateNames}
           activeOpacity={0.8}
-          hitSlop={BUTTON_HIT_SLOP}
           disabled={isGenerating}
         >
           <Feather name={isGenerating ? 'loader' : 'zap'} size={16} color={colors.primaryForeground} />
@@ -165,7 +163,6 @@ export default function BrandScreen() {
               key={name}
               style={[styles.namePill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
               activeOpacity={0.7}
-              hitSlop={CHIP_HIT_SLOP}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setNameInput(name);
@@ -195,9 +192,6 @@ export default function BrandScreen() {
               key={s}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLogoStyle(s); }}
               activeOpacity={0.7}
-              hitSlop={CHIP_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityState={{ selected: logoStyle === s }}
               style={[styles.styleChip, {
                 backgroundColor: logoStyle === s ? colors.primary : colors.secondary,
                 borderColor: logoStyle === s ? colors.primary : colors.border,
@@ -213,7 +207,6 @@ export default function BrandScreen() {
           style={[styles.generateBtn, { backgroundColor: colors.primary, opacity: logoGenerating ? 0.7 : 1, marginTop: 4 }]}
           onPress={handleGenerateLogo}
           activeOpacity={0.85}
-          hitSlop={BUTTON_HIT_SLOP}
           disabled={logoGenerating}
         >
           <Feather name={logoGenerating ? 'loader' : 'aperture'} size={16} color={colors.primaryForeground} />
@@ -254,7 +247,6 @@ export default function BrandScreen() {
               <TouchableOpacity
                 style={[styles.generateBtn, { backgroundColor: theme.accentDim, marginTop: 8 }]}
                 activeOpacity={0.8}
-                hitSlop={BUTTON_HIT_SLOP}
                 onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
               >
                 <Feather name="download" size={15} color={colors.success} />
@@ -302,7 +294,7 @@ export default function BrandScreen() {
             <Text style={[styles.availText, { color: colors.success }]}>Available</Text>
           </View>
         </View>
-        <TouchableOpacity style={[styles.connectBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} hitSlop={BUTTON_HIT_SLOP} accessibilityRole="button">
+        <TouchableOpacity style={[styles.connectBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
           <Text style={[styles.connectText, { color: colors.primaryForeground }]}>Connect Domain</Text>
         </TouchableOpacity>
       </View>
@@ -310,14 +302,6 @@ export default function BrandScreen() {
     </View>
   );
 }
-
-// Invisible a11y touch padding (44pt min) — the ~43pt-tall full-width
-// buttons and the ~31-32pt-tall wrapped chips (vertical only: chip rows sit 8pt
-// apart).
-const BUTTON_HIT_SLOP = minHitSlop({ height: 43 });
-// 31pt chips minus their 1pt top+bottom border (on web the slop child is
-// positioned inside the border box).
-const CHIP_HIT_SLOP = minHitSlop({ height: 31 - 2 });
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

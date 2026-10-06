@@ -21,7 +21,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { FONT, FS } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 
 interface UploadedPhoto {
   id: string;
@@ -350,9 +349,6 @@ export default function AIPhotographyChatScreen() {
             activeOpacity={0.82}
             onPress={() => setMode('free')}
             testID="ai-photography-mode-free"
-            hitSlop={MODE_CHIP_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityState={{ selected: mode === 'free' }}
             style={[styles.modeChip, mode === 'free' && { backgroundColor: colors.primary }]}
           >
             <Feather name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
@@ -364,9 +360,6 @@ export default function AIPhotographyChatScreen() {
             activeOpacity={0.82}
             onPress={() => setMode('outfitSwap')}
             testID="ai-photography-mode-outfit-swap"
-            hitSlop={MODE_CHIP_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityState={{ selected: mode === 'outfitSwap' }}
             style={[styles.modeChip, mode === 'outfitSwap' && { backgroundColor: colors.primary }]}
           >
             <Feather name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
@@ -517,8 +510,6 @@ export default function AIPhotographyChatScreen() {
             activeOpacity={0.8}
             disabled={(mode === 'free' ? photos.length >= MAX_PHOTOS : (heroPhoto ? garments.length >= MAX_GARMENTS : false)) || loading}
             style={styles.attachBtn}
-            hitSlop={ATTACH_BTN_HIT_SLOP}
-            accessibilityRole="button"
             accessibilityLabel="Add photos"
             testID="ai-photography-attach"
           >
@@ -544,11 +535,6 @@ export default function AIPhotographyChatScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-// Mode chips draw at 34pt tall (10pt row padding above/below) and the attach
-// button at 40×40 — hitSlop pads both to 44pt without changing the layout.
-const MODE_CHIP_HIT_SLOP = minHitSlop({ height: 34 });
-const ATTACH_BTN_HIT_SLOP = minHitSlop({ width: 40, height: 40 });
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

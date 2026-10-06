@@ -22,15 +22,10 @@ import type { BuyerPost } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { minHitSlop } from '@/lib/hitSlop';
 
 const { width } = Dimensions.get('window');
 const GAP = SP.xs;
 const CELL = (width - SP.md * 2 - GAP * 2) / 3;
-
-// Posts/Stories pills draw 35pt tall with a 1pt border (slop is measured from
-// the 33pt padding box on web); pad the touch area vertically to 44pt.
-const TAB_PILL_HIT_SLOP = minHitSlop({ height: 33 });
 
 type ArchiveTab = 'posts' | 'stories';
 
@@ -126,7 +121,6 @@ export default function BuyerArchive() {
             key={t}
             style={[styles.tabPill, tab === t && styles.tabPillActive]}
             onPress={() => setTab(t)}
-            hitSlop={TAB_PILL_HIT_SLOP}
           >
             <Feather
               name={t === 'posts' ? 'grid' : 'clock'}

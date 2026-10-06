@@ -9,7 +9,6 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { describeDashboardDelta } from '@/lib/sellerDashboardStats';
 import type { TrafficSource } from '@/lib/sellerHomeAnalytics';
-import { minHitSlop } from '@/lib/hitSlop';
 
 /**
  * Traffic sources — redesigned per Dev's direction (Mobbin references:
@@ -123,7 +122,7 @@ export function SellerDashboardTrafficSources({
     <View testID="seller-dashboard-traffic-sources">
       <View style={styles.headerRow}>
         <Text style={[styles.sectionHeader, { color: theme.muted }]}>Traffic sources</Text>
-        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all traffic analytics" hitSlop={SEE_ALL_HIT_SLOP}>
+        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all traffic analytics" hitSlop={8}>
           <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
         </TouchableOpacity>
       </View>
@@ -219,9 +218,6 @@ export function SellerDashboardTrafficSources({
     </View>
   );
 }
-
-// The "See all" link is drawn ~41×16pt; pad its touch area to 44×44.
-const SEE_ALL_HIT_SLOP = minHitSlop({ width: 41, height: 16 });
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },

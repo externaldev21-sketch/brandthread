@@ -36,17 +36,10 @@ import {
   SectionHeader,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { minHitSlop } from '@/lib/hitSlop';
 import { ThreadProgress } from '@/components/onboarding/ThreadLine';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Task Step Card ───────────────────────────────────────────────────────────
-
-// 26pt check circle and the ~23×14 "Skip" text link, padded to 44×44 — the
-// card's 16pt padding leaves room for the slop on every side.
-// (check circle: 23pt padding box inside its 1.5pt border — web slop is laid out from there)
-const CHECK_HIT_SLOP = minHitSlop({ width: 23, height: 23 });
-const SKIP_HIT_SLOP = minHitSlop({ width: 23, height: 14 });
 
 function TaskCard({
   task, active, onComplete, onSkip, onPress,
@@ -84,10 +77,7 @@ function TaskCard({
         <TouchableOpacity
           onPress={task.completed ? undefined : handleComplete}
           style={[ts.check, task.completed && ts.checkDone]}
-          hitSlop={CHECK_HIT_SLOP}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: task.completed, disabled: task.completed }}
-          accessibilityLabel={task.completed ? `${task.label} complete` : `Mark ${task.label} complete`}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           {task.completed && <Feather name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
@@ -109,9 +99,7 @@ function TaskCard({
         {!task.completed && (
           <TouchableOpacity
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSkip(task.id); }}
-            hitSlop={SKIP_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityLabel={`Skip ${task.label}`}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={ts.skip}>Skip</Text>
           </TouchableOpacity>

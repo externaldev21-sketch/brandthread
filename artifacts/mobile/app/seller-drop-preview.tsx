@@ -21,7 +21,6 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
 import { computeCountdownParts } from '@/lib/dropCountdown';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
-import { minHitSlop } from '@/lib/hitSlop';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const { width: W } = Dimensions.get('window');
@@ -95,7 +94,7 @@ export default function SellerDropPreview() {
       <View style={[styles.center, { backgroundColor: theme.background, gap: 12 }]}>
         <Feather name="alert-triangle" size={28} color={theme.muted} />
         <Text style={{ color: theme.text, fontFamily: FONT.regular }}>Couldn't load this drop.</Text>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={{ padding: 12 }} hitSlop={minHitSlop({ height: 41 })} accessibilityRole="button">
+        <TouchableOpacity onPress={() => goBackOr(router)} style={{ padding: 12 }}>
           <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Back</Text>
         </TouchableOpacity>
       </View>

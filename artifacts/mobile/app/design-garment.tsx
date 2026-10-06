@@ -22,16 +22,6 @@ import {
 } from '@/lib/theme';
 import { getProject, updateProject } from '@/services/designService';
 import { GARMENT_TYPES, GARMENT_TEMPLATES, GARMENT_VIEWS } from '@/services/designTypes';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// Touch-area extensions up to 44pt — no visual/layout change. Bordered
-// controls are sized from their padding box (drawn size minus borders),
-// because on web the slop is laid out inside the border.
-const TYPE_PILL_HIT_SLOP = minHitSlop({ height: 32 });   // 34pt pills (1pt border), 4pt gaps → vertical only
-const VIEW_TAB_HIT_SLOP = minHitSlop({ height: 32 });    // 32pt segments (no border)
-const SWATCH_HIT_SLOP = minHitSlop({ width: 34, height: 34 }); // 40pt swatches (up to 2.5pt border), 12pt gaps
-const ZONE_CHIP_HIT_SLOP = minHitSlop({ height: 28 });   // 30pt chips (1pt border)
-const OPTION_TOGGLE_HIT_SLOP = minHitSlop({ height: 31 }); // ~33pt toggles (1pt border)
 
 function viewLabel(view: string): string {
   return GARMENT_VIEWS.find(v => v.value === view)?.label ?? view;
@@ -248,17 +238,12 @@ export default function DesignGarmentScreen() {
         {/* ── GARMENT TYPE PICKER ── */}
         <View style={gs.section}>
           <Text style={gs.sectionLabel}>Garment Type</Text>
-          {/* 5pt padding offset by an equal negative margin: the row doesn't move,
-              but the (clipping) ScrollView has room for the pills' 44pt touch areas. */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: -5 }} contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md, paddingVertical: 5 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md }}>
             {GARMENT_TYPES.map(t => (
               <TouchableOpacity
                 key={t.value}
                 style={[gs.typePill, garmentType === t.value && gs.typePillActive]}
                 onPress={() => { Haptics.selectionAsync(); setGarmentType(t.value); }}
-                hitSlop={TYPE_PILL_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ selected: garmentType === t.value }}
               >
                 <Text style={[gs.typePillText, garmentType === t.value && { color: PURPLE_LIGHT }]}>
                   {t.label}
@@ -309,21 +294,11 @@ export default function DesignGarmentScreen() {
         <View style={gs.section}>
           <Text style={gs.sectionLabel}>View</Text>
           <View style={gs.viewTabs}>
-            {availableViews.map((view: string, i: number) => (
+            {availableViews.map((view: string) => (
               <TouchableOpacity
                 key={view}
-                style={[
-                  gs.viewTab,
-                  // The outer corners round the selected fill directly, so the
-                  // container needs no overflow clip (which cut off hitSlop).
-                  i === 0 && gs.viewTabFirst,
-                  i === availableViews.length - 1 && gs.viewTabLast,
-                  currentView === view && gs.viewTabActive,
-                ]}
+                style={[gs.viewTab, currentView === view && gs.viewTabActive]}
                 onPress={() => { Haptics.selectionAsync(); setCurrentView(view); }}
-                hitSlop={VIEW_TAB_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ selected: currentView === view }}
               >
                 <Text style={[gs.viewTabText, currentView === view && { color: '#000000', fontFamily: FONT.bold }]}>{viewLabel(view)}</Text>
               </TouchableOpacity>
@@ -340,10 +315,6 @@ export default function DesignGarmentScreen() {
                 key={hex}
                 style={[gs.colorSwatch, { backgroundColor: hex }, garmentColor === hex && gs.colorSwatchActive]}
                 onPress={() => { Haptics.selectionAsync(); setGarmentColor(hex); }}
-                hitSlop={SWATCH_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityLabel={`${label} garment color`}
-                accessibilityState={{ selected: garmentColor === hex }}
               >
                 {garmentColor === hex && (
                   <Feather name="check" size={12} color={isDarkGarment ? '#FFFFFF' : '#000000'} />
@@ -362,9 +333,6 @@ export default function DesignGarmentScreen() {
                 key={zone}
                 style={[gs.zoneChip, selectedZone === zone && gs.zoneChipActive]}
                 onPress={() => { Haptics.selectionAsync(); setSelectedZone(selectedZone === zone ? null : zone); }}
-                hitSlop={ZONE_CHIP_HIT_SLOP}
-                accessibilityRole="button"
-                accessibilityState={{ selected: selectedZone === zone }}
               >
                 <Text style={[gs.zoneChipText, selectedZone === zone && { color: CYAN }]}>{zone}</Text>
               </TouchableOpacity>
@@ -379,10 +347,6 @@ export default function DesignGarmentScreen() {
             <TouchableOpacity
               style={[gs.optionToggle, showSafeArea && gs.optionToggleActive]}
               onPress={() => { Haptics.selectionAsync(); setShowSafeArea(v => !v); }}
-              hitSlop={OPTION_TOGGLE_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityLabel="Print-Safe Area"
-              accessibilityState={{ selected: showSafeArea }}
             >
               <Feather name="maximize" size={14} color={showSafeArea ? SUCCESS : MUTED} />
               <Text style={[gs.optionToggleText, showSafeArea && { color: SUCCESS }]}>Print-Safe Area</Text>
@@ -390,10 +354,6 @@ export default function DesignGarmentScreen() {
             <TouchableOpacity
               style={[gs.optionToggle, showEmbroidery && gs.optionToggleActive]}
               onPress={() => { Haptics.selectionAsync(); setShowEmbroidery(v => !v); }}
-              hitSlop={OPTION_TOGGLE_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityLabel="Embroidery-Safe"
-              accessibilityState={{ selected: showEmbroidery }}
             >
               <Feather name="scissors" size={14} color={showEmbroidery ? CYAN : MUTED} />
               <Text style={[gs.optionToggleText, showEmbroidery && { color: CYAN }]}>Embroidery-Safe</Text>
@@ -456,9 +416,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: SUCCESS, backgroundColor: 'rgba(16,185,129,0.12)', borderStyle: 'dashed' },
   embroideryOverlay: { position: 'absolute', left: '25%', top: '15%', width: '50%', height: '40%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: CYAN, backgroundColor: CYAN_DIM, borderStyle: 'dashed' },
 
-  viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },
-  viewTabFirst: { borderTopLeftRadius: RADIUS.sm - 1, borderBottomLeftRadius: RADIUS.sm - 1 },
-  viewTabLast:  { borderTopRightRadius: RADIUS.sm - 1, borderBottomRightRadius: RADIUS.sm - 1 },
+  viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   viewTab:      { flex: 1, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
   // Monochrome rule: the selected segment is a solid white fill with black
   // text, not a tinted grey pill.
