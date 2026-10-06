@@ -1,13 +1,12 @@
 /**
  * FeedGestureGuide — first-time buyer coach screen for the video feed.
- * Modeled on Instagram's "Watching stories" coach mark: a dim/blurred
- * overlay, a title and subtitle, four animated gesture rows, and
+ * Modeled on Instagram's "Watching stories" coach mark: a solid black
+ * backdrop, a title and subtitle, four animated gesture rows, and
  * "Tap to keep watching". Any tap dismisses it; shown once per account
  * (see FEED_GESTURE_GUIDE_SEEN_KEY / dismissFeedGestureGuide below).
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, ON_DARK_MUTED } from '@/lib/theme';
 
@@ -64,9 +63,6 @@ function HoldRightGlyph() {
     <AnimatedGlyph>
       {t => (
         <View style={glyphStyles.holdRow}>
-          <Animated.View style={{ opacity: t.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }}>
-            <Feather name="circle" size={10} color="#FFFFFF" />
-          </Animated.View>
           <Animated.View style={{ transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] }) }] }}>
             <Text style={glyphStyles.speedText}>2x</Text>
           </Animated.View>
@@ -124,12 +120,7 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
       testID="feed-gesture-guide"
     >
       <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Tap to keep watching">
-        <BlurView
-          intensity={Platform.OS === 'ios' ? 46 : 60}
-          tint="dark"
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[StyleSheet.absoluteFill, styles.dim]} />
+        <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
         <View style={styles.content} pointerEvents="none">
           <Text style={styles.title}>Watching Threads</Text>
           <Text style={styles.subtitle}>A few gestures to get you moving</Text>
@@ -160,7 +151,8 @@ export function FeedGestureGuide({ visible, onDismiss }: { visible: boolean; onD
 
 const styles = StyleSheet.create({
   root: { zIndex: 9999, elevation: 9999 },
-  dim: { backgroundColor: 'rgba(0,0,0,0.38)' },
+  // Solid, not a blur over the video: Dev's rule is no translucent overlays.
+  backdrop: { backgroundColor: '#000000' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xxl, textAlign: 'center' },
   subtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6, marginBottom: 40 },
@@ -169,6 +161,6 @@ const styles = StyleSheet.create({
   glyphSlot: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1 },
   rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
-  rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  dismissHint: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 48, letterSpacing: 0.3 },
+  rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
+  dismissHint: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base, marginTop: 48, letterSpacing: 0.3 },
 });
