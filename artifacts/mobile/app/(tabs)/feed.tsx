@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { DEMO_RUNWAY_VIDEO_SOURCES, DEMO_RUNWAY_VIDEO_URIS } from '@/lib/demoMedia';
 import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
@@ -351,22 +352,11 @@ type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
 
-const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = [
-  require('../../assets/videos/fashion_runway_01.mp4'),
-  require('../../assets/videos/fashion_runway_02.mp4'),
-  require('../../assets/videos/fashion_runway_03.mp4'),
-  require('../../assets/videos/fashion_runway_04.mp4'),
-  require('../../assets/videos/fashion_runway_05.mp4'),
-  require('../../assets/videos/fashion_runway_06.mp4'),
-  require('../../assets/videos/fashion_runway_07.mp4'),
-  require('../../assets/videos/fashion_runway_08.mp4'),
-  require('../../assets/videos/fashion_runway_09.mp4'),
-  require('../../assets/videos/fashion_runway_10.mp4'),
-];
+// Demo clips are fetched on demand from public/demo-media (or a CDN), never
+// bundled into the app — see lib/demoMedia.ts.
+const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = DEMO_RUNWAY_VIDEO_SOURCES;
 
-const FASHION_PREVIEW_VIDEO_URIS = FASHION_PREVIEW_VIDEO_SOURCES.map(
-  module => Asset.fromModule(module as number).uri,
-);
+const FASHION_PREVIEW_VIDEO_URIS = DEMO_RUNWAY_VIDEO_URIS;
 
 const FASHION_PREVIEW_POSTER_SOURCES = [
   require('../../assets/videos/fashion_runway_01.jpg'),
@@ -408,11 +398,9 @@ const BOOTS_TAG_IMAGE_URI = Asset.fromModule(
 if (FASHION_PREVIEW_POSTER_URIS[0]) {
   ExpoImage.prefetch(FASHION_PREVIEW_POSTER_URIS[0]).catch(() => {});
 }
-if (FASHION_PREVIEW_VIDEO_URIS[0]) {
-  Asset.fromModule(FASHION_PREVIEW_VIDEO_SOURCES[0] as number)
-    .downloadAsync()
-    .catch(() => {});
-}
+// (The first demo clip is no longer downloaded here: it is a remote file
+// now, and fetching ~4 MB at import time would cost every visitor, not just
+// the demo feed. The player streams it when its page mounts.)
 
 // Exported for the buyer search page's empty-state reference video grid,
 // which reuses these bundled 9:16 assets so it renders instantly with no

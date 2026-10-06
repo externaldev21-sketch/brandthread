@@ -38,6 +38,7 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf',
   '.otf': 'font/otf',
   '.map': 'application/json',
+  '.mp4': 'video/mp4',
 };
 
 function send(res, status, body, contentType = 'text/plain; charset=utf-8') {
@@ -69,11 +70,59 @@ function safeFilePath(urlPath) {
 
 const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.css', '.json', '.svg', '.map']);
 
-function serveFile(filePath, res, acceptEncoding = '') {
+// Video needs byte ranges: Safari won't play an <video> source without 206
+// responses, and every browser uses them to seek. (Demo feed clips are served
+// from public/demo-media instead of being bundled into the app.)
+const RANGE_EXTS = new Set(['.mp4']);
+
+function parseRange(rangeHeader, size) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
+  if (!match || (match[1] === '' && match[2] === '')) return null;
+  let start;
+  let end;
+  if (match[1] === '') {
+    const suffix = Number(match[2]);
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(match[1]);
+    end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return 'unsatisfiable';
+  return { start, end };
+}
+
+function serveFile(filePath, res, acceptEncoding = '', rangeHeader = '') {
   if (!filePath || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return false;
   }
   const ext = path.extname(filePath).toLowerCase();
+  if (RANGE_EXTS.has(ext)) {
+    const body = fs.readFileSync(filePath);
+    const base = {
+      'content-type': MIME_TYPES[ext],
+      'accept-ranges': 'bytes',
+      'cache-control': 'public, max-age=31536000, immutable',
+    };
+    const range = rangeHeader ? parseRange(rangeHeader, body.length) : null;
+    if (range === 'unsatisfiable') {
+      res.writeHead(416, { ...base, 'content-range': `bytes */${body.length}` });
+      res.end();
+      return true;
+    }
+    if (range) {
+      res.writeHead(206, {
+        ...base,
+        'content-range': `bytes ${range.start}-${range.end}/${body.length}`,
+        'content-length': String(range.end - range.start + 1),
+      });
+      res.end(body.subarray(range.start, range.end + 1));
+      return true;
+    }
+    res.writeHead(200, { ...base, 'content-length': String(body.length) });
+    res.end(body);
+    return true;
+  }
   const headers = {
     'content-type': MIME_TYPES[ext] || 'application/octet-stream',
     'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
@@ -164,7 +213,7 @@ const server = http.createServer(async (req, res) => {
     res.end(gzip ? zlib.gzipSync(landingHtml) : landingHtml);
     return;
   }
-  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
+  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding, req.headers?.range)) return;
 
   // This server only ever serves the exported browser app — real /api/*
   // traffic is handled by api-server, a separate process/origin (see this
@@ -205,4 +254,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, server };
+module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, parseRange, server };
