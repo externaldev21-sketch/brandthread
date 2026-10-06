@@ -36,8 +36,8 @@ afterEach(async () => {
   while (testUserIds.length > 0) {
     const id = testUserIds.pop()!;
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, id));
-    // The money ledger is append-only at the database level (migration
-    // 084's trigger); its rows reference ids only, so they stay.
+    // ledger_postings / ledger_transactions are append-only (immutability
+    // triggers reject DELETE); the rows are keyed to this random test id.
     await db.delete(users).where(eq(users.clerkId, id));
   }
 });

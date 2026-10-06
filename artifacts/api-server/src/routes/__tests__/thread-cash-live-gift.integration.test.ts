@@ -79,6 +79,7 @@ describe("sendLiveGift", () => {
 
     await sendLiveGift(buyer, seller, stream, 150, crypto.randomUUID());
 
+    // The buyer also holds the daily_checkin grant row, so select by source.
     const [debit] = await db.select().from(threadCashEntries)
       .where(and(eq(threadCashEntries.buyerId, buyer), eq(threadCashEntries.source, "live_gift_sent"))).limit(1);
     expect(debit).toMatchObject({ amountCents: -150, source: "live_gift_sent", referenceId: stream });
@@ -166,25 +167,26 @@ describe("sendLiveGift", () => {
   });
 
   it("enforces the daily receive cap on the seller", async () => {
-    const buyer = await makeUser();
+    // Several senders: the receive cap must trip on the seller even when no
+    // single buyer has hit their own (lower) daily send cap.
     const seller = await makeUser();
     const stream = await makeStream(seller);
     const [config] = await db.select().from(threadCashConfig).limit(1);
     const cap = config?.dailyReceiveCapCents ?? 5000;
-    const sendCap = config?.dailySendCapCents ?? 2000;
-    // The receive cap is larger than one buyer's send cap, so fill it from
-    // several buyers — the cap is per seller, across every sender.
-    let remaining = cap;
-    while (remaining > 0) {
+    const sendCap = config?.dailySendCapCents ?? cap;
+
+    let received = 0;
+    while (received < cap) {
       const sender = await makeUser();
-      const amount = Math.min(sendCap, remaining);
-      await grant(sender, amount);
-      await sendLiveGift(sender, seller, stream, amount, crypto.randomUUID());
-      remaining -= amount;
+      const chunk = Math.min(sendCap, cap - received);
+      await grant(sender, chunk);
+      await sendLiveGift(sender, seller, stream, chunk, crypto.randomUUID());
+      received += chunk;
     }
-    await grant(buyer, 100);
+    const third = await makeUser();
+    await grant(third, 100);
     await expect(
-      sendLiveGift(buyer, seller, stream, 1, crypto.randomUUID()),
+      sendLiveGift(third, seller, stream, 1, crypto.randomUUID()),
     ).rejects.toMatchObject({ code: "THREAD_CASH_DAILY_RECEIVE_CAP" });
   });
 
