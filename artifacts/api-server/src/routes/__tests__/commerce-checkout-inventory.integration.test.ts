@@ -18,6 +18,7 @@ import crypto from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 vi.hoisted(() => {
+  process.env.PAYOUT_MODE = "hold";
   process.env.STRIPE_SECRET_KEY = "sk_test_commerce_e2e";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_commerce_e2e";
   process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ||= "http://127.0.0.1:9/openai";
