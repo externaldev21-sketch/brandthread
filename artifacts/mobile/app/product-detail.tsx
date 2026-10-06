@@ -24,7 +24,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 
-import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
+import { initProductService, getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
 import { useApi } from '@/lib/api';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
@@ -92,6 +92,10 @@ export default function ProductDetailScreen() {
     }
     setLoading(true);
     try {
+      // A cold deep link can render this before the app has pointed the
+      // product store at the signed-in account; doing it here (idempotent)
+      // keeps the read from landing on the signed-out store.
+      if (userId) initProductService(userId);
       const p = await getProduct(id);
       setProduct(p ?? null);
       setLoadError(false);
