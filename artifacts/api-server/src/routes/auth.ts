@@ -37,8 +37,13 @@ import { revokeAppleTokens } from "../lib/appleAuth";
 
 /** Clerk session facts that count as re-authentication for account deletion (QA-0074). */
 function reauthContext(req: Parameters<typeof getAuth>[0]) {
-  const auth = getAuth(req) as { factorVerificationAge?: [number, number] | null; sessionId?: string | null };
-  return { factorVerificationAge: auth.factorVerificationAge ?? null, sessionId: auth.sessionId ?? null };
+  try {
+    const auth = getAuth(req) as { factorVerificationAge?: [number, number] | null; sessionId?: string | null };
+    return { factorVerificationAge: auth.factorVerificationAge ?? null, sessionId: auth.sessionId ?? null };
+  } catch {
+    // No Clerk session facts on this request: it simply doesn't count as a recent sign-in.
+    return { factorVerificationAge: null, sessionId: null };
+  }
 }
 
 /** Undo the renewal stop that scheduling deletion applied (never throws). */

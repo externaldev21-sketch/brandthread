@@ -28,7 +28,8 @@ const SELLER = id("seller");
 const OTHER_SELLER = id("other");
 const tok = (name: string) => `ExponentPushToken[spb-${sfx}-${name}]`;
 
-const followerNames = ["ok1", "ok2", "pushoff", "prefoff", "blockedme", "iblocked", "quiet", "muted"] as const;
+// "nopromo" follows but never opted in to promotional push (QA-0148).
+const followerNames = ["ok1", "ok2", "pushoff", "prefoff", "blockedme", "iblocked", "quiet", "muted", "nopromo"] as const;
 const allUserIds = [SELLER, OTHER_SELLER, ...followerNames.map(id), id("stranger")];
 
 let server: Server;
@@ -63,6 +64,8 @@ beforeAll(async () => {
     clerkId, email: `${clerkId}@test.local`, name: clerkId, displayName: clerkId === SELLER ? "Atelier Test" : clerkId,
     username: clerkId.replace(/[^a-z0-9]/gi, "").slice(0, 28), role: "buyer", accountType: clerkId === SELLER || clerkId === OTHER_SELLER ? "seller" : "buyer",
   })));
+  // A broadcast is promotional: only followers who opted in get a device push.
+  await db.update(users).set({ promoPushOptIn: true }).where(inArray(users.clerkId, followerNames.filter((n) => n !== "nopromo").map(id)));
   await db.update(users).set({ pushEnabled: false }).where(eq(users.clerkId, id("pushoff")));
   await db.update(users).set({ notificationPreferences: { seller_announcements: false } as any }).where(eq(users.clerkId, id("prefoff")));
   await db.update(users).set({ quietHoursStart: "00:00", quietHoursEnd: "23:59", quietHoursTimezone: "UTC" }).where(eq(users.clerkId, id("quiet")));
@@ -107,7 +110,7 @@ describe("seller follower push broadcasts", () => {
   it("previews the audience without sending or consuming the daily slot", async () => {
     const r = await call("POST", "/preview", SELLER, { title: "Drop Friday", body: "Doors open at 6pm." });
     expect(r.status).toBe(200);
-    expect(r.body.audience).toEqual({ followers: followerNames.length, recipients: 3 });
+    expect(r.body.audience).toEqual({ followers: followerNames.length, recipients: 4 });
     expect(r.body.canSendNow).toBe(true);
     expect(pushed).toHaveLength(0);
     const rows = await db.select().from(sellerPushBroadcasts).where(eq(sellerPushBroadcasts.sellerId, SELLER));
@@ -132,17 +135,18 @@ describe("seller follower push broadcasts", () => {
     const [mine] = await db.insert(products).values({ ownerId: SELLER, name: "My hoodie" }).returning({ id: products.id });
     const r = await call("POST", "/", SELLER, { title: "Drop Friday", body: "Doors open at 6pm.", deeplinkType: "product", deeplinkId: mine!.id });
     expect(r.status).toBe(201);
-    expect(r.body.delivery).toMatchObject({ recipients: 3, sent: 3, skipped: 5 });
-    expect(r.body.broadcast).toMatchObject({ recipientCount: 3, sentCount: 3, skippedCount: 5, status: "sent" });
+    expect(r.body.delivery).toMatchObject({ recipients: 4, sent: 4, skipped: 5 });
+    expect(r.body.broadcast).toMatchObject({ recipientCount: 4, sentCount: 4, skippedCount: 5, status: "sent" });
 
     const feed = await db.select({ userId: notificationsFeed.userId, targetType: notificationsFeed.targetType, targetId: notificationsFeed.targetId })
       .from(notificationsFeed).where(eq(notificationsFeed.actorId, SELLER));
-    expect(feed.map((f) => f.userId).sort()).toEqual([id("ok1"), id("ok2"), id("quiet")].sort());
+    expect(feed.map((f) => f.userId).sort()).toEqual([id("ok1"), id("ok2"), id("quiet"), id("nopromo")].sort());
     expect(feed.every((f) => f.targetType === "product" && f.targetId === mine!.id)).toBe(true);
 
     // Only the two followers outside quiet hours get a device push.
     expect(pushed.sort()).toEqual([tok("ok1"), tok("ok2")].sort());
-    for (const skipped of ["pushoff", "prefoff", "blockedme", "iblocked", "muted", "quiet"]) {
+    // QA-0148: the follower who never opted in to promotional push gets the in-app item, not a push.
+    for (const skipped of ["pushoff", "prefoff", "blockedme", "iblocked", "muted", "quiet", "nopromo"]) {
       expect(pushed).not.toContain(tok(skipped));
     }
     expect(pushed).not.toContain(tok("stranger"));
@@ -199,6 +203,6 @@ describe("seller follower push broadcasts", () => {
     });
     const r = await call("GET", `/${latest.id}`, SELLER);
     expect(r.body.opened).toBeGreaterThanOrEqual(1);
-    expect(r.body.recipientCount).toBe(3);
+    expect(r.body.recipientCount).toBe(4);
   });
 });

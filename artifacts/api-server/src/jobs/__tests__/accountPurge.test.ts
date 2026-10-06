@@ -8,6 +8,9 @@ const state = vi.hoisted(() => ({
   deleted: [] as string[],
   deleteUserError: null as unknown,
   purgeError: null as unknown,
+  subscription: null as null | { provider: "stripe"; subscriptionId: string } | { provider: "store" },
+  cancelled: [] as string[],
+  cancelError: null as unknown,
 }));
 
 vi.mock("drizzle-orm", () => {
@@ -55,6 +58,14 @@ vi.mock("../../lib/accountDeletion", () => ({
   },
 }));
 
+vi.mock("../../lib/accountDeletionBilling", () => ({
+  getDeletionSubscription: async () => state.subscription,
+  cancelSubscriptionAtPurge: async (id: string) => {
+    if (state.cancelError) throw state.cancelError;
+    state.cancelled.push(id);
+  },
+}));
+
 import { runAccountPurge } from "../accountPurge";
 
 const now = new Date("2026-03-01T00:00:00.000Z");
@@ -67,6 +78,9 @@ beforeEach(() => {
   state.deleted = [];
   state.deleteUserError = null;
   state.purgeError = null;
+  state.subscription = null;
+  state.cancelled = [];
+  state.cancelError = null;
 });
 
 describe("runAccountPurge", () => {
@@ -110,5 +124,29 @@ describe("runAccountPurge", () => {
     state.purgeError = new Error("db down");
     expect(await runAccountPurge(now)).toEqual({ purged: 0, postponed: 0, failed: 2 });
     expect((state.sets[0].deletionScheduledFor as Date).getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  // QA-0073: a purged account is never charged again.
+  it("cancels a web-billed (Stripe) plan before purging", async () => {
+    state.due = [{ clerkId: "user_a", deletedAt: null }];
+    state.subscription = { provider: "stripe", subscriptionId: "sub_1" };
+    expect(await runAccountPurge(now)).toEqual({ purged: 1, postponed: 0, failed: 0 });
+    expect(state.cancelled).toEqual(["sub_1"]);
+    expect(state.purged).toEqual(["user_a"]);
+  });
+
+  it("does not purge when Stripe cannot cancel, and retries later", async () => {
+    state.due = [{ clerkId: "user_a", deletedAt: null }];
+    state.subscription = { provider: "stripe", subscriptionId: "sub_1" };
+    state.cancelError = new Error("stripe down");
+    expect(await runAccountPurge(now)).toEqual({ purged: 0, postponed: 0, failed: 1 });
+    expect(state.purged).toEqual([]);
+  });
+
+  it("purges store-billed accounts (only the person can cancel those; the delete screen told them how)", async () => {
+    state.due = [{ clerkId: "user_a", deletedAt: null }];
+    state.subscription = { provider: "store" };
+    expect(await runAccountPurge(now)).toEqual({ purged: 1, postponed: 0, failed: 0 });
+    expect(state.cancelled).toEqual([]);
   });
 });
