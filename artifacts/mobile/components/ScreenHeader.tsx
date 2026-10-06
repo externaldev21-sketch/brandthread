@@ -44,6 +44,8 @@ interface ScreenHeaderProps {
    * itself, only which icon a screen that already has one shows.
    */
   variant?: 'push' | 'modal';
+  /** Drops the hairline under the header. Off by default so existing call sites are unchanged. */
+  hideDivider?: boolean;
 }
 
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
@@ -61,7 +63,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', hideDivider = false,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -84,7 +86,7 @@ export function ScreenHeader({
   const closeOrBack = () => (onBack ? onBack() : goBackOr(router));
 
   return (
-    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
+    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }, hideDivider && { borderBottomWidth: 0 }]}>
       <View style={styles.container}>
         {variant === 'push' && (
           <PressableScale
