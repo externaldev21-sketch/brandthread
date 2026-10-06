@@ -847,6 +847,12 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
 
+  // "@handle" in the caption reaches the people mentioned (published + visible only;
+  // a held caption notifies nobody until a moderator approves it).
+  if (postStatus === "published" && !postHeld) {
+    void notifyCaptionMentions({ postId: post.id, authorId: clerkId, caption: post.caption });
+  }
+
   // Validate + tag products (must belong to the posting seller)
   const taggedProducts: any[] = [];
   if (taggedProductIds && taggedProductIds.length > 0) {
@@ -864,12 +870,6 @@ router.post("/", requireAuth, async (req, res) => {
         taggedProducts.push(...sellerProds);
       }
     }
-  }
-
-  // "@handle" in the caption reaches the people mentioned (published + visible only;
-  // a held caption notifies nobody until a moderator approves it).
-  if (postStatus === "published" && !postHeld) {
-    void notifyCaptionMentions({ postId: post.id, authorId: clerkId, caption: post.caption });
   }
 
   return res.status(201).json({

@@ -2348,14 +2348,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Toggle like on a story */
       likeStory: (storyId: string) =>
         post<{ liked: boolean; likesCount: number }>(`/api/social/stories/${encodeURIComponent(storyId)}/like`, {}),
-      /** Record a story view */
-      viewStory: (storyId: string) =>
-        post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {}),
       /** Reply to a story (author's reply settings enforced server-side). */
       replyToStory: (storyId: string, body: { text: string; slideUri?: string }) =>
         post<{ conversationId: string; messageId: string; isRequest: boolean }>(
           `/api/social/stories/${encodeURIComponent(storyId)}/reply`, body,
         ),
+      /** Record a story view */
+      viewStory: (storyId: string) =>
+        post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {}),
       /** Block a user — removes mutual follows, prevents messaging/following */
       block: (userId: string) =>
         post<{ ok: boolean }>('/api/social/block', { userId }),
