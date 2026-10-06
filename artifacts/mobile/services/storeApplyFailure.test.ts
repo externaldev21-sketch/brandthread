@@ -10,6 +10,9 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {},
 }));
 
+// storeService imports devPreview (react-native Platform) for its sync guard.
+vi.mock('@/lib/devPreview', () => ({ isSellerDevPreview: () => false }));
+
 vi.mock('@/lib/api', () => ({
   api: {
     store: {

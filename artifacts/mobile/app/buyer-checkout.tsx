@@ -85,7 +85,7 @@ import {
 import { tipsForRequest, type TipChoice } from '@/lib/checkoutTips';
 import { ApiError } from '@/lib/networkNotice';
 import { CheckoutSkeleton, PressableScale } from '@/components/BrandthreadUI';
-import { StickyFooter } from '@/components/layout';
+import { EmptyState, StickyFooter } from '@/components/layout';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { Button, ErrorState, IconButton } from '@/components/ui';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
@@ -168,6 +168,9 @@ export default function BuyerCheckoutScreen() {
   const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  /** No saved session and nothing in the cart — render an empty state here
+   * instead of bouncing back to whatever screen sits underneath (QA-0007). */
+  const [cartEmpty, setCartEmpty] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<CheckoutError | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
@@ -202,11 +205,12 @@ export default function BuyerCheckoutScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setLoadFailed(false);
+    setCartEmpty(false);
     try {
       let next = await getCheckoutSession();
       if (!next) {
         const cart = await getCart();
-        if (!cart.items.length) { leaveCheckout(); return; }
+        if (!cart.items.length) { setCartEmpty(true); setLoading(false); return; }
         next = await createCheckoutSession(cart, source === 'buynow');
       }
       // Normalize legacy step values
@@ -989,6 +993,22 @@ export default function BuyerCheckoutScreen() {
           message={t("We couldn't load checkout. Check your connection and try again.")}
           onRetry={() => void load()}
           retryLabel={t('Try again')}
+          style={{ flex: 1 }}
+        />
+      </View>
+    );
+  }
+
+  if (cartEmpty) {
+    return (
+      <View style={styles.root} testID="checkout-empty">
+        {header('Checkout', leaveCheckout, 'Close checkout')}
+        <EmptyState
+          icon="shopping-bag"
+          title="Your cart is empty"
+          message="Add something to your cart to check out."
+          actionLabel="Browse"
+          onAction={() => router.replace('/(buyer)/discover' as never)}
           style={{ flex: 1 }}
         />
       </View>

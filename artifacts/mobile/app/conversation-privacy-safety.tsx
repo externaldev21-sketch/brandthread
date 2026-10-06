@@ -7,7 +7,7 @@
  * see docs/dm-flows.md for this documented scope decision.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -19,6 +19,9 @@ import { confirmBlock, confirmUnblock } from '@/lib/safety';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useReportSheet } from '@/components/safety/ReportSheet';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { useConversationParticipant } from '@/hooks/useConversationParticipant';
 
 export default function ConversationPrivacySafetyScreen() {
   const { theme } = useAppTheme();
@@ -28,6 +31,8 @@ export default function ConversationPrivacySafetyScreen() {
   const params = useLocalSearchParams<{ id: string; participantUserId: string; participantName: string }>();
   const { openReport } = useReportSheet();
   const [isBlocked, setIsBlocked] = useState(false);
+  const { state, retry } = useConversationParticipant(params);
+  const participant = state.status === 'ready' ? state.participant : null;
 
   // The switch reflects the server, not a guess: load whether I already blocked them.
   useEffect(() => {
@@ -40,8 +45,9 @@ export default function ConversationPrivacySafetyScreen() {
   }, [api, params.participantUserId]);
 
   async function toggleBlock() {
+    if (!participant) return;
     hapticSelection();
-    const subject = { userId: params.participantUserId, name: params.participantName };
+    const subject = { userId: participant.userId, name: participant.name };
     const ok = isBlocked
       ? await confirmUnblock(subject, api.social.unblock)
       : await confirmBlock(subject, api.social.block);
@@ -49,12 +55,13 @@ export default function ConversationPrivacySafetyScreen() {
   }
 
   function report() {
+    if (!participant) return;
     hapticSelection();
     openReport({
       targetType: 'profile',
-      targetId: params.participantUserId,
-      ownerId: params.participantUserId,
-      ownerName: params.participantName,
+      targetId: participant.userId,
+      ownerId: participant.userId,
+      ownerName: participant.name,
     });
   }
 
@@ -66,32 +73,42 @@ export default function ConversationPrivacySafetyScreen() {
         backTestID="privacy-safety-back"
       />
 
+      {state.status === 'loading' ? (
+        <ActivityIndicator style={{ marginTop: SP.xl }} color={theme.muted} testID="privacy-safety-loading" />
+      ) : state.status === 'error' ? (
+        <ErrorState message="Couldn’t load this conversation." onRetry={retry} />
+      ) : !participant ? (
+        <EmptyState icon="message-circle" title="Conversation not found" message="This conversation isn’t available." testID="privacy-safety-not-found" />
+      ) : (
+      <>
       <View style={[s.list, { borderColor: theme.border }]}>
         <PressableScale rippleEnabled={false} onPress={toggleBlock} testID="privacy-safety-block">
           <View style={[s.row, { borderBottomColor: theme.border }]}>
             <Feather name="slash" size={ICON.md} color={theme.error} style={{ width: 28 }} />
-            <Text style={[s.rowTitle, { color: theme.error }]}>{isBlocked ? `Unblock ${params.participantName}` : `Block ${params.participantName}`}</Text>
+            <Text style={[s.rowTitle, { color: theme.error }]}>{isBlocked ? `Unblock ${participant.name}` : `Block ${participant.name}`}</Text>
           </View>
         </PressableScale>
         <PressableScale rippleEnabled={false} onPress={report} testID="privacy-safety-report">
           <View style={s.row}>
             <Feather name="alert-circle" size={ICON.md} color={theme.text} style={{ width: 28 }} />
-            <Text style={[s.rowTitle, { color: theme.text }]}>Report {params.participantName}</Text>
+            <Text style={[s.rowTitle, { color: theme.text }]}>Report {participant.name}</Text>
           </View>
         </PressableScale>
       </View>
 
       <Text style={[s.explainer, { color: theme.muted }]}>
-        Blocking stops {params.participantName} from finding your profile, seeing your posts, comments or
+        Blocking stops {participant.name} from finding your profile, seeing your posts, comments or
         stories, or messaging you. You won’t see theirs either. They aren’t notified.
       </Text>
+      </>
+      )}
     </View>
   );
 }
 
 const makeStyles = () => StyleSheet.create({
   root: { flex: 1 },
-  list: { marginTop: SP.md, borderTopWidth: StyleSheet.hairlineWidth },
+  list: { marginTop: SP.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
   explainer: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, paddingHorizontal: SP.md, marginTop: SP.md },

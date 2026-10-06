@@ -73,7 +73,7 @@ describe('notification response navigation', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
     handler(targetResponse('drop-1', { targetType: 'drop', targetId: 'drop-abc' }));
-    expect(router.push).toHaveBeenCalledWith('/buyer-drop-detail?id=drop-abc');
+    expect(router.push).toHaveBeenCalledWith('/buyer-drop-detail?dropId=drop-abc');
   });
 
   it('routes a live-started notification to the live viewer', () => {

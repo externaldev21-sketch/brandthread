@@ -17,10 +17,13 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
-  ORANGE, RED, FONT, FS, SP, RADIUS,
+  ORANGE, RED, FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
@@ -30,16 +33,28 @@ export default function VacationModeScreen() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
+  // ?bt_preview=seller with no signed-in account: no token for the protected
+  // vacation endpoints — never call them (same guard as app/finance.tsx).
+  const isPreviewMode = isSellerDevPreview();
+  const skipProtectedReads = (isPreviewMode && !userId) || (isPreviewMode && (!isAuthLoaded || !isSignedIn));
 
-  const [loading,         setLoading]         = useState(true);
+  const [loading,         setLoading]         = useState(!skipProtectedReads);
+  // True when the current vacation state failed to load. Save stays blocked
+  // until the real state is known, so it can never PUT the defaults
+  // (vacationMode:false, message:null) over a seller's live away settings.
+  const [loadError,       setLoadError]       = useState(false);
   const [saving,          setSaving]          = useState(false);
   const [vacationMode,    setVacationMode]    = useState(false);
   const [message,         setMessage]         = useState('');
   const [returnDate,      setReturnDate]      = useState('');
 
-  useFocusEffect(useCallback(() => {
+  const load = useCallback(() => {
+    if (skipProtectedReads) { setLoading(false); return; }
     setLoading(true);
-    (api as any).seller?.vacation?.get?.()
+    setLoadError(false);
+    Promise.resolve()
+      .then(() => (api as any).seller.vacation.get())
       .then((d: any) => {
         setVacationMode(d?.vacationMode ?? false);
         setMessage(d?.vacationMessage ?? '');
@@ -47,11 +62,14 @@ export default function VacationModeScreen() {
           setReturnDate(new Date(d.vacationUntil).toISOString().split('T')[0]);
         }
       })
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [api]));
+  }, [api, skipProtectedReads]);
+
+  useFocusEffect(load);
 
   async function handleSave() {
+    if (loading || loadError || skipProtectedReads) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
@@ -83,11 +101,22 @@ export default function VacationModeScreen() {
     );
   }
 
+  if (loadError) {
+    return (
+      <View style={s.root}>
+        <ScreenHeader title="Vacation Mode" />
+        <ErrorState message="Couldn't load your vacation settings." onRetry={load} />
+      </View>
+    );
+  }
+
+  const saveDisabled = saving || loading || loadError || skipProtectedReads;
+
   return (
     <View style={s.root}>
       <ScreenHeader title="Vacation Mode" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 80 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md }}>
 
         {/* Status hero card */}
         <View style={[s.statusCard, { borderColor: vacationMode ? ORANGE : SUCCESS }]}>
@@ -166,13 +195,13 @@ export default function VacationModeScreen() {
 
         {/* Save button */}
         <TouchableOpacity
-          style={[s.saveBtn, saving && { opacity: 0.6 }]}
+          style={[s.saveBtn, saveDisabled && { opacity: 0.6 }]}
           onPress={handleSave}
-          disabled={saving}
+          disabled={saveDisabled}
           activeOpacity={0.85}
         >
           {saving
-            ? <ActivityIndicator color="#fff" />
+            ? <ActivityIndicator color={theme.onAccent} />
             : <Text style={s.saveBtnText}>Save Changes</Text>
           }
         </TouchableOpacity>
@@ -182,7 +211,7 @@ export default function VacationModeScreen() {
   );
 }
 
-const createStyles = (theme: { accent: string }) => {
+const createStyles = (theme: { accent: string; onAccent: string }) => {
   const { accent: PURPLE } = theme;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
@@ -208,6 +237,8 @@ const createStyles = (theme: { accent: string }) => {
   infoBulletText:{ flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
 
   saveBtn:    { backgroundColor: PURPLE, borderRadius: RADIUS.md, alignItems: 'center', paddingVertical: 16 },
-  saveBtnText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  // onAccent, not '#fff': the accent is white in the black/white/silver
+  // theme, so a hardcoded white label rendered invisible (QA-0172).
+  saveBtnText:{ fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
   });
 };

@@ -51,6 +51,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { takePendingMockup } from '@/lib/mockupProductHandoff';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -437,6 +438,19 @@ export default function AddProductScreen() {
     const aim = setTimeout(scrollToVariantsSection, 450);
     const stop = setTimeout(() => { pendingSectionScroll.current = false; }, 1200);
     return () => { clearTimeout(aim); clearTimeout(stop); };
+  }, [params.editId, params.section]);
+  // ── Mockup preview "Add to product → Create new product": start with the mockup photo ──
+  useEffect(() => {
+    const mockupProjectId = typeof params.mockupProjectId === 'string' ? params.mockupProjectId : undefined;
+    if (!mockupProjectId || params.editId) return;
+    const mockup = takePendingMockup(mockupProjectId);
+    if (!mockup) return;
+    const item: ProductMedia = {
+      id: `mockup-${Date.now()}`, type: 'image', uri: mockup.uri, originalUri: mockup.uri,
+      isCover: true, sortOrder: 0, createdAt: new Date().toISOString(),
+    };
+    patchDraft({ media: [item] });
+    void uploadMediaAsset(item);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load collections ──
