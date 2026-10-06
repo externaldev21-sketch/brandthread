@@ -31,8 +31,8 @@ export default function SecurityScreen() {
       <View style={styles.section}>
         <View style={styles.rowBetween}>
           <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
-            <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Monitor and review user activities</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Login activity</Text>
+            <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Review recent sign-ins to your account</Text>
           </View>
           <Button label="View" variant="secondary" size="small" onPress={viewActivityLog} />
         </View>

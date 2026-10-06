@@ -4,6 +4,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, ShopifyImportJob } from '@/lib/api';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
   StoreCollection, StorePage, StorePolicy, StoreMenu, StoreMenuItem,
@@ -395,21 +396,24 @@ export async function getStorefront(): Promise<Storefront> {
       migratedToThread = true;
     }
 
-    // Overlay server-side published state (non-blocking)
-    try {
-      const remote = await api.store.get();
-      if (remote?.status === 'published') {
-        local.publishStatus = 'published';
-        local.publishedAt = remote.publishedAt ?? local.publishedAt;
-      } else if (remote?.status === 'draft' && local.publishStatus === 'published') {
-        local.publishStatus = 'unpublished';
-      }
-      local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
-      // Sync server title/slug if we don't have one locally
-      if (!local.settings.storeUrl && remote?.slug) {
-        local.settings.storeUrl = `${remote.slug}.brandthread.app`;
-      }
-    } catch { /* no-op — API may not be reachable */ }
+    // Overlay server-side published state (non-blocking). The signed-out web
+    // preview has no session, so it never calls the protected store API.
+    if (!isSellerDevPreview() && !isBuyerDevPreview()) {
+      try {
+        const remote = await api.store.get();
+        if (remote?.status === 'published') {
+          local.publishStatus = 'published';
+          local.publishedAt = remote.publishedAt ?? local.publishedAt;
+        } else if (remote?.status === 'draft' && local.publishStatus === 'published') {
+          local.publishStatus = 'unpublished';
+        }
+        local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
+        // Sync server title/slug if we don't have one locally
+        if (!local.settings.storeUrl && remote?.slug) {
+          local.settings.storeUrl = `${remote.slug}.brandthread.app`;
+        }
+      } catch { /* no-op — API may not be reachable */ }
+    }
 
     if (!raw || migratedToThread) await AsyncStorage.setItem(STORE_KEY, JSON.stringify(local));
     return local;
