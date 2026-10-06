@@ -347,6 +347,8 @@ async function signedOutPreview(browser, origin) {
   // The preview's own feed/Discover/comment data is English-only, so the
   // preview "See translation" → sign-in path is covered by
   // components/translation/__tests__/CaptionTranslation.test.tsx.
+  await page.goto(`${origin}/?bt_preview=buyer`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2000);
   await navigate(page, '/buyer-settings-detail?section=language&bt_preview=buyer');
   await page.getByText('Auto-translate captions', { exact: true }).first().waitFor({ timeout: 15_000 });
   await page.getByRole('switch').last().click();

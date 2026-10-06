@@ -45,6 +45,22 @@ async function shot(page, name) {
   console.log(`      → ${name}`);
 }
 
+/** openScreen, retried: the app can still remount onto "/" right after Clerk loads. */
+async function openAndWait(page, activity, origin, role, target, selector, options = {}) {
+  await openScreen(page, activity, origin, role, target, options);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const found = await page.waitForSelector(selector, { timeout: 12_000 }).then(() => true).catch(() => false);
+    if (found) return;
+    await page.evaluate((url) => {
+      history.pushState(history.state, '', url);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+  }
+  await page.screenshot({ path: path.join(WORK_DIR, `debug-${target.replace(/\W+/g, '_')}.png`) });
+  console.log('[debug] stored', await page.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith('bt:checkout')).map(([k, v]) => `${k}=${v.slice(0, 90)}`)));
+  throw new Error(`${target} never showed ${selector} (at ${page.url()})`);
+}
+
 function cors(origin) {
   return {
     'access-control-allow-origin': origin,
@@ -65,8 +81,7 @@ async function seller(browser, origin, images) {
   });
   page.on('pageerror', (err) => console.log('[pageerror]', err.message));
 
-  await openScreen(page, activity, origin, 'seller', '/store-settings');
-  await page.waitForSelector(tid('store-settings-checkout'), { timeout: 30_000 });
+  await openAndWait(page, activity, origin, 'seller', '/store-settings', tid('store-settings-checkout'));
   await page.locator(tid('store-settings-checkout')).scrollIntoViewIfNeeded();
   await shot(page, 'checkout-settings-entry.png');
   const before = apiCalls.length;
@@ -154,11 +169,9 @@ async function buyer(browser, origin, images, { language, step, name }) {
   const { context, page, activity } = await openContext(browser, { device: DEVICE, role: 'buyer', origin, images });
   const session = singleSellerSession(step);
   const sellerId = session.deliveryGroups[0].sellerId;
-  await context.addInitScript(([key, value]) => {
-    if (sessionStorage.getItem('bt:checkout-extras-seeded')) return;
-    localStorage.setItem(key, value);
-    sessionStorage.setItem('bt:checkout-extras-seeded', '1');
-  }, ['bt:checkout:user_jordan:v1', JSON.stringify(session)]);
+  // Written on every document load (after the harness's own demo seed), so a
+  // reload during start-up can't bring the multi-seller demo checkout back.
+  await context.addInitScript(([key, value]) => localStorage.setItem(key, value), ['bt:checkout:user_jordan:v1', JSON.stringify(session)]);
   page.on('pageerror', (err) => console.log('[pageerror]', err.message));
   if (process.env.DEBUG_SHOTS) page.on('request', (r) => { if (r.url().startsWith(DEMO_API)) console.log('[api]', r.method(), new URL(r.url()).pathname); });
 
@@ -193,12 +206,12 @@ async function buyer(browser, origin, images, { language, step, name }) {
     return route.fulfill({ status: 404, headers, contentType: 'application/json', body: '{}' });
   });
 
-  await openScreen(page, activity, origin, 'buyer', '/buyer-checkout');
+  // Seeded once the app has settled on "/" (its cart sync rewrites the
+  // demo checkout before then), right before opening the checkout.
+  await openAndWait(page, activity, origin, 'buyer', '/buyer-checkout', tid(step === 'confirmation' ? 'post-purchase-offer' : 'checkout-place-order'), {
+    beforeNavigate: () => page.evaluate(([key, value]) => localStorage.setItem(key, value), ['bt:checkout:user_jordan:v1', JSON.stringify(session)]),
+  });
   if (step === 'confirmation') {
-    await page.waitForSelector(tid('post-purchase-offer'), { timeout: 30_000 }).catch(async (error) => {
-      await page.screenshot({ path: path.join(WORK_DIR, `debug-${name}.png`) });
-      throw error;
-    });
     await waitForQuietNetwork(activity);
     await shot(page, `${name}.png`);
     if (language === 'en') {
@@ -215,7 +228,6 @@ async function buyer(browser, origin, images, { language, step, name }) {
       check(await page.getByText('Pedido confirmado').count() > 0, 'confirmation renders in the store language (es)');
     }
   } else {
-    await page.waitForSelector(tid('checkout-place-order'), { timeout: 30_000 });
     await waitForQuietNetwork(activity);
     await page.waitForTimeout(600);
     check(await page.getByText('Resumen del pedido').count() > 0, 'checkout renders in the store language (es)');
