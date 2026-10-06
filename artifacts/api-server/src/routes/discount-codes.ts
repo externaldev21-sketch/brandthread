@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, discountCodes, discountCodeUses, products } from "@workspace/db";
+import { db, discountCodes, discountCodeUses, products, shopifyImportCollections } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
@@ -10,7 +10,29 @@ const router = Router();
 router.use(requireAuth);
 
 const VALID_TYPES = ["percentage", "fixed", "free_shipping", "free_item"] as const;
-const VALID_APPLIES_TO = ["entire_store", "specific_products"] as const;
+const VALID_APPLIES_TO = ["entire_store", "specific_products", "collections"] as const;
+
+/** Validates the newer optional rules shared by create + update; returns an error message or null. */
+async function validateExtensions(sellerId: string, v: {
+  appliesTo?: string; collectionIds?: unknown; maxUsesPerCustomer?: unknown; minQuantity?: unknown;
+}): Promise<string | null> {
+  if (v.appliesTo === "collections") {
+    const ids = Array.isArray(v.collectionIds) ? v.collectionIds.filter((id): id is string => typeof id === "string") : [];
+    if (ids.length === 0) return "collectionIds must be a non-empty array when appliesTo is collections";
+    const owned = await db
+      .select({ id: shopifyImportCollections.id })
+      .from(shopifyImportCollections)
+      .where(and(eq(shopifyImportCollections.ownerId, sellerId), inArray(shopifyImportCollections.id, ids)));
+    if (owned.length !== ids.length) return "One or more collectionIds don't belong to this store";
+  }
+  if (v.maxUsesPerCustomer != null && (!Number.isInteger(v.maxUsesPerCustomer) || (v.maxUsesPerCustomer as number) < 1)) {
+    return "maxUsesPerCustomer must be a whole number of at least 1";
+  }
+  if (v.minQuantity != null && (!Number.isInteger(v.minQuantity) || (v.minQuantity as number) < 0)) {
+    return "minQuantity must be a whole number of 0 or more";
+  }
+  return null;
+}
 
 function randomCode(): string {
   // Unambiguous alphabet (no 0/O/1/I) — easy to read back over the phone.
@@ -50,6 +72,21 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /collections — the seller's collections, for the "applies to" picker
+router.get("/collections", async (req, res) => {
+  try {
+    const sellerId = (req as any).clerkUserId as string;
+    const rows = await db
+      .select({ id: shopifyImportCollections.id, title: shopifyImportCollections.title })
+      .from(shopifyImportCollections)
+      .where(eq(shopifyImportCollections.ownerId, sellerId));
+    res.json(rows);
+  } catch (err) {
+    req.log.error({ err }, "Failed to list collections for discount codes");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST / — create a new discount code
 router.post("/", requirePermission("marketing"), async (req, res) => {
   try {
@@ -66,7 +103,15 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
       singleUse,
       startsAt,
       expiresAt,
+      firstOrderOnly,
+      collectionIds,
+      maxUsesPerCustomer,
+      minQuantity,
     } = req.body as {
+      firstOrderOnly?: boolean;
+      collectionIds?: string[];
+      maxUsesPerCustomer?: number | null;
+      minQuantity?: number;
       code?: string;
       type?: string;
       value?: number;
@@ -115,6 +160,12 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
       }
     }
 
+    const extError = await validateExtensions(sellerId, { appliesTo: scope, collectionIds, maxUsesPerCustomer, minQuantity });
+    if (extError) {
+      res.status(400).json({ error: extError });
+      return;
+    }
+
     // Auto-generate a code if the seller didn't type one; retry on collision.
     let normalizedCode = code?.trim() ? code.trim().toUpperCase() : "";
     if (!normalizedCode) {
@@ -160,6 +211,10 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
         maxUses: effectiveMaxUses,
         usesCount: 0,
         oneUsePerCustomer: !!oneUsePerCustomer,
+        firstOrderOnly: !!firstOrderOnly,
+        collectionIds: scope === "collections" && Array.isArray(collectionIds) ? collectionIds : [],
+        maxUsesPerCustomer: maxUsesPerCustomer ?? null,
+        minQuantity: minQuantity ?? 0,
         startsAt: startsAt ? new Date(startsAt) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         active: true,
@@ -247,8 +302,12 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
     const { id } = req.params;
     const {
       active, expiresAt, startsAt, minOrderCents, maxUses, oneUsePerCustomer,
-      appliesTo, productIds, value,
+      appliesTo, productIds, value, firstOrderOnly, collectionIds, maxUsesPerCustomer, minQuantity,
     } = req.body as {
+      firstOrderOnly?: boolean;
+      collectionIds?: string[];
+      maxUsesPerCustomer?: number | null;
+      minQuantity?: number;
       active?: boolean;
       expiresAt?: string | null;
       startsAt?: string | null;
@@ -270,6 +329,20 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
     if (appliesTo !== undefined && VALID_APPLIES_TO.includes(appliesTo as any)) updates.appliesTo = appliesTo;
     if (productIds !== undefined) updates.productIds = Array.isArray(productIds) ? productIds : [];
     if (value !== undefined) updates.value = String(value);
+    if (firstOrderOnly !== undefined) updates.firstOrderOnly = !!firstOrderOnly;
+    if (collectionIds !== undefined) updates.collectionIds = Array.isArray(collectionIds) ? collectionIds : [];
+    if (maxUsesPerCustomer !== undefined) updates.maxUsesPerCustomer = maxUsesPerCustomer;
+    if (minQuantity !== undefined) updates.minQuantity = minQuantity;
+    if (appliesTo === "collections" || collectionIds !== undefined || maxUsesPerCustomer !== undefined || minQuantity !== undefined) {
+      const extError = await validateExtensions(sellerId, {
+        appliesTo: appliesTo === "collections" ? appliesTo : undefined,
+        collectionIds, maxUsesPerCustomer, minQuantity,
+      });
+      if (extError) {
+        res.status(400).json({ error: extError });
+        return;
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: "No valid fields to update" });
