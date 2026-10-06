@@ -70,7 +70,7 @@ function hasBannedWording(source: string): boolean {
 // store.tsx / analytics-content.tsx / analytics-marketing.tsx /
 // analytics-production.tsx / analytics-profit.tsx for the pattern.
 const COMING_SOON_ALLOWLIST = new Set([
-  'app/(buyer)/inbox.tsx',
+  'components/inbox/MessagesInbox.tsx',
   'app/(tabs)/feed.tsx',
   'app/(tabs)/following.tsx',
   'app/automation.tsx',

@@ -76,6 +76,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/ai-assistant.tsx',
   'app/bg-removal.tsx',
   'app/buyer-account-control.tsx',
+  // Renders the shared components/chat/ConversationThread.tsx (own chat header).
+  'app/buyer-conversation.tsx',
   'app/buyer-drop-detail.tsx',
   'app/buyer-live.tsx',
   'app/buyer-login-activity.tsx',
@@ -124,6 +126,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/seller-conversation.tsx',
   'app/seller-drop-preview.tsx',
   'app/seller-go-live.tsx',
+  // Renders the shared components/inbox/MessagesInbox.tsx (TabPageHeader, like (buyer)/inbox).
+  'app/seller-inbox.tsx',
   'app/seller-live.tsx',
   'app/seller-profile.tsx',
   'app/settings.tsx',

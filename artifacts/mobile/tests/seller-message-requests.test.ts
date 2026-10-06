@@ -19,39 +19,46 @@ import { SELLER_PREVIEW_CONVERSATION_SEEDS } from '@/lib/previewInboxData';
  * tests/request-actions.test.ts's pure-logic style for the new seller
  * preview-cache mutators.
  */
-const inboxSrc = readFileSync(resolve(import.meta.dirname, '../app/seller-inbox.tsx'), 'utf8');
-const convSrc = readFileSync(resolve(import.meta.dirname, '../app/seller-conversation.tsx'), 'utf8');
+// Seller messages = buyer messages: both seller routes now render the ONE
+// shared screen (components/inbox/MessagesInbox.tsx and
+// components/chat/ConversationThread.tsx) as their seller variant, so the
+// seller-side request checks read those shared sources.
+const inboxRoute = readFileSync(resolve(import.meta.dirname, '../app/seller-inbox.tsx'), 'utf8');
+const convRoute = readFileSync(resolve(import.meta.dirname, '../app/seller-conversation.tsx'), 'utf8');
+const inboxSrc = readFileSync(resolve(import.meta.dirname, '../components/inbox/MessagesInbox.tsx'), 'utf8');
+const convSrc = readFileSync(resolve(import.meta.dirname, '../components/chat/ConversationThread.tsx'), 'utf8');
 const sellerRequestActionsSrc = readFileSync(resolve(import.meta.dirname, '../lib/sellerRequestActions.ts'), 'utf8');
 
-describe('app/seller-inbox.tsx: Requests tab', () => {
-  it('has an Inbox/Requests pill row with a live unread-count badge', () => {
+describe('seller inbox (shared MessagesInbox, seller variant): Requests tab', () => {
+  it('the seller route renders the shared inbox', () => {
+    expect(inboxRoute).toContain('<MessagesInbox variant="seller" />');
+  });
+
+  it('has an Inbox/Requests pill row with a live count', () => {
     expect(inboxSrc).toContain("type InboxTab = 'inbox' | 'requests';");
     expect(inboxSrc).toContain('function InboxPillRow(');
     expect(inboxSrc).toContain('requestsCount={requestConvs.length}');
   });
 
   it('filters the Requests tab to isRequest conversations only, excluding archived and pending-delete rows', () => {
-    expect(inboxSrc).toContain(
-      'const requestConvs = useMemo(() => convs.filter((c) =>\n' +
-      '    c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id)\n' +
-      '  ), [convs, pendingDeleteIds]);'
-    );
+    expect(inboxSrc).toContain('conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)');
   });
 
   it('excludes requests from the main Inbox list', () => {
-    expect(inboxSrc).toContain('if (c.isArchived || c.isRequest || pendingDeleteIds.has(c.id)) return false;');
+    expect(inboxSrc).toContain('if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;');
   });
 
-  it('does not optimistically mark a request read on open — the sender should not see a read receipt before acceptance', () => {
-    expect(inboxSrc).toContain('function openRequestConversation(conversationId: string) {');
-    expect(inboxSrc).toContain('function openConversation(conversationId: string) {');
+  it('does not mark a request read on open — the sender should not see a read receipt before acceptance', () => {
+    const fn = inboxSrc.slice(inboxSrc.indexOf('function openRequestConversation('), inboxSrc.indexOf('function openRequestConversation(') + 400);
+    expect(fn).not.toContain('markReadSafely');
+    expect(fn).toContain('/seller-conversation?id=');
   });
 
   it('offers Block and Delete per request row (Accept lives only in the conversation screen’s panel)', () => {
     expect(inboxSrc).toContain('function renderRequestRow(');
     expect(inboxSrc).toContain("key: 'block',");
-    expect(inboxSrc).toContain('onPress: () => blockRequestConversation(item),');
-    expect(inboxSrc).toContain('onPress: () => deleteRequestConversation(item),');
+    expect(inboxSrc).toContain('onPress: () => blockRequestConversation(conv),');
+    expect(inboxSrc).toContain('onPress: () => deleteRequestConversation(conv),');
   });
 
   it('has a "Delete all" action and an honest empty state for the Requests tab', () => {
@@ -59,61 +66,68 @@ describe('app/seller-inbox.tsx: Requests tab', () => {
     expect(inboxSrc).toContain('title="No message requests"');
   });
 
-  it('uses the shared preview-aware seller request actions, not a duplicate implementation', () => {
+  it('uses the shared preview-aware seller request actions for the seller variant', () => {
     expect(inboxSrc).toContain(
       "import {\n" +
       "  scheduleDeleteSellerConversationRequest, undoDeleteSellerConversationRequest, blockSellerConversationRequestUser,\n" +
       "} from '@/lib/sellerRequestActions';"
     );
+    expect(inboxSrc).toContain('if (isSeller) scheduleDeleteSellerConversationRequest(id, api, onCommitted);');
+    expect(inboxSrc).toContain('if (isSeller) undoDeleteSellerConversationRequest(id);');
+    expect(inboxSrc).toContain('if (isSeller) await blockSellerConversationRequestUser(conv.id, participant);');
   });
 });
 
-describe('app/seller-conversation.tsx: request mode', () => {
+describe('seller thread (shared ConversationThread, seller variant): request mode', () => {
+  it('the seller route renders the shared thread', () => {
+    expect(convRoute).toContain('<ConversationThread variant="seller" />');
+  });
+
   it('derives isRequestMode and isRequestSender from conv.isRequest/requestedBy', () => {
     expect(convSrc).toContain('const isRequestMode = conv?.isRequest === true;');
-    expect(convSrc).toContain('const isRequestSender = isRequestMode && conv?.requestedBy === effectiveMyId;');
+    expect(convSrc).toContain('const isRequestSender = isSeller && isRequestMode && !!conv?.requestedBy && conv.requestedBy === myId;');
+    expect(convSrc).toContain('const requestLocked = isRequestMode && !isRequestSender;');
   });
 
   it('only blocks send for the RECIPIENT of a pending request — the sender can keep messaging', () => {
-    expect(convSrc).toContain('&& !(isRequestMode && !isRequestSender);');
+    expect(convSrc).toContain('&& !isDisabled && !isSending && !requestLocked;');
   });
 
   it('replaces the composer with the Accept/Delete/Block panel for the recipient only', () => {
-    expect(convSrc).toContain('{isRequestMode && !isRequestSender && other ? (');
-    expect(convSrc).toContain('<SellerRequestActionPanel');
+    expect(convSrc).toContain('{requestLocked && participant ? (');
+    expect(convSrc).toContain('<RequestActionPanel');
   });
 
   it('shows a "Sent as a request" indicator on the sender’s own view instead of the panel', () => {
-    expect(convSrc).toContain('{isRequestSender && !messagingBlocked && (');
-    expect(convSrc).toContain('testID="seller-conversation-sent-request-banner"');
-    expect(convSrc).toContain("Sent as a message request");
+    expect(convSrc).toContain('{isRequestSender && !messaging.blockedByMe && !messaging.unavailable && (');
+    expect(convSrc).toContain('testID="conversation-sent-request-banner"');
+    expect(convSrc).toContain('Sent as a message request');
   });
 
-  it('the request panel’s buttons read Accept/Delete/Block, matching the buyer screen', () => {
-    expect(convSrc).toContain('testID="seller-conversation-request-accept"');
-    expect(convSrc).toContain('testID="seller-conversation-request-delete"');
-    expect(convSrc).toContain('testID="seller-conversation-request-block"');
+  it('the request panel’s buttons read Accept/Delete/Block — the same panel as the buyer side', () => {
+    expect(convSrc).toContain('testID="conversation-request-accept"');
+    expect(convSrc).toContain('testID="conversation-request-delete"');
+    expect(convSrc).toContain('testID="conversation-request-block"');
     expect(convSrc).toContain('>Accept</Text>');
     expect(convSrc).toContain('>Delete</Text>');
     expect(convSrc).toContain('>Block</Text>');
   });
 
-  it('wires Accept/Decline through the real PATCH .../accept and DELETE endpoints (via lib/sellerRequestActions.ts)', () => {
-    expect(convSrc).toContain('await acceptSellerConversationRequest(id, api);');
-    expect(convSrc).toContain('scheduleDeleteSellerConversationRequest(conversationId, api);');
-    expect(convSrc).toContain('await blockSellerConversationRequestUser(id, other);');
+  it('wires Accept/Delete/Block through lib/sellerRequestActions.ts for the seller variant', () => {
+    expect(convSrc).toContain('if (isSeller) await acceptSellerConversationRequest(conv.id, api);');
+    expect(convSrc).toContain('if (isSeller) scheduleDeleteSellerConversationRequest(conversationId, api);');
+    expect(convSrc).toContain('if (isSeller) await blockSellerConversationRequestUser(conv.id, participant);');
   });
 
   it('only marks the thread read once it is known not to be a pending request', () => {
-    expect(convSrc).toContain('if (!convView.isRequest) {');
-    expect(convSrc).toContain('api.conversations.markRead(id).catch(() => {');
+    expect(convSrc).toContain('if (!loadedConv.isRequest) {');
+    expect(convSrc).toContain('await markConversationRead(readId).catch(() => notifyConversationReadFailure(readId));');
   });
 
-  it('surfaces REQUEST_NOT_ACCEPTED (and every other structured send error) through apiErrorMessage, never a raw fallback', () => {
-    expect(convSrc).toContain("if (apiErrorCode(e) === 'REQUEST_NOT_ACCEPTED') {");
-    expect(convSrc).toContain("Alert.alert('Not sent', apiErrorMessage(e, 'Message not sent. Tap to retry.'));");
-    // The old ad-hoc raw.includes('MODERATED'/'BLOCKED') string-matching is
-    // gone — every structured code now goes through the one shared helper.
+  it('surfaces REQUEST_NOT_ACCEPTED through apiErrorMessage and swaps in the request panel', () => {
+    expect(convSrc).toContain("if (isSeller && apiErrorCode(e) === 'REQUEST_NOT_ACCEPTED') {");
+    expect(convSrc).toContain('setConv((prev) => (prev ? { ...prev, isRequest: true } : prev));');
+    expect(convSrc).toContain("Alert.alert('Message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));");
     expect(convSrc).not.toContain("raw.includes('MODERATED')");
   });
 });

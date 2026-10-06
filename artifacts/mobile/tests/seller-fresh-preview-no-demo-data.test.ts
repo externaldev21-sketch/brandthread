@@ -28,17 +28,16 @@ function read(relPath: string): string {
 }
 
 describe('seller fresh preview: no seeded/demo data by default', () => {
-  it('seller-inbox.tsx only reads the seeded seller conversations behind isPreviewDemoMode()', () => {
-    const src = read('app/seller-inbox.tsx');
-    expect(src).toContain("import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
-    // The call to the seeded dataset must be guarded by isPreviewDemoMode()
-    // in the same conditional that reaches it — not merely present somewhere
-    // in the file (which the earlier, reverted PR attempt would also match).
-    const guardedCallPattern = /if\s*\(isPreviewInboxEnabled\(\)\s*&&\s*isPreviewDemoMode\(\)\)\s*\{\s*setConvs\(getSellerPreviewConversations\(\)/;
-    expect(src).toMatch(guardedCallPattern);
-    // And the sibling branch (demo off, i.e. the default) must resolve to a
-    // genuinely empty list, not fall through to the seeded data.
-    expect(src).toContain('setConvs([]);');
+  it('the seller inbox (shared MessagesInbox) only reads the seeded seller conversations behind isPreviewDemoMode()', () => {
+    expect(read('app/seller-inbox.tsx')).toContain('<MessagesInbox variant="seller" />');
+    const src = read('components/inbox/MessagesInbox.tsx');
+    expect(src).toContain("import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
+    // Every read of the seeded seller dataset is guarded by isPreviewDemoMode()
+    // in the same expression; the default (demo off) resolves to [].
+    expect(src).toContain('setConversations(isPreviewInboxEnabled() && isPreviewDemoMode() ? getSellerPreviewConversations() : []);');
+    expect(src).toContain('? (isPreviewDemoMode() ? getSellerPreviewConversations() : [])');
+    const calls = src.match(/getSellerPreviewConversations\(\)/g) ?? [];
+    expect(calls.length).toBe(2);
   });
 
   it('no seller screen calls getSellerPreviewConversations() outside an isPreviewDemoMode() check', () => {

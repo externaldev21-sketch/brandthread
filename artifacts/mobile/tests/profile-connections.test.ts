@@ -61,7 +61,7 @@ describe('feed player reuse from profiles', () => {
 
 describe('product detail → seller, DM, and featured videos', () => {
   const pdp = read('app/buyer-product-detail.tsx');
-  const dm = read('app/buyer-conversation.tsx');
+  const dm = read('components/chat/ConversationThread.tsx');
 
   it('links product detail to the seller profile, a product DM, and the videos featuring it', () => {
     expect(pdp).toContain("profileHref({ userId: product.sellerId, accountType: 'seller' })");

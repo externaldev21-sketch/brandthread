@@ -31,34 +31,18 @@ const read = (relativePath: string) => readFileSync(resolve(__dirname, '..', rel
  */
 describe('conversation header name truncates instead of overlapping the action icons', () => {
   describe('app/seller-conversation.tsx', () => {
-    const src = read('app/seller-conversation.tsx');
-
-    it('renders the name with numberOfLines={1} and an explicit tail ellipsis', () => {
-      expect(src).toContain('<Text style={s.headerName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>');
-    });
-
-    it('wraps the name-row PressableScale in a plain View carrying flex: 1, minWidth: 0 — not the PressableScale itself', () => {
-      expect(src).toContain('<View style={s.headerCenterWrap}>');
-      expect(src).toMatch(/headerCenterWrap:\s*\{\s*flex:\s*1,\s*minWidth:\s*0\s*\}/);
-      const jsxNameBlock = src.slice(
-        src.indexOf('<View style={s.headerCenterWrap}>'),
-        src.indexOf('testID="seller-conversation-header-name"'),
-      );
-      expect(jsxNameBlock).toContain('<PressableScale');
-    });
-
-    it('still gives headerLeftGroup (a plain View, not a PressableScale) minWidth: 0 directly', () => {
-      expect(src).toMatch(/headerLeftGroup:\s*\{[^}]*minWidth:\s*0/);
-    });
-
-    it('the name Text itself keeps minWidth: 0 inside its own (now correctly bounded) column', () => {
-      expect(src).toMatch(/headerCenter:\s*\{[^}]*flex:\s*1[^}]*minWidth:\s*0/);
-      expect(src).toMatch(/headerName:\s*\{[^}]*minWidth:\s*0/);
+    // The seller thread now renders the ONE shared thread screen (Dev:
+    // "seller messages = buyer messages"), so it gets the buyer header's
+    // truncation fix below by construction.
+    it('renders the shared thread screen, so its header is the one checked below', () => {
+      const route = read('app/seller-conversation.tsx');
+      expect(route).toContain("import { ConversationThread } from '@/components/chat/ConversationThread';");
+      expect(route).toContain('<ConversationThread variant="seller" />');
     });
   });
 
-  describe('app/buyer-conversation.tsx', () => {
-    const src = read('app/buyer-conversation.tsx');
+  describe('components/chat/ConversationThread.tsx (app/buyer-conversation.tsx + app/seller-conversation.tsx)', () => {
+    const src = read('components/chat/ConversationThread.tsx');
 
     it('renders the name with numberOfLines={1} and an explicit tail ellipsis', () => {
       expect(src).toContain('<Text style={s.headerName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>');
