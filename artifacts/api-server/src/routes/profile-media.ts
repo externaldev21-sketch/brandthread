@@ -39,6 +39,7 @@ import {
 import { matchesMutedWords } from "../lib/contentModerator";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { parsePagination } from "../lib/pagination";
+import { viewerPostStates } from "../lib/viewerPostState";
 
 const router = Router();
 
@@ -154,6 +155,7 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
   const reposts = byPost(repostRows);
   const views = byPost(viewRows);
   const repostedByMe = new Set(myReposts.map((row) => row.postId).filter(Boolean) as string[]);
+  const stateFor = await viewerPostStates(viewerId, rows.map((row) => row.id));
   const tagsByPost = new Map<string, typeof tagRows>();
   for (const tag of tagRows) {
     if (!tagsByPost.has(tag.postId)) tagsByPost.set(tag.postId, []);
@@ -194,6 +196,8 @@ export async function hydrateVideoRows(rows: VideoRow[], viewerId: string | null
     commentsCount: commentCounts.get(row.id) ?? 0,
     viewsCount:    views.get(row.id) ?? 0,
     repostedByMe:  repostedByMe.has(row.id),
+    likedByMe:     stateFor(row.id).likedByMe,
+    savedByMe:     stateFor(row.id).savedByMe,
   }));
 }
 

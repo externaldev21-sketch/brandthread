@@ -60,6 +60,7 @@ function PostCard({
   onSave,
   onOpenComments,
   onNotInterested,
+  onShared,
 }: {
   post: BuyerPost;
   saved: boolean;
@@ -68,6 +69,7 @@ function PostCard({
   onSave: (post: BuyerPost) => void;
   onOpenComments: (post: BuyerPost) => void;
   onNotInterested: (post: BuyerPost) => void;
+  onShared?: (post: BuyerPost) => void;
 }) {
   const router = useRouter();
   const { theme } = useAppTheme();
@@ -163,7 +165,11 @@ function PostCard({
         <PressableScale
           style={s.actionIcon}
           accessibilityLabel="Share post"
-          onPress={() => Share.share({ message: `See ${post.authorName}'s post on Brandthread` })}
+          onPress={() => {
+            void Share.share({ message: `See ${post.authorName}'s post on Brandthread` })
+              .then((result) => { if ((result as any)?.action !== 'dismissedAction') onShared?.(post); })
+              .catch(() => {});
+          }}
         >
           <Feather name="send" size={ICON.lg} color={palette.mutedForeground} />
         </PressableScale>
@@ -245,7 +251,11 @@ export default function FriendsScreen() {
       const now = Date.now();
       setStories(stories.filter(s => s.expiresAt > now));
       setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
-      setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
+      const activity = Array.isArray(activityRows) ? activityRows : [];
+      setFeedPosts(activity);
+      // Saved state comes from the server per post (savedByMe), not a
+      // session-only Set that always started empty.
+      setSavedIds(new Set(activity.filter(p => p.savedByMe).map(p => p.id)));
     } catch (error) {
       // No backend reachable in the dev-web preview. Default is a brand-new,
       // zero-state account (fresh install) — never reached for a real
@@ -315,7 +325,8 @@ export default function FriendsScreen() {
           : p,
       ),
     );
-    api.posts.interact(postId, { type: 'repost' }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === postId ? { ...p, repostedByMe: !p.repostedByMe, repostsCount: p.repostedByMe ? p.repostsCount - 1 : p.repostsCount + 1 } : p)); Alert.alert('Could not update repost', 'Try again.'); });
+    const wasReposted = feedPosts.find(p => p.id === postId)?.repostedByMe === true;
+    api.posts.interact(postId, { type: 'repost', value: wasReposted ? 'remove' : undefined }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === postId ? { ...p, repostedByMe: !p.repostedByMe, repostsCount: p.repostedByMe ? p.repostsCount - 1 : p.repostsCount + 1 } : p)); Alert.alert('Could not update repost', 'Try again.'); });
   }
 
   function handleSave(post: BuyerPost) {
@@ -327,7 +338,12 @@ export default function FriendsScreen() {
       return next;
     });
     if (wasSaved) {
-      showSnackbar('Removed from saved');
+      api.buyer.saved.remove(post.id)
+        .then(() => showSnackbar('Removed from saved'))
+        .catch(() => {
+          setSavedIds(prev => new Set(prev).add(post.id));
+          showSnackbar('Could not remove from saved. Try again.');
+        });
       return;
     }
     saveItem({
@@ -345,6 +361,13 @@ export default function FriendsScreen() {
     hapticSelection();
     setFeedPosts(prev => prev.filter(p => p.id !== post.id));
     showSnackbar('Post hidden');
+    // Persist the hide (same signal as the main feed's "Not interested").
+    api.posts.interact(post.id, { type: 'not_interested' }).catch(() => {});
+  }
+
+  function handleShared(post: BuyerPost) {
+    // Counts toward the owner's share count and Content Analytics.
+    api.posts.interact(post.id, { type: 'share' }).catch(() => {});
   }
 
   function handleOpenComments(post: BuyerPost) {
@@ -594,6 +617,7 @@ export default function FriendsScreen() {
               onSave={handleSave}
               onOpenComments={handleOpenComments}
               onNotInterested={handleNotInterested}
+              onShared={handleShared}
             />
           )}
         />
