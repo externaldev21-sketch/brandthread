@@ -83,9 +83,9 @@ export default function BuyerSecurity() {
           <ListRow
             icon="key"
             title="Change password"
-            subtitle="Reset via the sign-in screen"
+            subtitle="Update your current password"
             chevron
-            onPress={() => router.push('/forgot-password' as never)}
+            onPress={() => router.push('/change-password' as never)}
           />
           <View style={s.divider} />
           <ListRow

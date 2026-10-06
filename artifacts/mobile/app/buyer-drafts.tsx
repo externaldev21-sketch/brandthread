@@ -18,12 +18,12 @@ import type { BuyerPost } from '@/services/socialTypes';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
-import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
+import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 
 export default function BuyerDraftsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
 
   const [drafts, setDrafts] = useState<BuyerPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,6 @@ export default function BuyerDraftsScreen() {
             layout={layout}
             icon={empty.icon as keyof typeof Feather.glyphMap}
             title={empty.title}
-            description={empty.message}
             testID="buyer-drafts-empty"
           />
         )}

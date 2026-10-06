@@ -1,0 +1,16 @@
+FAIL analytics-tab
+    {"kind":"tight-padding","text":"Visits","left":11,"right":209}
+    {"kind":"tight-padding","text":"0","left":11,"right":225}
+    {"kind":"tight-padding","text":"Revenue","left":11,"right":48}
+    {"kind":"tight-padding","text":"$0.00","left":11,"right":37}
+PASS advanced-analytics
+PASS advanced-analytics-locked
+FAIL plans-pro
+    {"kind":"tight-padding","text":"Revenue","left":9,"right":30}
+    {"kind":"tight-padding","text":"$4,210","left":9,"right":32}
+    {"kind":"tight-padding","text":"Orders","left":9,"right":39}
+    {"kind":"tight-padding","text":"86","left":9,"right":58}
+    {"kind":"tight-padding","text":"RECOMMENDED","left":10,"right":10}
+    {"kind":"tight-padding","text":"","left":8,"right":8}
+    {"kind":"tight-padding","text":"","left":8,"right":8}
+    {"kind":"tight-padding","text":"","left":8,"right":8}

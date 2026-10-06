@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
+import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
 
 const FLOWS = [
   { label: 'Buyer card', href: '/buyer-product-detail?id=scene-isolation-product' },
@@ -13,6 +14,10 @@ const FLOWS = [
 
 export default function NavigationIsolationProbe() {
   const router = useRouter();
+
+  // Test-only route: expo-router registers every file in app/, so a deep link
+  // to it must bounce in a production build (see lib/buildFlags.ts).
+  if (!NAVIGATION_ISOLATION_TEST) return <Redirect href="/" />;
 
   return (
     <View testID="navigation-isolation-origin" style={styles.root}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
@@ -19,7 +19,10 @@ export default function SplashScreen() {
     continuing.current = true;
     AsyncStorage.setItem('splash_seen', 'true')
       .catch(() => {})
-      .finally(() => router.replace('/onboarding' as never));
+      .finally(() => {
+        const next = __DEV__ && Platform.OS === 'web' ? '/sign-in' : '/onboarding';
+        router.replace(next as never);
+      });
   };
 
   useEffect(() => {

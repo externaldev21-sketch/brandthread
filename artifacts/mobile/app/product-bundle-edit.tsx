@@ -34,6 +34,7 @@ import {
   BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
+import { radius } from '@/constants/radii';
 
 function centsToDecimalInput(cents: number | undefined): string {
   if (cents === undefined) return '';
@@ -355,7 +356,7 @@ const s = StyleSheet.create({
   savingsAmount:{ fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT },
   toggleRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: BORDER },
   itemsHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
-  addItemBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill },
+  addItemBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: PURPLE_DIM, borderRadius: radius.sm },
   addItemBtnText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT },
   newBundleHint:{ flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, padding: SP.sm, borderWidth: 1, borderColor: BORDER },
   newBundleHintText: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, flex: 1 },

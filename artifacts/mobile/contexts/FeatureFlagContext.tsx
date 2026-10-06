@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 
 export type FeatureFlagKey =
   | 'aiPhotoShoot'
@@ -12,7 +13,9 @@ export type FeatureFlagKey =
   | 'threadCashSend'
   | 'oauthGoogleEnabled'
   | 'oauthAppleEnabled'
-  | 'hostedCheckoutFallback';
+  | 'hostedCheckoutFallback'
+  | 'live_tips'
+  | 'autoCaptions';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -38,6 +41,12 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // One-page checkout kill switch (migration 107): ON sends every buyer back
   // to Stripe-hosted Checkout instead of paying in the app.
   hostedCheckoutFallback: false,
+  // Live tips (gift button in the live viewer). OFF until Thread Cash is
+  // finalised; the server enforces it too (POST /thread-cash/live-gift).
+  live_tips: false,
+  // Auto captions (Whisper) on video posts. OFF until the server has the AI keys
+  // and an operator flips it (PUT /api/feature-flags/autoCaptions).
+  autoCaptions: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';
@@ -56,9 +65,11 @@ const FeatureFlagContext = createContext<FeatureFlagContextValue>({
 
 export function FeatureFlagProvider({ children }: PropsWithChildren) {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   const [flags, setFlags] = useState<Record<string, boolean>>(DEFAULT_FLAGS);
 
   const refresh = async () => {
+    if (!isSignedIn) return;
     const response = await api.config.featureFlags();
     const next = { ...DEFAULT_FLAGS, ...response.flags };
     setFlags(next);
@@ -66,6 +77,10 @@ export function FeatureFlagProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
+    if (!isSignedIn) {
+      setFlags(DEFAULT_FLAGS);
+      return;
+    }
     let cancelled = false;
     void AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
@@ -78,7 +93,7 @@ export function FeatureFlagProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isSignedIn]);
 
   const value = useMemo<FeatureFlagContextValue>(
     () => ({

@@ -10,7 +10,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
   TextInput, ActivityIndicator, Platform,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ import { FormInput, PrimaryButton, EmptyState, StatusBadge } from '@/components/
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from '@/services/manufacturerRfq';
+import { radius } from '@/constants/radii';
 
 const MAX_TARGETS = 10;
 
@@ -205,7 +206,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   sectionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.sm },
-  typeChip: { paddingHorizontal: SP.md, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
+  typeChip: { paddingHorizontal: SP.md, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   typeChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   typeChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   typeChipTextActive: { color: theme.accentLight, fontFamily: FONT.semibold },

@@ -10,6 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -64,6 +65,7 @@ export default function LoginActivity() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const { signOut } = useAuth();
 
   const [sessions, setSessions] = useState<AccountSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,6 +147,31 @@ export default function LoginActivity() {
             } catch (err) {
               Alert.alert('Couldn’t sign out other devices', apiErrorMessage(err, 'Try again.'));
             } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  // Ends every session including this one: other devices first, then here.
+  function signOutEverywhere() {
+    Alert.alert(
+      'Sign out everywhere?',
+      'Every device, including this one, will be signed out. You’ll need to sign in again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out everywhere',
+          style: 'destructive',
+          onPress: async () => {
+            setBusyId('everywhere');
+            try {
+              if (others.length > 0 && !(isSellerDevPreview() || isBuyerDevPreview())) await api.auth.revokeOtherSessions();
+              await signOut();
+            } catch (err) {
+              Alert.alert('Couldn’t sign out everywhere', apiErrorMessage(err, 'Try again.'));
               setBusyId(null);
             }
           },
@@ -240,6 +267,17 @@ export default function LoginActivity() {
               />
             </>
           )}
+
+          <Button
+            label="Sign out everywhere"
+            variant="secondary"
+            icon="log-out"
+            onPress={signOutEverywhere}
+            loading={busyId === 'everywhere'}
+            disabled={busyId !== null}
+            fullWidth
+            style={s.dangerBtn}
+          />
 
           <PressableScale onPress={() => router.push('/login-methods' as never)} style={s.linkRow} accessibilityRole="button">
             <Feather name="key" size={16} color={theme.text} />

@@ -7,7 +7,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -23,6 +23,7 @@ import {
   addGuestMutedWord, GUEST_MUTED_WORD_LIMIT, readGuestMutedWords, removeGuestMutedWord,
 } from '@/lib/guestMutedWords';
 import type { MutedWord } from '@/lib/safetyTypes';
+import { radius } from '@/constants/radii';
 
 const MAX_LENGTH = 60;
 const SUGGESTIONS = ['spoilers', 'giveaway', 'dm me', 'resell', 'crypto'];
@@ -263,7 +264,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   suggestion: {
     flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 12,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.border,
+    borderRadius: radius.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.border,
   },
   suggestionText: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.sm },
   wordChip: {

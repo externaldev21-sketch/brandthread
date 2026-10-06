@@ -8,13 +8,15 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import Composer from '@/components/ui/Composer';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
 interface Message {
   id: string;
@@ -25,9 +27,9 @@ interface Message {
 }
 
 const SUGGESTED = [
-  'A minimalist hoodie with our wordmark centered on the chest',
-  'Streetwear tee, bold graphic on the back, our brand colors',
-  'Cropped jacket with an embroidered logo on the sleeve',
+  'Minimalist hoodie, chest wordmark',
+  'Streetwear tee, bold back graphic',
+  'Cropped jacket, embroidered sleeve logo',
 ];
 
 const INITIAL_MSG: Message = {
@@ -88,15 +90,7 @@ export default function AIMockupChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <ScreenHeader
-        title="AI Clothing Mockups"
-        subtitle="AI-generated mockups"
-        rightElement={
-          <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.statusText, { color: colors.foreground }]}>Online</Text>
-          </View>
-        }
-      />
+      <ScreenHeader title="AI Clothing Mockups" divider={false} />
 
       {/* Messages */}
       <FlatList
@@ -129,11 +123,14 @@ export default function AIMockupChatScreen() {
               {msg.content}
             </Text>
             {msg.image && (
-              <Image
-                source={{ uri: `data:image/png;base64,${msg.image}` }}
-                style={styles.mockupImage}
-                resizeMode="cover"
-              />
+              <View>
+                <Image
+                  source={{ uri: `data:image/png;base64,${msg.image}` }}
+                  style={styles.mockupImage}
+                  resizeMode="cover"
+                />
+                <AiGeneratedBadge />
+              </View>
             )}
           </View>
         )}
@@ -152,23 +149,18 @@ export default function AIMockupChatScreen() {
         placeholder="Describe your design in your own words..."
         topSlot={
           messages.length <= 1 ? (
-            <FlatList
-              horizontal
-              data={SUGGESTED}
-              keyExtractor={(s) => s}
-              showsHorizontalScrollIndicator={false}
-              style={styles.suggestionList}
-              contentContainerStyle={{ gap: 8, paddingBottom: 8, alignItems: 'center' }}
-              renderItem={({ item: s }) => (
+            <View style={styles.suggestionList}>
+              {SUGGESTED.map((s) => (
                 <TouchableOpacity
+                  key={s}
                   onPress={() => sendMessage(s)}
                   activeOpacity={0.75}
                   style={[styles.suggestion, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
-                  <Text style={[styles.suggestionText, { color: colors.foreground }]} numberOfLines={2}>{s}</Text>
+                  <Text style={[styles.suggestionText, { color: colors.foreground }]}>{s}</Text>
                 </TouchableOpacity>
-              )}
-            />
+              ))}
+            </View>
           ) : null
         }
       />
@@ -178,8 +170,6 @@ export default function AIMockupChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 11, fontFamily: FONT.semibold },
   bubble: { maxWidth: '85%', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
@@ -189,7 +179,7 @@ const styles = StyleSheet.create({
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
   loadingText: { fontSize: 13, fontFamily: FONT.regular },
-  suggestionList: { flexGrow: 0, maxHeight: 40 },
-  suggestion: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 220, alignSelf: 'center' },
-  suggestionText: { fontSize: 12, fontFamily: FONT.regular },
+  suggestionList: { gap: 8, paddingBottom: 8 },
+  suggestion: { borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, maxWidth: 220, alignSelf: 'center' },
+  suggestionText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
 });

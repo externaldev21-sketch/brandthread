@@ -18,6 +18,8 @@ import { formatCents } from '@/lib/money';
 import { getCustomerAnalytics, getFilterState } from '@/services/analyticsService';
 import { CustomerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { getEntitlementRejection } from '@/lib/entitlementError';
+import { ProLockedState } from '@/components/analytics/ProLockedState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -55,6 +57,7 @@ export default function AnalyticsCustomersScreen() {
   const [loading,    setLoading]    = useState(true);
   const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [proLocked,  setProLocked]  = useState(false);
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
@@ -62,20 +65,28 @@ export default function AnalyticsCustomersScreen() {
     const requestedUser = userId;
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
+    let planRejected = false;
+    const customerCall = api.analytics.customers(10).catch((e) => {
+      if (getEntitlementRejection(e)) planRejected = true;
+      return null;
+    });
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
       const [analytics, customerResponse] = await Promise.all([
-        getCustomerAnalytics(f), api.analytics.customers(10).catch(() => null),
+        getCustomerAnalytics(f), customerCall,
       ]);
       if (requestUser.current !== requestedUser) return;
       setData(analytics);
       setTopCustomers(customerResponse ? (customerResponse.topCustomers ?? []) : []);
-      setLoadError(false);
+      setLoadError(false); setProLocked(false);
     } catch (err) {
+      await customerCall;
       if (requestUser.current !== requestedUser) return;
       setData(null); setTopCustomers([]);
-      setLoadError(true);
+      // Customer analytics is a Pro module: a plan rejection is a locked state, not an error.
+      if (planRejected) { setProLocked(true); setLoadError(false); }
+      else setLoadError(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, [api, filter, authLoaded, userId]);
 
@@ -88,9 +99,11 @@ export default function AnalyticsCustomersScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Customer Analytics" subtitle="All time" />
+      <ScreenHeader title="Customer Analytics" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={0} listRows={4} />
+      ) : proLocked ? (
+        <View style={s.loadWrap}><ProLockedState source="analytics-customers" title="Customer analytics is a Pro feature" /></View>
       ) : loadError && !data ? (
         <View style={s.loadWrap}>
           <ErrorState message="Couldn't load customer analytics." onRetry={() => load()} />

@@ -74,3 +74,28 @@ export function setCachedFeedPosts<T>(tab: string, posts: T[]): void {
   const toPersist = posts.slice(0, MAX_CACHED_POSTS);
   AsyncStorage.setItem(STORAGE_PREFIX + scoped, JSON.stringify(toPersist)).catch(() => {});
 }
+
+/**
+ * Blocking someone must remove their posts from the warm-start feed caches
+ * right away (memory and AsyncStorage, every tab for the current account), so a
+ * cold start or tab switch can never paint a blocked person's post before the
+ * network responds. Posts carry the author in `sellerId`.
+ */
+export async function purgeAuthorFromFeedPostsCache(authorId: string): Promise<void> {
+  if (!authorId) return;
+  const prefix = `${_scopeUserId}:`;
+  const tabs = new Set<string>(['for-you', 'following']);
+  for (const key of memoryCache.keys()) if (key.startsWith(prefix)) tabs.add(key.slice(prefix.length));
+  await Promise.all([...tabs].map(async (tab) => {
+    const posts = await hydrateFeedPostsCache<{ sellerId?: string }>(tab);
+    if (!posts) return;
+    const filtered = posts.filter((post) => post?.sellerId !== authorId);
+    if (filtered.length === posts.length) return;
+    memoryCache.set(scopedTab(tab), filtered);
+    try {
+      await AsyncStorage.setItem(STORAGE_PREFIX + scopedTab(tab), JSON.stringify(filtered.slice(0, MAX_CACHED_POSTS)));
+    } catch {
+      // The memory copy is already clean; the next feed load rewrites the disk copy.
+    }
+  }));
+}

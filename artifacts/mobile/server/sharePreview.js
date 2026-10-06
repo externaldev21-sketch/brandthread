@@ -17,7 +17,12 @@
  * the real screen as usual; this only affects what a link-unfurling crawler
  * (and the initial "view source") sees.
  */
-const CANONICAL_ORIGIN = 'https://brandthread.app';
+// SHARE_ORIGIN (falls back to EXPO_PUBLIC_SHARE_ORIGIN) lets staging builds
+// advertise their own origin; production defaults to https://brandthread.app.
+const CANONICAL_ORIGIN = (() => {
+  const raw = (process.env.SHARE_ORIGIN || process.env.EXPO_PUBLIC_SHARE_ORIGIN || '').trim().replace(/\/+$/, '');
+  return /^https?:\/\/[^\s/]+$/i.test(raw) ? raw : 'https://brandthread.app';
+})();
 const OG_IMAGE_FALLBACK = `${CANONICAL_ORIGIN}/brandthread-logo.png`;
 const FETCH_TIMEOUT_MS = 2500;
 
@@ -28,7 +33,71 @@ function apiBase() {
   return (process.env.SHARE_PREVIEW_API_BASE || `${CANONICAL_ORIGIN}/api/v1`).replace(/\/+$/, '');
 }
 
+// A loader may return NOT_FOUND to say "the API answered 404" (as opposed to
+// null = "couldn't tell": API down, timeout, bad JSON). Not-found resources
+// get a real 404 status + noindex so a deleted / private post never unfurls
+// or gets indexed; "couldn't tell" falls back to the generic shell (200).
+const NOT_FOUND = Symbol('not-found');
+
+const HASHTAG_RE = /^\/tag\/([\p{L}\p{N}_]{1,60})\/?$/u;
+
 const MATCHERS = [
+  {
+    pattern: /^\/p\/([A-Za-z0-9_-]{6,64})\/?$/,
+    async load(match) {
+      const res = await fetchResource(`${apiBase()}/public/posts/${encodeURIComponent(match[1])}/share-preview`);
+      if (res.status === 404) return NOT_FOUND;
+      const post = res.data;
+      if (!post) return null;
+      const author = post.authorName || (post.authorHandle ? `@${post.authorHandle}` : 'Brandthread');
+      return {
+        title: `${author} on Brandthread`,
+        description: post.caption || `Watch ${author}'s post on Brandthread.`,
+        image: post.imageUrl || OG_IMAGE_FALLBACK,
+      };
+    },
+  },
+  {
+    pattern: /^\/store\/(?!product(?:\/|$))([^/]+)\/?$/,
+    async load(match) {
+      const res = await fetchResource(`${apiBase()}/public/stores/${encodeURIComponent(match[1])}/share-preview`);
+      if (res.status === 404) return NOT_FOUND;
+      const store = res.data;
+      if (!store) return null;
+      return {
+        title: `${store.name} on Brandthread`,
+        description: store.description || `Shop ${store.name} on Brandthread.`,
+        image: store.imageUrl || OG_IMAGE_FALLBACK,
+      };
+    },
+  },
+  {
+    // Hashtags have no private data to look up, so no API round trip.
+    pattern: HASHTAG_RE,
+    async load(match) {
+      const tag = match[1].toLowerCase();
+      return {
+        title: `#${tag} on Brandthread`,
+        description: `Watch the latest posts tagged #${tag} on Brandthread.`,
+        image: OG_IMAGE_FALLBACK,
+      };
+    },
+  },
+  {
+    // Served by the places API (built alongside the location pages). Until
+    // that endpoint exists it 404s, which degrades to the generic card.
+    pattern: /^\/place\/([A-Za-z0-9_-]{6,64})\/?$/,
+    async load(match) {
+      const res = await fetchResource(`${apiBase()}/public/places/${encodeURIComponent(match[1])}/share-preview`);
+      const place = res.data;
+      if (!place || !place.name) return null;
+      return {
+        title: `${place.name} on Brandthread`,
+        description: place.description || `See posts from ${place.name} on Brandthread.`,
+        image: place.imageUrl || OG_IMAGE_FALLBACK,
+      };
+    },
+  },
   {
     pattern: /^\/u\/([^/]+)\/?$/,
     async load(match) {
@@ -92,6 +161,20 @@ function lowestVariantPrice(variants) {
   return `$${(Math.min(...cents) / 100).toFixed(2)}`;
 }
 
+async function fetchResource(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return { status: res.status, data: null };
+    return { status: res.status, data: await res.json() };
+  } catch {
+    return { status: 0, data: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchJson(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -119,11 +202,13 @@ function findMatcher(pathname) {
 }
 
 /**
- * Returns HTML with resource-specific meta injected, or null when the path
- * isn't a known share-preview route, the resource wasn't found, or the API
- * call failed — callers should fall back to serving the shell unchanged.
+ * Returns `{ html, status }` with resource-specific meta injected, or null
+ * when the path isn't a known share-preview route or the API couldn't be
+ * reached — callers fall back to serving the shell unchanged. `status` is 404
+ * (with noindex meta) when the API says the resource doesn't exist or isn't
+ * public.
  */
-async function renderSharePreviewHtml(pathname, shellHtml) {
+async function renderSharePreview(pathname, shellHtml) {
   const found = findMatcher(pathname);
   if (!found) return null;
 
@@ -135,7 +220,12 @@ async function renderSharePreviewHtml(pathname, shellHtml) {
   }
   if (!meta) return null;
 
-  const canonicalUrl = `${CANONICAL_ORIGIN}${pathname}`;
+  if (meta === NOT_FOUND) {
+    const html = shellHtml.replace('</head>', '<meta name="robots" content="noindex" /></head>');
+    return { html, status: 404 };
+  }
+
+  const canonicalUrl = escapeHtmlAttr(`${CANONICAL_ORIGIN}${pathname}`);
   const title = escapeHtmlAttr(meta.title);
   const description = escapeHtmlAttr(meta.description);
   const image = escapeHtmlAttr(meta.image);
@@ -144,6 +234,7 @@ async function renderSharePreviewHtml(pathname, shellHtml) {
     `<title>${title}</title>`,
     `<meta name="description" content="${description}" />`,
     `<meta property="og:url" content="${canonicalUrl}" />`,
+    `<meta property="og:site_name" content="Brandthread" />`,
     `<meta property="og:title" content="${title}" />`,
     `<meta property="og:description" content="${description}" />`,
     `<meta property="og:type" content="website" />`,
@@ -154,11 +245,20 @@ async function renderSharePreviewHtml(pathname, shellHtml) {
     `<meta name="twitter:image" content="${image}" />`,
   ].join('');
 
-  return shellHtml
+  const html = shellHtml
     .replace(/<title\b[^>]*>[\s\S]*?<\/title>/i, '')
     .replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/i, '')
     .replace(/<meta\b[^>]*name=["']description["'][^>]*>/i, '')
+    .replace(/<meta\b[^>]*property=["']og:[^"']+["'][^>]*>/gi, '')
+    .replace(/<meta\b[^>]*name=["']twitter:[^"']+["'][^>]*>/gi, '')
     .replace('</head>', `${tags}</head>`);
+  return { html, status: 200 };
 }
 
-module.exports = { renderSharePreviewHtml, apiBase };
+/** Back-compat wrapper: HTML string for a successful preview, else null. */
+async function renderSharePreviewHtml(pathname, shellHtml) {
+  const result = await renderSharePreview(pathname, shellHtml);
+  return result && result.status === 200 ? result.html : null;
+}
+
+module.exports = { renderSharePreviewHtml, renderSharePreview, apiBase };

@@ -32,22 +32,23 @@ const CONFIG: Record<string, Config> = {
   'hidden-words': { title: 'Hidden Words', intro: 'Automatically filter comments and message requests containing offensive or custom words.', items: s => [{ label: 'Hide offensive comments', toggle: 'hiddenWords' }, { label: 'Advanced comment filtering', toggle: 'hiddenWords' }, { label: 'Custom words and phrases', value: 'Manage list' }] },
   muted: { title: 'Muted accounts', items: () => [{ label: 'No muted accounts', sub: 'People you mute will appear here.', icon: 'volume-x' }] },
   restricted: { title: 'Restricted accounts', items: () => [{ label: 'No restricted accounts', sub: 'Restricted people cannot see when you are online or when you read their messages.', icon: 'user-x' }] },
-  favorites: { title: 'Favorites', intro: 'Favoriting sellers and brands is coming soon. Follow them for now to see more from them in Discover.', items: () => [] },
+  favorites: { title: 'Favorites', intro: 'Follow sellers and brands to see more from them in Discover.', items: () => [] },
   content: { title: 'Content preferences', items: s => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', icon: 'refresh-cw' }] },
   suggested: { title: 'Suggested content', items: s => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Snooze suggested posts', value: 'Off' }, { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
   payments: { title: 'Addresses and payments', items: () => [{ label: 'Shipping addresses', icon: 'map-pin', value: '1 saved' }, { label: 'Payment methods', icon: 'credit-card', value: 'Manage' }, { label: 'Autofill checkout info', icon: 'zap', value: 'On' }, { label: 'Purchase protection', icon: 'shield', value: 'Brandthread protected' }] },
-  notifications: { title: 'Push notifications', intro: 'Choose which updates Brandthread may send to this device.', items: s => [
+  notifications: { title: 'Push notifications', intro: 'Choose which updates Brandthread may send to this device.', items: (s, router) => [
     { label: 'New drops', sub: 'Drops from sellers you follow', toggle: 'dropAlerts' },
     { label: 'Messages', sub: 'New direct messages and replies', toggle: 'messageNotifications' },
     { label: 'Order updates', sub: 'Shipping, delivery, returns, and refunds', toggle: 'orderUpdates' },
     { label: 'Friend activity', sub: 'Requests, follows, and social activity', toggle: 'friendActivity' },
+    { label: 'Email & in-app', sub: 'Choose what reaches your inbox and your activity feed', icon: 'mail', action: () => router?.push('/notification-channels' as never) },
   ] },
   accessibility: { title: 'Accessibility', items: s => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, { label: 'Text size', value: 'Default' }, { label: 'High contrast icons', value: 'Off' }] },
   language: { title: 'Language', items: s => [{ label: 'App language', value: s.language }, { label: 'Translation language', value: 'English' }, { label: 'Auto-translate captions', value: 'On' }] },
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
   appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
   'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
-  about: { title: 'About Brandthread', items: (_s, router) => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
+  about: { title: 'About Brandthread', items: (_s, router) => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Privacy policy', icon: 'lock', action: () => router?.push('/privacy' as never) }, { label: 'Refund policy', icon: 'rotate-ccw', action: () => router?.push('/refund-policy' as never) }, { label: 'Seller agreement', icon: 'briefcase', action: () => router?.push('/seller-agreement' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
 };
 
 export default function BuyerSettingsDetail() {

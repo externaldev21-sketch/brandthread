@@ -23,7 +23,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
-import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { withOrigin } from '@/lib/navigation/flowOrigin';
 import {
   getSetupState, completeTask, skipTask,
   SetupState, SetupTask, SetupTaskId,
@@ -175,7 +175,9 @@ export default function SetupScreen() {
   function handleTaskPress(task: SetupTask) {
     if (task.completed) return;
     Alert.alert(task.label, task.description, [
-      { text: 'Open', onPress: () => { try { router.replace(withSellerSetupOrigin(task.route) as never); } catch { /* ok */ } } },
+      // push (never replace) with an explicit origin so the task's Cancel/Back
+      // pops to this checklist, not to a tabs index (docs/NAVIGATION.md).
+      { text: 'Open', onPress: () => { try { router.push(withOrigin(task.route, 'setup') as never); } catch { /* ok */ } } },
       { text: 'Mark complete', onPress: () => handleComplete(task.id) },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -191,7 +193,6 @@ export default function SetupScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
         title="Store setup"
-        subtitle={`${done} of ${total} required completed`}
         variant="modal"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
         rightElement={
@@ -244,7 +245,9 @@ export default function SetupScreen() {
             </View>
             <PrimaryButton
               label="Go to Dashboard"
-              onPress={() => router.replace('/(tabs)/' as never)}
+              // navigate (not replace): pops the root stack back to the existing
+              // (tabs) scene on the Dashboard tab instead of stacking a new one.
+              onPress={() => router.navigate('/(tabs)/' as never)}
               icon="home"
               style={{ marginTop: SP.md }}
             />

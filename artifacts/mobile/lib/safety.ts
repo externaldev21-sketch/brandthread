@@ -43,6 +43,7 @@ export const TARGET_LABELS: Record<ReportTargetType, string> = {
   message: 'message',
   community_message: 'message',
   community: 'group',
+  review: 'review',
 };
 
 export const TARGET_ICONS: Record<ReportTargetType, IconName> = {
@@ -57,6 +58,7 @@ export const TARGET_ICONS: Record<ReportTargetType, IconName> = {
   message: 'message-circle',
   community_message: 'message-circle',
   community: 'users',
+  review: 'star',
 };
 
 /** Accept legacy and alias target names used by older routes. */
@@ -69,7 +71,7 @@ export function normalizeReportTarget(raw: string | null | undefined): ReportTar
       return 'message';
     case 'post': case 'video': case 'live': case 'live_comment': case 'comment':
     case 'story': case 'product': case 'profile': case 'message':
-    case 'community_message': case 'community':
+    case 'community_message': case 'community': case 'review':
       return raw;
     default:
       return 'post';
@@ -190,6 +192,31 @@ export function confirmUnblock(
   });
 }
 
+export const REPORT_NOTE_LIMIT = 1000;
+
+/** Why a report can't be submitted yet, or null when it can. */
+export function reportNoteError(reason: ReportReasonId | null, note: string): string | null {
+  if (!reason) return 'Choose a reason first.';
+  if (reason === 'other' && note.trim().length < 3) return 'Tell us what’s wrong so we can review it.';
+  return null;
+}
+
+/** The exact body POSTed to /api/reports for a chosen reason and optional note. */
+export function buildReportPayload(input: {
+  targetType: ReportTargetType | 'seller' | 'user' | 'dm';
+  targetId: string;
+  reason: ReportReasonId;
+  note?: string;
+}): { targetType: ReportTargetType; targetId: string; reason: ReportReasonId; note?: string } {
+  const note = (input.note ?? '').trim().slice(0, REPORT_NOTE_LIMIT);
+  return {
+    targetType: normalizeReportTarget(input.targetType),
+    targetId: input.targetId,
+    reason: input.reason,
+    ...(note ? { note } : {}),
+  };
+}
+
 /** "2m", "3h", "4d", then a short date. */
 export function shortRelativeTime(iso: string, now = Date.now()): string {
   const diff = Math.max(0, now - new Date(iso).getTime());
@@ -202,3 +229,5 @@ export function shortRelativeTime(iso: string, now = Date.now()): string {
   if (days < 7) return `${days}d`;
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+export { REPORT_SLA_HOURS, reportSla, type ReportSla } from './reportSla';

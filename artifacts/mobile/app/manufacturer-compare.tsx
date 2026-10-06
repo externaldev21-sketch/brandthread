@@ -17,6 +17,7 @@ import { formatCents } from '@/lib/money';
 import { getFavoriteManufacturerIds, getManufacturer } from '@/services/manufacturerService';
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { radius } from '@/constants/radii';
 
 const MAX_COMPARE = 4;
 const MIN_COMPARE = 2;
@@ -152,7 +153,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   pickerWrap: { paddingTop: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm },
   pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: SP.md, marginBottom: SP.xs },
   pickerRow: { paddingHorizontal: SP.md, gap: SP.sm },
-  pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
+  pickerChip: { paddingHorizontal: SP.md, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center', maxWidth: 160 },
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   pickerChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   pickerChipTextActive: { color: theme.accentLight, fontFamily: FONT.semibold },

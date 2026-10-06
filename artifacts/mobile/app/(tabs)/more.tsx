@@ -25,6 +25,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -52,6 +53,8 @@ const STORE_ITEMS: NavItem[] = [
   { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: 'secondary', route: '/store-collections' },
   { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: 'accentLight', route: '/store-domain' },
   { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'warning', route: '/discounts' },
+  { icon: 'percent', label: 'Sales',         desc: 'Automatic sale prices',        accent: 'warning', route: '/sales' },
+  { icon: 'gift',   label: 'Gift cards',    desc: 'Sell and manage store gift cards', accent: 'accentLight', route: '/gift-cards-manage' },
 ];
 
 const STUDIO_ITEMS: NavItem[] = [
@@ -77,6 +80,9 @@ const GROWTH_ITEMS: NavItem[] = [
   { icon: 'bar-chart-2', label: 'Analytics', desc: 'Sales, traffic and insights', accent: 'accentLight', route: '/(tabs)/analytics' },
   { icon: 'video', label: 'Content', desc: 'Posts, drafts and scheduled', accent: 'secondary', route: '/content' },
   { icon: 'users', label: 'Community', desc: 'Join topic group chats', accent: 'secondary', route: '/community' },
+  { icon: 'link', label: 'Creator program', desc: 'Affiliate codes and commissions', accent: 'accent', route: '/seller-creator-program' },
+  { icon: 'star', label: 'Reviews', desc: 'Read and reply to buyer reviews', accent: 'warning', route: '/seller-reviews' },
+  { icon: 'help-circle', label: 'Questions', desc: 'Answer buyer questions on products', accent: 'accentLight', route: '/seller-questions' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [
@@ -110,6 +116,8 @@ const SECTIONS: { key: string; title: string; icon: keyof typeof Feather.glyphMa
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MoreScreen() {
+  // Content ends above the floating tab bar (shared app-wide rule).
+  const tabBarClearance = useTabBarClearance(2);
   const scrollResetRef = useScrollReset<ScrollView>();
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
@@ -194,7 +202,7 @@ export default function MoreScreen() {
       <ScrollView
         ref={scrollResetRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
       >
         {/* USER HEADER */}
         <GradientCard

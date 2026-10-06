@@ -16,6 +16,7 @@ import { Router } from "express";
 import { db, notificationsFeed, conversationParticipants, users, blocks, activityMutes, follows } from "@workspace/db";
 import { eq, and, desc, inArray, notInArray, or, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import {
@@ -321,7 +322,7 @@ buyerRouter.delete("/:id", async (req, res) => {
 
 // ─── Internal publisher (used by other routes, e.g. order status webhooks) ───
 
-export async function publishNotification(n: {
+type PublishInput = {
   userId:       string;
   category:     string;
   type:         string;
@@ -342,7 +343,46 @@ export async function publishNotification(n: {
   pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
-}): Promise<void> {
+  /** Promotional vs transactional override (see lib/pushPolicy.ts). */
+  pushKind?: "transactional" | "promotional";
+  /** The recipient asked for this exact alert (e.g. per-drop "notify me"). */
+  pushExplicitRequest?: boolean;
+};
+
+/** conversation_participants.muted_until in the future (Chat details > Mute). */
+async function isConversationMutedFor(n: PublishInput): Promise<boolean> {
+  if (n.targetType !== "conversation" || !n.targetId) return false;
+  const [participant] = await db.select({ mutedUntil: conversationParticipants.mutedUntil })
+    .from(conversationParticipants)
+    .where(and(
+      eq(conversationParticipants.conversationId, n.targetId),
+      eq(conversationParticipants.userId, n.userId),
+    ))
+    .limit(1);
+  return Boolean(participant?.mutedUntil && participant.mutedUntil.getTime() > Date.now());
+}
+
+async function sendFeedlessPush(n: PublishInput, pushCategory: PushEventCategory): Promise<void> {
+  if (await isConversationMutedFor(n)) return;
+  await sendPushToUser(n.userId, {
+    title: n.title,
+    body: n.body ?? "",
+    data: {
+      type: n.type,
+      category: n.category,
+      targetId: n.targetId,
+      targetType: n.targetType,
+      cta: n.cta,
+      commentId: n.commentId,
+    },
+    sound: n.pushSound,
+    channelId: n.pushChannelId,
+    kind: n.pushKind,
+    explicitRequest: n.pushExplicitRequest,
+  }, pushCategory, n.analyticsOwnerId);
+}
+
+export async function publishNotification(n: PublishInput): Promise<void> {
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
   // "See less" preferences (Activity "..." menu) — a muted type or a muted
@@ -352,6 +392,15 @@ export async function publishNotification(n: {
   const muted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
     .where(and(eq(activityMutes.userId, n.userId), inArray(activityMutes.muteKey, muteKeys)));
   const isMuted = muted.length > 0;
+
+  // Settings → Notifications → In-app: a type switched off never reaches the
+  // feed. Push is a separate channel, so it still goes out (without a feed id
+  // to dedupe retries on) when its own switch is on.
+  const feedEnabled = pushCategory ? await isChannelEnabledForUser(n.userId, pushCategory, "inApp") : true;
+  if (!feedEnabled) {
+    if (!isMuted && pushCategory) await sendFeedlessPush(n, pushCategory);
+    return;
+  }
 
   const [notification] = await db
     .insert(notificationsFeed)
@@ -385,19 +434,9 @@ export async function publishNotification(n: {
   if (!notification || isMuted) return;
 
   if (pushCategory) {
-    // A muted conversation (conversation_participants.muted_until in the
-    // future) only suppresses device delivery; the feed row above is kept and
-    // unread state is unchanged.
-    if (n.targetType === "conversation" && n.targetId) {
-      const [participant] = await db.select({ mutedUntil: conversationParticipants.mutedUntil })
-        .from(conversationParticipants)
-        .where(and(
-          eq(conversationParticipants.conversationId, n.targetId),
-          eq(conversationParticipants.userId, n.userId),
-        ))
-        .limit(1);
-      if (participant?.mutedUntil && participant.mutedUntil.getTime() > Date.now()) return;
-    }
+    // A muted conversation only suppresses device delivery; the feed row
+    // above is kept and unread state is unchanged.
+    if (await isConversationMutedFor(n)) return;
 
     await sendPushToUser(n.userId, {
       title: n.title,
@@ -413,6 +452,8 @@ export async function publishNotification(n: {
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
+      kind: n.pushKind,
+      explicitRequest: n.pushExplicitRequest,
     }, pushCategory, n.analyticsOwnerId);
   }
 }

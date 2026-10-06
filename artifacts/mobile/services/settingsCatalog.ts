@@ -41,7 +41,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Archive', description: 'Archived posts and stories', aliases: ['archived'], icon: 'archive', route: '/buyer-archive', audience: 'buyer' },
       { label: 'Saved', description: 'Posts, products, and collections you saved', aliases: ['bookmarks'], icon: 'bookmark', route: '/buyer-saved', audience: 'buyer' },
       { label: 'QR code', description: 'Share your Brandthread profile', aliases: ['qr', 'scan'], icon: 'grid', route: '/buyer-qr-code', audience: 'buyer' },
-      { label: 'Invite friends', description: 'Share your invite code and earn rewards', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
+      { label: 'Invite friends', description: 'Give $10, get $10 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
       { label: 'Following brands', description: 'Brands and creators you follow', aliases: ['following', 'brands'], icon: 'users', route: '/(buyer)/following', audience: 'buyer' },
     ],
   },
@@ -50,6 +50,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Orders and returns', description: 'View purchases, returns, and order support', aliases: ['orders', 'purchases', 'refunds', 'returns'], icon: 'package', route: '/(buyer)/orders', audience: 'buyer' },
       { label: 'Shopping preferences', description: 'Sizes, fit, favorite categories, and recommendations', aliases: ['shopping', 'sizes', 'fit', 'recommendations'], icon: 'shopping-bag', route: '/shopping-preferences', audience: 'buyer' },
+      { label: 'My sizes', description: 'Sizes and measurements', aliases: ['sizes', 'size', 'measurements', 'fit', 'height'], icon: 'maximize-2', route: '/buyer-my-sizes', audience: 'buyer' },
     ],
   },
   {
@@ -83,6 +84,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted accounts', description: 'Accounts whose posts and comments are muted', aliases: ['mute', 'muted'], icon: 'volume-x', route: '/buyer-muted', audience: 'buyer' },
       { label: 'Restricted accounts', description: 'Accounts with limited interaction with you', aliases: ['restrict', 'restricted'], icon: 'user-x', route: '/buyer-restricted', audience: 'buyer' },
+      { label: 'Follow requests', description: 'Confirm or delete requests to follow your private account', aliases: ['requests', 'follow requests', 'private account'], icon: 'user-plus', route: '/buyer-friend-requests', audience: 'buyer' },
       { label: 'Close Friends', description: 'The people who see your close friends posts', aliases: ['close friends'], icon: 'star', route: '/buyer-close-friends', audience: 'buyer' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Who can message and see me', description: 'Messages, story replies, tags, mentions, comments, and sharing', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
@@ -114,6 +116,8 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
       { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
       { label: 'Privacy Policy', description: 'How we collect, use, and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
+      { label: 'Refund Policy', description: 'Cancellations, returns, and refunds', aliases: ['refund', 'refunds', 'returns', 'cancellation', 'buyer protection', 'legal'], icon: 'file-text', route: '/refund-policy', audience: 'shared' },
+      { label: 'Seller Agreement', description: 'Fees, payouts, and rules for selling on Brandthread', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
     ],
   },
   {
@@ -198,6 +202,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Subscription', description: 'Manage your Brandthread seller plan', aliases: ['plan', 'billing', 'membership'], icon: 'star', route: '/subscription', audience: 'seller' },
       { label: 'Compare plans', description: 'See all available Brandthread plans', aliases: ['plans', 'upgrade', 'compare'], icon: 'trending-up', route: '/plans', audience: 'seller' },
+      { label: 'AI credits', description: 'Balance, credit packs and usage history', aliases: ['credits', 'ai', 'top up', 'usage'], icon: 'zap', route: '/ai-credits', audience: 'seller' },
     ],
   },
   {
@@ -221,6 +226,8 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },
+      { label: 'Review promotions', description: 'Approve or reject paid boosts and Featured slots', aliases: ['promotions', 'boosts', 'featured', 'approve', 'admin'], icon: 'check-square', route: '/admin-promotions', audience: 'seller', requiresModerator: true },
+      { label: 'Invites and waitlist', description: 'Invite-only launch switch, access codes and waitlist', aliases: ['invite', 'invites', 'access code', 'waitlist', 'launch', 'admin'], icon: 'user-plus', route: '/admin-invites', audience: 'seller', requiresModerator: true },
     ],
   },
   {
@@ -237,7 +244,8 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Help and support', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Download my data', description: 'Export your products, orders, and customers', aliases: ['export', 'data', 'download'], icon: 'download', route: '/seller-data-export', audience: 'seller' },
-      { label: 'Invite friends', description: 'Share your referral code and see rewards', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'seller' },
+      { label: 'About Brandthread', description: 'App version and legal documents', aliases: ['about', 'version', 'legal', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'seller' },
+      { label: 'Invite friends', description: 'Give $10, get $10 purchase-only Thread Cash; share your referral code and see rewards', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'seller' },
     ],
   },
   {
@@ -246,6 +254,8 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
       { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
       { label: 'Privacy Policy', description: 'How we collect, use, and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
+      { label: 'Refund Policy', description: 'Cancellations, returns, and refunds', aliases: ['refund', 'refunds', 'returns', 'cancellation', 'buyer protection', 'legal'], icon: 'file-text', route: '/refund-policy', audience: 'shared' },
+      { label: 'Seller Agreement', description: 'Fees, payouts, and rules for selling on Brandthread', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
     ],
   },
   {

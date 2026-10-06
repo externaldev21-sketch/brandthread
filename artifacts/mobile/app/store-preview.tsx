@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { isAuthError } from '@/lib/networkNotice';
 import { buildPreviewStorefrontHtml } from '@/lib/previewStorefrontHtml';
+import { radius, nestedRadius } from '@/constants/radii';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -44,6 +45,7 @@ const DESKTOP_WIDTH = 1280;
 function HtmlSurface({ html, width, height, injectedJS }: {
   html: string; width: number; height: number; injectedJS?: string;
 }) {
+  const source = React.useMemo(() => ({ html }), [html]);
   if (Platform.OS === 'web') {
     return React.createElement('iframe', {
       srcDoc: html,
@@ -53,7 +55,7 @@ function HtmlSurface({ html, width, height, injectedJS }: {
   }
   return (
     <WebView
-      source={{ html }}
+      source={source}
       style={{ width, height }}
       scalesPageToFit={false}
       injectedJavaScriptBeforeContentLoaded={injectedJS}
@@ -86,7 +88,10 @@ export default function StorePreview() {
   // the first's, or after the screen has lost focus/unmounted.
   const inFlight = useRef(false);
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Fresh preview (no &demo=1) never has a real store to fetch — see the
   // file doc comment.
@@ -201,7 +206,7 @@ export default function StorePreview() {
             action={{ label: 'Add product', onPress: () => router.push('/add-product' as never), icon: 'plus' }}
           />
         </View>
-      ) : loading ? (
+      ) : loading && !html ? (
         <View style={styles.center}>
           <ActivityIndicator color={theme.text} size="large" />
         </View>
@@ -262,12 +267,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // Monochrome rule: black/white/silver only — was theme.borderSubtle (a
   // grey fill) with a theme.muted (grey) inactive icon.
   deviceToggle: {
-    flexDirection: 'row', borderRadius: RADIUS.pill,
+    flexDirection: 'row', borderRadius: radius.md,
     backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
     padding: 3, gap: 3,
   },
   deviceBtn: {
-    width: 34, height: 30, borderRadius: RADIUS.pill,
+    width: 34, height: 30, borderRadius: nestedRadius(radius.md, 3),
     alignItems: 'center', justifyContent: 'center',
   },
   deviceBtnActive: { backgroundColor: theme.text },

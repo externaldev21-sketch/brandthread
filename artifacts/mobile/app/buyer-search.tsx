@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
@@ -42,9 +43,13 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
+import { ShopByCategoryRail } from '@/components/discover/DiscoverShopRails';
+import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
 import { TagRow, type SearchTag } from '@/components/search/TagRow';
+import { TrendingTags } from '@/components/search/TrendingTags';
+import { hashtagHref, normalizeTag } from '@/lib/hashtagText';
 import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
 import { VideoTile } from '@/components/search/VideoTile';
@@ -56,12 +61,18 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { FilterSheet } from '@/components/search/FilterSheet';
+import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 type VideoResult = Extract<SearchResult, { kind: 'video' }>;
 
 const DEBOUNCE_MS = 150;
+
+// Filters live for the app session only (module scope): they survive leaving
+// and re-opening Search, and reset on a fresh launch. Never written to storage.
+let sessionFilters: SearchFilters = {};
 const VIDEO_GRID_GAP = 8;
 
 /** Small, clearly-fictional preview accounts so the Users tab is demoable
@@ -143,9 +154,11 @@ function deriveTags(videos: VideoResult[], query: string): SearchTag[] {
 
 export default function BuyerSearchScreen() {
   const router = useRouter();
+  const { openReport } = useReportSheet();
   const params = useLocalSearchParams<{ q?: string }>();
   const insets = useSafeAreaInsets();
   const { push } = useThreadPull();
+  const shopShelves = useDiscoveryShelves({ categories: true, trending: false });
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const bg = theme.background;
@@ -164,9 +177,15 @@ export default function BuyerSearchScreen() {
   const [activeTab, setActiveTab] = useState<SearchTabKey>('forYou');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people, setPeople] = useState<SearchPerson[]>([]);
+  const [serverTags, setServerTags] = useState<SearchTag[]>([]);
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [filters, setFiltersState] = useState<SearchFilters>(sessionFilters);
+  const [facets, setFacets] = useState<SearchFacets | null>(null);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const activeFilterCount = countActiveFilters(filters);
+  const setFilters = useCallback((next: SearchFilters) => { sessionFilters = next; setFiltersState(next); }, []);
   const trimmedQuery = query.trim();
 
   // Browse grid backing the unfocused entry state — the same "For You"
@@ -218,11 +237,15 @@ export default function BuyerSearchScreen() {
   }
 
   const performSearch = useCallback(async (term: string) => {
-    const [productRes, peopleRes] = await Promise.allSettled([
-      api.public.search({ q: term, limit: 30 }),
+    const [productRes, peopleRes, tagRes] = await Promise.allSettled([
+      api.public.search({ q: term, limit: 30, facets: true, ...filtersToApiOptions(filters) }),
       api.social.search(term, 20),
+      previewMode ? Promise.resolve({ tags: [] as SearchTag[] }) : Promise.resolve().then(() => api.hashtags.search(term, 12)),
     ]);
+    setServerTags(tagRes.status === 'fulfilled' ? tagRes.value.tags : []);
     setResults(productRes.status === 'fulfilled' ? productRes.value.results ?? [] : []);
+    if (productRes.status === 'fulfilled' && productRes.value.facets) setFacets(productRes.value.facets);
+    else if (productRes.status !== 'fulfilled') setFacets(null);
     let peopleResult = peopleRes.status === 'fulfilled' ? (peopleRes.value as unknown as SearchPerson[]) : [];
     if (peopleResult.length === 0 && previewMode) {
       const q = term.toLowerCase();
@@ -230,7 +253,7 @@ export default function BuyerSearchScreen() {
     }
     setPeople(peopleResult);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode]);
+  }, [previewMode, filters]);
 
   useEffect(() => {
     const q = query.trim();
@@ -257,9 +280,24 @@ export default function BuyerSearchScreen() {
   const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
   const productResults = productResultsRaw.length > 0 ? productResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
+    : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
-  const tagRows = useMemo(() => deriveTags(videoResults, trimmedQuery), [videoResults, trimmedQuery]);
+  // Server-side hashtag search first (real post counts), then tags derived
+  // from the matched captions for anything the index does not know yet.
+  const tagRows = useMemo(() => {
+    const merged = new Map<string, SearchTag>();
+    for (const t of serverTags) merged.set(t.tag, t);
+    for (const t of deriveTags(videoResults, trimmedQuery)) {
+      const key = normalizeTag(t.tag);
+      if (key && !merged.has(key)) merged.set(key, { tag: key, postCount: t.postCount });
+    }
+    return [...merged.values()];
+  }, [serverTags, videoResults, trimmedQuery]);
+
+  function openHashtag(tag: string) {
+    hapticPrimaryAction();
+    router.push(hashtagHref(normalizeTag(tag)) as never);
+  }
 
   const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
   const { width: winWidth } = useWindowDimensions();
@@ -313,9 +351,11 @@ export default function BuyerSearchScreen() {
     const wasFollowing = person.isFollowing;
     setFollowPending((prev) => ({ ...prev, [person.userId]: true }));
     try {
+      let requested = false;
       if (wasFollowing) await api.social.unfollow(person.userId);
-      else await api.social.follow(person.userId);
-      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing } : p)));
+      else requested = (await api.social.follow(person.userId))?.status === 'requested';
+      // A private account only received a follow request — not following yet.
+      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing && !requested } : p)));
       hapticPrimaryAction();
     } catch {
       // Keep previous state on failure.
@@ -411,6 +451,18 @@ export default function BuyerSearchScreen() {
   ));
 
   function renderNoResults() {
+    if (activeFilterCount > 0 && activeTab === 'products') {
+      return (
+        <View testID="buyer-search-no-results">
+          <EmptyState
+            icon="sliders"
+            title="No products match these filters"
+            description="Try removing a filter to see more."
+            action={{ label: 'Clear filters', icon: 'x-circle', onPress: () => setFilters({}) }}
+          />
+        </View>
+      );
+    }
     return (
       <View testID="buyer-search-no-results">
         <EmptyState
@@ -494,6 +546,7 @@ export default function BuyerSearchScreen() {
   function renderRecent() {
     return (
       <View testID="buyer-search-recent">
+        <TrendingTags onPress={openHashtag} />
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>Recent</Text>
           {recentSearches.length > 0 && (
@@ -521,8 +574,39 @@ export default function BuyerSearchScreen() {
       return <View>{personRows(people)}{brandRowList(brandRows)}</View>;
     }
     if (activeTab === 'products') {
-      if (productResults.length === 0) return renderNoResults();
-      return productGrid(productResults);
+      return (
+        <View>
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => { hapticSelection(); setFilterSheetOpen(true); }}
+              accessibilityRole="button"
+              accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
+              testID="buyer-search-filter-button"
+            >
+              <Feather name="sliders" size={14} color={fg} />
+              <Text style={[TYPE_SCALE.footnote, { color: fg, fontFamily: FONT.medium }]}>Filters</Text>
+              {activeFilterCount > 0 && (
+                <View style={[styles.filterBadge, { backgroundColor: fg }]} testID="buyer-search-filter-badge">
+                  <Text style={[styles.filterBadgeText, { color: bg }]}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {activeFilterCount > 0 && (
+              <TouchableOpacity
+                onPress={() => { hapticSelection(); setFilters({}); }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all filters"
+                hitSlop={12}
+                testID="buyer-search-filter-clear"
+              >
+                <Text style={[TYPE_SCALE.footnote, { color: muted, fontFamily: FONT.semibold }]}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {productResults.length === 0 ? renderNoResults() : productGrid(productResults)}
+        </View>
+      );
     }
     if (activeTab === 'tags') {
       if (tagRows.length === 0) {
@@ -532,7 +616,7 @@ export default function BuyerSearchScreen() {
           </View>
         );
       }
-      return <View>{tagRows.map((t) => <TagRow key={t.tag} tag={t} onPress={() => submitTerm(t.tag)} />)}</View>;
+      return <View>{tagRows.map((t) => <TagRow key={t.tag} tag={t} onPress={() => openHashtag(t.tag)} />)}</View>;
     }
     if (activeTab === 'brands') {
       if (brandRows.length === 0) return renderNoResults();
@@ -648,7 +732,10 @@ export default function BuyerSearchScreen() {
           keyboardDismissMode="on-drag"
         >
           {trimmedQuery.length === 0 ? (
-            renderRecent()
+            <>
+              {renderRecent()}
+              <ShopByCategoryRail categories={shopShelves.categories} />
+            </>
           ) : !submitted ? (
             renderSuggestions()
           ) : (
@@ -664,6 +751,14 @@ export default function BuyerSearchScreen() {
           <View style={{ height: insets.bottom + SPACING.xl }} />
         </ScrollView>
       )}
+
+      <FilterSheet
+        visible={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        value={filters}
+        onApply={setFilters}
+        facets={facets}
+      />
 
       {viewer && (
         <DiscoverPostViewer
@@ -689,7 +784,13 @@ export default function BuyerSearchScreen() {
           onNotInterested={() => { removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id); setSafetyMenuPost(null); }}
           onMute={() => { removePostFromLists(safetyMenuPost.authorId); setSafetyMenuPost(null); }}
           onReport={() => {
-            api.reports.submit({ targetType: 'post', targetId: safetyMenuPost.id, reason: 'other', note: 'Reported from Search' }).catch(() => {});
+            openReport({
+              targetType: 'post',
+              targetId: safetyMenuPost.id,
+              label: 'Post',
+              ownerId: safetyMenuPost.authorId,
+              ownerName: safetyMenuPost.authorName,
+            });
             setSafetyMenuPost(null);
           }}
         />
@@ -734,6 +835,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   videoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: VIDEO_GRID_GAP },
   tabsRow: { paddingTop: SPACING.xs },
+  filterRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm, paddingBottom: SPACING.xs,
+  },
+  filterButton: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, height: 34,
+    paddingHorizontal: SPACING.md, borderRadius: RADII.pill,
+    borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface,
+  },
+  filterBadge: { minWidth: 18, height: 18, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  filterBadgeText: { fontSize: 11, fontFamily: FONT.bold },
   suggestionRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xs + 3,

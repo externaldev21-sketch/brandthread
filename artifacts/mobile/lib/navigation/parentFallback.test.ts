@@ -55,8 +55,11 @@ describe('PARENT_FALLBACK map', () => {
       const src = readFileSync(file!, 'utf8');
       const expected = `goBackOr(router, '${parent}')`;
       const expectedDouble = `goBackOr(router, "${parent}")`;
+      // Setup-task destinations exit through leaveSetupFlow (pop first, then
+      // the explicit `from` origin, then this parent as the last resort).
+      const expectedSetup = `leaveSetupFlow(router, params.from, '${parent}')`;
       expect(
-        src.includes(expected) || src.includes(expectedDouble),
+        src.includes(expected) || src.includes(expectedDouble) || src.includes(expectedSetup),
         `${screen} does not call ${expected} anywhere in its source`,
       ).toBe(true);
     });

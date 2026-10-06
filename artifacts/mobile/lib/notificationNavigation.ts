@@ -87,6 +87,14 @@ export function createNotificationResponseHandler(
       }
       return;
     }
+    if (data?.targetType === 'live' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/buyer-live?streamId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    if (data?.targetType === 'cart') {
+      router.push('/(buyer)/cart');
+      return;
+    }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`);
       return;
@@ -102,8 +110,21 @@ export function createNotificationResponseHandler(
       }
       return;
     }
+    // A buyer asked a question on the seller's product: open the seller's answer inbox.
+    if (data?.targetType === 'product_question') {
+      router.push('/seller-questions');
+      return;
+    }
+    if (data?.targetType === 'giveaway' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/giveaway?code=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'return' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    if (data?.targetType === 'dispute' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/dispute-detail?disputeId=${encodeURIComponent(data.targetId)}`);
       return;
     }
     if (data?.targetType === 'payout') {
@@ -116,7 +137,7 @@ export function createNotificationResponseHandler(
     // of a generic feed.
     if (
       (data?.targetType === 'post' || data?.targetType === 'story' || data?.targetType === 'user'
-        || data?.targetType === 'thread_cash_transfer')
+        || data?.targetType === 'thread_cash_transfer' || data?.targetType === 'referral')
       && typeof data.targetId === 'string' && data.targetId
     ) {
       const href = activityHref({

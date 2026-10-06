@@ -50,7 +50,7 @@ import {
 import {
   Button, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
 } from '@/components/ui';
-import { RADII } from '@/constants/radii';
+import { RADII, radius } from '@/constants/radii';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 import { useAuth } from '@clerk/expo';
@@ -1037,7 +1037,6 @@ export default function CartScreen() {
             <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
           </TouchableOpacity>
         ) : undefined}
-        dividerVariant="subtle"
       />
 
       {!hasItems && !hasSaved && !loadError ? (
@@ -1351,7 +1350,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
   checkoutPill: {
     minWidth: 132, minHeight: COMP.buttonH,
-    borderRadius: RADIUS.pill, backgroundColor: '#FFFFFF',
+    borderRadius: radius.md, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: SP.lg,
   },

@@ -129,9 +129,11 @@ export function buildMoneyTiles(summary: FinanceSummary): MoneyTile[] {
       key: 'paidOut',
       label: 'Paid out',
       value: formatCents(summary.paidOut.amount),
-      caption: summary.paidOut.toBank
-        ? `${formatCents(summary.paidOut.toBank.amount)} reached your bank`
-        : 'Sent to your Stripe account',
+      caption: summary.paidOut.amount === 0
+        ? 'No payouts yet'
+        : summary.paidOut.toBank
+          ? `${formatCents(summary.paidOut.toBank.amount)} reached your bank`
+          : 'Sent to your Stripe account',
       tone: 'neutral',
       icon: 'send',
     },

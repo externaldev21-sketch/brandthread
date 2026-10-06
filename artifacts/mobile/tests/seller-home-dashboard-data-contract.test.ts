@@ -9,9 +9,12 @@ const source = fs.readFileSync(
 
 describe('seller home dashboard data contract', () => {
   it('waits for the authenticated seller and reloads analytics when the range changes', () => {
-    expect(source).toContain('if (!userId)');
-    expect(source).toContain('[api, range, userId, retryTick, storeContextTick]');
-    expect(source).toContain('sellerHomeAnalyticsKey(userId, range)');
+    expect(source).toContain('if (sellerPreview)');
+    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
+    // analyticsUserId = the signed-in user, or a fixed id in the dev preview (which has no account).
+    expect(source).toContain('sellerHomeAnalyticsKey(analyticsUserId, range)');
+    expect(source).toContain('const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId');
+    expect(source).toContain('allPreviewSellerOrders()');
     expect(source).toContain('setSnapshot({ key: requestKey');
   });
 
@@ -70,6 +73,17 @@ describe('seller home dashboard data contract', () => {
     expect(source).not.toContain('styles.statGrid');
   });
 
+  it('always opens on Today, never a persisted or Week default', () => {
+    expect(source).toContain("useState<SellerDashboardRange>('today')");
+    expect(source).not.toContain("useState<SellerDashboardRange>('week')");
+  });
+
+  it('shows the empty-sales message once (in the chart) and hides the flat "—" delta on stat tiles', () => {
+    expect(source).not.toContain(">{EMPTY_CHART_MESSAGE[range]}<");
+    expect(source).toContain('emptyMessage={EMPTY_CHART_MESSAGE[range]}');
+    expect(source).toContain("return { direction: 'flat', label: '' }");
+  });
+
   it('hides action-needed/top-products/recent-orders and shows the setup card for a brand-new seller', () => {
     expect(source).toContain('const newSeller = everSoldCount !== null && isNewSeller(everSoldCount)');
     expect(source).toContain('newSeller ? (');
@@ -102,7 +116,7 @@ describe('seller home dashboard data contract', () => {
     // store (same signed-in account) used to leave the dashboard showing the
     // previously active store's numbers, because only loadFinanceBalance
     // reacted to subscribeStoreContext.
-    expect(source).toContain('[api, range, userId, retryTick, storeContextTick]');
+    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
     expect(source).toContain('[loadSecondaryData, retryTick, storeContextTick]');
     // The stale snapshot/top-products/recent-orders must be dropped
     // immediately on a store switch, not left on screen until the refetch

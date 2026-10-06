@@ -448,6 +448,16 @@ export const PREVIEW_FOLLOWER_SEEDS: Array<{
   { id: 'preview-notif-follow-01', actorUserId: 'preview-seller-01', actorName: 'Atelier Noire', actorInitials: 'AN', actorColor: pickAvatarColor('preview-seller-01'), isRead: false, minutesAgo: 30 },
   { id: 'preview-notif-follow-02', actorUserId: 'preview-seller-04', actorName: 'Orison', actorInitials: 'OR', actorColor: pickAvatarColor('preview-seller-04'), isRead: false, minutesAgo: 90 },
   { id: 'preview-notif-follow-03', actorUserId: 'preview-seller-07', actorName: 'Astrae', actorInitials: 'AS', actorColor: pickAvatarColor('preview-seller-07'), isRead: true, minutesAgo: 300 },
+  { id: 'preview-notif-follow-04', actorUserId: 'preview-seller-11', actorName: 'Common Hours', actorInitials: 'CH', actorColor: pickAvatarColor('preview-seller-11'), isRead: false, minutesAgo: 440 },
+  { id: 'preview-notif-follow-05', actorUserId: 'preview-seller-12', actorName: 'Morrow Form', actorInitials: 'MF', actorColor: pickAvatarColor('preview-seller-12'), isRead: true, minutesAgo: 660 },
+  { id: 'preview-notif-follow-06', actorUserId: 'preview-seller-13', actorName: 'Ciel Atelier', actorInitials: 'CA', actorColor: pickAvatarColor('preview-seller-13'), isRead: true, minutesAgo: 1100 },
+  { id: 'preview-notif-follow-07', actorUserId: 'preview-seller-14', actorName: 'Soft Theory', actorInitials: 'ST', actorColor: pickAvatarColor('preview-seller-14'), isRead: true, minutesAgo: 1500 },
+  { id: 'preview-notif-follow-08', actorUserId: 'preview-seller-15', actorName: 'Studio Lune', actorInitials: 'SL', actorColor: pickAvatarColor('preview-seller-15'), isRead: true, minutesAgo: 2100 },
+  { id: 'preview-notif-follow-09', actorUserId: 'preview-seller-16', actorName: 'Field Notes', actorInitials: 'FN', actorColor: pickAvatarColor('preview-seller-16'), isRead: true, minutesAgo: 2900 },
+  { id: 'preview-notif-follow-10', actorUserId: 'preview-seller-17', actorName: 'Pale Objects', actorInitials: 'PO', actorColor: pickAvatarColor('preview-seller-17'), isRead: true, minutesAgo: 3600 },
+  { id: 'preview-notif-follow-11', actorUserId: 'preview-seller-18', actorName: 'Sunday Assembly', actorInitials: 'SA', actorColor: pickAvatarColor('preview-seller-18'), isRead: true, minutesAgo: 4500 },
+  { id: 'preview-notif-follow-12', actorUserId: 'preview-seller-19', actorName: 'Alder & Ash', actorInitials: 'AA', actorColor: pickAvatarColor('preview-seller-19'), isRead: true, minutesAgo: 5200 },
+  { id: 'preview-notif-follow-13', actorUserId: 'preview-seller-20', actorName: 'After Image', actorInitials: 'AI', actorColor: pickAvatarColor('preview-seller-20'), isRead: true, minutesAgo: 6800 },
 ];
 
 // ─── Seller preview inbox (item 71) ────────────────────────────────────────

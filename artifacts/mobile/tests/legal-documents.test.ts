@@ -67,11 +67,18 @@ describe('legal documents (single source)', () => {
 });
 
 describe('agreement at sign-up', () => {
-  it('requires the checkbox before email, Google or Apple sign-up', () => {
+  it('shows one linked line under the sign-up buttons and records agreement on continue', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect((onboarding.match(/<LegalConsent /g) ?? []).length).toBe(3);
-    expect((onboarding.match(/if \(!requireConsent\(\)\) return;/g) ?? []).length).toBe(4);
-    expect(onboarding).not.toContain('By continuing you agree');
+    expect((onboarding.match(/<LegalContinueNotice /g) ?? []).length).toBe(3);
+    // email, Google and Apple sign-up each remember the agreement when continuing
+    expect((onboarding.match(/recordConsent\(\);/g) ?? []).length).toBe(4);
+    expect(onboarding).not.toContain('agreedToTerms');
+    const consent = read('components/legal/LegalConsent.tsx');
+    const notice = consent.slice(consent.indexOf('export function LegalContinueNotice'));
+    expect(notice).toContain('By continuing you agree to our');
+    for (const route of ["'/terms'", "'/privacy'", "'/community-guidelines'"]) expect(notice).toContain(route);
+    expect(notice).not.toContain('accessibilityRole="checkbox"');
+    expect(notice).not.toContain('<Modal');
   });
 
   it('records agreement for every signed-in account', () => {

@@ -38,13 +38,13 @@ describe('AuthGate corrects a (buyer)/(tabs) route-group mismatch in dev preview
   it('corrects a buyer devRole landing in the (tabs) group back to (buyer), preserving the sub-path', () => {
     const block = devRoleBlock();
     expect(block).toContain("devRole === 'buyer' && inTabsGroup");
-    expect(block).toContain('router.replace(`/(buyer)/${rest}` as never);');
+    expect(block).toContain('router.replace(`/(buyer)/${rest}${previewQuery}` as never);');
   });
 
   it('corrects a seller devRole landing in the (buyer) group back to (tabs), preserving the sub-path', () => {
     const block = devRoleBlock();
     expect(block).toContain("devRole === 'seller' && inBuyerGroup");
-    expect(block).toContain('router.replace(`/(tabs)/${rest}` as never);');
+    expect(block).toContain('router.replace(`/(tabs)/${rest}${previewQuery}` as never);');
   });
 
   it('derives the preserved sub-path from every segment after the group itself', () => {

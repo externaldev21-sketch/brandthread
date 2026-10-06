@@ -1,10 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Platform } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,9 +27,10 @@ import {
   Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME,
   THREAD_THEME_LIGHT_PALETTE,
 } from '@/services/storeTypes';
-import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { radius } from '@/constants/radii';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -68,7 +68,7 @@ function timeAgo(dateStr: string): string {
 
 export default function StoreBuilderScreen() {
   const { theme } = useAppTheme();
-  const s = makeStyles(theme);
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
@@ -83,24 +83,34 @@ export default function StoreBuilderScreen() {
   const [importJob, setImportJob] = useState<ShopifyImportJob | null>(null);
   const [importError, setImportError] = useState('');
   const [submittingImport, setSubmittingImport] = useState(false);
+  const loadGeneration = useRef(0);
 
   const leaveSetupDestination = () => {
-    if (isSellerSetupOrigin(params.from)) {
-      router.replace(SELLER_HOME_ROUTE as never);
-      return;
-    }
-    goBackOr(router);
+    // Pop to the exact screen underneath (dashboard / setup checklist / tab);
+    // only a cold deep link with no history falls back to the `from` origin.
+    leaveSetupFlow(router, params.from);
   };
 
   const loadData = useCallback(async () => {
+    const generation = ++loadGeneration.current;
+    const current = () => generation === loadGeneration.current;
     try {
-      const localStore = await getStorefront();
+      const localStore = await getStorefront({
+        onLocal: draft => {
+          if (!current()) return;
+          setStore(draft);
+          setLoading(false);
+        },
+      });
+      if (!current()) return;
       setStore(localStore);
       setLoading(false);
       getLatestShopifyImport().then(async (latest) => {
-        if (!latest) return;
+        if (!latest || !current()) return;
         if (latest.status === 'complete' || latest.status === 'needs_continuation') {
-          setStore(await syncShopifyImportedStorefront());
+          const imported = await syncShopifyImportedStorefront();
+          if (!current()) return;
+          setStore(imported);
         }
         if (latest.status !== 'complete') {
           setImportJob(latest);
@@ -110,20 +120,24 @@ export default function StoreBuilderScreen() {
 
       // Suggestions are secondary content. Do not keep the entire builder on a
       // spinner while they refresh or when the authenticated API is unavailable.
-      generateAISuggestions()
-        .then(setStore)
-        .catch(() => {});
+      if (localStore.aiSuggestions.filter(s => !s.dismissed && !s.applied).length < 3) {
+        generateAISuggestions()
+          .then(next => { if (current()) setStore(next); })
+          .catch(() => {});
+      }
     } catch {
-      setStore(null);
+      if (current()) setStore(null);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (current()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
-    loadData();
+    void loadData();
+    return () => { loadGeneration.current++; };
   }, [loadData]));
 
   useEffect(() => {
@@ -632,7 +646,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: BORDER_ACTIVE,
   },

@@ -7,7 +7,7 @@
 export type ReportTargetType =
   | 'post' | 'video' | 'live' | 'live_comment' | 'comment'
   | 'story' | 'product' | 'profile' | 'message'
-  | 'community_message' | 'community';
+  | 'community_message' | 'community' | 'review';
 
 export type ReportReasonId =
   | 'spam' | 'harassment' | 'nudity' | 'hate' | 'violence'
@@ -37,6 +37,12 @@ export interface ThreadComment {
   canDelete: boolean;
   /** Held by the content filter — visible only to its author until reviewed. */
   pendingReview: boolean;
+  /** Pinned to the top by the post owner (top-level comments only). */
+  pinned?: boolean;
+  /** The post owner liked this comment. */
+  creatorLiked?: boolean;
+  /** Server-verified @mentions in `body`. */
+  mentions?: { userId: string; handle: string }[];
   replies: ThreadComment[];
 }
 
@@ -46,6 +52,8 @@ export interface CommentThread {
   hiddenByMutedWords: number;
   commentsDisabled: boolean;
   canComment: boolean;
+  /** The viewer owns the post (can pin / unpin comments). */
+  isPostOwner?: boolean;
   nextCursor: string | null;
 }
 
@@ -65,6 +73,8 @@ export interface ModerationQueueItem {
   reason: string;
   note: string | null;
   createdAt: string;
+  /** createdAt + 24h — the review promise made in the Community Guidelines. */
+  dueBy?: string;
   resolution: { action: string | null; note: string | null; resolvedAt: string | null } | null;
   owner: ProfileSummary | null;
   reporter: ProfileSummary | null;
@@ -75,7 +85,7 @@ export interface ModerationQueueItem {
 export interface ModerationQueue {
   items: ModerationQueueItem[];
   hasMore: boolean;
-  summary: { open: number; heldByFilter: number; resolvedToday: number };
+  summary: { open: number; heldByFilter: number; resolvedToday: number; overdue?: number };
 }
 
 export type ModerationAction = 'dismiss' | 'remove_content' | 'suspend_user';
@@ -109,6 +119,12 @@ export interface DeletionBlocker {
 export interface AccountDeletionCheck {
   canDelete: boolean;
   accountType: string | null;
+  /** Days the account stays restorable before it is permanently deleted. */
+  graceDays?: number;
+  /** Proof required to delete: the account password, or an emailed code. */
+  reauth?: 'password' | 'email_code';
+  /** Set when signing back in recently cancelled a scheduled deletion. */
+  deletionCancelledAt?: string | null;
   blockers: DeletionBlocker[];
   willDelete: string[];
   willRetain: string[];

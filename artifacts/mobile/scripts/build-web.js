@@ -33,8 +33,16 @@ const ROUTE_METADATA = {
     title: 'Community Guidelines | Brandthread',
     description: 'The rules for posting, selling, commenting, live shopping and messaging on Brandthread, and how we enforce them.',
   },
+  '/seller-agreement': {
+    title: 'Seller Agreement | Brandthread',
+    description: 'The Brandthread Seller Agreement: the 5% platform fee, Stripe payouts, preorder and drop funds, prohibited items, intellectual property and account termination.',
+  },
+  '/refund-policy': {
+    title: 'Refund Policy | Brandthread',
+    description: 'Brandthread’s refund policy: cancelling orders, requesting returns, automatic refunds for failed drops, and payment disputes.',
+  },
 };
-const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines'];
+const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines', '/seller-agreement', '/refund-policy'];
 
 function domainFromEnvironment() {
   const isPublishedBuild =
@@ -211,6 +219,17 @@ if (fs.existsSync(outputDir)) {
 // file names and lines. They are uploaded to Sentry and then deleted, so they
 // are never served publicly.
 const uploadSourceMaps = ['SENTRY_AUTH_TOKEN', 'SENTRY_ORG', 'SENTRY_PROJECT'].every((name) => process.env[name]?.trim());
+
+// One chunk per route: the first load ships the shell and the landing route
+// instead of every screen. app.config.js turns on Expo Router async routes for
+// web only while this marker exists; it is always removed again, so native and
+// EAS configs (and the OTA fingerprint) never see it. Set
+// BRANDTHREAD_WEB_ASYNC_ROUTES=0 to export a single-bundle web build instead.
+const asyncRoutesMarker = path.join(projectRoot, '.web-async-routes');
+if (process.env.BRANDTHREAD_WEB_ASYNC_ROUTES !== '0') {
+  fs.writeFileSync(asyncRoutesMarker, 'web export only; see app.config.js\n');
+  process.on('exit', () => fs.rmSync(asyncRoutesMarker, { force: true }));
+}
 
 console.log(`Exporting Brandthread web build for ${env.EXPO_PUBLIC_DOMAIN}…`);
 const result = spawnSync(

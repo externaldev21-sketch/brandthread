@@ -11,8 +11,14 @@ import { useApi } from '@/lib/api';
 import { Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { useAuth } from '@clerk/expo';
+import { DisputeTimeline } from '@/components/disputes/DisputeTimeline';
+import { DisputeEvidenceFiles } from '@/components/disputes/DisputeEvidenceFiles';
+import { demoDisputeDetail } from '@/components/disputes/demoDisputes';
+import type { DisputeEvidenceFile } from '@/lib/disputeTypes';
+import { radius } from '@/constants/radii';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +89,8 @@ export default function DisputeDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { userId: authUserId } = useAuth();
+  const isSignedOutPreview = isSellerDevPreview() && !authUserId;
 
   // order shape compatible with render code
   const [order, setOrder] = useState<any | null>(null);
@@ -98,6 +106,9 @@ export default function DisputeDetailScreen() {
   const [addingNote, setAddingNote] = useState(false);
   const [conceding, setConceding] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
+  const [evidenceFiles, setEvidenceFiles] = useState<DisputeEvidenceFile[]>([]);
+  const [evidenceSubmittedAt, setEvidenceSubmittedAt] = useState<string | null>(null);
+  const [timelineKey, setTimelineKey] = useState(0);
 
   const load = useCallback(async () => {
     // No id at all (e.g. a bad/incomplete deep link) — show "not found"
@@ -108,6 +119,27 @@ export default function DisputeDetailScreen() {
     if (!disputeId) {
       setLoading(false);
       return;
+    }
+    // Demo rows from the Chargebacks list (?bt_preview=seller&demo=1, signed out): no API call.
+    if (isSignedOutPreview && isPreviewDemoMode() && disputeId.startsWith('demo-')) {
+      const demo = demoDisputeDetail(disputeId);
+      if (demo) {
+        setDispute({
+          id: demo.item.id, orderId: orderId ?? '', type: (demo.item.reason ?? 'general') as any,
+          status: mapStatus(demo.item.status) as any, customerClaim: demo.claim,
+          amountCents: Math.round(demo.item.amount * 100), evidenceDeadline: demo.item.evidenceDeadline ?? undefined,
+          evidence: [], internalNotes: [], potentialHoldCents: Math.round(demo.item.amount * 100),
+          createdAt: demo.item.createdAt, updatedAt: demo.item.createdAt,
+        } as Dispute);
+        setOrder({
+          orderNumber: demo.order.orderNumber, createdAt: demo.order.createdAt,
+          payment: { totalCents: demo.order.totalCents }, lineItems: [], shipments: [],
+        });
+        setEvidenceFiles(demo.files);
+        setEvidenceSubmittedAt(demo.item.evidenceSubmittedAt);
+        setLoading(false);
+        return;
+      }
     }
     setLoading(true);
     setLoadError(false);
@@ -133,6 +165,9 @@ export default function DisputeDetailScreen() {
           updatedAt:        data.updatedAt,
         };
         setDispute(mapped);
+        setEvidenceFiles(data.evidenceFiles ?? []);
+        setEvidenceSubmittedAt(data.evidenceSubmittedAt ?? null);
+        setTimelineKey(k => k + 1);
 
         // Build order-compatible shape from the order context the API includes
         const o = data.order;
@@ -183,7 +218,7 @@ export default function DisputeDetailScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [orderId, disputeId]);
+  }, [orderId, disputeId, isSignedOutPreview]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -355,6 +390,15 @@ export default function DisputeDetailScreen() {
           )}
         </GradientCard>
 
+        {/* STATUS TIMELINE */}
+        <DisputeTimeline
+          disputeId={dispute.id}
+          refreshKey={timelineKey}
+          demo={isSignedOutPreview
+            ? { status: dispute.status, createdAt: dispute.createdAt, evidenceDeadline: dispute.evidenceDeadline ?? null }
+            : undefined}
+        />
+
         {/* 3. CUSTOMER CLAIM */}
         <View>
           <Text style={styles.sectionHeader}>Customer Claim</Text>
@@ -408,6 +452,17 @@ export default function DisputeDetailScreen() {
               <Text style={styles.evidenceDesc}>{ev.description}</Text>
             </BrandthreadCard>
           ))}
+
+          {/* Uploaded evidence files */}
+          <View style={{ marginBottom: SP.sm }}>
+            <DisputeEvidenceFiles
+              disputeId={dispute.id}
+              files={evidenceFiles}
+              locked={isFinal || status === 'under_review' || !!evidenceSubmittedAt}
+              readOnly={isSignedOutPreview}
+              onAdded={(file) => setEvidenceFiles(prev => [...prev.filter(f => f.evidenceType !== file.evidenceType), file])}
+            />
+          </View>
 
           {/* Add evidence form */}
           {!isFinal && (
@@ -470,7 +525,7 @@ export default function DisputeDetailScreen() {
             </View>
           )}
 
-          {(status === 'evidence_needed' || status === 'evidence_submitted') && dispute.evidence.filter(e => !e.description.startsWith('[INTERNAL NOTE]')).length > 0 && (
+          {(status === 'evidence_needed' || status === 'evidence_submitted') && !evidenceSubmittedAt && (dispute.evidence.filter(e => !e.description.startsWith('[INTERNAL NOTE]')).length > 0 || evidenceFiles.length > 0) && (
             <View style={{ marginTop: SP.sm }}>
               <PrimaryButton
                 label="Submit All Evidence"
@@ -591,7 +646,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chip:               {
     flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     paddingHorizontal: SP.sm, paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill, backgroundColor: CARD,
+    borderRadius: radius.sm, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
   chipActive:         { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

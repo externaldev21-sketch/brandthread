@@ -8,7 +8,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -90,7 +90,7 @@ export default function ForgotPasswordScreen() {
         >
           {/* Back */}
           {step !== 'done' && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button"
               style={s.backBtn}
               onPress={() => {
                 Haptics.selectionAsync();
@@ -118,7 +118,7 @@ export default function ForgotPasswordScreen() {
 
               <View style={s.fieldWrap}>
                 <Text style={s.label}>Email address</Text>
-                <TextInput
+                <TextInput accessibilityLabel="Email"
                   style={s.input}
                   placeholder="you@yourbrand.com"
                    placeholderTextColor={theme.subtle}
@@ -176,7 +176,7 @@ export default function ForgotPasswordScreen() {
 
               <View style={s.fieldWrap}>
                 <Text style={s.label}>Reset code</Text>
-                <TextInput
+                <TextInput accessibilityLabel="Reset code"
                   style={[s.input, s.codeInput]}
                   placeholder="000000"
                    placeholderTextColor={theme.subtle}
@@ -191,7 +191,7 @@ export default function ForgotPasswordScreen() {
               <View style={s.fieldWrap}>
                 <Text style={s.label}>New password</Text>
                 <View style={s.pwRow}>
-                  <TextInput
+                  <TextInput accessibilityLabel="New password"
                     style={[s.input, s.pwInput]}
                     placeholder="Minimum 8 characters"
                      placeholderTextColor={theme.subtle}
@@ -200,7 +200,7 @@ export default function ForgotPasswordScreen() {
                     secureTextEntry={!showPw}
                     autoComplete="new-password"
                   />
-                  <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
+                  <TouchableOpacity accessibilityLabel={showPw ? 'Hide password' : 'Show password'} accessibilityRole="button" style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
                      <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
                   </TouchableOpacity>
                 </View>

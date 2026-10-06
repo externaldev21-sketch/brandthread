@@ -13,6 +13,7 @@
  * PUT    /api/conversations/:id/messages/:messageId/reactions   — set my reaction (upsert)
  * DELETE /api/conversations/:id/messages/:messageId/reactions   — remove my reaction
  * PATCH  /api/conversations/:id/read      — mark read
+ * PATCH  /api/conversations/:id/mute      — mute or unmute this conversation
  * PATCH  /api/conversations/:id/typing    — set/clear my "typing…" signal (polled by the other side)
  * PATCH  /api/conversations/:id/accept    — accept a message request
  * DELETE /api/conversations/:id           — decline / delete conversation
@@ -29,11 +30,16 @@ import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { maybeSendAwayAutoReply } from "../lib/awayAutoReply";
 import { isFollowedBy, shouldRouteToRequests } from "../lib/conversationRouting";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
 import { enrichProductAttachments } from "../lib/productAttachmentInfo";
 import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
+import {
+  checkUpload, validateMediaAttachment, decideOrderShare, decidePostShare, decideProductShare,
+} from "../lib/dmAttachmentPolicy";
+import { IMMUTABLE_PUBLIC_CACHE_CONTROL, normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 router.use(requireAuth);
@@ -112,6 +118,7 @@ function buildConversationView(
       ? new Date(conv.lastMessageAt).getTime()
       : undefined,
     unreadCount:        me?.unreadCount        ?? 0,
+    isMuted:            me?.isMuted            ?? false,
     isFriendshipActive: true,
     isArchived:         false,
     // The Brandthread Agent's welcome thread is always pinned regardless of
@@ -177,6 +184,8 @@ function adaptMessage(
     status:         m.status,
     deliveredAt:    m.deliveredAt?.toISOString() ?? undefined,
     readAt:         m.readAt?.toISOString() ?? undefined,
+    // Away auto-reply (migration 142): clients label these "Automated reply".
+    automated:      m.isAutomated === true ? true : undefined,
     deletedAt:      m.deletedAt?.toISOString() ?? undefined,
     ts:             new Date(m.createdAt!).getTime(),
     deletedForMe:   false,
@@ -504,6 +513,29 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+// ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
+router.patch("/:id/mute", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const muted = (req.body as { muted?: unknown } | undefined)?.muted;
+
+  if (typeof muted !== "boolean") {
+    return res.status(400).json({ error: "muted must be a boolean" });
+  }
+
+  const [membership] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!membership) return res.status(403).json({ error: "Not a participant" });
+
+  await db.update(conversationParticipants)
+    .set({ isMuted: muted })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ muted });
+});
+
 // ─── GET /api/conversations/:id/messages ─────────────────────────────────────
 const lastSweepAt = new Map<string, number>();
 const SWEEP_EVERY_MS = 60_000;
@@ -695,13 +727,17 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     }
   }
 
-  if (primaryAttachment != null) {
-    const att = primaryAttachment as {
+  const attachmentsToValidate = [...new Set([primaryAttachment, ...attachmentItems].filter((a) => a != null))];
+  for (const item of attachmentsToValidate) {
+    const att = item as {
       type?: string;
       title?: string;
       subtitle?: string;
+      uri?: string;
       meta?: { productId?: string; orderId?: string; postId?: string };
     };
+    const mediaCheck = validateMediaAttachment(att as any, (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim());
+    if (!mediaCheck.ok) return res.status(400).json({ error: mediaCheck.error });
     const allowedTypes = MESSAGE_ATTACHMENT_TYPES;
     if (!att.type || !allowedTypes.includes(att.type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
@@ -719,22 +755,9 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
         .where(eq(products.id, pid))
         .limit(1);
       if (!product) return res.status(400).json({ error: "Attached product not found." });
-      if (product.status !== "active") return res.status(400).json({ error: "Only active products can be attached." });
-      // Allow if sender owns the product OR the product belongs to another participant
-      if (product.ownerId !== userId) {
-        const [conversation] = await db
-          .select({ type: conversations.type })
-          .from(conversations)
-          .where(eq(conversations.id, id))
-          .limit(1);
-        const isSellerConversation = conversation?.type === "buyer_to_seller"
-          || conversation?.type === "buyer_to_seller_product"
-          || conversation?.type === "buyer_to_seller_order";
-        const isParticipantProduct = otherIds.includes(product.ownerId);
-        if (!isSellerConversation || !isParticipantProduct) {
-          return res.status(403).json({ error: "You can only attach products from this conversation's seller." });
-        }
-      }
+      // Any active product can be shared as a card (it is already public).
+      const productDecision = decideProductShare({ product });
+      if (!productDecision.ok) return res.status(productDecision.status).json({ error: productDecision.error });
     }
 
     if (att.type === "order") {
@@ -748,12 +771,13 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       const orderId = att.meta?.orderId ?? conv?.contextOrderId ?? null;
       if (!orderId) return res.status(400).json({ error: "No order linked to this conversation." });
       const [order] = await db
-        .select({ id: orders.id, ownerId: orders.ownerId })
+        .select({ id: orders.id, ownerId: orders.ownerId, buyerId: orders.buyerId })
         .from(orders)
         .where(eq(orders.id, orderId))
         .limit(1);
       if (!order) return res.status(400).json({ error: "Attached order not found." });
-      if (order.ownerId !== userId) return res.status(403).json({ error: "You can only attach your own orders." });
+      const orderDecision = decideOrderShare({ order, senderId: userId, otherParticipantIds: otherIds });
+      if (!orderDecision.ok) return res.status(orderDecision.status).json({ error: orderDecision.error });
       // Normalize meta to include the validated orderId
       (att as any).meta = { ...((att as any).meta ?? {}), orderId };
     }
@@ -762,24 +786,16 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       const postId = att.meta?.postId;
       if (!postId) return res.status(400).json({ error: "Attachment post requires meta.postId." });
       const [post] = await db
-        .select({ id: posts.id, userId: posts.userId })
+        .select({
+          id: posts.id, userId: posts.userId, postStatus: posts.postStatus,
+          moderationStatus: posts.moderationStatus, visibility: posts.visibility,
+        })
         .from(posts)
         .where(eq(posts.id, postId))
         .limit(1);
       if (!post) return res.status(400).json({ error: "Attached post not found." });
-      if (post.userId !== userId) {
-        const [conversation] = await db
-          .select({ type: conversations.type })
-          .from(conversations)
-          .where(eq(conversations.id, id))
-          .limit(1);
-        const isSellerConversation = conversation?.type === "buyer_to_seller"
-          || conversation?.type === "buyer_to_seller_product"
-          || conversation?.type === "buyer_to_seller_order";
-        if (!isSellerConversation || !otherIds.includes(post.userId)) {
-          return res.status(403).json({ error: "You can only attach posts from this conversation's seller." });
-        }
-      }
+      const postDecision = decidePostShare({ post, senderId: userId });
+      if (!postDecision.ok) return res.status(postDecision.status).json({ error: postDecision.error });
       (att as any).meta = { ...((att as any).meta ?? {}), postId };
     }
   }
@@ -823,6 +839,12 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       .set({ unreadCount: sql`unread_count + 1` })
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
   ]);
+
+  // Seller away auto-reply (non-critical). Awaited so the reply is already
+  // persisted when the sender's client next polls; errors never fail the send.
+  // This route only handles human sends, and the auto-reply is inserted
+  // directly (never through here), so it cannot loop.
+  await maybeSendAwayAutoReply({ conversationId: id, senderId: userId, otherIds }).catch(() => undefined);
 
   // Notify each recipient of the new message (non-critical, fire-and-forget).
   // Chat details > Mute: a recipient who muted this conversation gets no
@@ -1218,23 +1240,6 @@ router.patch("/:id/accept", async (req, res) => {
 // never taken from the request (it previously allowed arbitrary characters,
 // including "/", into the generated object key) and the content-type is
 // restricted to a fixed allowlist of media types this feature supports.
-const UPLOAD_MEDIA_MIME_EXTENSIONS: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "video/mp4": "mp4",
-  "video/quicktime": "mov",
-  "video/webm": "webm",
-  "audio/mpeg": "mp3",
-  "audio/mp4": "m4a",
-  "audio/x-m4a": "m4a",
-  // Some recorders (including this app's voice-message recorder) report the
-  // informal "audio/m4a" mime type rather than the registered "audio/mp4" —
-  // accept it as the same alias so voice message uploads aren't rejected.
-  "audio/m4a": "m4a",
-  "audio/wav": "wav",
-};
 const UPLOAD_MEDIA_BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 
 router.post("/upload-media", async (req, res) => {
@@ -1264,19 +1269,17 @@ router.post("/upload-media", async (req, res) => {
   }
 
   const normalizedMimeType = typeof mimeType === "string" ? mimeType.toLowerCase() : "";
-  const ext = UPLOAD_MEDIA_MIME_EXTENSIONS[normalizedMimeType];
-  if (!ext) {
-    return res.status(400).json({
-      error: `mimeType must be one of: ${Object.keys(UPLOAD_MEDIA_MIME_EXTENSIONS).join(", ")}`,
-    });
-  }
+  const buffer = Buffer.from(base64, "base64");
+  const check = checkUpload(normalizedMimeType, buffer);
+  if (!check.ok) return res.status(check.status).json({ error: check.error });
+  const ext = check.ext;
 
   const { randomUUID } = await import("crypto");
   const filename = `messaging/${userId}/${randomUUID()}.${ext}`;
 
   try {
     const { objectStorageClient } = await import("../lib/objectStorage");
-    const buffer = Buffer.from(base64, "base64");
+    const raw = buffer;
 
     // Automatic screening (off when the AI integration env is missing). A DM
     // has no held state, so flagged media is refused; an outage of the
@@ -1292,9 +1295,18 @@ router.post("/upload-media", async (req, res) => {
         return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
       }
     }
+    // Images are downscaled and stripped of EXIF/GPS (after screening, which sees the original bytes);
+    // video and audio are stored as sent.
+    const isImage = normalizedMimeType.startsWith("image/");
+    const stored = isImage ? await normalizeUploadedImage(raw, normalizedMimeType) : { buffer: raw, contentType: normalizedMimeType };
     const bucket = objectStorageClient.bucket(BUCKET_ID);
     const file   = bucket.file(filename);
-    await file.save(buffer, { contentType: normalizedMimeType, resumable: false });
+    // Object keys are random UUIDs and never rewritten, so images can be cached forever.
+    await file.save(stored.buffer, {
+      contentType: stored.contentType,
+      resumable: false,
+      ...(isImage ? { metadata: { cacheControl: IMMUTABLE_PUBLIC_CACHE_CONTROL } } : {}),
+    });
     await file.makePublic();
     const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
     return res.json({ url });

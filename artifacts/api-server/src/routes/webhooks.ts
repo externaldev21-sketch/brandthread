@@ -6,7 +6,7 @@ import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import type Stripe from "stripe";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
   revenueCatWebhookEvents, manufacturers, sampleOrders, manufacturerActivityEvents,
   stripeTrialWarningEvents,
@@ -21,11 +21,15 @@ import {
   activateBoostFromCheckoutSession,
   markBoostCheckoutFailed,
 } from "./boosts";
+import { fulfilCreditCheckoutSession, grantRevenueCatCreditPurchase } from "../lib/aiCredits/purchases";
+import { activateFeaturedSlotFromCheckoutSession, markFeaturedSlotCheckoutFailed } from "./featured-slots";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
+import { drizzlePromoStore } from "../lib/iapPromotionsStore";
 import {
   awardLoyaltyPointsOnce,
   consumeLoyaltyRedemption,
@@ -36,16 +40,25 @@ import {
   releaseThreadCashRedemption,
 } from "../lib/threadCash/wallet";
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
+import { qualifyReferralForOrderSafe } from "../lib/referrals/rewards";
+import { GIFT_CARD_PURCHASE_KIND, handleGiftCardPaymentSucceeded } from "../lib/giftCards/purchase";
+import { finalizeGiftCardsForGroup } from "../lib/giftCards/checkout";
+import { giftCentsForCheckouts } from "../lib/giftCards/service";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
-import { applyDisputePause, applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
+import { applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
+  sendPayoutEmail,
 } from "../lib/brandthreadEmail";
+import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { publishNotification } from "./notifications-feed";
+import { shouldNotifyRestricted } from "../lib/connectOnboarding";
+import { processDisputeEvent } from "../lib/disputes/webhook";
+import { buildDisputeDeps } from "../lib/disputes/store";
 import { productThumbnail } from "../lib/activityEvents";
 import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
@@ -62,6 +75,7 @@ import {
 } from "../lib/stripeWebhookLedger";
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
 import { recordDiscountCodeUse } from "../lib/discounts";
+import { attributeOrder as attributeAffiliateOrder } from "../lib/affiliate/service";
 import { splitOrder } from "../lib/money/fees";
 import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
 import {
@@ -73,6 +87,9 @@ import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
+import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore";
+import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
+import { amountBucket, captureServerEvent } from "../lib/analytics";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -260,6 +277,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
           // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
           break;
         }
+        // ── AI credit pack checkout ──────────────────────────────────────────
+        if (cs.metadata?.kind === "ai_credits") {
+          if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
+          break;
+        }
+        // ── Featured slot checkout ───────────────────────────────────────────
+        if (cs.metadata?.kind === "featured_slot") {
+          if (cs.payment_status === "paid" || cs.payment_status === "no_payment_required") {
+            await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
+          }
+          break;
+        }
         // ── Regular buyer checkout ───────────────────────────────────────────
         if (cs.payment_status === "paid") {
           await handleCheckoutPaid(cs, event.id, paidAt);
@@ -272,10 +301,14 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "checkout.session.async_payment_succeeded": {
         const cs = event.data.object as any;
         const paidAt = new Date(event.created * 1000);
-        if (cs.metadata?.kind === "ad_campaign") {
+        if (cs.metadata?.kind === "ai_credits") {
+          await fulfilCreditCheckoutSession(cs);
+        } else if (cs.metadata?.kind === "ad_campaign") {
           await activateAdCampaignFromCheckoutSession(cs, paidAt);
         } else if (cs.metadata?.kind === "boost") {
           await activateBoostFromCheckoutSession(cs, paidAt);
+        } else if (cs.metadata?.kind === "featured_slot") {
+          await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
         } else {
           await handleCheckoutPaid(cs, event.id, paidAt);
         }
@@ -290,6 +323,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await markAdCampaignCheckoutFailed(cs);
         } else if (cs.metadata?.kind === "boost") {
           await markBoostCheckoutFailed(cs);
+        } else if (cs.metadata?.kind === "featured_slot") {
+          await markFeaturedSlotCheckoutFailed(cs);
         } else {
           await releaseCheckoutLoyaltyRedemption(cs);
         }
@@ -305,6 +340,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const pi = event.data.object as any;
         if (pi.metadata?.kind === CART_CHECKOUT_KIND) {
           await handleCartPaymentSucceeded(pi, event.id, new Date(event.created * 1000));
+        } else if (pi.metadata?.kind === GIFT_CARD_PURCHASE_KIND) {
+          await handleGiftCardPaymentSucceeded(pi);
         }
         break;
       }
@@ -400,24 +437,35 @@ router.post("/stripe", async (req: Request, res: Response) => {
           cumulativeReversedCents: event.data.object.amount,
           providerEventId: event.id,
           source: "dispute",
-        })) await handleDisputeCreated(event.data.object);
+        })) await handleDisputeEvent(event);
         break;
 
+      // Updated / closed / funds_withdrawn / funds_reinstated all run through
+      // the same idempotent processor (lib/disputes/webhook.ts), which writes
+      // the dispute_events timeline, the ledger effect and the seller alert.
       case "charge.dispute.updated":
+      case "charge.dispute.closed":
+      case "charge.dispute.funds_withdrawn":
+      case "charge.dispute.funds_reinstated":
         if (!await isManufacturerCardPayment(
           stripeReferenceId(event.data.object.payment_intent),
           stripeReferenceId(event.data.object.charge),
         )) {
-          await handleDisputeUpdated(event.data.object);
+          await handleDisputeEvent(event);
         }
         break;
 
-      case "charge.dispute.closed":
-        if (!await isManufacturerCardPayment(
-          stripeReferenceId(event.data.object.payment_intent),
-          stripeReferenceId(event.data.object.charge),
-        )) {
-          await handleDisputeClosed(event.data.object);
+      // ── Stripe Radar manual reviews (risk flags on orders; best effort) ──
+      case "review.opened":
+      case "review.closed":
+        try {
+          await applyReviewToOrders(
+            dbReviewDeps,
+            event.type === "review.opened" ? "opened" : "closed",
+            event.data.object as any,
+          );
+        } catch (err) {
+          req.log.warn({ err, eventId: event.id }, "Radar review event could not update order risk");
         }
         break;
 
@@ -478,6 +526,28 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     if (!recorded) {
       res.json({ received: true, duplicate: true });
       return;
+    }
+    // Consumable Boost / Create-ad purchases (Guideline 3.1.1 native rail).
+    const promo = promotionPurchaseFromWebhookEvent(event);
+    if (promo) {
+      if (!iapPromotionsEnabled()) {
+        req.log.warn({ eventId }, "RevenueCat promotion purchase received while IAP_PROMOTIONS_ENABLED is off");
+        res.json({ received: true, ignored: true });
+        return;
+      }
+      const result = await grantPromotionPurchase(drizzlePromoStore, { ...promo, source: "webhook" });
+      req.log.info({ eventId, result }, "RevenueCat promotion purchase processed");
+      res.json({ received: true, promotion: result.status });
+      return;
+    }
+    // One-off AI credit packs (store consumables): credit once per event id.
+    // Subscription events fall through to the reconciliation below, untouched.
+    if (event.type === "NON_RENEWING_PURCHASE") {
+      const credit = await grantRevenueCatCreditPurchase({ eventId, appUserId, productId: event.product_id });
+      if (credit.handled) {
+        res.json({ received: true, credited: credit.granted === true });
+        return;
+      }
     }
     // Reconciliation reads the current provider state, so stale/out-of-order
     // webhook payloads cannot overwrite a newer entitlement.
@@ -579,6 +649,8 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
   const shipping = pi.shipping?.address
     ? { name: pi.shipping.name ?? undefined, address: pi.shipping.address }
     : undefined;
+  // Gift card cents held on each group: part of its value, not a discount.
+  const giftByGroup = await giftCentsForCheckouts(db, groups.map((group) => group.id));
   for (const group of groups) {
     if (!group.stripeSessionId) continue;
     const subtotal = (group.items ?? []).reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
@@ -593,11 +665,14 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
       total_details: {
         amount_tax: tax,
         amount_shipping: shippingCents,
-        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal),
+        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal - (giftByGroup.get(group.id) ?? 0)),
       },
       shipping_details: shipping,
       metadata: { csRef: group.id },
     }, providerEventId, paidAt);
+    await finalizeGiftCardsForGroup(stripe, group).catch((err) => {
+      logger.error({ err, checkoutSessionId: group.id }, "Gift card settlement failed; redelivery retries it");
+    });
     await recordCartTaxTransaction(group).catch((err) => {
       logger.error({ err, checkoutSessionId: group.id }, "Stripe Tax transaction record failed");
     });
@@ -688,6 +763,7 @@ export async function handleCheckoutPaid(
   if (existing) {
     await recordPaidPhysicalOrder(existing);
     await awardPurchasePoints(existing);
+    await qualifyReferralForOrderSafe(existing.id); // referral: inviter's $10 on first paid order (idempotent)
     try {
       await sendOrderConfirmationForOrder(existing.id);
     } catch (err) {
@@ -887,7 +963,9 @@ export async function handleCheckoutPaid(
         buyerId: buyerId ?? null,
         ...(guestEmail ? { guestEmail } : {}),
         orderNumber,
-        status:                  oversoldItems.length > 0 ? "refund_pending" : "pending",
+        // Orders are automatic: a paid order goes straight to "processing"
+        // (the seller app shows it as "To ship"); there is no accept step.
+        status:                  oversoldItems.length > 0 ? "refund_pending" : "processing",
         totalCents,
         subtotalCents,
         shippingCents,
@@ -915,6 +993,8 @@ export async function handleCheckoutPaid(
       shippingCents,
       taxCents,
       grossCents: totalCents,
+      // Rate fixed when the checkout was created; null (older sessions) = standard 5%.
+      platformFeeBps: csRecord.platformFeeBps,
       processingFeeCents: chargeModel === "held"
         ? chargeDetails.processingFeeCents
         : chargeModel === "transfer"
@@ -1013,6 +1093,27 @@ export async function handleCheckoutPaid(
       });
     }
 
+    // Affiliate program: if the buyer used a creator's code or arrived through
+    // a creator's link, record the commission (lib/affiliate). Additive and
+    // isolated in a savepoint: no affiliate, or any failure here, leaves the
+    // order and payment exactly as they were.
+    if (oversoldItems.length === 0) {
+      try {
+        await tx.transaction((sp) => attributeAffiliateOrder(sp as any, {
+          orderId: order.id,
+          sellerId: ownerId,
+          buyerId: buyerId ?? null,
+          guestEmail: guestEmail ?? null,
+          subtotalCents,
+          sellerDiscountCents: Math.min(Math.max(0, stripeDiscountCents - threadCashAppliedCents), subtotalCents),
+          discountCodeId: csRecord.discountCodeId ?? null,
+          paidAt: successfulPaymentAt,
+        }));
+      } catch (affiliateError) {
+        logger.error({ err: affiliateError, orderId: order.id }, "Affiliate attribution failed; order unaffected");
+      }
+    }
+
     // Record the purchase reward in the same transaction as the confirmed
     // order. A cancellation cannot land between the order commit and award.
     if (oversoldItems.length === 0) {
@@ -1101,6 +1202,18 @@ export async function handleCheckoutPaid(
     }
   });
 
+  // Funnel analytics: the authoritative "purchase completed" (no-op without
+  // POSTHOG_API_KEY; never throws). Amount is bucketed, never exact.
+  if (createdOrderId && oversoldItems.length === 0) {
+    captureServerEvent("purchase_completed", buyerId, {
+      amount_bucket: amountBucket(totalCents),
+      currency: typeof session.currency === "string" ? session.currency.toLowerCase() : "usd",
+      item_count: cartItems.reduce((n, i) => n + i.quantity, 0),
+      charge_model: chargeModel,
+      is_guest: !buyerId,
+    });
+  }
+
   // ── Issue Stripe refund for oversold orders ───────────────────────────────
   if (oversoldItems.length > 0) {
     logger.error(
@@ -1143,6 +1256,18 @@ export async function handleCheckoutPaid(
     }
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
+
+    // Seller-only Radar risk flags. Best effort: enrichOrderRisk never throws.
+    if (createdOrderId) {
+      await enrichOrderRisk(dbEnrichDeps, {
+        orderId: createdOrderId,
+        buyerId: buyerId ?? null,
+        guestEmail,
+        totalCents,
+        shippingCountry: shippingAddress?.country ?? null,
+        radar: chargeDetails.radar ?? null,
+      });
+    }
 
     // For You: a purchase is the strongest taste signal (seller + style of the content that sold it).
     if (buyerId) {
@@ -1228,6 +1353,8 @@ export async function handleCheckoutPaid(
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
       }
+
+      await qualifyReferralForOrderSafe(createdOrderId); // referral: inviter's $10 on first paid order (idempotent)
 
       // One-page checkout: pay the seller their share now (separate charges
       // and transfers). A failure is retried by webhook redelivery and the
@@ -1615,115 +1742,15 @@ async function handleIdentityFailed(session: any) {
 }
 
 // ─── Dispute handlers ─────────────────────────────────────────────────────────
+// The logic lives in lib/disputes/webhook.ts so it can be tested without a
+// database; this wires in the real store, ledger and notification publisher.
 
-function mapDisputeStatus(s: string): string {
-  switch (s) {
-    case "needs_response":           return "needs_response";
-    case "under_review":             return "under_review";
-    case "warning_needs_response":   return "needs_response";
-    case "warning_under_review":     return "under_review";
-    case "warning_closed":           return "closed";
-    case "charge_refunded":          return "closed";
-    case "won":                      return "won";
-    case "lost":                     return "lost";
-    default:                         return s;
+async function handleDisputeEvent(event: { id: string; type: string; created?: number; data: { object: any } }) {
+  await processDisputeEvent(event, buildDisputeDeps(publishNotification));
+  // Delivery-guarantee hold: pause/resume the order's payout while a dispute is open.
+  if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"].includes(event.type)) {
+    await applyDisputePauseByDisputeId(event.data.object.id, event.data.object.status);
   }
-}
-
-/** Resolve the seller's clerkId from a Stripe paymentIntentId or chargeId. */
-async function resolveSellerAndOrder(
-  paymentIntentId: string | null,
-  chargeId: string | null,
-): Promise<{ sellerId: string; orderId: string | null }> {
-  // Try to find matching order by payment intent ID
-  if (paymentIntentId) {
-    const [ord] = await db
-      .select({ id: orders.id, ownerId: orders.ownerId })
-      .from(orders)
-      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
-      .limit(1);
-    if (ord) return { sellerId: ord.ownerId, orderId: ord.id };
-  }
-  return { sellerId: "unknown", orderId: null };
-}
-
-async function handleDisputeCreated(dispute: any) {
-  const dueBy = dispute.evidence_details?.due_by
-    ? new Date(dispute.evidence_details.due_by * 1000)
-    : null;
-
-  const { sellerId, orderId } = await resolveSellerAndOrder(
-    dispute.payment_intent ?? null,
-    dispute.charge ?? null,
-  );
-
-  // Build human-readable claim from reason
-  const reasonLabels: Record<string, string> = {
-    credit_not_processed:    "Customer claims they did not receive a refund.",
-    duplicate:               "Customer claims this is a duplicate charge.",
-    fraudulent:              "Customer reports this as an unauthorized charge.",
-    general:                 "Customer filed a general dispute.",
-    product_not_received:    "Customer claims the product was not received.",
-    product_unacceptable:    "Customer claims the product was defective or not as described.",
-    subscription_canceled:   "Customer claims they canceled their subscription.",
-    unrecognized:            "Customer does not recognize this charge.",
-  };
-  const customerClaim = reasonLabels[dispute.reason] ?? `Dispute filed: ${dispute.reason}`;
-
-  await db
-    .insert(disputes)
-    .values({
-      stripeDisputeId:       dispute.id,
-      stripeChargeId:        dispute.charge ?? null,
-      stripePaymentIntentId: dispute.payment_intent ?? null,
-      orderId,
-      sellerId,
-      amountCents:           dispute.amount,
-      currency:              dispute.currency,
-      reason:                dispute.reason,
-      status:                mapDisputeStatus(dispute.status),
-      evidenceDueBy:         dueBy,
-      stripeEvidenceDetails: dispute.evidence_details ?? {},
-      isChargeRefundable:    dispute.is_charge_refundable ?? true,
-      networkReasonCode:     dispute.network_reason_code ?? null,
-      customerClaim,
-    })
-    .onConflictDoNothing();
-
-  await applyDisputePause(orderId, dispute.status);
-  logger.info({ disputeId: dispute.id, sellerId, orderId, reason: dispute.reason }, "Dispute created");
-}
-
-async function handleDisputeUpdated(stripeDispute: any) {
-  const dueBy = stripeDispute.evidence_details?.due_by
-    ? new Date(stripeDispute.evidence_details.due_by * 1000)
-    : null;
-
-  await db
-    .update(disputes)
-    .set({
-      status:                mapDisputeStatus(stripeDispute.status),
-      evidenceDueBy:         dueBy,
-      stripeEvidenceDetails: stripeDispute.evidence_details ?? {},
-      updatedAt:             new Date(),
-    })
-    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
-  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
-
-  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute updated");
-}
-
-async function handleDisputeClosed(stripeDispute: any) {
-  await db
-    .update(disputes)
-    .set({
-      status:    mapDisputeStatus(stripeDispute.status),
-      updatedAt: new Date(),
-    })
-    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
-  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
-
-  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
 }
 
 /**
@@ -1798,7 +1825,7 @@ async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
 async function handleSellerPayoutPaid(payout: any, connectedAccountId?: string | null) {
   if (!connectedAccountId || typeof payout?.id !== "string") return;
   const [seller] = await db
-    .select({ clerkId: users.clerkId })
+    .select({ clerkId: users.clerkId, email: users.email })
     .from(users)
     .where(eq(users.stripeAccountId, connectedAccountId))
     .limit(1);
@@ -1823,6 +1850,16 @@ async function handleSellerPayoutPaid(payout: any, connectedAccountId?: string |
   } catch (err) {
     logger.error({ err, payoutId: payout.id }, "Seller payout notification failed");
   }
+
+  // Payout email — Settings → Notifications → Email (Payouts). The Resend
+  // idempotency key makes a retried webhook a no-op.
+  try {
+    if (seller.email && await isChannelEnabledForUser(seller.clerkId, "payout", "email")) {
+      await sendPayoutEmail({ to: seller.email, amountCents: amount, currency, payoutId: payout.id });
+    }
+  } catch (err) {
+    logger.error({ err, payoutId: payout.id }, "Seller payout email failed");
+  }
 }
 
 async function handleAccountUpdated(account: any, providerEventId?: string) {
@@ -1839,10 +1876,35 @@ async function handleAccountUpdated(account: any, providerEventId?: string) {
       ? "restricted"
       : "pending";
 
+  const [sellerBefore] = await db
+    .select({ clerkId: users.clerkId, stripeAccountStatus: users.stripeAccountStatus })
+    .from(users)
+    .where(eq(users.stripeAccountId, stripeAccountId))
+    .limit(1);
+
   await db
     .update(users)
     .set({ stripeAccountStatus: status, updatedAt: new Date() })
     .where(eq(users.stripeAccountId, stripeAccountId));
+
+  // Seller payout setup: tell the seller when Stripe newly restricts the
+  // account or a requirement goes past due (transition only, never repeats).
+  const pastDue: string[] = account.requirements?.past_due ?? [];
+  if (sellerBefore && shouldNotifyRestricted(sellerBefore.stripeAccountStatus, status, pastDue)) {
+    try {
+      await publishNotification({
+        userId: sellerBefore.clerkId,
+        category: "payout",
+        type: "payout_setup_restricted",
+        title: pastDue.length > 0 ? "Payout info is overdue" : "Payout setup needs attention",
+        body: "Open payout setup to finish what Stripe still needs.",
+        targetType: "payout_setup",
+        cta: "/payout-setup",
+      });
+    } catch (err) {
+      logger.warn({ err, stripeAccountId }, "Seller payout-setup notification failed");
+    }
+  }
 
   // Freelancer rows track the same Connect account status (the account may be
   // shared with a seller profile, or freelancer-only).

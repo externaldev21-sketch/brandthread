@@ -15,6 +15,7 @@ import { ListSkeleton } from '@/components/layout';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { SectionError } from '@/components/InlineFeedback';
 import { LivePulseDot, UpcomingCountdown } from '@/components/CommerceSignal';
+import { DropsCalendar } from '@/components/drops/DropsCalendar';
 import { BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
 
 type DropsTab = 'live' | 'upcoming' | 'recent';
@@ -99,6 +100,7 @@ export default function BuyerDrops() {
   const { theme } = useAppTheme();
   const [tab, setTab] = useState<DropsTab>('live');
   const [refreshing, setRefreshing] = useState(false);
+  const [upcomingView, setUpcomingView] = useState<'list' | 'calendar'>('list');
 
   const [rows, setRows] = useState<Record<DropsTab, DropRowItem[]>>({ live: [], upcoming: [], recent: [] });
   const [loading, setLoading] = useState<Record<DropsTab, boolean>>({ live: true, upcoming: true, recent: true });
@@ -179,7 +181,28 @@ export default function BuyerDrops() {
             }
           />
         ) : (
-          rows[tab].map(item => <DropBrowseRow key={item.id} item={item} />)
+          <>
+            {tab === 'upcoming' && (
+              <View style={styles.viewToggle}>
+                {(['list', 'calendar'] as const).map(v => (
+                  <TouchableOpacity
+                    key={v}
+                    onPress={() => { Haptics.selectionAsync().catch(() => {}); setUpcomingView(v); }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: upcomingView === v }}
+                    style={[styles.viewPill, { backgroundColor: upcomingView === v ? theme.text : 'transparent', borderColor: theme.border }]}
+                  >
+                    <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: upcomingView === v ? theme.background : theme.text }}>
+                      {v === 'list' ? 'List' : 'Calendar'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {tab === 'upcoming' && upcomingView === 'calendar'
+              ? <DropsCalendar drops={rows.upcoming} />
+              : rows[tab].map(item => <DropBrowseRow key={item.id} item={item} />)}
+          </>
         )}
       </ScrollView>
     </View>
@@ -191,6 +214,8 @@ const styles = StyleSheet.create({
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
   tabItem: { flex: 1, paddingVertical: SP.sm + 2, alignItems: 'center' },
   tabText: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  viewToggle: { flexDirection: 'row', gap: 8 },
+  viewPill: { paddingHorizontal: 16, minHeight: 36, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   tabUnderline: { height: 2, width: '60%', borderRadius: 1, marginTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1 },
   avatar: { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },

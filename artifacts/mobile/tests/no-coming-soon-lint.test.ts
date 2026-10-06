@@ -76,10 +76,8 @@ const COMING_SOON_ALLOWLIST = new Set([
   'app/automation.tsx',
   'app/buyer-drop-detail.tsx',
   'app/buyer-report.tsx',
-  'app/buyer-settings-detail.tsx',
   'app/buyer-settings.tsx',
   'app/buyer-story-create.tsx',
-  'app/create-post.tsx',
   'app/manufacturer-messages.tsx',
   'app/quote-detail.tsx',
   'app/seller-settings.tsx',
@@ -89,7 +87,6 @@ const COMING_SOON_ALLOWLIST = new Set([
   'lib/financeSummary.ts',
   'lib/previewNotes.ts',
   'services/settingsCatalog.ts',
-  'services/storeService.ts',
 ]);
 
 describe('no "coming soon" wording outside the tracked allowlist', () => {

@@ -11,6 +11,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatUpcomingTime, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { SuggestedCreator, UpcomingLive } from '@/lib/live/types';
 import { LiveHostAvatar } from './LiveOverlays';
+import { radius } from '@/constants/radii';
 
 export function LiveEmptyState({
   upcoming, suggested, error, topInset, bottomInset, onRemind, onFollow, onOpenCreator, onRetry,
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
   heroIcon: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   heroTitle: { fontFamily: FONT.bold, fontSize: FS.xl, textAlign: 'center' },
   heroSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, textAlign: 'center', marginTop: SP.xs, maxWidth: 300 },
-  retry: { marginTop: SP.md, borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2 },
+  retry: { marginTop: SP.md, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2 },
   retryText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   section: { marginTop: SP.lg, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.base, marginBottom: 2 },
@@ -125,10 +126,10 @@ const styles = StyleSheet.create({
   upWhen: { fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.8 },
   upTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 2 },
   upHost: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
-  pillBtn: { flexDirection: 'row', alignItems: 'center', height: 32, paddingHorizontal: 12, borderRadius: RADIUS.pill },
+  pillBtn: { flexDirection: 'row', alignItems: 'center', height: 32, paddingHorizontal: 12, borderRadius: radius.sm },
   pillText: { fontFamily: FONT.bold, fontSize: FS.xs },
   card: { width: 136, alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, padding: 12, gap: 10 },
   cardName: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 8, maxWidth: 110 },
   cardMeta: { fontFamily: FONT.regular, fontSize: 11, marginTop: 1 },
-  cardFollow: { alignSelf: 'stretch', height: 30, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  cardFollow: { alignSelf: 'stretch', height: 30, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
 });

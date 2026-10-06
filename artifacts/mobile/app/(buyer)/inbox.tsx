@@ -64,6 +64,7 @@ import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
+import { radius } from '@/constants/radii';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -144,7 +145,7 @@ const pillS = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
@@ -1577,7 +1578,7 @@ export default function InboxScreen() {
                       style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
                       numberOfLines={1}
                     >
-                      {myNote ? myNote.text : 'Your thoughts go here...'}
+                      {myNote ? myNote.text : 'Note'}
                     </Text>
                   </View>
                   <View style={[s.noteBubbleTail, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} />
@@ -2003,7 +2004,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   activeRailNoteWrap: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
-    maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
+    maxWidth: 84, paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
   noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },

@@ -181,7 +181,7 @@ describe("buyer checkout → seller orders cohesion", () => {
     // Same number format and the same status enum on both sides.
     expect(sellerView.orderNumber).toMatch(/^BT-\d{5}$/);
     expect(sellerView.orderNumber).toBe(buyerRows[0].orderNumber);
-    expect(sellerView.status).toBe("pending");
+    expect(sellerView.status).toBe("processing");
     expect(buyerRows[0].status).toBe(sellerView.status);
     // A paid checkout order carries its payment time to the seller list.
     expect(sellerView.paidAt).toBeTruthy();

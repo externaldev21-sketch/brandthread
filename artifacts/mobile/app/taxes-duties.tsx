@@ -93,7 +93,7 @@ export default function TaxesDutiesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Taxes and duties" subtitle="Powered by Stripe Tax" />
+      <ScreenHeader title="Taxes and duties" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Collect sales tax ─────────────────────────────────────────── */}

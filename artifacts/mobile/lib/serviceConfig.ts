@@ -13,6 +13,8 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import { storeContextHeaders, versionApiPath } from '@/lib/api';
+import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 type GetToken = () => Promise<string | null>;
 
@@ -76,6 +78,19 @@ export function configureServices(getToken: GetToken): void {
 }
 
 /**
+ * Whether a signed-in session token is available right now. Optional surfaces
+ * (Sponsored placement) use this to avoid calling protected APIs signed out.
+ */
+export async function hasServiceToken(): Promise<boolean> {
+  if (!_getToken) return false;
+  try {
+    return !!(await _getToken());
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Make an authenticated GET/POST/PATCH request to the Brandthread API.
  * Throws if services haven't been configured yet.
  */
@@ -84,8 +99,17 @@ export async function serviceRequest<T = unknown>(
   options: RequestInit = {},
   reportErrors = true,
 ): Promise<T> {
+  if (isSellerDevPreview()) {
+    throw new ApiError(403, JSON.stringify({
+      error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
+    }));
+  }
   await whenConfigured();
   const token = await _getToken!();
+  // Guest guard (App Store 5.1.1(v)): no account-scoped/paid calls when signed out.
+  if (!token && isSignedInOnlyPath(path)) {
+    throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
+  }
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   let res: Response;
   try {

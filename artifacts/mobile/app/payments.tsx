@@ -17,6 +17,7 @@ import {
 import { FS } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { ListRow } from '@/components/ui/ListRow';
 import { useRouter } from 'expo-router';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -404,6 +405,27 @@ export default function PaymentsScreen() {
   }, [api]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Buy now, pay later (Klarna / Afterpay) opt-in. The row only exists when
+  // the platform has it switched on.
+  const [bnpl, setBnpl] = useState<{ enabled: boolean; available: boolean } | null>(null);
+  useEffect(() => {
+    let active = true;
+    api.sellerPaymentSettings.get()
+      .then((value) => { if (active) setBnpl({ enabled: value.bnplEnabled, available: value.bnplAvailable }); })
+      .catch(() => { if (active) setBnpl(null); });
+    return () => { active = false; };
+  }, [api]);
+  const toggleBnpl = useCallback(async (next: boolean) => {
+    setBnpl((prev) => (prev ? { ...prev, enabled: next } : prev));
+    try {
+      const saved = await api.sellerPaymentSettings.setBnpl(next);
+      setBnpl({ enabled: saved.bnplEnabled, available: saved.bnplAvailable });
+    } catch {
+      setBnpl((prev) => (prev ? { ...prev, enabled: !next } : prev));
+      showToast("Couldn't update this setting");
+    }
+  }, [api, showToast]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const primary = colors.primary;
@@ -418,7 +440,7 @@ export default function PaymentsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <Toast message={toast.message} visible={toast.visible} />
-      <ScreenHeader title="Payments" subtitle="Drop payouts & methods" />
+      <ScreenHeader title="Payments" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 120, paddingHorizontal: 20 }}
@@ -466,6 +488,17 @@ export default function PaymentsScreen() {
             <Text style={[styles.listRowLabel, { color: colors.foreground, flex: 1 }]}>View payouts</Text>
             <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
+
+          {bnpl?.available ? (
+            <ListRow
+              icon="clock"
+              title="Buy now, pay later"
+              subtitle="Klarna and Afterpay at checkout"
+              toggle={{ value: bnpl.enabled, onChange: toggleBnpl }}
+              style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 14 }}
+              testID="seller-bnpl-toggle"
+            />
+          ) : null}
         </View>
 
         {!loading && loadError ? (

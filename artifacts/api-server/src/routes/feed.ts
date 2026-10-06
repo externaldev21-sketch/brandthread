@@ -12,6 +12,7 @@
  * only for the behavioral signals that have nowhere else to land: view,
  * watch_time, rewatch, shop taps, add-to-bag, skip, and not-interested.
  */
+import { attachQuoteData } from "../lib/quotedPosts";
 import { Router } from "express";
 import { db, posts, interactions, users, liveStreams, postTaggedProducts, products, productVariants } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -24,6 +25,8 @@ import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../li
 import { getRankingConfig, saveRankingConfig, DEFAULT_RANKING_CONFIG } from "../lib/ranking/config";
 import { hidePostFromForYou, unhidePostFromForYou } from "../lib/ranking/signals";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { serveSponsoredSlots } from "../lib/promotions/sponsoredService";
+import { injectSponsored } from "../lib/promotions/sponsored";
 
 const router = Router();
 
@@ -179,7 +182,7 @@ router.get("/for-you", requireAuth, async (req, res) => {
     // Blocked-seller filtering already happened during candidate generation
     // in computeForYouRankingForUser (via the `blocks` table), so this page
     // hydration doesn't need to re-check it.
-    const items = slice.map((item) => {
+    const rawItems = slice.map((item) => {
       if (item.isLive) {
         const stream = liveById.get(item.liveStreamId!);
         if (!stream) return null;
@@ -227,8 +230,36 @@ router.get("/for-you", requireAuth, async (req, res) => {
       };
     }).filter((i): i is NonNullable<typeof i> => i !== null);
 
+    // One batched lookup for every post item on the page (quotedPost + quotesCount).
+    const quoteById = new Map(
+      (await attachQuoteData(rawItems.filter((i) => i.type === "post").map((i) => ({ id: (i as { id: string }).id })), userId))
+        .map((q) => [q.id, { quotedPost: q.quotedPost, quotesCount: q.quotesCount }]),
+    );
+    const items = rawItems.map((i) => (i.type === "post" ? { ...i, ...quoteById.get((i as { id: string }).id) } : i));
+
+    // Sponsored placement (opt-in via ?sessionId=): approved, paid boosts are
+    // spliced in as clearly labelled items under the frequency cap. Failure
+    // never affects the organic page.
+    let outItems: unknown[] = items;
+    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
+    if (/^[A-Za-z0-9_-]{8,64}$/.test(sessionId)) {
+      try {
+        const slots = await serveSponsoredSlots({ viewerId: userId, sessionId, organicOffset: offset, organicCount: items.length });
+        if (slots.length > 0) {
+          const sponsoredPostIds = new Set(slots.map((s) => s.post.id));
+          const organic = items.filter((i) => !(i.type === "post" && sponsoredPostIds.has(i.id)));
+          outItems = injectSponsored(organic, slots.map((s) => ({
+            afterIndex: Math.min(s.afterIndex, organic.length - 1),
+            item: { type: "post" as const, ...s.post, sponsored: true, boostId: s.boostId, label: "Sponsored" as const, score: 0 },
+          })));
+        }
+      } catch (err) {
+        req.log.error({ err, userId }, "Failed to inject sponsored items");
+      }
+    }
+
     res.json({
-      items,
+      items: outItems,
       nextOffset: offset + slice.length < ranked.length ? offset + slice.length : null,
     });
   } catch (err) {

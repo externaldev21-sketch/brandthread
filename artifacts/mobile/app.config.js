@@ -6,12 +6,31 @@
  *
  * - updates.url: EAS Update endpoint, derived from the project ID that
  *   `eas init` writes to app.json (extra.eas.projectId).
+ * - extra.router.asyncRoutes (web export only): while scripts/build-web.js is
+ *   exporting the static web build it creates `.web-async-routes` next to this
+ *   file and removes it afterwards. With that marker present every route
+ *   becomes its own web chunk, so the first load ships the shell and the
+ *   landing route instead of every screen. EAS and native builds never see the
+ *   marker, so the native config, fingerprint and OTA compatibility are
+ *   unchanged. The marker is a file rather than an environment variable on
+ *   purpose: it cannot differ between machines building the same binary.
  */
+const fs = require('fs');
+const path = require('path');
+
+const WEB_ASYNC_ROUTES_MARKER = path.join(__dirname, '.web-async-routes');
+
 module.exports = ({ config }) => {
-  const projectId = config.extra?.eas?.projectId;
-  if (!projectId || config.updates?.url) return config;
+  const base = fs.existsSync(WEB_ASYNC_ROUTES_MARKER)
+    ? {
+        ...config,
+        extra: { ...config.extra, router: { ...config.extra?.router, asyncRoutes: { web: true, default: false } } },
+      }
+    : config;
+  const projectId = base.extra?.eas?.projectId;
+  if (!projectId || base.updates?.url) return base;
   return {
-    ...config,
-    updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` },
+    ...base,
+    updates: { ...base.updates, url: `https://u.expo.dev/${projectId}` },
   };
 };

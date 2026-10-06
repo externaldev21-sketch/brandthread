@@ -22,6 +22,7 @@ import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } 
 import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
 import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
+import { radius } from '@/constants/radii';
 
 // Smooth ease-out, no bounce/overshoot — this round's explicit spec for the
 // compact <-> regular capsule transition (superseding the earlier SHEET_EASING/
@@ -320,11 +321,11 @@ export function BuyerTabBar({
       <Animated.View
         style={[
           styles.shadow,
-          { width: regularMetrics.capsuleWidth, height: regularMetrics.capsuleHeight, borderRadius: regularMetrics.capsuleHeight / 2 },
+          { width: regularMetrics.capsuleWidth, height: regularMetrics.capsuleHeight, borderRadius: radius.bar },
           capsuleAnimatedStyle,
         ]}
       >
-        <TabBarGlass theme={theme} radius={regularMetrics.capsuleHeight / 2} />
+        <TabBarGlass theme={theme} radius={radius.bar} />
 
         <TabBarIndicator
           x={indicatorX}

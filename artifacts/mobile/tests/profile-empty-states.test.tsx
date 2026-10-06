@@ -34,7 +34,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 
 import { getBuyerTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
-import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { ProfileGridPlaceholder, EMPTY_STATE_TOP_GAP } from '@/components/profile/ProfileGridStates';
 import {
   EMPTY_AREA_MIN_HEIGHT, computeEmptyArea, profileEmptyState, type ProfileEmptyTab,
 } from '@/components/profile/profileEmptyStates';
@@ -67,10 +67,12 @@ function barOccupied(bar: Case['bar']): number {
 describe('profile empty states — copy and CTAs', () => {
   it('gives your own tabs a CTA into the real flow and other people’s profiles none', () => {
     expect(profileEmptyState('buyer:posts', true).cta).toEqual({ label: 'Share your first thread', route: '/create-post?accountType=buyer' });
-    expect(profileEmptyState('seller:post', true).cta).toEqual({ label: 'Create your first post', route: '/create-post' });
+    // Seller's own tabs (Dev): "Create post" opens the create camera flow.
+    expect(profileEmptyState('seller:post', true).cta).toEqual({ label: 'Create post', route: '/create-post' });
     expect(profileEmptyState('seller:draft', true).cta?.route).toBe('/create-post');
     expect(profileEmptyState('seller:schedule', true).cta).toEqual({ label: 'Schedule a post', route: '/create-post?mode=schedule' });
-    expect(profileEmptyState('shop', true).cta).toEqual({ label: 'Add a product', route: '/add-product' });
+    // Opens add-product as a modal over the profile, so closing returns there.
+    expect(profileEmptyState('shop', true).cta).toEqual({ label: 'Add a product', route: '/add-product?presentation=modal' });
     for (const { tab } of CASES) {
       const pub = profileEmptyState(tab, false);
       expect(pub.cta).toBeUndefined();
@@ -116,8 +118,11 @@ describe('profile empty states — never under the tab bar (375x667)', () => {
       });
       const root = renderer.root.findAll((node) => node.props.testID === 'profile-empty-state' && typeof node.type === 'string')[0];
       const flat = Object.assign({}, ...[root.props.style].flat(3).filter(Boolean));
+      // Still reserves the whole visible gap (never under the bar), but the
+      // empty state itself sits a fixed 32px under the tab row on every tab.
       expect(flat.minHeight).toBe(area.minHeight);
-      expect(flat.justifyContent).toBe('center');
+      expect(flat.justifyContent).toBe('flex-start');
+      expect(flat.paddingTop).toBe(EMPTY_STATE_TOP_GAP);
       const cta = renderer.root.findAll((node) => node.props.testID === 'profile-empty-state-action' && typeof node.type === 'string');
       expect(cta.length).toBe(copy.cta ? 1 : 0);
 

@@ -36,8 +36,8 @@ describe('app background theme', () => {
   it('isolates every root stack scene on an opaque background plane', () => {
     const rootLayout = readFileSync(appPath('_layout.tsx'), 'utf8');
 
-    expect(rootLayout).toContain('screenLayout={({ children }) => (');
-    expect(rootLayout).toContain('<IsolatedStackScene>{children}</IsolatedStackScene>');
+    expect(rootLayout).toContain('screenLayout={({ children, route, options }) => (');
+    expect(rootLayout).toMatch(/<IsolatedStackScene routeName=\{route\.name\}[^>]*>\s*\{children\}\s*<\/IsolatedStackScene>/);
     expect(rootLayout).not.toContain('AnimatedGradientBackground');
     expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');
     expect(rootLayout).not.toContain("contentStyle: { backgroundColor: 'transparent' }");

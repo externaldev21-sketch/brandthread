@@ -6,10 +6,12 @@ import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds"
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
+import { isChannelEnabledForUser } from "../lib/notificationChannels";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { notifySellerReturnRequested } from "../lib/orderNotifications";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -68,7 +70,8 @@ router.post(
     }
     let objectPath: string | null = null;
     try {
-      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType, `${evidencePrefix(buyerId)}${crypto.randomUUID()}`);
+      const stored = await normalizeUploadedImage(bytes, contentType);
+      objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType, `${evidencePrefix(buyerId)}${crypto.randomUUID()}`);
       await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: buyerId, visibility: "private" });
       res.status(201).json({ objectPath });
     } catch (err) {
@@ -136,6 +139,9 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
   }).catch((err) => {
     logger.warn({ err, returnId, status }, "Return status push notification failed");
   });
+
+  // Settings → Notifications → Email (Returns).
+  if (!(await isChannelEnabledForUser(row.buyerId, "return", "email"))) return;
 
   const sent = await sendReturnStatusEmail({
     to: row.buyerEmail,
@@ -304,6 +310,11 @@ router.get("/buyer", async (req, res) => {
         sellerResponse: returns.sellerResponse,
         evidenceUrls: returns.evidenceUrls,
         requestedItems: returns.requestedItems,
+        returnLabelUrl: returns.returnLabelUrl,
+        returnCarrier: returns.returnCarrier,
+        returnTrackingNumber: returns.returnTrackingNumber,
+        returnTrackingStatus: returns.returnTrackingStatus,
+        refundOnScan: returns.refundOnScan,
         createdAt: returns.createdAt,
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
@@ -345,6 +356,11 @@ router.get("/", async (req, res) => {
         sellerResponse: returns.sellerResponse,
         evidenceUrls: returns.evidenceUrls,
         requestedItems: returns.requestedItems,
+        returnLabelUrl: returns.returnLabelUrl,
+        returnCarrier: returns.returnCarrier,
+        returnTrackingNumber: returns.returnTrackingNumber,
+        returnTrackingStatus: returns.returnTrackingStatus,
+        refundOnScan: returns.refundOnScan,
         createdAt: returns.createdAt,
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
@@ -385,6 +401,11 @@ router.get("/:id", async (req, res) => {
         sellerResponse: returns.sellerResponse,
         evidenceUrls: returns.evidenceUrls,
         requestedItems: returns.requestedItems,
+        returnLabelUrl: returns.returnLabelUrl,
+        returnCarrier: returns.returnCarrier,
+        returnTrackingNumber: returns.returnTrackingNumber,
+        returnTrackingStatus: returns.returnTrackingStatus,
+        refundOnScan: returns.refundOnScan,
         createdAt: returns.createdAt,
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
@@ -421,10 +442,13 @@ router.patch("/:id/status", async (req, res) => {
       status: newStatus,
       sellerResponse,
       refundAmountCents: bodyRefundAmount,
+      refundOnScan,
     } = req.body as {
       status?: "approved" | "denied";
       sellerResponse?: string;
       refundAmountCents?: number;
+      /** Approve now, refund when the carrier first scans the prepaid return label. */
+      refundOnScan?: boolean;
     };
 
     if (!newStatus || !["approved", "denied"].includes(newStatus)) {
@@ -454,6 +478,24 @@ router.patch("/:id/status", async (req, res) => {
       if (returnRow.status === "refunded") return res.json(returnRow);
       if (returnRow.status !== "pending" && returnRow.status !== "approved") {
         return res.status(409).json({ error: `This return is already ${returnRow.status}` });
+      }
+
+      if (refundOnScan === true) {
+        // Approved, refund held until the buyer's parcel is scanned by the carrier
+        // (see lib/returnLabels.ts). The refund itself is unchanged.
+        const [approved] = await db.update(returns).set({
+          status: "approved",
+          sellerResponse: sellerResponse ?? null,
+          refundAmountCents: bodyRefundAmount ?? null,
+          refundOnScan: true,
+          updatedAt: new Date(),
+        }).where(and(eq(returns.id, id), inArray(returns.status, ["pending", "approved"]))).returning();
+        if (approved && returnRow.status === "pending") {
+          void notifyReturnStatus(id, "approved", null, approved.sellerResponse).catch((err) => {
+            req.log.error({ err, returnId: id }, "Return status email delivery failed");
+          });
+        }
+        return res.json(await signEvidence(approved ?? returnRow));
       }
 
       try {

@@ -22,6 +22,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -36,6 +37,7 @@ import { getPreviewActivity, isPreviewActivityEnabled, previewActorAvatarUri } f
 import { getPreviewFollowing } from '@/lib/previewFollowStore';
 import { getGroupedActivityActors, type GroupedActivityActor } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -131,9 +133,9 @@ export default function ActivityPeopleScreen() {
   const [query, setQuery] = useState('');
   const requestId = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     const id = ++requestId.current;
-    setStatus('loading');
+    if (!silent) setStatus('loading');
     if (ids.length === 0) {
       setActors([]);
       setStatus('ready');
@@ -167,6 +169,7 @@ export default function ActivityPeopleScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const handleRetry = useCallback(() => { void load(); }, [load]);
+  const pull = usePullToRefresh(() => load(true));
 
   // Same destination as tapping a single-person Activity row.
   const handleOpen = useCallback((actor: GroupedActivityActor) => {
@@ -254,10 +257,11 @@ export default function ActivityPeopleScreen() {
         </View>
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={visible}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          bounces={false}
+          refreshControl={pull.refreshControl}
           overScrollMode="never"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

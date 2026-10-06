@@ -55,6 +55,12 @@ export const LEDGER_ACCOUNTS = {
    * `thread_cash_seller_topup` — see lib/threadCash/cashOut.ts.
    */
   thread_cash_seller_cash_out: "thread_cash_seller_cash_out",
+  /**
+   * Gift card money Brandthread holds for a store (party = seller): credited
+   * when a buyer purchases a gift card, released to `seller_paid_out` only when
+   * the card is redeemed at that store — see lib/giftCards/payout.ts.
+   */
+  gift_card_liability: "gift_card_liability",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

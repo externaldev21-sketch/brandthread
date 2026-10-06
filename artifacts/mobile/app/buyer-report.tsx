@@ -7,39 +7,34 @@
  * optionally block the owner → confirmation. Reports are stored server-side
  * and land in the moderation queue; reporters stay anonymous.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, StyleSheet, Platform,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { useApi } from '@/lib/api';
+import { useReportFlow } from '@/lib/useReportFlow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   PressableScale, PrimaryButton, SecondaryButton, HapticSwitch, AnimatedEntrance,
 } from '@/components/BrandthreadUI';
 import {
-  REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget,
+  REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, normalizeReportTarget,
   BLOCK_EXPLAINER,
 } from '@/lib/safety';
-import type { ReportReasonId } from '@/lib/safetyTypes';
 
 const NOTE_LIMIT = 1000;
-
-type Step = 'reason' | 'details' | 'done';
 
 export default function ReportScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const api = useApi();
   const params = useLocalSearchParams<{
     targetType?: string;
     targetId?: string;
@@ -53,76 +48,15 @@ export default function ReportScreen() {
   const ownerId = params.targetUserId || (targetType === 'profile' ? params.targetId : undefined);
   const ownerName = params.targetUserName || (targetType === 'profile' ? params.targetLabel : undefined) || 'this account';
 
-  const [step, setStep] = useState<Step>('reason');
-  const [reason, setReason] = useState<ReportReasonId | null>(null);
-  const [note, setNote] = useState('');
-  const [alsoBlock, setAlsoBlock] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [alreadyReported, setAlreadyReported] = useState(false);
-  const [blocked, setBlocked] = useState(false);
-  const [blocking, setBlocking] = useState(false);
-
-  const selected = REPORT_REASONS.find((r) => r.id === reason) ?? null;
-  const noteRequired = reason === 'other';
-  const noteTooShort = noteRequired && note.trim().length < 3;
-  const canSubmit = !!reason && !noteTooShort && !submitting && !!params.targetId;
+  const {
+    step, setStep, selected, note, setNote, alsoBlock, setAlsoBlock, submitting, error,
+    alreadyReported, blocked, blocking, noteRequired, noteTooShort, canSubmit,
+    chooseReason, submit, blockNow,
+  } = useReportFlow({ targetType, targetId: params.targetId, ownerId });
 
   function close() {
     if (router.canGoBack()) goBackOr(router);
     else router.replace('/');
-  }
-
-  function chooseReason(id: ReportReasonId) {
-    Haptics.selectionAsync();
-    setReason(id);
-    setError(null);
-    setStep('details');
-  }
-
-  async function submit() {
-    if (!canSubmit || !params.targetId || !reason) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const result = await api.reports.submit({
-        targetType,
-        targetId: params.targetId,
-        reason,
-        ...(note.trim() ? { note: note.trim() } : {}),
-      });
-      setAlreadyReported(result?.status === 'already_reported');
-      if (alsoBlock && ownerId) {
-        try {
-          await api.social.block(ownerId);
-          setBlocked(true);
-        } catch {
-          // The report itself succeeded; the block can be retried from the
-          // confirmation screen.
-        }
-      }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep('done');
-    } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t send your report. Check your connection and try again.'));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function blockNow() {
-    if (!ownerId || blocking) return;
-    setBlocking(true);
-    try {
-      await api.social.block(ownerId);
-      setBlocked(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t block this account. Try again.'));
-    } finally {
-      setBlocking(false);
-    }
   }
 
   const header = (

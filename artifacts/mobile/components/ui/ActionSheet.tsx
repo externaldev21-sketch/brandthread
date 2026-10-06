@@ -13,6 +13,7 @@
  * and renders a real themed bottom sheet on every platform (including web).
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { a11yModalProps } from '@/lib/a11y/modal';
 import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetHandle, PressableScale } from '@/components/BrandthreadUI';
@@ -53,7 +54,7 @@ export function ActionSheetHost() {
   return (
     <Modal visible={!!state} transparent animationType="fade" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close menu">
-        <Pressable style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
+        <Pressable {...a11yModalProps()} style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]} onPress={() => {}}>
           <SheetHandle />
           {(state?.title || state?.message) && (
             <View style={styles.header}>

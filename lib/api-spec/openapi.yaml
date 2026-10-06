@@ -1161,14 +1161,26 @@ paths:
     delete:
       operationId: deleteAccount
       tags: [account]
-      summary: Permanently delete the account, its data, and the Clerk user
+      summary: Schedule account deletion (30-day grace, then permanent). Hides the account and revokes every session. Needs a password, or an emailed code for password-less accounts.
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: "#/components/schemas/DeleteAccountInput" }
       responses:
-        "200": { description: Deleted, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+        "200":
+          description: Scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  scheduledFor: { type: ["string", "null"], format: date-time }
+                  graceDays: { type: integer }
+        "401": { description: "Re-authentication required (code REAUTH_REQUIRED)" }
+        "403": { description: "Wrong password or code (INVALID_PASSWORD, INVALID_CODE, CODE_EXPIRED)" }
         "409":
           description: Open orders, held funds or disputes must be settled first
           content:
@@ -1180,6 +1192,25 @@ paths:
                   error: { type: string }
                   code: { type: string, enum: [DELETION_BLOCKED] }
                   blockers: { type: array, items: { $ref: "#/components/schemas/DeletionBlocker" } }
+
+  /auth/account/deletion-code:
+    post:
+      operationId: requestAccountDeletionCode
+      tags: [account]
+      summary: Email a single-use 6-digit re-auth code to an account without a password
+      responses:
+        "200": { description: Sent, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+        "422": { description: Mail not configured (code MAIL_NOT_CONFIGURED) }
+        "429": { description: A code was sent in the last minute (CODE_RECENTLY_SENT) }
+
+  /auth/account/restore:
+    post:
+      operationId: restoreAccount
+      tags: [account]
+      summary: Cancel a pending account deletion (signing back in via POST /auth/sync also cancels it)
+      responses:
+        "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+        "409": { description: Not scheduled for deletion (NOT_PENDING_DELETION) }
 
   /auth/legal-acceptance:
     post:
@@ -1932,7 +1963,7 @@ components:
 
     ReportTargetType:
       type: string
-      enum: [post, video, live, live_comment, comment, story, product, profile, message]
+      enum: [post, video, live, live_comment, comment, story, product, profile, message, community_message, community, review]
 
     ReportReason:
       type: string
@@ -2078,6 +2109,9 @@ components:
       properties:
         canDelete: { type: boolean }
         accountType: { type: ["string", "null"] }
+        graceDays: { type: integer, description: Days the account stays restorable before permanent deletion }
+        reauth: { type: string, enum: [password, email_code], description: Proof required by DELETE /auth/account }
+        deletionCancelledAt: { type: ["string", "null"], format: date-time, description: Set for a week after signing back in cancelled a scheduled deletion }
         blockers: { type: array, items: { $ref: "#/components/schemas/DeletionBlocker" } }
         willDelete: { type: array, items: { type: string } }
         willRetain: { type: array, items: { type: string } }
@@ -2127,9 +2161,12 @@ components:
       required: [confirmation]
       properties:
         confirmation: { type: string, enum: [DELETE] }
+        password: { type: string, description: Required for accounts that have a password }
+        code: { type: string, description: Emailed 6-digit code, for accounts without a password }
 
     LegalAcceptanceInput:
       type: object
       required: [version]
       properties:
         version: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(\\.[0-9]+)?$" }
+        source: { type: string, enum: [signup, update_prompt] }

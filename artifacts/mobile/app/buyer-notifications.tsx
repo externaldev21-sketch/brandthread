@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   View, Text, FlatList, ScrollView,
   Alert, StyleSheet,
 } from 'react-native';
+import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { FONT, ICON } from '@/lib/theme';
@@ -91,6 +95,8 @@ function notifIcon(type: Notification['type']): string {
     case 'order_exception': return 'alert-triangle';
     case 'order_returned_to_sender': return 'corner-up-left';
     case 'drop_live': return 'zap';
+    case 'live_reminder':
+    case 'live_started': return 'video';
     case 'product_restocked': return 'refresh-cw';
     case 'price_drop': return 'trending-down';
     case 'saved_product_update': return 'bookmark';
@@ -153,6 +159,7 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
   }
   switch (notif.type) {
     case 'friend_request':
+    case 'follow_request':
       router.push('/buyer-friend-requests' as any);
       break;
     case 'order_confirmed':
@@ -176,6 +183,12 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
       // own history, which both duplicates it and breaks that tab's back
       // behavior. navigate reuses the existing tab instance and its stack.
       router.navigate('/(buyer)/orders' as any);
+      break;
+    case 'live_started':
+      router.push((notif.targetId ? `/live?streamId=${encodeURIComponent(notif.targetId)}` : '/live') as any);
+      break;
+    case 'live_reminder':
+      router.push('/live' as any);
       break;
     case 'drop_live':
     case 'product_restocked':
@@ -239,8 +252,20 @@ export default function BuyerNotifications() {
 
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory | undefined>(undefined);
+  const [filterEdges, setFilterEdges] = useState({ left: false, right: false });
+  const filterViewport = useRef(0);
+  const filterContent = useRef(0);
+  const filterOffset = useRef(0);
+  const updateFilterEdges = useCallback(() => {
+    const left = filterOffset.current > 2;
+    const right = filterContent.current - filterViewport.current - filterOffset.current > 2;
+    setFilterEdges(previous =>
+      previous.left === left && previous.right === right ? previous : { left, right },
+    );
+  }, []);
   const [notifLoading, setNotifLoading] = useState(true);
   const [optionsFor, setOptionsFor] = useState<Notification | null>(null);
+  const [notifFailed, setNotifFailed] = useState(false);
 
   // Only the very first load shows the full-screen loader. Focus refocuses and
   // realtime socket events after that refresh the list silently so the loader
@@ -252,13 +277,17 @@ export default function BuyerNotifications() {
     try {
       const data = await getNotifications();
       setNotifs(data);
+      setNotifFailed(false);
       void syncNotificationBadge(data);
     } catch (_) {
+      setNotifFailed(true);
     } finally {
       hasLoadedOnce.current = true;
       setNotifLoading(false);
     }
   }, []);
+
+  const pull = usePullToRefresh(loadNotifs);
 
   useFocusEffect(useCallback(() => { loadNotifs(); }, [loadNotifs]));
 
@@ -454,24 +483,65 @@ export default function BuyerNotifications() {
       />
 
       {/* CATEGORY PILLS */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.pillsScroll}
-        contentContainerStyle={styles.pillsContent}
-      >
-        {PILLS.map(pill => {
-          const active = selectedCategory === pill.value;
-          return (
-            <Chip
-              key={pill.label}
-              label={pill.label}
-              selected={active}
-              onPress={() => setSelectedCategory(pill.value)}
+      <View style={styles.pillsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          overScrollMode="never"
+          directionalLockEnabled
+          scrollEventThrottle={16}
+          accessibilityLabel="Notification filters, swipe left or right for more categories"
+          style={styles.pillsScroll}
+          contentContainerStyle={styles.pillsContent}
+          onLayout={event => {
+            filterViewport.current = event.nativeEvent.layout.width;
+            updateFilterEdges();
+          }}
+          onContentSizeChange={width => {
+            filterContent.current = width;
+            updateFilterEdges();
+          }}
+          onScroll={event => {
+            filterOffset.current = event.nativeEvent.contentOffset.x;
+            updateFilterEdges();
+          }}
+        >
+          {PILLS.map(pill => {
+            const active = selectedCategory === pill.value;
+            return (
+              <Chip
+                key={pill.label}
+                label={pill.label}
+                selected={active}
+                onPress={() => setSelectedCategory(pill.value)}
+              />
+            );
+          })}
+        </ScrollView>
+        {filterEdges.left && (
+          <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeLeft]}>
+            <LinearGradient
+              colors={[theme.background, `${theme.background}00`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
             />
-          );
-        })}
-      </ScrollView>
+            <Feather name="chevron-left" size={14} color={theme.muted} />
+          </View>
+        )}
+        {filterEdges.right && (
+          <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeRight]}>
+            <LinearGradient
+              colors={[`${theme.background}00`, theme.background]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Feather name="chevron-right" size={14} color={theme.muted} />
+          </View>
+        )}
+      </View>
 
       {/* UNREAD COUNT */}
       {unreadCount > 0 && (
@@ -487,7 +557,9 @@ export default function BuyerNotifications() {
           style={{ position: 'absolute', top: 80, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
       )}
-      {!notifLoading && listData.length === 0 ? (
+      {!notifLoading && listData.length === 0 && notifFailed ? (
+        <ErrorState message="Couldn't load notifications." onRetry={() => { void loadNotifs(); }} style={{ flex: 1 }} />
+      ) : !notifLoading && listData.length === 0 ? (
         <EmptyState
           icon="bell"
           title="Quiet looks good on you."
@@ -496,11 +568,13 @@ export default function BuyerNotifications() {
         />
       ) : (
         <FlatList
+          {...LONG_LIST_TUNING}
           data={listData}
           keyExtractor={(item) =>
             item.type === 'header' ? `header-${item.title}` : item.notif.id
           }
           renderItem={renderItem}
+          refreshControl={pull.refreshControl}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
         />
@@ -537,6 +611,9 @@ const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
+  pillsRow: {
+    position: 'relative',
+  },
   pillsScroll: {
     flexGrow: 0,
     // flexShrink defaults to 1, so a sibling flex:1 element (the loading
@@ -550,6 +627,24 @@ const makeStyles = () => StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     gap: SPACING.sm,
+    alignItems: 'center',
+  },
+  pillsEdge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    bottom: SPACING.sm,
+    width: 28,
+    justifyContent: 'center',
+  },
+  pillsEdgeLeft: {
+    left: 0,
+    alignItems: 'flex-start',
+    paddingLeft: 2,
+  },
+  pillsEdgeRight: {
+    right: 0,
+    alignItems: 'flex-end',
+    paddingRight: 2,
   },
   unreadBar: {
     paddingHorizontal: SPACING.md,

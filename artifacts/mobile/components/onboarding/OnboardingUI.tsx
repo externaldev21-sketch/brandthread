@@ -35,6 +35,7 @@ import { Feather } from '@expo/vector-icons';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { identityOrNone } from '@/lib/animationUtils';
 import { MOTION, PRESS_SCALE, RADIUS, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
+import { radius } from '@/constants/radii';
 
 // ─── Reveal ───────────────────────────────────────────────────────────────────
 
@@ -451,7 +452,7 @@ export function HairlineDivider({ children }: { children?: React.ReactNode }) {
 const styles = StyleSheet.create({
   pill: {
     minHeight: 56,
-    borderRadius: RADIUS.pill,
+    borderRadius: radius.md,
     paddingHorizontal: SPACE.lg,
     alignItems: 'center',
     justifyContent: 'center',

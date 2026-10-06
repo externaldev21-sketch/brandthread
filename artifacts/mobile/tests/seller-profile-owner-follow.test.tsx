@@ -32,7 +32,7 @@ const {
   setFollowingMock: vi.fn(),
   searchParamsMock: vi.fn((): Record<string, string> => ({ id: "seller-9" })),
   creatorVideosMock: vi.fn(),
-  authMock: vi.fn(() => ({ isLoaded: true, userId: "buyer-1" })),
+  authMock: vi.fn((): { isLoaded: boolean; userId: string | null } => ({ isLoaded: true, userId: "buyer-1" })),
   shopPageMock: vi.fn(),
 }));
 
@@ -109,6 +109,8 @@ vi.mock("@clerk/expo", () => ({
   useAuth: () => authMock(),
 }));
 
+// The save heart has its own coverage (saved-products-store.test.ts).
+vi.mock("@/components/SaveHeart", () => ({ SaveHeart: () => null }));
 vi.mock("@expo/vector-icons", () => ({
   Feather: ({ name }: { name: string }) => React.createElement("Feather", { name }),
 }));
@@ -131,6 +133,8 @@ vi.mock("expo-linear-gradient", () => ({
 vi.mock("react-native-svg", () => ({
   default: ({ children }: { children?: React.ReactNode }) => React.createElement("Svg", {}, children),
   Line: (props: Record<string, unknown>) => React.createElement("SvgLine", props),
+  // The shared empty-state badge (components/layout/EmptyStateBadge.tsx) draws with these.
+  ...Object.fromEntries(["G", "Path", "Rect", "Circle", "Polyline", "Polygon", "Ellipse"].map((n) => [n, (props: Record<string, unknown>) => React.createElement(`Svg${n}`, props)])),
 }));
 
 vi.mock("react-native-reanimated", () => {
@@ -160,6 +164,8 @@ vi.mock("react-native-reanimated", () => {
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
   useLocalSearchParams: () => searchParamsMock(),
+  useGlobalSearchParams: () => ({}),
+  usePathname: () => "/seller-profile",
   useFocusEffect: (callback: () => void) => {
     const ReactActual = require("react") as typeof import("react");
     ReactActual.useEffect(callback, [callback]);
@@ -167,10 +173,15 @@ vi.mock("expo-router", () => ({
 }));
 
 vi.mock("react-native-safe-area-context", () => ({
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 vi.mock("@/hooks/useApi", () => ({ useApi: () => apiMock }));
+vi.mock("@/lib/api", () => ({ useApi: () => apiMock }));
+vi.mock("@/contexts/FeatureFlagContext", () => ({ useFeatureFlag: () => false }));
+vi.mock("@/components/thread-cash/ChatAttachThreadCash", () => ({ ThreadCashAttachButton: () => null }));
+vi.mock("@/lib/contextualPushPermission", () => ({ requestContextualPushPermission: vi.fn() }));
 
 vi.mock("@/hooks/useColors", () => ({
   useColors: () => ({ primary: "#C7CDD5", foreground: "#FAFAFA", mutedForeground: "#D7D7DB" }),
@@ -212,6 +223,7 @@ vi.mock("@/lib/safety", () => ({
 }));
 
 import SellerProfileScreen from "@/app/seller-profile";
+import BuyerOtherProfileScreen from "@/app/buyer-other-profile";
 
 async function switchTab(renderer: ReactTestRenderer, label: string) {
   const tab = renderer.root.findAll((n) => n.props.testID === `profile-tab-${label}` && typeof n.props.onPress === "function")[0];
@@ -241,7 +253,7 @@ function textContent(value: unknown): string {
 
 const sellerProfile = {
   clerkId: "seller-9", brandName: "Acme Co", username: "acme", bio: "We make things.",
-  productsCount: 12, videosCount: 2,
+  productsCount: 12, videosCount: 2, likesCount: 12_500, followersCount: 12, followingCount: 3,
 };
 
 const videoRow = (id: string) => ({
@@ -482,6 +494,25 @@ describe("seller-profile.tsx videos grid and shop", () => {
     await act(async () => { followers.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith("/connections?type=followers&userId=seller-9");
   });
+
+  it("shows server totals in Followers · Following · Likes order, not page likes or rating", async () => {
+    renderer = await renderScreen();
+    const stats = renderer.root.findByProps({ testID: "profile-stats" });
+    const rows = stats.findAll((node) => typeof node.props.testID === "string" && node.props.testID.startsWith("profile-stat-") && typeof node.type === "string");
+    expect(rows.map((row) => row.props.testID)).toEqual(["profile-stat-followers", "profile-stat-following", "profile-stat-likes"]);
+    expect(stats.findByProps({ testID: "profile-stat-likes" }).props.accessibilityLabel).toBe("12.5K Likes");
+    expect(textContent(stats)).not.toContain("Rating");
+  });
+
+  it("shows all three public totals to a signed-out visitor", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: null });
+    renderer = await renderScreen();
+    expect(apiMock.social.profile).not.toHaveBeenCalled();
+    const stats = renderer.root.findByProps({ testID: "profile-stats" });
+    expect(stats.findByProps({ testID: "profile-stat-followers" }).props.accessibilityLabel).toBe("12 Followers");
+    expect(stats.findByProps({ testID: "profile-stat-following" }).props.accessibilityLabel).toBe("3 Following");
+    expect(stats.findByProps({ testID: "profile-stat-likes" }).props.accessibilityLabel).toBe("12.5K Likes");
+  });
 });
 
 describe("seller-profile.tsx follow", () => {
@@ -495,5 +526,30 @@ describe("seller-profile.tsx follow", () => {
     await act(async () => { follow.props.onPress(); await flush(); });
     expect(setFollowingMock).toHaveBeenCalledWith("seller-9", true);
     expect(textContent(renderer.root.findByProps({ testID: "profile-stat-followers" }).props.children)).toContain("13");
+  });
+});
+
+describe("buyer-other-profile.tsx public stats", () => {
+  let renderer: ReactTestRenderer | undefined;
+  afterEach(async () => { if (renderer) await act(async () => { renderer?.unmount(); }); });
+
+  it("uses the API Likes total, not the page of loaded videos", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: "buyer-1" });
+    searchParamsMock.mockReturnValue({ userId: "buyer-2", name: "Alex", handle: "@alex" });
+    apiMock.social.profile.mockResolvedValue({
+      userId: "buyer-2", name: "Alex", username: "alex", displayName: "Alex",
+      followersCount: 5, followingCount: 10_000, likesCount: 12_500,
+      isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false,
+    });
+    (apiMock.social as any).storiesForUser = vi.fn().mockResolvedValue([]);
+    creatorVideosMock.mockResolvedValue({
+      posts: [videoRow("one")], total: 1, hasMore: false, nextOffset: 1, restricted: null, user: null,
+    });
+    await act(async () => { renderer = create(<BuyerOtherProfileScreen />); await flush(); });
+    const stats = renderer!.root.findByProps({ testID: "profile-stats" });
+    expect(stats.findAll((node) => typeof node.props.testID === "string" && node.props.testID.startsWith("profile-stat-") && typeof node.type === "string")
+      .map((row) => row.props.testID)).toEqual(["profile-stat-followers", "profile-stat-following", "profile-stat-likes"]);
+    expect(stats.findByProps({ testID: "profile-stat-likes" }).props.accessibilityLabel).toBe("12.5K Likes");
+    expect(stats.findByProps({ testID: "profile-stat-following" }).props.accessibilityLabel).toBe("10K Following");
   });
 });

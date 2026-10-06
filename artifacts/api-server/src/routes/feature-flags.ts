@@ -10,7 +10,7 @@ type FeatureFlagRow = {
 };
 
 const router = Router();
-const KEY_PATTERN = /^[a-z][A-Za-z0-9]{1,63}$/;
+const KEY_PATTERN = /^[a-z][A-Za-z0-9_]{1,63}$/;
 
 router.get("/", async (_req, res, next) => {
   try {

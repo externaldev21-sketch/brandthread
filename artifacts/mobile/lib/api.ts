@@ -3,24 +3,56 @@
  * Base URL is resolved from EXPO_PUBLIC_API_BASE_URL (set in the dev script).
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
+import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
+import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 import { useAuth } from '@clerk/expo';
+import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type {
   AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
 } from './safetyTypes';
 import { useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { uploadChunked, type ChunkedTransport, type ResumeStore } from '@/lib/createPost/chunkedUpload';
 import {
   ApiError,
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import { reportServerError } from '@/lib/monitoringHooks';
+import { trackAfter } from '@/lib/analytics/trackAfter';
+import { isSignedInOnlyPath } from '@/lib/guestApiPolicy';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { StatementDetail, StatementFormat, StatementList } from '@/lib/statements';
+import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
+import type { DisputeEvidenceFile, DisputeFileType, DisputeTimeline } from '@/lib/disputeTypes';
+import type { ReorderResolution } from '@/lib/reorderSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
-import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
-import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
+import type { AiCreditHistoryPage, AiCreditsOverview } from '@/lib/aiCredits';
+import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { ImportCommitResult, ImportPreview, ImportProviders, ImportRun } from '@/lib/productImportTypes';
+import type { GiftCard, GiftCardHistoryEntry, GiftCardSettings, GiftCardStoreInfo } from '@/lib/giftCards';
+import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '@/services/socialTypes';
+import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
+
+/** Server story highlight (GET /api/social/highlights/*). */
+export interface ServerHighlight {
+  id: string; userId: string; title: string;
+  coverUrl: string | null; coverEmoji: string | null; coverColor: string | null;
+  position: number; itemCount: number;
+  items: Array<{ id: string; storyId: string | null; media: any[]; visibility: string; thumbnailUrl: string | null; storyCreatedAt: number | null; position: number }>;
+  createdAt: number; updatedAt: number;
+}
+/** A story of mine that can be added to a highlight (live or archived). */
+export interface HighlightPickerStory {
+  storyId: string; thumbnailUrl: string | null; slides: number;
+  visibility: 'public' | 'friends' | 'close_friends'; createdAt: number; live: boolean;
+}
+import type { BulkPriceRequest, BulkPriceResult, BulkProductList, ProductSeoDetail, ProductSeoInput } from '@/lib/productBulk';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -50,6 +82,13 @@ export const API_BASE_URL = BASE;
  * error a screen can show instead of leaving loading state stuck forever.
  */
 const REQUEST_TIMEOUT_MS = 15_000;
+
+function rejectSellerPreviewApiRequest(): void {
+  if (!isSellerDevPreview()) return;
+  throw new ApiError(403, JSON.stringify({
+    error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' },
+  }));
+}
 
 /**
  * AI generation endpoints (mockup/photography/logo/background-removal) can
@@ -374,6 +413,23 @@ function raceAuthTokenTimeout(inFlight: Promise<string | null>): Promise<string 
 // Share the in-flight promise so the second caller just awaits the first.
 const inFlightGetRequests = new Map<string, Promise<any>>();
 
+export interface LiveReplay {
+  streamId: string;
+  sellerId: string;
+  postId: string | null;
+  title: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  replayUrl: string;
+  peakViewerCount: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  isOwner: boolean;
+  /** Owner only. */
+  visibility?: 'public' | 'hidden';
+}
+
 function request<T = any>(
   path: string,
   options: RequestInit,
@@ -406,6 +462,7 @@ async function doRequest<T = any>(
   reportErrors = true,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
+  rejectSellerPreviewApiRequest();
   await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
@@ -413,6 +470,11 @@ async function doRequest<T = any>(
     ? await apiCacheKey(resolvedPath, getCacheScope)
     : null;
   const token = await getCachedToken(getToken);
+  // Guest guard (App Store 5.1.1(v)): a signed-out session never sends
+  // account-scoped or paid requests; it fails locally like the server's 401.
+  if (!token && isSignedInOnlyPath(resolvedPath)) {
+    throw new ApiError(401, JSON.stringify({ error: { message: 'Sign in required', code: 'auth_required' } }));
+  }
   // Build a plain Record so TypeScript is happy with every HeadersInit variant.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -440,13 +502,17 @@ async function doRequest<T = any>(
     throw error;
   }
   if (!res.ok) {
-    if (res.status === 429) noteRateLimited(retryAfterSecondsFrom(res));
     const body = await res.text();
+    // AI credit gate refusals (402/429/503 with a credits code) are not generic rate limiting.
+    const aiCreditsKind = classifyAiCreditsError(res.status, body);
+    if (res.status === 429 && !aiCreditsKind) noteRateLimited(retryAfterSecondsFrom(res));
+    if (aiCreditsKind) surfaceAiCreditsError(aiCreditsKind);
     const error = new ApiError(res.status, body);
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
     const cached = cacheKey && (res.status >= 500 || res.status === 429) ? await readApiCache<T>(cacheKey) : null;
+    if (res.status >= 500) reportServerError(res.status, options.method ?? 'GET', resolvedPath);
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
@@ -462,17 +528,38 @@ async function doRequest<T = any>(
   return data;
 }
 
+export interface ProductQuestion {
+  id: string;
+  productId: string;
+  body: string;
+  askerName: string;
+  createdAt: string;
+  mine: boolean;
+  answer: { id: string; body: string; createdAt: string; updatedAt?: string } | null;
+}
+export interface SellerProductQuestion {
+  id: string;
+  productId: string;
+  productName: string;
+  body: string;
+  askerName: string;
+  createdAt: string;
+  answer: { id: string; body: string; createdAt: string } | null;
+}
+
 async function uploadImage<T = any>(
   path: string,
   image: { uri: string; mimeType?: string | null },
   getToken: GetToken,
   getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
+  image = await prepareImageForUpload(image);
   const source = await fetch(image.uri);
   if (!source.ok) {
     throw new Error("Could not read the selected image.");
   }
   const imageBlob = await source.blob();
+  rejectSellerPreviewApiRequest();
   const contentType = image.mimeType || imageBlob.type || "image/jpeg";
   const token = await getCachedToken(getToken);
   let res: Response;
@@ -510,6 +597,7 @@ async function uploadVideo<T = any>(
   const source = await fetch(video.uri);
   if (!source.ok) throw new Error("Could not read the recorded video.");
   const videoBlob = await source.blob();
+  rejectSellerPreviewApiRequest();
   const contentType = video.mimeType || videoBlob.type || "video/mp4";
   const token = await getCachedToken(getToken);
   let res: Response;
@@ -537,6 +625,119 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+export interface ProductPairing { id: string; name: string; image: string | null; active: boolean; position: number }
+export interface PublicPairedProduct {
+  id: string;
+  sellerId: string;
+  sellerName: string | null;
+  name: string;
+  image: string | null;
+  images: string[];
+  priceCents: number;
+  isPreOrder: boolean;
+  available: boolean;
+  variants: Array<{ id: string; size: string | null; color: string | null; priceCents: number; stock: number }>;
+}
+export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
+
+/** Like uploadVideo, but reports upload progress (0–1) via XHR. */
+async function uploadVideoWithProgress<T = any>(
+  path: string,
+  video: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+  getCacheScope: GetCacheScope = () => 'anonymous',
+  onProgress?: (fraction: number) => void,
+): Promise<T> {
+  const source = await fetch(video.uri);
+  if (!source.ok) throw new Error("Could not read the selected video.");
+  const videoBlob = await source.blob();
+  rejectSellerPreviewApiRequest();
+  const contentType = video.mimeType || videoBlob.type || "video/mp4";
+  const token = await getCachedToken(getToken);
+  const result = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE}${versionApiPath(path)}`);
+    xhr.setRequestHeader("Content-Type", contentType);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    for (const [key, value] of Object.entries(storeContextHeaders())) xhr.setRequestHeader(key, String(value));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(Math.min(1, event.loaded / event.total));
+    };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new Error("Network error while uploading the video."));
+    xhr.send(videoBlob);
+  }).catch((error) => { reportNetworkError(error); throw error; });
+  if (result.status < 200 || result.status >= 300) {
+    const error = new ApiError(result.status, result.text);
+    reportNetworkError(error);
+    throw error;
+  }
+  dismissNetworkNotice();
+  onProgress?.(1);
+  await clearApiCache(await getCacheScope());
+  return JSON.parse(result.text) as T;
+}
+/** Remembers in-flight chunked upload sessions so a retry/restart resumes instead of restarting. */
+const chunkedResumeStore: ResumeStore = {
+  get: async (key) => { try { return await AsyncStorage.getItem(`bt_chunked_upload:${key}`); } catch { return null; } },
+  set: async (key, id) => {
+    try {
+      if (id) await AsyncStorage.setItem(`bt_chunked_upload:${key}`, id);
+      else await AsyncStorage.removeItem(`bt_chunked_upload:${key}`);
+    } catch { /* resume is best-effort */ }
+  },
+};
+
+/** Chunked, resumable video upload (see lib/createPost/chunkedUpload.ts). */
+async function uploadVideoChunked(
+  video: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+  opts: { onProgress?: (fraction: number) => void; signal?: { aborted: boolean } } = {},
+): Promise<{ objectPath: string; contentType: string; size: number }> {
+  const source = await fetch(video.uri);
+  if (!source.ok) throw new Error("Could not read the selected video.");
+  const blob = await source.blob();
+  rejectSellerPreviewApiRequest();
+  const contentType = (video.mimeType || blob.type || "video/mp4").split(";")[0];
+  const authHeaders = async () => {
+    const token = await getCachedToken(getToken);
+    return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() };
+  };
+  const json = async <T,>(path: string, init: RequestInit): Promise<T> => {
+    const res = await fetch(`${BASE}${versionApiPath(path)}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(await authHeaders()), ...(init.headers ?? {}) },
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return (res.status === 204 ? undefined : await res.json()) as T;
+  };
+  const transport: ChunkedTransport = {
+    start: (meta) => json("/api/posts/uploads", { method: "POST", body: JSON.stringify(meta) }),
+    status: (id) => json(`/api/posts/uploads/${id}`, { method: "GET" }),
+    complete: (id) => json(`/api/posts/uploads/${id}/complete`, { method: "POST", body: "{}" }),
+    putChunk: async (id, index, chunk, onBytes) => {
+      const headers = await authHeaders();
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", `${BASE}${versionApiPath(`/api/posts/uploads/${id}/chunks/${index}`)}`);
+        xhr.setRequestHeader("Content-Type", "application/octet-stream");
+        for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, String(v));
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) onBytes(e.loaded); };
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, xhr.responseText)));
+        xhr.onerror = () => reject(new Error("Network error while uploading"));
+        xhr.send(chunk);
+      });
+    },
+  };
+  return uploadChunked({
+    transport, blob, contentType,
+    resumeKey: `${video.uri}|${blob.size}`,
+    resumeStore: chunkedResumeStore,
+    onProgress: opts.onProgress,
+    signal: opts.signal,
+  });
+}
+
 // ─── Ad Campaign Types ────────────────────────────────────────────────────────
 
 export type AdCtaKind =
@@ -759,6 +960,10 @@ export interface LocalUserProfile {
   termsAcceptedAt?: string | null;
   /** Set when a moderator suspends the account. */
   suspendedAt?: string | null;
+  /** True when this sync cancelled a pending deletion (signing back in cancels it). */
+  deletionCancelled?: boolean;
+  /** Derived age band (the date of birth is never stored). null = not asked yet. */
+  ageBand?: 'under_13' | '13_17' | '18_plus' | null;
 }
 
 export interface ShopifyImportJob {
@@ -823,6 +1028,79 @@ export interface PostAnalyticsResponse {
     };
   };
 }
+// ── Seller messaging tools types ─────────────────────────────────────────────
+export interface SellerQuickReply { id: string; title: string; body: string; shortcut: string | null; updatedAt: string }
+export interface SellerAwaySettings {
+  enabled: boolean;
+  message: string;
+  mode: 'always' | 'outside_hours';
+  timezone: string;
+  /** 7-bit mask, bit 0 = Sunday. */
+  openDays: number;
+  /** Minutes from local midnight. */
+  openMinute: number;
+  closeMinute: number;
+}
+
+// ─── Email marketing (seller) ────────────────────────────────────────────────
+export type EmailAudience = 'subscribers' | 'customers' | 'followers';
+export interface EmailMarketingStatus {
+  enabled: boolean;
+  provider: string | null;
+  message: string | null;
+  dailyCap: number;
+  sentToday: number;
+  remainingToday: number;
+  tracking: { delivered: boolean; opened: boolean; clicked: boolean };
+  missing: string[];
+}
+export interface EmailSubscriberRow { id: string; email: string; status: string; source: string; createdAt: string }
+export interface EmailAudienceResponse {
+  counts: Record<EmailAudience, number>;
+  byStatus: Record<string, number>;
+  subscribers: EmailSubscriberRow[];
+  hasMore: boolean;
+}
+export interface EmailCampaignBody {
+  headline: string;
+  text: string;
+  imageUrl: string | null;
+  productIds: string[];
+  cta: { label: string; url: string } | null;
+}
+export interface EmailCampaignStats {
+  sent: number; failed: number; skipped: number; queued: number;
+  delivered: number; opened: number; clicked: number; bounced: number;
+}
+export interface EmailCampaign {
+  id: string;
+  subject: string;
+  preheader: string;
+  audience: EmailAudience;
+  body: EmailCampaignBody;
+  status: 'draft' | 'scheduled' | 'sending' | 'sent';
+  scheduledAt: string | null;
+  sentAt: string | null;
+  recipientCount: number;
+  createdAt: string;
+  updatedAt: string;
+  stats?: EmailCampaignStats | null;
+  tracking?: boolean;
+}
+export interface EmailSettings {
+  fromName: string; replyTo: string; postalAddress: string; doubleOptIn: boolean; defaultFromName: string;
+}
+export type EmailCampaignInput = Pick<EmailCampaign, 'subject' | 'preheader' | 'audience' | 'body'>;
+
+export interface AccessStatus { inviteOnly: boolean; redeemed: boolean; required: boolean }
+export interface AccessInviteCode {
+  id: string; code: string; label: string | null; maxUses: number | null; uses: number;
+  expiresAt: string | null; disabled: boolean; status: 'active' | 'disabled' | 'expired' | 'used up'; createdAt: string;
+}
+export interface AccessWaitlist {
+  items: { id: string; email: string; createdAt: string; invitedAt: string | null; code: string | null }[];
+  counts: { total: number; invited: number; pending: number };
+}
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
@@ -840,6 +1118,43 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
     },
+    // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
+    liveReplays: {
+      bySeller: (sellerId: string, opts: { limit?: number; offset?: number } = {}) =>
+        get<{ replays: LiveReplay[]; hasMore: boolean }>(
+          `/api/live-replays/by-seller/${encodeURIComponent(sellerId)}?limit=${opts.limit ?? 30}&offset=${opts.offset ?? 0}`,
+        ),
+      get: (streamId: string) => get<{ replay: LiveReplay }>(`/api/live-replays/${encodeURIComponent(streamId)}`),
+      setVisibility: (streamId: string, visibility: 'public' | 'hidden') =>
+        patch<{ ok: boolean; visibility: 'public' | 'hidden' }>(`/api/live-replays/${encodeURIComponent(streamId)}`, { visibility }),
+      remove: (streamId: string) => del<{ ok: boolean }>(`/api/live-replays/${encodeURIComponent(streamId)}`),
+    },
+    liveTips: {
+      /** Host only. `enabled: false` when the live_tips flag is OFF. */
+      total: (streamId: string) =>
+        get<{ enabled: boolean; totalCents: number; giftCount: number }>(`/api/live-tips/${encodeURIComponent(streamId)}/total`),
+    },
+    // ── end live replays + tips ───────────────────────────────────────────────
+    /** Invite-only launch mode (feature flag `inviteOnlySignup`). */
+    access: {
+      status: () => freshGet<AccessStatus>('/api/access/status'),
+      validate: (code: string) => post<{ valid: boolean }>('/api/access/validate', { code }),
+      redeem: (code: string) => post<{ ok: true }>('/api/access/redeem', { code }),
+      joinWaitlist: (email: string) => post<{ ok: true }>('/api/access/waitlist', { email }),
+      /** Moderators only. */
+      admin: {
+        invites: () => freshGet<{ items: AccessInviteCode[] }>('/api/admin/invites'),
+        createInvites: (body: { count: number; maxUses?: number; label?: string; expiresAt?: string }) =>
+          post<{ codes: string[] }>('/api/admin/invites', body),
+        revokeInvite: (id: string) => post<{ ok: true }>(`/api/admin/invites/${encodeURIComponent(id)}/disable`, {}),
+        waitlist: (status: 'all' | 'pending' | 'invited' = 'all') =>
+          freshGet<AccessWaitlist>(`/api/admin/access/waitlist?status=${status}`),
+        inviteFromWaitlist: (id: string) =>
+          post<{ code: string; invitedAt: string; reused: boolean }>(`/api/admin/access/waitlist/${encodeURIComponent(id)}/invite`, {}),
+        setInviteOnly: (enabled: boolean) =>
+          put<{ key: string; enabled: boolean }>('/api/config/features/inviteOnlySignup', { enabled }),
+      },
+    },
     auth: {
       /** Create the matching local user record after Clerk authentication.
        * During onboarding, pass the name that the person explicitly entered so
@@ -849,10 +1164,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       me:          ()             => get<LocalUserProfile>('/api/auth/me'),
       onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
       completeOnboarding: (accountType: 'buyer' | 'seller', expectedClerkId?: string) =>
-        post<LocalUserProfile>('/api/auth/onboarding/complete', {
+        trackAfter(post<LocalUserProfile>('/api/auth/onboarding/complete', {
           accountType,
           ...(expectedClerkId ? { expectedClerkId } : {}),
-        }),
+        }), [['onboarding_completed', { account_type: accountType }], ...(accountType === 'seller' ? [['seller_onboarding_completed'] as const] : [])]),
       saveBuyerPreferences: (styleInterests: string[], expectedClerkId: string) =>
         patch<{ ok: boolean }>('/api/auth/onboarding/buyer-preferences', {
           styleInterests,
@@ -862,7 +1177,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  Returns { available: true } if free (or already owned by this user),
        *  { available: false, error: string } if taken or invalid format. */
       checkUsername: (username: string) =>
-        get<{ available: boolean; error?: string }>(
+        get<{ available: boolean; error?: string; code?: 'USERNAME_COOLDOWN'; nextChangeAt?: string }>(
           `/api/auth/username/check?username=${encodeURIComponent(username)}`
         ),
       /** Same check, usable before sign-up completes (no session yet) —
@@ -918,14 +1233,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  endpoint — any authenticated user owns exactly one `profileImageUrl`. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
-      /** Permanently erase this account after the explicit DELETE confirmation. */
-      deleteAccount: () => request<{ ok: true }>(
+      /** Schedule deletion (30-day grace) after the typed DELETE confirmation plus
+       *  fresh proof: `password`, or `code` for accounts without a password. */
+      deleteAccount: (reauth: { password?: string; code?: string } = {}) => request<{ ok: true; scheduledFor: string | null; graceDays: number }>(
         '/api/auth/account',
-        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE' }) },
+        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE', ...reauth }) },
         getToken,
         false,
         getCacheScope,
       ),
+      /** Email a 6-digit re-auth code to an account that has no password. */
+      requestDeletionCode: () => post<{ ok: true }>('/api/auth/account/deletion-code', {}),
       /** Everything deletion removes/retains, plus anything that must be settled first. */
       deletionCheck: () => freshGet<AccountDeletionCheck>('/api/auth/account/deletion-check'),
       /** Send a branded, server-issued (Resend) 6-digit password reset code.
@@ -940,8 +1258,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       confirmPasswordReset: (body: { email: string; code: string; newPassword: string }) =>
         post<{ ok: true }>('/api/auth/password-reset/confirm', body),
       /** Record agreement to the Terms, Community Guidelines and Privacy Policy version shown. */
-      acceptLegal: (version: string) =>
-        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', { version }),
+      acceptLegal: (version: string, source?: 'signup' | 'update_prompt') =>
+        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', source ? { version, source } : { version }),
       /** Real Clerk sessions for this account (Login Activity). */
       sessions: () => freshGet<{ sessions: AccountSession[] }>('/api/auth/sessions'),
       revokeSession: (sessionId: string) =>
@@ -958,12 +1276,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           messages?: { conversations: unknown[]; messages: unknown[] };
         }>('/api/auth/data-export', { include }),
     },
+    aiHelpers: {
+      caption: (body: { draft?: string; description?: string; imagePath?: string; tone?: string }) =>
+        postExpensive<{ captions: string[]; hashtags: string[] }>('/api/ai-helpers/caption', body),
+      productDescription: (body: { productId?: string; imagePaths?: string[]; name?: string; details?: string; tone?: string }) =>
+        postExpensive<{ title: string; description: string; bullets: string[] }>('/api/ai-helpers/product-description', body),
+      sizeChart: (body: unknown) =>
+        postExpensive<{ unit: 'cm' | 'in'; note: string; rows: Record<string, string | number>[]; sizeChart: { columns: string[]; rows: { size: string; values: string[] }[]; unit: 'inches' | 'cm'; notes?: string } }>('/api/ai-helpers/size-chart', body),
+      save: (body: unknown) => post<{ saved: true }>('/api/ai-helpers/save', body),
+    },
     products: {
       list:           ()                       => get('/api/products'),
       publicList:     (ownerId?: string)       =>
         get<any[]>(`/api/public/products${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get:            (id: string)             => get(`/api/products/${id}`),
-      create:         (body: unknown)          => post('/api/products', body),
+      create:         (body: unknown)          => trackAfter(post('/api/products', body), [['product_published']]),
       update:         (id: string, body: unknown) => put(`/api/products/${id}`, body),
       archive:        (id: string)             => del(`/api/products/${id}`),
       restore:        (id: string)             => post(`/api/products/${id}/restore`, {}),
@@ -975,6 +1302,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload one product photo and return the URL to store in `images`. */
       uploadImage: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ objectPath: string }>('/api/products/images', image, getToken, getCacheScope),
+    },
+    /** Bulk product actions ("Select products") and per-product search listing (SEO). */
+    productBulk: {
+      list: (params: { q?: string; status?: string } = {}) => {
+        const qs = new URLSearchParams();
+        if (params.q) qs.set('q', params.q);
+        if (params.status && params.status !== 'all') qs.set('status', params.status);
+        const s = qs.toString();
+        return get<BulkProductList>(`/api/product-bulk/products${s ? `?${s}` : ''}`);
+      },
+      price: (body: BulkPriceRequest) => post<BulkPriceResult>('/api/product-bulk/price', body),
+      status: (body: { productIds: string[]; status: 'active' | 'draft' | 'archived' }) =>
+        post<{ status: string; updated: string[]; unchanged: string[] }>('/api/product-bulk/status', body),
+      duplicate: (body: { productIds: string[]; copyInventory?: boolean }) =>
+        post<{ created: Array<{ sourceId: string; id: string; name: string }> }>('/api/product-bulk/duplicate', body),
+    },
+    productSeo: {
+      get: (productId: string) => get<ProductSeoDetail>(`/api/product-seo/${encodeURIComponent(productId)}`),
+      save: (productId: string, body: ProductSeoInput) =>
+        put<ProductSeoDetail>(`/api/product-seo/${encodeURIComponent(productId)}`, body),
     },
     ipCases: {
       create: (body: { listingProductId: string; claimantName: string; claimantEmail: string; rightsType: string; description: string; evidenceReferences: string[] }) =>
@@ -994,7 +1341,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
-      /** Ship part of an order: tracking for just these items (409 AUTO_REFUNDED on a refunded order). */
+      /** Ship only the selected order items with their own tracking number. */
       addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
         patch(`/api/orders/${id}/items-tracking`, body),
       updateTracking: (id: string, body: {
@@ -1084,6 +1431,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>;
         stats: { totalCustomers: number; repeatCustomers: number; repeatRate: number; avgOrdersPerCustomer: number };
       }>(`/api/analytics/customers?limit=${limit}`),
+      /** Brandthread Pro: cohorts, lifetime value and order value by month. 403 PLAN_REQUIRED below Pro. */
+      advanced:   () => get<{
+        months: string[];
+        cohorts: Array<{ month: string; customers: number; repeatCustomers: number; repeatRate: number; revenueCents: number }>;
+        orderValue: Array<{ month: string; orders: number; revenueCents: number; averageOrderCents: number }>;
+        lifetime: { customers: number; revenueCents: number; averageLifetimeValueCents: number };
+      }>('/api/analytics/advanced'),
     },
     inventory: {
       list:   () => get<any[]>('/api/inventory'),
@@ -1243,21 +1597,27 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
           pushEnabled: boolean;
+          promotionalPush?: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
+          channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
         }>('/api/notification-prefs'),
       update: (body: {
         digest?: 'realtime' | 'daily';
         categories?: Record<string, boolean>;
+        channels?: { inApp?: Record<string, boolean>; email?: Record<string, boolean> };
         pushEnabled?: boolean;
+        promotionalPush?: boolean;
         quietHours?: { start: string; end: string; timezone?: string } | null;
       }) =>
         put<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
           pushEnabled: boolean;
+          promotionalPush?: boolean;
           quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
+          channels: Record<'push' | 'inApp' | 'email', Record<string, boolean>>;
         }>('/api/notification-prefs', body),
     },
     logo: {
@@ -1359,6 +1719,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
     },
     buyer: {
+      /** Saved sizes / preferences. GET returns defaults when nothing is saved; update is a partial merge (null clears a size). */
+      preferences: {
+        get: () => get<BuyerPreferences>('/api/buyer/preferences'),
+        update: (body: BuyerPreferencesPatch) => patch<BuyerPreferences>('/api/buyer/preferences', body),
+      },
+      /** "Brands you might like" — ranked by style interests + liked brands + popularity; excludes followed/blocked. */
+      recommendedBrands: (limit = 12) =>
+        get<{ brands: RecommendedBrand[]; followedBrandCount: number }>(`/api/buyer/recommended-brands?limit=${limit}`),
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),
         autocomplete: (query: string, country = 'US') =>
@@ -1403,9 +1771,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             threadCashToken?: string;
             /** Seller discount code, validated fresh server-side and applied to this charge. */
             discountCode?: string;
+            /** Live the buyer is shopping from (required for live-only codes). */
+            liveStreamId?: string;
           },
         ) =>
-          post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
+          trackAfter(post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
             items,
             successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
             cancelUrl:  'mobile://checkout/cancel',
@@ -1416,7 +1786,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
             ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
             ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
-          }),
+            ...(opts.liveStreamId          ? { liveStreamId:          opts.liveStreamId          } : {}),
+          }), [['checkout_started', { flow: 'hosted', item_count: items.length }]]),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
         verifySession: (sessionId: string) =>
@@ -1437,7 +1808,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
          */
         paymentIntent: {
           quote: (body: QuoteBody) => post<CartQuote>('/api/buyer/checkout/payment-intent/quote', body),
-          create: (body: CreatePaymentIntentBody) => post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body),
+          create: (body: CreatePaymentIntentBody) => trackAfter(post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body), [['checkout_started', { flow: 'one_page' }]]),
           get: (paymentIntentId: string) =>
             get<PaymentIntentStatus>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}`),
           cancel: (paymentIntentId: string) =>
@@ -1447,13 +1818,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
         get:    (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
-        /** "I received it": marks the order delivered (idempotent). 409 NOT_SHIPPED | ALREADY_REFUNDED. */
-        confirmReceipt: (id: string) => post<{ delivery: unknown }>(
-          `/api/buyer/orders/${encodeURIComponent(id)}/confirm-receipt`, {}
-        ),
+        /** Buyer confirms receipt of a shipped order; delivery state is recorded server-side. */
+        confirmReceipt: (id: string) =>
+          post<{ delivery?: unknown }>(`/api/buyer/orders/${encodeURIComponent(id)}/confirm-receipt`, {}),
         /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
         cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
+        ),
+        /** Re-resolves a past order against today's catalogue (price, stock, variants). Read-only; the client adds the addable lines to the cart. */
+        reorder: (id: string) => post<ReorderResolution>(
+          `/api/buyer/orders/${encodeURIComponent(id)}/reorder`, {}
         ),
       },
       /** Recently viewed products — recorded on product detail view, shown on Discover and in the bag. */
@@ -1565,7 +1939,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       setDisappearing: (id: string, enabled: boolean) =>
         patch<{ ok: boolean; disappearingEnabled: boolean; message: any }>(`/api/conversations/${encodeURIComponent(id)}/disappearing`, { enabled }),
       send:       (id: string, body: { text: string; attachment?: any; replyToId?: string }) =>
-        post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
+        trackAfter(post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body), [['message_sent', { surface: 'dm', has_attachment: Boolean(body.attachment) }]]),
       markRead:   (id: string) =>
         patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/read`, {}),
       /** Real-time "X is typing…" (no websocket layer — the other side picks
@@ -1776,18 +2150,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>>(`/api/public/products/${encodeURIComponent(productId)}/videos${limit ? `?limit=${limit}` : ''}`),
     },
     public: {
-      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; size?: string; brand?: string; limit?: number; offset?: number }) => {
+      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string | string[]; size?: string | string[]; color?: string | string[]; brand?: string | string[]; inStock?: boolean; facets?: boolean; limit?: number; offset?: number }) => {
         const params = new URLSearchParams();
         if (opts.q) params.set('q', opts.q);
         if (opts.sort) params.set('sort', opts.sort);
         if (opts.minPriceCents !== undefined) params.set('minPriceCents', String(opts.minPriceCents));
         if (opts.maxPriceCents !== undefined) params.set('maxPriceCents', String(opts.maxPriceCents));
-        if (opts.category) params.set('category', opts.category);
-        if (opts.size) params.set('size', opts.size);
-        if (opts.brand) params.set('brand', opts.brand);
+        // Multi-value filters are sent as repeated params (?size=M&size=L).
+        for (const key of ['category', 'size', 'color', 'brand'] as const) {
+          const raw = opts[key];
+          for (const v of Array.isArray(raw) ? raw : raw ? [raw] : []) params.append(key, v);
+        }
+        if (opts.inStock) params.set('inStock', '1');
+        if (opts.facets) params.set('facets', '1');
         if (opts.limit) params.set('limit', String(opts.limit));
         if (opts.offset) params.set('offset', String(opts.offset));
-        return get<{ results: any[]; pagination: { limit: number; offset: number; returned: number; total?: number; hasMore: boolean } }>(`/api/public/search?${params.toString()}`);
+        return get<{
+          results: any[];
+          pagination: { limit: number; offset: number; returned: number; total?: number; hasMore: boolean };
+          facets?: {
+            sizes: Array<{ value: string; count: number }>;
+            colors: Array<{ value: string; count: number }>;
+            categories: Array<{ value: string; count: number }>;
+            brands: Array<{ id: string; name: string; count: number }>;
+            price: { minCents: number; maxCents: number } | null;
+            inStockCount: number;
+          };
+        }>(`/api/public/search?${params.toString()}`);
       },
       /** Trending search terms (real logged queries once there's enough volume, else categories + brands) for the search empty state. */
       trending: (limit = 8) =>
@@ -1824,6 +2213,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           categories: Array<{ category: string; productCount: number; imageUri: string | null; color: string }>;
         }>(`/api/public/search/categories?limit=${encodeURIComponent(String(limit))}`),
     },
+    /** Product Q&A — public read, signed-in ask, seller answers. */
+    productQa: {
+      list: (productId: string, limit = 30, offset = 0) =>
+        get<{ questions: ProductQuestion[]; totalCount: number }>(
+          `/api/product-qa/product/${encodeURIComponent(productId)}?limit=${limit}&offset=${offset}`,
+        ),
+      ask: (productId: string, body: string) =>
+        post<ProductQuestion>(`/api/product-qa/product/${encodeURIComponent(productId)}`, { body }),
+      remove: (questionId: string) => del<{ ok: boolean }>(`/api/product-qa/questions/${encodeURIComponent(questionId)}`),
+      /** Seller inbox — questions on my products, unanswered first. */
+      sellerInbox: () =>
+        quietGet<{ unansweredCount: number; questions: SellerProductQuestion[] }>('/api/product-qa/seller'),
+      answer: (questionId: string, body: string) =>
+        post<{ id: string; body: string; createdAt: string }>(`/api/product-qa/questions/${encodeURIComponent(questionId)}/answer`, { body }),
+    },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */
       forProduct: (productId: string) =>
@@ -1842,7 +2246,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         productId?: string;
         rating:     number;
         body?:      string;
+        /** Object paths returned by `uploadPhoto`. */
+        photos?:    string[];
+        fitNote?:   'Runs small' | 'True to size' | 'Runs large';
       }) => post<any>('/api/reviews', body),
+      /** Upload one review photo (buyer); send the returned objectPath in `photos`. */
+      uploadPhoto: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ objectPath: string }>('/api/reviews/photos', image, getToken, getCacheScope),
+      /** Mark a review helpful (idempotent, signed-in). */
+      markHelpful: (reviewId: string) =>
+        put<{ helpfulCount: number; viewerHelpful: boolean }>(`/api/reviews/${encodeURIComponent(reviewId)}/helpful`, {}),
+      unmarkHelpful: (reviewId: string) =>
+        del<{ helpfulCount: number; viewerHelpful: boolean }>(`/api/reviews/${encodeURIComponent(reviewId)}/helpful`),
       /** Seller — all received reviews with buyer + product info (authenticated as seller). */
       mine:  () => quietGet<any[]>('/api/reviews/mine'),
       /** Seller — post a public reply to a received review. */
@@ -1870,6 +2285,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           profileImageUrl: string | null;
           logoUrl:     string | null;
           bannerUrl:   string | null;
+          storeAccentColor: string | null;
           category:    string | null;
           tags:        string[];
           location:    string | null;
@@ -1897,6 +2313,25 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload the storefront banner / cover image (wide aspect). */
       uploadBanner: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ bannerUrl: string }>('/api/seller/profile/banner/upload', image, getToken, getCacheScope),
+      /** Availability + profanity/reserved screening for a store name and/or @handle. */
+      checkStoreIdentity: (params: { name?: string; handle?: string }) => {
+        const q = new URLSearchParams();
+        if (params.name !== undefined) q.set('name', params.name);
+        if (params.handle !== undefined) q.set('handle', params.handle);
+        return get<{
+          name?:   { available: boolean; error?: string; code?: string };
+          handle?: { available: boolean; error?: string; code?: string };
+        }>(`/api/seller/identity/check?${q.toString()}`);
+      },
+      /** Claim the store name + handle; the server re-runs every check. */
+      saveStoreIdentity: (body: { brandName: string; handle: string }) =>
+        put<{ brandName: string; username: string }>('/api/seller/identity', body),
+      /** Set (or clear with null) the storefront accent, from the monochrome allowlist. */
+      setStoreAccent: (color: string | null) =>
+        put<{ storeAccentColor: string | null }>('/api/seller/profile/accent', { color }),
+      /** Save Instagram / TikTok handles or links; the server returns canonical URLs. */
+      saveSocialLinks: (body: { instagram?: string; tiktok?: string }) =>
+        put<{ socialLinks: Record<string, string> }>('/api/seller/social-links', body),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
@@ -1906,6 +2341,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  SearchResult shape (kind='brand'|'product') compatible with searchData.ts. */
       search: (q: string, limit = 20) =>
         get<{ results: any[] }>(`/api/public/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      launchChecklist: {
+        get: () => get<LaunchChecklistResponse>('/api/seller/launch-checklist'),
+        previewSeen: () => post<void>('/api/seller/launch-checklist/preview-seen', {}),
+        dismiss: () => post<void>('/api/seller/launch-checklist/dismiss', {}),
+      },
       verification: {
         /** Returns the seller's current identity verification status. */
         status: () =>
@@ -1942,7 +2382,28 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           } | null;
           requirementsDue?: string[];
           taxInfoStatus?: 'submitted' | 'needed' | 'unknown';
+          /** Setup checklist (identity / bank account / tax info). */
+          setupState?: 'not_started' | 'in_progress' | 'in_review' | 'complete' | 'restricted';
+          steps?: Array<{
+            id: 'identity' | 'bank_account' | 'tax_info';
+            label: string;
+            status: 'complete' | 'needed' | 'in_review';
+            detail: string;
+            requirements: string[];
+            pastDue: boolean;
+            upcoming: string[];
+          }>;
+          /** ISO date Stripe needs the outstanding details by, if any. */
+          deadline?: string | null;
+          disabledReason?: string | null;
         }>('/api/seller/connect/status'),
+        /** A fresh single-use hosted link to resume setup (or the Express dashboard once complete). */
+        link: () => get<{
+          url: string;
+          kind: 'account_onboarding' | 'login_link';
+          expiresAt: number | null;
+          stripeAccountId: string;
+        }>('/api/seller/connect/link'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: {
@@ -1985,6 +2446,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
         }>('/api/seller/subscription/status'),
+        /** What each plan includes (price, commission, AI credits, advanced analytics) plus the caller's plan. */
+        perks: () => get<import('./proPerks').PerksResponse>('/api/seller/subscription/perks'),
         dismissTrialBanner: (trialEndAt: string) =>
           post<{ ok: boolean; trialEndAt: string }>('/api/seller/subscription/trial-banner/dismiss', { trialEndAt }),
         /** Read-only invoice summaries for the active seller store. */
@@ -2063,6 +2526,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             '/api/seller/vacation', body
           ),
       },
+      // ── Seller messaging tools: quick replies + away auto-reply ───────────
+      quickReplies: {
+        list: () =>
+          get<{ quickReplies: SellerQuickReply[]; limit: number }>('/api/seller/quick-replies'),
+        create: (body: { title: string; body: string; shortcut?: string | null }) =>
+          post<SellerQuickReply>('/api/seller/quick-replies', body),
+        update: (id: string, body: { title: string; body: string; shortcut?: string | null }) =>
+          put<SellerQuickReply>(`/api/seller/quick-replies/${encodeURIComponent(id)}`, body),
+        remove: (id: string) =>
+          del<{ ok: true }>(`/api/seller/quick-replies/${encodeURIComponent(id)}`),
+      },
+      awayMessage: {
+        get: () => get<SellerAwaySettings>('/api/seller/away-message'),
+        update: (body: SellerAwaySettings) => put<SellerAwaySettings>('/api/seller/away-message', body),
+      },
+      // ── end seller messaging tools ────────────────────────────────────────
     },
     /** In-app support tickets */
     support: {
@@ -2094,7 +2573,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         mediaUrls?: string[]; mediaType?: string; aspectRatio?: string; caption?: string;
         hashtags?: string[]; styleTags?: string[]; taggedProductIds?: string[];
         sound?: unknown; visibility?: unknown; isDraft?: boolean; scheduledAt?: string | null;
+        /** Quote repost: embeds this post; requires a caption (server: POST /api/posts). */
+        quotedPostId?: string;
       }) => post<any>('/api/posts', body),
+      /** Public, paginated quote reposts of a post. */
+      quotes: (id: string, query?: { limit?: number; offset?: number }) =>
+        get<any[]>(`/api/posts/${encodeURIComponent(id)}/quotes${query ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString()}` : ''}`),
       patch: (id: string, body: {
         mediaUrl?: string; thumbnailUrl?: string | null; mediaUrls?: string[];
         mediaPaths?: string[]; slideOverlays?: unknown;
@@ -2109,6 +2593,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           contentType: string;
           size: number;
         }>('/api/posts/video-clips', { uri, mimeType }, getToken, getCacheScope),
+      /** Long videos (up to 10 min): chunked + resumable, real progress. */
+      uploadVideoChunked: (
+        video: { uri: string; mimeType?: string | null },
+        opts?: { onProgress?: (fraction: number) => void; signal?: { aborted: boolean } },
+      ) => uploadVideoChunked(video, getToken, opts),
       /** Upload a single raw photo slide (JPEG/PNG/WEBP) for slideshow composition */
       uploadPhotoSlide: (uri: string, mimeType?: string | null) =>
         uploadImage<{
@@ -2133,6 +2622,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         duration: number;
         clipCount: number;
       }>('/api/posts/compose-video', body),
+      /** POST carousel: crop + adjust + trim every slide (photos and videos) into the fixed 3:4 canvas. */
+      composeCarousel: (body: {
+        items: Array<{
+          kind: 'photo' | 'video'; objectPath: string;
+          crop?: { x: number; y: number; width: number; height: number };
+          adjust?: Record<string, number>;
+          trimStart?: number; trimEnd?: number;
+        }>;
+      }) => post<{
+        items: Array<{
+          kind: 'photo' | 'video'; mediaPath: string; mediaUrl: string;
+          thumbnailPath: string; thumbnailUrl: string; duration?: number;
+        }>;
+      }>('/api/posts/compose-carousel', body),
       /** Re-extract the cover frame from an already-composed video at a chosen offset, without re-encoding. */
       composeVideoThumbnail: (mediaPath: string, offset: number) => post<{
         thumbnailUrl: string;
@@ -2141,6 +2644,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }>('/api/posts/compose-video/thumbnail', { mediaPath, offset }),
       /** Compose ordered photo slides with per-slide text overlays into portrait rendered images */
       composeSlideshow: (body: {
+        aspectRatio?: '1:1' | '3:4' | '9:16';
+        surface?: 'thread' | 'profile';
+        coverIndex?: number;
         slides: Array<{
           objectPath: string;
           overlays?: Array<{
@@ -2162,8 +2668,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         freshGet<{ items: WatchedVideo[]; nextCursor: string | null }>(
           `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
         ),
+      /** Caption tracks of a video post (503 CAPTIONS_UNAVAILABLE while the flag/AI keys are off). */
+      captions: (id: string) =>
+        get<{ postId: string; tracks: Array<{ language: string; status: 'pending' | 'ready' | 'failed'; source: 'whisper' | 'manual'; vttUrl: string | null; segments: Array<{ start: number; end: number; text: string }> }> }>(
+          `/api/posts/${encodeURIComponent(id)}/captions`,
+        ),
+      /** Owner-only: start caption generation (idempotent unless force). */
+      generateCaptions: (id: string, force = false) =>
+        post<{ status: 'pending' | 'ready' }>(`/api/posts/${encodeURIComponent(id)}/captions/generate`, { force }),
+      /** Owner-only: replace the text of every segment, in order (timing is kept server-side). */
+      updateCaptions: (id: string, language: string, texts: string[]) =>
+        patch<any>(`/api/posts/${encodeURIComponent(id)}/captions/${encodeURIComponent(language)}`, {
+          segments: texts.map((text) => ({ text })),
+        }),
       recordWatchedVideo: (id: string) =>
-        post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}),
+        trackAfter(post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}), [['video_watched', { surface: 'feed' }]]),
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
@@ -2218,18 +2737,74 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`,
           { liked },
         ),
+      /** Post owner only: pin a top-level comment (replaces any other pin). */
+      pin: (postId: string, commentId: string) =>
+        post<{ pinned: boolean; commentId: string }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/pin`, {},
+        ),
+      unpin: (postId: string, commentId: string) =>
+        del<{ pinned: boolean; commentId: string }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/pin`,
+        ),
+    },
+    /** Hashtag pages, trending and follows (public reads; follow needs auth). */
+    hashtags: {
+      trending: (limit = 10) =>
+        get<{ tags: HashtagTrendingTag[] }>(`/api/hashtags/trending?limit=${limit}`),
+      search: (q: string, limit = 12) =>
+        get<{ tags: Array<{ tag: string; postCount: number }> }>(
+          `/api/hashtags/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      page: (tag: string, sort: 'top' | 'recent' = 'top') =>
+        get<HashtagPage>(`/api/hashtags/${encodeURIComponent(tag)}?sort=${sort}`),
+      posts: (tag: string, sort: 'top' | 'recent', cursor?: string | null) =>
+        get<HashtagPostsPage>(
+          `/api/hashtags/${encodeURIComponent(tag)}/posts?sort=${sort}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+      follow: (tag: string) =>
+        post<{ tag: string; isFollowing: boolean }>(`/api/hashtags/${encodeURIComponent(tag)}/follow`, {}),
+      unfollow: (tag: string) =>
+        del<{ tag: string; isFollowing: boolean }>(`/api/hashtags/${encodeURIComponent(tag)}/follow`),
+      following: () =>
+        get<{ tags: Array<{ tag: string; postCount: number; followedAt: string }> }>('/api/hashtags/following'),
+    },
+    /** Locations: search/autocomplete, place pages, find-or-create (post location tags). */
+    places: {
+      search: (q: string, coords?: { lat: number; lng: number }) =>
+        get<{ places: PlaceSearchResult[]; providerEnabled: boolean }>(
+          `/api/places/search?q=${encodeURIComponent(q)}${coords ? `&lat=${coords.lat}&lng=${coords.lng}` : ''}`),
+      page: (placeId: string, sort: 'top' | 'recent' = 'top') =>
+        get<PlacePage>(`/api/places/${encodeURIComponent(placeId)}?sort=${sort}`),
+      posts: (placeId: string, sort: 'top' | 'recent', cursor?: string | null) =>
+        get<PlacePostsPage>(
+          `/api/places/${encodeURIComponent(placeId)}/posts?sort=${sort}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+      /** Find-or-create from a name (+ optional coordinates / provider id). */
+      save: (body: { name: string; lat?: number; lng?: number; city?: string; region?: string; country?: string; providerPlaceId?: string }) =>
+        post<{ place: PlaceInfo; created: boolean }>('/api/places', body),
     },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {
+      /** Contact sync (privacy-preserving: only SHA-256 hashes leave the device; feature-flagged server-side). */
+      contacts: {
+        status: () => get<{ enabled: boolean; optedIn: boolean }>('/api/social/contacts/status'),
+        match: (hashes: string[]) =>
+          post<{ matches: ContactMatch[] }>('/api/social/contacts/match', { hashes }),
+        /** "Let friends find me": server hashes my account email; phoneHash is optional (hashed on device). */
+        optIn: (phoneHash?: string) =>
+          post<{ optedIn: boolean; kinds: string[] }>('/api/social/contacts/opt-in', phoneHash ? { phoneHash } : {}),
+        revoke: () => del<{ ok: boolean }>('/api/social/contacts'),
+      },
       /** Follow another buyer */
       follow: (userId: string) =>
-        post<{ ok: boolean; isFollowing: boolean; followersCount: number }>('/api/social/follow', { userId }),
+        trackAfter(post<{ ok: boolean; isFollowing: boolean; followersCount: number; status?: 'requested' }>('/api/social/follow', { userId }), [['follow', { surface: 'profile' }]]),
       /** Unfollow a buyer */
       unfollow: (userId: string) =>
         del<{ ok: boolean; isFollowing: boolean; followersCount: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
       /** Check follow status between me and another user */
       status: (userId: string) =>
-        get<{ isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean; followersCount: number }>(
+        get<{
+          isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean; followersCount: number;
+          /** 'requested' while a follow request to a private account is pending. */
+          status?: 'following' | 'requested' | 'none'; isPrivate?: boolean;
+        }>(
           `/api/social/status/${encodeURIComponent(userId)}`
         ),
       /** Get a buyer's public profile + follow counts */
@@ -2241,6 +2816,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
+          isPrivate?: boolean; followRequested?: boolean; contentHidden?: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
       /** Posts where someone tagged this profile (the profile "Tagged" tab). */
       tagged: (userId: string, limit = 30, offset = 0) =>
@@ -2285,7 +2861,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         authorName: string; authorHandle?: string; authorInitials?: string;
         authorColor?: string; authorAccountType?: string;
         media: any[]; repliesDisabled?: boolean;
-        privacy?: { visibility?: string; replyPermission?: string };
+        privacy?: { visibility?: string; replyPermission?: string; closeFriendsOnly?: boolean };
         /** Reshare of a story that tagged me ("Add to your story"). */
         originalStoryId?: string;
       }) => post<any>('/api/social/stories', body),
@@ -2351,6 +2927,47 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Record a story view */
       viewStory: (storyId: string) =>
         post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {}),
+      // ── Close Friends (server-backed audience list) ────────────────────────
+      closeFriends: () =>
+        get<{ friends: Array<{ userId: string; name: string; handle: string; initials: string; avatarUrl: string | null }>; userIds: string[]; cap: number }>(
+          '/api/social/close-friends'),
+      saveCloseFriends: (userIds: string[]) =>
+        put<{ userIds: string[]; rejected: string[] }>('/api/social/close-friends', { userIds }),
+      // ── Story highlights (server-backed) ───────────────────────────────────
+      myHighlights: () => get<ServerHighlight[]>('/api/social/highlights/me'),
+      userHighlights: (userId: string) =>
+        get<ServerHighlight[]>(`/api/social/highlights/user/${encodeURIComponent(userId)}`),
+      highlight: (id: string) =>
+        get<ServerHighlight & { stories: any[] }>(`/api/social/highlights/${encodeURIComponent(id)}`),
+      highlightStories: () => get<HighlightPickerStory[]>('/api/social/highlights/stories'),
+      createHighlight: (body: { title: string; coverEmoji?: string | null; coverColor?: string | null; coverUrl?: string | null; storyIds?: string[] }) =>
+        post<ServerHighlight>('/api/social/highlights', body),
+      updateHighlight: (id: string, body: { title?: string; coverEmoji?: string | null; coverColor?: string | null; coverUrl?: string | null; position?: number }) =>
+        patch<ServerHighlight>(`/api/social/highlights/${encodeURIComponent(id)}`, body),
+      deleteHighlight: (id: string) =>
+        del<{ id: string; deleted: boolean }>(`/api/social/highlights/${encodeURIComponent(id)}`),
+      addHighlightItem: (id: string, storyId: string) =>
+        post<ServerHighlight>(`/api/social/highlights/${encodeURIComponent(id)}/items`, { storyId }),
+      removeHighlightItem: (id: string, itemId: string) =>
+        del<{ id: string; deleted: boolean }>(`/api/social/highlights/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
+      // ── Interactive story stickers ─────────────────────────────────────────
+      /** Vote on a poll sticker. 409 ALREADY_VOTED carries the current stickerState. */
+      pollVote: (storyId: string, overlayId: string, optionIndex: number) =>
+        post<{ ok: boolean; stickerState: StoryStickerState | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/poll-vote`, { overlayId, optionIndex }),
+      /** Answer a question sticker (one answer per person). */
+      questionAnswer: (storyId: string, overlayId: string, answer: string) =>
+        post<{ ok: boolean; stickerState: StoryStickerState | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/question-answer`, { overlayId, answer }),
+      /** Author only: every answer to the story's question stickers. */
+      questionAnswers: (storyId: string) =>
+        get<{ storyId: string; questions: Array<{ overlayId: string; prompt: string; answers: Array<{
+          userId: string; name: string; handle: string; initials: string; avatarUrl: string | null; answer: string; createdAt: number;
+        }> }> }>(`/api/social/stories/${encodeURIComponent(storyId)}/question-answers`),
+      /** Author only: the DM to reply to someone's answer in (send the message with the normal messages endpoint). */
+      questionReplyConversation: (storyId: string, userId: string) =>
+        post<{ conversationId: string; route: 'inbox' | 'requests'; isRequest: boolean }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/question-reply-conversation`, { userId }),
       /** Block a user — removes mutual follows, prevents messaging/following */
       block: (userId: string) =>
         post<{ ok: boolean }>('/api/social/block', { userId }),
@@ -2365,26 +2982,87 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Get (or lazily generate) my invite code + shareable link */
       code: () =>
         get<{ code: string; link: string; shareText: string }>('/api/referrals/code'),
-      /** How many people signed up using my code */
+      /** My invitees (with reward status), pending vs earned Thread Cash, link clicks */
       stats: () =>
-        get<{ total: number; pointsEarned: number; referrals: Array<{ inviteeId: string; name: string | null; joinedAt: string }> }>(
-          '/api/referrals/stats'
-        ),
+        get<{
+          total: number;
+          pointsEarned: number;
+          clicks?: number;
+          earnedCents?: number;
+          pendingCents?: number;
+          referrals: Array<{
+            inviteeId: string;
+            name: string | null;
+            joinedAt: string;
+            status?: 'pending' | 'qualified' | 'rewarded' | 'capped';
+            rewardCents?: number;
+          }>;
+        }>('/api/referrals/stats'),
       /** Attribute a referral to the current user — call once after signup with the code they entered */
       apply: (code: string, expectedClerkId?: string) =>
-        post<{ ok: boolean; inviterId: string }>('/api/referrals/apply', {
+        post<{ ok: boolean; inviterId: string; inviteeRewardCents?: number }>('/api/referrals/apply', {
           code,
           ...(expectedClerkId ? { expectedClerkId } : {}),
         }),
+    },
+    /** Affiliate / creator program — creator side (/api/affiliate) and seller side (/api/seller/affiliate) */
+    affiliate: {
+      overview: () => get<import('./affiliateTypes').CreatorOverview>('/api/affiliate/overview'),
+      brand: (ref: string) => get<import('./affiliateTypes').BrandProgramInfo>(`/api/affiliate/brands/${encodeURIComponent(ref)}`),
+      apply: (sellerId: string) =>
+        post<{ id: string; status: string; code: string }>(`/api/affiliate/brands/${encodeURIComponent(sellerId)}/apply`, {}),
+      respondToInvite: (id: string, accept: boolean) =>
+        post<{ id: string; status: string }>(`/api/affiliate/invites/${encodeURIComponent(id)}/${accept ? 'accept' : 'decline'}`, {}),
+      payouts: () =>
+        get<{ payouts: import('./affiliateTypes').CreatorPayout[]; payout: import('./affiliateTypes').CreatorPayoutStatus }>('/api/affiliate/payouts'),
+      onboardPayouts: () => post<{ url: string }>('/api/affiliate/payout-account/onboard', {}),
+      /** Public, unauthenticated: records a click on a creator link. */
+      click: (code: string, visitorId?: string) =>
+        post<{ valid: boolean; code: string; sellerId: string }>('/api/public/affiliate/click', { code, visitorId }),
+      attach: (code: string) =>
+        post<{ attributed: boolean; reason?: string }>('/api/affiliate/attach', { code }),
+      seller: {
+        overview: () => get<import('./affiliateTypes').SellerAffiliateOverview>('/api/seller/affiliate'),
+        saveProgram: (body: Partial<{
+          enabled: boolean; commissionPercent: number; buyerDiscountPercent: number; windowDays: number;
+          holdDays: number; minPayoutCents: number; autoApprove: boolean;
+        }>) => put<{ program: import('./affiliateTypes').SellerProgram }>('/api/seller/affiliate/program', body),
+        invite: (username: string, commissionPercent?: number) =>
+          post<{ id: string; status: string }>('/api/seller/affiliate/creators/invite', { username, ...(commissionPercent != null ? { commissionPercent } : {}) }),
+        approve: (id: string) => post<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}/approve`, {}),
+        update: (id: string, body: { status?: 'active' | 'paused'; commissionPercent?: number | null }) =>
+          patch<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}`, body),
+        remove: (id: string) => del<{ id: string; status: string }>(`/api/seller/affiliate/creators/${encodeURIComponent(id)}`),
+        payouts: () => get<{ payouts: Array<{ id: string; creatorName: string; amountCents: number; state: string; paidAt: string | null; createdAt: string }>; payoutsAvailable: boolean }>('/api/seller/affiliate/payouts'),
+      },
     },
     /** Server-side privacy settings */
     privacy: {
       /** Get current server-side privacy preferences */
       get: () =>
-        get<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy'),
+        get<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean; canBePrivate?: boolean }>('/api/auth/privacy'),
       /** Update server-side privacy preferences */
-      update: (settings: { dmPrivacy?: 'requests' | 'followers_only' }) =>
-        patch<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy', settings),
+      update: (settings: { dmPrivacy?: 'requests' | 'followers_only'; isPrivate?: boolean }) =>
+        patch<{ dmPrivacy: 'requests' | 'followers_only'; isPrivate?: boolean }>('/api/auth/privacy', settings),
+    },
+    /** Private-account follow requests (incoming) and the Close Friends list. */
+    followRequests: {
+      list: (limit = 50, offset = 0) =>
+        get<Array<{ userId: string; name: string; username: string | null; handle: string; avatarUrl: string | null; requestedAt: string }>>(
+          `/api/social/follow-requests?limit=${limit}&offset=${offset}`,
+        ),
+      approve: (userId: string) =>
+        post<{ ok: boolean; status: 'approved' }>(`/api/social/follow-requests/${encodeURIComponent(userId)}/approve`, {}),
+      decline: (userId: string) =>
+        post<{ ok: boolean; status: 'declined' }>(`/api/social/follow-requests/${encodeURIComponent(userId)}/decline`, {}),
+    },
+    closeFriends: {
+      get: () =>
+        get<{ friendIds: string[]; friends: Array<{ userId: string; name: string; username: string | null; handle: string; avatarUrl: string | null }> }>(
+          '/api/social/close-friends',
+        ),
+      replace: (friendIds: string[]) =>
+        put<{ ok: boolean; friendIds: string[]; skipped: string[] }>('/api/social/close-friends', { friendIds }),
     },
     /**
      * Server-side "seen" state for the buyer "Watching Threads" gesture coach
@@ -2440,21 +3118,68 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       unsubscribe: (id: string) =>
         del<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),
     },
+    /** Seller email marketing (list, campaigns, sending) */
+    emailMarketing: {
+      status:   () => get<EmailMarketingStatus>('/api/marketing/email/status'),
+      settings: () => get<EmailSettings>('/api/marketing/email/settings'),
+      saveSettings: (data: Omit<EmailSettings, 'defaultFromName'>) => put<{ ok: boolean }>('/api/marketing/email/settings', data),
+      audience: (offset = 0) => freshGet<EmailAudienceResponse>(`/api/marketing/email/audience?limit=50&offset=${offset}`),
+      exportCsv: () => getText('/api/marketing/email/audience/export'),
+      removeSubscriber: (id: string) => del<{ ok: boolean }>(`/api/marketing/email/subscribers/${encodeURIComponent(id)}`),
+      campaigns: () => freshGet<{ campaigns: EmailCampaign[] }>('/api/marketing/email/campaigns'),
+      campaign: (id: string) => freshGet<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}`),
+      createCampaign: (data: EmailCampaignInput) => post<EmailCampaign>('/api/marketing/email/campaigns', data),
+      updateCampaign: (id: string, data: EmailCampaignInput) => put<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}`, data),
+      deleteCampaign: (id: string) => del<{ ok: boolean }>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}`),
+      preview: (id: string) => post<{ html: string; text: string }>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/preview`, {}),
+      sendTest: (id: string) => post<{ ok: boolean; sentTo: string }>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/test`, {}),
+      send: (id: string, scheduleAt?: string) => post<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/send`, scheduleAt ? { scheduleAt } : {}),
+      unschedule: (id: string) => post<EmailCampaign>(`/api/marketing/email/campaigns/${encodeURIComponent(id)}/unschedule`, {}),
+    },
+    /** Buyer discovery: normalized categories and real-signal trending (public). */
+    publicDiscovery: {
+      categories: () =>
+        get<{ categories: Array<{ slug: string; label: string; productCount: number; coverImageUrl: string | null }> }>(
+          '/api/public/categories',
+        ),
+      categoryProducts: (slug: string, opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        if (opts.limit) params.set('limit', String(opts.limit));
+        if (opts.offset) params.set('offset', String(opts.offset));
+        const q = params.toString();
+        return get<{ slug: string; label: string | null; total: number; products: any[] }>(
+          `/api/public/categories/${encodeURIComponent(slug)}/products${q ? `?${q}` : ''}`,
+        );
+      },
+      trendingProducts: (limit = 12) =>
+        get<{ windowDays: number; products: any[] }>(`/api/public/trending/products?limit=${encodeURIComponent(String(limit))}`),
+      trendingBrands: (limit = 12) =>
+        get<{ windowDays: number; brands: Array<{
+          id: string; sellerId: string; name: string; brandType: string | null; logoUrl: string | null;
+          coverImageUrl: string | null; followerCount: number; verified: boolean;
+        }> }>(`/api/public/trending/brands?limit=${encodeURIComponent(String(limit))}`),
+    },
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
       list:   () => get<any[]>('/api/discount-codes'),
+      collections: () => get<Array<{ id: string; title: string }>>('/api/discount-codes/collections'),
       create: (data: {
         code?: string;
         type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
         value?: number;
         minOrderCents?: number;
-        appliesTo?: 'entire_store' | 'specific_products';
+        appliesTo?: 'entire_store' | 'specific_products' | 'collections';
         productIds?: string[];
+        collectionIds?: string[];
+        firstOrderOnly?: boolean;
+        minQuantity?: number;
         maxUses?: number | null;
         singleUse?: boolean;
         oneUsePerCustomer?: boolean;
         startsAt?: string | null;
         expiresAt?: string | null;
+        /** Live-only code: valid only for this stream, while it is live. */
+        liveStreamId?: string;
       }) => post<any>('/api/discount-codes', data),
       update: (id: string, data: {
         active?: boolean;
@@ -2463,14 +3188,62 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         minOrderCents?: number;
         maxUses?: number | null;
         oneUsePerCustomer?: boolean;
-        appliesTo?: 'entire_store' | 'specific_products';
+        appliesTo?: 'entire_store' | 'specific_products' | 'collections';
         productIds?: string[];
+        collectionIds?: string[];
+        firstOrderOnly?: boolean;
+        minQuantity?: number;
         value?: number;
       }) => patch<any>(`/api/discount-codes/${id}`, data),
       delete: (id: string) => del<any>(`/api/discount-codes/${id}`),
       uses:   (id: string) => get<any[]>(`/api/discount-codes/${id}/uses`),
-      validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
-        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
+      validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[], liveStreamId?: string) =>
+        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}${liveStreamId ? `&liveStreamId=${encodeURIComponent(liveStreamId)}` : ''}`),
+    },
+    /** Automatic sales — seller-managed price reductions (no code needed) */
+    sales: {
+      list:        () => get<any[]>('/api/sales'),
+      collections: () => get<string[]>('/api/sales/collections'),
+      create: (data: {
+        name: string; discountType: 'percent' | 'fixed'; value: number;
+        scope: 'store' | 'products' | 'collection'; productIds?: string[]; collection?: string | null;
+        startsAt?: string | null; endsAt?: string | null; active?: boolean;
+      }) => post<any>('/api/sales', data),
+      update: (id: string, data: Partial<{
+        name: string; discountType: 'percent' | 'fixed'; value: number;
+        scope: 'store' | 'products' | 'collection'; productIds: string[]; collection: string | null;
+        startsAt: string | null; endsAt: string | null; active: boolean;
+      }>) => patch<any>(`/api/sales/${id}`, data),
+      delete: (id: string) => del<any>(`/api/sales/${id}`),
+    },
+    /** Seller follower push broadcasts (1 per rolling 24h, enforced server-side). */
+    sellerPush: {
+      status: () => get<any>('/api/seller/push-broadcasts'),
+      preview: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+        post<any>('/api/seller/push-broadcasts/preview', body),
+      send: (body: { title: string; body: string; deeplinkType?: string | null; deeplinkId?: string | null }) =>
+        post<any>('/api/seller/push-broadcasts', body),
+      results: (id: string) => get<any>(`/api/seller/push-broadcasts/${encodeURIComponent(id)}`),
+    },
+    /** Seller giveaway tool. */
+    sellerGiveaways: {
+      list: () => get<{ giveaways: any[] }>('/api/seller/giveaways'),
+      get: (id: string) => get<any>(`/api/seller/giveaways/${encodeURIComponent(id)}`),
+      create: (body: unknown) => post<any>('/api/seller/giveaways', body),
+      rulesTemplate: (query: string) => get<{ rulesText: string }>(`/api/seller/giveaways/rules-template?${query}`),
+      end: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/end`, {}),
+      cancel: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/cancel`, {}),
+      draw: (id: string) => post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/draw`, {}),
+      redraw: (id: string, winnerId: string, reason: string) =>
+        post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/redraw`, { reason }),
+      markShipped: (id: string, winnerId: string, shipped: boolean) =>
+        post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/shipped`, { shipped }),
+      myPosts: () => get<any[]>('/api/posts/mine?limit=30'),
+    },
+    /** Buyer-facing giveaway reads (card on a brand's profile + the entry page). */
+    giveaways: {
+      liveForSeller: (sellerId: string) => get<{ giveaway: any | null }>(`/api/giveaways/seller/${encodeURIComponent(sellerId)}/live`),
+      get: (code: string) => get<any>(`/api/giveaways/${encodeURIComponent(code)}`),
     },
     /** Returns — buyer-initiated return requests */
     returns: {
@@ -2552,6 +3325,48 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       sellerNotify:  (variantId: string) =>
         post<{ notified: number }>(`/api/waitlist/seller/notify/${encodeURIComponent(variantId)}`, {}),
     },
+    /** Scheduled product launches + "Notify me". */
+    productLaunches: {
+      /** Public: is this product waiting on a launch time? */
+      state:       (productId: string) =>
+        get<{ launching: boolean; launchAt: string | null; serverNow: string }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+      alertStatus: (productId: string) =>
+        get<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      alertOn:     (productId: string) =>
+        post<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`, {}),
+      alertOff:    (productId: string) =>
+        del<{ subscribed: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}/alert`),
+      /** Seller. */
+      list:        () => get<Array<{
+        productId: string; name: string; imageUrl: string | null; status: string;
+        launchAt: string; launchedAt: string | null; notifyFollowers: boolean; alertCount: number;
+      }>>('/api/product-launches'),
+      schedule:    (productId: string, data: { launchAt: string; notifyFollowers?: boolean }) =>
+        put<any>(`/api/product-launches/${encodeURIComponent(productId)}`, data),
+      cancel:      (productId: string) =>
+        del<{ cancelled: boolean }>(`/api/product-launches/${encodeURIComponent(productId)}`),
+    },
+    /** Pre-order ship-by terms (60-day refund window). */
+    preorderTerms: {
+      get: (productId: string) =>
+        get<{ shipBy: string; daysLeft: number; closingDate: string | null; refundWindowDays: number; refundCopy: string; note: string | null }>(
+          `/api/preorder-terms/${encodeURIComponent(productId)}`),
+      set: (productId: string, data: { shipBy: string; note?: string | null }) =>
+        put<any>(`/api/preorder-terms/${encodeURIComponent(productId)}`, data),
+    },
+    /** Reusable size chart templates — seller CRUD, apply to products. */
+    sizeChartTemplates: {
+      list:   () => get<{ templates: SizeChartTemplateSummary[]; presets: SizeChartPreset[] }>('/api/size-chart-templates'),
+      get:    (id: string) => get<SizeChartTemplateDetail>(`/api/size-chart-templates/${encodeURIComponent(id)}`),
+      create: (data: { name: string; chart?: SizeChartData; fromProductId?: string }) =>
+        post<SizeChartTemplateSummary>('/api/size-chart-templates', data),
+      update: (id: string, data: { name?: string; chart?: SizeChartData }) =>
+        put<SizeChartTemplateSummary>(`/api/size-chart-templates/${encodeURIComponent(id)}`, data),
+      delete: (id: string) => del<{ success: boolean }>(`/api/size-chart-templates/${encodeURIComponent(id)}`),
+      apply:  (id: string, productIds: string[]) =>
+        post<{ applied: number }>(`/api/size-chart-templates/${encodeURIComponent(id)}/apply`, { productIds }),
+      sync:   (id: string) => post<{ synced: number }>(`/api/size-chart-templates/${encodeURIComponent(id)}/sync`, {}),
+    },
     /** Product bundles — seller CRUD. */
     bundles: {
       list:       () => get<any[]>('/api/bundles'),
@@ -2566,6 +3381,43 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         del<any>(`/api/bundles/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
       publicList: (sellerId: string) =>
         get<any[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
+    },
+    /** "Complete the fit" — seller-curated related products for a product page. */
+    productPairings: {
+      get:  (productId: string) =>
+        freshGet<{ pairings: ProductPairing[] }>(`/api/product-pairings/${encodeURIComponent(productId)}`),
+      save: (productId: string, pairedProductIds: string[]) =>
+        put<{ pairings: ProductPairing[] }>(`/api/product-pairings/${encodeURIComponent(productId)}`, { pairedProductIds }),
+      /** Public (works signed out): active products only. */
+      publicList: (productId: string) =>
+        get<PublicPairedProduct[]>(`/api/product-pairings/public/${encodeURIComponent(productId)}`),
+    },
+    /** Product video — one short silent video per product. */
+    productVideos: {
+      get:    (productId: string) =>
+        freshGet<{ video: ProductVideoInfo | null }>(`/api/product-videos/${encodeURIComponent(productId)}`),
+      upload: (productId: string, uri: string, mimeType?: string | null, onProgress?: (fraction: number) => void) =>
+        uploadVideoWithProgress<{ video: ProductVideoInfo }>(
+          `/api/product-videos/${encodeURIComponent(productId)}`, { uri, mimeType }, getToken, getCacheScope, onProgress,
+        ),
+      remove: (productId: string) =>
+        del<{ video: null }>(`/api/product-videos/${encodeURIComponent(productId)}`),
+      /** Public (works signed out). */
+      publicGet: (productId: string) =>
+        get<{ video: ProductVideoInfo | null }>(`/api/product-videos/public/${encodeURIComponent(productId)}`),
+    },
+    /** Variant option axes, matrix generation, bulk variant edits and stock rules. */
+    productVariants: {
+      get:      (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}`),
+      putAxes:  (productId: string, axes: Array<{ name: string; values: string[] }>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/axes`, { axes }),
+      generate: (productId: string, data: { priceCents?: number; stock?: number; lowStockThreshold?: number; baseSku?: string }) =>
+        post<any>(`/api/product-variants/${encodeURIComponent(productId)}/generate`, data),
+      bulkUpdate: (productId: string, updates: Array<{ variantId: string; priceCents?: number; stock?: number; sku?: string; lowStockThreshold?: number }>) =>
+        patch<any>(`/api/product-variants/${encodeURIComponent(productId)}/variants/bulk`, { updates }),
+      getStockRules: (productId: string) => get<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`),
+      putStockRules: (productId: string, data: Record<string, unknown>) =>
+        put<any>(`/api/product-variants/${encodeURIComponent(productId)}/stock-rules`, data),
     },
     // (buyer key defined earlier in this object — no duplicate)
     /** Team members — invite flow, roles, and activity log */
@@ -2654,6 +3506,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get: (id: string) => get<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}`),
       continue: (id: string) => post<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}/continue`, {}),
     },
+    /** CSV (Shopify / Etsy / Brandthread layouts) and Etsy product import. */
+    productImport: {
+      providers: () => get<ImportProviders>('/api/product-import/providers'),
+      runs: () => get<{ runs: ImportRun[] }>('/api/product-import/runs'),
+      previewCsv: (csv: string) => request<ImportPreview>(
+        '/api/product-import/csv/preview', { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      commitCsv: (csv: string, filename?: string) => request<ImportCommitResult>(
+        `/api/product-import/csv/commit${filename ? `?filename=${encodeURIComponent(filename)}` : ''}`,
+        { method: 'POST', body: csv, headers: { 'Content-Type': 'text/csv' } },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyConnect: () => post<{ authorizeUrl: string }>('/api/product-import/etsy/connect/start', {}),
+      etsyDisconnect: () => post<{ ok: boolean }>('/api/product-import/etsy/disconnect', {}),
+      etsyPreview: () => request<ImportPreview>('/api/product-import/etsy/preview', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+      etsyCommit: () => request<ImportCommitResult>('/api/product-import/etsy/commit', { method: 'POST', body: '{}' },
+        getToken, false, getCacheScope, false, EXPENSIVE_REQUEST_TIMEOUT_MS),
+    },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {
       list: () => get<any[]>('/api/disputes'),
@@ -2664,6 +3534,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/disputes/${encodeURIComponent(id)}/submit`, {}),
       accept: (id: string) =>
         post<any>(`/api/disputes/${encodeURIComponent(id)}/accept`, {}),
+      /** Stored status events merged with Stripe's live state. */
+      timeline: (id: string) =>
+        freshGet<DisputeTimeline>(`/api/disputes/${encodeURIComponent(id)}/timeline`),
+      /** JPEG / PNG / PDF, 5 MB max. `type` is the Stripe evidence field. */
+      uploadEvidenceFile: (
+        id: string,
+        file: { uri: string; mimeType: string; name?: string },
+        type: DisputeFileType,
+      ) => uploadImage<{ file: DisputeEvidenceFile }>(
+        `/api/disputes/${encodeURIComponent(id)}/evidence/upload?type=${encodeURIComponent(type)}${file.name ? `&filename=${encodeURIComponent(file.name)}` : ''}`,
+        { uri: file.uri, mimeType: file.mimeType },
+        getToken,
+        getCacheScope,
+      ),
     },
     /** Finance / Payouts dashboard — real Stripe Connect data */
     finance: {
@@ -2678,8 +3562,40 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<any>(`/api/finance/transactions${q.toString() ? `?${q}` : ''}`);
       },
       statementCsvUrl: () => '/api/finance/statement.csv',
-      payout: (data: { idempotencyKey: string; amount: number; currency: string }) =>
+      /** Fee schedule (no auth). Derived server-side from lib/money/fees.ts. */
+      feeSchedule: () => get<any>('/api/public/fee-schedule'),
+      payout: (data: { idempotencyKey: string; amount: number; currency: string; method?: 'standard' | 'instant' }) =>
         post<any>('/api/finance/payout', data),
+      /** Current schedule, Instant eligibility and fee quote (optionally for an amount in cents), next payout estimate. */
+      payoutSchedule: (amountCents?: number) =>
+        freshGet<PayoutScheduleInfo>(`/api/finance/payout-schedule${amountCents ? `?amount=${amountCents}` : ''}`),
+      setPayoutSchedule: (data: { interval: 'daily' | 'weekly' | 'manual'; weeklyAnchor?: WeeklyAnchor }) =>
+        patch<{ changed: boolean; schedule: PayoutScheduleInfo['schedule'] }>('/api/finance/payout-schedule', data),
+      /** One payout with its Sales / fees / refunds / holds breakdown. */
+      payoutDetail: (id: string) =>
+        freshGet<PayoutDetail>(`/api/finance/payouts/${encodeURIComponent(id)}`),
+    },
+    /** Seller payment settings (Buy now, pay later opt-in). */
+    sellerPaymentSettings: {
+      get: () => get<{ bnplEnabled: boolean; bnplAvailable: boolean }>('/api/seller/payment-settings'),
+      setBnpl: (bnplEnabled: boolean) =>
+        patch<{ bnplEnabled: boolean; bnplAvailable: boolean }>('/api/seller/payment-settings', { bnplEnabled }),
+    },
+    /** Monthly seller statements (list, JSON summary, authenticated PDF/CSV bytes). */
+    statements: {
+      list: (limit?: number) => freshGet<StatementList>(`/api/finance/statements${limit ? `?limit=${limit}` : ''}`),
+      get:  (month: string) => freshGet<StatementDetail>(`/api/finance/statements/${encodeURIComponent(month)}`),
+      /** Bearer-authenticated file download; returns the raw bytes. */
+      download: async (month: string, format: StatementFormat): Promise<ArrayBuffer> => {
+        const token = await getCachedToken(getToken);
+        const res = await fetchWithTimeout(
+          `${BASE}${versionApiPath(`/api/finance/statements/${encodeURIComponent(month)}.${format}`)}`,
+          { method: 'GET', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() } },
+          EXPENSIVE_REQUEST_TIMEOUT_MS,
+        );
+        if (!res.ok) throw new ApiError(res.status, await res.text());
+        return res.arrayBuffer();
+      },
     },
     /** Taxes & Duties — Stripe Tax integration */
     taxes: {
@@ -2702,11 +3618,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Live Shopping — Agora-powered live streams */
     live: {
-      start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string }) =>
+      start:          (data: { title: string; description?: string; productTags?: any[]; thumbnailUrl?: string; scheduledLiveId?: string }) =>
         post<any>('/api/live/start', data),
       active:         () => get<{ streams: any[] }>('/api/live/active'),
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
-      join:           (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}),
+      join:           (id: string) => trackAfter(post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}), [['live_joined']]),
       leave:          (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/leave`, {}),
       /** HTTP presence fallback — only used when the WebSocket can't connect (see lib/live/useLiveSocket.ts). */
       heartbeat:      (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/heartbeat`, {}),
@@ -2715,9 +3631,48 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         patch<any>(`/api/live/${encodeURIComponent(id)}/products`, { productTags }),
       comment:        (id: string, data: { message: string; displayName?: string; avatarUrl?: string }) =>
         post<any>(`/api/live/${encodeURIComponent(id)}/comment`, data),
+      // ── Live commerce (pin) ── routes/live-commerce.ts
+      /** Pin a tagged product (productId) or unpin (null); broadcast to viewers over the live socket. */
+      pin:            (id: string, productId: string | null) =>
+        post<{ pinnedProductId: string | null; productTags: any[] }>(`/api/live/${encodeURIComponent(id)}/pin`, { productId }),
+      // ── end live commerce ──
       comments:       (id: string, since?: string) =>
         get<{ comments: any[] }>(`/api/live/${encodeURIComponent(id)}/comments${since ? `?since=${encodeURIComponent(since)}` : ''}`),
     },
+    // ── BEGIN live moderation + co-host (routes/live-moderation.ts, routes/live-cohost.ts) ──
+    liveMod: {
+      get:         (id: string) => get<LiveModerationState>(`/api/live/${encodeURIComponent(id)}/moderation`),
+      saveSettings: (id: string, data: { bannedWords?: string[]; slowModeSeconds?: number; saveAsDefault?: boolean }) =>
+        put<{ bannedWords: string[]; slowModeSeconds: number }>(`/api/live/${encodeURIComponent(id)}/moderation/settings`, data),
+      pin:         (id: string, commentId: string | null) =>
+        post<{ pinnedComment: any }>(`/api/live/${encodeURIComponent(id)}/moderation/pin`, { commentId }),
+      mute:        (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/moderation/mute`, { userId }),
+      unmute:      (id: string, userId: string) => del<any>(`/api/live/${encodeURIComponent(id)}/moderation/mute/${encodeURIComponent(userId)}`),
+      ban:         (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/moderation/ban`, { userId }),
+      unban:       (id: string, userId: string) => del<any>(`/api/live/${encodeURIComponent(id)}/moderation/ban/${encodeURIComponent(userId)}`),
+      removeComment: (id: string, commentId: string) =>
+        del<any>(`/api/live/${encodeURIComponent(id)}/moderation/comments/${encodeURIComponent(commentId)}`),
+      /** Anyone: the pinned comment + slow-mode seconds for the viewer chat header. */
+      pinned:      (id: string) => get<{ pinnedComment: any | null; slowModeSeconds: number }>(`/api/live/${encodeURIComponent(id)}/pinned`),
+      defaults:    () => get<{ bannedWords: string[]; slowModeSeconds: number }>('/api/live/moderation-defaults'),
+      saveDefaults: (data: { bannedWords: string[]; slowModeSeconds: number }) =>
+        put<{ bannedWords: string[]; slowModeSeconds: number }>('/api/live/moderation-defaults', data),
+    },
+    liveCohost: {
+      candidates:  (q: string) => get<{ sellers: LiveCohostCandidate[] }>(`/api/live/cohost-candidates?q=${encodeURIComponent(q)}`),
+      invites:     () => get<{ invites: LiveCohostInvite[] }>('/api/live/cohost-invites'),
+      list:        (id: string) => get<{ cohosts: LiveCohostPerson[] }>(`/api/live/${encodeURIComponent(id)}/cohosts`),
+      invite:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/invite`, { userId }),
+      cancel:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/cancel`, { userId }),
+      respond:     (id: string, accept: boolean) =>
+        post<{ ok: boolean; status: string; channelName?: string; agoraUid?: number; agoraAppId?: string; token?: string }>(
+          `/api/live/${encodeURIComponent(id)}/cohost/respond`, { accept }),
+      token:       (id: string) =>
+        post<{ channelName: string; agoraUid: number; agoraAppId: string; token: string }>(`/api/live/${encodeURIComponent(id)}/cohost/token`, {}),
+      remove:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/remove`, { userId }),
+      leave:       (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/leave`, {}),
+    },
+    // ── END live moderation + co-host ──
     /** AI — brand memory, proactive suggestions */
     ai: {
       brandMemoryRebuild: () => postExpensive<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
@@ -2807,10 +3762,47 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        */
       verify: (id: string) =>
         post<any>(`/api/boosts/${encodeURIComponent(id)}/pay/verify`, {}),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and grants the boost. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/boost/${encodeURIComponent(id)}/verify`, { transactionId }),
       update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
       summary: () =>
         get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
+    },
+    /** Featured brand slots on Discover (seller purchase flow; /active is public). */
+    featuredSlots: {
+      active: () => get<{ label: 'Featured'; brands: FeaturedBrand[] }>('/api/featured-slots/active'),
+      availability: () => freshGet<FeaturedAvailability>('/api/featured-slots/availability'),
+      mine: () => freshGet<FeaturedSlot[]>('/api/featured-slots/mine'),
+      reserve: (durationDays: number) => post<FeaturedSlot>('/api/featured-slots', { durationDays }),
+      pay: (id: string, returnUrl: string) =>
+        post<{ sessionId: string; url: string | null; paymentStatus: string; status: string }>(
+          `/api/featured-slots/${encodeURIComponent(id)}/pay`, { returnUrl }),
+      verify: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/pay/verify`, {}),
+      cancel: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/cancel`, {}),
+    },
+    /** Sponsored placement in For You: slots to splice in + impression confirmation. */
+    promotions: {
+      sponsored: (p: { sessionId: string; organicOffset: number; organicCount: number }) =>
+        freshGet<{ slots: Array<{ afterIndex: number; boostId: string; label: 'Sponsored'; post: any }> }>(
+          `/api/promotions/sponsored?sessionId=${encodeURIComponent(p.sessionId)}&organicOffset=${p.organicOffset}&organicCount=${p.organicCount}`),
+      impression: (boostId: string, sessionId: string) =>
+        post<{ counted: boolean }>('/api/promotions/sponsored/impression', { boostId, sessionId }),
+    },
+    /** Admin approval queue for boosts + featured slots (users.role = 'admin'). */
+    adminPromotions: {
+      queue: (params: { status?: 'in_review' | 'approved' | 'rejected' | 'all'; kind?: 'all' | 'boost' | 'featured_slot' } = {}) => {
+        const q = new URLSearchParams();
+        if (params.status) q.set('status', params.status);
+        if (params.kind) q.set('kind', params.kind);
+        const suffix = q.toString();
+        return freshGet<AdminPromotionQueue>(`/api/admin/promotions${suffix ? `?${suffix}` : ''}`);
+      },
+      approve: (kind: 'boost' | 'featured_slot', id: string) =>
+        post<{ state: string }>(`/api/admin/promotions/${kind === 'boost' ? 'boosts' : 'featured'}/${encodeURIComponent(id)}/approve`, {}),
+      reject: (kind: 'boost' | 'featured_slot', id: string, reason: string) =>
+        post<{ state: string; refundStatus: string }>(`/api/admin/promotions/${kind === 'boost' ? 'boosts' : 'featured'}/${encodeURIComponent(id)}/reject`, { reason }),
     },
     /** Ad Campaigns — end-to-end Create Ad flow with media upload, payment, and lifecycle. */
     adCampaigns: {
@@ -2881,6 +3873,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/ad-campaigns/${encodeURIComponent(id)}/pay/verify`,
           {},
         ),
+      /** Native store purchase (RevenueCat consumable): server re-reads it and grants the campaign. */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/campaign/${encodeURIComponent(id)}/verify`, { transactionId }),
     },
     /**
      * Meta (Facebook & Instagram) Ads — OAuth connection, campaign builder,
@@ -2966,7 +3961,41 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       redeem: (body: { points: number }) =>
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
     },
+    /** Store gift cards: buy, send, wallet, and the store's own settings and list. */
+    giftCards: {
+      store: (sellerId: string) => get<GiftCardStoreInfo>(`/api/gift-cards/store/${encodeURIComponent(sellerId)}`),
+      purchase: (body: {
+        sellerId: string; amountCents: number; recipientEmail: string; recipientName?: string; message?: string;
+        forSelf?: boolean; clientIdempotencyKey: string;
+      }) => post<{ giftCardId: string; paymentIntentId: string; clientSecret: string | null; amountCents: number }>('/api/gift-cards/purchase', body),
+      confirmPurchase: (giftCardId: string) =>
+        post<{ status: 'paid' | 'processing' | 'unpaid'; card: GiftCard; code: string | null }>(
+          `/api/gift-cards/purchase/${encodeURIComponent(giftCardId)}/confirm`, {}),
+      claim: (code: string) => post<{ card: GiftCard; storeName: string }>('/api/gift-cards/claim', { code }),
+      mine: () => freshGet<{ cards: GiftCard[]; totalCents: number }>('/api/gift-cards/mine'),
+      get: (id: string) =>
+        get<{ card: GiftCard; history: GiftCardHistoryEntry[] }>(`/api/gift-cards/mine/${encodeURIComponent(id)}`),
+      seller: {
+        settings: () => freshGet<GiftCardSettings>('/api/gift-cards/seller/settings'),
+        saveSettings: (body: { enabled?: boolean; denominations?: number[]; allowCustom?: boolean; expiryMonths?: number | null }) =>
+          put<GiftCardSettings>('/api/gift-cards/seller/settings', body),
+        cards: () => freshGet<{ cards: GiftCard[]; outstandingCents: number }>('/api/gift-cards/seller/cards'),
+        issue: (body: { amountCents: number; recipientEmail: string; recipientName?: string; message?: string }) =>
+          post<{ card: GiftCard; code: string; emailed: boolean }>('/api/gift-cards/seller/issue', body),
+        void: (id: string) => post<{ card: GiftCard }>(`/api/gift-cards/seller/cards/${encodeURIComponent(id)}/void`, {}),
+      },
+    },
     /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
+    /** AI credits: balance, history and pack purchases (web checkout; native uses store billing). */
+    aiCredits: {
+      get: () => get<AiCreditsOverview>('/api/ai/credits'),
+      history: (limit = 30, before?: string) =>
+        get<AiCreditHistoryPage>(`/api/ai/credits/history?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+      checkout: (packId: string, returnUrl: string) =>
+        post<{ sessionId: string; url: string | null }>(`/api/ai/credits/packs/${encodeURIComponent(packId)}/checkout`, { returnUrl }),
+      verify: (sessionId: string) =>
+        post<{ credited: boolean; newlyGranted: boolean; credits: number; balance: number }>('/api/ai/credits/purchases/verify', { sessionId }),
+    },
     threadCash: {
       get: () =>
         get<ThreadCashStatus>('/api/thread-cash'),
@@ -2976,6 +4005,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<ThreadCashCheckInResult>('/api/thread-cash/daily/claim', body),
       history: (limit = 50) =>
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
+      ledger: (opts: { kind?: ThreadCashLedgerKind; offset?: number; limit?: number } = {}) =>
+        get<ThreadCashLedger>(`/api/thread-cash/ledger?limit=${opts.limit ?? 50}&offset=${opts.offset ?? 0}${opts.kind ? `&kind=${opts.kind}` : ''}`),
       redeem: (body: { amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
       /** Return an unused, unattached redemption's amount to the balance (idempotent). */
@@ -3095,7 +4126,68 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
     },
+    /** Age gate: the DOB is sent once, reduced to a band server-side, and never stored. */
+    ageGate: {
+      submit: (dateOfBirth: string) => post<{ ageBand: 'under_13' | '13_17' | '18_plus' }>('/api/auth/age', { dateOfBirth }),
+    },
+    /** Account security — emailed "Download my data" jobs. */
+    dataExportJobs: {
+      list: () => freshGet<DataExportJobsResponse>('/api/auth/data-export/jobs'),
+      create: (include: string[]) =>
+        post<{ job: DataExportJob }>('/api/auth/data-export/jobs', { include }),
+      link: (id: string) =>
+        post<{ url: string; expiresAt: string }>(`/api/auth/data-export/jobs/${encodeURIComponent(id)}/link`, {}),
+    },
+    /** Report + block helpers shared by ReportSheet and the privacy screens. */
+    trust: {
+      /** Whether I blocked this person / they blocked me. */
+      blockStatus: (userId: string) =>
+        freshGet<{ blockedByMe: boolean; blockedMe: boolean }>(`/api/social/block-status/${encodeURIComponent(userId)}`),
+    },
   };
+}
+
+export interface BuyerMeasurementsDto { heightCm?: number; weightKg?: number; chestCm?: number; waistCm?: number; hipsCm?: number }
+export interface BuyerSizesDto {
+  tops?: string; bottoms?: string; outerwear?: string; shoes?: string;
+  measurements?: BuyerMeasurementsDto;
+}
+export interface BuyerPreferences {
+  sizes: BuyerSizesDto;
+  likedBrandIds: string[];
+  styleInterests: string[];
+  surveyCompletedAt: string | null;
+  updatedAt: string | null;
+}
+/** Partial update: omitted = unchanged, null = clear, arrays replace, surveyCompleted stamps/clears surveyCompletedAt. */
+export interface BuyerPreferencesPatch {
+  sizes?: {
+    tops?: string | null; bottoms?: string | null; outerwear?: string | null; shoes?: string | null;
+    measurements?: { [K in keyof BuyerMeasurementsDto]?: number | null };
+  };
+  likedBrandIds?: string[];
+  styleInterests?: string[];
+  surveyCompleted?: boolean;
+}
+
+export type DataExportJob = {
+  id: string;
+  status: 'queued' | 'running' | 'ready' | 'failed' | 'expired';
+  categories: string[];
+  requestedAt: string;
+  readyAt: string | null;
+  expiresAt: string | null;
+  emailed: boolean;
+  downloadable: boolean;
+};
+export type DataExportJobsResponse = { jobs: DataExportJob[]; nextRequestAt: string | null; emailEnabled: boolean };
+export interface RecommendedBrand {
+  id: string; sellerId: string; name: string; brandType: string | null;
+  logoUrl: string | null; verified: boolean; followerCount: number; reason: string;
+}
+export interface ContactMatch {
+  userId: string; name: string; username: string | null; avatarUrl: string | null;
+  initials: string; color: string; handle: string; isFollowing: boolean;
 }
 
 export type BrandthreadApi = ReturnType<typeof createApi>;
@@ -3107,6 +4199,63 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
  * Memoised per user. Clerk may return a new getToken function between renders,
  * so the client reads it through a ref instead of rebuilding on function identity.
  */
+export interface HashtagTrendingTag { tag: string; rank: number; postCount: number; recentPostCount: number; score: number }
+export interface HashtagPostItem {
+  id: string; mediaType: string; mediaUrl: string; mediaUrls: string[]; thumbnailUrl: string | null;
+  aspectRatio: string; caption: string | null; hashtags: string[]; createdAt: string;
+  likesCount: number | null; commentsCount: number;
+  author: { userId: string; name: string; handle: string; avatarUrl: string | null; accountType: string | null };
+}
+export interface HashtagPostsPage { items: HashtagPostItem[]; nextCursor: string | null }
+export interface HashtagPage {
+  tag: string; postCount: number; followerCount: number; isFollowing: boolean;
+  sort: 'top' | 'recent'; posts: HashtagPostsPage;
+}
+export interface PlaceInfo {
+  id: string; name: string; city: string | null; region: string | null; country: string | null;
+  lat: number | null; lng: number | null;
+}
+export interface PlaceSearchResult {
+  /** Absent for provider suggestions that have not been saved yet; call api.places.save with providerPlaceId. */
+  id?: string; name: string; source: 'local' | 'google'; postCount: number;
+  city?: string | null; region?: string | null; country?: string | null; lat?: number | null; lng?: number | null;
+  providerPlaceId?: string; secondary?: string | null;
+}
+export interface PlacePostsPage {
+  items: Array<{
+    id: string; mediaType: string; mediaUrl: string; mediaUrls: string[]; thumbnailUrl: string | null;
+    aspectRatio: string; caption: string | null; hashtags: string[]; createdAt: string;
+    likesCount: number | null; commentsCount: number;
+    author: { userId: string; name: string; handle: string; avatarUrl: string | null; accountType: string | null };
+  }>;
+  nextCursor: string | null;
+}
+export interface PlacePage { place: PlaceInfo; postCount: number; sort: 'top' | 'recent'; posts: PlacePostsPage }
+
+// ─── Promotions (featured slots + admin approval) ─────────────────────────────
+export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+export type FeaturedSlot = {
+  id: string; placement: string; durationDays: number; priceCents: number;
+  startsAt: string; endsAt: string; status: string;
+  displayState: 'awaiting_payment' | 'in_review' | 'scheduled' | 'live' | 'rejected' | 'ended' | 'cancelled';
+  paid: boolean; rejectionReason: string | null; refundStatus: string; createdAt: string;
+};
+export type FeaturedAvailability = {
+  placement: string; capacity: number;
+  options: Array<{ durationDays: number; priceCents: number; startsAt: string; endsAt: string; availableNow: boolean }>;
+  openSlot: FeaturedSlot | null;
+};
+export type AdminPromotionItem = {
+  kind: 'boost' | 'featured_slot'; id: string;
+  seller: { userId: string; name: string; avatarUrl: string | null } | null;
+  state: 'in_review' | 'approved' | 'rejected';
+  amountCents: number; durationDays: number;
+  submittedAt: string | null; reviewedAt: string | null; rejectionReason: string | null; refundStatus: string;
+  post: { id: string; caption: string | null; mediaUrl: string | null; thumbnailUrl: string | null; mediaType: string | null } | null;
+  window: { startsAt: string; endsAt: string } | null;
+};
+export type AdminPromotionQueue = { items: AdminPromotionItem[]; summary: { pendingBoosts: number; pendingFeatured: number } };
+
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
   const getTokenRef = useRef(getToken);

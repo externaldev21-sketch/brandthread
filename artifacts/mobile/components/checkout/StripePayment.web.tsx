@@ -77,8 +77,18 @@ function makeAppearance(ck: CheckoutColors): StripeElementsOptions['appearance']
   };
 }
 
-export function StripePaymentProvider({ amountCents, children, onUnavailable }: {
+const KNOWN_TYPES = ['card', 'klarna', 'afterpay_clearpay'];
+
+/** The server's offered methods (card, plus Klarna / Afterpay when the cart qualifies); card only when unknown. */
+export function offeredPaymentTypes(types?: string[]): string[] {
+  const known = (types ?? []).filter(type => KNOWN_TYPES.includes(type));
+  return known.includes('card') ? known : ['card'];
+}
+
+export function StripePaymentProvider({ amountCents, children, onUnavailable, paymentMethodTypes }: {
   amountCents: number;
+  /** From the server's quote; must match the PaymentIntent's payment_method_types. */
+  paymentMethodTypes?: string[];
   children: React.ReactNode;
   /** Stripe.js failed to load: the screen falls back to hosted Checkout. */
   onUnavailable?: () => void;
@@ -91,21 +101,28 @@ export function StripePaymentProvider({ amountCents, children, onUnavailable }: 
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loader]);
+  const offered = offeredPaymentTypes(paymentMethodTypes);
+  const offeredKey = offered.join(',');
   const options = useMemo<StripeElementsOptions>(() => ({
     mode: 'payment',
     currency: 'usd',
     // Deferred intent: the amount only drives what the wallet sheet shows;
     // the server's PaymentIntent is the charge. Stripe needs at least 50¢.
     amount: Math.max(MIN_CARD_CHARGE_CENTS_CLIENT, Math.round(amountCents)),
-    paymentMethodTypes: ['card'],
+    paymentMethodTypes: offered,
     // Matches the server (cards are kept on the buyer's Stripe customer for
-    // next time, as the hosted flow always did).
-    setupFutureUsage: 'off_session',
+    // next time, as the hosted flow always did). Klarna / Afterpay can't be
+    // combined with a top-level setupFutureUsage, so then it is card-only.
+    ...(offered.length === 1
+      ? { setupFutureUsage: 'off_session' as const }
+      : { paymentMethodOptions: { card: { setup_future_usage: 'off_session' as const } } }),
     appearance: makeAppearance(ck),
     fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap' }],
-  }), [amountCents, ck]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [amountCents, ck, offeredKey]);
   if (!loader) return <>{children}</>;
-  return <Elements stripe={loader} options={options}>{children}</Elements>;
+  // Elements can't change its payment methods after mount, so a change remounts it.
+  return <Elements key={offeredKey} stripe={loader} options={options}>{children}</Elements>;
 }
 
 // ─── Outcomes ────────────────────────────────────────────────────────────────

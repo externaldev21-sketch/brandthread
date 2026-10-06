@@ -32,6 +32,7 @@ function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
     case 'daily_checkin': return 'Daily check-in';
     case 'streak_bonus': return 'Streak bonus';
+    case 'referral': return 'Referral';
     case 'redemption': return 'Used at checkout';
     case 'checkout_spend': return 'Spent on an order';
     case 'refund_credit': return 'Returned from a refund';
@@ -54,6 +55,7 @@ function historyGlyph(
   switch (entry.source) {
     case 'daily_checkin': return { icon: 'check-circle', color: theme.success };
     case 'streak_bonus': return { icon: 'zap', color: theme.accent };
+    case 'referral': return { icon: 'users', color: theme.success };
     case 'redemption':
     case 'checkout_spend': return { icon: 'shopping-bag', color: theme.muted };
     case 'refund_credit':
@@ -79,6 +81,7 @@ function historyGlyph(
 // explicit ?bt_preview=buyer&demo=1 opt-in.
 const PREVIEW_HISTORY: ThreadCashEntry[] = [
   { id: 'p1', buyerId: 'preview', amountCents: 10, source: 'daily_checkin', referenceId: null, note: null, createdAt: new Date().toISOString() },
+  { id: 'p7', buyerId: 'preview', amountCents: 1000, source: 'referral', referenceId: null, note: 'Referral welcome credit', createdAt: new Date(Date.now() - 0.5 * 864e5).toISOString() },
   { id: 'p2', buyerId: 'preview', amountCents: 500, source: 'send_received', referenceId: null, note: 'For the drop', createdAt: new Date(Date.now() - 864e5).toISOString() },
   { id: 'p3', buyerId: 'preview', amountCents: -800, source: 'checkout_spend', referenceId: null, note: null, createdAt: new Date(Date.now() - 2 * 864e5).toISOString() },
   { id: 'p4', buyerId: 'preview', amountCents: 100, source: 'streak_bonus', referenceId: null, note: null, createdAt: new Date(Date.now() - 3 * 864e5).toISOString() },
@@ -199,7 +202,7 @@ export default function ThreadCashScreen() {
 
   return (
     <BrandthreadScreen scrollable noSafeTop>
-      <ScreenHeader title="Thread Cash" onBack={() => goBackOr(router)} />
+      <ScreenHeader hideDivider title="Thread Cash" onBack={() => goBackOr(router)} />
       {loading ? (
         <BalanceSkeleton styles={styles} />
       ) : (
@@ -220,7 +223,7 @@ export default function ThreadCashScreen() {
                   {formatCents(status?.balanceCents ?? 0)}
                 </Text>
               )}
-              <Text style={styles.balanceHint} numberOfLines={2}>
+              <Text style={styles.balanceHint}>
                 Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
               </Text>
             </BrandthreadCard>
@@ -275,8 +278,8 @@ export default function ThreadCashScreen() {
               })}
             </View>
             <Text style={[styles.streakSub, TABULAR_NUMS, { color: theme.muted }]}>
-              Longest streak: {status?.streak.longestStreak ?? 0} days · Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)}/day,
-              {' '}${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
+              Longest streak: {status?.streak.longestStreak ?? 0} days{'\n'}
+              Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)} a day, ${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
             </Text>
           </BrandthreadCard>
 
@@ -325,6 +328,17 @@ export default function ThreadCashScreen() {
               })}
             </View>
           )}
+
+          <Pressable
+            onPress={() => router.push('/thread-cash-ledger')}
+            accessibilityRole="button"
+            accessibilityLabel="Open full Thread Cash ledger"
+            testID="thread-cash-open-ledger"
+            style={[styles.ledgerRow, { borderColor: theme.borderSubtle }]}
+          >
+            <Text style={[styles.historyLabel, { color: theme.text, flex: 1 }]}>Full ledger</Text>
+            <Feather name="chevron-right" size={ICON.md} color={theme.muted} />
+          </Pressable>
 
           {/* Rules */}
             <Text style={[styles.sectionTitle, { color: theme.text }]}>How it works</Text>
@@ -395,6 +409,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   historyLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
   historyDate: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'right' },
+  ledgerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 0, borderTopWidth: StyleSheet.hairlineWidth },
   rulesCard: { marginBottom: SP.lg, padding: 0, overflow: 'hidden' },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md },
   ruleDot: { width: 5, height: 5, borderRadius: 3, marginTop: 7 },

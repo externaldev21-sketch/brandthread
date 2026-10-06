@@ -45,6 +45,16 @@ describe('payment-intent request bodies (PCI SAQ-A: card data never reaches our 
     expect(single.groups[0].discountCode).toBe('TENOFF');
   });
 
+  it('sends each store its own code on a multi-store order and never crosses stores', () => {
+    const multi = {
+      ...session,
+      discounts: [{ code: 'S2ONLY', isValid: true, sellerId: 's2', appliedAmountCents: 500 }],
+    };
+    const body = buildCreatePaymentIntentBody({ session: multi, contact: {}, address: {}, idempotencyKey: 'k1234567', saveCard: false });
+    expect(body.groups[0]).not.toHaveProperty('discountCode');
+    expect(body.groups[1].discountCode).toBe('S2ONLY');
+  });
+
   it('quotes with only the parts of the address that price the order', () => {
     expect(canQuote({ postalCode: '1' })).toBe(false);
     expect(canQuote({ postalCode: '10012', country: 'US' })).toBe(true);
@@ -124,5 +134,17 @@ describe('quote responses', () => {
     expect(isCartQuote(null)).toBe(false);
     expect(isCartQuote({ amountCents: 100 })).toBe(false);
     expect(isCartQuote({ amountCents: 100, groups: [{}] })).toBe(false);
+  });
+});
+
+describe('quoteOffersBnpl', () => {
+  it('is true only when the server offered klarna or afterpay', async () => {
+    const { quoteOffersBnpl } = await import('./checkoutPayment');
+    const base = { amountCents: 100, groups: [] };
+    expect(quoteOffersBnpl(undefined)).toBe(false);
+    expect(quoteOffersBnpl(base)).toBe(false);
+    expect(quoteOffersBnpl({ ...base, paymentMethodTypes: ['card'] })).toBe(false);
+    expect(quoteOffersBnpl({ ...base, paymentMethodTypes: ['card', 'klarna'] })).toBe(true);
+    expect(quoteOffersBnpl({ ...base, paymentMethodTypes: ['card', 'afterpay_clearpay'] })).toBe(true);
   });
 });

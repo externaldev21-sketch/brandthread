@@ -3,6 +3,7 @@
  * AsyncStorage-backed layer. Real API failures propagate; no fake product substitution.
  */
 
+import { track } from '@/lib/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/safeAsyncStorage';
 import { previewShippingRate } from '@/lib/previewCheckout';
@@ -22,6 +23,7 @@ import {
 } from './cartTypes';
 import { formatCents } from '@/lib/money';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
+import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
@@ -147,6 +149,7 @@ function adaptApiProduct(row: any): BuyerProduct {
     variants,
     isActive: row.status ? row.status === 'active' : true,
     tags: Array.isArray(row.tags) ? row.tags : [],
+    sizeChart: row.sizeChart && typeof row.sizeChart === 'object' ? row.sizeChart : null,
   };
 }
 
@@ -329,6 +332,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
   }
 
   await saveCart(cart, k);
+  track('add_to_cart', { quantity });
 
   // Meta Pixel + Conversions API — this is the single choke point every
   // "Add to cart" entry point (product detail, shop sheet, …) funnels
@@ -594,7 +598,7 @@ async function fetchShippingRateDetails(
 
 // ─── Cart validation ──────────────────────────────────────────────────────────
 
-export async function validateCart(items: CartItem[], discountCodes: string[] = []): Promise<CartValidationResult> {
+export async function validateCart(items: CartItem[], discountCodes: string[] = [], liveStreamId?: string | null): Promise<CartValidationResult> {
   const result = await serviceRequest<{ isValid: boolean; issues: CartValidationIssue[] }>(
     '/api/buyer/cart/validate',
     {
@@ -608,6 +612,7 @@ export async function validateCart(items: CartItem[], discountCodes: string[] = 
           priceCents: item.priceCents,
         })),
         discountCodes,
+        ...(liveStreamId ? { liveStreamId } : {}),
       }),
     },
   );
@@ -751,6 +756,8 @@ export async function applyDiscount(
   code: string,
   subtotalCents: number,
   existingDiscounts: CheckoutDiscount[],
+  /** Multi-store carts: validate against this seller's group (and its own subtotal) instead of the first group. */
+  forSellerId?: string,
 ): Promise<CheckoutDiscount> {
   const trimmedCode = code.trim().toUpperCase();
   if (!trimmedCode) {
@@ -759,7 +766,11 @@ export async function applyDiscount(
   // Get current checkout session to find the seller and line items (for
   // product-scoped codes — an entire_store code ignores these anyway).
   const sess = await getCheckoutSession();
-  const group = (sess as any)?.deliveryGroups?.[0];
+  const groups: any[] = (sess as any)?.deliveryGroups ?? [];
+  const group = forSellerId ? groups.find(g => g?.sellerId === forSellerId) : groups[0];
+  if (forSellerId && Array.isArray(group?.items)) {
+    subtotalCents = group.items.reduce((sum: number, item: CartItem) => sum + item.priceCents * item.quantity, 0);
+  }
   const sellerId = group?.sellerId ?? '';
   if (!sellerId) {
     // No seller context to validate a code against — fail closed rather than
@@ -771,7 +782,8 @@ export async function applyDiscount(
     : undefined;
   try {
     const { api } = await import('@/lib/api');
-    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents, items);
+    const liveStreamId = getLiveCheckoutContext(sellerId)?.streamId;
+    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents, items, liveStreamId);
     return {
       code: result.code,
       type: result.type,
@@ -780,6 +792,7 @@ export async function applyDiscount(
       isValid: true,
       appliedAmountCents: result.appliedAmountCents,
       errorMessage: undefined,
+      ...(forSellerId ? { sellerId: forSellerId } : {}),
     } as CheckoutDiscount;
   } catch (err: any) {
     // Only a 4xx answer is the server saying "this code isn't valid". A
@@ -790,21 +803,28 @@ export async function applyDiscount(
     if (status === null || status === 408 || status === 429 || status >= 500) throw err;
     // Parse error code from API response body
     let errCode = 'UNKNOWN';
+    let errMessage = '';
     try {
-      const body = err?.message ?? '';
+      // ApiError keeps the raw JSON body ({ error: CODE, message }); older
+      // error shapes only carry it inside the message text.
+      const body = typeof err?.body === 'string' && err.body ? err.body : (err?.message ?? '');
       const match = body.match(/\{.*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
         errCode = parsed?.error ?? errCode;
+        errMessage = typeof parsed?.message === 'string' ? parsed.message : '';
       }
     } catch {}
     const msg = errCode === 'EXPIRED' ? 'This code has expired.' :
                 errCode === 'NOT_STARTED' ? "This code isn't active yet." :
                 errCode === 'MAX_USES_REACHED' ? 'This code has reached its usage limit.' :
                 errCode === 'ALREADY_USED_BY_CUSTOMER' ? "You've already used this code." :
-                errCode === 'MIN_ORDER_NOT_MET' ? 'Minimum order not met for this code.' :
+                errCode === 'MIN_ORDER_NOT_MET' ? (errMessage || 'Minimum order not met for this code.') :
                 errCode === 'NO_ELIGIBLE_ITEMS' ? 'No items in your cart qualify for this code.' :
                 errCode === 'INACTIVE' ? 'This code is paused.' :
+                errCode === 'FIRST_ORDER_ONLY' ? 'This code is only valid on your first order with this shop.' :
+                errCode === 'CUSTOMER_LIMIT_REACHED' ? "You've reached the limit for this code." :
+                errCode === 'MIN_QUANTITY_NOT_MET' ? (errMessage || 'Add more items to use this code.') :
                 'Invalid or expired discount code.';
     return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: msg };
   }

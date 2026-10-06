@@ -1,10 +1,12 @@
 /**
  * Close Friends — manage close friends list with star toggle.
- * Selection is persisted via socialService.getCloseFriendIds / saveCloseFriendIds,
- * which scope the key by the current Clerk user ID so accounts never share the list.
+ * The list is stored on the server (GET/PUT /api/social/close-friends) so it
+ * follows the account across devices and can gate close-friends stories.
+ * socialService.getCloseFriendIds / saveCloseFriendIds keep a per-account local
+ * cache that is the fallback when the server can't be reached.
  */
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -13,7 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
+import { radius } from '@/constants/radii';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -21,7 +23,9 @@ import { ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useApi } from '@/lib/api';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -29,17 +33,43 @@ export default function BuyerCloseFriends() {
   const s = makeStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [closeFriends, setCloseFriends] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const loadFriends = useCallback(async () => {
+    const [list, localIds, followers, following, remote] = await Promise.all([
+      getAcceptedFriends(),
+      getCloseFriendIds(),
+      api.social.followers().catch(() => []),
+      api.social.following().catch(() => []),
+      api.closeFriends.get().catch(() => null),
+    ]);
+    // Candidates: the existing friends list plus the real people I follow / who follow me.
+    const byId = new Map<string, Friendship>(list.map(f => [f.userId, f]));
+    const addPerson = (p: { userId: string; name: string; handle: string }) => {
+      if (byId.has(p.userId)) return;
+      byId.set(p.userId, {
+        id: p.userId, userId: p.userId, name: p.name, handle: p.handle,
+        initials: '', color: '', status: 'accepted', mutualFriendsCount: 0, updatedAt: '',
+      });
+    };
+    (Array.isArray(followers) ? followers : []).forEach(addPerson);
+    (Array.isArray(following) ? following : []).forEach(addPerson);
+    (remote?.friends ?? []).forEach(addPerson);
+    setFriends(Array.from(byId.values()));
+    // The server list is the source of truth when reachable; refresh the local cache from it.
+    const ids = remote ? remote.friendIds : localIds;
+    setCloseFriends(new Set(ids));
+    if (remote) void saveCloseFriendIds(ids).catch(() => {});
+  }, [api]);
+  const pull = usePullToRefresh(loadFriends);
+
   useFocusEffect(useCallback(() => {
-    Promise.all([getAcceptedFriends(), getCloseFriendIds()]).then(([list, ids]) => {
-      setFriends(list);
-      setCloseFriends(new Set(ids));
-    });
-  }, []));
+    void loadFriends();
+  }, [loadFriends]));
 
   const filtered = friends.filter(f =>
     f.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -60,9 +90,15 @@ export default function BuyerCloseFriends() {
     if (saving) return;
     setSaving(true);
     try {
-      await saveCloseFriendIds(Array.from(closeFriends));
+      const all = Array.from(closeFriends);
+      // Local cache first so it is never lost; 'u_…' ids are local-only placeholders the server doesn't know.
+      await saveCloseFriendIds(all);
+      const result = await api.closeFriends.replace(all.filter(id => !id.startsWith('u_')));
+      await saveCloseFriendIds([...result.friendIds, ...all.filter(id => id.startsWith('u_'))]);
       hapticSuccessAction();
       goBackOr(router);
+    } catch {
+      Alert.alert("Couldn't save", 'Your Close Friends list was kept on this device but not saved to your account. Try again.');
     } finally {
       setSaving(false);
     }
@@ -127,6 +163,7 @@ export default function BuyerCloseFriends() {
         data={filtered}
         keyExtractor={f => f.id}
         renderItem={renderFriend}
+        refreshControl={pull.refreshControl}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 120 }}
         ListEmptyComponent={
           <EmptyState
@@ -176,7 +213,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   emptyDesc: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, textAlign: 'center', maxWidth: 240 },
   findFriendsBtn: {
     marginTop: SPACING.xs, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm,
-    borderRadius: RADII.pill, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border,
   },
   findFriendsBtnText: { fontFamily: FONT.semibold, ...TYPE_SCALE.body, color: colors.foreground },
 });

@@ -6,6 +6,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   BrandMemory, BrandMemoryField, BrandMemorySummary, DEFAULT_BRAND_MEMORY,
 } from './aiTypes';
@@ -68,7 +69,7 @@ export async function rebuildBrandMemory(authToken?: string | null): Promise<Bra
 
   // Try real API first — derives brand voice from seller's actual products/posts/store
   const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-  if (API_BASE && authToken) {
+  if (!isSellerDevPreview() && API_BASE && authToken) {
     try {
       const res = await fetch(`${API_BASE}/ai/brand-memory/rebuild`, {
         method: 'POST',

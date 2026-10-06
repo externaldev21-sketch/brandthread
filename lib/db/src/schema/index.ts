@@ -1,15 +1,33 @@
+export * from './productImports';
 import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, real, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
+export * from './sizeCharts';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
+export * from './productVariantsStock';
 export * from './security';
 export * from './money';
+export * from './productLaunches';
 export * from './threadCash';
+export * from './threadCashExpiry';
 export * from './shopifyFulfillment';
+export * from './productFit';
 export * from './metaAds';
 export * from './communities';
+export * from './iapPromotions';
+export * from './sales';
+export * from './sellerAnalytics';
+export * from './affiliate';
+export * from './liveCommerce';
+export * from './growth';
+export * from './emailMarketing';
+export * from './giftCards';
+export * from './productBulkSeo';
+export * from './promotions';
+export * from './sellerPushGiveaways';
 export * from './admin';
 import { manufacturers, sellerRfqs } from './manufacturers';
+import { places } from './places';
 import { relations, sql } from 'drizzle-orm';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
@@ -37,8 +55,12 @@ export const users = pgTable('users', {
   // Referral / invite system
   inviteCode:     text('invite_code').unique(),   // lazily generated on first /referrals/code call
   referredByCode: text('referred_by_code'),       // code used when this user signed up
+  inviteLinkClicks:    integer('invite_link_clicks').notNull().default(0),
+  inviteLastClickedAt: timestamp('invite_last_clicked_at', { withTimezone: true }),
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
+  // Private account (buyers only): new followers need approval (follow_requests).
+  isPrivate:      boolean('is_private').notNull().default(false),
   // Buyer onboarding style picks (cold start for the For You ranking pipeline).
   buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
@@ -78,6 +100,11 @@ export const users = pgTable('users', {
   // with a completed identity verification before exposing a verified badge.
   activeStanding:               boolean('active_standing').notNull().default(true),
   policyRestricted:             boolean('policy_restricted').notNull().default(false),
+  // Repeat-infringer policy (see routes/ip-cases.ts): one strike per upheld
+  // takedown, auto-flag at IP_REPEAT_INFRINGER_STRIKES for moderator review.
+  ipStrikeCount:                integer('ip_strike_count').notNull().default(0),
+  ipRepeatInfringer:            boolean('ip_repeat_infringer').notNull().default(false),
+  ipRepeatInfringerFlaggedAt:   timestamp('ip_repeat_infringer_flagged_at', { withTimezone: true }),
   returnPolicy:       text('return_policy'),
   cancellationPolicy: text('cancellation_policy'),
   // ISO-3166 alpha-2 country the seller ships from. Used to resolve which
@@ -96,6 +123,7 @@ export const users = pgTable('users', {
   // by a later Clerk sync.
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
+  storeAccentColor: text('store_accent_color'),
   // Profile cover video (all account types) — a short, always-muted looping
   // clip shown in the profile hero. Separate from the avatar. Server-rendered
   // compressed rendition + poster frame, both public object paths served via
@@ -123,9 +151,15 @@ export const users = pgTable('users', {
   // a UNIQUE INDEX on lower(username) WHERE username IS NOT NULL —
   // migration 109 — not by this .unique(). Always store/compare lowercased.
   username: text('username').unique(),
+  // When the @handle last changed (migration 117). Drives the 30-day change cooldown.
+  usernameChangedAt: timestamp('username_changed_at', { withTimezone: true }),
   // Storefront visit counter — incremented by a public endpoint each time a buyer
   // views this seller's storefront. Drives the real conversion rate stat.
   storefrontVisitCount: integer('storefront_visit_count').notNull().default(0),
+  // Seller launch checklist (migration 114): first "preview as buyer" and
+  // the dismissal of the dashboard card. Published state lives on storefronts.
+  storePreviewedAt: timestamp('store_previewed_at', { withTimezone: true }),
+  launchChecklistDismissedAt: timestamp('launch_checklist_dismissed_at', { withTimezone: true }),
   // Vacation / away mode
   vacationMode:    boolean('vacation_mode').notNull().default(false),
   vacationMessage: text('vacation_message'),
@@ -138,6 +172,10 @@ export const users = pgTable('users', {
   // Master push kill switch. false suppresses push sends for every category
   // while leaving the in-app notification feed and per-category prefs intact.
   pushEnabled: boolean('push_enabled').notNull().default(true),
+  // Promotional/marketing push opt-in (App Store 4.5.4). Separate from the
+  // transactional category toggles in notificationPreferences and OFF by
+  // default; enforced server-side in lib/pushPolicy.ts / sendPushToUser.
+  promoPushOptIn: boolean('promo_push_opt_in').notNull().default(false),
   // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
   // A push falling inside the window is suppressed (feed row still written);
   // null start/end means quiet hours are off.
@@ -147,6 +185,13 @@ export const users = pgTable('users', {
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  // Soft-delete grace: the person asked to delete their account. It is hidden
+  // everywhere immediately and purged (see jobs/accountPurge.ts) once
+  // deletionScheduledFor passes, unless they restore it first.
+  deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
+  deletionScheduledFor: timestamp('deletion_scheduled_for', { withTimezone: true }),
+  // Set when signing back in during the grace period cancelled a deletion.
+  deletionCancelledAt: timestamp('deletion_cancelled_at', { withTimezone: true }),
   // Platform suspension set by a moderator. Suspended accounts cannot publish
   // and their public content is hidden from every surface.
   suspendedAt: timestamp('suspended_at', { withTimezone: true }),
@@ -154,6 +199,11 @@ export const users = pgTable('users', {
   // Terms of Service / Community Guidelines / Privacy Policy acceptance.
   termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
   termsVersion: text('terms_version'),
+  // Age gate (migration 113). Only the derived band is stored, never the date
+  // of birth. NULL = legacy account not yet asked. 'under_13' accounts are blocked.
+  ageBand: text('age_band'),
+  ageVerifiedAt: timestamp('age_verified_at', { withTimezone: true }),
+  underageBlockedAt: timestamp('underage_blocked_at', { withTimezone: true }),
   // The single official "Brandthread Agent" AI friend account (see
   // lib/brandthreadAgent.ts in api-server). At most one row may ever have
   // this set — enforced by a partial unique index in migration 091. Distinct
@@ -198,10 +248,14 @@ export const storeVisits = pgTable('store_visits', {
   // mobile app's lib/profileNavigation.ts for how each is attached.
   source:        text('source').notNull(),
   viewerUserId:  text('viewer_user_id'),
+  // 'ios' | 'android' | 'web' (migration 121) — sent by the app, else sniffed
+  // from the User-Agent. Null for rows recorded before it existed.
+  device:        text('device'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   sellerIdIndex:        index('store_visits_seller_id_idx').on(table.sellerId),
   sellerCreatedAtIndex: index('store_visits_seller_created_at_idx').on(table.sellerId, table.createdAt),
+  productCreatedAtIndex: index('store_visits_product_created_at_idx').on(table.productId, table.createdAt),
 }));
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -262,9 +316,22 @@ export const ipCases = pgTable('ip_cases', {
   moderatorNotes: text('moderator_notes'),
   assignedModeratorId: text('assigned_moderator_id'),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  // Takedown workflow (migration 231)
+  sellerId: text('seller_id'),
+  channel: text('channel').notNull().default('app'),
+  goodFaithStatement: boolean('good_faith_statement').notNull().default(false),
+  accuracyStatement: boolean('accuracy_statement').notNull().default(false),
+  signature: text('signature'),
+  takedownAt: timestamp('takedown_at', { withTimezone: true }),
+  sellerNotifiedAt: timestamp('seller_notified_at', { withTimezone: true }),
+  strikeAppliedAt: timestamp('strike_applied_at', { withTimezone: true }),
+  counterNoticeStatus: text('counter_notice_status').notNull().default('none'),
+  counterNoticeStatement: text('counter_notice_statement'),
+  counterNoticeReceivedAt: timestamp('counter_notice_received_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  sellerIdx: index('ip_cases_seller_idx').on(table.sellerId),
   statusLookupIdx: index('ip_cases_reference_token_idx').on(table.publicReference, table.statusTokenHash),
   moderationIdx: index('ip_cases_moderation_idx').on(table.status, table.createdAt),
   listingIdx: index('ip_cases_listing_idx').on(table.listingProductId),
@@ -292,6 +359,8 @@ export const productVariants = pgTable('product_variants', {
   color: text('color'),
   sku: text('sku').notNull().unique(),
   priceCents: integer('price_cents').notNull(),
+  // Seller-set "was" price, shown struck through (migration 120). Null = none.
+  compareAtPriceCents: integer('compare_at_price_cents'),
   stock: integer('stock').notNull().default(0),
   lowStockThreshold: integer('low_stock_threshold').notNull().default(10),
   // Used to resolve weight-tiered shipping zone rates at checkout (see
@@ -452,6 +521,12 @@ export const orders = pgTable('orders', {
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
   stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
+  // Stripe Radar / review signals, seller-only (see api-server lib/risk/orderRisk.ts).
+  // Null until the paid-order webhook has normalised the charge outcome.
+  riskLevel: text('risk_level'), // 'normal' | 'elevated' | 'highest'
+  riskScore: integer('risk_score'),
+  riskFlags: jsonb('risk_flags').$type<Array<{ code: string; label: string; severity: 'info' | 'medium' | 'high' }>>().default([]),
+  riskReviewed: boolean('risk_reviewed'),
   // ── Delivery guarantee (see api-server lib/delivery, migration 110) ───────
   // deliverBy is stamped at purchase: paid_at + 15 days (60 for a pre-order).
   // NULL on orders that predate the guarantee.
@@ -554,7 +629,16 @@ export const posts = pgTable('posts', {
   }>>().notNull().default([]),
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
+  /** 'thread' = public Threads feed (sellers only); 'profile' = the author's own profile grid. */
+  surface: text('surface').notNull().default('thread'),
+  /** Ordered carousel slides (photos and/or videos) for POST carousels; empty for legacy posts. */
+  slides: jsonb('slides').$type<Array<{
+    kind: 'photo' | 'video'; path: string; url: string;
+    thumbnailPath: string; thumbnailUrl: string; duration?: number;
+  }>>().notNull().default([]),
   caption: text('caption'),
+  /** Optional tagged location (see schema/places.ts). Set null if the place is removed. */
+  placeId: uuid('place_id').references(() => places.id, { onDelete: 'set null' }),
   hashtags: json('hashtags').$type<string[]>().notNull().default([]),
   // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
   // For You style-match candidate generation, which only jsonb supports.
@@ -584,9 +668,16 @@ export const posts = pgTable('posts', {
   moderatedAt: timestamp('moderated_at', { withTimezone: true }),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  // Quote repost (migration 118): the direct original this post quotes. Set
+  // to NULL (not cascaded) if the original is ever hard-deleted; `repostKind`
+  // stays 'quote' so readers can tell "original gone" from "not a quote".
+  quotedPostId: uuid('quoted_post_id'),
+  repostKind: text('repost_kind'), // null | 'quote'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
+  quotedPostFk: foreignKey({ columns: [table.quotedPostId], foreignColumns: [table.id], name: 'posts_quoted_post_id_fkey' }).onDelete('set null'),
+  quotedPostIdx: index('posts_quoted_post_idx').on(table.quotedPostId).where(sql`${table.quotedPostId} IS NOT NULL`),
   userCreatedPublishedIdx: index('posts_user_created_published_idx')
     .on(table.userId, table.createdAt)
     .where(sql`${table.postStatus} = 'published'`),
@@ -670,6 +761,8 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
   platformFeeCents: integer('platform_fee_cents'),
+  // Commission rate (bps) from the seller's plan, fixed at checkout creation.
+  platformFeeBps: integer('platform_fee_bps'),
   processingFeeEstimateCents: integer('processing_fee_estimate_cents'),
   // One-page checkout (in-app PaymentIntent, chargeModel 'transfer'): this
   // seller group's share of the cart's single PaymentIntent, fixed when the
@@ -867,7 +960,17 @@ export const referrals = pgTable('referrals', {
   inviteeId:  text('invitee_id').notNull().unique(), // Clerk userId of the new user
   inviteCode: text('invite_code').notNull(),         // the code that was used
   joinedAt:   timestamp('joined_at').defaultNow().notNull(),
-  // Reward/status columns can be added here later without breaking existing rows
+  // Migration 119: reward lifecycle. pending -> qualified (first qualifying paid
+  // order) -> rewarded (inviter cash credited) | capped (inviter hit the cap).
+  status:              text('status').notNull().default('pending'),
+  qualifiedAt:         timestamp('qualified_at', { withTimezone: true }),
+  qualifyingOrderId:   text('qualifying_order_id'),
+  inviteeRewardCents:  integer('invitee_reward_cents').notNull().default(0),
+  inviterRewardCents:  integer('inviter_reward_cents').notNull().default(0),
+  inviteeRewardEntryId: uuid('invitee_reward_entry_id'),
+  inviterRewardEntryId: uuid('inviter_reward_entry_id'),
+  rewardedAt:          timestamp('rewarded_at', { withTimezone: true }),
+  source:              text('source').notNull().default('code'), // 'code' | 'link'
 });
 
 // ─── Blocks (server-side enforcement; replaces local AsyncStorage blocks) ─────
@@ -878,6 +981,7 @@ export const blocks = pgTable('blocks', {
   createdAt:  timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   pk: primaryKey({ columns: [t.blockerId, t.blockedId] }),
+  blockedIdx: index('blocks_blocked_id_idx').on(t.blockedId),
 }));
 
 // ─── Conversations & Messages (buyer ↔ seller DM) ────────────────────────────
@@ -942,6 +1046,7 @@ export const conversationParticipants = pgTable('conversation_participants', {
   accountType:    text('account_type').notNull().default('buyer'),
   unreadCount:    integer('unread_count').notNull().default(0),
   lastReadAt:     timestamp('last_read_at'),
+  isMuted:        boolean('is_muted').notNull().default(false),
   // Chat details (DM flows PR 2) mute: null = not muted; a timestamp = muted
   // until then (a far-future sentinel represents "Until I turn it back on").
   // Per-membership, like unreadCount/lastReadAt above, since mute is a
@@ -992,6 +1097,8 @@ export const messages = pgTable('messages', {
   // read time, matching Instagram's own copy. An opportunistic sweep in the
   // messages routes hard-deletes anything past this, in place of a cron job.
   disappearAt:    timestamp('disappear_at', { withTimezone: true }),
+  // True for seller away auto-replies (migration 142).
+  isAutomated:    boolean('is_automated').notNull().default(false),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   conversationOrderIdx: index('messages_conversation_order_idx').on(table.conversationId, table.createdAt),
@@ -1090,6 +1197,7 @@ export const savedItems = pgTable('saved_items', {
 }, (table) => ({
   collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
+  typeCreatedAtIndex: index('saved_items_type_created_at_idx').on(table.itemType, table.createdAt),
 }));
 
 // ─── First-run tips (per-account "seen" tracking) ─────────────────────────────
@@ -1140,6 +1248,7 @@ export const cartItems = pgTable('cart_items', {
   itemData:              json('item_data').notNull().default({}),
   updatedAt:             timestamp('updated_at').defaultNow().notNull(),
   notifiedAbandonedAt:   timestamp('notified_abandoned_at'),
+  pushRemindedAt:        timestamp('push_reminded_at'),
 });
 
 // ─── In-app notification feed ─────────────────────────────────────────────────
@@ -1195,6 +1304,9 @@ export const notificationsFeed = pgTable('notifications_feed', {
   dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
+  liveStartedUnique: uniqueIndex('notifications_feed_live_started_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'live_started' AND ${table.targetId} IS NOT NULL`),
   priceDropUnique: uniqueIndex('notifications_feed_price_drop_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'price_drop' AND ${table.targetId} IS NOT NULL`),
@@ -1246,6 +1358,13 @@ export const reviews = pgTable('reviews', {
   productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
   rating:    integer('rating').notNull(),
   body:      text('body'),
+  sellerReply:     text('seller_reply'),
+  sellerRepliedAt: timestamp('seller_replied_at', { withTimezone: true }),
+  /** Private object paths; signed on read (migration 113). */
+  photos:          jsonb('photos').$type<string[]>().notNull().default([]),
+  sizeBought:      text('size_bought'),
+  fitNote:         text('fit_note'),
+  fitScale:        integer('fit_scale'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -1254,6 +1373,42 @@ export const reviews = pgTable('reviews', {
   buyerOrderUnique: uniqueIndex('reviews_buyer_order_unique')
     .on(table.buyerId, table.orderId)
     .where(sql`${table.orderId} IS NOT NULL`),
+}));
+
+export const reviewHelpfulVotes = pgTable('review_helpful_votes', {
+  reviewId:  uuid('review_id').notNull().references(() => reviews.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.reviewId, table.userId] }),
+  userIdx: index('review_helpful_votes_user_idx').on(table.userId),
+}));
+
+// ─── Product Q&A (migration 114) ──────────────────────────────────────────────
+
+export const productQuestions = pgTable('product_questions', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  sellerId:  text('seller_id').notNull(),
+  askerId:   text('asker_id').notNull(),
+  body:      text('body').notNull(),
+  status:    text('status').notNull().default('published'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  productIdx: index('product_questions_product_idx').on(table.productId, table.createdAt),
+  sellerIdx:  index('product_questions_seller_idx').on(table.sellerId, table.createdAt),
+  askerIdx:   index('product_questions_asker_idx').on(table.askerId, table.createdAt),
+}));
+
+export const productAnswers = pgTable('product_answers', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  questionId: uuid('question_id').notNull().references(() => productQuestions.id, { onDelete: 'cascade' }),
+  sellerId:   text('seller_id').notNull(),
+  body:       text('body').notNull(),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+  updatedAt:  timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  questionUnique: uniqueIndex('product_answers_question_unique').on(table.questionId),
 }));
 
 // ─── Shoppable post tagging ────────────────────────────────────────────────────
@@ -1280,6 +1435,38 @@ export const postUserTags = pgTable('post_user_tags', {
 }, (table) => ({
   taggedIdx: index('post_user_tags_tagged_idx').on(table.taggedUserId, table.createdAt),
   uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
+}));
+
+// ─── Buyer saved sizes / preferences ──────────────────────────────────────────
+// One row per Clerk user. `sizes` = {tops, bottoms, outerwear, shoes,
+// measurements:{heightCm, weightKg, chestCm, waistCm, hipsCm}}. styleInterests
+// mirrors users.buyer_style_interests (which stays the source for ranking).
+export type BuyerSizesJson = {
+  tops?: string; bottoms?: string; outerwear?: string; shoes?: string;
+  measurements?: { heightCm?: number; weightKg?: number; chestCm?: number; waistCm?: number; hipsCm?: number };
+};
+export const buyerPreferences = pgTable('buyer_preferences', {
+  userId:            text('user_id').primaryKey(), // Clerk user ID
+  sizes:             jsonb('sizes').$type<BuyerSizesJson>().notNull().default({}),
+  likedBrandIds:     jsonb('liked_brand_ids').$type<string[]>().notNull().default([]),
+  styleInterests:    jsonb('style_interests').$type<string[]>().notNull().default([]),
+  surveyCompletedAt: timestamp('survey_completed_at'),
+  updatedAt:         timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Legal acceptance history ────────────────────────────────────────────────
+// One row per (account, legal document set version) the person agreed to, at
+// sign-up or from the "updated terms" prompt. users.terms_version /
+// terms_accepted_at keep the latest agreement; this table keeps the history.
+
+export const legalAcceptances = pgTable('legal_acceptances', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  clerkId:    text('clerk_id').notNull(),
+  version:    text('version').notNull(),
+  source:     text('source').notNull().default('signup'), // 'signup' | 'update_prompt'
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userVersionUnique: uniqueIndex('legal_acceptances_clerk_version_unique').on(table.clerkId, table.version),
 }));
 
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
@@ -1380,6 +1567,29 @@ export const follows = pgTable('follows', {
 }, (t) => ({
   pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
   followingIdx: index('follows_following_idx').on(t.followingId),
+  createdAtIdx: index('follows_created_at_idx').on(t.createdAt),
+}));
+
+// Pending follow requests to a private account; approval moves the row into follows.
+export const followRequests = pgTable('follow_requests', {
+  requesterId: text('requester_id').notNull(),
+  targetId:    text('target_id').notNull(),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:        primaryKey({ columns: [t.requesterId, t.targetId] }),
+  targetIdx: index('follow_requests_target_idx').on(t.targetId, t.createdAt),
+}));
+
+// Opt-in contact-sync lookup (migration 116). One row per (user, kind, hash);
+// present only while the user has opted in to "let friends find me".
+export const userContactHashes = pgTable('user_contact_hashes', {
+  userId:    text('user_id').notNull(),
+  kind:      text('kind').$type<'email' | 'phone'>().notNull(),
+  hash:      text('hash').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.kind, t.hash] }),
+  lookupIdx: index('user_contact_hashes_lookup_idx').on(t.kind, t.hash),
 }));
 
 // Dismissed "Suggested for you" rows on the Activity tab — the X on a
@@ -1422,13 +1632,23 @@ export const discountCodes = pgTable('discount_codes', {
   maxUses:        integer('max_uses'),
   usesCount:      integer('uses_count').notNull().default(0),
   expiresAt:      timestamp('expires_at'),
-  /** 'entire_store' | 'specific_products' */
+  /** 'entire_store' | 'specific_products' | 'collections' */
   appliesTo:      text('applies_to').notNull().default('entire_store'),
   /** Product ids the code applies to when appliesTo === 'specific_products' */
   productIds:     jsonb('product_ids').$type<string[]>().notNull().default([]),
   oneUsePerCustomer: boolean('one_use_per_customer').notNull().default(false),
+  /** Only buyers with no prior paid order from this seller may use the code. */
+  firstOrderOnly: boolean('first_order_only').notNull().default(false),
+  /** shopify_import_collections ids the code applies to when appliesTo === 'collections' */
+  collectionIds:  jsonb('collection_ids').$type<string[]>().notNull().default([]),
+  /** Generalises oneUsePerCustomer: max redemptions per customer (null = unlimited). */
+  maxUsesPerCustomer: integer('max_uses_per_customer'),
+  /** Minimum number of eligible items in the cart (0 = none). */
+  minQuantity:    integer('min_quantity').notNull().default(0),
   startsAt:       timestamp('starts_at'),
   active:         boolean('active').notNull().default(true),
+  /** Live-only code (migration 122): valid only for this stream, only while it is live. */
+  liveStreamId:   uuid('live_stream_id'),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('discount_codes_seller_idx').on(t.sellerId),
@@ -1475,6 +1695,15 @@ export const returns = pgTable('returns', {
     unitPriceCents?: number;
   }>>().notNull().default([]),
   createdAt:           timestamp('created_at').defaultNow().notNull(),
+  /** Prepaid return label (migration 241). */
+  returnLabelId:         uuid('return_label_id'),
+  returnLabelUrl:        text('return_label_url'),
+  returnCarrier:         text('return_carrier'),
+  returnTrackingNumber:  text('return_tracking_number'),
+  returnTrackingStatus:  text('return_tracking_status'),
+  /** When true the refund is issued at the carrier's first scan instead of at approval. */
+  refundOnScan:          boolean('refund_on_scan').notNull().default(false),
+  firstScanAt:           timestamp('first_scan_at'),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({
   orderIdx:  index('returns_order_idx').on(t.orderId),
@@ -1597,10 +1826,13 @@ export const postComments = pgTable('post_comments', {
   moderationReason: text('moderation_reason'),
   moderatedAt:      timestamp('moderated_at', { withTimezone: true }),
   moderatedBy:      text('moderated_by'),
+  // Set while the post owner has this top-level comment pinned (migration 116).
+  pinnedAt:         timestamp('pinned_at', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   parentFk: foreignKey({ columns: [table.parentId], foreignColumns: [table.id] }).onDelete('cascade'),
+  onePinnedPerPost: uniqueIndex('post_comments_one_pinned_per_post').on(table.postId).where(sql`${table.pinnedAt} IS NOT NULL`),
   postCreatedIdx: index('post_comments_post_created_idx').on(table.postId, table.createdAt),
   authorIdx: index('post_comments_author_idx').on(table.authorId),
 }));
@@ -1841,10 +2073,54 @@ export const disputes = pgTable('disputes', {
   isChargeRefundable:     boolean('is_charge_refundable').notNull().default(true),
   networkReasonCode:      text('network_reason_code'),
   customerClaim:          text('customer_claim').notNull().default(''),
+  /** Set once evidence is sent to Stripe for review (migration 114); Stripe allows one submission. */
+  evidenceSubmittedAt:    timestamp('evidence_submitted_at'),
   createdAt:              timestamp('created_at').defaultNow().notNull(),
   updatedAt:              timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   orderIdx: index('disputes_order_idx').on(table.orderId),
+}));
+
+export const DISPUTE_EVENT_KINDS = [
+  'created', 'evidence_due_soon', 'updated', 'funds_withdrawn', 'funds_reinstated',
+  'evidence_submitted', 'accepted', 'won', 'lost', 'warning_closed',
+] as const;
+export type DisputeEventKind = (typeof DISPUTE_EVENT_KINDS)[number];
+
+// Status timeline for a dispute (migration 114). stripe_event_id is unique so a
+// replayed webhook never writes twice; events raised by our own API use a
+// deterministic synthetic id.
+export const disputeEvents = pgTable('dispute_events', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  disputeId:     uuid('dispute_id').notNull().references(() => disputes.id, { onDelete: 'cascade' }),
+  stripeEventId: text('stripe_event_id').notNull(),
+  kind:          text('kind').$type<DisputeEventKind>().notNull(),
+  /** Safe summary only (status, amounts, fee) — never the raw Stripe payload. */
+  payload:       jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+  occurredAt:    timestamp('occurred_at').defaultNow().notNull(),
+  notifiedAt:    timestamp('notified_at'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  stripeEventUnique: uniqueIndex('dispute_events_stripe_event_unique').on(table.stripeEventId),
+  disputeIdx: index('dispute_events_dispute_idx').on(table.disputeId, table.occurredAt),
+}));
+
+// Files a seller uploaded as dispute evidence (migration 114). evidence_type is
+// the Stripe evidence field the file is sent under, so one live file per type.
+export const disputeEvidenceFiles = pgTable('dispute_evidence_files', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  disputeId:    uuid('dispute_id').notNull().references(() => disputes.id, { onDelete: 'cascade' }),
+  sellerId:     text('seller_id').notNull(),
+  evidenceType: text('evidence_type').notNull(),
+  fileName:     text('file_name').notNull().default(''),
+  objectKey:    text('object_key').notNull(),
+  contentType:  text('content_type').notNull(),
+  sizeBytes:    integer('size_bytes').notNull(),
+  stripeFileId: text('stripe_file_id'),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  disputeIdx: index('dispute_evidence_files_dispute_idx').on(table.disputeId),
+  typeUnique: uniqueIndex('dispute_evidence_files_type_unique').on(table.disputeId, table.evidenceType),
 }));
 
 // ─── Paid Promotion Boosts ────────────────────────────────────────────────────
@@ -1863,7 +2139,7 @@ export const boosts = pgTable('boosts', {
   stripeCheckoutSessionId: text('stripe_checkout_session_id').unique(),
   /** Incremented each time an expired session is rotated out; used for versioned idempotency keys. */
   checkoutSessionVersion:  integer('checkout_session_version').notNull().default(0),
-  /** 'pending_payment' | 'active' | 'paused' | 'completed' | 'cancelled' | 'failed' */
+  /** 'pending_payment' | 'in_review' | 'active' | 'paused' | 'completed' | 'cancelled' | 'rejected' | 'failed' */
   status:                  text('status').notNull().default('pending_payment'),
   impressionsCount:        integer('impressions_count').notNull().default(0),
   /** Set only after Stripe confirms payment — null for pending/failed/cancelled boosts. */
@@ -1871,6 +2147,17 @@ export const boosts = pgTable('boosts', {
   startsAt:                timestamp('starts_at', { withTimezone: true }),
   endsAt:                  timestamp('ends_at').notNull(),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
+  /** 'pending' | 'approved' | 'rejected' — admin review (migration 114). Legacy rows are 'approved'. */
+  reviewStatus:            text('review_status').notNull().default('approved'),
+  reviewedBy:              text('reviewed_by'),
+  reviewedAt:              timestamp('reviewed_at', { withTimezone: true }),
+  rejectionReason:         text('rejection_reason'),
+  refundId:                text('refund_id'),
+  /** 'none' | 'refunded' | 'failed' */
+  refundStatus:            text('refund_status').notNull().default('none'),
+  refundedAt:              timestamp('refunded_at', { withTimezone: true }),
+  /** Spend delivered through the Sponsored placement; never exceeds budgetCents. */
+  deliveredSpendCents:     integer('delivered_spend_cents').notNull().default(0),
 }, (table) => ({
   csStatusIdx: index('boosts_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
@@ -1989,6 +2276,12 @@ export const liveStreams = pgTable('live_streams', {
   recordingStartedAt:   timestamp('recording_started_at', { withTimezone: true }),
   recordingStoppedAt:   timestamp('recording_stopped_at', { withTimezone: true }),
   recordingError:       text('recording_error'),
+  // Migration 130 — owner controls for the saved replay.
+  replayVisibility:     text('replay_visibility').notNull().default('public'), // 'public' | 'hidden'
+  replayDeletedAt:      timestamp('replay_deleted_at', { withTimezone: true }),
+  // Pinned product (migration 120): the on-screen Buy card.
+  pinnedProductId:      text('pinned_product_id'),
+  pinUpdatedAt:         timestamp('pin_updated_at', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   statusViewerIdx: index('live_streams_status_viewer_idx')
@@ -2005,6 +2298,8 @@ export const liveComments = pgTable('live_comments', {
   avatarUrl:    text('avatar_url'),
   message:      text('message').notNull(),
   createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  /** Set when the host removes the comment (migration 125). */
+  removedAt:    timestamp('removed_at', { withTimezone: true }),
 }, (table) => ({
   streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
 }));
@@ -2142,6 +2437,11 @@ export const shippingLabels = pgTable('shipping_labels', {
   providerShipmentId: text('provider_shipment_id'),
   providerTransactionId: text('provider_transaction_id'),
   providerRateId: text('provider_rate_id').notNull(),
+  /** order_items.id values this label covers; null = the whole order (migration 112). */
+  itemIds: uuid('item_ids').array(),
+  /** 'outbound' (to the buyer) | 'return' (prepaid, buyer to seller; migration 241). */
+  direction: text('direction').notNull().default('outbound'),
+  returnId: text('return_id'),
   carrier: text('carrier'),
   service: text('service'),
   trackingNumber: text('tracking_number'),
@@ -2212,6 +2512,7 @@ export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   stripeAccountId: text('stripe_account_id'),
   bankDestinationId: text('bank_destination_id'),
   status: text('status').notNull().default('processing'), // processing|succeeded|failed
+  method: text('method').notNull().default('standard'), // standard|instant
   stripePayoutId: text('stripe_payout_id'),
   responseStatus: text('response_status'),
   responseArrivalDate: timestamp('response_arrival_date', { withTimezone: true }),
@@ -2287,6 +2588,10 @@ export const adCampaigns = pgTable('ad_campaigns', {
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
+export * from './sellerPaymentSettings';
+export * from './sellerMessaging';
+export * from './aiCredits';
+export * from './liveModeration';
 
 // ─── Automatic media screening results (migration 115) ───────────────────────
 // Held / rejected uploads only. No raw images are stored.
@@ -2317,4 +2622,10 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
   reviewIdx: index('media_moderation_results_review_idx').on(table.verdict, table.reviewedAt, table.createdAt),
 }));
 
+export * from './storyHighlights';
+export * from './storyStickers';
 export * from './ranking';
+export * from './comments';
+export * from './hashtags';
+export * from './captions';
+export * from './places';

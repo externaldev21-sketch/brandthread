@@ -20,6 +20,7 @@
  */
 import type { BuyerProduct } from '@/services/cartTypes';
 import type { PreviewCatalogProduct } from './previewCatalog';
+import { isPreviewDemoMode } from './devPreview';
 
 // previewCatalog pulls in bundled image assets; require it lazily (same
 // reason as lib/previewOrders.ts) so importing this module is free.
@@ -115,6 +116,12 @@ function handleFor(name: string): string {
 }
 
 /** Pure: a preview catalog row → the product page's BuyerProduct (exported for tests). */
+const DEMO_CHEST_CM: Record<string, [number, number]> = { XS: [82, 88], S: [88, 94], M: [94, 100], L: [100, 108], XL: [108, 116] };
+function demoSizeChart(sizes: string[]) {
+  const rows = sizes.filter((s) => DEMO_CHEST_CM[s]).map((s) => ({ size: s, values: [`${DEMO_CHEST_CM[s][0]}-${DEMO_CHEST_CM[s][1]}`] }));
+  return rows.length ? { columns: ['Chest'], unit: 'cm', rows } : null;
+}
+
 export function previewBuyerProductFromCatalog(row: PreviewCatalogProduct): BuyerProduct {
   const details = DETAILS[row.name];
   const optionId = 'opt_size';
@@ -166,6 +173,8 @@ export function previewBuyerProductFromCatalog(row: PreviewCatalogProduct): Buye
     isActive: true,
     tags: row.tags,
     sizeChartImageUrl: row.sizeChartImageUrl,
+    // &demo=1 only: a seeded chest/waist chart so the size recommendation can be reviewed.
+    sizeChart: isPreviewDemoMode() ? demoSizeChart(row.sizes) : null,
   };
 }
 

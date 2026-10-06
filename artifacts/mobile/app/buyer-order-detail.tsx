@@ -16,6 +16,7 @@
  *   - Post-submit: "Thanks for reviewing" state, no re-entry
  *   - Gate: order.status === 'delivered' && !reviewSubmitted && real order ID (not local/demo)
  */
+import { shareInvoice, invoiceFromBuyerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -28,7 +29,10 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { FIT_OPTIONS, MAX_REVIEW_PHOTOS, addReviewPhotos, type FitOption } from '@/lib/reviewDisplay';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
+import { useReorderFlow } from '@/components/orders/ReorderFlow';
 import { mapDelivery, safeTrackingUrl } from '@/lib/deliveryGuarantee';
 import { DeliveryTrackerCard, AutoRefundCard } from '@/components/orders/DeliveryTracker';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -40,7 +44,7 @@ import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadCard,
-  GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
+  GradientCard, StatusBadge, PrimaryButton, SecondaryButton, PressableScale,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -73,17 +77,6 @@ function carrierTrackingUrl(carrier: string | undefined, trackingNumber: string)
   if (key.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encoded}`;
   if (key.includes('dhl')) return `https://www.dhl.com/en/express/tracking.html?AWB=${encoded}`;
   return `https://www.google.com/search?q=${encoded}+tracking`;
-}
-
-function formatRelativeUpdate(timestamp: number): string {
-  const elapsed = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (elapsed < 5) return 'just now';
-  if (elapsed < 60) return `${elapsed}s ago`;
-  const mins = Math.floor(elapsed / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 // Monochrome (item 107): every normal order state is the neutral badge;
@@ -238,24 +231,49 @@ function StarRating({ rating, size = 36, interactive = true, onRate }: {
   );
 }
 
+export interface ReviewExtras { photoUris: string[]; fitNote: FitOption | null }
+
 // ─── Inline review rating sheet (Depop-pattern) ───────────────────────────────
 
 function ReviewSheet({
   visible, sellerName, onClose, onSubmit, submitting,
 }: {
   visible: boolean; sellerName: string;
-  onClose: () => void; onSubmit: (rating: number, body: string) => void;
+  onClose: () => void; onSubmit: (rating: number, body: string, extras: ReviewExtras) => void;
   submitting: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [fit, setFit] = useState<FitOption | null>(null);
+  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
 
   // Reset when sheet opens
   useEffect(() => {
-    if (visible) { setRating(0); setBody(''); }
+    if (visible) { setRating(0); setBody(''); setPhotos([]); setFit(null); setPhotoNotice(null); }
   }, [visible]);
+
+  async function pickPhotos() {
+    setPhotoNotice(null);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setPhotoNotice('Allow photo access in Settings to add photos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.7,
+        selectionLimit: MAX_REVIEW_PHOTOS - photos.length,
+      });
+      if (!result.canceled) setPhotos(prev => addReviewPhotos(prev, result.assets.map(a => a.uri)));
+    } catch {
+      setPhotoNotice('Couldn’t open your photos. Try again.');
+    }
+  }
 
   const canSubmit = rating > 0 && !submitting;
   const ratingLabel = rating === 0 ? 'Tap to rate your experience'
@@ -310,6 +328,58 @@ function ReviewSheet({
         />
         <Text style={[rvs.charCount, { color: theme.subtle }]}>{body.length}/500</Text>
 
+        {/* Fit */}
+        <View style={rvs.chipRow} accessibilityLabel="How did it fit">
+          {FIT_OPTIONS.map(option => {
+            const active = fit === option;
+            return (
+              <PressableScale
+                key={option}
+                onPress={() => setFit(active ? null : option)}
+                style={[rvs.chip, { borderColor: active ? theme.text : theme.border, backgroundColor: active ? theme.text : 'transparent' }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={option}
+              >
+                <Text style={[rvs.chipText, { color: active ? theme.background : theme.muted }]}>{option}</Text>
+              </PressableScale>
+            );
+          })}
+        </View>
+
+        {/* Add photos */}
+        <View style={rvs.photoRow}>
+          {photos.map(uri => (
+            <View key={uri} style={rvs.photoWrap}>
+              <Image source={{ uri }} style={[rvs.photo, { backgroundColor: theme.cardElevated }]} />
+              <View style={rvs.photoRemoveSlot} pointerEvents="box-none">
+                <PressableScale
+                  onPress={() => setPhotos(prev => prev.filter(u => u !== uri))}
+                  style={[rvs.photoRemove, { backgroundColor: theme.text }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove photo"
+                  hitSlop={12}
+                  noMinHeight
+                >
+                  <Feather name="x" size={11} color={theme.background} />
+                </PressableScale>
+              </View>
+            </View>
+          ))}
+          {photos.length < MAX_REVIEW_PHOTOS && (
+            <PressableScale
+              onPress={pickPhotos}
+              style={[rvs.addPhoto, { borderColor: theme.border }]}
+              accessibilityRole="button"
+              accessibilityLabel="Add photos"
+            >
+              <Feather name="camera" size={16} color={theme.text} />
+              <Text style={[rvs.addPhotoText, { color: theme.text }]}>Add photos</Text>
+            </PressableScale>
+          )}
+        </View>
+        {!!photoNotice && <Text style={[rvs.charCount, { color: theme.muted, textAlign: 'left' }]}>{photoNotice}</Text>}
+
         {/* Actions */}
         <View style={rvs.actions}>
           <TouchableOpacity
@@ -322,7 +392,7 @@ function ReviewSheet({
           </TouchableOpacity>
           <TouchableOpacity
             style={[rvs.submitBtn, { backgroundColor: theme.accent }, !canSubmit && rvs.submitBtnDisabled]}
-            onPress={canSubmit ? () => onSubmit(rating, body) : undefined}
+            onPress={canSubmit ? () => onSubmit(rating, body, { photoUris: photos, fitNote: fit }) : undefined}
             disabled={!canSubmit}
             activeOpacity={0.8}
             accessibilityRole="button"
@@ -361,6 +431,16 @@ const rvs = StyleSheet.create({
     marginBottom: 4,
   },
   charCount: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md },
+  chipRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, flexWrap: 'wrap' },
+  chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chipText: { fontFamily: FONT.semibold, fontSize: FS.meta },
+  photoRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, alignItems: 'center', flexWrap: 'wrap' },
+  photoWrap: { width: 56, height: 56 },
+  photo: { width: 56, height: 56, borderRadius: 8 },
+  photoRemoveSlot: { position: 'absolute', top: -6, right: -6 },
+  photoRemove: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  addPhoto: { height: 56, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  addPhotoText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   actions: { flexDirection: 'row', gap: SP.sm },
   cancelBtn: { flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
@@ -498,6 +578,7 @@ export default function BuyerOrderDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { reorder, busyOrderId: reorderBusyId, element: reorderElement } = useReorderFlow();
   const { userId } = useAuth();
 
   // The real order, or — only when that request fails in the dev-web
@@ -517,7 +598,6 @@ export default function BuyerOrderDetailScreen() {
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [showReviewSheet, setShowReviewSheet] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -541,7 +621,6 @@ export default function BuyerOrderDetailScreen() {
     setFetchError(false);
     setRefreshing(false);
     setIsFetching(false);
-    setLastUpdatedAt(null);
     setLoading(true);
     setShowReviewSheet(false);
     setShowCancelModal(false);
@@ -562,7 +641,6 @@ export default function BuyerOrderDetailScreen() {
           setFetchError(false);
           setLoading(false);
           setIsFetching(false);
-          setLastUpdatedAt(Date.now());
           consecutiveFailuresRef.current = 0;
         }
       }).catch(() => {
@@ -612,7 +690,6 @@ export default function BuyerOrderDetailScreen() {
       setFetchError(false);
       setRefreshing(false);
       setIsFetching(false);
-      setLastUpdatedAt(Date.now());
     }).catch(() => {
       if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(null);
@@ -711,7 +788,7 @@ export default function BuyerOrderDetailScreen() {
     router.push(('/buyer-report?targetType=seller&targetId=' + encodeURIComponent(order.sellerId) + '&targetLabel=' + encodeURIComponent(order.sellerName)) as never);
   }
 
-  async function handleSubmitReview(rating: number, body: string) {
+  async function handleSubmitReview(rating: number, body: string, extras: ReviewExtras) {
     if (!order) return;
     // Gate: only allow reviews on real API orders to prevent demo/local data contamination
     if (!isRealOrderId(order.id)) {
@@ -720,11 +797,19 @@ export default function BuyerOrderDetailScreen() {
     }
     setSubmittingReview(true);
     try {
+      // Photos upload first; the review carries only the returned private paths.
+      const photos: string[] = [];
+      for (const uri of extras.photoUris) {
+        const { objectPath } = await api.reviews.uploadPhoto({ uri });
+        photos.push(objectPath);
+      }
       await api.reviews.create({
         orderId:  order.id,
         sellerId: order.sellerId,
         rating,
         body: body.trim() || undefined,
+        ...(photos.length ? { photos } : {}),
+        ...(extras.fitNote ? { fitNote: extras.fitNote } : {}),
       });
       setReviewSubmitted(true);
       setShowReviewSheet(false);
@@ -777,19 +862,11 @@ export default function BuyerOrderDetailScreen() {
     }
   }
 
+  // Extends the old "Buy Again" alert (which only pointed at Discover): one
+  // tap now re-checks price/stock and adds every available line to the cart.
   function handleBuyAgain() {
     if (!order) return;
-    const firstItem = order.lineItems[0];
-    if (!firstItem) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Buy Again',
-      `Looking for ${firstItem.productName}? Browse Discover to find it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Discover', onPress: () => router.navigate('/(buyer)/discover' as never) },
-      ]
-    );
+    void reorder(order.id);
   }
 
   // ── Render states ────────────────────────────────────────────────────────────
@@ -848,24 +925,9 @@ export default function BuyerOrderDetailScreen() {
       {/* Header */}
       <ScreenHeader
         title={`Order ${order.orderNumber}`}
-        subtitle={order.sellerName}
+        divider={false}
         onBack={() => goBackOr(router, '/(buyer)/orders')}
       />
-
-      {/* Live-updating status indicator */}
-      <View style={styles.refreshStatus} accessibilityLiveRegion="polite">
-        {isFetching ? (
-          <>
-            <ActivityIndicator color={theme.accent} size="small" />
-            <Text style={styles.refreshStatusText}>Updating order status…</Text>
-          </>
-        ) : lastUpdatedAt !== null ? (
-          <>
-            <Feather name="check-circle" size={ICON.xs} color={theme.subtle} />
-            <Text style={styles.refreshStatusText}>Last updated {formatRelativeUpdate(lastUpdatedAt)}</Text>
-          </>
-        ) : null}
-      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -928,6 +990,7 @@ export default function BuyerOrderDetailScreen() {
               <DeliveryTrackerCard
                 delivery={order.delivery}
                 status={order.status}
+                storeName={order.sellerName}
                 onCopyTracking={handleCopyTracking}
                 trackingCopied={trackingCopied}
                 onOpenTracking={handleTrackOnCarrier}
@@ -1082,6 +1145,12 @@ export default function BuyerOrderDetailScreen() {
             <Text style={styles.totalAmount}>{formatCents(order.payment.totalCents)}</Text>
           </View>
           <Text style={styles.paymentNote}>Payment processed securely via Brandthread</Text>
+          <SecondaryButton
+            label="Download invoice"
+            icon="file-text"
+            onPress={() => { shareInvoice(invoiceFromBuyerOrder(order)).catch(() => Alert.alert('Could not create invoice', 'Please try again.')); }}
+            style={{ marginTop: SP.md }}
+          />
         </SectionCard>
 
         {/* ── Buyer protection (same note as product detail + checkout) ──── */}
@@ -1166,7 +1235,7 @@ export default function BuyerOrderDetailScreen() {
           <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
           <SecondaryButton label="Report Seller" icon="flag" onPress={handleReportSeller} accent={theme.error} />
           {order.status === 'delivered' && (
-            <SecondaryButton label="Buy Again" icon="repeat" onPress={handleBuyAgain} />
+            <SecondaryButton label={reorderBusyId === order.id ? 'Adding…' : 'Reorder'} icon="repeat" onPress={handleBuyAgain} disabled={reorderBusyId === order.id} />
           )}
         </View>
 
@@ -1277,6 +1346,7 @@ export default function BuyerOrderDetailScreen() {
         onSubmit={handleSubmitReview}
         submitting={submittingReview}
       />
+      {reorderElement}
     </BrandthreadScreen>
   );
 }
@@ -1286,8 +1356,6 @@ export default function BuyerOrderDetailScreen() {
 const makeStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
     fulfillmentStatus: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-    refreshStatus: { minHeight: 28, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-    refreshStatusText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
     preOrderInfoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },
     preOrderInfoText: { fontSize: FS.sm, fontFamily: FONT.medium },
     trackingInfoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm, flexWrap: 'wrap' },

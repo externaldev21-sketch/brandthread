@@ -16,7 +16,7 @@ const HAPPY_PATH: OrderStatus[] = ['new', 'processing', 'ready_to_ship', 'shippe
 
 const STAGE_LABEL: Record<OrderStatus, string> = {
   new: 'Placed',
-  processing: 'Processing',
+  processing: 'Packing',
   ready_to_ship: 'Ready',
   shipped: 'Shipped',
   delivered: 'Delivered',
@@ -94,7 +94,6 @@ export function OrderStatusTimeline({
               </Animated.View>
               {!compact ? (
                 <Text
-                  numberOfLines={1}
                   style={[styles.stageLabel, { color: active || done ? theme.text : theme.muted }]}
                 >
                   {STAGE_LABEL[stage]}
@@ -120,7 +119,7 @@ export function OrderStatusTimeline({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: SP.sm },
   rowCompact: { paddingVertical: 0 },
-  stageCol: { alignItems: 'center', width: 56 },
+  stageCol: { alignItems: 'center', minWidth: 56 },
   dot: {
     width: 24,
     height: 24,

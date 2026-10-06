@@ -8,7 +8,7 @@ import {
   ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, Platform,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -148,7 +148,6 @@ export default function FreelancerApplyScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title={isEdit ? 'Edit Freelancer Profile' : 'Become a Freelancer'}
-        subtitle={`Step ${step + 1} of 3 — ${STEPS[step]}`}
       />
       {/* Step dots */}
       <View style={styles.dotsRow}>

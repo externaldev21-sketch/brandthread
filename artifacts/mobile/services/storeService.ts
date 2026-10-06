@@ -372,7 +372,10 @@ function defaultStorefront(): Storefront {
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
-export async function getStorefront(): Promise<Storefront> {
+export async function getStorefront(options: {
+  refreshRemote?: boolean;
+  onLocal?: (store: Storefront) => void;
+} = {}): Promise<Storefront> {
   try {
     // Load from AsyncStorage first (local truth for complex UI state)
     const raw = await AsyncStorage.getItem(STORE_KEY);
@@ -395,8 +398,13 @@ export async function getStorefront(): Promise<Storefront> {
       migratedToThread = true;
     }
 
-    // Overlay server-side published state (non-blocking)
-    try {
+    // Paint the editable draft before checking publication state. Keep the
+    // snapshot separate: the remote overlay below mutates local settings.
+    options.onLocal?.({ ...local, settings: { ...local.settings } });
+
+    // Publication-sensitive callers still await authoritative server state.
+    // Local editing operations don't need a network read before every change.
+    if (options.refreshRemote !== false) try {
       const remote = await api.store.get();
       if (remote?.status === 'published') {
         local.publishStatus = 'published';
@@ -447,6 +455,8 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
       metaTitle:       store.seo.homepageTitle,
       metaDescription: store.seo.homepageDescription,
       keywords:        [],
+      productSeoDefaults: store.seo.productSeoDefaults,
+      sitemapEnabled:     store.seo.sitemapEnabled,
     },
   } as Record<string, unknown>).catch(() => {/* no-op */});
 
@@ -454,7 +464,7 @@ async function saveStorefront(store: Storefront): Promise<Storefront> {
 }
 
 export async function autosaveStorefront(partial: Partial<Storefront>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const updated = { ...store, ...partial, autosaveAt: new Date().toISOString() };
   return saveStorefront(updated);
 }
@@ -466,7 +476,7 @@ export async function updateSettings(settings: Partial<StoreSettings>): Promise<
 }
 
 export async function updateBranding(branding: Partial<StoreBranding>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const nextBranding = { ...store.branding, ...branding };
   if (store.themeSettings.themeId === THREAD_THEME_ID) {
     nextBranding.colors = store.themeSettings.activePresetId === 'dark'
@@ -487,7 +497,7 @@ export async function updateBranding(branding: Partial<StoreBranding>): Promise<
 }
 
 export async function updateThemeSettings(ts: Partial<StoreThemeSettings>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   store.themeSettings = {
     ...store.themeSettings,
     ...ts,
@@ -565,7 +575,7 @@ export async function applyTheme(themeId: string, presetId?: string): Promise<St
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 export async function createSection(type: StoreSectionType, settings?: Partial<StoreSectionSettings>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   _pushUndo(store, 'create_section', { sections: store.sections });
   const maxOrder = store.sections.reduce((m, s) => Math.max(m, s.order), -1);
   const section: StoreSection = {
@@ -583,7 +593,7 @@ export async function createSection(type: StoreSectionType, settings?: Partial<S
 }
 
 export async function updateSection(id: string, settings: Partial<StoreSectionSettings>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const idx = store.sections.findIndex(s => s.id === id);
   if (idx === -1) return store;
   _pushUndo(store, 'update_section', { section: store.sections[idx] });
@@ -596,7 +606,7 @@ export async function updateSection(id: string, settings: Partial<StoreSectionSe
 }
 
 export async function reorderSections(orderedIds: string[]): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   _pushUndo(store, 'reorder_sections', { sections: store.sections.map(s => ({ id: s.id, order: s.order })) });
   orderedIds.forEach((id, idx) => {
     const s = store.sections.find(sec => sec.id === id);
@@ -607,7 +617,7 @@ export async function reorderSections(orderedIds: string[]): Promise<Storefront>
 }
 
 export async function toggleSection(id: string): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const s = store.sections.find(sec => sec.id === id);
   if (!s) return store;
   _pushUndo(store, 'toggle_section', { id, enabled: s.enabled });
@@ -617,7 +627,7 @@ export async function toggleSection(id: string): Promise<Storefront> {
 }
 
 export async function duplicateSection(id: string): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const orig = store.sections.find(s => s.id === id);
   if (!orig) return store;
   _pushUndo(store, 'duplicate_section', { sections: store.sections });
@@ -636,7 +646,7 @@ export async function duplicateSection(id: string): Promise<Storefront> {
 }
 
 export async function deleteSection(id: string): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   _pushUndo(store, 'delete_section', { sections: JSON.parse(JSON.stringify(store.sections)) });
   store.sections = store.sections.filter(s => s.id !== id);
   store.sections.forEach((s, i) => { s.order = i; });
@@ -651,7 +661,7 @@ function _pushUndo(store: Storefront, action: string, before: unknown) {
 }
 
 export async function undoLastAction(): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const entry = store.undoStack.pop();
   if (!entry) return store;
   store.redoStack.push({ ...entry, after: JSON.parse(JSON.stringify(store.sections)) });
@@ -672,7 +682,7 @@ export async function undoLastAction(): Promise<Storefront> {
 }
 
 export async function redoLastAction(): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const entry = store.redoStack.pop();
   if (!entry) return store;
   if (entry.after) {
@@ -684,12 +694,12 @@ export async function redoLastAction(): Promise<Storefront> {
 
 // ─── Collections ──────────────────────────────────────────────────────────────
 export async function getCollections(): Promise<StoreCollection[]> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   return store.collections;
 }
 
 export async function createCollection(data: Partial<StoreCollection>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const now = new Date().toISOString();
   const col: StoreCollection = {
     id: uid('col'),
@@ -711,7 +721,7 @@ export async function createCollection(data: Partial<StoreCollection>): Promise<
 }
 
 export async function updateCollection(id: string, data: Partial<StoreCollection>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const idx = store.collections.findIndex(c => c.id === id);
   if (idx === -1) return store;
   store.collections[idx] = { ...store.collections[idx], ...data, updatedAt: new Date().toISOString() };
@@ -719,19 +729,19 @@ export async function updateCollection(id: string, data: Partial<StoreCollection
 }
 
 export async function deleteCollection(id: string): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   store.collections = store.collections.filter(c => c.id !== id);
   return saveStorefront(store);
 }
 
 // ─── Pages ────────────────────────────────────────────────────────────────────
 export async function getPages(): Promise<StorePage[]> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   return store.pages;
 }
 
 export async function createPage(data: Partial<StorePage>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const now = new Date().toISOString();
   const page: StorePage = {
     id: uid('page'),
@@ -749,7 +759,7 @@ export async function createPage(data: Partial<StorePage>): Promise<Storefront> 
 }
 
 export async function updatePage(id: string, data: Partial<StorePage>): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const idx = store.pages.findIndex(p => p.id === id);
   if (idx === -1) return store;
   store.pages[idx] = { ...store.pages[idx], ...data, updatedAt: new Date().toISOString() };
@@ -757,7 +767,7 @@ export async function updatePage(id: string, data: Partial<StorePage>): Promise<
 }
 
 export async function duplicatePage(id: string): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const orig = store.pages.find(p => p.id === id);
   if (!orig) return store;
   const now = new Date().toISOString();
@@ -775,7 +785,7 @@ export async function duplicatePage(id: string): Promise<Storefront> {
 }
 
 export async function deletePage(id: string): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   store.pages = store.pages.filter(p => p.id !== id);
   return saveStorefront(store);
 }
@@ -809,12 +819,12 @@ export async function upsertPolicy(type: StorePolicy['type'], content: string, a
 
 // ─── Menus ────────────────────────────────────────────────────────────────────
 export async function getMenus(): Promise<StoreMenu[]> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   return store.menus;
 }
 
 export async function updateMenu(id: string, items: StoreMenuItem[]): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const idx = store.menus.findIndex(m => m.id === id);
   if (idx === -1) return store;
   store.menus[idx] = { ...store.menus[idx], items, updatedAt: new Date().toISOString() };
@@ -980,7 +990,7 @@ export async function restoreVersion(versionId: string): Promise<Storefront> {
 
 // ─── AI Suggestions ───────────────────────────────────────────────────────────
 export async function generateAISuggestions(): Promise<Storefront> {
-  const store = await getStorefront();
+  const store = await getStorefront({ refreshRemote: false });
   const active = store.aiSuggestions.filter(s => !s.dismissed && !s.applied);
   if (active.length >= 3) return store;
   // Pick random suggestions not already present
@@ -1565,5 +1575,5 @@ export function generatePolicyDraft(type: StorePolicy['type'], storeName: string
     terms: `TERMS OF SERVICE\n\nBy purchasing from ${storeName}, you agree to these terms. We reserve the right to refuse service, cancel orders, or limit quantities at our discretion.\n\nPrices and availability are subject to change without notice.${disclaimer}`,
     pre_order: `PRE-ORDER POLICY\n\nPre-order items are charged at the time of purchase. Estimated delivery dates are provided but not guaranteed.\n\nIf we are unable to fulfill a pre-order within 90 days of the estimated date, you may request a full refund.${disclaimer}`,
   };
-  return templates[type] ?? `${type.toUpperCase()} POLICY\n\nContent coming soon.${disclaimer}`;
+  return templates[type] ?? `${type.toUpperCase()} POLICY\n\nPlease contact us for details.${disclaimer}`;
 }

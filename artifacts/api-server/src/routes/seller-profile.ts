@@ -9,6 +9,15 @@ import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
+import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import {
+  normalizeSocialLink,
+  normalizeStoreAccent,
+  validateBrandName,
+  validateHandle,
+  type SocialPlatform,
+} from "../lib/storeIdentity";
+import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
 
 // ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
@@ -24,6 +33,7 @@ import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeratio
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_email TEXT`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_url TEXT`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS store_accent_color TEXT`);
   } catch (err) {
     logger.error({ err }, "Seller profile migration failed");
   }
@@ -88,6 +98,7 @@ router.get("/profile", async (req, res): Promise<void> => {
         avatarUrl:           users.avatarUrl,
         logoUrl:             users.logoUrl,
         bannerUrl:           users.bannerUrl,
+        storeAccentColor:    users.storeAccentColor,
         category:            users.category,
         tags:                users.tags,
         location:            users.location,
@@ -202,7 +213,8 @@ function createProfileImageUploadHandler(
 
       let objectPath: string | null = null;
       try {
-        objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+        const stored = await normalizeUploadedImage(bytes, contentType);
+        objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
         await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
           owner: clerkId,
           visibility: "private",
@@ -240,6 +252,140 @@ router.post("/profile/logo/upload", ...createProfileImageUploadHandler("logoUrl"
 
 // ─── POST /api/seller/profile/banner/upload ───────────────────────────────────
 router.post("/profile/banner/upload", ...createProfileImageUploadHandler("bannerUrl", users.bannerUrl, MAX_BANNER_BYTES, "banner"));
+
+// ─── Store identity setup ─────────────────────────────────────────────────────
+// Claim a store name + @handle, pick a monochrome accent, connect socials.
+// Every write re-validates server-side; the mobile screens only preview.
+type AvailabilityResult = { available: boolean; error?: string; code?: string };
+
+async function nameAvailability(clerkId: string, raw: unknown): Promise<AvailabilityResult & { name: string }> {
+  const { name, problem } = validateBrandName(raw);
+  if (problem) return { name, available: false, error: problem.error, code: problem.code };
+  const [taken] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(and(eq(sql`lower(trim(${users.brandName}))`, name.toLowerCase()), sql`${users.clerkId} <> ${clerkId}`))
+    .limit(1);
+  if (taken) return { name, available: false, error: "That name is already taken.", code: "NAME_TAKEN" };
+  return { name, available: true };
+}
+
+async function handleAvailability(clerkId: string, raw: unknown): Promise<AvailabilityResult & { handle: string }> {
+  const { handle, problem } = validateHandle(raw);
+  if (problem) return { handle, available: false, error: problem.error, code: problem.code };
+  const [taken] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(sql`lower(${users.username})`, handle))
+    .limit(1);
+  if (taken && taken.clerkId !== clerkId) {
+    return { handle, available: false, error: "That handle is already taken.", code: "USERNAME_TAKEN" };
+  }
+  return { handle, available: true };
+}
+
+// ─── GET /api/seller/identity/check?name=&handle= ─────────────────────────────
+router.get("/identity/check", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const out: { name?: AvailabilityResult; handle?: AvailabilityResult } = {};
+  if (typeof req.query.name === "string") {
+    const { name: _n, ...rest } = await nameAvailability(clerkId, req.query.name);
+    out.name = rest;
+  }
+  if (typeof req.query.handle === "string") {
+    const { handle: _h, ...rest } = await handleAvailability(clerkId, req.query.handle);
+    out.handle = rest;
+  }
+  res.json(out);
+});
+
+// ─── PUT /api/seller/identity ─────────────────────────────────────────────────
+router.put("/identity", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const nameCheck = await nameAvailability(clerkId, req.body?.brandName);
+  if (!nameCheck.available) {
+    res.status(nameCheck.code === "NAME_TAKEN" ? 409 : 400).json({ error: nameCheck.error, code: nameCheck.code, field: "brandName" });
+    return;
+  }
+  const handleCheck = await handleAvailability(clerkId, req.body?.handle);
+  if (!handleCheck.available) {
+    res.status(handleCheck.code === "USERNAME_TAKEN" ? 409 : 400).json({ error: handleCheck.error, code: handleCheck.code, field: "handle" });
+    return;
+  }
+  try {
+    const [updated] = await db
+      .update(users)
+      .set({ brandName: nameCheck.name, username: handleCheck.handle, updatedAt: new Date() })
+      .where(eq(users.clerkId, clerkId))
+      .returning({ brandName: users.brandName, username: users.username });
+    if (!updated) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    // The pre-check races with concurrent claims; the unique index decides.
+    if (isUniqueViolation(err) && violatedConstraint(err) === "users_username_ci_unique") {
+      res.status(409).json({ error: "That handle is already taken.", code: "USERNAME_TAKEN", field: "handle" });
+      return;
+    }
+    req.log.error({ err }, "Store identity save failed");
+    res.status(500).json({ error: "Could not save your store name. Please try again." });
+  }
+});
+
+// ─── PUT /api/seller/profile/accent ───────────────────────────────────────────
+router.put("/profile/accent", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const raw = req.body?.color;
+  const color = raw === null ? null : normalizeStoreAccent(raw);
+  if (raw !== null && !color) {
+    res.status(400).json({ error: "Choose one of the available colors." });
+    return;
+  }
+  const [updated] = await db
+    .update(users)
+    .set({ storeAccentColor: color, updatedAt: new Date() })
+    .where(eq(users.clerkId, clerkId))
+    .returning({ storeAccentColor: users.storeAccentColor });
+  if (!updated) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
+  res.json(updated);
+});
+
+// ─── PUT /api/seller/social-links ─────────────────────────────────────────────
+// Merges into users.socialLinks, leaving any other keys untouched. An empty
+// value removes that platform's link.
+router.put("/social-links", async (req, res): Promise<void> => {
+  const clerkId = (req as any).clerkUserId as string;
+  const platforms: SocialPlatform[] = ["instagram", "tiktok"];
+  const next: Partial<Record<SocialPlatform, string>> = {};
+  for (const platform of platforms) {
+    if (req.body?.[platform] === undefined) continue;
+    const link = normalizeSocialLink(platform, req.body[platform]);
+    if (link === null) {
+      const label = platform === "instagram" ? "Instagram" : "TikTok";
+      res.status(400).json({ error: `Enter a ${label} handle or a link to your ${label} profile.`, field: platform });
+      return;
+    }
+    next[platform] = link;
+  }
+  const [seller] = await db.select({ socialLinks: users.socialLinks }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+  if (!seller) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
+  const merged: Record<string, string> = { ...(seller.socialLinks ?? {}) };
+  for (const platform of platforms) {
+    if (next[platform] === undefined) continue;
+    if (next[platform]) merged[platform] = next[platform]!;
+    else delete merged[platform];
+  }
+  await db.update(users).set({ socialLinks: merged, updatedAt: new Date() }).where(eq(users.clerkId, clerkId));
+  res.json({ socialLinks: merged });
+});
 
 // ─── PATCH /api/seller/policy ─────────────────────────────────────────────────
 router.patch("/policy", async (req, res): Promise<void> => {

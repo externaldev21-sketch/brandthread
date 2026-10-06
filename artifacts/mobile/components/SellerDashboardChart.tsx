@@ -1,34 +1,36 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { Glass } from '@/components/ui/Glass';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
 import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
+import { radius } from '@/constants/radii';
 
-export type SellerDashboardRange = 'today' | 'week' | 'month' | 'year' | 'all';
+import { DASHBOARD_RANGES, SellerDashboardRangePills, type SellerDashboardRange } from '@/components/SellerDashboardRangePills';
 
-export const DASHBOARD_RANGES: Array<{ id: SellerDashboardRange; label: string }> = [
-  { id: 'today', label: 'Today' },
-  { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Month' },
-  { id: 'year', label: 'Year' },
-  { id: 'all', label: 'All' },
-];
+// The range pill row (and its type/list) now live in their own component so
+// other analytics screens can show the exact same control — re-exported
+// here so every existing import of the chart keeps working unchanged.
+export { DASHBOARD_RANGES, type SellerDashboardRange };
 
 const CHART_HEIGHT = 168;
+/** The empty/fresh-store chart: no curve, just gridlines + a centred
+ *  message — at the full 168 that message floated in a tall blank band
+ *  under the hero figure (Dev: "big empty gap between $0.00 and the
+ *  chart"). Shorter when there's nothing to plot; the real chart keeps
+ *  CHART_HEIGHT. */
+const EMPTY_CHART_HEIGHT = 112;
 
 // Each visible axis label is positioned absolutely at its bucket's own x
 // (see the axisRow render below), in a fixed-width box centered on that
@@ -84,52 +86,14 @@ export function SellerDashboardChart({
   showNowMarker?: boolean;
 }) {
   const [width, setWidth] = useState(0);
-  const [rangeRowWidth, setRangeRowWidth] = useState(0);
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
+  const chartHeight = isEmpty ? EMPTY_CHART_HEIGHT : CHART_HEIGHT;
   const lastHapticIndex = React.useRef<number | null>(null);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout.width;
     setWidth((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
   }, []);
-
-  const onRangeRowLayout = useCallback((event: LayoutChangeEvent) => {
-    const next = event.nativeEvent.layout.width;
-    setRangeRowWidth((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
-  }, []);
-
-  // Sliding glass-pill active-range indicator: one equal-width segment per
-  // range tab (gap already subtracted so the pill lands exactly on a tab).
-  const rangeSegmentGap = SP.xs;
-  const rangeSegmentWidth = rangeRowWidth > 0
-    ? (rangeRowWidth - rangeSegmentGap * (DASHBOARD_RANGES.length - 1)) / DASHBOARD_RANGES.length
-    : 0;
-  const activeRangeIndex = DASHBOARD_RANGES.findIndex((item) => item.id === range);
-  const rangeIndicatorX = useSharedValue(0);
-  // The pill only mounts once rangeSegmentWidth is known (below), but that
-  // first layout measurement lands well after mount — often seconds, on a
-  // screen that waits on real data first. Springing to the initial position
-  // from this shared value's x=0 default made the indicator visibly launch
-  // from "Today" (index 0) and glide over to whatever range was actually
-  // selected the moment it appeared, reading as the period switching itself
-  // after load. Only animate real, user-driven range changes; snap directly
-  // to the correct spot the first time a width is known.
-  const hasPositionedIndicatorRef = React.useRef(false);
-  React.useEffect(() => {
-    if (rangeSegmentWidth <= 0 || activeRangeIndex < 0) return;
-    const x = activeRangeIndex * (rangeSegmentWidth + rangeSegmentGap);
-    if (!hasPositionedIndicatorRef.current) {
-      hasPositionedIndicatorRef.current = true;
-      rangeIndicatorX.value = x;
-    } else {
-      rangeIndicatorX.value = withSpring(x, TAB_INDICATOR_SPRING);
-    }
-  }, [activeRangeIndex, rangeSegmentGap, rangeSegmentWidth, rangeIndicatorX]);
-  const rangeIndicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: rangeIndicatorX.value }],
-    width: rangeSegmentWidth > 0 ? rangeSegmentWidth : 0,
-    opacity: rangeSegmentWidth > 0 ? 1 : 0,
-  }));
 
   // Empty/new-seller state: no curve at all (not even a flat one) — a
   // drawn-but-flat line at $0 read as a broken/glitched chart. The empty
@@ -138,16 +102,16 @@ export function SellerDashboardChart({
   // chart rather than a rendering failure.
   const series = isEmpty ? [] : values;
   const points = useMemo(
-    () => (series.length > 0 ? layoutSeriesPoints(series, Math.max(width, 1), CHART_HEIGHT) : []),
-    [series, width],
+    () => (series.length > 0 ? layoutSeriesPoints(series, Math.max(width, 1), chartHeight) : []),
+    [series, width, chartHeight],
   );
   const linePath = useMemo(() => smoothPath(points), [points]);
   const areaPath = useMemo(() => {
     if (points.length < 2) return '';
     const last = points[points.length - 1];
     const first = points[0];
-    return `${linePath} L${last.x},${CHART_HEIGHT} L${first.x},${CHART_HEIGHT} Z`;
-  }, [linePath, points]);
+    return `${linePath} L${last.x},${chartHeight} L${first.x},${chartHeight} Z`;
+  }, [linePath, points, chartHeight]);
 
   const scrubX = useSharedValue(0);
   const scrubActive = useSharedValue(0);
@@ -218,7 +182,7 @@ export function SellerDashboardChart({
       opacity: scrubActive.value,
       transform: [
         { translateX: (point?.x ?? 0) - 4 },
-        { translateY: (point?.y ?? CHART_HEIGHT / 2) - 4 },
+        { translateY: (point?.y ?? chartHeight / 2) - 4 },
       ],
     };
   });
@@ -259,10 +223,10 @@ export function SellerDashboardChart({
           testID="seller-dashboard-chart"
           accessibilityLabel="Sales activity chart, scrub with your finger to inspect a point"
           onLayout={onLayout}
-          style={styles.chartArea}
+          style={[styles.chartArea, { height: chartHeight }]}
         >
           {width > 0 && points.length > 0 && (
-            <Svg width={width} height={CHART_HEIGHT}>
+            <Svg width={width} height={chartHeight}>
               <Defs>
                 <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <Stop offset="0" stopColor={strokeColor} stopOpacity={isEmpty ? 0.08 : 0.32} />
@@ -289,7 +253,7 @@ export function SellerDashboardChart({
                   key={`gridline-${i}`}
                   style={[
                     styles.emptyGridline,
-                    { top: ((i + 1) * CHART_HEIGHT) / (EMPTY_GRIDLINE_COUNT + 1), backgroundColor: theme.borderSubtle },
+                    { top: ((i + 1) * chartHeight) / (EMPTY_GRIDLINE_COUNT + 1), backgroundColor: theme.borderSubtle },
                   ]}
                 />
               ))}
@@ -426,35 +390,7 @@ export function SellerDashboardChart({
         </View>
       )}
 
-      <View style={styles.rangeRow} onLayout={onRangeRowLayout} testID="seller-dashboard-range-pills">
-        {rangeSegmentWidth > 0 && (
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.rangeIndicatorWrap, rangeIndicatorStyle]}
-            testID="seller-dashboard-range-indicator"
-          >
-            <Glass variant="pressed" radius={999} style={StyleSheet.absoluteFill} />
-          </Animated.View>
-        )}
-        {DASHBOARD_RANGES.map((item) => {
-          const selected = item.id === range;
-          return (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => onRangeChange(item.id)}
-              activeOpacity={0.75}
-              style={styles.rangePill}
-              accessibilityRole="button"
-              accessibilityLabel={`Show ${item.label}`}
-              accessibilityState={{ selected }}
-            >
-              <Text style={[styles.rangeText, { color: selected ? theme.text : theme.muted }]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <SellerDashboardRangePills range={range} onRangeChange={onRangeChange} theme={theme} />
     </View>
   );
 }
@@ -528,31 +464,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT.semibold,
     fontSize: FS.xs,
     fontVariant: ['tabular-nums'],
-  },
-  rangeRow: {
-    flexDirection: 'row',
-    gap: SP.xs,
-    marginTop: SP.sm,
-    position: 'relative',
-  },
-  rangeIndicatorWrap: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  rangePill: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-  },
-  rangeText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.xs,
   },
   axisRow: {
     height: 16,

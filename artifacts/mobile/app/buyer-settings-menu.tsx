@@ -81,6 +81,7 @@ export default function BuyerSettingsMenuScreen() {
       title: 'How you use Brandthread',
       rows: [
         { key: 'saved', icon: 'bookmark', label: 'Saved', onPress: () => router.push('/buyer-saved' as any) },
+        { key: 'drafts', icon: 'file-text', label: 'Drafts', onPress: () => router.push('/buyer-drafts' as any) },
         { key: 'archive', icon: 'archive', label: 'Archive', onPress: () => router.push('/buyer-archive' as any) },
         { key: 'your-activity', icon: 'activity', label: 'Your activity', onPress: () => router.push('/buyer-your-activity' as any) },
         { key: 'close-friends', icon: 'star', label: 'Close friends', onPress: () => router.push('/buyer-close-friends' as any) },
@@ -95,12 +96,14 @@ export default function BuyerSettingsMenuScreen() {
         { key: 'orders', icon: 'package', label: 'Orders', onPress: () => router.push('/(buyer)/orders') },
         { key: 'rewards', icon: 'gift', label: 'Rewards', onPress: () => router.push('/loyalty' as any) },
         { key: 'thread-cash', icon: 'credit-card', label: 'Thread Cash wallet', onPress: () => router.push('/thread-cash' as any) },
+        { key: 'gift-cards', icon: 'gift', label: 'Gift cards', onPress: () => router.push('/buyer-gift-cards' as any) },
       ],
     },
     {
       title: 'Work',
       rows: [
         { key: 'freelancer-jobs', icon: 'briefcase', label: 'Freelancer jobs', onPress: () => router.push('/freelancer-jobs' as any) },
+        { key: 'creator-program', icon: 'link', label: 'Creator program', onPress: () => router.push('/creator-program' as any) },
       ],
     },
     {

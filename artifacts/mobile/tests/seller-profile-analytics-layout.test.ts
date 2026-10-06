@@ -76,10 +76,10 @@ describe('seller profile action layout', () => {
 
   it('reaches post creation from the Studio control center instead of a top action button', () => {
     expect(profileSource).not.toContain('Share something with');
-    // The empty Post tab offers "Create your first post" through the shared
+    // The empty Posts tab offers a slim "Create post" pill through the shared
     // profile empty-state table (components/profile/profileEmptyStates.ts).
     expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
-      .toContain("label: 'Create your first post', route: '/create-post'");
+      .toContain("cta: { label: 'Create post', route: '/create-post' }");
     const controlCenterSource = fs.readFileSync(
       path.resolve(__dirname, '../lib/sellerControlCenter.ts'),
       'utf8',
@@ -93,15 +93,23 @@ describe('seller analytics overview layout', () => {
   // The "14 Days"/"Custom" ranges and the "Leads"/"Traffic sources" cards
   // were non-functional stubs (always empty, no backing API) and were
   // removed as a P0 fix — see docs/polish/punch-list.md, Seller Analytics.
-  // Only the working 7-day range ships now.
-  it('renders only the working 7-day range, real metrics, and the chart', () => {
+  // Every range shown now is a Dashboard range (Today / Week / Month / Year /
+  // All) backed by the same real GET /api/analytics/home call.
+  it('renders only the real Dashboard ranges, real metrics, and the chart', () => {
     expect(analyticsSource).not.toContain("label: '14 Days'");
     expect(analyticsSource).not.toContain("label: 'Custom'");
     expect(analyticsSource).not.toContain('label="Leads"');
-    expect(analyticsSource).toContain('Last 7 days');
+    expect(analyticsSource).toContain('await api.analytics.home(range)');
+    // Header is bare (no "Last 7 days" subtitle); the period is the
+    // Dashboard's own Today/Week/Month/Year/All pills, opening on Today, and
+    // the chart is titled "Revenue" so it follows the selected range.
+    expect(analyticsSource).not.toContain('Last 7 days');
+    expect(analyticsSource).toContain('<SellerDashboardRangePills');
+    expect(analyticsSource).toContain('useState<InsightRange>(DEFAULT_INSIGHT_RANGE)');
     expect(analyticsSource).toContain('label="Visits"');
     expect(analyticsSource).toContain('label="Revenue"');
-    expect(analyticsSource).toContain('Daily Revenue');
+    expect(analyticsSource).toContain('<SectionTitle>Revenue</SectionTitle>');
+    expect(analyticsSource).not.toContain('Daily Revenue');
   });
 
   it('uses zero-safe data and omits fabricated trends and traffic sources', () => {
