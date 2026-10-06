@@ -38,9 +38,17 @@ export default function AnalyticsContentScreen() {
   const hasData = !!data && (data.totals.views > 0 || data.posts.length > 0 || data.totals.followerGrowth > 0);
   const posts = data ? sortPosts(data.posts, sort).slice(0, 20) : [];
   return (
-    <InsightFrame title="Threads and videos" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
+    <InsightFrame title="Content Analytics" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
       {!data ? null : !hasData ? (
-        <EmptyState icon="play-circle" title="No views in this period" description="Views, likes, saves and sales from your threads and videos show here." />
+        <EmptyState
+          icon="video"
+          title="No views yet"
+          description="Post a Thread to see how it performs."
+          action={{ label: 'Create post', onPress: () => router.push('/create-post' as never) }}
+          actionVariant="pill"
+          style={{ marginTop: SP.lg }}
+          testID="content-analytics-empty"
+        />
       ) : (
         <>
           <KpiGrid range={range} items={[

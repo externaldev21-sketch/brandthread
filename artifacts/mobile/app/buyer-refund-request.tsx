@@ -131,7 +131,6 @@ export default function BuyerRefundRequestScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
         title="Request Refund"
-        subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>

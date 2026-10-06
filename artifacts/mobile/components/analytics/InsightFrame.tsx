@@ -12,13 +12,15 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader, type ScreenHeaderAction } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { AnalyticsSkeleton } from '@/components/analytics/AnalyticsKit';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
 
 /** Space a report screen keeps clear at the bottom for the floating seller bar. */
 export function useReportBottomInset(): number {
   // Same geometry the seller bar itself is drawn from (two side circles).
-  return useTabBarMetrics(2).occupiedHeight;
+  return useTabBarClearance(2);
 }
 
 export function InsightFrame({
@@ -28,6 +30,7 @@ export function InsightFrame({
   range?: InsightRange; onRangeChange?: (r: InsightRange) => void; actions?: ScreenHeaderAction[]; children: React.ReactNode;
 }) {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const bottom = useReportBottomInset();
   return (
     <View style={{ flex: 1 }}>
@@ -44,7 +47,7 @@ export function InsightFrame({
           refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
         >
           {range && onRangeChange && (
-            <SegmentedPills options={INSIGHT_RANGES} value={range} onChange={onRangeChange} />
+            <SellerDashboardRangePills range={range} onRangeChange={onRangeChange} theme={theme} />
           )}
           {children}
         </ScrollView>

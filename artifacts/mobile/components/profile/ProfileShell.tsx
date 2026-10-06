@@ -58,7 +58,7 @@ import { LiveAvatarRing } from '@/components/live/LiveAvatarRing';
 import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { ProfileVideoHeader } from './ProfileVideoHeader';
 import { ProfileStoryAvatar } from './ProfileStoryAvatar';
-import { avatarGeometry } from './profileAvatarGeometry';
+import { avatarGeometry, PROFILE_VIDEO_HEADER_AVATAR_SIZE } from './profileAvatarGeometry';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -83,6 +83,9 @@ export interface ProfileIdentity {
   verified?: boolean;
   /** "Seller" / "Buyer" — shown as a chip beside the handle. */
   roleLabel: string;
+  /** `headerVariant="video"` only: more chips stacked directly under the
+   *  role chip, same height and style (e.g. the owner's plan chip). */
+  extraChips?: Array<{ label: string; icon?: keyof typeof Feather.glyphMap }>;
   pronouns?: string | null;
 }
 
@@ -359,7 +362,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     : avatar?.accessibilityLabel ?? `${identity.name} avatar`;
 
   const topPad = headerTopInset;
-  const videoAvatarSize = avatarGeometry().outer;
+  const videoAvatarSize = avatarGeometry(PROFILE_VIDEO_HEADER_AVATAR_SIZE).outer;
   const videoHeader = isVideoHeader ? (
     <ProfileVideoHeader
       hero={hero}
@@ -379,6 +382,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       avatar={(
         <LiveAvatarRing live={!!liveStreamId} size={videoAvatarSize} testID={liveStreamId ? 'profile-live-ring' : undefined}>
           <ProfileStoryAvatar
+            size={PROFILE_VIDEO_HEADER_AVATAR_SIZE}
             uri={identity.avatarUrl}
             videoUri={identity.avatarVideoUrl}
             initials={identity.initials || '•'}
@@ -392,7 +396,10 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       name={identity.name}
       nameAccessory={identity.verified ? <Feather name="check-circle" size={16} color={ON_DARK} accessibilityLabel="Verified" /> : null}
       handle={identity.handle ?? null}
-      chip={<ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />}
+      chips={[
+        <ProfileChip key="role" size="sm" label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />,
+        ...(identity.extraChips ?? []).map((c) => <ProfileChip key={c.label} size="sm" label={c.label} icon={c.icon} />),
+      ]}
       meta={meta}
       coverAffordance={isOwnProfile ? coverAffordance : null}
       stats={stats}

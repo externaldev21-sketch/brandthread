@@ -622,6 +622,9 @@ export default function ProfileScreen() {
           avatarVideoUrl: profile?.avatarVideoUrl ?? null,
           verified: !!profile?.verified,
           roleLabel: 'Seller',
+          // Dev's header layout: "Seller" chip on top, the plan chip
+          // directly below it — stacked, same height and style.
+          extraChips: [{ label: planLabel, icon: hasPaidPlan ? 'award' : 'layers' }],
         }}
         avatar={{
           // Accent ring = an unexpired story (verified shows as the check by the name).
@@ -671,9 +674,7 @@ export default function ProfileScreen() {
           </ProfileTopBarIconRow>
         )}
         meta={(
-          <ProfileMeta bio={profile?.bio}>
-            <ProfileChip label={planLabel} icon={hasPaidPlan ? 'award' : 'layers'} tone={hasPaidPlan ? 'accent' : 'muted'} />
-          </ProfileMeta>
+          <ProfileMeta bio={profile?.bio} />
         )}
         stats={stats}
         statsLoading={statsInitialLoading}
@@ -749,8 +750,9 @@ export default function ProfileScreen() {
             description={empty.message}
             action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
             testID={`seller-own-empty-${activeTab.toLowerCase()}`}
-            actionStyle="text"
-            alignTop={activeTab === 'Posts'}
+            // All three tabs: one shared empty state, identical layout (Dev)
+            // — badge + title (+ a slim white pill), ~32px under the tabs.
+            actionStyle="pill"
           />
         )}
         refreshing={refreshing}

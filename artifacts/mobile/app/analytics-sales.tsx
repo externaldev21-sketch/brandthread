@@ -79,7 +79,7 @@ export default function AnalyticsSalesScreen() {
   const points = chartData();
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Sales Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
+      <ScreenHeader title="Sales Analytics" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={0} listRows={3} />
       ) : loadError && !data ? (

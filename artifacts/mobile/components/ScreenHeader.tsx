@@ -17,11 +17,16 @@ export interface ScreenHeaderAction {
   badge?: boolean;
 }
 
+/**
+ * Every screen header, app-wide, is a bare back arrow (or close X) + title —
+ * Dev's rule: no subtitle/caption line and no divider under the header. The
+ * old `subtitle` prop was removed outright (not just ignored) so a new call
+ * site can't quietly bring one back; the divider is now off by default.
+ */
 interface ScreenHeaderProps {
   title: string;
   /** Top-level tab screens have no back destination. */
   showBack?: boolean;
-  subtitle?: string;
   rightElement?: React.ReactNode;
   /** Extra icon-button actions rendered right of `rightElement` (back/action slots). */
   actions?: ScreenHeaderAction[];
@@ -35,7 +40,7 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
-  /** Draw the hairline under the header (default true). Pass false for a bare back arrow + title. */
+  /** Off by default; explicitly opt in only when content needs a hard edge. */
   divider?: boolean;
   /** Override the spoken back label when the route changes between a list and an inline form. */
   backAccessibilityLabel?: string;
@@ -68,7 +73,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = true, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false,
+  title, rightElement, actions, scrollY, collapseDistance = 48, onBack, divider = false, backTestID, backAccessibilityLabel, variant = 'push', showBack = true, hideDivider = false,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -159,32 +164,10 @@ export function ScreenHeader({
         </View>
       </View>
 
-      {subtitle && !scrollY && (
-        <Text
-          maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
-          style={[
-            styles.subtitle,
-            {
-              color: colors.mutedForeground,
-              // Sibling row below `container`, so it needs its own horizontal
-              // offset to line up under the title: the container's own gutter
-              // (SP.md) plus, for push, the back button's width + gap (44 +
-              // SP.sm) that the title itself is indented by in that variant.
-              paddingHorizontal: SP.md,
-              marginLeft: variant === 'push' ? 44 + SP.sm : 0,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {subtitle}
-        </Text>
-      )}
-
       {scrollY && (
         <Animated.View style={{ opacity: largeTitleOpacity!, transform: [{ scale: largeTitleScale! }], height: largeTitleHeight!, overflow: 'hidden' }}>
           <View style={styles.largeTitleWrap}>
             <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.title1, { color: colors.foreground, fontFamily: FONT.bold }]} numberOfLines={1}>{title}</Text>
-            {subtitle && <Text style={[styles.subtitle, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={1}>{subtitle}</Text>}
           </View>
         </Animated.View>
       )}
@@ -244,11 +227,6 @@ const styles = StyleSheet.create({
     fontSize: TITLE_SIZE,
     fontFamily: FONT.bold,
     letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    marginTop: SP.xs,
   },
   rightSlot: {
     minWidth: COMP.iconBtn,

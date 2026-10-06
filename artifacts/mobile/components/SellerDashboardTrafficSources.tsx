@@ -132,7 +132,7 @@ export function SellerDashboardTrafficSources({
         <View style={styles.emptyState}>
           <View style={[styles.emptyBarTrack, { borderColor: theme.borderSubtle }]} />
           <Text style={[styles.emptyText, { color: theme.muted }]}>
-            No visits yet — share your store to start getting traffic.
+            No visits yet
           </Text>
           <PressableScale
             onPress={onShareStore}

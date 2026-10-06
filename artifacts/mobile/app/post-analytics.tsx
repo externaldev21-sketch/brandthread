@@ -555,10 +555,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
 
   // ── Header ──
+  // No divider under the header (app-wide header rule).
   header: {
     backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,

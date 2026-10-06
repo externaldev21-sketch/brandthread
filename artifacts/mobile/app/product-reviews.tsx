@@ -74,10 +74,7 @@ export default function ProductReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader
-        title={productName || 'Reviews'}
-        subtitle={totalCount > 0 ? `${avgRating.toFixed(1)} · ${totalCount} reviews` : undefined}
-      />
+      <ScreenHeader title={productName || 'Reviews'} />
       {loading ? (
         <View style={{ padding: SP.md }}>
           {[0, 1, 2].map(i => (

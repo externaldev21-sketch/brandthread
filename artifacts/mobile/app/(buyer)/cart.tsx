@@ -1037,7 +1037,6 @@ export default function CartScreen() {
             <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
           </TouchableOpacity>
         ) : undefined}
-        dividerVariant="subtle"
       />
 
       {!hasItems && !hasSaved && !loadError ? (

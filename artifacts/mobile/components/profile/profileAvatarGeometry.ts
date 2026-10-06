@@ -20,6 +20,9 @@
 
 /** Instagram's own-profile avatar is ~72pt on a 390pt phone and does not scale with width. */
 export const PROFILE_AVATAR_SIZE = 72;
+/** The seller's own Profile tab (video header): Dev asked for a noticeably
+ *  bigger picture there (+22% over the shared 72pt default). */
+export const PROFILE_VIDEO_HEADER_AVATAR_SIZE = 88;
 /** Background-coloured separator stroke around the avatar. */
 export const AVATAR_HALO_BORDER = 2;
 /** Background-coloured gap between the separator stroke and the avatar. */

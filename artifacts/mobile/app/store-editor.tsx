@@ -1147,7 +1147,6 @@ export default function StoreEditor() {
     <View style={styles.root}>
       <ScreenHeader
         title="Edit Store"
-        subtitle={savingStatus !== 'idle' ? saveStatusText() : undefined}
         onBack={() => goBackOr(router)}
         rightElement={
           <View style={styles.headerRight}>

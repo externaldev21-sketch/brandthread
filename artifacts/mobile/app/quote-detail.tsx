@@ -342,7 +342,6 @@ export default function QuoteDetailScreen() {
     <BrandthreadScreen noSafeTop>
       <ScreenHeader
         title="Quote Details"
-        subtitle={manufacturerName}
         onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView

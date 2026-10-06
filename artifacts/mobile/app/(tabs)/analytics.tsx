@@ -36,7 +36,9 @@ import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { bucketLabel } from '@/lib/sellerHomeChartLabels';
 import { AnalyticsBarChart, AnalyticsSkeleton, Card, SectionTitle, StatTile } from '@/components/analytics/AnalyticsKit';
 import { AnalyticsReportsList } from '@/components/analytics/AnalyticsReportsList';
-import { SegmentedPills, useReportBottomInset } from '@/components/analytics/InsightFrame';
+import { useReportBottomInset } from '@/components/analytics/InsightFrame';
+import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { previousPeriodLabel } from '@/components/analytics/InsightCharts';
 import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
@@ -78,6 +80,7 @@ const CHART_TITLE: Record<InsightRange, string> = {
 
 export default function AnalyticsScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const onBack = params.from === STUDIO_MENU_ORIGIN ? () => {
@@ -174,11 +177,13 @@ export default function AnalyticsScreen() {
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
           {/* ── Range (same pills as the Dashboard) ───────────────────────── */}
-          <SegmentedPills options={INSIGHT_RANGES} value={range} onChange={setRange} testID="analytics-range-pills" />
+          <SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} />
 
           {/* ── Summary stats ──────────────────────────────────────────────── */}
           <View style={s.statsRow}>
-            <StatTile label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <StatTile label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} />
+            </View>
             <View ref={revenueTileRef} onLayout={revenueTileOnLayout} collapsable={false} style={{ flex: 1 }}>
               <StatTile label="Revenue" value={displayRevenue} changePct={summary.revenueChangePct} featured />
             </View>
@@ -186,8 +191,8 @@ export default function AnalyticsScreen() {
 
           {/* ── Revenue chart for the selected range ──────────────────────── */}
           <Card padded>
-            <SectionTitle note={comparedTo ? `Change ${comparedTo}` : undefined}>{CHART_TITLE[range]}</SectionTitle>
-            <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue in this period" />
+            <SectionTitle>Revenue</SectionTitle>
+            <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" height={bars.some(b => b.cents > 0) ? 140 : 120} />
           </Card>
 
           {/* ── Reports (appended) ─────────────────────────────────────────── */}

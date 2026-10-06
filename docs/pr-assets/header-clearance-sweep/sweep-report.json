@@ -1,0 +1,137 @@
+{
+  "dashboard": {
+    "barTop": 770,
+    "lowestContentBottom": 732,
+    "gap": 38
+  },
+  "products": {
+    "barTop": 770,
+    "lowestContentBottom": 448.5,
+    "gap": 321.5
+  },
+  "orders": {
+    "barTop": 770,
+    "lowestContentBottom": 426,
+    "gap": 344
+  },
+  "profile": {
+    "barTop": 770,
+    "lowestContentBottom": 304,
+    "gap": 466
+  },
+  "analytics": {
+    "barTop": 770,
+    "lowestContentBottom": 443,
+    "gap": 327
+  },
+  "more": {
+    "barTop": 770,
+    "lowestContentBottom": 693.5,
+    "gap": 76.5
+  },
+  "marketing": {
+    "barTop": 770,
+    "lowestContentBottom": 701,
+    "gap": 69
+  },
+  "studio": {
+    "barTop": 770,
+    "lowestContentBottom": 729,
+    "gap": 41
+  },
+  "analytics-content": {
+    "barTop": 770,
+    "lowestContentBottom": 417,
+    "gap": 353
+  },
+  "analytics-sales": {
+    "barTop": 770,
+    "lowestContentBottom": 460,
+    "gap": 310
+  },
+  "analytics-store": {
+    "barTop": 770,
+    "lowestContentBottom": 505.5,
+    "gap": 264.5
+  },
+  "customers": {
+    "barTop": 770,
+    "lowestContentBottom": 430,
+    "gap": 340
+  },
+  "payouts": {
+    "barTop": 770,
+    "lowestContentBottom": 632,
+    "gap": 138
+  },
+  "seller-inbox": {
+    "barTop": 770,
+    "lowestContentBottom": 545.5,
+    "gap": 224.5
+  },
+  "seller-settings": {
+    "barTop": 770,
+    "lowestContentBottom": 616,
+    "gap": 154
+  },
+  "discounts": {
+    "barTop": 770,
+    "lowestContentBottom": 412.5,
+    "gap": 357.5
+  },
+  "profileEmptyGaps": [
+    33,
+    33,
+    33
+  ],
+  "badgeOffsets": {
+    "posts": {
+      "dx": 0,
+      "dy": 0,
+      "count": 1156,
+      "glyphW": 23,
+      "glyphH": 23,
+      "ringW": 64
+    },
+    "shop": {
+      "dx": 0,
+      "dy": 0,
+      "count": 1026,
+      "glyphW": 23,
+      "glyphH": 26,
+      "ringW": 64
+    },
+    "tagged": {
+      "dx": 0,
+      "dy": -0.25,
+      "count": 651,
+      "glyphW": 25,
+      "glyphH": 24.5,
+      "ringW": 64
+    }
+  },
+  "badge-analytics-content": {
+    "dx": 0,
+    "dy": 0,
+    "count": 723,
+    "glyphW": 26,
+    "glyphH": 16,
+    "ringW": 64
+  },
+  "badge-seller-inbox": {
+    "dx": 0,
+    "dy": 0,
+    "count": 719,
+    "glyphW": 26,
+    "glyphH": 26,
+    "ringW": 64
+  },
+  "badge-customers": {
+    "dx": 0,
+    "dy": 0,
+    "count": 721,
+    "glyphW": 26,
+    "glyphH": 23,
+    "ringW": 64
+  }
+}

@@ -46,7 +46,7 @@ describe('ProfileEditMessagesRow', () => {
   });
 
   it('both buttons are 39pt tall with a 10pt (RADIUS.sm) radius and a padded 44pt-ish hit area', () => {
-    expect(controls).toContain('editBtn: {\n    height: 39, borderRadius: RADIUS.sm, borderWidth: 1,');
+    expect(controls).toContain("editBtn: {\n    width: '100%', height: 39, borderRadius: RADIUS.sm, borderWidth: 1,");
     expect(controls).toContain("messagesBtn: {\n    width: '100%', height: 39, borderRadius: RADIUS.sm,");
     expect(controls).toContain("const hitSlop = { top: 3, bottom: 3, left: 3, right: 3 };");
   });

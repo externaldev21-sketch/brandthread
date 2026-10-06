@@ -62,7 +62,7 @@ export default function AnalyticsProfitScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Profit & Payout" subtitle={filter?.dateRange.label ?? '30 days'} />
+      <ScreenHeader title="Profit & Payout" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={0} listRows={3} />
       ) : (
