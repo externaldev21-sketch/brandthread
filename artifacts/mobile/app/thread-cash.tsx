@@ -8,13 +8,15 @@
  * before — nothing about eligibility, amounts, or business logic changed.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { fmtDate } from '@/lib/format';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -125,6 +127,7 @@ export default function ThreadCashScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useBuyerTabBarInset();
   const celebrateThreadCash = useCelebrateThreadCash();
   const [status, setStatus] = useState<ThreadCashStatus | null>(null);
   const [history, setHistory] = useState<ThreadCashEntry[]>([]);
@@ -198,8 +201,15 @@ export default function ThreadCashScreen() {
   const claimedThroughDay = status?.streak.alreadyCheckedInToday ? dayInCycle : dayInCycle - 1;
 
   return (
-    <BrandthreadScreen scrollable noSafeTop>
+    <BrandthreadScreen noSafeTop>
+      {/* Header sits outside the scroll view so it stays fixed and the
+          content scrolls beneath it — never up under the status bar. */}
       <ScreenHeader title="Thread Cash" onBack={() => goBackOr(router)} />
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarInset + SP.md }}
+      >
       {loading ? (
         <BalanceSkeleton styles={styles} />
       ) : (
@@ -310,7 +320,7 @@ export default function ThreadCashScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.historyLabel, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
                       <Text style={[styles.historyDate, { color: theme.subtle }]} numberOfLines={1}>
-                        {new Date(entry.createdAt).toLocaleDateString()}
+                        {fmtDate(entry.createdAt)}
                         {entry.note ? ` · “${entry.note}”` : ''}
                       </Text>
                     </View>
@@ -351,6 +361,7 @@ export default function ThreadCashScreen() {
             </BrandthreadCard>
           </View>
       )}
+      </ScrollView>
     </BrandthreadScreen>
   );
 }

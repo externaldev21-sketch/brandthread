@@ -130,9 +130,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.sm + 2,
     paddingVertical: SP.sm,
     paddingRight: SP.md,
-    paddingLeft: SP.xs,
+    // Unread dot sits inside the 16px side gutter, never against the edge.
+    paddingLeft: SP.md,
   },
-  dotSlot: { width: 12, alignItems: 'center' },
+  dotSlot: { width: 8, alignItems: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.text },
   avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   initials: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
