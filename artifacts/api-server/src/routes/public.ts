@@ -21,6 +21,7 @@ import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant }
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { viewerPostStates } from "../lib/viewerPostState";
 import {
   paginationMetadata,
   parsePagination,
@@ -686,10 +687,12 @@ router.get("/search", async (req, res): Promise<void> => {
           createdAt: posts.createdAt,
           relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
         }).from(posts)
-          .where(and(eq(posts.mediaType, "video"), publicPostCondition(), match))
+          .where(and(eq(posts.mediaType, "video"), publicPostCondition(), notBlockedWith(viewerId, posts.userId), match))
           .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
           .limit(VIDEO_SEARCH_PAGE);
-        const exact = await videoQuery(sql`${ilike(posts.caption, pattern)}`);
+        // Hashtags are stored on posts.hashtags (not always repeated in the
+        // caption), so a "#tag" / "tag" search matches them directly too.
+        const exact = await videoQuery(sql`(${ilike(posts.caption, pattern)} OR COALESCE(${posts.hashtags}::text, '') ILIKE ${containsSearchPattern(term.replace(/^#+/, "") || term)})`);
         if (exact.length >= VIDEO_SEARCH_PAGE) return exact;
         const tagged = await videoQuery(sql`${posts.id} IN (
           SELECT ptp.post_id FROM post_tagged_products ptp
@@ -1661,6 +1664,11 @@ router.get("/posts", async (req, res) => {
         eq(users.accountType, "seller"),
         publicPostCondition(),
         notBlockedWith(viewerId, posts.userId),
+        // "Not interested" in the general feed hides the post for this viewer
+        // for good (a creator's own grid, ?ownerId=, still lists it).
+        viewerId && !ownerId
+          ? sql`NOT EXISTS (SELECT 1 FROM feed_not_interested fni WHERE fni.user_id = ${viewerId} AND fni.post_id = ${posts.id})`
+          : undefined,
       ))
       .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)
@@ -1735,6 +1743,7 @@ router.get("/posts", async (req, res) => {
     const savesByPost: Record<string, number> = {};
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
+    const stateFor = await viewerPostStates(viewerId, postIds);
 
     const result = rows.map((p) => ({
       id:             p.id,
@@ -1766,6 +1775,7 @@ router.get("/posts", async (req, res) => {
       sharesCount:   sharesByPost[p.id]   ?? 0,
       savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
+      ...stateFor(p.id),
     }));
 
     return res.json(result);

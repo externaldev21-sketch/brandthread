@@ -258,6 +258,48 @@ export async function getPostById(postId: string, k: SocialKeys = K()): Promise<
   try {
     return await serviceRequest<BuyerPost>(`/api/social/posts/${encodeURIComponent(postId)}`);
   } catch {
+    // Not a friend's buyer post — share links, Saved, Collections and
+    // Recently watched also open seller (Thread) posts here, which live
+    // behind the public post endpoint instead.
+    return getPublicPostAsBuyerPost(postId);
+  }
+}
+
+/** GET /api/posts/:id mapped onto the viewer's BuyerPost shape (with the viewer's like/save/repost state). */
+async function getPublicPostAsBuyerPost(postId: string): Promise<BuyerPost | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId)) return null;
+  try {
+    const p = await serviceRequest<any>(`/api/posts/${encodeURIComponent(postId)}`);
+    const name = p.seller?.brandName || p.seller?.displayName || 'Brandthread';
+    const handle = p.seller?.username ? `@${p.seller.username}` : `@${name.toLowerCase().replace(/\s+/g, '')}`;
+    const type: BuyerPost['type'] = p.mediaType === 'video' ? 'video' : (Array.isArray(p.mediaUrls) && p.mediaUrls.length > 1 ? 'slideshow' : 'photo');
+    return {
+      id: p.id,
+      authorId: p.userId,
+      authorName: name,
+      authorHandle: handle,
+      authorInitials: name.split(/\s+/).map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase(),
+      authorColor: '#1a1a1a',
+      authorAccountType: 'buyer',
+      feedEligibility: 'profile_only',
+      profileVisibility: 'public' as BuyerPost['profileVisibility'],
+      type,
+      caption: p.caption ?? '',
+      hashtags: Array.isArray(p.hashtags) ? p.hashtags : [],
+      mediaColors: [],
+      mediaUrl: p.mediaUrl ?? undefined,
+      likesCount: typeof p.likeCount === 'number' ? p.likeCount : 0,
+      commentsCount: typeof p.commentsCount === 'number' ? p.commentsCount : 0,
+      repostsCount: typeof p.repostCount === 'number' ? p.repostCount : 0,
+      likedByMe: p.likedByMe === true,
+      savedByMe: p.savedByMe === true,
+      repostedByMe: p.repostedByMe === true,
+      isArchived: false,
+      isDraft: false,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt ?? p.createdAt,
+    };
+  } catch {
     return null;
   }
 }
@@ -875,8 +917,10 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     savedCount:    typeof p.savesCount === 'number' ? p.savesCount : 0,
     sharesCount:   typeof p.sharesCount === 'number' ? p.sharesCount : 0,
     viewsCount:    typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
-    likedByMe:     false,
-    savedByMe:     false,
+    // Viewer state comes from the server (lib/viewerPostState.ts) so a
+    // reload never shows a liked/saved post as untouched.
+    likedByMe:     p.likedByMe === true,
+    savedByMe:     p.savedByMe === true,
     repostedByMe:  p.repostedByMe === true,
     friendReposts: Array.isArray(p.friendReposts)
       ? p.friendReposts.slice(0, 5).flatMap((reposter: any) => {

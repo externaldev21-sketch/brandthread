@@ -107,6 +107,7 @@ interface ShopProductSheetProps {
 // Preview catalog products aren't real rows in the reviews table, so they get
 // seeded review data — enough to exercise the average/breakdown/top-reviews
 // UI without a network call.
+const UUID_RE_SHOP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
 
 /**
@@ -364,6 +365,23 @@ export function ShopProductSheet({
   // ever pushing the CTA bar off-screen or behind it.
   const [activeTagIdx, setActiveTagIdx] = useState(selection.activeTagIndex);
   const activeTag = selection.tags[activeTagIdx];
+
+  // A product-tag tap that opens this sheet is the post's "product click":
+  // record it once per post+product so the seller's post analytics and
+  // Content Analytics count real product clicks (previously always 0).
+  const recordedShopClicksRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const postId = selection.postId;
+    const productId = activeTag?.productId;
+    if (!postId || !productId || !UUID_RE_SHOP.test(postId)) return;
+    const key = `${postId}:${productId}`;
+    if (recordedShopClicksRef.current.has(key)) return;
+    recordedShopClicksRef.current.add(key);
+    try {
+      const { api: _api } = require('@/lib/api');
+      void _api.posts.interact(postId, { type: 'shop_click', value: productId }).catch(() => {});
+    } catch { /* no API in this context */ }
+  }, [selection.postId, activeTag?.productId]);
   const hasMultipleTags = selection.tags.length > 1;
 
   // LIST step sheet height (item: half-height-or-taller, drag-to-expand up

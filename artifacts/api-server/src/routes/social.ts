@@ -33,6 +33,7 @@ import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStor
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
 import { storyListedFor } from "../lib/storyVisibility";
+import { viewerPostStates } from "../lib/viewerPostState";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -192,6 +193,7 @@ async function buildBuyerPosts(
   const likes = counts(likeRows);
   const reposts = counts(repostRows);
   const comments = commentRows;
+  const stateFor = await viewerPostStates(viewerId, postIds);
   const mine = new Map<string, Set<string>>();
   for (const row of myRows) {
     if (!row.postId) continue;
@@ -221,7 +223,7 @@ async function buildBuyerPosts(
       repostsCount: reposts.get(row.id) ?? 0,
       likedByMe: mine.get(row.id)?.has("like") ?? false,
       repostedByMe: mine.get(row.id)?.has("repost") ?? false,
-      savedByMe: false,
+      savedByMe: stateFor(row.id).savedByMe,
       isArchived: false,
       isDraft: row.postStatus === "draft",
       createdAt: row.createdAt,

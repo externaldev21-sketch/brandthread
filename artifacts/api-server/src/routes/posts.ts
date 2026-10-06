@@ -12,7 +12,7 @@ import {
   db, posts, postTaggedProducts, products, productVariants, users, interactions, follows, boosts, blocks,
   savedItems, orders,
 } from "@workspace/db";
-import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
+import { eq, and, inArray, count, sql, desc, lte, lt, gte, or, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import postVideoRouter, {
@@ -22,6 +22,7 @@ import postVideoRouter, {
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { viewerPostStates } from "../lib/viewerPostState";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -498,6 +499,7 @@ router.get("/feed", requireAuth, async (req, res) => {
     const savesByPost: Record<string, number> = {};
     for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
+    const stateFor = await viewerPostStates(clerkId, postIds);
 
     // ─── Boost ranking: find active boosts for this page of posts ────────────
     const now = new Date();
@@ -554,6 +556,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       sharesCount:   sharesByPost[p.id]   ?? 0,
       savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
+      ...stateFor(p.id),
     }));
 
     // Stable-sort: boosted posts surface first, rest preserve createdAt DESC order
@@ -1221,7 +1224,7 @@ router.get("/:id/analytics", requireAuth, async (req, res) => {
   }
 
   try {
-    const [interactionRows, saveRows, conversionRows, watchRows] = await Promise.all([
+    const [interactionRows, saveRows, conversionRows, watchRows, commentCounts] = await Promise.all([
       db
         .select({
           type: interactions.type,
@@ -1231,7 +1234,9 @@ router.get("/:id/analytics", requireAuth, async (req, res) => {
         .from(interactions)
         .where(and(
           eq(interactions.postId, id),
-          inArray(interactions.type, ["like", "repost", "view", "shop_click"]),
+          inArray(interactions.type, ["like", "repost", "view", "shop_click", "share"]),
+          // The owner opening their own post is not an audience signal.
+          ne(interactions.userId, ownerId),
         ))
         .groupBy(interactions.type),
       db
@@ -1253,6 +1258,7 @@ router.get("/:id/analytics", requireAuth, async (req, res) => {
         .select({ value: interactions.value })
         .from(interactions)
         .where(and(eq(interactions.postId, id), eq(interactions.type, "watch_time"))),
+      visibleCommentCounts([id]),
     ]);
 
     const interactionsByType = new Map(
@@ -1277,6 +1283,8 @@ router.get("/:id/analytics", requireAuth, async (req, res) => {
       metrics: {
         likes: interactionsByType.get("like")?.count ?? 0,
         reposts: interactionsByType.get("repost")?.count ?? 0,
+        shares: interactionsByType.get("share")?.count ?? 0,
+        comments: commentCounts.get(id) ?? 0,
         views: views
           ? { tracked: true, count: views.count, uniqueViewers: views.uniqueUsers }
           : { tracked: false, count: null, uniqueViewers: null },
@@ -1439,8 +1447,8 @@ router.get("/:id", async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
 
-  const [sellerRows, tags, likeRows, repostRows] = await Promise.all([
-    db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified })
+  const [sellerRows, tags, likeRows, repostRows, commentCounts] = await Promise.all([
+    db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, username: users.username })
       .from(users).where(eq(users.clerkId, post.userId)).limit(1),
     db.select({
       productId: postTaggedProducts.productId,
@@ -1455,15 +1463,19 @@ router.get("/:id", async (req, res) => {
       .where(and(eq(interactions.postId, id), eq(interactions.type, "like"))),
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "repost"))),
+    visibleCommentCounts([id]),
   ]);
 
   const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
+  const stateFor = await viewerPostStates(viewerId, [post.id]);
   return res.json({
     ...post,
+    ...stateFor(post.id),
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
+    commentsCount: commentCounts.get(id) ?? 0,
   });
 });
 
