@@ -9,7 +9,8 @@ import { eq } from "drizzle-orm";
 import { db, ledgerPostings, ledgerTransactions, threadCashEntries, users } from "@workspace/db";
 import { createFakeStripe } from "../../money/__tests__/fakeStripe";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../cashOut";
-import { getBalanceCents } from "../wallet";
+import { getBalanceCents, getCashableBalanceCents, sendLiveGift } from "../wallet";
+import { liveStreams } from "@workspace/db";
 
 const testUserIds: string[] = [];
 
@@ -35,8 +36,8 @@ afterEach(async () => {
   while (testUserIds.length > 0) {
     const id = testUserIds.pop()!;
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, id));
-    await db.delete(ledgerPostings).where(eq(ledgerPostings.partyId, id));
-    await db.delete(ledgerTransactions).where(eq(ledgerTransactions.sellerId, id));
+    // The money ledger is append-only at the database level (migration
+    // 084's trigger); its rows reference ids only, so they stay.
     await db.delete(users).where(eq(users.clerkId, id));
   }
 });
@@ -108,5 +109,72 @@ describe("cashOutThreadCash", () => {
     await expect(cashOutThreadCash(stripe, seller, 500, crypto.randomUUID()))
       .rejects.toMatchObject({ code: "THREAD_CASH_CASH_OUT_TRANSFER_FAILED" });
     expect(await getBalanceCents(db, seller)).toBe(1_000);
+  });
+
+  it("never cashes out platform reward credit (check-ins, streaks, refunds)", async () => {
+    const seller = await makeSeller();
+    await db.insert(threadCashEntries).values([
+      { buyerId: seller, amountCents: 500, source: "daily_checkin", referenceId: "2026-10-01" },
+      { buyerId: seller, amountCents: 300, source: "streak_bonus", referenceId: crypto.randomUUID() },
+    ]);
+    const { stripe, state } = createFakeStripe();
+
+    expect(await getCashableBalanceCents(db, seller)).toBe(0);
+    await expect(cashOutThreadCash(stripe, seller, 100, crypto.randomUUID()))
+      .rejects.toMatchObject({ code: "THREAD_CASH_NOT_CASHABLE" });
+    expect(state.transfers).toHaveLength(0);
+    expect(await getBalanceCents(db, seller)).toBe(800);
+  });
+
+  it("cashes out only what was earned, even with rewards in the same balance", async () => {
+    const seller = await makeSeller();
+    await grant(seller, 1_000);
+    await db.insert(threadCashEntries).values({ buyerId: seller, amountCents: 700, source: "daily_checkin", referenceId: "2026-10-02" });
+    const { stripe } = createFakeStripe();
+
+    expect(await getCashableBalanceCents(db, seller)).toBe(1_000);
+    await expect(cashOutThreadCash(stripe, seller, 1_200, crypto.randomUUID()))
+      .rejects.toMatchObject({ code: "THREAD_CASH_NOT_CASHABLE" });
+    await cashOutThreadCash(stripe, seller, 1_000, crypto.randomUUID());
+    expect(await getCashableBalanceCents(db, seller)).toBe(0);
+    expect(await getBalanceCents(db, seller)).toBe(700);
+  });
+
+  it("never replays another user's cash-out for a reused idempotency key", async () => {
+    const a = await makeSeller();
+    const b = await makeSeller();
+    await grant(a, 500);
+    await grant(b, 500);
+    const { stripe, state } = createFakeStripe();
+    const key = crypto.randomUUID();
+
+    await cashOutThreadCash(stripe, a, 400, key);
+    await expect(cashOutThreadCash(stripe, b, 400, key))
+      .rejects.toMatchObject({ code: "THREAD_CASH_IDEMPOTENCY_KEY_REUSED" });
+    expect(state.transfers).toHaveLength(1);
+    expect(await getBalanceCents(db, b)).toBe(500);
+  });
+
+  it("a cash-out racing a live gift by the same seller never overdraws the balance", async () => {
+    const seller = await makeSeller();
+    const host = await makeSeller();
+    const streamId = crypto.randomUUID();
+    await db.insert(liveStreams).values({ id: streamId, sellerId: host, channelName: `cash-out-race-${streamId}`, title: "Race", status: "live" });
+    try {
+      const { stripe } = createFakeStripe();
+      // Each round leaves exactly 150 in the balance and races two writes
+      // that each want all of it: at most one may win.
+      for (let i = 0; i < 8; i++) {
+        const balance = await getBalanceCents(db, seller);
+        await grant(seller, 150 - balance);
+        await Promise.allSettled([
+          cashOutThreadCash(stripe, seller, 150, crypto.randomUUID()),
+          sendLiveGift(seller, host, streamId, 150, crypto.randomUUID()),
+        ]);
+        expect(await getBalanceCents(db, seller)).toBeGreaterThanOrEqual(0);
+      }
+    } finally {
+      await db.delete(liveStreams).where(eq(liveStreams.id, streamId));
+    }
   });
 });

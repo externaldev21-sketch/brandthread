@@ -22,9 +22,11 @@ import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 export function SellerThreadCashCard({
-  balanceCents, loading, error, onReload, onCashOutPress,
+  balanceCents, cashableCents, loading, error, onReload, onCashOutPress,
 }: {
   balanceCents: number | null;
+  /** What may actually be cashed out (earned, not reward credit). Defaults to the balance. */
+  cashableCents?: number | null;
   loading: boolean;
   error: boolean;
   onReload: () => void;
@@ -35,14 +37,15 @@ export function SellerThreadCashCard({
   const api = useApi();
   const [cashOutValueCents, setCashOutValueCents] = useState<number | null>(null);
 
+  const quotedCents = cashableCents === undefined ? balanceCents : cashableCents;
   useEffect(() => {
-    if (!balanceCents) { setCashOutValueCents(balanceCents); return; }
+    if (!quotedCents) { setCashOutValueCents(quotedCents); return; }
     let cancelled = false;
-    api.threadCash.cashOutQuote(balanceCents)
+    api.threadCash.cashOutQuote(quotedCents)
       .then((q) => { if (!cancelled) setCashOutValueCents(q.payoutCents); })
-      .catch(() => { if (!cancelled) setCashOutValueCents(balanceCents); });
+      .catch(() => { if (!cancelled) setCashOutValueCents(quotedCents); });
     return () => { cancelled = true; };
-  }, [balanceCents, api]);
+  }, [quotedCents, api]);
 
   return (
     <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]} testID="seller-thread-cash-card">
