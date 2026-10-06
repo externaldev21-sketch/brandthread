@@ -14,6 +14,8 @@ type RevenueCatContextValue = {
   restore: () => Promise<never>;
   purchaseConsumable: (_productId: string) => Promise<never>;
   refresh: () => Promise<void>;
+  creditPackPrices: (productIds: string[]) => Promise<Record<string, string>>;
+  purchaseCreditPack: (productId: string) => Promise<never>;
 };
 
 const unavailable = async (): Promise<never> => {
@@ -23,6 +25,7 @@ const unavailable = async (): Promise<never> => {
 const value: RevenueCatContextValue = {
   available: false, packages: [], customerInfo: null, managementURL: null,
   purchase: unavailable, restore: unavailable, purchaseConsumable: unavailable, refresh: async () => {},
+  creditPackPrices: async () => ({}), purchaseCreditPack: unavailable,
 };
 const RevenueCatContext = createContext<RevenueCatContextValue>(value);
 

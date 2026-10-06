@@ -25,6 +25,8 @@ import inventoryRouter from "./inventory";
 import sellerHubRouter from "./seller-hub";
 import pushRouter from "./push";
 import aiRouter from "./ai";
+import aiCreditsRouter from "./ai-credits";
+import { aiCreditsGate } from "../lib/aiCredits/gate";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
 import featuredPublicRouter from "./featured-public";
@@ -157,6 +159,10 @@ router.use("/giveaways",       publicGiveawaysRouter); // public reads; per-view
 // tc (teamContext) is applied to every seller-scoped route so X-Store-Context
 // is honoured consistently. resolveTeamContext is idempotent (cached on req),
 // so routes that already mount it internally get a free no-op on the second call.
+// AI credits: debits every paid AI endpoint listed in lib/aiCredits/catalogue.ts
+// (and refunds on error). Must stay ahead of the AI routers below.
+router.use(aiCreditsGate);
+router.use("/ai/credits",      aiCreditsRouter);
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
