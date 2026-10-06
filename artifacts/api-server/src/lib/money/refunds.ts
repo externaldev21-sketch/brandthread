@@ -42,6 +42,7 @@ import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "
 import { restoreStockForOrder } from "../stockReservation";
 import { reverseCommissionForOrder } from "../affiliate/service";
 import { restoreGiftCardsOnFullRefund } from "../giftCards/payout";
+import { notifyStockRestored } from "../stockNotifications";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
@@ -325,7 +326,8 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
   }
 
   // ── Phase C ──────────────────────────────────────────────────────────────
-  return db.transaction(async (tx) => {
+  let restockedLines: Array<{ variantId: string; quantity: number }> = [];
+  const settledResult = await db.transaction(async (tx) => {
     const locked = await lockOrder(tx, order.id);
     const [settled] = await tx.update(orderRefunds).set({
       state: "succeeded",
@@ -415,10 +417,8 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
     if (options.cancelOrder?.restock) {
       const items = await tx.select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
         .from(orderItems).where(eq(orderItems.orderId, locked.id));
-      await restoreStockForOrder(
-        tx,
-        items.filter((i): i is { variantId: string; quantity: number } => Boolean(i.variantId)),
-      );
+      restockedLines = items.filter((i): i is { variantId: string; quantity: number } => Boolean(i.variantId));
+      await restoreStockForOrder(tx, restockedLines);
     }
     await options.onSucceeded?.(tx, { order: locked, amountCents: amount, refundId: refund.id });
     // Affiliate program: claw back the creator's commission on the refunded
@@ -478,6 +478,12 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       duplicate: false,
     };
   });
+  // After commit: back-in-stock to savers + re-arm the seller's stock alert.
+  if (restockedLines.length > 0) {
+    await notifyStockRestored(restockedLines)
+      .catch((err) => logger.warn({ err, refundId: refund.id }, "Restock notifications failed"));
+  }
+  return settledResult;
 }
 
 async function failRefund(

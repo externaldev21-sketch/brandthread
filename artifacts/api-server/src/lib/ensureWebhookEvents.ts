@@ -19,11 +19,17 @@ import { getWebOrigin } from "./webOrigin";
  * Full set of event types the /api/webhooks/stripe handler processes.
  * Keep this in sync with the switch statement in routes/webhooks.ts.
  */
-const REQUIRED_EVENTS = [
+export const REQUIRED_EVENTS = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
   "checkout.session.expired",
+  // One-page checkout (PaymentSheet / Apple Pay): the order is created and
+  // held stock is released from these — without them a paid in-app cart
+  // never becomes an order.
+  "payment_intent.succeeded",
+  "payment_intent.payment_failed",
+  "payment_intent.canceled",
   "account.updated",
   "transfer.created",
   "transfer.updated",

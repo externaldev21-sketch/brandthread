@@ -5,7 +5,7 @@
  * place.
  */
 import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
-import { db, productVariants, products, savedItems, waitlistEntries } from "@workspace/db";
+import { db, notificationsFeed, productVariants, products, savedItems, waitlistEntries } from "@workspace/db";
 import { productThumbnail } from "./activityEvents";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
@@ -54,6 +54,15 @@ export async function notifyStockLevelChanged(input: {
   newStock: number;
   lowStockThreshold: number;
 }): Promise<void> {
+  // Stock went back up (restock, cancellation, refund): clear the earlier
+  // low/out-of-stock alert for this product so the next decline alerts again.
+  // notifications_feed_low_stock_unique allows one such row per product, so
+  // without this a product could only ever be alerted on once.
+  if (input.newStock > input.previousStock) {
+    await rearmLowStockAlert(input.ownerId, input.productId)
+      .catch((err) => logger.warn({ err, productId: input.productId }, "Low stock alert re-arm failed"));
+    return;
+  }
   if (!shouldAlertLowStock(input)) return;
   const isOut = input.newStock === 0;
 
@@ -126,7 +135,15 @@ export async function notifyWaitlistRestock(input: {
   return [...new Set(claimed.map((c) => c.userId))];
 }
 
-/** Buyer-facing restock alert for everyone who saved/wishlisted the product and everyone on its waitlist. */
+export async function rearmLowStockAlert(ownerId: string, productId: string): Promise<void> {
+  await db.delete(notificationsFeed).where(and(
+    eq(notificationsFeed.userId, ownerId),
+    eq(notificationsFeed.type, "low_stock"),
+    eq(notificationsFeed.targetId, productId),
+  ));
+}
+
+/** Buyer-facing restock alert for savers and waitlist members. */
 export async function notifyBackInStock(input: {
   productId: string;
   ownerId: string;
@@ -192,4 +209,37 @@ export async function notifyPriceDrop(input: {
       pushChannelId: "stock",
     }).catch((err) => logger.warn({ err, userId, productId: input.productId }, "Price drop notification failed"))
   ));
+}
+
+/**
+ * Units went back on the shelf outside a manual stock edit (an order was
+ * cancelled or refunded with restock). Call after the restock commits: savers
+ * get "Back in stock" when a product goes 0 → >0, and the seller's earlier
+ * low/out-of-stock alert is re-armed — the same effects a manual restock has.
+ */
+export async function notifyStockRestored(
+  lines: Array<{ variantId: string; quantity: number }>,
+): Promise<void> {
+  const restored = new Map<string, number>();
+  for (const line of lines) restored.set(line.variantId, (restored.get(line.variantId) ?? 0) + line.quantity);
+  if (restored.size === 0) return;
+  const rows = await db
+    .select({
+      variantId: productVariants.id,
+      stock: productVariants.stock,
+      lowStockThreshold: productVariants.lowStockThreshold,
+      productId: products.id,
+      productName: products.name,
+      ownerId: products.ownerId,
+    })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(inArray(productVariants.id, [...restored.keys()]));
+  for (const row of rows) {
+    const previousStock = Math.max(0, row.stock - (restored.get(row.variantId) ?? 0));
+    const change = { productId: row.productId, ownerId: row.ownerId, productName: row.productName, previousStock, newStock: row.stock };
+    await notifyStockLevelChanged({ ...change, lowStockThreshold: row.lowStockThreshold ?? 0 });
+    await notifyBackInStock(change).catch((err) =>
+      logger.warn({ err, productId: row.productId }, "Back-in-stock after restock failed"));
+  }
 }
