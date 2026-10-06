@@ -39,6 +39,7 @@ import {
   calculateGroupTax, findCardDataInRequest, priceCartGroup, type CartShipping, type PricedGroup,
 } from "../lib/money/cartCheckout";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
+import { DiscountValidationError, reserveDiscountCapacity } from "../lib/discounts";
 
 const router = Router();
 
@@ -280,6 +281,16 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
     rows = await db.transaction(async (tx) => {
       const inserted: Array<typeof checkoutSessions.$inferSelect> = [];
       for (const group of priced) {
+        if (group.discountCodeId) {
+          // A capped code is held for this checkout atomically with its row.
+          await reserveDiscountCapacity(tx, { discountCodeId: group.discountCodeId, customerKey: buyerId })
+            .catch((error) => {
+              if (error instanceof DiscountValidationError) {
+                throw new CartCheckoutError(400, error.code, error.message, error.details ?? {});
+              }
+              throw error;
+            });
+        }
         const [row] = await tx.insert(checkoutSessions).values({
           buyerId,
           sellerId: group.sellerId,

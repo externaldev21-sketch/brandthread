@@ -1044,7 +1044,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/drops/${encodeURIComponent(dropId)}/cancel`, confirm ? { confirm } : {}),
     },
     analytics: {
-      dashboard:  () => get('/api/analytics/dashboard'),
+      dashboard:  () => get(`/api/analytics/dashboard?tz=${-new Date().getTimezoneOffset()}`),
       home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all') =>
         get<{
           range: string;
@@ -1073,7 +1073,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
           // buckets land on the seller's local calendar day, not the server's.
         }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
-      revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
+      revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}&tz=${-new Date().getTimezoneOffset()}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
       customers:  (limit = 10) => get<{

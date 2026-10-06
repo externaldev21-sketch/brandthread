@@ -128,20 +128,24 @@ describe("GET /api/analytics/home — headline == sum(buckets), every range", ()
 });
 
 describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for a deterministic UTC seller)", () => {
-  it("places an order just before local midnight in TODAY's last bucket, not tomorrow's", async () => {
+  it("places an order just before local midnight in that day's last bucket, not the next day's", async () => {
+    // Yesterday 23:58 (tz=0): in YESTERDAY's last hourly bucket, never in
+    // today. (A "today 23:58" order would be in the future, which the
+    // no-future-buckets rule rightly leaves out.)
     const now = new Date();
     const todayMidnightUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    // 23:58 today (still "today" for a tz=0 seller) — only meaningful when
-    // run before 23:58 UTC; guarded so this never flakes near midnight.
-    const lateToday = new Date(todayMidnightUtc.getTime() + 23 * 60 * 60 * 1000 + 58 * 60 * 1000);
-    if (lateToday.getTime() > now.getTime()) {
-      await makeOrder({ totalCents: 1234, createdAt: lateToday });
-      const response = await fetch(`${base}/api/analytics/home?range=today&tz=0`);
-      const body = await response.json() as any;
-      expect(body.totalCents).toBeGreaterThanOrEqual(1234);
-      expect(body.totalCents).toBe(sumBuckets(body, "totalCents"));
-      await db.delete(orders).where(eq(orders.ownerId, sellerId));
-    }
+    const lateYesterday = new Date(todayMidnightUtc.getTime() - 2 * 60 * 1000);
+    await makeOrder({ totalCents: 1234, createdAt: lateYesterday });
+
+    const yesterday = await (await fetch(`${base}/api/analytics/home?range=yesterday&tz=0`)).json() as any;
+    expect(yesterday.totalCents).toBe(1234);
+    expect(yesterday.totalCents).toBe(sumBuckets(yesterday, "totalCents"));
+    const lastBucket = (yesterday.buckets as any[]).at(-1);
+    expect(Number(lastBucket.totalCents)).toBe(1234);
+
+    const today = await (await fetch(`${base}/api/analytics/home?range=today&tz=0`)).json() as any;
+    expect(today.totalCents).toBe(0);
+    await db.delete(orders).where(eq(orders.ownerId, sellerId));
   });
 
   it("places an order on the most recent Sunday in the WEEK range (Sunday-first, not ISO Monday-first)", async () => {
@@ -160,7 +164,8 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
 
     // The day BEFORE the most recent Sunday belongs to LAST week, and must
     // never be counted in this week's total.
-    const lastSaturdayUtc = new Date(mostRecentSundayUtc.getTime() - 60 * 60 * 1000);
+    // Sunday 12:00 − 13h = Saturday 23:00 (−1h stayed on Sunday).
+    const lastSaturdayUtc = new Date(mostRecentSundayUtc.getTime() - 13 * 60 * 60 * 1000);
     const priorOrderId = await makeOrder({ totalCents: 9999, createdAt: lastSaturdayUtc });
     const response2 = await fetch(`${base}/api/analytics/home?range=week&tz=0`);
     const body2 = await response2.json() as any;
@@ -182,7 +187,8 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
 
     // The LAST day of the previous month must never be counted, even though
     // it could fall within a rolling 30-day window.
-    const lastDayOfPrevMonthUtc = new Date(firstOfMonthUtc.getTime() - 60 * 60 * 1000);
+    // The 1st 12:00 − 13h = previous month's last day, 23:00.
+    const lastDayOfPrevMonthUtc = new Date(firstOfMonthUtc.getTime() - 13 * 60 * 60 * 1000);
     const priorOrderId = await makeOrder({ totalCents: 8800, createdAt: lastDayOfPrevMonthUtc });
     const response2 = await fetch(`${base}/api/analytics/home?range=month&tz=0`);
     const body2 = await response2.json() as any;
@@ -204,7 +210,8 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
 
     // Dec 31 of LAST year must never be counted, even though a trailing
     // 12-month window would include it most of the year.
-    const dec31LastYearUtc = new Date(jan1Utc.getTime() - 60 * 60 * 1000);
+    // Jan 1 12:00 − 13h = Dec 31 23:00 of last year.
+    const dec31LastYearUtc = new Date(jan1Utc.getTime() - 13 * 60 * 60 * 1000);
     const priorOrderId = await makeOrder({ totalCents: 7700, createdAt: dec31LastYearUtc });
     const response2 = await fetch(`${base}/api/analytics/home?range=year&tz=0`);
     const body2 = await response2.json() as any;
@@ -214,25 +221,20 @@ describe("GET /api/analytics/home — boundary placement (seller-local, tz=0 for
     await db.delete(orders).where(eq(orders.ownerId, sellerId));
   });
 
-  it("an order just before midnight for a UTC-8 seller still lands in TODAY, even though the server is already tomorrow", async () => {
-    // Build "now" in UTC, then construct a timestamp that is 23:59 local for
-    // a UTC-8 (tz offset -480) seller but already past UTC midnight on the
-    // server. tz=-480 means local = UTC - 8h, so local 23:59 on day D is
-    // UTC 07:59 on day D+1.
+  it("for a UTC-8 seller, an order at 07:59 UTC is local 23:59 YESTERDAY, though the server's date is already today", async () => {
+    // tz=-480: local = UTC − 8h, so UTC 07:59 on day D is local 23:59 on
+    // D−1. Run only once that moment is in the past (UTC ≥ 08:00).
     const now = new Date();
     const serverTodayUtcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    // Only run this deterministically when "now" (UTC) is itself already
-    // past 08:00 UTC, so the constructed sellerLocalLateNight timestamp is
-    // safely in the past relative to "now" and doesn't depend on wall-clock
-    // timing at test run.
-    if (now.getUTCHours() >= 9) {
+    if (now.getUTCHours() >= 8) {
       const sellerLocalLateNightUtc = new Date(serverTodayUtcMidnight.getTime() + 7 * 60 * 60 * 1000 + 59 * 60 * 1000);
       await makeOrder({ totalCents: 5500, createdAt: sellerLocalLateNightUtc });
 
-      const response = await fetch(`${base}/api/analytics/home?range=today&tz=-480`);
-      const body = await response.json() as any;
-      expect(body.totalCents).toBeGreaterThanOrEqual(5500);
-      expect(body.totalCents).toBe(sumBuckets(body, "totalCents"));
+      const yesterday = await (await fetch(`${base}/api/analytics/home?range=yesterday&tz=-480`)).json() as any;
+      expect(yesterday.totalCents).toBe(5500);
+      expect(yesterday.totalCents).toBe(sumBuckets(yesterday, "totalCents"));
+      const today = await (await fetch(`${base}/api/analytics/home?range=today&tz=-480`)).json() as any;
+      expect(today.totalCents).toBe(0);
 
       await db.delete(orders).where(eq(orders.ownerId, sellerId));
     }

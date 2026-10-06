@@ -38,7 +38,7 @@ import {
 } from "../lib/threadCash/wallet";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
-import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
+import { validateDiscountCode, DiscountValidationError, reserveDiscountCapacity } from "../lib/discounts";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -433,6 +433,20 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
         message: vacation.message,
         canContinue: false,
       });
+    }
+  }
+  // Drop launch lock (same server-clock rule checkout enforces): tell the
+  // buyer in the cart, not only after they reach payment.
+  // (The launch checks run per product's drop, so one pass covers every seller.)
+  if (lines.length > 0 && sellerIds.size > 0) {
+    try {
+      await resolveChargePlan({ productIds: lines.map((line) => line.productId), sellerId: [...sellerIds][0], buyerId });
+    } catch (err) {
+      if (err instanceof CheckoutPlanError && ["DROP_NOT_ACTIVE", "DROP_NOT_LIVE", "DROP_ENDED"].includes(err.code)) {
+        issues.push({
+          itemId: "drop", productName: "Drop", type: "unavailable", message: err.message, canContinue: false,
+        });
+      }
     }
   }
   if (issues.length === 0 && sellerIds.size === 1) {
@@ -1045,10 +1059,16 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     };
     let checkoutRecord: { id: string } | undefined;
     try {
-      [checkoutRecord] = await db
-        .insert(checkoutSessions)
-        .values(insertValues)
-        .returning({ id: checkoutSessions.id });
+      [checkoutRecord] = await db.transaction(async (tx) => {
+        // A capped code is held for this checkout atomically with its row.
+        if (discountApplication) {
+          await reserveDiscountCapacity(tx, { discountCodeId: discountApplication.discount.id, customerKey: buyerId });
+        }
+        return tx
+          .insert(checkoutSessions)
+          .values(insertValues)
+          .returning({ id: checkoutSessions.id });
+      });
     } catch (insertError: any) {
       // Another identical request won the unique idempotency key while this one
       // was preparing checkout. Wait briefly for its Stripe session and reuse it.
@@ -1248,6 +1268,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     }
     if (err instanceof LoyaltyRedemptionError) {
       res.status(err.status).json({ error: err.message, code: err.code });
+      return;
+    }
+    if (err instanceof DiscountValidationError) {
+      res.status(400).json({ error: err.message, code: err.code, ...err.details });
       return;
     }
     // Stripe card errors (e.g. card_declined) → 402 with a buyer-friendly message.

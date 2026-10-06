@@ -18,6 +18,14 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
 }));
 
+// The drops router gates writes with requireRole, which resolves team roles
+// through Clerk; this suite exercises scheduling, not role resolution.
+vi.mock("../../middlewares/requireRole", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  teamContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 let server: Server;
 let base: string;
 
