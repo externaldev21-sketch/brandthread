@@ -21,6 +21,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
+vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: alertMock }));
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
   Platform: { OS: 'ios', select: (o: Record<string, unknown>) => o.ios ?? o.default },

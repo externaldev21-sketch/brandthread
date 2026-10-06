@@ -3,7 +3,6 @@
 // Mock generation is separated into pure functions — never placed in UI code.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
 import { api, ShopifyImportJob } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import {
@@ -487,9 +486,12 @@ export async function syncStorefrontToServer(store: Storefront): Promise<boolean
     setSyncStatus({ state: 'failed', error: message });
     if (!_syncFailureNotified) {
       _syncFailureNotified = true;
-      Alert.alert(
+      // Lazy: keeps react-native out of this service's import graph (tests
+      // and non-UI callers load it), and showActionSheet works on web too.
+      const { showActionSheet } = await import('@/components/ui/ActionSheet');
+      showActionSheet(
         "Store changes didn't sync",
-        "They're saved on this device but didn't reach Brandthread, so your live store may be out of date.",
+        'They\'re saved on this device. Your live store isn\'t updated yet.',
         [
           { text: 'OK', style: 'cancel' },
           { text: 'Retry', onPress: () => { void getStorefront().then(syncStorefrontToServer); } },

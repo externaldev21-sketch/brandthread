@@ -391,12 +391,12 @@ export default function ProfileScreen() {
     // protected screens render at all) still reports a truthy id, which
     // would otherwise fall through to the real backend-less endpoint below
     // and log a console 404 — see the identical fix in app/seller-inbox.tsx.
-    if (!id || isBuyerDevPreview()) {
+    if (id && isBuyerDevPreview()) {
       // demo=1 only: counts consistent with the seeded Activity/Friends data.
-      const previewCounts = isBuyerDevPreview() ? await getPreviewSocialCounts() : null;
+      const previewCounts = await getPreviewSocialCounts();
       if (previewCounts && accountRef.current === id) setSocialCounts(previewCounts);
-      return;
     }
+    if (!id || isBuyerDevPreview()) return;
     try {
       const data = await api.social.profile(id);
       if (accountRef.current !== id || !data) return;
