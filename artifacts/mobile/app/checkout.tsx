@@ -1,38 +1,120 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+/**
+ * Checkout settings (seller). Saved to the store's settings as soon as they
+ * change (PATCH /api/seller/settings, like the Languages screen) and enforced
+ * at checkout by the API (api-server lib/sellerCheckoutSettings.ts):
+ *  - "Accounts required" turns guest checkout off for this store;
+ *  - tipping adds a tip choice to the buyer's in-app checkout, charged and
+ *    paid out with the order.
+ * The checkout language is the store language set on the Languages screen.
+ * The signed-out seller web preview never calls the API; changes stay local.
+ */
+import React, { useCallback, useRef, useState } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-
-const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
+import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import {
+  DEFAULT_SELLER_CHECKOUT_SETTINGS, checkoutModeOption, nextCheckoutMode, sellerCheckoutSettingsFrom, storeLanguageName,
+  type SellerCheckoutSettings,
+} from '@/lib/checkoutSettings';
 
 export default function CheckoutScreen() {
   const colors = useColors();
-  const [modeIndex, setModeIndex] = useState(0);
-  const [tipping, setTipping] = useState(false);
-  const [postPurchaseFeatures, setPostPurchaseFeatures] = useState(false);
-  const [scripts, setScripts] = useState('');
+  const api = useApi();
+  const router = useRouter();
+  const previewOnly = isSellerDevPreview();
+  const [settings, setSettings] = useState<SellerCheckoutSettings | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const settingsRef = useRef<SellerCheckoutSettings | null>(null);
+  settingsRef.current = settings;
+
+  const load = useCallback(async () => {
+    setLoadFailed(false);
+    if (previewOnly) {
+      setSettings(prev => prev ?? { ...DEFAULT_SELLER_CHECKOUT_SETTINGS });
+      return;
+    }
+    try {
+      const data = await api.seller.getSettings();
+      setSettings(sellerCheckoutSettingsFrom(data?.settings));
+    } catch {
+      if (!settingsRef.current) setLoadFailed(true);
+    }
+  }, [api, previewOnly]);
+
+  // Reloads on focus so a store language changed on the Languages screen shows here.
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
-  function cycleMode() {
+  async function save(patch: Partial<Pick<SellerCheckoutSettings, 'checkoutMode' | 'tippingEnabled'>>) {
+    const prior = settingsRef.current;
+    if (!prior) return;
     haptic();
-    setModeIndex((i) => (i + 1) % CHECKOUT_MODES.length);
+    setSettings({ ...prior, ...patch });
+    if (previewOnly) return;
+    try {
+      const result = await api.seller.updateSettings(patch);
+      if (result?.settings) setSettings(sellerCheckoutSettingsFrom(result.settings));
+    } catch {
+      setSettings(prior);
+      Alert.alert('Could not save', 'Your checkout settings were not changed. Try again.');
+    }
   }
+
+  function cycleMode() {
+    if (!settings) return;
+    void save({ checkoutMode: nextCheckoutMode(settings.checkoutMode) });
+  }
+
+  if (!settings) {
+    return (
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <ScreenHeader title="Checkout settings" />
+        {loadFailed ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
+              We couldn't load your checkout settings. Check your connection and try again.
+            </Text>
+            <TouchableOpacity onPress={() => { void load(); }} activeOpacity={0.7} style={[styles.selectBox, { borderColor: colors.border }]}>
+              <Text style={[styles.selectValue, { color: colors.foreground }]}>Try again</Text>
+              <Feather name="refresh-cw" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.section}><ActivityIndicator color={colors.primary} /></View>
+        )}
+      </View>
+    );
+  }
+
+  const mode = checkoutModeOption(settings.checkoutMode);
+  const tipping = settings.tippingEnabled;
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Checkout settings" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <TouchableOpacity onPress={cycleMode} activeOpacity={0.7} style={[styles.selectBox, { borderColor: colors.border, marginBottom: 12 }]}>
-            <Text style={[styles.selectValue, { color: colors.foreground }]}>{CHECKOUT_MODES[modeIndex]}</Text>
+          <TouchableOpacity
+            onPress={cycleMode}
+            activeOpacity={0.7}
+            style={[styles.selectBox, { borderColor: colors.border, marginBottom: 12 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Checkout mode: ${mode.label}`}
+            accessibilityHint="Switches between accounts optional and accounts required"
+          >
+            <Text style={[styles.selectValue, { color: colors.foreground }]}>{mode.label}</Text>
             <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>{mode.description}</Text>
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
@@ -46,7 +128,9 @@ export default function CheckoutScreen() {
             Customers can choose between 3 presets or enter a custom amount
           </Text>
           <TouchableOpacity
-            onPress={() => { haptic(); setTipping((v) => !v); }}
+            onPress={() => { void save({ tippingEnabled: !tipping }); }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: tipping }}
             activeOpacity={0.7}
             style={styles.checkRow}
           >
@@ -65,42 +149,18 @@ export default function CheckoutScreen() {
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Post-purchase page</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground, marginBottom: 14 }]}>
-            Add tracking scripts and other customizations
-          </Text>
-
-          <TouchableOpacity onPress={() => { haptic(); setPostPurchaseFeatures((v) => !v); }} activeOpacity={0.7} style={styles.radioRow}>
-            <View
-              style={[
-                styles.checkbox,
-                { borderColor: postPurchaseFeatures ? colors.primary : colors.border, backgroundColor: postPurchaseFeatures ? colors.primary : 'transparent' },
-              ]}
-            >
-              {postPurchaseFeatures && <Feather name="check" size={12} color={colors.primaryForeground} />}
-            </View>
-            <Text style={[styles.radioLabel, { color: colors.foreground }]}>Add extra features after checkout</Text>
-          </TouchableOpacity>
-
-          <View style={[styles.textAreaBox, { borderColor: colors.border }]}>
-            <TextInput
-              value={scripts}
-              onChangeText={setScripts}
-              placeholder="Additional scripts"
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              style={[styles.textArea, { color: colors.foreground }]}
-            />
-          </View>
-        </View>
-
-        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
-
-        <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Checkout language</Text>
-          <View style={[styles.langRow, { borderColor: colors.border }]}>
-            <Text style={[styles.langText, { color: colors.foreground }]}>English</Text>
-          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/languages' as never)}
+            activeOpacity={0.7}
+            style={[styles.langRow, { borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Checkout language: ${storeLanguageName(settings.storeLanguage)}`}
+            accessibilityHint="Opens your store language settings"
+          >
+            <Text style={[styles.langText, { color: colors.foreground }]}>{storeLanguageName(settings.storeLanguage)}</Text>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -119,10 +179,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: FS.md, fontFamily: FONT.semibold },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginTop: SP.xs },
   checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  radioRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginBottom: SP.sm + 4 },
-  radioLabel: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
-  textAreaBox: { borderWidth: 1, borderRadius: RADIUS.md, marginTop: SP.xs },
-  textArea: { fontSize: FS.sm, fontFamily: FONT.regular, padding: SP.md - 2, minHeight: 90, textAlignVertical: 'top' },
   langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md - 2, gap: SP.sm + 2 },
   langText: { fontSize: FS.md, fontFamily: FONT.medium },
 });

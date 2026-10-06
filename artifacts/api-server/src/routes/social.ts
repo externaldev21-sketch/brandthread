@@ -33,6 +33,7 @@ import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStor
 import { MEDIA_HELD_MESSAGE, MEDIA_REJECTED_MESSAGE } from "../lib/mediaModeration";
 import { isFlagged, recordHeldMedia, recordRejectedUpload, screenMediaRefs } from "../lib/mediaModerationStore";
 import { storyListedFor } from "../lib/storyVisibility";
+import { authorsHidingStoriesFrom, storyHiddenFrom } from "../lib/interactionSettings";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -1200,6 +1201,8 @@ router.get("/stories/user/:userId", async (req, res) => {
   if (authorId !== myId) {
     if ((await blockRelation(myId, authorId)) !== "none") { res.json([]); return; }
     if (!(await isFollowing(myId, authorId))) { res.json([]); return; }
+    // "Hide story from" (lib/interactionSettings.ts).
+    if (await storyHiddenFrom(authorId, myId)) { res.json([]); return; }
   }
 
   const rows = await db.select().from(stories)
@@ -1252,9 +1255,13 @@ router.get("/stories/following", async (req, res) => {
       .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
   );
 
+  // Authors who hide their stories from me ("Hide story from").
+  const hidingAuthors = await authorsHidingStoriesFrom(myId, Array.from(new Set(rows.map((r) => r.authorId))));
+
   const visibleRows = rows.filter((r) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
+    if (hidingAuthors.has(r.authorId)) return false;
     if (r.privacyVisibility === "friends") return false; // mutual-only check omitted from the tray for simplicity; per-user fetch still enforces it
     return true;
   });
@@ -1364,6 +1371,9 @@ router.post("/stories/:id/like", async (req, res) => {
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
     res.status(404).json({ error: "Story not found" }); return;
   }
+  if (await storyHiddenFrom(story.authorId, myId)) {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
 
   // Counter changes are driven only by rows actually inserted/deleted, so
   // concurrent taps and retries cannot make likes_count drift from story_likes.
@@ -1405,6 +1415,9 @@ router.post("/stories/:id/view", async (req, res) => {
   const story = await loadActiveStory(storyId);
   if (!story) { res.status(404).json({ error: "Story not found" }); return; }
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
+  if (await storyHiddenFrom(story.authorId, myId)) {
     res.status(404).json({ error: "Story not found" }); return;
   }
 

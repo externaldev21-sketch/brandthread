@@ -9,6 +9,8 @@ export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
 export * from './admin';
+export * from './aiSettings';
+export * from './interactionSettings';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -680,6 +682,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
+  // The buyer's tip for this seller group (migration 117); included in
+  // amountTotalCents and paid out to the seller with the order.
+  tipCents: integer('tip_cents').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),

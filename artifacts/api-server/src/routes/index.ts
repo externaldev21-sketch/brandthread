@@ -55,6 +55,7 @@ import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
+import interactionSettingsRouter from "./interaction-settings";
 import socialRouter from "./social";
 import storyMentionsRouter from "./story-mentions";
 import referralsRouter from "./referrals";
@@ -220,6 +221,7 @@ router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
+router.use("/interaction-settings",      interactionSettingsRouter); // comment/repost/download + hidden-story settings; download check is public
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
 router.use("/referrals",                 referralsRouter);

@@ -593,7 +593,9 @@ export async function handleCartPaymentSucceeded(pi: any, providerEventId: strin
       total_details: {
         amount_tax: tax,
         amount_shipping: shippingCents,
-        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal),
+        // The group's tip (seller Checkout settings) is part of amountTotal,
+        // not a negative discount.
+        amount_discount: Math.max(0, subtotal + shippingCents + tax + (group.tipCents ?? 0) - amountTotal),
       },
       shipping_details: shipping,
       metadata: { csRef: group.id },

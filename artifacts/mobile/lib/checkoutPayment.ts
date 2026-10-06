@@ -57,7 +57,12 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** The buyer's tip for this seller (sent only when > 0; the server checks the seller accepts tips). */
+  tipCents?: number;
 };
+
+/** sellerId → tip in cents (lib/checkoutTips.ts tipsForRequest). */
+export type CheckoutTips = Record<string, number>;
 
 export type PaymentIntentAddress = {
   recipientName: string;
@@ -86,16 +91,20 @@ export type QuoteBody = {
 type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
 
 /** One group per seller. A promo code applies to single-seller orders, as before. */
-export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
+export function paymentGroups(session: SessionForPayment, tips: CheckoutTips = {}): PaymentIntentGroup[] {
   const code = session.deliveryGroups.length === 1 ? session.discounts.find(d => d.isValid)?.code : undefined;
-  return session.deliveryGroups.map(group => ({
-    items: group.items.map(item => ({
-      variantId: String(item.variantId),
-      productId: String(item.productId),
-      quantity: Number(item.quantity),
-    })),
-    ...(code ? { discountCode: String(code) } : {}),
-  }));
+  return session.deliveryGroups.map(group => {
+    const tip = Math.round(Number(tips[group.sellerId] ?? 0));
+    return {
+      items: group.items.map(item => ({
+        variantId: String(item.variantId),
+        productId: String(item.productId),
+        quantity: Number(item.quantity),
+      })),
+      ...(code ? { discountCode: String(code) } : {}),
+      ...(Number.isFinite(tip) && tip > 0 ? { tipCents: tip } : {}),
+    };
+  });
 }
 
 export function recipientName(address: Partial<CheckoutAddress>): string {
@@ -108,10 +117,11 @@ export function buildCreatePaymentIntentBody(input: {
   address: Partial<CheckoutAddress>;
   idempotencyKey: string;
   saveCard: boolean;
+  tips?: CheckoutTips;
 }): CreatePaymentIntentBody {
   const { address, contact } = input;
   return {
-    groups: paymentGroups(input.session),
+    groups: paymentGroups(input.session, input.tips),
     contactEmail: String(contact.email ?? '').trim(),
     contactPhone: String(contact.phone ?? '').trim(),
     shippingAddress: {
@@ -134,9 +144,9 @@ export function canQuote(address: Partial<CheckoutAddress>): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9 -]{1,15}$/.test(zip) && !!(address.country ?? 'US');
 }
 
-export function buildQuoteBody(session: SessionForPayment, address: Partial<CheckoutAddress>): QuoteBody {
+export function buildQuoteBody(session: SessionForPayment, address: Partial<CheckoutAddress>, tips: CheckoutTips = {}): QuoteBody {
   return {
-    groups: paymentGroups(session),
+    groups: paymentGroups(session, tips),
     shippingAddress: {
       ...(address.line1?.trim() ? { street: address.line1.trim() } : {}),
       ...(address.city?.trim() ? { city: address.city.trim() } : {}),
@@ -163,6 +173,10 @@ export type QuoteGroup = {
   taxCents: number;
   totalCents: number;
   processingDays: number | null;
+  /** The tip included in totalCents (servers before tipping omit it). */
+  tipCents?: number;
+  /** The seller accepts tips (seller Checkout settings). */
+  tippingEnabled?: boolean;
 };
 
 export type CartQuote = { amountCents: number; groups: QuoteGroup[] };
@@ -198,6 +212,11 @@ export function quoteTotals(quote: CartQuote) {
     taxCents: sum.taxCents + group.taxCents,
     totalCents: sum.totalCents + group.totalCents,
   }), { subtotalCents: 0, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 0 });
+}
+
+/** The tips included in a quote's total. */
+export function quoteTipCents(quote: CartQuote): number {
+  return quote.groups.reduce((sum, group) => sum + (Number.isFinite(group.tipCents) ? Number(group.tipCents) : 0), 0);
 }
 
 // ─── Delivery window ─────────────────────────────────────────────────────────

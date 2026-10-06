@@ -22,6 +22,7 @@ import postVideoRouter, {
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { repostsAllowedBy } from "../lib/interactionSettings";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -1503,6 +1504,14 @@ router.post("/:id/interact", requireAuth, rateLimit("post-interact"), async (req
     visiblePost.visibility?.showLikeCount === false && visiblePost.ownerId !== clerkId ? undefined : n;
   if (type === "repost" && visiblePost.visibility?.allowReposts === false) {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
+  }
+  // The owner's account-wide "Allow reposts" setting (lib/interactionSettings.ts).
+  // Undoing an existing repost stays possible.
+  if (
+    type === "repost" && value !== "remove" && visiblePost.ownerId && visiblePost.ownerId !== clerkId
+    && !(await repostsAllowedBy(visiblePost.ownerId))
+  ) {
+    return res.status(403).json({ error: "This account doesn't allow reposts.", code: "REPOSTS_DISABLED" });
   }
 
   if (RECORDED_ONLY_TYPES.includes(type)) {

@@ -12,7 +12,7 @@
  * the shared /buyer-post-comments sheet; Share opens the shared
  * ThreadShareSheet.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -67,6 +67,16 @@ function ViewerPage({
   const [engagement, setEngagementState] = useState(() => discoverEngagementFor(post));
   const { liked, likesCount, saved } = engagement;
   const [shareOpen, setShareOpen] = useState(false);
+  // The author's Follow pill starts from the viewer's real follow state.
+  const [followInitial, setFollowInitial] = useState({ isFollowing: false, isFollowedBy: false, isMutual: false });
+  useEffect(() => {
+    if (!isSignedIn || !post.authorId || post.authorId.startsWith('preview-')) return undefined;
+    let cancelled = false;
+    api.social.status(post.authorId)
+      .then((r) => { if (!cancelled) setFollowInitial({ isFollowing: !!r?.isFollowing, isFollowedBy: !!r?.isFollowedBy, isMutual: !!r?.isMutual }); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, isSignedIn, post.authorId]);
   const hasTags = (post.productTags?.length ?? 0) > 0;
   // Real posts persist through the API; seeded preview posts (non-UUID ids,
   // `&demo=1` only) have nothing to persist against and stay session-local.
@@ -159,7 +169,7 @@ function ViewerPage({
         <View style={{ marginTop: SP.sm }}>
           <FollowButton
             userId={post.authorId}
-            initial={{ isFollowing: false, isFollowedBy: false, isMutual: false }}
+            initial={followInitial}
             size="compact"
             style={styles.followInline}
           />

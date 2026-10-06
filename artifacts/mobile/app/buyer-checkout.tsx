@@ -70,9 +70,10 @@ import {
 } from '@/lib/checkoutReadiness';
 import {
   buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
-  isCartQuote, quoteKey, quoteTotals, recipientName, walletContactToCheckout,
+  isCartQuote, quoteKey, quoteTipCents, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
+import { tipsForRequest, type TipChoice } from '@/lib/checkoutTips';
 import { ApiError } from '@/lib/networkNotice';
 import { CheckoutSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { StickyFooter } from '@/components/layout';
@@ -88,6 +89,7 @@ import {
 import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
+import { TipSection } from '@/components/checkout/TipSection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
 import { OrderConfirmation, OrderConfirmationActions } from '@/components/checkout/OrderConfirmation';
 import {
@@ -145,6 +147,8 @@ export default function BuyerCheckoutScreen() {
   const [cardComplete, setCardComplete] = useState(false);
   const [walletAvailable, setWalletAvailable] = useState(false);
   const [quote, setQuote] = useState<{ key: string; value: CartQuote } | null>(null);
+  /** sellerId → the buyer's tip choice (sellers whose Checkout settings accept tips). */
+  const [tipChoices, setTipChoices] = useState<Record<string, TipChoice>>({});
   const [serverSaidHosted, setServerSaidHosted] = useState(false);
   const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -355,8 +359,14 @@ export default function BuyerCheckoutScreen() {
   }), [previewOnly, isSignedIn, hostedFallbackFlag, session, serverSaidHosted, stripeLoadFailed]);
   const inApp = payment.path === 'in_app';
 
+  // ── Tips: offered where the last server quote says the seller accepts them ─
+  // (the last quote received, not only the current one, so a pending re-quote
+  // never drops the tip it was asked to price).
+  const tipGroups = quote?.value.groups ?? [];
+  const tips = inApp ? tipsForRequest(tipChoices, tipGroups) : {};
+
   // ── Server quote: real shipping + tax for the address (in-app only) ─────
-  const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address) : null;
+  const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address, tips) : null;
   const currentQuoteKey = quoteBody ? quoteKey(quoteBody) : null;
   useEffect(() => {
     if (!quoteBody || !currentQuoteKey || quote?.key === currentQuoteKey) return;
@@ -432,6 +442,7 @@ export default function BuyerCheckoutScreen() {
         address: who.address,
         idempotencyKey: base.idempotencyKey,
         saveCard: true,
+        tips,
       }));
       startedRef.current = started;
       // Remember the intent so a restart can find the orders it produced.
@@ -567,7 +578,7 @@ export default function BuyerCheckoutScreen() {
       const value = await api.buyer.checkout.paymentIntent.quote(buildQuoteBody(session, {
         city: walletAddress.city ?? '', state: walletAddress.state ?? '',
         postalCode: walletAddress.postalCode ?? '', country: walletAddress.country ?? 'US',
-      }));
+      }, tips));
       return isCartQuote(value) ? value : null;
     } catch {
       return null;
@@ -804,8 +815,14 @@ export default function BuyerCheckoutScreen() {
       await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
+    } catch (err) {
+      const apiError = err instanceof ApiError ? err : null;
+      if (apiError?.code === 'ACCOUNT_REQUIRED') {
+        // The seller's Checkout settings require an account (no guest checkout).
+        showError({ title: 'Sign in to check out', message: apiError.message });
+      } else {
+        showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
+      }
     }
     setPlacing(false);
   };
@@ -930,6 +947,7 @@ export default function BuyerCheckoutScreen() {
         threadCashCents: 0,
         orderTotalCents: quoted.totalCents,
         totalCents: quoted.totalCents,
+        tipCents: activeQuote ? quoteTipCents(activeQuote) : 0,
       }
     : sessionTotals;
   const taxNote = quoted || previewOnly
@@ -1093,6 +1111,17 @@ export default function BuyerCheckoutScreen() {
               ))}
             </CheckoutSection>
           )}
+
+          {inApp ? (
+            <TipSection
+              groups={current.deliveryGroups.flatMap(group => {
+                const quotedGroup = tipGroups.find(q => q.sellerId === group.sellerId && q.tippingEnabled === true);
+                return quotedGroup ? [{ sellerId: group.sellerId, sellerName: group.sellerName, subtotalCents: quotedGroup.subtotalCents }] : [];
+              })}
+              choices={tipChoices}
+              onChange={(sellerId, choice) => setTipChoices(prev => ({ ...prev, [sellerId]: choice }))}
+            />
+          ) : null}
 
           <OrderSummarySection
             session={current}

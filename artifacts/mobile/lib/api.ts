@@ -20,6 +20,7 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { InteractionSettings } from '@/lib/interactionSettings';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
 import type {
@@ -1698,10 +1699,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         clientEventId: string;
       }) =>
         post<{ recorded: true }>('/api/call/events', body),
-    },
       /** Rings the other participant(s) of a 1:1 DM call (push + in-app notification). */
       dmRing: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
         post<{ rung: number }>('/api/call/dm/ring', body),
+    },
     /** Unauthenticated public endpoints — no Authorization header needed. */
     /**
      * Profile cover video (buyer + seller). The server enforces ≤25s and one
@@ -2388,6 +2389,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Update server-side privacy preferences */
       update: (settings: { dmPrivacy?: 'requests' | 'followers_only' }) =>
         patch<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy', settings),
+    },
+    /**
+     * Account interaction settings, enforced server-side: who can comment on
+     * my posts, whether others can repost or download my content, and the
+     * people I hide my stories from.
+     */
+    interactionSettings: {
+      get: () => freshGet<{ settings: InteractionSettings; storyHiddenCount: number }>('/api/interaction-settings'),
+      update: (body: Partial<InteractionSettings>) =>
+        patch<{ settings: InteractionSettings }>('/api/interaction-settings', body),
+      storyHidden: () => freshGet<{ userIds: string[] }>('/api/interaction-settings/story-hidden'),
+      setStoryHidden: (userIds: string[]) =>
+        put<{ userIds: string[] }>('/api/interaction-settings/story-hidden', { userIds }),
+      /** May the viewer save this post's media? (signed-out allowed) */
+      downloadAllowed: (postId: string) =>
+        quietGet<{ allowed: boolean }>(`/api/interaction-settings/posts/${encodeURIComponent(postId)}/download`),
     },
     /**
      * Server-side "seen" state for the buyer "Watching Threads" gesture coach

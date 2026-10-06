@@ -134,6 +134,9 @@ export function OrderSummarySection({
         {totals.promoCents > 0 ? (
           <Line styles={styles} label="Discount" value={`−${formatCents(totals.promoCents)}`} testID="checkout-discount-line" />
         ) : null}
+        {(totals.tipCents ?? 0) > 0 ? (
+          <Line styles={styles} label="Tip" value={formatCents(totals.tipCents ?? 0)} testID="checkout-tip-line" />
+        ) : null}
         {totals.rewardsCents > 0 ? <Line styles={styles} label="Rewards" value={`−${formatCents(totals.rewardsCents)}`} /> : null}
         {totals.threadCashCents > 0 ? (
           <>

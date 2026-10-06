@@ -885,7 +885,7 @@ export default function BuyerPostCommentsScreen() {
       setReplyingTo(parent);
       const code = apiErrorCode(error);
       setSendError(
-        code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED'
+        code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED' || code === 'COMMENTS_LIMITED'
           ? apiErrorMessage(error, 'This comment can’t be posted.')
           : 'Could not post comment. Tap to retry.',
       );

@@ -56,7 +56,7 @@ async function openPage(browser, origin, { cookieConsent = true, overrides = () 
       'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     };
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const p = url.pathname.replace(/^\/api/, '');
+    const p = url.pathname.replace(/^\/api\/v1/, '').replace(/^\/api/, '');
     let body = null;
     try { body = request.postDataJSON(); } catch {}
     calls.push({ method: request.method(), path: p, body });
@@ -71,6 +71,7 @@ async function openPage(browser, origin, { cookieConsent = true, overrides = () 
     return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(fallback) });
   });
   const page = await context.newPage();
+  globalThis.__lastPage = page;
   page.on('pageerror', (err) => console.log('[pageerror]', err.message));
   return { context, page };
 }
@@ -140,6 +141,7 @@ async function liveFeed(browser, origin) {
 async function discover(browser, origin) {
   const calls = [];
   const overrides = ({ path: p, query }) => {
+    if (p === '/social/status/seller_northline') return { body: { isFollowing: true, isFollowedBy: false, isMutual: false, followersCount: 10 } };
     if (p === '/public/trending') {
       const base = respond({ method: 'GET', path: '/api/public/trending', query, role: 'buyer', options: {} });
       const rows = base.trending.map((r, i) => (i === 0 ? { ...r, id: POST_UUID } : r));
@@ -166,12 +168,13 @@ async function discover(browser, origin) {
   const tile = page.getByText('Drop 04 is live', { exact: false }).first();
   await tile.click();
   await page.waitForTimeout(1200);
-  await page.getByLabel('heart').first().click();
+  await page.getByLabel('4,210', { exact: true }).first().click();
   await page.waitForTimeout(500);
   check(calls.some((c) => c.method === 'POST' && c.path === `/posts/${POST_UUID}/interact` && c.body?.type === 'like'), 'QA-0079 Like calls POST /api/posts/:id/interact');
   await page.getByLabel('bookmark').first().click();
   await page.waitForTimeout(500);
   check(calls.some((c) => c.method === 'POST' && c.path === '/buyer/saved' && c.body?.targetId === POST_UUID), 'QA-0079 Save calls POST /api/buyer/saved');
+  check(await page.getByText('Following', { exact: true }).count() > 0, 'Discover viewer Follow pill starts from the real follow state');
   await page.screenshot({ path: path.join(OUT, 'discover-viewer-liked-saved.png') });
   await page.getByLabel('Share').first().click();
   await page.waitForTimeout(900);
@@ -227,7 +230,7 @@ async function main() {
     for (const [name, fn] of Object.entries(runs)) {
       if (only && !only.split(',').includes(name)) continue;
       console.log(`\n── ${name}`);
-      try { await fn(browser, origin); } catch (e) { check(false, `${name} crashed: ${e.message.split('\n')[0]}`); }
+      try { await fn(browser, origin); } catch (e) { await globalThis.__lastPage?.screenshot({ path: path.join(OUT, `debug-${name}.png`) }).catch(() => {}); check(false, `${name} crashed: ${e.message.split('\n')[0]}`); }
     }
   } finally {
     await browser.close();
