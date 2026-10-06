@@ -2472,6 +2472,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
         get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
     },
+    /** Automatic sales — seller-managed price reductions (no code needed) */
+    sales: {
+      list:        () => get<any[]>('/api/sales'),
+      collections: () => get<string[]>('/api/sales/collections'),
+      create: (data: {
+        name: string; discountType: 'percent' | 'fixed'; value: number;
+        scope: 'store' | 'products' | 'collection'; productIds?: string[]; collection?: string | null;
+        startsAt?: string | null; endsAt?: string | null; active?: boolean;
+      }) => post<any>('/api/sales', data),
+      update: (id: string, data: Partial<{
+        name: string; discountType: 'percent' | 'fixed'; value: number;
+        scope: 'store' | 'products' | 'collection'; productIds: string[]; collection: string | null;
+        startsAt: string | null; endsAt: string | null; active: boolean;
+      }>) => patch<any>(`/api/sales/${id}`, data),
+      delete: (id: string) => del<any>(`/api/sales/${id}`),
+    },
     /** Returns — buyer-initiated return requests */
     returns: {
       create: (data: {
