@@ -31,10 +31,15 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-/** In-app routes only: "/inventory", "/(tabs)/orders" — never "//host" or a URL. */
+/** The removed Inventory screen's route (older servers still send it); Products absorbed it. */
+const REMOVED_INVENTORY_ROUTE = /^\/inventory(?:[/?#]|$)/;
+const PRODUCTS_LOW_STOCK_ROUTE = '/(tabs)/products?filter=low-stock';
+
+/** In-app routes only: "/(tabs)/products", "/(tabs)/orders" — never "//host" or a URL. */
 export function safeSuggestionRoute(route: unknown): string | undefined {
   const r = str(route);
   if (!r.startsWith('/') || r.startsWith('//') || /\s/.test(r)) return undefined;
+  if (REMOVED_INVENTORY_ROUTE.test(r)) return PRODUCTS_LOW_STOCK_ROUTE;
   return r;
 }
 
