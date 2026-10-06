@@ -1364,6 +1364,9 @@ export function HapticSwitch({
       }}
       accessibilityRole="switch"
       accessibilityState={{ checked: on, disabled: !!disabled }}
+      // react-native-web drops accessibilityState, so without this the web
+      // switch never announces on/off; RN maps aria-checked natively too.
+      aria-checked={on}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       testID={testID}

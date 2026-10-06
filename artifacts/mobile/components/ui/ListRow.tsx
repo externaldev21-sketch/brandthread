@@ -67,7 +67,7 @@ export function ListRow({
       </View>
       {right}
       {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1}>{value}</Text>}
-      {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} />}
+      {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} accessibilityLabel={title} />}
       {!right && chevron && !toggle && <Feather name="chevron-right" size={18} color={palette.mutedForeground} />}
     </>
   );

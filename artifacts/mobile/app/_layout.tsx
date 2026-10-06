@@ -1202,7 +1202,9 @@ function RootLayoutNav() {
       <NotificationBanner />
       <NetworkNoticeBanner />
       <ActionSheetHost />
-      <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
+      {/* tabIndex -1: on web `accessible={false}` alone still left this
+          whole-app wrapper in the keyboard tab order as a nameless control. */}
+      <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} tabIndex={-1} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
         screenLayout={({ children }) => (

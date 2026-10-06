@@ -206,6 +206,8 @@ export function SettingsRow({
           value={!!switchValue}
           onValueChange={onSwitchChange}
           disabled={disabled}
+          accessibilityLabel={label}
+          accessibilityHint={subtitle}
         />
       ) : onPress && !inert ? (
         <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
