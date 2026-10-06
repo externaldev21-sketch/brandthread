@@ -107,6 +107,13 @@ vi.mock("../../lib/objectStorage", () => ({
   },
 }));
 
+// requirePermission reads Clerk directly; team-role enforcement has its own
+// suite (team-permission-gate.test.ts), so the owner is let through here.
+vi.mock("../../middlewares/requireRole", () => ({
+  requirePermission: () => (_req: any, _res: any, next: any) => next(),
+  teamContext: () => (_req: any, _res: any, next: any) => next(),
+}));
+
 // ─── Import route under test (after vi.mock declarations) ─────────────────────
 
 import adCampaignsRouter, {
