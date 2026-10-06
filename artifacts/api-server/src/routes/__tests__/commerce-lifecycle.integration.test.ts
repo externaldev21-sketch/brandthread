@@ -18,6 +18,9 @@ import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 
 const env = vi.hoisted(() => {
+  // Production money timing: sellers are paid after delivery (vitest.setup.ts
+  // defaults the older suites to "immediate").
+  process.env.PAYOUT_MODE = "hold";
   process.env.STRIPE_SECRET_KEY = "sk_test_commerce_lifecycle";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_commerce_lifecycle";
   // Imported (never called) by AI routers that the full app mounts.
@@ -125,7 +128,9 @@ describe("commerce lifecycle: list → buy → seller sees it", () => {
     ctx.stripeSessionId = session.body.sessionId;
     const create = fake.stripe.callsTo("checkout.sessions.create").at(-1);
     expect(create.args[0].line_items[0].price_data.unit_amount).toBe(4_000);
-    expect(create.args[0].payment_intent_data.transfer_data.destination).toBe(app.sellerAccount);
+    // Hold-until-delivered: charged on the platform, paid to the seller later.
+    expect(create.args[0].payment_intent_data.transfer_data).toBeUndefined();
+    expect(create.args[0].payment_intent_data.metadata.chargeModel).toBe("transfer");
     ctx.checkoutRef = create.args[0].metadata.csRef;
     expect(ctx.checkoutRef).toBeTruthy();
   });

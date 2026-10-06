@@ -100,6 +100,10 @@ export function createFakeStripe(): FakeStripe {
     "charges.retrieve": (cid: string) => ({ id: cid, balance_transaction: { fee: 0 } }),
     "tax.calculations.create": () => ({ id: id("taxcalc_test"), tax_amount_exclusive: 0 }),
     "disputes.update": (did: string) => ({ id: did, status: "under_review" }),
+    "disputes.close": (did: string) => ({ id: did, status: "lost" }),
+    "transfers.createReversal": (tid: string, params: any) =>
+      store({ id: id("trr_test"), object: "transfer_reversal", transfer: tid, amount: params?.amount }),
+    "tax.transactions.createFromCalculation": () => ({ id: id("tax_txn_test") }),
     "webhooks.constructEvent": (body: Buffer | string) =>
       JSON.parse(Buffer.isBuffer(body) ? body.toString("utf8") : String(body)),
   };

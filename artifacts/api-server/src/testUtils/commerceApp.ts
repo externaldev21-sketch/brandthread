@@ -2,8 +2,10 @@
  * Helpers for whole-app, two-sided commerce tests (buyer + seller) against
  * the real routers and the real test database.
  *
- * The test file itself must install the module mocks (vi.mock is hoisted per
- * file): `stripe` → testUtils/fakeStripe, `@clerk/express` → getAuth reading
+ * The test file itself must set the env in vi.hoisted (STRIPE_SECRET_KEY,
+ * STRIPE_WEBHOOK_SECRET, the AI integration URL/key the full app imports, and
+ * PAYOUT_MODE=hold — production timing; vitest.setup.ts defaults older suites
+ * to "immediate") and install the module mocks (vi.mock is hoisted per file): `stripe` → testUtils/fakeStripe, `@clerk/express` → getAuth reading
  * the `x-test-user-id` header, and `lib/push` → a recorder. See
  * routes/__tests__/commerce-lifecycle.integration.test.ts for the template.
  */
@@ -23,15 +25,6 @@ function warnCleanup(err: unknown): void {
 
 export type ApiResult = { status: number; body: any };
 
-/** Env the full app needs at import time. Call from vi.hoisted(). */
-export function setCommerceTestEnv(): void {
-  process.env.STRIPE_SECRET_KEY = "sk_test_commerce_e2e";
-  process.env.STRIPE_WEBHOOK_SECRET = "whsec_commerce_e2e";
-  // Imported (never called) by AI routers that the full app mounts.
-  process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ||= "http://127.0.0.1:9/openai";
-  process.env.AI_INTEGRATIONS_OPENAI_API_KEY ||= "test-not-used";
-}
-
 export interface CommerceApp {
   base: string;
   seller: string;
@@ -44,11 +37,15 @@ export interface CommerceApp {
   stripeEvent(type: string, object: any, extra?: Record<string, unknown>): Promise<ApiResult>;
   /** Create another user row (cleaned up with the rest). */
   addUser(kind: "buyer" | "seller", extra?: Record<string, unknown>): Promise<string>;
+  /** Another seller with an active Stripe account (cleaned up with the rest). */
+  addSeller(): Promise<string>;
   /** Seller lists an active product through POST /api/products. */
   listProduct(input: {
     name: string;
     variants: Array<{ size?: string; priceCents: number; stock: number; lowStockThreshold?: number }>;
     extra?: Record<string, unknown>;
+    /** Listing seller; defaults to the main seller. */
+    as?: string;
   }): Promise<{ productId: string; variantIds: string[] }>;
   /** Buyer pays for items through hosted Checkout + checkout.session.completed. Returns the order id. */
   buyViaHostedCheckout(items: Array<{ productId: string; variantId: string; quantity: number }>, opts?: { buyer?: string; discountCode?: string }): Promise<string>;
@@ -116,8 +113,15 @@ export async function startCommerceApp(label: string, fake: { stripe: any }): Pr
       } as any);
       return id;
     },
-    async listProduct({ name, variants, extra = {} }) {
-      const created = await call(seller, "POST", "/api/products", {
+    async addSeller() {
+      return ctx.addUser("seller", {
+        displayName: "E2E Second Studio",
+        stripeAccountId: `acct_e2e_${crypto.randomBytes(6).toString("hex")}`,
+        stripeAccountStatus: "active",
+      });
+    },
+    async listProduct({ name, variants, extra = {}, as = seller }) {
+      const created = await call(as, "POST", "/api/products", {
         name, status: "active", ...extra,
         variants: variants.map((v, i) => ({ sku: `${suffix}-${productIds.length}-${i}`, lowStockThreshold: 0, ...v })),
       });
