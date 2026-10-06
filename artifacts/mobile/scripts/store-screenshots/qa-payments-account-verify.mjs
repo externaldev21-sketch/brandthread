@@ -18,6 +18,7 @@ const DEVICE = { viewport: { width: 390, height: 844 }, scale: 2, isMobile: true
 
 const NO_PLAN = { plan: 'starter', status: 'none', renewsOn: null, trialEnd: null, trialBanner: null, amountCents: 0, paymentMethodLabel: null, effectiveProvider: 'none', native: null };
 const state = { consent: false, consentAsked: 0 };
+const SUGGESTION = 'A minimalist hoodie with our wordmark centered on the chest';
 
 function fixtures(method, p) {
   if (p === '/api/team/context') return { role: 'owner', storeOwnerId: 'seller', teamMembershipId: null };
@@ -76,7 +77,7 @@ async function main() {
       const p = u.pathname.replace(/^\/api\/v1/, '/api');
       const headers = { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true' };
       // AI tools refuse until the person allows sending content to the providers (QA-0043).
-      if (p === '/api/techpack/generate' && !state.consent) {
+      if (p === '/api/mockup/generate' && !state.consent) {
         state.consentAsked += 1;
         return route.fulfill({ status: 403, contentType: 'application/json', headers,
           body: JSON.stringify({ error: 'Allow AI data sharing to use Brandthread AI. You can change this in Settings.', code: 'ai_consent_required' }) });
@@ -119,14 +120,9 @@ async function main() {
       await page.waitForTimeout(800); await shot('07-delete-account-sso-reauth');
       await go('/featured-slot', 'History'); await shot('08-featured-store-refund', { scroll: true });
       await go('/ai-data-sharing', 'Allow Brandthread AI'); await shot('09-ai-data-sharing-setting');
-      await go('/tech-pack-generator', '');
-      for (let i = 0; i < 6; i += 1) {
-        const gen = page.getByText('Generate tech pack', { exact: true }).first();
-        if (await gen.isVisible().catch(() => false)) { await gen.click(); break; }
-        const next = page.getByText(/^(Next|Continue)$/).last();
-        if (!(await next.isVisible().catch(() => false))) break;
-        await next.click(); await page.waitForTimeout(500);
-      }
+      // First AI use: the server refuses with ai_consent_required and the app asks.
+      await go('/ai-mockup-chat', 'Describe your design');
+      await page.getByText(SUGGESTION, { exact: true }).first().click();
       await page.waitForTimeout(1200);
       await shot('10-ai-consent-sheet');
       console.log('consent refusals served:', state.consentAsked);
