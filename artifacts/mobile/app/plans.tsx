@@ -6,7 +6,7 @@
  *   Growth   $79/mo  — unlimited products, AI Design Studio, manufacturer hub, live shopping
  *   Pro     $199/mo  — everything in Growth + unlimited team, advanced analytics, white-glove
  *
- * All tiers carry a 5% platform commission on sales.
+ * Platform commission on sales depends on the plan (GET /seller/subscription/perks).
  * Every new subscription starts with a 5-day free trial (card required upfront).
  *
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
@@ -58,6 +58,8 @@ import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 import { displayPriceFor } from '@/lib/sellerPlansDisplay';
+import { commissionSummary, wantsProHighlight, DEMO_PERKS, type PerksResponse } from '@/lib/proPerks';
+import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
   ONE_TIME_OFFER_DISCOUNT_PERCENT,
   isOneTimeOfferAvailable,
@@ -98,7 +100,7 @@ export default function PlansScreen() {
   const insets    = useSafeAreaInsets();
   const router    = useRouter();
   const api       = useApi();
-  const { fromOnboarding } = useLocalSearchParams<{ fromOnboarding?: string }>();
+  const { fromOnboarding, highlight } = useLocalSearchParams<{ fromOnboarding?: string; highlight?: string; source?: string }>();
   const isOnboarding = fromOnboarding === 'true';
   const { currentRole } = useTeamRole();
   const { available: revenueCatAvailable, packages, purchase, restore } = useRevenueCat();
@@ -110,6 +112,7 @@ export default function PlansScreen() {
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
   const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
+  const [perks,             setPerks]             = useState<PerksResponse | null>(null);
   const [selectedId,        setSelectedId]        = useState<SellerPlanDefinition['id'] | null>(null);
   const [exitDrawerVisible, setExitDrawerVisible] = useState(false);
   const [offerVisible,      setOfferVisible]      = useState(false);
@@ -152,7 +155,10 @@ export default function PlansScreen() {
       } catch {
         goals = [];
       }
-      const resolvedId = (selected[1] as SellerPlanDefinition['id'] | null) ?? recommendSellerPlan(stage[1] ?? '', goals).planId;
+      // Locked Pro surfaces (e.g. advanced analytics) open this screen with Pro preselected.
+      const resolvedId = wantsProHighlight(highlight)
+        ? 'pro'
+        : (selected[1] as SellerPlanDefinition['id'] | null) ?? recommendSellerPlan(stage[1] ?? '', goals).planId;
       setRecommendedId(resolvedId);
       setSelectedId(resolvedId);
       // If not onboarding, load live plan so we can show CURRENT badge
@@ -164,7 +170,21 @@ export default function PlansScreen() {
         } catch { /* non-fatal */ }
       }
     })();
-  }, [isOnboarding, api]);
+  }, [isOnboarding, api, highlight]);
+
+  // Plan perks (commission, credits) come from the server so the note below is never hardcoded.
+  // Dev previews never call the API; `&demo=1` shows sample values.
+  useEffect(() => {
+    if (isSellerDevPreview() || isBuyerDevPreview()) {
+      setPerks(isPreviewDemoMode() ? DEMO_PERKS : null);
+      return;
+    }
+    let cancelled = false;
+    api.seller.subscription.perks()
+      .then((result) => { if (!cancelled) setPerks(result); })
+      .catch(() => { /* non-fatal: the note falls back to generic copy */ });
+    return () => { cancelled = true; };
+  }, [api]);
 
   // ── AppState listener: when seller returns from Stripe Checkout ────────────
   useEffect(() => {
@@ -448,7 +468,9 @@ export default function PlansScreen() {
 
         {/* Commission disclosure — small print, not part of the primary pitch */}
         <Text style={styles.commissionNote}>
-          All plans carry a 5% platform commission on each sale.
+          {commissionSummary(perks)
+            ? `Platform commission on each sale: ${commissionSummary(perks)}.`
+            : 'A platform commission applies to each sale.'}
         </Text>
 
         {/* Skip during onboarding — Starter is a paid plan, so this must not read as "free" */}

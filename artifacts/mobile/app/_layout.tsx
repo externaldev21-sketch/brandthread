@@ -1314,6 +1314,7 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-advanced"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />

@@ -670,6 +670,8 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
   platformFeeCents: integer('platform_fee_cents'),
+  // Commission rate (bps) from the seller's plan, fixed at checkout creation.
+  platformFeeBps: integer('platform_fee_bps'),
   processingFeeEstimateCents: integer('processing_fee_estimate_cents'),
   // One-page checkout (in-app PaymentIntent, chargeModel 'transfer'): this
   // seller group's share of the cart's single PaymentIntent, fixed when the
@@ -2287,6 +2289,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));
+export * from './aiCredits';
 
 // ─── Automatic media screening results (migration 115) ───────────────────────
 // Held / rejected uploads only. No raw images are stored.

@@ -14,6 +14,7 @@ import {
   ensureStripeCustomer,
   mapStripeError,
 } from "../lib/stripe";
+import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { buildBuyerDelivery, deliveryColumns, loadBuyerDelivery } from "../lib/delivery/buyerView";
 import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
@@ -1014,11 +1015,13 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
     // by the webhook even if the later session-ID write is interrupted.
+    const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
       preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
+      platformFeeBps,
     });
     const insertValues = {
       buyerId,
@@ -1027,6 +1030,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       chargeModel: money.chargeModel,
       dropId: chargePlan.dropId,
       platformFeeCents: money.platformFeeCents,
+      platformFeeBps,
       processingFeeEstimateCents: money.processingFeeEstimateCents,
       ...(loyaltyRedemption ? {
         loyaltyToken: loyaltyRedemption.token,
