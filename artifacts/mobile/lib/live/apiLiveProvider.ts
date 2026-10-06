@@ -14,8 +14,10 @@
  *    an "Open player" hand-off to the existing /buyer-live Agora screen.
  *  - Realtime transport. The repo has no websocket/realtime layer, so
  *    `subscribe` polls every few seconds (same cadence buyer-live uses).
- *  - Scheduled lives / reminders and like counts: no tables exist, so
- *    `listUpcoming` returns [] and `setReminder` / `sendLike` are no-ops.
+ *  - Scheduled lives / reminders: no tables exist, so `listUpcoming`
+ *    returns [] and `setReminder` is a no-op. Hearts are real:
+ *    `sendLike` → POST /api/live/:id/like, and the running total
+ *    (live_streams.like_count) comes back with every poll.
  */
 import { serviceRequest } from '@/lib/serviceConfig';
 import { setSellerFollowing } from '@/services/socialService';
@@ -61,7 +63,8 @@ export function productsFromTags(tags: unknown): { products: LiveProduct[]; pinn
       productId: t.productId,
       name: t.productName ?? 'Product',
       priceCents: Number(t.priceCents) || 0,
-      imageUri: t.imageUri ?? null,
+      // Server-resolved tags carry `imageUrl` (lib/liveProductTags.ts).
+      imageUri: t.imageUri ?? t.imageUrl ?? null,
     }));
   const highlighted = list.find((t: any) => t?.highlighted)?.productId ?? null;
   return { products, pinned: highlighted ?? products[0]?.productId ?? null };
@@ -74,7 +77,7 @@ export function streamFromRow(row: Row): LiveStream {
     host: hostFromRow(row),
     title: row.title ?? '',
     viewerCount: Number(row.viewer_count) || 0,
-    likeCount: 0,
+    likeCount: Number(row.like_count) || 0,
     startedAt: row.started_at ? new Date(row.started_at).getTime() : Date.now(),
     followedByViewer: row.followed === true,
     products,
@@ -142,6 +145,7 @@ export function createApiLiveProvider(): LiveStreamProvider {
       let since = new Date().toISOString();
       let stopped = false;
       let lastPinned: string | null | undefined;
+      let lastLikes: number | undefined;
       const id = encodeURIComponent(streamId);
       async function poll() {
         try {
@@ -158,6 +162,11 @@ export function createApiLiveProvider(): LiveStreamProvider {
           const s = detail.stream;
           if (!s || s.status !== 'live') { listener({ type: 'ended', streamId }); return; }
           listener({ type: 'viewers', streamId, viewerCount: Number(s.viewer_count) || 0 });
+          const likeCount = Number(s.like_count) || 0;
+          if (likeCount !== lastLikes) {
+            lastLikes = likeCount;
+            listener({ type: 'likes', streamId, likeCount });
+          }
           const { pinned } = productsFromTags(s.product_tags);
           if (pinned !== lastPinned) {
             lastPinned = pinned;
@@ -177,8 +186,10 @@ export function createApiLiveProvider(): LiveStreamProvider {
       return chatFromRow(data.comment);
     },
 
-    async sendLike() {
-      // No live-like counter on the backend yet; the heart burst is local.
+    async sendLike(streamId) {
+      // The heart burst plays locally at once; the total is server-side and
+      // reaches everyone with the next poll / socket broadcast.
+      await post(`/api/live/${encodeURIComponent(streamId)}/like`, { count: 1 }).catch(() => {});
     },
 
     async setReminder() {

@@ -456,6 +456,7 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'repost':
     case 'story_reshare': return 'repeat';
     case 'thread_cash_received': return 'dollar-sign';
+    case 'live_started': return 'video';
     case 'price_drop': return 'trending-down';
     case 'back_in_stock':
     case 'waitlist_restock':
@@ -610,6 +611,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
         : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
     case 'thread_cash_transfer':
       return '/thread-cash';
+    case 'live_stream':
+      // "<Brand> is live" — straight into the stream.
+      return id ? `/buyer-live?streamId=${q(id)}` : '/live';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
     case 'user': {

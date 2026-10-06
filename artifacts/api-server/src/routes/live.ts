@@ -16,6 +16,7 @@
  *  POST   /api/live/:id/end             seller ends stream (saves replay)
  *  PATCH  /api/live/:id/products        update tagged products mid-stream
  *  POST   /api/live/:id/comment         add a chat comment
+ *  POST   /api/live/:id/like            heart reactions (batched taps)
  *  GET    /api/live/:id/comments        poll recent comments (one-shot backfill)
  *
  * Realtime: new comments and product-tag changes are broadcast to the
@@ -34,8 +35,12 @@ import { evaluateContent } from "../lib/contentModerator";
 import { optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
-import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
-import { broadcastToRoom } from "../ws/liveHub";
+import { beginCloudRecording } from "../lib/liveReplay";
+import { broadcastToRoom, roomUserIds } from "../ws/liveHub";
+import { LiveProductTagError, resolveLiveProductTags } from "../lib/liveProductTags";
+import { notifyFollowersSellerIsLive } from "../lib/liveGoLiveNotify";
+import { endLiveStream } from "../lib/liveEnd";
+import { MAX_LIVE_HOURS } from "../jobs/liveStaleStreams";
 
 const router = Router();
 
@@ -54,7 +59,9 @@ function generateToken(
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
-    const expireTs = Math.floor(Date.now() / 1000) + 7200; // 2 h
+    // A live is ended by jobs/liveStaleStreams.ts once it reaches
+    // MAX_LIVE_HOURS, so the media token covers the whole stream.
+    const expireTs = Math.floor(Date.now() / 1000) + MAX_LIVE_HOURS * 3600;
     return RtcTokenBuilder.buildTokenWithUid(
       appId,
       appCert,
@@ -76,6 +83,26 @@ function uidFromClerkId(clerkId: string): number {
   return Math.abs(h) % 999999 + 1;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Every :id route casts to uuid; a malformed id is a 404, never a 500. */
+router.param("id", (req, res, next, id) => {
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    res.status(404).json({ error: "Stream not found" });
+    return;
+  }
+  next();
+});
+
+async function blockedBetween(a: string, b: string): Promise<boolean> {
+  const rows = await db.execute(sql`
+    SELECT 1 FROM blocks
+    WHERE (blocker_id = ${a} AND blocked_id = ${b}) OR (blocker_id = ${b} AND blocked_id = ${a})
+    LIMIT 1
+  `);
+  return rows.rows.length > 0;
+}
+
 function randomChannelName(): string {
   return `bt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -94,17 +121,24 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
     return res.status(503).json({ error: "AGORA_APP_ID not configured" });
   }
 
-  // Only one live stream per seller at a time
+  let resolvedTags;
+  try {
+    resolvedTags = await resolveLiveProductTags(sellerId, productTags);
+  } catch (err) {
+    if (err instanceof LiveProductTagError) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+
+  // Only one live stream per seller at a time. A seller can only broadcast
+  // from one device, so a stream still marked live when they go live again
+  // is a crashed/killed session: end it (viewers are told, its replay is
+  // finalized) instead of locking the seller out with a 409.
   const existing = await db.execute(sql`
     SELECT id FROM live_streams
     WHERE seller_id = ${sellerId} AND status = 'live'
-    LIMIT 1
   `);
-  if (existing.rows.length) {
-    return res.status(409).json({
-      error: "You already have a live stream. End it first.",
-      streamId: (existing.rows[0] as any).id,
-    });
+  for (const row of existing.rows as Array<{ id: string }>) {
+    await endLiveStream(row.id, "restarted");
   }
 
   const channelName = randomChannelName();
@@ -115,12 +149,12 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
   const result = await db.execute(sql`
     INSERT INTO live_streams
       (seller_id, channel_name, title, description, status, product_tags,
-       agora_uid, thumbnail_url, started_at)
+       agora_uid, thumbnail_url, started_at, host_last_seen_at)
     VALUES
       (${sellerId}, ${channelName}, ${title.trim()},
        ${description ?? null}, 'live',
-       ${JSON.stringify(productTags)}::jsonb,
-       ${agoraUid}, ${thumbnailUrl ?? null}, now())
+       ${JSON.stringify(resolvedTags)}::jsonb,
+       ${agoraUid}, ${thumbnailUrl ?? null}, now(), now())
     RETURNING *
   `);
 
@@ -134,12 +168,19 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
     logger.error({ err, streamId: stream.id }, "beginCloudRecording threw unexpectedly"),
   );
 
+  // Followers hear about it now — the whole point of going live. Never
+  // blocks or fails the start.
+  notifyFollowersSellerIsLive({
+    id: stream.id, sellerId, title: stream.title, thumbnailUrl: stream.thumbnail_url,
+  }).catch((err) => logger.error({ err, streamId: stream.id }, "Go-live follower notification failed"));
+
   return res.status(201).json({
     stream: {
       id: stream.id,
       channelName: stream.channel_name,
       agoraUid:    stream.agora_uid,
       title:       stream.title,
+      productTags: resolvedTags,
     },
     agoraAppId: appId,
     token,          // "" means no-cert dev mode — Agora console must have auth disabled
@@ -245,13 +286,16 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
   try {
     const rows = await db.execute(sql`
-      SELECT id, channel_name, status, agora_uid
+      SELECT id, seller_id, channel_name, status, agora_uid
       FROM live_streams WHERE id = ${id}::uuid
     `);
     if (!rows.rows.length) return res.status(404).json({ error: "Stream not found" });
     const stream = rows.rows[0] as any;
     if (stream.status !== "live") {
       return res.status(410).json({ error: "Stream has ended" });
+    }
+    if (stream.seller_id !== viewerId && await blockedBetween(viewerId, stream.seller_id)) {
+      return res.status(404).json({ error: "Stream not found" });
     }
 
     // Presence: mark this viewer live right away so the count feels instant
@@ -303,6 +347,18 @@ router.post("/:id/leave", requireAuth, async (req, res) => {
 router.post("/:id/heartbeat", requireAuth, async (req, res) => {
   const viewerId = (req as any).clerkUserId as string;
   try {
+    const [stream] = await db.execute(sql`
+      SELECT seller_id, status FROM live_streams WHERE id = ${req.params.id}::uuid
+    `).then((r) => r.rows as Array<{ seller_id: string; status: string }>);
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    // An ended stream gets no new presence; the client stops on 410.
+    if (stream.status !== "live") return res.status(410).json({ error: "Stream has ended", ended: true });
+    if (stream.seller_id === viewerId) {
+      // The host's fallback heartbeat keeps the stream from being swept as
+      // abandoned; the host is never counted as a viewer.
+      await db.execute(sql`UPDATE live_streams SET host_last_seen_at = now() WHERE id = ${req.params.id}::uuid`);
+      return res.json({ ok: true });
+    }
     await db.execute(sql`
       INSERT INTO live_viewers (stream_id, user_id_or_session_id, last_seen)
       VALUES (${req.params.id}::uuid, ${viewerId}, now())
@@ -316,7 +372,9 @@ router.post("/:id/heartbeat", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/live/:id/end ───────────────────────────────────────────────────
-router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
+// No plan gate: a host whose plan lapsed mid-stream must still be able to
+// end it (starting and re-tagging still require Pro).
+router.post("/:id/end", requireAuth, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
 
   try {
@@ -328,36 +386,8 @@ router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
     const stream = rows.rows[0] as any;
     if (stream.status === "ended") return res.json({ ok: true, message: "Already ended" });
 
-    // Mark as ended
-    await db.execute(sql`
-      UPDATE live_streams
-      SET status = 'ended', ended_at = now()
-      WHERE id = ${req.params.id}::uuid
-    `);
-
-    // Stop the Agora Cloud Recording session (if one is running) and, if the
-    // upload is already confirmed, create the replay post right away.
-    //
-    // IMPORTANT: a replay post is only ever created once a real recording
-    // file is confirmed uploaded — never here unconditionally. If recording
-    // was never configured/started, or the upload isn't confirmed yet, no
-    // post is created now; `recording_status` stays 'stopping' and
-    // jobs/liveRecordingFinalize.ts finishes the job once Agora reports the
-    // file as ready (or marks it 'failed' after a bounded timeout).
-    let replayPostId: string | null = null;
-    let replayStatus: "ready" | "pending" | "unavailable" = "unavailable";
-    try {
-      const { postId } = await stopCloudRecordingAndMaybeFinalize(stream);
-      if (postId) {
-        replayPostId = postId;
-        replayStatus = "ready";
-      } else if (stream.recording_status === "started") {
-        replayStatus = "pending";
-      }
-    } catch (err) {
-      logger.error({ err, streamId: stream.id }, "stopCloudRecordingAndMaybeFinalize threw unexpectedly");
-    }
-
+    const result = await endLiveStream(stream.id, "host");
+    const { replayPostId, replayStatus } = result;
     return res.json({ ok: true, replayPostId, replayStatus });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
@@ -367,21 +397,31 @@ router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
 // ─── PATCH /api/live/:id/products ────────────────────────────────────────────
 router.patch("/:id/products", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { productTags } = req.body;
+  const { productTags } = req.body ?? {};
   if (!Array.isArray(productTags)) return res.status(400).json({ error: "productTags must be an array" });
 
   try {
+    // Names, prices and images come from the seller's catalogue — never
+    // from the request — so viewers can't be shown a made-up price.
+    const resolved = await resolveLiveProductTags(sellerId, productTags);
     const result = await db.execute(sql`
       UPDATE live_streams
-      SET product_tags = ${JSON.stringify(productTags)}::jsonb
-      WHERE id = ${req.params.id}::uuid AND seller_id = ${sellerId}
+      SET product_tags = ${JSON.stringify(resolved)}::jsonb
+      WHERE id = ${req.params.id}::uuid AND seller_id = ${sellerId} AND status = 'live'
       RETURNING product_tags
     `);
-    if (!result.rows.length) return res.status(404).json({ error: "Not found" });
+    if (!result.rows.length) {
+      const [owned] = await db.execute(sql`
+        SELECT status FROM live_streams WHERE id = ${req.params.id}::uuid AND seller_id = ${sellerId}
+      `).then((r) => r.rows as Array<{ status: string }>);
+      if (owned) return res.status(410).json({ error: "This live has ended." });
+      return res.status(404).json({ error: "Not found" });
+    }
     const updatedTags = (result.rows[0] as any).product_tags;
     broadcastToRoom(String(req.params.id), { type: "products", productTags: updatedTags });
     return res.json({ productTags: updatedTags });
   } catch (e: any) {
+    if (e instanceof LiveProductTagError) return res.status(e.status).json({ error: e.message });
     return res.status(500).json({ error: e.message });
   }
 });
@@ -395,6 +435,15 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
 
   const restriction = await publishingRestriction(userId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  const [stream] = await db.execute(sql`
+    SELECT seller_id, status FROM live_streams WHERE id = ${req.params.id}::uuid
+  `).then((r) => r.rows as Array<{ seller_id: string; status: string }>);
+  if (!stream) return res.status(404).json({ error: "Stream not found" });
+  if (stream.status !== "live") return res.status(410).json({ error: "This live has ended.", code: "LIVE_STREAM_ENDED" });
+  if (stream.seller_id !== userId && await blockedBetween(userId, stream.seller_id)) {
+    return res.status(403).json({ error: "You can't comment on this live.", code: "LIVE_COMMENT_BLOCKED" });
+  }
 
   // displayName/avatarUrl are resolved from the caller's own profile — never
   // trust client-supplied identity fields here, or any authenticated viewer
@@ -425,11 +474,67 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
       RETURNING *
     `);
     const comment = result.rows[0];
-    broadcastToRoom(String(req.params.id), { type: "comment", comment });
+    // Same filter GET /comments applies per viewer: anyone in a block
+    // relationship with the commenter never receives the line live either.
+    const present = roomUserIds(String(req.params.id)).filter((id) => id !== userId);
+    let skip: Set<string> | undefined;
+    if (present.length > 0) {
+      const presentList = sql.join(present.map((id) => sql`${id}`), sql`, `);
+      const blocked = await db.execute(sql`
+        SELECT CASE WHEN blocker_id = ${userId} THEN blocked_id ELSE blocker_id END AS other
+        FROM blocks
+        WHERE (blocker_id = ${userId} AND blocked_id IN (${presentList}))
+           OR (blocked_id = ${userId} AND blocker_id IN (${presentList}))
+      `);
+      if (blocked.rows.length) skip = new Set((blocked.rows as Array<{ other: string }>).map((r) => r.other));
+    }
+    broadcastToRoom(String(req.params.id), { type: "comment", comment }, { skipUserIds: skip });
     return res.status(201).json({ comment });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
+});
+
+// ─── POST /api/live/:id/like ──────────────────────────────────────────────────
+// Body: { count?: 1..20 } — the client batches rapid heart taps. A per-user
+// window caps how fast one viewer can inflate the total.
+const LIKE_WINDOW_MS = 10_000;
+const LIKES_PER_WINDOW = 60;
+const likeWindows = new Map<string, { startedAt: number; used: number }>();
+
+router.post("/:id/like", requireAuth, async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const requested = Math.floor(Number(req.body?.count ?? 1));
+  if (!Number.isFinite(requested) || requested < 1) return res.status(400).json({ error: "count must be at least 1" });
+
+  const key = `${req.params.id}:${userId}`;
+  const now = Date.now();
+  let windowState = likeWindows.get(key);
+  if (!windowState || now - windowState.startedAt > LIKE_WINDOW_MS) {
+    windowState = { startedAt: now, used: 0 };
+    likeWindows.set(key, windowState);
+  }
+  const count = Math.min(requested, 20, LIKES_PER_WINDOW - windowState.used);
+  if (likeWindows.size > 50_000) {
+    for (const [k, v] of likeWindows) if (now - v.startedAt > LIKE_WINDOW_MS) likeWindows.delete(k);
+  }
+
+  const [stream] = await db.execute(sql`
+    SELECT seller_id, status, like_count FROM live_streams WHERE id = ${req.params.id}::uuid
+  `).then((r) => r.rows as Array<{ seller_id: string; status: string; like_count: number }>);
+  if (!stream) return res.status(404).json({ error: "Stream not found" });
+  if (stream.status !== "live") return res.status(410).json({ error: "This live has ended." });
+  if (count <= 0) return res.json({ likeCount: stream.like_count, accepted: 0 });
+  windowState.used += count;
+
+  const [row] = await db.execute(sql`
+    UPDATE live_streams SET like_count = like_count + ${count}
+    WHERE id = ${req.params.id}::uuid AND status = 'live'
+    RETURNING like_count
+  `).then((r) => r.rows as Array<{ like_count: number }>);
+  const likeCount = row?.like_count ?? stream.like_count;
+  broadcastToRoom(String(req.params.id), { type: "likes", likeCount, userId, added: count });
+  return res.json({ likeCount, accepted: count });
 });
 
 // ─── GET /api/live/:id/comments ───────────────────────────────────────────────
