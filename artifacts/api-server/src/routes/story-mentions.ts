@@ -14,6 +14,7 @@
 import { Router } from "express";
 import {
   db, users, follows, stories, storyMentions, storyLikes, storyViews,
+  conversations, conversationParticipants, messages,
 } from "@workspace/db";
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql, notInArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -22,6 +23,9 @@ import { blockRelation, blockedUserIds, profilesById, publishingRestriction } fr
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { storyListedFor } from "../lib/storyVisibility";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
+import { moderateMessage } from "../lib/contentModerator";
+import { publishNotification } from "./notifications-feed";
+import { actorFieldsFromProfile } from "../lib/activityEvents";
 
 /** Brand palette is black/white/silver: every avatar without a photo is a white monogram on this. */
 const MONOGRAM_COLOR = "#1C1C1E";
@@ -264,6 +268,108 @@ router.post("/stories/:id/mention-reply", rateLimit("messaging"), async (req, re
     route: result.conversation.isRequest ? "requests" : "inbox",
     isRequest: result.conversation.isRequest,
     requestedBy: result.conversation.requestedBy ?? null,
+  });
+});
+
+// ─── POST /api/social/stories/:id/reply ──────────────────────────────────────
+// Reply to anyone's story (Instagram's "Send message" bar / quick reactions):
+// one call that enforces the author's reply settings, routes the thread to
+// their Inbox or Requests (same rule as every DM — lib/conversationRouting),
+// sends the message with the replied-to slide attached, and notifies the
+// author as "replied to your story" (not a generic "New message").
+// Previously the client created a buyer_to_buyer conversation (even with a
+// seller) and sent a plain message — "Replies off" was only a UI label.
+router.post("/stories/:id/reply", rateLimit("messaging"), async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const text = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, 2000) : "";
+  const slideUri = typeof req.body?.slideUri === "string" ? req.body.slideUri.slice(0, 2048) : undefined;
+  if (!text) { res.status(400).json({ error: "text required" }); return; }
+  const moderation = moderateMessage(text);
+  if (moderation.blocked) {
+    res.status(422).json({ error: moderation.reason ?? "Message was flagged by safety filters.", code: "MODERATED" }); return;
+  }
+  const restriction = await publishingRestriction(myId);
+  if (restriction) { res.status(restriction.status).json(restriction.body); return; }
+
+  const [story] = await db.select().from(stories).where(eq(stories.id, String(req.params.id))).limit(1);
+  if (!story || !isLive(story)) { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
+  if (story.authorId === myId) { res.status(400).json({ error: "You can't reply to your own story" }); return; }
+
+  const relation = await blockRelation(myId, story.authorId);
+  if (relation === "blocked_by_me") { res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" }); return; }
+  if (relation !== "none") { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
+
+  // The author's reply settings, enforced here (not just a UI label).
+  const perm = (story.privacyReplyPerm ?? "everyone").toLowerCase();
+  if (story.repliesDisabled || perm === "off" || perm === "none" || perm === "no_one") {
+    res.status(403).json({ error: "Replies are turned off for this story.", code: "REPLIES_DISABLED" }); return;
+  }
+  if (perm === "following" || perm === "people_you_follow" || perm === "followers") {
+    const [authorFollowsMe] = await db.select({ f: follows.followerId }).from(follows)
+      .where(and(eq(follows.followerId, story.authorId), eq(follows.followingId, myId))).limit(1);
+    if (!authorFollowsMe) {
+      res.status(403).json({ error: "Only people this account follows can reply.", code: "REPLIES_LIMITED" }); return;
+    }
+  }
+
+  const result = await ensureStoryReplyConversation(myId, story.authorId);
+  if (!result) { res.status(404).json({ error: "Account not found" }); return; }
+  const conv = result.conversation;
+  // Same request gate as POST /conversations/:id/messages: the recipient of a
+  // pending request from this author must accept it before replying.
+  if (conv.isRequest && conv.requestedBy && conv.requestedBy !== myId) {
+    res.status(403).json({ error: "Accept this request before replying.", code: "REQUEST_NOT_ACCEPTED" }); return;
+  }
+
+  const [sender] = await db.select().from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, conv.id), eq(conversationParticipants.userId, myId))).limit(1);
+  const attachment = { type: "story_reply", uri: slideUri, title: "Replied to your story", meta: { storyId: story.id } };
+  const now = new Date();
+  const [msg] = await db.insert(messages).values({
+    conversationId: conv.id,
+    senderId: myId,
+    senderName: sender?.name ?? "",
+    senderInitials: sender?.initials ?? "",
+    senderColor: sender?.color ?? MONOGRAM_COLOR,
+    body: text,
+    attachment,
+    attachments: [attachment],
+    status: "sent",
+    deliveredAt: now,
+  }).returning();
+  await Promise.all([
+    db.update(conversations).set({ lastMessage: text.slice(0, 100), lastMessageAt: now, updatedAt: now })
+      .where(eq(conversations.id, conv.id)),
+    db.update(conversationParticipants).set({ unreadCount: sql`unread_count + 1` })
+      .where(and(eq(conversationParticipants.conversationId, conv.id), ne(conversationParticipants.userId, myId))),
+  ]);
+
+  // One notification, the specific one. A muted conversation stays silent.
+  void (async () => {
+    try {
+      const [authorPart] = await db.select({ mutedUntil: conversationParticipants.mutedUntil }).from(conversationParticipants)
+        .where(and(eq(conversationParticipants.conversationId, conv.id), eq(conversationParticipants.userId, story.authorId))).limit(1);
+      if (authorPart?.mutedUntil && authorPart.mutedUntil.getTime() > Date.now()) return;
+      const actor = (await profilesById([myId])).get(myId);
+      if (!actor || actor.deleted || actor.suspended) return;
+      await publishNotification({
+        userId: story.authorId,
+        category: "messages",
+        type: "story_reply",
+        title: `${actorFieldsFromProfile(actor).actorName} replied to your story`,
+        body: text.slice(0, 100),
+        ...actorFieldsFromProfile(actor),
+        targetId: conv.id,
+        targetType: "conversation",
+        targetImageUrl: slideUri ?? null,
+      });
+    } catch { /* non-critical */ }
+  })();
+
+  res.status(201).json({
+    conversationId: conv.id,
+    messageId: msg.id,
+    isRequest: conv.isRequest,
   });
 });
 

@@ -21,7 +21,7 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
-import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { notifyCaptionMentions, notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { hidePostFromForYou, recordPostSignal } from "../lib/ranking/signals";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -863,6 +863,12 @@ router.post("/", requireAuth, async (req, res) => {
         taggedProducts.push(...sellerProds);
       }
     }
+  }
+
+  // "@handle" in the caption reaches the people mentioned (published + visible only;
+  // a held caption notifies nobody until a moderator approves it).
+  if (postStatus === "published" && !postHeld) {
+    void notifyCaptionMentions({ postId: post.id, authorId: clerkId, caption: post.caption });
   }
 
   return res.status(201).json({

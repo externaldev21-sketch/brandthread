@@ -399,9 +399,15 @@ export async function publishNotification(n: {
       if (participant?.mutedUntil && participant.mutedUntil.getTime() > Date.now()) return;
     }
 
+    // App-icon badge = the same unread count the bell shows, so the icon
+    // never lags the in-app badge (pushes used to carry no badge at all).
+    const [unread] = await db.select({ count: sql<number>`cast(count(*) as int)` })
+      .from(notificationsFeed)
+      .where(and(eq(notificationsFeed.userId, n.userId), eq(notificationsFeed.isRead, false), eq(notificationsFeed.isMuted, false)));
     await sendPushToUser(n.userId, {
       title: n.title,
       body: n.body ?? "",
+      badge: Number(unread?.count ?? 0),
       data: {
         notificationId: notification.id,
         type: n.type,

@@ -55,6 +55,12 @@ router.post("/events", async (req, res) => {
     eventType,
     occurredAt,
   });
+  // Opening a push is reading it: its Activity row stops counting as unread
+  // (badges, bell). It used to stay unread after the tap took you there.
+  if ((eventType === "open" || eventType === "tap") && ownedFeed.length > 0) {
+    await db.update(notificationsFeed).set({ isRead: true })
+      .where(and(eq(notificationsFeed.id, notificationId), eq(notificationsFeed.userId, userId), eq(notificationsFeed.isRead, false)));
+  }
   return res.json({ ok: true, recorded: inserted });
 });
 

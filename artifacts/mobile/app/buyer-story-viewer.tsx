@@ -30,7 +30,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import {
-  getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
+  getStories, subscribeSocial, muteUser,
   MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import {
@@ -49,6 +49,7 @@ import {
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
+import { apiErrorMessage } from '@/lib/safety';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -201,15 +202,23 @@ export default function BuyerStoryViewer() {
 
   useEffect(() => {
     loadStories();
-    if (storyId) {
-      trackStoryView(storyId).catch(() => {});
-      // Also record view server-side (fire-and-forget)
-      api.social.viewStory(storyId).catch(() => {});
-    }
     if (myUserId) {
       shouldShowStoryGestureGuide(myUserId).then(show => { if (show) setShowGestureGuide(true); });
     }
   }, []);
+
+  // One view per story actually shown — every story in the tray as the
+  // viewer taps/swipes through, not just the one that opened the viewer
+  // (that undercounted every author after the first). Never your own story.
+  const recordedViewsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const id = currentStory?.id;
+    if (!id || !myUserId || currentStory?.authorId === myUserId || currentStory?.authorId === 'me') return;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    if (recordedViewsRef.current.has(id)) return;
+    recordedViewsRef.current.add(id);
+    api.social.viewStory(id).catch(() => { recordedViewsRef.current.delete(id); });
+  }, [api, currentStory?.id, currentStory?.authorId, myUserId]);
 
   // Seed like state from server story data
   useEffect(() => {
@@ -313,23 +322,16 @@ export default function BuyerStoryViewer() {
         });
         touchPreviewConversation(conv.id, attachment.title as string, ts);
       } else {
-        const conv = await createOrGetConversation({
-          type: 'buyer_to_buyer',
-          participant: {
-            userId: currentStory.authorId,
-            name: currentStory.authorName,
-            handle: currentStory.authorHandle,
-            initials: currentStory.authorInitials,
-            color: currentStory.authorColor,
-            accountType: 'buyer',
-          },
-        });
-        await sendMessage(conv.id, text, attachment);
+        // One server call: enforces the author's reply settings, routes to
+        // their Inbox or Requests (buyer or seller), attaches the slide and
+        // notifies them as "replied to your story".
+        await api.social.replyToStory(currentStory.id, { text, slideUri: currentSlide?.imageUri });
       }
       if (!override) setInputText('');
       hapticSuccessAction();
-    } catch {
-      Alert.alert('Couldn’t send reply', 'Try again.');
+    } catch (error) {
+      // e.g. "Replies are turned off for this story." from the server.
+      Alert.alert('Couldn’t send reply', apiErrorMessage(error, 'Try again.'));
     } finally {
       setSendingReply(false);
     }

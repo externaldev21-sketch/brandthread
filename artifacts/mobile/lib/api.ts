@@ -2351,6 +2351,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Record a story view */
       viewStory: (storyId: string) =>
         post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {}),
+      /** Reply to a story (author's reply settings enforced server-side). */
+      replyToStory: (storyId: string, body: { text: string; slideUri?: string }) =>
+        post<{ conversationId: string; messageId: string; isRequest: boolean }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/reply`, body,
+        ),
       /** Block a user — removes mutual follows, prevents messaging/following */
       block: (userId: string) =>
         post<{ ok: boolean }>('/api/social/block', { userId }),
