@@ -14,6 +14,7 @@ export function DiscoverBrandCard({ brand }: { brand: BrandCardData }) {
       subline={brand.followersLabel}
       fallbackIcon="shopping-bag"
       onPress={() => router.push(`/seller-profile?id=${encodeURIComponent(brand.id)}&src=feed` as never)}
+      followInitial={{ isFollowing: !!brand.isFollowing, isFollowedBy: false, isMutual: false }}
     />
   );
 }

@@ -17,6 +17,16 @@ import { db, products, productVariants, orders, posts, storefronts } from "@work
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { buildSellerSnapshot, type SellerSnapshot } from "../lib/sellerSnapshot";
 import { helpDocsForPrompt, matchHelpDocs, type HelpDoc } from "../lib/aiHelpDocs";
+import {
+  applyConfirmationPolicy,
+  dataSourcePromptNote,
+  mergeStricter,
+  redactSnapshotForAi,
+  sanitizeScreenContext,
+  suggestionCategoryAllowed,
+  type AiAssistantSettings,
+} from "../lib/aiSettings";
+import { loadAiSettings, loadAiSettingsForEnforcement, saveAiSettings } from "../lib/aiSettingsStore";
 import type { Logger } from "pino";
 
 const router = Router();
@@ -32,9 +42,16 @@ const CHAT_MODEL           = "gpt-5.4-mini";
 
 function buildSystemPrompt(
   snapshot: SellerSnapshot,
-  context: Record<string, unknown>,
-  brandMemory?: Record<string, string>,
+  rawContext: Record<string, unknown>,
+  rawBrandMemory: Record<string, string> | undefined,
+  settings: AiAssistantSettings,
 ): string {
+  // Seller AI Settings are enforced here, before anything reaches the model:
+  // disabled data sources are removed from the snapshot and screen context,
+  // and brand memory is dropped when Brand Memory is off.
+  const context = sanitizeScreenContext(rawContext, settings);
+  const brandMemory = settings.brandMemoryEnabled ? rawBrandMemory : undefined;
+  const visibleSnapshot = redactSnapshotForAi(snapshot, settings);
   const screen = (context?.screen as string) ?? "general";
 
   const screenContext: Record<string, string> = {
@@ -54,14 +71,17 @@ function buildSystemPrompt(
     settings:         "The seller is in Settings.",
   };
 
-  const screenNote = screenContext[screen] ?? "The seller is using Brandthread.";
+  const screenNote = context.restricted
+    ? "The seller is on a screen whose data they have turned off for AI in AI Settings."
+    : screenContext[screen] ?? "The seller is using Brandthread.";
+  const dataSourceNote = dataSourcePromptNote(settings);
 
   const brandSection = brandMemory && Object.keys(brandMemory).length > 0
     ? `\n\nBrand memory (personalise advice accordingly):\n${Object.entries(brandMemory).map(([k, v]) => `- ${k}: ${v}`).join("\n")}`
     : "";
 
   // Compact JSON snapshot — null values are preserved to signal unavailability
-  const snapshotJson = JSON.stringify(snapshot, null, 0);
+  const snapshotJson = JSON.stringify(visibleSnapshot, null, 0);
 
   return [
     "You are Brandthread AI — an intelligent business assistant embedded in the Brandthread seller platform.",
@@ -78,6 +98,7 @@ function buildSystemPrompt(
     "8. Revenue figures in the snapshot are gross paid order totals only — always note this when discussing revenue.",
     "",
     `Current screen context: ${screenNote}${brandSection}`,
+    ...(dataSourceNote ? ["", dataSourceNote] : []),
     "",
     `Verified account snapshot (snapshotAt: ${snapshot.snapshotAt}):`,
     "```json",
@@ -140,6 +161,45 @@ function validateAndSanitizeMessages(
   return { messages: safe.slice(-MAX_MESSAGES) };
 }
 
+// ─── AI Settings enforcement ──────────────────────────────────────────────────
+
+/** Body returned when the seller has turned the assistant off in AI Settings. */
+export const AI_DISABLED_RESPONSE = {
+  error: "Brandthread AI is turned off in AI Settings.",
+  code: "AI_DISABLED",
+} as const;
+
+/**
+ * The settings that govern this request: the account's stored settings,
+ * tightened (never loosened) by any `aiSettings` the client sent along —
+ * that covers a toggle flipped offline that has not synced yet.
+ */
+async function resolveRequestSettings(userId: string, requested: unknown): Promise<AiAssistantSettings> {
+  return mergeStricter(await loadAiSettingsForEnforcement(userId), requested);
+}
+
+/**
+ * Assistant (AI Brain) requests always carry a screen `context`; one-off
+ * copy tools elsewhere in the app (store policies, brand story rewrite) call
+ * /chat without one. "Enable AI assistant" governs the assistant only, while
+ * data-source and brand-memory rules apply to every request.
+ */
+function isAssistantRequest(context: unknown): boolean {
+  return typeof context === "object" && context !== null;
+}
+
+function parseActionCard(raw: string, settings: AiAssistantSettings): Record<string, unknown> | undefined {
+  const cardMatch = raw.match(/```json:action\n([\s\S]*?)\n```/);
+  if (!cardMatch) return undefined;
+  try {
+    const parsed = JSON.parse(cardMatch[1]) as Record<string, unknown>;
+    if (typeof parsed !== "object" || parsed === null) return undefined;
+    return applyConfirmationPolicy(parsed, settings);
+  } catch {
+    return undefined; // ignore malformed action
+  }
+}
+
 // ─── POST /api/ai/chat ─────────────────────────────────────────────────────────
 
 router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -150,11 +210,12 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
   const reqId = (req as Request & { id?: string }).id ?? "unknown";
   log?.info({ reqId, userId: "[redacted]", route: "POST /api/ai/chat" }, "ai.chat.start");
 
-  const { messages: rawMessages, context, brandMemory, maxTokens } = req.body as {
+  const { messages: rawMessages, context, brandMemory, maxTokens, aiSettings } = req.body as {
     messages?: unknown;
     context?: Record<string, unknown>;
     brandMemory?: Record<string, string>;
     maxTokens?: number;
+    aiSettings?: unknown;
   };
 
   // Validate messages before any expensive operations
@@ -164,6 +225,12 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
     return;
   }
   const safeMessages = validation.messages!;
+
+  const settings = await resolveRequestSettings(userId, aiSettings);
+  if (isAssistantRequest(context) && !settings.enabled) {
+    res.status(403).json(AI_DISABLED_RESPONSE);
+    return;
+  }
 
   // Build a fresh, permission-scoped snapshot from the verified user identity.
   // This is the only source of account data — client-provided IDs are ignored.
@@ -193,7 +260,7 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
     };
   }
 
-  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory);
+  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory, settings);
 
   try {
     const completion = await openai.chat.completions.create({
@@ -204,14 +271,9 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
 
     const raw = completion.choices[0]?.message?.content ?? "";
 
-    // Extract optional structured action card
-    const cardMatch = raw.match(/```json:action\n([\s\S]*?)\n```/);
-    let actionCard: Record<string, unknown> | undefined;
-    if (cardMatch) {
-      try {
-        actionCard = JSON.parse(cardMatch[1]) as Record<string, unknown>;
-      } catch { /* ignore malformed action */ }
-    }
+    // Extract optional structured action card; its confirmation requirement
+    // comes from the seller's confirm-before-action settings.
+    const actionCard = parseActionCard(raw, settings);
 
     const content = raw.replace(/```json:action\n[\s\S]*?\n```/g, "").trim();
 
@@ -255,11 +317,12 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
   const log = (req as Request & { log?: Logger }).log;
   const reqId = (req as Request & { id?: string }).id ?? "unknown";
 
-  const { messages: rawMessages, context, brandMemory, maxTokens } = req.body as {
+  const { messages: rawMessages, context, brandMemory, maxTokens, aiSettings } = req.body as {
     messages?: unknown;
     context?: Record<string, unknown>;
     brandMemory?: Record<string, string>;
     maxTokens?: number;
+    aiSettings?: unknown;
   };
 
   const validation = validateAndSanitizeMessages(rawMessages);
@@ -268,6 +331,12 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
   const safeMessages = validation.messages!;
+
+  const settings = await resolveRequestSettings(userId, aiSettings);
+  if (isAssistantRequest(context) && !settings.enabled) {
+    res.status(403).json(AI_DISABLED_RESPONSE);
+    return;
+  }
   const lastUserMessage = [...safeMessages].reverse().find(m => m.role === "user")?.content ?? "";
   const sources: HelpDoc[] = matchHelpDocs(lastUserMessage);
 
@@ -280,7 +349,7 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
     return;
   }
 
-  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory);
+  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory, settings);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -309,11 +378,7 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
     }
 
     if (!closed) {
-      const cardMatch = full.match(/```json:action\n([\s\S]*?)\n```/);
-      let actionCard: Record<string, unknown> | undefined;
-      if (cardMatch) {
-        try { actionCard = JSON.parse(cardMatch[1]) as Record<string, unknown>; } catch { /* ignore malformed action */ }
-      }
+      const actionCard = parseActionCard(full, settings);
       const content = full.replace(/```json:action\n[\s\S]*?\n```/g, "").trim();
       writeSse(res, {
         type: "done",
@@ -344,9 +409,17 @@ router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Pr
 router.post("/brand-memory/rebuild", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const ownerId: string = (req as any).clerkUserId as string;
 
-  // Gather context from DB in parallel
+  const settings = await loadAiSettingsForEnforcement(ownerId);
+  if (!settings.enabled) {
+    res.status(403).json(AI_DISABLED_RESPONSE);
+    return;
+  }
+  const ds = settings.dataSources;
+
+  // Gather context from DB in parallel — only from data sources the seller
+  // allows the AI to read.
   const [sellerProducts, sellerPosts, sellerStore] = await Promise.allSettled([
-    db.select({
+    !ds.products ? Promise.resolve([]) : db.select({
       name: products.name,
       description: products.description,
       priceCents: sql<number | null>`min(${productVariants.priceCents})`,
@@ -357,9 +430,9 @@ router.post("/brand-memory/rebuild", requireAuth, async (req: Request, res: Resp
       .where(eq(products.ownerId, ownerId))
       .groupBy(products.id)
       .limit(20),
-    db.select({ caption: posts.caption, mediaType: posts.mediaType, createdAt: posts.createdAt })
+    !ds.content ? Promise.resolve([]) : db.select({ caption: posts.caption, mediaType: posts.mediaType, createdAt: posts.createdAt })
       .from(posts).where(eq(posts.userId, ownerId)).orderBy(desc(posts.createdAt)).limit(15),
-    db.select({ title: storefronts.title, subtitle: storefronts.subtitle, description: storefronts.description, branding: storefronts.branding })
+    !ds.store ? Promise.resolve([]) : db.select({ title: storefronts.title, subtitle: storefronts.subtitle, description: storefronts.description, branding: storefronts.branding })
       .from(storefronts).where(eq(storefronts.ownerId, ownerId)).limit(1),
   ]);
 
@@ -373,10 +446,10 @@ router.post("/brand-memory/rebuild", requireAuth, async (req: Request, res: Resp
     storeData ? `Store: "${storeData.title ?? ""}" — ${storeData.subtitle ?? ""} — ${storeData.description ?? ""}` : "",
     productList.length > 0
       ? `Products (${productList.length}): ${productList.map(p => `${p.name} ($${((p.priceCents ?? 0) / 100).toFixed(0)}) — ${(p.description ?? "").slice(0, 80)}`).join("; ")}`
-      : "No products yet.",
+      : ds.products ? "No products yet." : "",
     postList.length > 0
       ? `Recent captions: ${postList.map(p => `"${(p.caption ?? "").slice(0, 100)}"`).join("; ")}`
-      : "No posts yet.",
+      : ds.content ? "No posts yet." : "",
     "",
     "Based on this data, fill in the following brand profile fields. For any field where there's insufficient data, make a reasonable inference. Respond ONLY with valid JSON:",
     '{"brandDescription":"","brandVoice":"","targetAudience":"","pricePosition":"","visualStyle":"","marketingTone":"","preferredWords":"","productCategories":""}',
@@ -409,9 +482,20 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
     actionLabel: string; actionRoute: string; category: string; priority: string;
   }> = [];
 
+  // Dashboard suggestions honour AI Settings server-side: nothing is computed
+  // when the assistant or suggestions are off, and each category is skipped
+  // when its data source is off.
+  const settings = await loadAiSettingsForEnforcement(ownerId);
+  if (!suggestionCategoryAllowed("inventory", settings)
+    && !suggestionCategoryAllowed("orders", settings)
+    && !suggestionCategoryAllowed("content", settings)) {
+    res.json({ suggestions: [] });
+    return;
+  }
+
   try {
     // ── Low inventory variants ───────────────────────────────────────────────
-    const lowStock = await db
+    const lowStock = !suggestionCategoryAllowed("inventory", settings) ? [] : await db
       .select({
         sku:               productVariants.sku,
         stock:             productVariants.stock,
@@ -439,14 +523,15 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
           : `Only ${v.stock} units remaining (threshold: ${v.lowStockThreshold ?? 5}). At current velocity, stock may deplete within days.`,
         expectedImpact: isOut ? "Prevents ongoing missed revenue from visitors" : `Reordering now prevents ~${(v.stock ?? 0) * 2} lost sales`,
         actionLabel:    "View inventory",
-        actionRoute:    "/inventory",
+        // Inventory lives in the Products tab (the old /inventory screen was removed).
+        actionRoute:    isOut ? "/(tabs)/products?filter=out-of-stock" : "/(tabs)/products?filter=low-stock",
         category:       "inventory",
         priority:       isOut ? "urgent" : "high",
       });
     }
 
     // ── Unfulfilled orders ───────────────────────────────────────────────────
-    const unfulfilledOrders = await db
+    const unfulfilledOrders = !suggestionCategoryAllowed("orders", settings) ? [] : await db
       .select({ id: orders.id, status: orders.status, createdAt: orders.createdAt })
       .from(orders)
       .where(and(
@@ -473,7 +558,8 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
     }
 
     // ── Underperforming posts ────────────────────────────────────────────────
-    const recentPosts = await db
+    const contentAllowed = suggestionCategoryAllowed("content", settings);
+    const recentPosts = !contentAllowed ? [] : await db
       .select({ id: posts.id, caption: posts.caption, createdAt: posts.createdAt })
       .from(posts)
       .where(eq(posts.userId, ownerId))
@@ -496,7 +582,7 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
     }
 
     // If seller has very few posts, suggest creating content
-    if (recentPosts.length === 0) {
+    if (contentAllowed && recentPosts.length === 0) {
       suggestions.push({
         id:             "sug_no_content",
         title:          "Start posting to grow your audience",
@@ -515,6 +601,34 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
   }
 
   res.json({ suggestions });
+});
+
+// ─── GET/PUT /api/ai/settings ─────────────────────────────────────────────────
+// Per-account AI Settings (migration 116) so the seller's choices follow them
+// across devices and are enforced by every route above.
+
+router.get("/settings", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId: string = (req as any).clerkUserId as string;
+  try {
+    res.json(await loadAiSettings(userId));
+  } catch {
+    res.status(503).json({ error: "Could not load AI settings." });
+  }
+});
+
+router.put("/settings", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId: string = (req as any).clerkUserId as string;
+  const body = req.body as { settings?: unknown } | undefined;
+  const raw = body?.settings;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    res.status(400).json({ error: "settings object is required." });
+    return;
+  }
+  try {
+    res.json(await saveAiSettings(userId, raw));
+  } catch {
+    res.status(503).json({ error: "Could not save AI settings." });
+  }
 });
 
 // ─── GET /api/seller/sessions ─────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import type { PaymentPath } from '@/lib/checkoutPayment';
 import { FONT, FS, SP } from '@/lib/theme';
 import { CheckoutSection, OptionRow, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import { CardEntry } from './StripePayment';
+import { useCheckoutT, type CheckoutT } from './CheckoutLanguage';
 
 export interface SavedCard {
   id: string;
@@ -46,10 +47,10 @@ function brandLabel(brand: string) {
   return brand.charAt(0).toUpperCase() + brand.slice(1);
 }
 
-function expiry(card: SavedCard): string {
+function expiry(card: SavedCard, t: CheckoutT): string {
   return card.expMonth && card.expYear
-    ? `Expires ${String(card.expMonth).padStart(2, '0')}/${String(card.expYear).slice(-2)}`
-    : 'Saved card';
+    ? t('Expires {date}', { date: `${String(card.expMonth).padStart(2, '0')}/${String(card.expYear).slice(-2)}` })
+    : t('Saved card');
 }
 
 // ─── Hosted / preview express button ─────────────────────────────────────────
@@ -104,10 +105,15 @@ function WalletMark({ kind }: { kind: WalletKind }) {
       </View>
     );
   }
+  return <ExpressMark />;
+}
+
+function ExpressMark() {
+  const t = useCheckoutT();
   return (
     <View style={walletStyles.walletMark}>
       <Feather name="zap" size={16} color={WALLET_FG} />
-      <Text style={walletStyles.walletLead}>Express checkout</Text>
+      <Text style={walletStyles.walletLead}>{t('Express checkout')}</Text>
     </View>
   );
 }
@@ -146,6 +152,7 @@ export function HostedExpressButton({
 export function ExpressSection({ children, visible }: { children: React.ReactNode; visible: boolean }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
+  const t = useCheckoutT();
   return (
     // Stays mounted while hidden: the in-app wallet button reports whether a
     // wallet is available only once it has mounted.
@@ -153,7 +160,7 @@ export function ExpressSection({ children, visible }: { children: React.ReactNod
       {children}
       <View style={styles.orRow}>
         <View style={styles.orLine} />
-        <Text style={styles.orText}>or</Text>
+        <Text style={styles.orText}>{t('or')}</Text>
         <View style={styles.orLine} />
       </View>
     </View>
@@ -175,16 +182,17 @@ export function PaymentSection({
 }) {
   const ck = useCheckoutColors();
   const styles = useMemo(() => makeStyles(ck), [ck]);
+  const t = useCheckoutT();
   if (path === 'preview') {
     return (
-      <CheckoutSection title="Payment" testID="checkout-payment">
+      <CheckoutSection title={t('Payment')} testID="checkout-payment">
         <View style={styles.noteRow} testID="checkout-preview-note">
           <Feather name="info" size={14} color={ck.muted} style={styles.noteIcon} />
           {/* No mention of "preview"/"demo" here — the dev/demo preview
               bypass must have zero user-visible tells (Dev's explicit
               request). The underlying `path === 'preview'` code path stays;
               only the copy shown for it changed. */}
-          <Text style={styles.note}>This order won’t be charged.</Text>
+          <Text style={styles.note}>{t('This order won’t be charged.')}</Text>
         </View>
       </CheckoutSection>
     );
@@ -192,12 +200,12 @@ export function PaymentSection({
 
   if (path === 'hosted') {
     return (
-      <CheckoutSection title="Payment" testID="checkout-payment">
+      <CheckoutSection title={t('Payment')} testID="checkout-payment">
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}><Feather name="credit-card" size={16} color={ck.text} /></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Card, Apple Pay or Google Pay</Text>
-            <Text style={styles.cardSub}>Entered on Stripe’s secure page after you tap Pay</Text>
+            <Text style={styles.cardTitle}>{t('Card, Apple Pay or Google Pay')}</Text>
+            <Text style={styles.cardSub}>{t('Entered on Stripe’s secure page after you tap Pay')}</Text>
           </View>
         </View>
         <SecureLine sellerCount={sellerCount} hosted ck={ck} styles={styles} />
@@ -207,7 +215,7 @@ export function PaymentSection({
 
   const showNewCard = savedCards.length === 0 || selectedCard === NEW_CARD;
   return (
-    <CheckoutSection title="Payment" testID="checkout-payment">
+    <CheckoutSection title={t('Payment')} testID="checkout-payment">
       {savedCards.length > 0 ? (
         <View accessibilityRole="radiogroup">
           {savedCards.map(card => (
@@ -216,14 +224,14 @@ export function PaymentSection({
               selected={selectedCard === card.id}
               onPress={() => onSelectCard(card.id)}
               title={`${brandLabel(card.brand)} •••• ${card.last4}`}
-              lines={[`${card.isDefault ? 'Default · ' : ''}${expiry(card)}`]}
+              lines={[`${card.isDefault ? `${t('Default')} · ` : ''}${expiry(card, t)}`]}
               testID={`checkout-saved-card-${card.id}`}
             />
           ))}
           <OptionRow
             selected={selectedCard === NEW_CARD}
             onPress={() => onSelectCard(NEW_CARD)}
-            title="Use a new card"
+            title={t('Use a new card')}
             last={selectedCard !== NEW_CARD}
             testID="checkout-new-card"
           />
@@ -242,15 +250,16 @@ export function PaymentSection({
 function SecureLine({ sellerCount, hosted, ck, styles }: {
   sellerCount: number; hosted?: boolean; ck: CheckoutColors; styles: ReturnType<typeof makeStyles>;
 }) {
+  const t = useCheckoutT();
   return (
     <View style={styles.secure}>
       <Feather name="lock" size={13} color={ck.muted} style={styles.noteIcon} />
       <Text style={styles.secureText}>
         {hosted && sellerCount > 1
-          ? `Secured by Stripe. Items from ${sellerCount} sellers are paid in ${sellerCount} separate secure payments.`
+          ? t('Secured by Stripe. Items from {count} sellers are paid in {count} separate secure payments.', { count: sellerCount })
           : sellerCount > 1
-            ? `Secured by Stripe. One payment covers all ${sellerCount} sellers. Brandthread never sees your card number.`
-            : 'Secured by Stripe. Brandthread never sees or stores your card number.'}
+            ? t('Secured by Stripe. One payment covers all {count} sellers. Brandthread never sees your card number.', { count: sellerCount })
+            : t('Secured by Stripe. Brandthread never sees or stores your card number.')}
       </Text>
     </View>
   );

@@ -4,10 +4,9 @@
  * two lines of text. Tapping it calls back (per the product requirement),
  * with a light haptic on press.
  *
- * PR1 note: the log this reads (`useCallLog`, lib/calls/CallSessionContext.tsx)
- * is in-memory only — it shows calls placed/received in the current app
- * session and is not persisted to a backend yet. See CallSessionContext's own
- * doc comment; PR2 adds real persistence with no change expected here.
+ * The log this reads (`useCallLog`, lib/calls/CallSessionContext.tsx) comes
+ * from the server's call records, so both participants see the same entries
+ * (missed, declined, durations) on every device.
  *
  * Monochrome hard rule: no color-only signal — a missed call is distinguished
  * by bold title text and a dedicated icon (not just a red tint).

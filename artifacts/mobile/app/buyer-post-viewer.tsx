@@ -36,6 +36,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { TranslatableCaption } from '@/components/translation/CaptionTranslation';
 
 function PostVideo({ uri, onWatched }: { uri: string; onWatched?: () => void }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -272,7 +273,7 @@ export default function BuyerPostViewer() {
 
         {/* Caption */}
         {caption ? (
-          <Text style={s.caption}>{caption}</Text>
+          <TranslatableCaption text={caption} style={s.caption} linkStyle={s.translationLink} />
         ) : null}
 
         {/* Timestamp */}
@@ -443,6 +444,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM },
   editBtnText: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE },
   caption: { paddingHorizontal: SP.md, paddingTop: SP.sm, fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 22 },
+  translationLink: { paddingHorizontal: SP.md, color: MUTED },
   timestamp: { paddingHorizontal: SP.md, paddingTop: SP.xs, fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   engagementBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
   engageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: SP.xs },

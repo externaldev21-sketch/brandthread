@@ -25,7 +25,8 @@ import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { StockEditorSheet } from '@/components/products/StockEditorSheet';
-import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
+import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct, summarizeProducts } from '@/services/productService';
+import { localPreviewSaves } from '@/lib/sellerProductPreview';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { FormInput } from '@/components/BrandthreadUI';
@@ -425,7 +426,12 @@ export default function ProductsScreen() {
 
   const loadStats = useCallback(async () => {
     if (previewOnly || previewOnlyRef.current) {
-      setStats(EMPTY_STATS);
+      // Signed-out preview: counts for the products saved on this device only.
+      try {
+        setStats(summarizeProducts(localPreviewSaves(await getProducts())));
+      } catch {
+        setStats(EMPTY_STATS);
+      }
       return;
     }
     try {
@@ -454,21 +460,15 @@ export default function ProductsScreen() {
   }, [searchQuery]);
 
   const loadProducts = useCallback(async () => {
-    if (previewOnly || previewOnlyRef.current) {
-      setProducts([]);
-      setStats(EMPTY_STATS);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       const result = await getProducts({ filter, text: debouncedQuery || undefined });
-      if (previewOnlyRef.current) {
-        setProducts([]);
-        setStats(EMPTY_STATS);
-        return;
-      }
-      setProducts(Array.isArray(result) ? result : []);
+      const list = Array.isArray(result) ? result : [];
+      // Signed-out preview (no account): list exactly what the seller saved
+      // on this device (Add product's local save) — never the seeded demo
+      // catalog, never another account's data (the product store is scoped
+      // to the signed-out 'anon' slot here).
+      setProducts(previewOnly || previewOnlyRef.current ? localPreviewSaves(list) : list);
       await loadStats();
     } catch {
       setProducts([]);
@@ -569,10 +569,6 @@ export default function ProductsScreen() {
   }
 
   async function handleRefresh() {
-    if (previewOnly) {
-      setProducts([]);
-      return;
-    }
     setRefreshing(true);
     try {
       await loadProducts();
@@ -599,7 +595,6 @@ export default function ProductsScreen() {
 
   // Sorted products
   const sortedProducts = useMemo(() => {
-    if (previewOnly) return [];
     const arr = [...products];
     switch (sort) {
       case 'name': return arr.sort((a, b) => a.name.localeCompare(b.name));
@@ -610,7 +605,7 @@ export default function ProductsScreen() {
       case 'newest':
       default: return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
-  }, [products, sort, previewOnly]);
+  }, [products, sort]);
 
   // Status filter pills
   const filterPills: { label: string; value: ProductFilter }[] = [
@@ -625,13 +620,11 @@ export default function ProductsScreen() {
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
   const hasActiveFilter = filter !== 'all';
 
+  // Product detail reads the same device product store, so a signed-out
+  // preview's saved product opens there too.
   const openProduct = useCallback((product: Product) => {
-    if (previewOnly) {
-      showPreviewOnlyFeedback();
-      return;
-    }
     router.push(('/product-detail?id=' + product.id) as never);
-  }, [router, previewOnly, showPreviewOnlyFeedback]);
+  }, [router]);
 
   const openActionSheet = useCallback((product: Product) => {
     if (previewOnly) {

@@ -12,6 +12,9 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
+import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
@@ -21,7 +24,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 
-import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
+import { initProductService, getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
 import { useApi } from '@/lib/api';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
@@ -81,12 +84,18 @@ export default function ProductDetailScreen() {
   const tabScrollRef = useRef<ScrollView>(null);
 
   const loadProduct = useCallback(async () => {
-    if (!id || !userId) {
+    // Signed-out seller preview has no userId but still has a (local)
+    // product store — e.g. a product it just saved from Add product.
+    if (!id || (!userId && !isSellerDevPreview())) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
+      // A cold deep link can render this before the app has pointed the
+      // product store at the signed-in account; doing it here (idempotent)
+      // keeps the read from landing on the signed-out store.
+      if (userId) initProductService(userId);
       const p = await getProduct(id);
       setProduct(p ?? null);
       setLoadError(false);
@@ -1187,6 +1196,12 @@ function StoreTab({
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const st = React.useMemo(() => makeStStyles(theme), [theme]);
+  const { userId: viewerId } = useAuth();
+  // Every one of the seller's products can be previewed: a live one opens
+  // its public page, a draft / archived one is served to its owner only
+  // (flagged previewOnly, not buyable), and one stored only on this device
+  // (signed-out preview, seeded demo) is built from the local product store.
+  const previewAsBuyerRoute = previewAsBuyerHref(id, { signedIn: !!viewerId && !isPreviewSellerProductId(id) });
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
@@ -1295,25 +1310,16 @@ function StoreTab({
             </GradientCard>
           )}
 
-          {/* CTA buttons — this is a seller preview of the buyer-facing store page,
-              so these don't actually add to a bag or check out here. */}
+          {/* QA-1344: no dead Add to Cart / Buy Now here — open the real buyer
+              product page for this product instead (see previewAsBuyerRoute). */}
           <View style={st.ctaRow}>
             <SecondaryButton
-              label="Add to Cart"
-              icon="shopping-cart"
-              onPress={() => {}}
-              disabled
-              style={{ flex: 1 }}
-            />
-            <PrimaryButton
-              label="Buy Now"
-              icon="zap"
-              onPress={() => {}}
-              disabled
+              label="Preview as buyer"
+              icon="eye"
+              onPress={() => router.push(previewAsBuyerRoute as never)}
               style={{ flex: 1 }}
             />
           </View>
-          <Text style={st.previewCaption}>Buttons are live on your store</Text>
 
           {/* Description accordion */}
           <PressableScale

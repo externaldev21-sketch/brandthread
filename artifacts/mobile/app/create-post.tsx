@@ -58,6 +58,7 @@ import { FADE_MS } from '@/constants/motion';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { MediaCropper } from '@/components/media/MediaCropper';
 import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
+import { remixClipToVideoClip, remixErrorMessage } from '@/lib/remix';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -464,7 +465,9 @@ export default function CreatePostScreen() {
   const insets   = useSafeAreaInsets();
   const router   = useRouter();
   const api      = useApi();
-  const params   = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string }>();
+  const params   = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; remixOf?: string }>();
+  // `?remixOf=<postId>` (share sheet "Remix"): the source video is preloaded as the clip.
+  const remixOf  = typeof params.remixOf === 'string' && params.remixOf ? params.remixOf : undefined;
   const isBuyer  = params.accountType === 'buyer';
   const editId   = typeof params.editId === 'string' ? params.editId : undefined;
   const isSellerSetup = isSellerSetupOrigin(params.from);
@@ -575,6 +578,28 @@ export default function CreatePostScreen() {
   }
 
   useEffect(() => { fetchTaggableProducts(); }, []);
+
+  // Remix: the server checks the author's "Allow remixes of videos" setting
+  // and copies the source video into a clip this account owns.
+  useEffect(() => {
+    if (!remixOf || editId) return;
+    let active = true;
+    api.remix.clip(remixOf)
+      .then((clip) => {
+        if (!active) return;
+        const first = remixClipToVideoClip(clip);
+        setVideoClips([first]); setTrimStart(0); setTrimEnd(first.duration); setScrubTime(0);
+        setPreviewSeekTime(0); setPreviewClipIndex(0); setComposedVideo(null);
+        setProcessingPhase('idle'); setProcessingError(null); setSlidePhotos([]);
+        setStep('video-edit');
+      })
+      .catch((error) => {
+        if (!active) return;
+        Alert.alert('Remix unavailable', remixErrorMessage(error) ?? "Couldn't load this video. Try again.");
+        leaveSetupDestination();
+      });
+    return () => { active = false; };
+  }, [remixOf, editId]);
 
   useEffect(() => {
     if (!editId) return;
@@ -905,6 +930,7 @@ export default function CreatePostScreen() {
       sound: selectedSound ?? undefined,
       visibility, isDraft,
       scheduledAt: isDraft || scheduleMode === 'now' ? null : scheduledAt,
+      remixOfPostId: !editId && contentType === 'video' ? remixOf : undefined,
     };
     let result: SellerThreadPost;
     if (editId) {

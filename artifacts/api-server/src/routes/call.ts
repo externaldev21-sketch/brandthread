@@ -8,15 +8,60 @@
  *   Body: { threadId: string, mode?: 'voice' | 'video', clientRenewalId: string }
  *   Returns: { appId, token, channelName, uid, mode, expiresAt }
  *
- * The channel name is deterministic (call_{conversationId}) so both
- * participants independently derive the same channel and join it.
+ * 1:1 DM calls with a real ringing/accept/decline/end lifecycle
+ * (table dm_calls, realtime over /ws/calls — see src/ws/callHub.ts):
+ *   POST /api/call/dm/calls                       { conversationId, mode } → 201 { call, rtc }
+ *   POST /api/call/dm/calls/:id/accept            → { call, rtc }
+ *   POST /api/call/dm/calls/:id/decline           → { call }
+ *   POST /api/call/dm/calls/:id/end               → { call }
+ *   POST /api/call/dm/calls/:id/token             → { rtc }
+ *   POST /api/call/dm/calls/:id/rating            { rating: 'good'|'not_good' } → { ok: true }
+ *   GET  /api/call/dm/calls/:id                   → { call }
+ *   GET  /api/call/dm/incoming                    → { call | null }
+ *   GET  /api/call/dm/conversations/:id/calls     → { calls }
+ *
+ * The legacy /token channel name is deterministic (call_{conversationId});
+ * DM calls use a per-call channel (dmcall_{callId without dashes}).
  */
-import { Router } from "express";
+import { randomUUID } from "node:crypto";
+import { Router, type Request, type Response } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db } from "@workspace/db";
 import { conversationParticipants, manufacturerActivityEvents, manufacturers, manufacturerThreads } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { publishNotification } from "./notifications-feed";
+import { logger } from "../lib/logger";
+import { isUniqueViolation } from "../lib/dbErrors";
+import { sendCallEvent } from "../ws/callHub";
+import {
+  LIVE_CALL_STATUSES,
+  RING_TIMEOUT_SECONDS,
+  channelNameForCall,
+  isAcceptedCallAbandoned,
+  isDmCallMode,
+  isRingExpired,
+  isTerminalCallStatus,
+  nextCallStatus,
+  roleOf,
+  serializeCall,
+  type DmCallPeerSource,
+  type DmCallRole,
+  type DmCallRow,
+  type DmCallStatus,
+} from "../lib/dmCalls";
+import {
+  getAvatarUrls,
+  getCall,
+  getCallParticipants,
+  getConversationForCall,
+  getLiveCallsForUser,
+  getRingingCallsForCallee,
+  insertCall,
+  isBlockedEitherWay,
+  listConversationCalls,
+  setCallQualityRating,
+  transitionCall,
+} from "../lib/dmCallsStore";
 
 const router = Router();
 router.use(requireAuth);
@@ -287,6 +332,341 @@ router.post("/token/renew", async (req, res) => {
       code: "CALL_TOKEN_RENEWAL_FAILED",
     });
   }
+});
+
+// ─── 1:1 DM calls (/api/call/dm/…) ─────────────────────────────────────────────
+//
+// A real call lifecycle: the caller creates a call (row in dm_calls, per-call
+// Agora channel), the callee is rung by push (Android "calls" channel, high
+// priority) and by the /ws/calls socket, and either side drives the
+// ringing → accepted → ended state machine (lib/dmCalls.ts). Every state
+// change is a conditional UPDATE, so two racing requests can't both win; the
+// loser gets 409 INVALID_CALL_STATE with the current call. Unanswered calls
+// become `missed` after RING_TIMEOUT_SECONDS — lazily on every read and by an
+// in-process timer set when the call is placed. Nothing is ever faked: with no
+// Agora credentials the create/accept/token endpoints answer 503.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function notConfigured(res: Response) {
+  return res.status(503).json({
+    error: "Calling is unavailable because secure call credentials are not configured",
+    code: "CALLING_NOT_CONFIGURED",
+  });
+}
+
+export type DmCallRtc = { appId: string; token: string; channelName: string; uid: number; expiresAt: string };
+
+function rtcFor(call: Pick<DmCallRow, "channelName">, userId: string): DmCallRtc {
+  const appId = process.env.AGORA_APP_ID?.trim() ?? "";
+  const appCert = process.env.AGORA_APP_CERTIFICATE?.trim() ?? "";
+  const uid = uidFromClerkId(userId);
+  const token = generateToken(appId, appCert, call.channelName, uid, 1 /* PUBLISHER */);
+  const expiresAt = new Date(Date.now() + CALL_TOKEN_TTL_SECONDS * 1000).toISOString();
+  return { appId, token, channelName: call.channelName, uid, expiresAt };
+}
+
+type CallView = { participants: DmCallPeerSource[]; avatars: Map<string, string | null> };
+
+async function loadCallView(conversationId: string, participants?: DmCallPeerSource[]): Promise<CallView> {
+  const ps = participants ?? await getCallParticipants(conversationId);
+  const avatars = await getAvatarUrls(ps.map((p) => p.userId));
+  return { participants: ps, avatars };
+}
+
+function emitCallEvent(type: "call.incoming" | "call.updated", call: DmCallRow, view: CallView, to: string[]) {
+  for (const userId of to) {
+    try {
+      sendCallEvent(userId, { type, call: serializeCall(call, userId, view.participants, view.avatars) });
+    } catch (err) {
+      logger.warn({ err, callId: call.id }, "DM call socket event failed");
+    }
+  }
+}
+
+async function publishMissedCall(call: DmCallRow, view: CallView): Promise<void> {
+  const caller = view.participants.find((p) => p.userId === call.callerId);
+  const callerName = caller?.name?.trim() || "Someone";
+  await publishNotification({
+    userId: call.calleeId,
+    category: "message",
+    type: "dm_call_missed",
+    title: call.mode === "video" ? "Missed video call" : "Missed voice call",
+    body: `You missed a call from ${callerName}`,
+    actorId: call.callerId,
+    actorName: callerName,
+    actorInitials: caller?.initials || undefined,
+    actorColor: caller?.color || undefined,
+    targetId: call.conversationId,
+    targetType: "conversation",
+    extraData: { callId: call.id, conversationId: call.conversationId, mode: call.mode },
+  });
+}
+
+/** Side effects of a transition this request won: realtime update to both, missed-call notice. */
+async function afterTransition(call: DmCallRow): Promise<void> {
+  try {
+    const view = await loadCallView(call.conversationId);
+    emitCallEvent("call.updated", call, view, [call.callerId, call.calleeId]);
+    if (call.status === "missed" || call.status === "cancelled") {
+      await publishMissedCall(call, view);
+    }
+  } catch (err) {
+    logger.error({ err, callId: call.id }, "DM call transition side effects failed");
+  }
+}
+
+/**
+ * Lazy timeouts: a ringing call past RING_TIMEOUT_SECONDS becomes `missed`; an
+ * accepted call abandoned by both clients for MAX_ACCEPTED_CALL_SECONDS is
+ * ended. Safe under races (conditional update; only the winner notifies).
+ */
+export async function expireCallIfStale(call: DmCallRow): Promise<DmCallRow> {
+  let updated: DmCallRow | undefined;
+  if (isRingExpired(call)) {
+    updated = await transitionCall(call.id, "ringing", "missed", null);
+  } else if (isAcceptedCallAbandoned(call)) {
+    updated = await transitionCall(call.id, "accepted", "ended", null, "timeout");
+  } else {
+    return call;
+  }
+  if (updated) {
+    await afterTransition(updated);
+    return updated;
+  }
+  return (await getCall(call.id)) ?? call;
+}
+
+function scheduleRingTimeout(callId: string): void {
+  const timer = setTimeout(() => {
+    void (async () => {
+      const call = await getCall(callId);
+      if (call?.status === "ringing") await expireCallIfStale(call);
+    })().catch((err) => logger.error({ err, callId }, "DM call ring timeout failed"));
+  }, RING_TIMEOUT_SECONDS * 1000 + 250);
+  timer.unref?.();
+}
+
+async function liveCallsFor(userId: string): Promise<DmCallRow[]> {
+  const rows = await getLiveCallsForUser(userId);
+  const fresh = await Promise.all(rows.map(expireCallIfStale));
+  return fresh.filter((c) => (LIVE_CALL_STATUSES as string[]).includes(c.status));
+}
+
+router.post("/dm/calls", async (req, res) => {
+  const callerId = (req as any).clerkUserId as string;
+  const { conversationId, mode } = req.body ?? {};
+  if (typeof conversationId !== "string" || !UUID_RE.test(conversationId)) {
+    return res.status(400).json({ error: "conversationId is required" });
+  }
+  if (!isDmCallMode(mode)) {
+    return res.status(400).json({ error: "mode must be voice or video" });
+  }
+
+  const conversation = await getConversationForCall(conversationId);
+  const participants = conversation && !conversation.deletedAt
+    ? await getCallParticipants(conversationId)
+    : [];
+  if (!participants.some((p) => p.userId === callerId)) {
+    return res.status(403).json({ error: "Not a participant in this conversation", code: "NOT_A_PARTICIPANT" });
+  }
+  const others = [...new Set(participants.map((p) => p.userId))].filter((id) => id !== callerId);
+  if (others.length !== 1) {
+    return res.status(403).json({ error: "Calls are only available in 1:1 conversations", code: "NOT_ONE_TO_ONE" });
+  }
+  const calleeId = others[0]!;
+  if (await isBlockedEitherWay(callerId, calleeId)) {
+    return res.status(403).json({ error: "You can't call this person", code: "BLOCKED" });
+  }
+  if (!isCallingConfigured()) return notConfigured(res);
+
+  if ((await liveCallsFor(calleeId)).length > 0) {
+    return res.status(409).json({ error: "They're on another call", code: "CALLEE_BUSY" });
+  }
+  const callerLive = await liveCallsFor(callerId);
+  if (callerLive.length > 0) {
+    const view = await loadCallView(callerLive[0]!.conversationId);
+    return res.status(409).json({
+      error: "You're already on a call",
+      code: "CALLER_BUSY",
+      call: serializeCall(callerLive[0]!, callerId, view.participants, view.avatars),
+    });
+  }
+
+  const id = randomUUID();
+  let call: DmCallRow;
+  try {
+    call = await insertCall({ id, conversationId, callerId, calleeId, mode, channelName: channelNameForCall(id) });
+  } catch (err) {
+    // dm_calls_one_live_per_conversation_idx: the other side called at the same instant.
+    if (isUniqueViolation(err)) {
+      return res.status(409).json({ error: "They're on another call", code: "CALLEE_BUSY" });
+    }
+    throw err;
+  }
+
+  const view = await loadCallView(conversationId, participants);
+  const rtc = rtcFor(call, callerId);
+  scheduleRingTimeout(call.id);
+  emitCallEvent("call.incoming", call, view, [calleeId]);
+
+  const caller = participants.find((p) => p.userId === callerId);
+  const callerName = caller?.name?.trim() || "Someone";
+  void publishNotification({
+    userId: calleeId,
+    category: "message",
+    type: "dm_call_incoming",
+    title: mode === "video" ? "Incoming video call" : "Incoming voice call",
+    body: `${callerName} is calling you`,
+    actorId: callerId,
+    actorName: callerName,
+    actorInitials: caller?.initials || undefined,
+    actorColor: caller?.color || undefined,
+    // Activity feed row opens the chat; the push itself carries the call.
+    targetId: conversationId,
+    targetType: "conversation",
+    pushCategory: "message",
+    pushChannelId: "calls",
+    pushSound: "default",
+    pushPriority: "high",
+    pushInterruptionLevel: "time-sensitive",
+    extraData: {
+      targetType: "dm_call",
+      targetId: call.id,
+      callId: call.id,
+      conversationId,
+      mode,
+      actorName: callerName,
+    },
+  }).catch((err) => req.log?.error?.({ err, callId: call.id }, "DM call incoming push failed"));
+
+  return res.status(201).json({ call: serializeCall(call, callerId, view.participants, view.avatars), rtc });
+});
+
+type LoadedCall = { call: DmCallRow; role: DmCallRole };
+
+/** Load a call the requester participates in (after lazy timeouts), or answer 404/403. */
+async function loadParticipantCall(req: Request, res: Response): Promise<LoadedCall | null> {
+  const userId = (req as any).clerkUserId as string;
+  const id = String(req.params.id ?? "");
+  const row = UUID_RE.test(id) ? await getCall(id) : undefined;
+  if (!row) {
+    res.status(404).json({ error: "Call not found", code: "CALL_NOT_FOUND" });
+    return null;
+  }
+  const role = roleOf(row, userId);
+  if (!role) {
+    res.status(403).json({ error: "Not a participant in this call", code: "NOT_A_PARTICIPANT" });
+    return null;
+  }
+  return { call: await expireCallIfStale(row), role };
+}
+
+async function respondCall(res: Response, status: number, call: DmCallRow, userId: string, extra: Record<string, unknown> = {}) {
+  const view = await loadCallView(call.conversationId);
+  return res.status(status).json({ ...extra, call: serializeCall(call, userId, view.participants, view.avatars) });
+}
+
+async function handleCallAction(req: Request, res: Response, action: "accept" | "decline" | "end") {
+  const userId = (req as any).clerkUserId as string;
+  const loaded = await loadParticipantCall(req, res);
+  if (!loaded) return;
+  let { call } = loaded;
+  const { role } = loaded;
+  const withRtc = action === "accept";
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const decision = nextCallStatus(action, role, call.status);
+    if (decision.kind === "forbidden") {
+      return res.status(403).json({ error: "Only the person being called can do that", code: "NOT_CALLEE" });
+    }
+    if (decision.kind === "invalid") {
+      return respondCall(res, 409, call, userId, { error: `Call is ${call.status}`, code: "INVALID_CALL_STATE" });
+    }
+    if (decision.kind === "idempotent") {
+      if (withRtc && !isCallingConfigured()) return notConfigured(res);
+      return respondCall(res, 200, call, userId, withRtc ? { rtc: rtcFor(call, userId) } : {});
+    }
+    if (withRtc && !isCallingConfigured()) return notConfigured(res);
+    const updated = await transitionCall(call.id, call.status as DmCallStatus, decision.next, userId);
+    if (updated) {
+      await afterTransition(updated);
+      return respondCall(res, 200, updated, userId, withRtc ? { rtc: rtcFor(updated, userId) } : {});
+    }
+    // Lost a race: re-read and decide again against the state that won.
+    const current = await getCall(call.id);
+    if (!current) return res.status(404).json({ error: "Call not found", code: "CALL_NOT_FOUND" });
+    call = current;
+  }
+  return respondCall(res, 409, call, userId, { error: `Call is ${call.status}`, code: "INVALID_CALL_STATE" });
+}
+
+router.post("/dm/calls/:id/accept", (req, res) => handleCallAction(req, res, "accept"));
+router.post("/dm/calls/:id/decline", (req, res) => handleCallAction(req, res, "decline"));
+router.post("/dm/calls/:id/end", (req, res) => handleCallAction(req, res, "end"));
+
+router.post("/dm/calls/:id/token", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const loaded = await loadParticipantCall(req, res);
+  if (!loaded) return;
+  const { call, role } = loaded;
+  const allowed = call.status === "accepted" || (call.status === "ringing" && role === "caller");
+  if (!allowed) {
+    return respondCall(res, 409, call, userId, { error: `Call is ${call.status}`, code: "INVALID_CALL_STATE" });
+  }
+  if (!isCallingConfigured()) return notConfigured(res);
+  return res.json({ rtc: rtcFor(call, userId) });
+});
+
+// Call-ended screen: "How was the quality of your call?" (Good / Not good).
+// Only for a call that was actually answered and is over; each side rates its
+// own column, and answering again overwrites.
+router.post("/dm/calls/:id/rating", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { rating } = req.body ?? {};
+  if (rating !== "good" && rating !== "not_good") {
+    return res.status(400).json({ error: "rating must be good or not_good" });
+  }
+  const loaded = await loadParticipantCall(req, res);
+  if (!loaded) return;
+  const { call, role } = loaded;
+  if (!isTerminalCallStatus(call.status) || !call.answeredAt) {
+    return respondCall(res, 409, call, userId, { error: `Call is ${call.status}`, code: "INVALID_CALL_STATE" });
+  }
+  await setCallQualityRating(call.id, role, rating);
+  return res.json({ ok: true });
+});
+
+router.get("/dm/calls/:id", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const loaded = await loadParticipantCall(req, res);
+  if (!loaded) return;
+  return respondCall(res, 200, loaded.call, userId);
+});
+
+router.get("/dm/incoming", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  res.setHeader("Cache-Control", "no-store");
+  // Newest first; stale ones are moved to `missed` on the way.
+  const calls = await Promise.all((await getRingingCallsForCallee(userId)).map(expireCallIfStale));
+  const call = calls.find((c) => c.status === "ringing");
+  if (call) return respondCall(res, 200, call, userId);
+  return res.json({ call: null });
+});
+
+router.get("/dm/conversations/:conversationId/calls", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const conversationId = String(req.params.conversationId ?? "");
+  const participants = UUID_RE.test(conversationId) ? await getCallParticipants(conversationId) : [];
+  if (!participants.some((p) => p.userId === userId)) {
+    return res.status(403).json({ error: "Not a participant in this conversation", code: "NOT_A_PARTICIPANT" });
+  }
+  const rawLimit = Number(req.query.limit ?? 50);
+  const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, Math.floor(rawLimit))) : 50;
+  const rows = await listConversationCalls(conversationId, limit);
+  const calls = await Promise.all(rows.map(expireCallIfStale));
+  const view = await loadCallView(conversationId, participants);
+  return res.json({ calls: calls.map((c) => serializeCall(c, userId, view.participants, view.avatars)) });
 });
 
 router.post("/events", async (req, res) => {

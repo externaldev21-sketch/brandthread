@@ -8,9 +8,10 @@
  * sending is a real `api.threadCash.liveGift()` call — instant, never
  * gated on mutual follow (a viewer gifting a host they're watching rarely
  * follows them back), unlike `api.threadCash.send()`'s friend-to-friend
- * transfer. Without a `streamId` (app/live-feed.tsx's sample rooms, which
- * have no real host account to transfer to), sending stays local-only: it
- * decrements the shown balance and the caller posts a chat line.
+ * transfer. Only a `previewOnly` sheet (app/live-feed.tsx's `&demo=1`
+ * sample rooms, which have no real host account) or a dev web preview stays
+ * local-only. Anything else without a real `recipientId` + `streamId` fails
+ * visibly instead of reporting a gift that never happened.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -25,12 +26,14 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { hapticLight } from '@/lib/haptics';
+import { apiErrorMessage } from '@/lib/safety';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
 
 export function LiveThreadCashSheet({
-  visible, brandName, recipientId, streamId, onClose, onSent, onSendFailed,
+  visible, brandName, recipientId, streamId, previewOnly = false, onClose, onSent, onSendFailed,
 }: {
   visible: boolean;
   brandName: string;
@@ -40,6 +43,8 @@ export function LiveThreadCashSheet({
   /** Real live stream id, required alongside `recipientId` for a real gift
    *  (the server looks up the authoritative host from it). */
   streamId?: string | null;
+  /** A demo sample room with no real host: the gift is shown locally only. */
+  previewOnly?: boolean;
   onClose: () => void;
   /** Fires once the gift is actually sent (transferred, or locally mocked
    *  when there's no `recipientId`) — the caller posts the chat line. */
@@ -53,6 +58,8 @@ export function LiveThreadCashSheet({
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  // Shown inside the sheet: a toast from the caller would sit behind this Modal.
+  const [sendError, setSendError] = useState<string | null>(null);
   const [justSentCents, setJustSentCents] = useState<number | null>(null);
   const pop = useSharedValue(0);
 
@@ -60,6 +67,7 @@ export function LiveThreadCashSheet({
     if (!visible) return;
     setSelected(null);
     setJustSentCents(null);
+    setSendError(null);
     // Same short-circuit ChatAttachThreadCash.tsx uses: there's no backend
     // to answer this in the dev-web preview, so attempting the real call
     // first just means a multi-second wait for it to time out before the
@@ -91,8 +99,17 @@ export function LiveThreadCashSheet({
   async function handleSend() {
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
+    setSendError(null);
     hapticLight();
-    if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
+    const localOnly = previewOnly
+      || (isPreviewThreadCashEnabled() && (isBuyerDevPreview() || isSellerDevPreview()));
+    if (!localOnly) {
+      if (!recipientId || !streamId) {
+        setSending(false);
+        setSendError('This live can’t receive Thread Cash right now.');
+        onSendFailed?.('This live can’t receive Thread Cash right now.');
+        return;
+      }
       try {
         await api.threadCash.liveGift({
           streamId,
@@ -101,7 +118,9 @@ export function LiveThreadCashSheet({
         });
       } catch (error: any) {
         setSending(false);
-        onSendFailed?.(error?.message ?? 'Could not send Thread Cash. Try again.');
+        const message = apiErrorMessage(error, 'Could not send Thread Cash. Try again.');
+        setSendError(message);
+        onSendFailed?.(message);
         return;
       }
     }
@@ -166,6 +185,10 @@ export function LiveThreadCashSheet({
           })}
         </View>
 
+        {sendError != null && (
+          <Text style={[styles.sendError, { color: theme.text }]} accessibilityRole="alert" testID="live-thread-cash-error">{sendError}</Text>
+        )}
+
         <Pressable
           onPress={handleSend}
           disabled={!selected || sending || balanceCents == null || selected > balanceCents}
@@ -212,6 +235,7 @@ const styles = StyleSheet.create({
   },
   tipDisabled: { opacity: 0.35 },
   tipText: { fontFamily: FONT.bold, fontSize: FS.sm },
+  sendError: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center', marginBottom: SP.sm },
   sendBtn: { height: 46, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },

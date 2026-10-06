@@ -15,6 +15,8 @@
  *     each other.
  *   • Comments containing the viewer's muted words are hidden from them.
  *   • Suspended accounts cannot comment and their comments are hidden.
+ *   • The post owner's "Allow comments from" setting (everyone / people they
+ *     follow / nobody) is enforced for everyone but the owner.
  *
  * Mounted without team context: a comment is always attributed to the person
  * who wrote it, never rewritten to a store owner.
@@ -26,6 +28,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition } from "../lib/postVisibility";
+import { commentRefusal } from "../lib/interactionSettings";
 import { notifyCommentActivity, notifyCommentLike } from "../lib/activityEvents";
 import { recordPostSignal } from "../lib/ranking/signals";
 import {
@@ -358,6 +361,11 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
     }
     if (post.userId !== authorId && (await blockRelation(authorId, post.userId)) !== "none") {
       return res.status(403).json({ error: "You can't comment on this post.", code: "BLOCKED" });
+    }
+    // The owner's "Allow comments from" account setting (lib/interactionSettings.ts).
+    const audienceRefusal = await commentRefusal(post.userId, authorId);
+    if (audienceRefusal) {
+      return res.status(403).json({ error: audienceRefusal.message, code: "COMMENTS_LIMITED" });
     }
 
     let parentId: string | null = null;

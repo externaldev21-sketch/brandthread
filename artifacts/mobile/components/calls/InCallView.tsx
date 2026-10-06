@@ -6,6 +6,11 @@
  * video calls, the peer's avatar centered (with "{name}'s camera is off"
  * once their camera drops), and the bottom control capsule.
  *
+ * Video is live (Agora): the peer's camera fills the screen behind the
+ * controls and yours plays in the PiP card (components/calls/RtcVideoView);
+ * until a side's first frame — or while that camera is off — its avatar
+ * shows instead.
+ *
  * Voice calls reuse the same avatar+name+duration treatment
  * app/call-screen.tsx already uses for its voice layout (a big centered
  * avatar with the running duration beneath it) — see `formatCallDuration`
@@ -17,6 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCallSession } from '@/lib/calls/CallSessionContext';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { CallAvatarCircle } from './CallAvatarCircle';
+import { RtcVideoView, useHasVideo } from './RtcVideoView';
 import {
   CallScreenShell, ControlButton, ControlCapsule, TopBarIconButton, formatCallDuration,
 } from './CallControls';
@@ -24,8 +30,11 @@ import {
 export function InCallView() {
   const { theme } = useAppTheme();
   const {
-    session, minimize, declineOrEndCall, toggleMute, toggleCameraOff, toggleSpeaker,
+    session, minimize, declineOrEndCall, toggleMute, toggleCameraOff, toggleSpeaker, switchCamera, rtcEngine,
   } = useCallSession();
+  const engine = rtcEngine();
+  const remoteVideo = useHasVideo(engine, 'remote');
+  const localVideo = useHasVideo(engine, 'local');
   const [durationSec, setDurationSec] = useState(0);
 
   useEffect(() => {
@@ -43,15 +52,15 @@ export function InCallView() {
   } = session;
   const isVideo = mode === 'video';
   const showScrim = isVideo && peerCameraOff;
+  const showRemoteVideo = isVideo && remoteVideo && !peerCameraOff;
 
   return (
     <CallScreenShell
       topLeft={<TopBarIconButton name="chevron-down" onPress={minimize} accessibilityLabel="Minimize call" />}
       style={showScrim ? { backgroundColor: theme.background } : undefined}
     >
-      {/* Dark scrim standing in for a blurred camera-off backdrop — no live
-          camera feed in the simulated provider, so a plain dark overlay is
-          used rather than a fake blurred photo. */}
+      {showRemoteVideo && <RtcVideoView engine={engine} which="remote" style={StyleSheet.absoluteFill} />}
+      {/* Dark scrim behind the "{name}'s camera is off" state. */}
       {showScrim && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.card, opacity: 0.55 }]} />}
 
       {isVideo && (
@@ -59,16 +68,18 @@ export function InCallView() {
           accessibilityLabel={`${me.name}'s camera preview`}
           style={[styles.pip, { backgroundColor: theme.card, borderColor: theme.border }]}
         >
-          {/* No live local camera feed in the simulated provider (PR1) — the
-              PiP always shows the self-avatar fallback, camera on or off. */}
-          <View style={[styles.pipFallback, { backgroundColor: me.color }]}>
-            <Text style={[TYPE_SCALE.footnote, styles.pipInitials]}>{me.initials}</Text>
-          </View>
+          {localVideo && !cameraOff ? (
+            <RtcVideoView engine={engine} which="local" style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[styles.pipFallback, { backgroundColor: me.color }]}>
+              <Text style={[TYPE_SCALE.footnote, styles.pipInitials]}>{me.initials}</Text>
+            </View>
+          )}
         </View>
       )}
 
       <View style={styles.center}>
-        {showScrim ? (
+        {showRemoteVideo ? null : showScrim ? (
           <CallAvatarCircle
             name={peer.name}
             initials={peer.initials}
@@ -112,7 +123,7 @@ export function InCallView() {
           {isVideo && (
             <ControlButton
               icon="refresh-cw"
-              onPress={() => { /* PR2: no real camera to flip in the preview provider yet. */ }}
+              onPress={switchCamera}
               accessibilityLabel="Flip camera"
             />
           )}

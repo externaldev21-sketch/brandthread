@@ -21,6 +21,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { storyListedFor } from "../lib/storyVisibility";
+import { storyHiddenFrom } from "../lib/interactionSettings";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
 
 /** Brand palette is black/white/silver: every avatar without a photo is a white monogram on this. */
@@ -135,6 +136,7 @@ router.get("/stories/mentions", async (req, res) => {
     .innerJoin(stories, eq(stories.id, storyMentions.storyId))
     .where(and(
       eq(storyMentions.mentionedUserId, myId),
+      eq(storyMentions.status, "approved"), // pending tags wait in Pending tags
       gt(stories.expiresAt, new Date()),
       storyListedFor(myId),
     ))
@@ -203,6 +205,8 @@ router.get("/stories/:id", async (req, res) => {
       const [follow] = await db.select({ f: follows.followerId }).from(follows)
         .where(and(eq(follows.followerId, myId), eq(follows.followingId, row.authorId))).limit(1);
       if (!follow) { gone(); return; }
+      // "Hide story from" (lib/interactionSettings.ts); a mention still shares it.
+      if (await storyHiddenFrom(row.authorId, myId)) { gone(); return; }
       if (row.privacyVisibility === "friends") {
         const [mutual] = await db.select({ f: follows.followerId }).from(follows)
           .where(and(eq(follows.followerId, row.authorId), eq(follows.followingId, myId))).limit(1);

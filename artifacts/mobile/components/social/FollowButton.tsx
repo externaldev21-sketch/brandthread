@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
+import { canUsePreviewFollow, getPreviewFollowing, setPreviewFollowing } from '@/lib/previewFollowStore';
+import { apiErrorMessage } from '@/lib/safety';
 
 export type FollowState = {
   isFollowing: boolean;
@@ -20,22 +24,52 @@ type Props = {
   disabled?: boolean;
   size?: 'default' | 'compact';
   style?: any;
+  /** Shown when a follow/unfollow fails (after the rollback). Defaults to a native alert. */
+  onError?: (message: string) => void;
 };
 
 /**
  * Optimistic follow/unfollow control. Flips state immediately on tap and
  * rolls back if the request fails — the network round trip never blocks the
  * UI. Wire `onChange` to update follower counts shown elsewhere on screen.
+ *
+ * Never a silent no-op: seeded preview people (`preview-*` ids) follow
+ * through lib/previewFollowStore, a signed-out viewer is sent to sign in,
+ * and a failed request rolls back AND says so (`onError`, else an alert).
  */
-export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style }: Props) {
+export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, onError }: Props) {
   const { theme } = useAppTheme();
   const api = useApi();
-  const [state, setState] = useState<FollowState>(initial);
+  const router = useRouter();
+  const { isSignedIn } = useAuth();
+  const previewId = canUsePreviewFollow(userId);
+  const [state, setState] = useState<FollowState>(() => {
+    const previewFollowing = previewId ? getPreviewFollowing(userId) : undefined;
+    return previewFollowing === undefined ? initial : { ...initial, isFollowing: previewFollowing, isMutual: previewFollowing && initial.isFollowedBy };
+  });
   const [busy, setBusy] = useState(false);
   const styles = React.useMemo(() => makeStyles(theme, size), [theme, size]);
 
+  // The parent may learn the real follow state after first render (an async
+  // status fetch) — adopt it, unless the viewer has already tapped.
+  const touchedRef = useRef(false);
+  useEffect(() => {
+    if (touchedRef.current || (previewId && getPreviewFollowing(userId) !== undefined)) return;
+    setState(initial);
+  }, [initial.isFollowing, initial.isFollowedBy, initial.isMutual]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reportError = (message: string) => {
+    if (onError) onError(message);
+    else if (Platform.OS !== 'web') Alert.alert('Something went wrong', message);
+  };
+
   const handlePress = async () => {
     if (busy || disabled || userId.startsWith('u_')) return;
+    touchedRef.current = true;
+    if (!previewId && !isSignedIn) {
+      router.push('/sign-in' as never);
+      return;
+    }
     const wasFollowing = state.isFollowing;
     const optimistic: FollowState = wasFollowing
       ? { isFollowing: false, isFollowedBy: state.isFollowedBy, isMutual: false }
@@ -47,15 +81,18 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
     onChange?.(optimistic, wasFollowing ? -1 : 1);
 
     try {
-      if (wasFollowing) {
+      if (previewId) {
+        setPreviewFollowing(userId, !wasFollowing);
+      } else if (wasFollowing) {
         await api.social.unfollow(userId);
       } else {
         await api.social.follow(userId);
       }
-    } catch {
+    } catch (error) {
       // Roll back on failure.
       setState(state);
       onChange?.(state, wasFollowing ? 1 : -1);
+      reportError(apiErrorMessage(error, wasFollowing ? 'Could not unfollow. Try again.' : 'Could not follow. Try again.'));
     } finally {
       setBusy(false);
     }

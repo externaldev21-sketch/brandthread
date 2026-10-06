@@ -21,6 +21,7 @@ import {
 import { and, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { extractMentions } from "./activityEvents";
 import { shouldRouteToRequests } from "./conversationRouting";
+import { tagStatusFor, usersRequiringTagApproval } from "./interactionSettings";
 
 /** Instagram allows up to 10 mentions on a story. */
 export const MAX_STORY_MENTIONS = 10;
@@ -237,11 +238,23 @@ export async function ensureStoryReplyConversation(senderId: string, recipientId
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-export async function recordStoryMentions(storyId: string, taggerId: string, mentions: VerifiedMention[]) {
-  if (mentions.length === 0) return;
-  await db.insert(storyMentions).values(mentions.map((m) => ({
-    storyId, taggerId, mentionedUserId: m.userId, sticker: m.sticker as unknown as Record<string, unknown>,
-  }))).onConflictDoNothing();
+/**
+ * Stores the story's mention tags. People with "Manually approve tags" on get
+ * a 'pending' tag (no notification, not on their Tagged tab or mentions rail
+ * until approved); returns their ids so the caller skips notifying them.
+ */
+export async function recordStoryMentions(storyId: string, taggerId: string, mentions: VerifiedMention[]): Promise<Set<string>> {
+  if (mentions.length === 0) return new Set();
+  const approvers = await usersRequiringTagApproval(mentions.map((m) => m.userId));
+  const pending = new Set<string>();
+  await db.insert(storyMentions).values(mentions.map((m) => {
+    const status = tagStatusFor(m.userId, taggerId, approvers);
+    if (status === "pending") pending.add(m.userId);
+    return {
+      storyId, taggerId, mentionedUserId: m.userId, sticker: m.sticker as unknown as Record<string, unknown>, status,
+    };
+  })).onConflictDoNothing();
+  return pending;
 }
 
 // ─── Reshare credit ───────────────────────────────────────────────────────────

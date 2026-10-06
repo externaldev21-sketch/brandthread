@@ -20,6 +20,7 @@ import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
+import { attachCallWebSocket } from "./ws/callHub";
 import { startCommunityPushJob } from "./lib/communityPush";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
@@ -54,6 +55,8 @@ const server = app.listen(port, (err) => {
   attachLiveWebSocket(server);
   // Community chat realtime channel (/ws/community), same HTTP server.
   attachCommunityWebSocket(server);
+  // 1:1 DM call signalling (/ws/calls), same HTTP server.
+  attachCallWebSocket(server);
 
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)

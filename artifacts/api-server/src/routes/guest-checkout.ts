@@ -13,6 +13,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { loadSellerCheckoutSettings, stripeCheckoutLocale } from "../lib/sellerCheckoutSettings";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -173,6 +174,14 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     if (!seller?.stripeAccountId || seller.stripeAccountStatus !== "active") {
       return res.status(400).json({ error: "Seller payment account is not active. Please try again later." });
     }
+    // The seller's Checkout settings: "Accounts required" turns guest checkout off.
+    const checkoutSettings = (await loadSellerCheckoutSettings([sellerId])).get(sellerId);
+    if (checkoutSettings?.checkoutMode === "accounts_required") {
+      return res.status(403).json({
+        error: "This shop asks buyers to sign in to check out. Sign in or create an account to continue.",
+        code: "ACCOUNT_REQUIRED",
+      });
+    }
     let chargePlan: ChargePlan;
     try {
       chargePlan = await resolveChargePlan({
@@ -297,6 +306,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
       success_url: successUrl, cancel_url: cancelUrl,
       customer_email: email,
+      // The store language (seller Languages screen) for Stripe's page.
+      ...(checkoutSettings ? { locale: stripeCheckoutLocale(checkoutSettings.storeLanguage) } : {}),
       metadata: { csRef: checkout.id, guest: "true", ...(validDropId ? { dropId: validDropId } : {}) },
       payment_intent_data: {
         ...money.paymentIntentData,

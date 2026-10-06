@@ -575,6 +575,8 @@ export interface SellerThreadPost {
   }>;
   /** Recorded plays — present on profile video grids (GET /api/public/users/:id/videos). */
   viewsCount?:       number;
+  /** Set when this post remixes another video — credits "Remix of @handle". */
+  remixOf?:          { postId: string; authorId: string; username: string | null } | null;
   /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
   mediaPaths?:       string[];
   /** Per-slide overlay metadata — used to restore draft editors */
@@ -682,6 +684,8 @@ export async function createSellerPost(params: {
   mediaPaths?: string[];
   /** Per-slide overlay metadata */
   slideOverlays?: Array<{ slideIndex: number; overlays: any[] }>;
+  /** The video this post remixes; the server refuses it (403 REMIX_NOT_ALLOWED) when the author doesn't allow it. */
+  remixOfPostId?: string;
 }): Promise<SellerThreadPost> {
   const k = K();
   const created = await serviceRequest<any>('/api/posts', {
@@ -707,6 +711,7 @@ export async function createSellerPost(params: {
         .filter(id => /^[0-9a-f-]{36}$/i.test(id)),
       isDraft: params.isDraft === true,
       scheduledAt: params.isDraft ? null : (params.scheduledAt ?? null),
+      ...(params.remixOfPostId ? { remixOfPostId: params.remixOfPostId } : {}),
     }),
   });
 
@@ -829,6 +834,9 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
  */
 export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   const now = iso();
+  const remixOf = p?.remixOf && typeof p.remixOf.postId === 'string'
+    ? { postId: p.remixOf.postId, authorId: String(p.remixOf.authorId ?? ''), username: typeof p.remixOf.username === 'string' ? p.remixOf.username : null }
+    : null;
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
     ? p.seller.username
@@ -836,6 +844,7 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
   const authorInitials = authorName.slice(0, 2).toUpperCase();
   const authorColor    = pickAvatarColor(p.userId ?? authorName);
   return {
+    remixOf,
     id:                p.id,
     authorId:          p.userId,
     authorAccountType: p.authorAccountType === 'buyer' ? 'buyer' : 'seller',

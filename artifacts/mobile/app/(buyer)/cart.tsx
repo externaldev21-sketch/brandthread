@@ -57,6 +57,9 @@ import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
+import { useSellerShell } from '@/contexts/SellerShellContext';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -649,6 +652,13 @@ export default function CartScreen() {
   const api = useApi();
   const { isSignedIn } = useAuth();
   const { showUndo } = useUndoToast();
+  // Sellers shop as themselves too (QA-0527): their cart is this same screen.
+  // Their app has no buyer Discover tab, so "Continue shopping" opens the
+  // Thread feed, and the seller tab bar (shown app-wide) steps aside for the
+  // checkout footer, as the buyer bar already does here.
+  const { isActiveSeller } = useSellerShell();
+  const sellerShopper = isActiveSeller || isSellerDevPreview();
+  useHideTabBar(sellerShopper);
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
@@ -1053,7 +1063,7 @@ export default function CartScreen() {
           <Button
             label="Continue shopping"
             icon="compass"
-            onPress={() => router.navigate('/(buyer)/discover' as never)}
+            onPress={() => router.navigate((sellerShopper ? '/(tabs)/feed' : '/(buyer)/discover') as never)}
             style={s.emptyCta}
             accessibilityHint="Opens Discover to browse products"
           />

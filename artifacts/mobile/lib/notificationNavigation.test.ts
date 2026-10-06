@@ -162,4 +162,16 @@ describe('notification response navigation', () => {
       '/community-chat?id=g3',
     ]);
   });
+
+  it('a DM call push asks the app-wide call overlay to show the ringing call, without navigating', async () => {
+    const { onIncomingCallSignal } = await import('./calls/incomingCallSignal');
+    const signal = vi.fn();
+    const off = onIncomingCallSignal(signal);
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('call-1', { type: 'dm_call_incoming', targetType: 'dm_call', targetId: 'call-9', conversationId: 'conv-9' }));
+    off();
+    expect(signal).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
 });
