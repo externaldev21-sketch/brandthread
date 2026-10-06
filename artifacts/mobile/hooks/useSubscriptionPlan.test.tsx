@@ -10,6 +10,8 @@ const { statusMock, api } = vi.hoisted(() => {
       seller: {
         subscription: {
           status,
+          // The hook reads /entitlement; the same mock answers both.
+          entitlement: status,
         },
       },
     },
@@ -18,6 +20,8 @@ const { statusMock, api } = vi.hoisted(() => {
 
 vi.mock("@/lib/api", () => ({
   useApi: () => api,
+  getStoreContext: () => null,
+  subscribeStoreContext: () => () => {},
 }));
 
 vi.mock("@clerk/expo", () => ({

@@ -156,6 +156,9 @@ router.get("/status", requireRole("owner"), async (req, res) => {
         amountCents: effective.provider === "revenuecat" ? PLAN_CATALOGUE[plan].amountCents : 0,
         paymentMethodLabel: null,
         effectiveProvider: effective.provider,
+        // The plan the server actually honours for paid tools right now
+        // (requirePlan reads the same getEffectiveEntitlement).
+        entitledPlan: effective.planId,
         native: nativeMetadata,
       });
       return;
@@ -220,6 +223,9 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       // retrieved successfully. Keep billing recovery pointed at Stripe even
       // when an unpaid subscription no longer grants an effective entitlement.
       effectiveProvider: "stripe",
+      // `plan` is what the seller is BILLED for; an unpaid/incomplete
+      // subscription keeps it but grants nothing. Tools unlock on this.
+      entitledPlan: effective.planId,
       native: nativeMetadata,
     });
   } catch (err: any) {
@@ -228,6 +234,19 @@ router.get("/status", requireRole("owner"), async (req, res) => {
     req.log.error({ err }, "Failed to fetch subscription status");
     res.status(500).json({ error: "Failed to fetch subscription status" });
   }
+});
+
+/**
+ * GET /api/seller/subscription/entitlement
+ * The store's effective plan for unlocking tools — no billing details — so
+ * every member of the store (not just the owner, who alone may see /status)
+ * sees the same locks the server enforces through requirePlan, which already
+ * checks the STORE OWNER's plan for team members.
+ */
+router.get("/entitlement", requireRole("viewer"), async (req, res) => {
+  const storeOwnerId = (req as any).clerkUserId as string;
+  const effective = await getEffectiveEntitlement(storeOwnerId);
+  res.json({ plan: effective.planId, status: effective.status, provider: effective.provider });
 });
 
 /** Persist dismissal for this exact trial only; a future trial shows again. */

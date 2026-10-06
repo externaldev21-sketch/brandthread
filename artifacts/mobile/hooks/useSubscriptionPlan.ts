@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useApi } from '@/lib/api';
+import { getStoreContext, subscribeStoreContext, useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 
 export type PlanId = 'starter' | 'growth' | 'pro';
@@ -28,6 +28,21 @@ export const ALLOW_TEST_SUBSCRIPTION_BYPASS =
 
 /** Cached plan — null means not yet loaded. */
 let _cache: PlanId | null = null;
+
+/** Whose plan `_cache` holds (signed-in user + selected store). A different
+ *  account on the same device, or switching to a joined store, must never
+ *  reuse it. */
+let _cacheKey: string | null = null;
+function cacheKeyFor(userId: string): string {
+  return `${userId}:${getStoreContext() ?? 'default'}`;
+}
+subscribeStoreContext(() => invalidatePlanCache());
+
+function planFrom(value: unknown): PlanId {
+  return value === 'growth' ? 'growth'
+    : value === 'scale' || value === 'pro' ? 'pro'
+    : 'starter';
+}
 
 /** In-flight fetch promise so concurrent mounts share one request. */
 let _promise: Promise<PlanId> | null = null;
@@ -77,6 +92,12 @@ export function useSubscriptionPlan() {
         setError(false);
         return;
       }
+      const key = cacheKeyFor(userId);
+      if (_cacheKey !== key) {
+        _cache = null;
+        _promise = null;
+        _cacheKey = key;
+      }
       if (_cache !== null) {
         setPlan(_cache);
         setLoading(false);
@@ -88,15 +109,20 @@ export function useSubscriptionPlan() {
       setError(false);
 
       if (!_promise) {
+        // The plan the SERVER honours (requirePlan): an unpaid subscription
+        // keeps its billed plan but unlocks nothing, and team members get
+        // the store's plan (they can't read the owner-only /status).
         _promise = api.seller.subscription
-          .status()
-          .then((data: any) => {
-            const p: PlanId =
-              data.plan === 'growth' ? 'growth'
-              : data.plan === 'scale' ? 'pro'
-              : data.plan === 'pro'  ? 'pro'
-              : 'starter';
-            _cache = p;
+          .entitlement()
+          .then((data: any) => planFrom(data.plan))
+          .catch(async (requestError: any) => {
+            if (requestError?.status !== 404) throw requestError;
+            // An older server without /entitlement.
+            const data: any = await api.seller.subscription.status();
+            return planFrom(data.entitledPlan ?? data.plan);
+          })
+          .then((p: PlanId) => {
+            if (_cacheKey === key) _cache = p;
             return p;
           })
           .catch((requestError) => {

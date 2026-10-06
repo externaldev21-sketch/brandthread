@@ -14,6 +14,14 @@ import {
 const router = Router();
 router.use(requireAuth);
 
+/**
+ * /api/onboarding-sample — ONLY the one free sample. It used to mount this
+ * whole file, which also exposed POST /api/onboarding-sample/generate: the
+ * paid, Growth-gated logo generator with no plan check and no allowance.
+ */
+export const onboardingSampleRouter = Router();
+onboardingSampleRouter.use(requireAuth);
+
 const userHits = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 5;
@@ -103,7 +111,9 @@ async function completeOnboardingSample(accountId: string, reservationId: string
 
 // POST /api/logo/generate
 router.post("/generate", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
+  // requireAuth's id. `req.auth` is a function in @clerk/express 2.x, so the
+  // old lookup put every seller in one shared "anon" bucket (5/min for all).
+  const userId = (req as any).clerkUserId as string;
   if (!checkRateLimit(userId)) {
     res.status(429).json({ error: "Too many logo generations. Please wait a minute and try again." });
     return;
@@ -147,7 +157,7 @@ router.post("/generate", async (req, res) => {
 });
 
 // POST /api/onboarding-sample/logo
-router.post("/logo", async (req, res) => {
+onboardingSampleRouter.post("/logo", async (req, res) => {
   const userId = (req as any).clerkUserId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required." });
