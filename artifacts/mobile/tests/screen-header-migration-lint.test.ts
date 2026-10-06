@@ -72,6 +72,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/add-product.tsx',
   'app/app-icon.tsx',
   'app/app-theme.tsx',
+  'app/automation.tsx', // redirect-only route
   'app/ai-assistant.tsx',
   'app/bg-removal.tsx',
   'app/buyer-account-control.tsx',
