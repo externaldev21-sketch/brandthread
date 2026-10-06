@@ -1,4 +1,4 @@
-/** One community in a list: tile, name (+ verified mark), member count, one-line description, Join / Joined pill. */
+/** One community in a list: tile, name (+ inline verified mark), member count, description (up to two lines), Join / Joined pill. */
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -30,15 +30,26 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
       >
         <CommunityAvatar community={community} size={52} />
         <View style={styles.copy}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{community.name}</Text>
-            {community.verified ? <VerifiedMark size={14} /> : null}
-          </View>
+          {/* The verified mark is inline inside the name's own Text, so it
+              always follows the last word — on one line, or at the end of the
+              second when a long name wraps — never floating off on its own
+              next to the Join pill. */}
+          <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={2}>
+            {community.name}
+            {community.verified ? (
+              <>
+                {'\u00A0'}
+                <View style={styles.inlineMark}><VerifiedMark size={14} /></View>
+              </>
+            ) : null}
+          </Text>
           <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
             {formatMemberCount(community.memberCount)}
           </Text>
           {community.description ? (
-            <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={1}>{community.description}</Text>
+            // Up to two lines (wrapping at word boundaries) rather than a
+            // one-line ellipsis cutting it mid-word.
+            <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={2}>{community.description}</Text>
           ) : null}
         </View>
         <PressableScale
@@ -71,8 +82,8 @@ export function CommunityRow({ community, joined, joining, error, onPress, onJoi
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md - 4, paddingVertical: SP.sm + 2, minHeight: 72 },
   copy: { flex: 1, gap: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.base },
+  name: { fontFamily: FONT.semibold, fontSize: FS.base },
+  inlineMark: { transform: [{ translateY: 2 }] },
   meta: { fontFamily: FONT.regular, fontSize: FS.meta },
   desc: { fontFamily: FONT.regular, fontSize: FS.sm },
   pill: { minWidth: 72, height: 36, paddingHorizontal: SP.md, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

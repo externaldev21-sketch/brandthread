@@ -15,6 +15,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/layout/EmptyState';
 import Composer from '@/components/ui/Composer';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -325,6 +326,12 @@ export default function AIPhotographyChatScreen() {
     }
   }
 
+  // Nothing sent yet: only the greeting is in the thread.
+  const isFreshThread = !loading && messages.every((m) => m.id === INITIAL_MSG.id);
+  const addPhotosDisabled = mode === 'free'
+    ? photos.length >= MAX_PHOTOS
+    : (heroPhoto ? garments.length >= MAX_GARMENTS : false);
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: 'transparent' }]}
@@ -381,7 +388,24 @@ export default function AIPhotographyChatScreen() {
         </View>
       )}
 
-      {/* Messages */}
+      {/* Messages — or, before anything has been sent, a proper empty state
+          in the content area with the real first step (add photos), instead
+          of a lone greeting bubble over a blank screen and a helper line
+          above the input. */}
+      {isFreshThread ? (
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon="camera"
+            title={mode === 'outfitSwap' ? 'Add a hero photo' : 'Add your product photos'}
+            message={mode === 'outfitSwap'
+              ? 'Upload one photo of the model and scene, then add garments to swap in.'
+              : "Add photos of your piece and any reference shots, then describe the vibe."}
+            actionLabel={addPhotosDisabled ? undefined : 'Add photos'}
+            onAction={addPhotosDisabled ? undefined : pickPhotos}
+            testID="ai-photography-empty"
+          />
+        </View>
+      ) : (
       <FlatList
         ref={flatRef}
         data={messages}
@@ -450,6 +474,7 @@ export default function AIPhotographyChatScreen() {
           </View>
         )}
       />
+      )}
 
       {/* Photo tray */}
       {mode === 'outfitSwap' && heroPhoto && (
@@ -522,15 +547,6 @@ export default function AIPhotographyChatScreen() {
             />
           </TouchableOpacity>
         }
-        topSlot={
-          (mode === 'free' ? photos.length === 0 : !heroPhoto && garments.length === 0) ? (
-            <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-              {mode === 'free'
-                ? 'Tap the camera icon to add product or reference photos first.'
-                : 'Tap the camera icon to add one hero photo. Garments can follow in this chat.'}
-            </Text>
-          ) : null
-        }
       />
     </KeyboardAvoidingView>
   );
@@ -577,5 +593,5 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   attachBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  hint: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginTop: 6, marginBottom: 4 },
+  emptyWrap: { flex: 1, justifyContent: 'center' },
 });

@@ -81,7 +81,6 @@ export function LiveHostPill({
         hitSlop={6}
         testID="live-follow"
       >
-        {following && <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />}
         {following
           ? <Feather name="check" size={14} color="#fff" />
           : <Text style={styles.followText}>Follow</Text>}
@@ -416,7 +415,7 @@ const styles = StyleSheet.create({
   // screens once the viewer stack + count + close button reached their
   // combined natural width.
   hostPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 3, paddingRight: 4, paddingVertical: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 3, paddingRight: 6, paddingVertical: 3,
     borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250, flexShrink: 1, minWidth: 0,
   },
   hostTap: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
@@ -434,8 +433,8 @@ const styles = StyleSheet.create({
   // Its own outlined circle, so the "Following" check reads as a separate
   // button inside the pill rather than a merged/clipped piece of it.
   followBtnOn: {
-    backgroundColor: 'transparent', overflow: 'hidden', minWidth: 32, paddingHorizontal: 0, width: 32,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.16)', overflow: 'hidden', minWidth: 32, paddingHorizontal: 0, width: 32,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)',
   },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
