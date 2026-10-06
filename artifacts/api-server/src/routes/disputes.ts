@@ -28,7 +28,7 @@ function buildStripeEvidence(type: string, description: string, trackingNumber?:
   switch (type) {
     case "tracking":
       return {
-        shipping_tracking_number: trackingNumber ?? "",
+        ...(trackingNumber ? { shipping_tracking_number: trackingNumber } : {}),
         shipping_documentation:   description,
         customer_communication:   description,
       };
@@ -51,6 +51,26 @@ function buildStripeEvidence(type: string, description: string, trackingNumber?:
   }
 }
 
+/**
+ * Stripe evidence from every item the seller added. shipping_tracking_number
+ * is a real tracking number — the one the seller typed with the evidence, else
+ * the order's own — never the free-text description.
+ */
+function mergeStripeEvidence(items: any[], orderTracking: string | null): Record<string, string> {
+  const tracking = [...items].reverse().find((e: any) => e.type === "tracking" && e.trackingNumber)?.trackingNumber
+    ?? orderTracking ?? undefined;
+  return items.reduce((acc: Record<string, string>, ev: any) => (
+    { ...acc, ...buildStripeEvidence(ev.type, ev.description, tracking) }
+  ), {});
+}
+
+async function orderTrackingNumber(orderId: string | null): Promise<string | null> {
+  if (!orderId) return null;
+  const [order] = await db.select({ trackingNumber: orders.trackingNumber }).from(orders)
+    .where(eq(orders.id, orderId)).limit(1);
+  return order?.trackingNumber ?? null;
+}
+
 function rowToDispute(row: typeof disputes.$inferSelect) {
   return {
     id:                   row.id,
@@ -58,6 +78,8 @@ function rowToDispute(row: typeof disputes.$inferSelect) {
     orderId:              row.orderId,
     sellerId:             row.sellerId,
     amount:               row.amountCents / 100,
+    // Integer cents — what the app's dispute screen reads.
+    amountCents:          row.amountCents,
     currency:             row.currency,
     reason:               row.reason,
     status:               row.status,
@@ -167,6 +189,9 @@ router.post("/:id/evidence", async (req, res) => {
       disputeId:   row.id,
       type,
       description: description.trim(),
+      ...(typeof trackingNumber === "string" && trackingNumber.trim()
+        ? { trackingNumber: trackingNumber.trim().slice(0, 64) }
+        : {}),
       submittedAt: new Date().toISOString(),
     };
 
@@ -175,10 +200,7 @@ router.post("/:id/evidence", async (req, res) => {
     const newEvidence = [...existing, evidenceItem];
 
     // Merge all evidence fields for Stripe (latest submission wins per field)
-    const mergedStripe = newEvidence.reduce((acc: Record<string, string>, ev: any) => {
-      const tracking = newEvidence.find((e: any) => e.type === "tracking")?.description;
-      return { ...acc, ...buildStripeEvidence(ev.type, ev.description, tracking) };
-    }, {});
+    const mergedStripe = mergeStripeEvidence(newEvidence, await orderTrackingNumber(row.orderId));
 
     let stripeStatus = row.status;
 
@@ -237,10 +259,7 @@ router.post("/:id/submit", async (req, res) => {
     }
 
     const existing = (row.evidenceJson as any[]) ?? [];
-    const mergedStripe = existing.reduce((acc: Record<string, string>, ev: any) => {
-      const tracking = existing.find((e: any) => e.type === "tracking")?.description;
-      return { ...acc, ...buildStripeEvidence(ev.type, ev.description, tracking) };
-    }, {});
+    const mergedStripe = mergeStripeEvidence(existing, await orderTrackingNumber(row.orderId));
 
     const updated = await stripe.disputes.update(row.stripeDisputeId, {
       evidence: mergedStripe,
@@ -280,11 +299,32 @@ router.post("/:id/accept", async (req, res) => {
 
     if (!row) { res.status(404).json({ error: "Dispute not found" }); return; }
 
-    // Closing a dispute on Stripe is done by NOT submitting evidence;
-    // Stripe will auto-close it when the window passes. We mark locally.
+    if (["won", "lost"].includes(row.status)) {
+      res.status(409).json({ error: "Finalised disputes cannot be accepted" });
+      return;
+    }
+
+    // Accepting concedes the dispute on Stripe right away (the buyer keeps
+    // the refund their bank already issued); waiting out the evidence window
+    // left it open for days while the app said it was settled.
+    let nextStatus = "closed";
+    if (row.stripeDisputeId) {
+      if (!stripe) {
+        res.status(503).json({ error: "Payments are unavailable right now. Try again shortly." });
+        return;
+      }
+      try {
+        const closed = await stripe.disputes.close(row.stripeDisputeId);
+        nextStatus = mapStripeStatus(closed.status ?? "lost");
+      } catch (stripeErr) {
+        req.log.error({ err: stripeErr, disputeId: row.id }, "Stripe dispute close failed");
+        res.status(502).json({ error: "We couldn't reach the payment processor. Nothing changed — try again." });
+        return;
+      }
+    }
     const [updated] = await db
       .update(disputes)
-      .set({ status: "closed", updatedAt: new Date() })
+      .set({ status: nextStatus, updatedAt: new Date() })
       .where(and(
         eq(disputes.id, row.id),
         sql`${disputes.status} NOT IN ('won', 'lost')`,

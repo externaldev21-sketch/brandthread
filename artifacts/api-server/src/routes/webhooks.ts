@@ -38,7 +38,8 @@ import {
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
-import { applyDisputePause, applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
+import { applyDisputePause, applyDisputePauseByDisputeId, ordersForDisputedPayment } from "../lib/delivery/disputePause";
+import { notifySellerDisputeClosed, notifySellerDisputeOpened } from "../lib/sellerMoneyNotifications";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -1630,21 +1631,24 @@ function mapDisputeStatus(s: string): string {
   }
 }
 
-/** Resolve the seller's clerkId from a Stripe paymentIntentId or chargeId. */
-async function resolveSellerAndOrder(
+/**
+ * The order (and seller) a dispute is recorded against, plus every order the
+ * disputed payment covered. A cart PaymentIntent can pay several sellers'
+ * orders: the dispute row goes to the order whose charge matches the
+ * disputed amount (else the largest), and every covered order is paused and
+ * its seller told.
+ */
+async function resolveDisputeOrders(
   paymentIntentId: string | null,
   chargeId: string | null,
-): Promise<{ sellerId: string; orderId: string | null }> {
-  // Try to find matching order by payment intent ID
-  if (paymentIntentId) {
-    const [ord] = await db
-      .select({ id: orders.id, ownerId: orders.ownerId })
-      .from(orders)
-      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
-      .limit(1);
-    if (ord) return { sellerId: ord.ownerId, orderId: ord.id };
-  }
-  return { sellerId: "unknown", orderId: null };
+  amountCents: number,
+) {
+  const covered = await ordersForDisputedPayment(paymentIntentId, chargeId);
+  const exact = covered.filter((o) => (o.grossChargedCents || o.totalCents) === amountCents);
+  const primary = exact.length === 1
+    ? exact[0]
+    : [...covered].sort((a, b) => (b.grossChargedCents || b.totalCents) - (a.grossChargedCents || a.totalCents))[0];
+  return { primary: primary ?? null, covered };
 }
 
 async function handleDisputeCreated(dispute: any) {
@@ -1652,10 +1656,13 @@ async function handleDisputeCreated(dispute: any) {
     ? new Date(dispute.evidence_details.due_by * 1000)
     : null;
 
-  const { sellerId, orderId } = await resolveSellerAndOrder(
+  const { primary, covered } = await resolveDisputeOrders(
     dispute.payment_intent ?? null,
     dispute.charge ?? null,
+    dispute.amount ?? 0,
   );
+  const sellerId = primary?.ownerId ?? "unknown";
+  const orderId = primary?.id ?? null;
 
   // Build human-readable claim from reason
   const reasonLabels: Record<string, string> = {
@@ -1670,7 +1677,7 @@ async function handleDisputeCreated(dispute: any) {
   };
   const customerClaim = reasonLabels[dispute.reason] ?? `Dispute filed: ${dispute.reason}`;
 
-  await db
+  const [inserted] = await db
     .insert(disputes)
     .values({
       stripeDisputeId:       dispute.id,
@@ -1688,10 +1695,32 @@ async function handleDisputeCreated(dispute: any) {
       networkReasonCode:     dispute.network_reason_code ?? null,
       customerClaim,
     })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning({ id: disputes.id });
 
-  await applyDisputePause(orderId, dispute.status);
-  logger.info({ disputeId: dispute.id, sellerId, orderId, reason: dispute.reason }, "Dispute created");
+  for (const order of covered) await applyDisputePause(order.id, dispute.status);
+
+  // First delivery only (a retried event inserts nothing): tell each seller
+  // whose order the disputed payment covered. The recorded seller can open
+  // the dispute to respond; others see the paused order.
+  if (inserted) {
+    const notified = new Set<string>();
+    for (const order of covered) {
+      if (notified.has(order.ownerId)) continue;
+      notified.add(order.ownerId);
+      const isPrimary = order.id === orderId;
+      await notifySellerDisputeOpened({
+        sellerId: order.ownerId,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        disputeId: isPrimary ? inserted.id : null,
+        amountCents: isPrimary ? dispute.amount : (order.grossChargedCents || order.totalCents),
+        reason: dispute.reason ?? null,
+        evidenceDueBy: dueBy,
+      });
+    }
+  }
+  logger.info({ disputeId: dispute.id, sellerId, orderId, coveredOrders: covered.length, reason: dispute.reason }, "Dispute created");
 }
 
 async function handleDisputeUpdated(stripeDispute: any) {
@@ -1714,14 +1743,34 @@ async function handleDisputeUpdated(stripeDispute: any) {
 }
 
 async function handleDisputeClosed(stripeDispute: any) {
-  await db
+  const outcome = mapDisputeStatus(stripeDispute.status);
+  const [before] = await db.select({ status: disputes.status }).from(disputes)
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id)).limit(1);
+  const [closed] = await db
     .update(disputes)
     .set({
-      status:    mapDisputeStatus(stripeDispute.status),
+      status:    outcome,
       updatedAt: new Date(),
     })
-    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id))
+    .returning();
   await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
+
+  // Tell the seller how it ended (once: a retried event finds the outcome
+  // already recorded).
+  if (closed && before?.status !== outcome && closed.sellerId !== "unknown") {
+    const [order] = closed.orderId
+      ? await db.select({ orderNumber: orders.orderNumber }).from(orders).where(eq(orders.id, closed.orderId)).limit(1)
+      : [];
+    await notifySellerDisputeClosed({
+      sellerId: closed.sellerId,
+      orderId: closed.orderId,
+      orderNumber: order?.orderNumber ?? null,
+      disputeId: closed.id,
+      amountCents: closed.amountCents,
+      outcome,
+    });
+  }
 
   logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
 }

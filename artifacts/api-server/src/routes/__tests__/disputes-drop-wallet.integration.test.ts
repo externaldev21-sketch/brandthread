@@ -22,6 +22,11 @@ const fake = vi.hoisted(() => {
         if (failDisputes) throw Object.assign(new Error("Stripe dispute unavailable"), { status: 502 });
         return { id, status: disputeStatus };
       },
+      // Accepting concedes on Stripe, which marks the dispute lost.
+      close: async (id: string) => {
+        if (failDisputes) throw Object.assign(new Error("Stripe dispute unavailable"), { status: 502 });
+        return { id, status: "lost" };
+      },
     },
     transfers: {
       create: (params: any, opts?: { idempotencyKey?: string }) => {
@@ -189,7 +194,9 @@ describe("disputes", () => {
     expect(second.status).toBe(200);
     expect(second.body.dispute.evidence).toHaveLength(2);
     expect(second.body.dispute.evidence[0].description).toBe("1ZTEST");
-    expect(fake.disputeUpdates[0].params.evidence.shipping_tracking_number).toBe("1ZTEST");
+    // The typed tracking number, not the free-text description.
+    expect(fake.disputeUpdates[0].params.evidence.shipping_tracking_number).toBe("1ZNUMBER");
+    expect(fake.disputeUpdates[0].params.evidence.shipping_documentation).toBe("1ZTEST");
   });
 
   it("rejects evidence for a final dispute and maps final submission statuses", async () => {
@@ -206,10 +213,13 @@ describe("disputes", () => {
     const dispute = await seedDispute();
     fake.failDisputes(true);
     expect((await call(`/api/disputes/${dispute.id}/submit`, { method: "POST" })).status).toBe(502);
+    // Accept fails cleanly (nothing changes) while Stripe is down…
+    expect((await call(`/api/disputes/${dispute.id}/accept`, { method: "POST" })).status).toBe(502);
     fake.failDisputes(false);
     const accepted = await call(`/api/disputes/${dispute.id}/accept`, { method: "POST" });
     expect(accepted.status).toBe(200);
-    expect(accepted.body.dispute.status).toBe("closed");
+    // …and once it goes through, Stripe records the conceded dispute as lost.
+    expect(accepted.body.dispute.status).toBe("lost");
     expect((await call(`/api/disputes/${dispute.id}/evidence`, { method: "POST", body: { type: "photo", description: "late" } })).status).toBe(400);
   });
 
@@ -222,7 +232,7 @@ describe("disputes", () => {
     expect([accept.status, evidence.status]).toContain(200);
     const [stored] = await db.select().from(disputes).where(eq(disputes.id, dispute.id));
     // Once acceptance has won, a stale evidence write must not reopen the case.
-    expect(stored.status).toBe("closed");
+    expect(stored.status).toBe("lost");
   });
 });
 
