@@ -9,6 +9,8 @@ import {
   isQualifyingComment,
   pickWinners,
   validateGiveawayInput,
+  PLATFORM_SPONSOR_DISCLAIMER,
+  withPlatformDisclaimer,
 } from "./giveaways";
 
 const SELLER = "seller_1";
@@ -141,6 +143,25 @@ describe("classifyEntries", () => {
     const out = classifyEntries({ ...base, userIds: ["a", "b"], following: new Set(["a"]), comments: null });
     expect(out.find((e) => e.userId === "a")!.eligible).toBe(true);
     expect(out.find((e) => e.userId === "b")!.excludedReason).toBe("not_following");
+  });
+});
+
+describe("Apple / Google sponsor disclaimer (QA-0100)", () => {
+  const base = {
+    title: "Spring drop", prizeText: "A hoodie", startsAt: new Date("2030-06-01T00:00:00Z").toISOString(),
+    endsAt: new Date("2030-06-08T00:00:00Z").toISOString(), winnerCount: 1,
+  };
+  it("is in the generated rules", () => {
+    expect(buildRulesTemplate({ sellerName: "A", prizeText: "B", startsAt: start, endsAt: end, winnerCount: 1, postEntry: false }))
+      .toContain(PLATFORM_SPONSOR_DISCLAIMER);
+  });
+  it("is added to seller-written rules exactly once", () => {
+    expect(withPlatformDisclaimer("My rules.")).toBe(`My rules.\n${PLATFORM_SPONSOR_DISCLAIMER}`);
+    expect(withPlatformDisclaimer(`My rules.\n${PLATFORM_SPONSOR_DISCLAIMER}`)).toBe(`My rules.\n${PLATFORM_SPONSOR_DISCLAIMER}`);
+  });
+  it("survives a seller deleting it before saving", () => {
+    const r = validateGiveawayInput({ ...base, rulesText: "No purchase necessary. Sponsor: me." }, new Date("2030-05-01T00:00:00Z"));
+    expect(r.ok && r.value.rulesText).toContain("Apple Inc. and Google LLC are not sponsors");
   });
 });
 

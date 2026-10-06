@@ -60,6 +60,21 @@ export interface RulesTemplateInput {
   postEntry: boolean;
 }
 
+/**
+ * App Store 5.3.3 (and Google Play's contest policy): official rules must say
+ * Apple / Google are not sponsors. Always part of the stored rules, whatever
+ * the seller edits (QA-0100).
+ */
+export const PLATFORM_SPONSOR_DISCLAIMER =
+  "Apple Inc. and Google LLC are not sponsors of, and are not involved in, this giveaway in any way.";
+
+/** The rules exactly as stored: the seller's text plus the platform disclaimer once. */
+export function withPlatformDisclaimer(rulesText: string): string {
+  const text = rulesText.trim();
+  if (text.includes(PLATFORM_SPONSOR_DISCLAIMER)) return text;
+  return `${text}\n${PLATFORM_SPONSOR_DISCLAIMER}`;
+}
+
 /** Editable starting point for the rules field. Always states "No purchase necessary". */
 export function buildRulesTemplate(i: RulesTemplateInput): string {
   const region = i.region?.trim() || "the regions where Brandthread is available";
@@ -72,6 +87,7 @@ export function buildRulesTemplate(i: RulesTemplateInput): string {
     "NO PURCHASE NECESSARY TO ENTER OR WIN. A purchase will not improve your chances of winning.",
     "",
     `Sponsor: ${i.sellerName}. This giveaway is not sponsored, endorsed or administered by Brandthread.`,
+    PLATFORM_SPONSOR_DISCLAIMER,
     `Giveaway period: ${fmtDate(i.startsAt)} to ${fmtDate(i.endsAt)} (UTC).`,
     `Eligibility: ${eligibility}. Open in ${region}. The sponsor and blocked accounts are not eligible.`,
     `How to enter: ${how} Each person gets one entry. Duplicate, automated or fake accounts are disqualified.`,
@@ -205,15 +221,16 @@ export function validateGiveawayInput(raw: unknown, now: Date = new Date(), opts
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const title = str(r.title);
   const prizeText = str(r.prizeText);
-  const rulesText = str(r.rulesText);
+  const rawRules = str(r.rulesText);
   const eligibility = str(r.eligibility);
   const region = str(r.region);
   if (!title) return { ok: false, error: "A title is required." };
   if (title.length > 80) return { ok: false, error: "Title must be 80 characters or fewer." };
   if (!prizeText) return { ok: false, error: "Describe the prize." };
   if (prizeText.length > 200) return { ok: false, error: "Prize must be 200 characters or fewer." };
-  if (!rulesText) return { ok: false, error: "Official rules are required." };
-  if (rulesText.length > 5000) return { ok: false, error: "Rules must be 5000 characters or fewer." };
+  if (!rawRules) return { ok: false, error: "Official rules are required." };
+  if (rawRules.length > 5000) return { ok: false, error: "Rules must be 5000 characters or fewer." };
+  const rulesText = withPlatformDisclaimer(rawRules);
   if (eligibility.length > 300) return { ok: false, error: "Eligibility must be 300 characters or fewer." };
   if (region.length > 100) return { ok: false, error: "Region must be 100 characters or fewer." };
 

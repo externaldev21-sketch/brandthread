@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/Button';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatDay, timeLeft } from '@/lib/sellerEngagement';
 
+import { PLATFORM_SPONSOR_DISCLAIMER } from '@/lib/giveawayDisclaimer';
+
 export default function GiveawayScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const api = useApi();
@@ -59,6 +61,8 @@ export default function GiveawayScreen() {
         <Text style={[styles.title, { color: c.foreground }]}>{g.title}</Text>
         <Text style={[styles.prize, { color: c.foreground }]}>{g.prizeText}</Text>
         <Text style={[styles.note, { color: c.mutedForeground }]}>Hosted by {g.seller.name}. No purchase necessary.</Text>
+        {/* App Store 5.3.3 / Google Play contest policy (QA-0100). */}
+        <Text style={[styles.note, { color: c.mutedForeground }]}>{PLATFORM_SPONSOR_DISCLAIMER}</Text>
 
         {g.youWon ? (
           <View style={[styles.banner, { borderColor: c.border }]}>
