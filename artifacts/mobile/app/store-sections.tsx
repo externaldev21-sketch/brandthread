@@ -27,7 +27,7 @@ import { StoreSectionType, SECTION_TYPE_LABELS } from '@/services/storeTypes';
 const SECTION_CATALOG = [
   {
     category: 'Hero', sections: [
-      { type: 'hero_image', icon: 'maximize', desc: 'Full-width image with heading and button.' },
+      { type: 'hero_image', icon: 'maximize', desc: 'Wide image with heading and button.' },
       { type: 'hero_video', icon: 'play-circle', desc: 'Autoplay video with overlay text.' },
       { type: 'hero_slideshow', icon: 'image', desc: 'Multiple images or videos in a carousel.' },
     ],
@@ -48,7 +48,7 @@ const SECTION_CATALOG = [
     ],
   },
   {
-    category: 'Social Proof', sections: [
+    category: 'Social proof', sections: [
       { type: 'customer_reviews', icon: 'star', desc: 'Display buyer reviews and ratings.' },
       { type: 'seller_posts', icon: 'video', desc: 'Your Thread posts on the storefront.' },
       { type: 'social_feed', icon: 'rss', desc: 'Social media content (upload required).' },
@@ -72,6 +72,10 @@ const SECTION_CATALOG = [
     ],
   },
 ];
+
+// Section labels are shared Title Case; show them in sentence case here (keep acronyms like FAQ).
+const toSentenceCase = (label: string) =>
+  label.split(' ').map((w, i) => (i === 0 || (w.length > 1 && w === w.toUpperCase()) ? w : w.toLowerCase())).join(' ');
 
 export default function StoreSectionsScreen() {
   const { theme } = useAppTheme();
@@ -98,23 +102,22 @@ export default function StoreSectionsScreen() {
   return (
     <View style={styles.root}>
       <ScreenHeader
-        title="Add Section"
+        title="Add section"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
-
-      <Text style={styles.subtitle}>Choose a section to add to your homepage.</Text>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + SP.xl }]}
         keyboardShouldPersistTaps="handled"
       >
+        <Text style={styles.subtitle}>Choose a section to add to your homepage.</Text>
         {SECTION_CATALOG.map((group) => (
           <View key={group.category} style={styles.group}>
             <SectionHeader title={group.category} style={styles.sectionHeader} />
             {group.sections.map((item) => {
               const isAdding = adding === item.type;
-              const sectionLabel = (SECTION_TYPE_LABELS as Record<string, string>)[item.type] ?? item.type;
+              const sectionLabel = toSentenceCase((SECTION_TYPE_LABELS as Record<string, string>)[item.type] ?? item.type);
               return (
                 <BrandthreadCard
                   key={item.type}
@@ -183,10 +186,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: MUTED,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
   },
   scrollContent: {
+    paddingTop: SP.md,
     paddingHorizontal: SP.md,
     gap: SP.md,
   },

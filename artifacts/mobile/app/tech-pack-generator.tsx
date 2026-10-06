@@ -265,7 +265,7 @@ export default function TechPackGeneratorScreen() {
               <View
                 style={[
                   styles.stepDot,
-                  { backgroundColor: i <= stepIndex ? colors.primary : colors.secondary },
+                  { backgroundColor: i <= stepIndex ? colors.primary : colors.border },
                 ]}
               />
               {i < STEPS.length - 1 && <View style={[styles.stepLine, { backgroundColor: colors.border }]} />}
@@ -276,23 +276,23 @@ export default function TechPackGeneratorScreen() {
         {step === 'info' && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Step 1 · Product info</Text>
-            <Field label="Product name*" value={productName} onChangeText={setProductName} colors={colors} placeholder="Oversized Hoodie" />
+            <Field label="Product name*" value={productName} onChangeText={setProductName} colors={colors} placeholder="e.g. Oversized hoodie" />
             <Field label="Brand name" value={brandName} onChangeText={setBrandName} colors={colors} placeholder="Your brand" />
             <View style={styles.row2}>
               <View style={{ flex: 1 }}>
-                <Field label="Category" value={category} onChangeText={setCategory} colors={colors} placeholder="Hoodie" />
+                <Field label="Category" value={category} onChangeText={setCategory} colors={colors} placeholder="e.g. Hoodie" />
               </View>
               <View style={{ flex: 1 }}>
-                <Field label="Season" value={season} onChangeText={setSeason} colors={colors} placeholder="FW26" />
+                <Field label="Season" value={season} onChangeText={setSeason} colors={colors} placeholder="e.g. FW26" />
               </View>
             </View>
-            <Field label="Style #" value={styleNumber} onChangeText={setStyleNumber} colors={colors} placeholder="HD-001" />
+            <Field label="Style #" value={styleNumber} onChangeText={setStyleNumber} colors={colors} placeholder="e.g. HD-001" />
             <Field
               label="Description / notes"
               value={description}
               onChangeText={setDescription}
               colors={colors}
-              placeholder="Heavyweight cotton fleece, boxy fit, dropped shoulder..."
+              placeholder="e.g. Heavyweight cotton fleece, boxy fit, dropped shoulder..."
               multiline
             />
             <Field
@@ -300,7 +300,7 @@ export default function TechPackGeneratorScreen() {
               value={colorwaysText}
               onChangeText={setColorwaysText}
               colors={colors}
-              placeholder="Black, Sand, Forest Green"
+              placeholder="e.g. Black, Sand, Forest Green"
             />
 
             <TouchableOpacity
@@ -401,7 +401,7 @@ export default function TechPackGeneratorScreen() {
                         value={row.point}
                         onChangeText={(v) => updateRowPoint(i, v)}
                         placeholder="Chest"
-                        placeholderTextColor={colors.mutedForeground}
+                        placeholderTextColor={colors.subtle}
                         style={[styles.pointInput, { color: colors.foreground, borderColor: colors.border }]}
                       />
                     </View>
@@ -411,7 +411,7 @@ export default function TechPackGeneratorScreen() {
                           value={row.values[size] ?? ''}
                           onChangeText={(v) => updateCell(i, size, v)}
                           placeholder="—"
-                          placeholderTextColor={colors.mutedForeground}
+                          placeholderTextColor={colors.subtle}
                           style={[styles.valueInput, { color: colors.foreground, borderColor: colors.border }]}
                         />
                       </View>
@@ -449,7 +449,7 @@ export default function TechPackGeneratorScreen() {
               value={materialsNotes}
               onChangeText={setMaterialsNotes}
               colors={colors}
-              placeholder="400gsm cotton fleece, YKK zippers, woven label at neck..."
+              placeholder="e.g. 400gsm cotton fleece, YKK zippers, woven label at neck..."
               multiline
             />
             <Field
@@ -457,7 +457,7 @@ export default function TechPackGeneratorScreen() {
               value={printPlacementNotes}
               onChangeText={setPrintPlacementNotes}
               colors={colors}
-              placeholder="Embroidered logo, left chest, 3in wide..."
+              placeholder="e.g. Embroidered logo, left chest, 3in wide..."
               multiline
             />
             <Field
@@ -562,7 +562,7 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.mutedForeground}
+        placeholderTextColor={colors.subtle}
         multiline={multiline}
         maxLength={1000}
       />

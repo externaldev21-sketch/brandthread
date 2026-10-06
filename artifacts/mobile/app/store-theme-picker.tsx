@@ -130,9 +130,9 @@ export default function StoreThemePicker() {
           <Text style={styles.themeMeta}>
             {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
             {'  ·  '}
-            {item.supportedModes.join(', ')}
+            {(() => { const modes = item.supportedModes.join(', '); return modes.charAt(0).toUpperCase() + modes.slice(1); })()}
           </Text>
-          <Text style={styles.themeBestFor} numberOfLines={1}>{item.bestFor}</Text>
+          <Text style={styles.themeBestFor} numberOfLines={2}>{item.bestFor}</Text>
 
           <View style={styles.themeActions}>
             <TouchableOpacity
@@ -154,7 +154,7 @@ export default function StoreThemePicker() {
               {isApplying ? (
                 <ActivityIndicator size="small" color={theme.text} />
               ) : (
-                <Text style={styles.useBtnText}>{isCurrent ? 'Active' : 'Use Theme'}</Text>
+                <Text style={styles.useBtnText}>{isCurrent ? 'Active' : 'Use theme'}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -166,7 +166,7 @@ export default function StoreThemePicker() {
   return (
     <View style={styles.root}>
       <ScreenHeader
-        title="Storefront Theme"
+        title="Storefront theme"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
 

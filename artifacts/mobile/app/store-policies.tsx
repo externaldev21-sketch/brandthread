@@ -27,12 +27,12 @@ export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' 
 interface StorePolicy { type: PolicyType; content: string; updatedAt?: string; aiGenerated?: boolean; }
 
 const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { type: 'shipping',   label: 'Shipping Policy',   icon: 'truck' },
-  { type: 'return',     label: 'Return Policy',      icon: 'rotate-ccw' },
-  { type: 'refund',     label: 'Refund Policy',      icon: 'dollar-sign' },
-  { type: 'privacy',    label: 'Privacy Policy',     icon: 'shield' },
-  { type: 'terms',      label: 'Terms of Service',   icon: 'file-text' },
-  { type: 'pre_order',  label: 'Pre-order Policy',   icon: 'calendar' },
+  { type: 'shipping',   label: 'Shipping policy',   icon: 'truck' },
+  { type: 'return',     label: 'Return policy',      icon: 'rotate-ccw' },
+  { type: 'refund',     label: 'Refund policy',      icon: 'dollar-sign' },
+  { type: 'privacy',    label: 'Privacy policy',     icon: 'shield' },
+  { type: 'terms',      label: 'Terms of service',   icon: 'file-text' },
+  { type: 'pre_order',  label: 'Pre-order policy',   icon: 'calendar' },
 ];
 
 export default function StorePoliciesScreen() {

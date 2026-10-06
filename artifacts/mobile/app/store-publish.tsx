@@ -49,6 +49,7 @@ export default function StorePublishScreen() {
   const [shareCopied, setShareCopied] = useState(false);
   const [revokingPreview, setRevokingPreview] = useState(false);
   const [previewRevoked, setPreviewRevoked] = useState(false);
+  const [previewLinkGenerated, setPreviewLinkGenerated] = useState(false);
 
   const leaveSetupDestination = () => {
     if (isSellerSetupOrigin(params.from)) {
@@ -65,6 +66,7 @@ export default function StorePublishScreen() {
       const result = await (api as any).store.sharePreview() as { url: string; expiresAt: string };
       await Clipboard.setStringAsync(result.url);
       setPreviewRevoked(false);
+      setPreviewLinkGenerated(true);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 3000);
     } catch {
@@ -240,10 +242,12 @@ export default function StorePublishScreen() {
           ) : null}
         </BrandthreadCard>
 
-        <TouchableOpacity style={pub.revalidateBtn} onPress={doValidate}>
-          <Feather name="refresh-cw" size={ICON.xs} color={MUTED} />
-          <Text style={pub.revalidateText}>Validate Again</Text>
-        </TouchableOpacity>
+        {!validating && (
+          <TouchableOpacity style={pub.revalidateBtn} onPress={doValidate}>
+            <Feather name="refresh-cw" size={ICON.xs} color={MUTED} />
+            <Text style={pub.revalidateText}>Validate again</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Share a private preview link before going live */}
         {!published && (
@@ -258,9 +262,9 @@ export default function StorePublishScreen() {
                 onPress={handleSharePreview}
                 disabled={sharingPreview}
                 icon={shareCopied ? 'check' : 'link'}
-                style={{ flex: 1 }}
+                style={{ flex: 1, paddingHorizontal: SP.md }}
               />
-              {!previewRevoked && (
+              {previewLinkGenerated && !previewRevoked && (
                 <TouchableOpacity onPress={handleRevokePreview} disabled={revokingPreview} style={pub.revokeBtn}>
                   <Text style={pub.revokeText}>{revokingPreview ? 'Revoking…' : 'Revoke'}</Text>
                 </TouchableOpacity>
@@ -353,6 +357,6 @@ function makePubStyles(c: { FG: string; MUTED: string; SUCCESS: string; RED: str
     shareDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: c.MUTED, lineHeight: 19 },
     shareActions: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.xs },
     revokeBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.sm },
-    revokeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.RED },
+    revokeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.MUTED },
   });
 }

@@ -165,7 +165,8 @@ function metricSeries(
 }
 
 function formatMetricValue(metric: MetricKey, value: number): string {
-  if (metric === 'sales' || metric === 'aov') return formatCentsCompact(Math.round(value));
+  // Full precision under $10k; compact ($12.4K) only above, so the hero never flips formats mid-day.
+  if (metric === 'sales' || metric === 'aov') return Math.abs(value) < 1_000_000 ? formatCents(Math.round(value)) : formatCentsCompact(Math.round(value));
   if (metric === 'conversion') return `${value.toFixed(1)}%`;
   return formatCompactCount(Math.round(value));
 }
