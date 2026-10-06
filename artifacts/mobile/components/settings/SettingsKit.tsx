@@ -62,7 +62,7 @@ export function SettingsProfileCard({
       <View style={s.profileCopy}>
         <Text style={s.profileEyebrow}>{eyebrow}</Text>
         <Text style={s.profileName} numberOfLines={2}>{name}</Text>
-        <Text style={s.profileSub} numberOfLines={1}>
+        <Text style={s.profileSub} numberOfLines={2}>
           {handle ? `@${handle}` : subtitle ?? 'Manage your account and preferences'}
         </Text>
       </View>

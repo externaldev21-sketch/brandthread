@@ -134,8 +134,8 @@ export default function ShopifyImportScreen() {
       ) : !connected ? (
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
           <BrandthreadCard style={styles.hero}>
-            <View style={[styles.heroIcon, { backgroundColor: '#95BF4722' }]}>
-              <Feather name="shopping-bag" size={22} color="#5E8E3E" />
+            <View style={[styles.heroIcon, { backgroundColor: colors.muted }]}>
+              <Feather name="shopping-bag" size={22} color={colors.foreground} />
             </View>
             <Text style={[styles.heroTitle, { color: colors.foreground }]}>Bring your Shopify catalog over</Text>
             <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>

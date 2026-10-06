@@ -266,7 +266,7 @@ export default function SellerVerificationScreen() {
             <Text style={s.sectionTitle}>How it works</Text>
             {[
               { n: '1', text: 'Tap "Start verification" below' },
-              { n: '2', text: "Take a photo of your government-issued ID (passport, driver's licence, or national ID card)" },
+              { n: '2', text: "Take a photo of your government-issued ID (passport, driver's license, or national ID card)" },
               { n: '3', text: 'Take a quick selfie to match your face to the document' },
               { n: '4', text: 'Stripe reviews the documents — typically takes a few minutes' },
             ].map(step => (
