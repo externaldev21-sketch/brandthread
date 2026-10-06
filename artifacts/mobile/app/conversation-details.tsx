@@ -200,7 +200,7 @@ export default function ConversationDetailsScreen() {
   function openNicknames() {
     hapticPrimaryAction();
     const qs = new URLSearchParams({
-      id: params.id,
+      id: params.id ?? '',
       role: params.role ?? 'buyer',
       participantUserId: params.participantUserId ?? '',
       participantName: params.participantName ?? '',
@@ -212,7 +212,7 @@ export default function ConversationDetailsScreen() {
   function openPrivacySafety() {
     hapticPrimaryAction();
     const qs = new URLSearchParams({
-      id: params.id,
+      id: params.id ?? '',
       participantUserId: params.participantUserId ?? '',
       participantName: params.participantName ?? '',
     });

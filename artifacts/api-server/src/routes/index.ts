@@ -226,6 +226,7 @@ router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
+router.use("/package-presets",           packagePresetsRouter); // router applies requireAuth/teamContext itself
 router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/returns",                   tc, returnsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);

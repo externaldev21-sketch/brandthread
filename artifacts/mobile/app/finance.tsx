@@ -19,6 +19,9 @@ import { zeroFinanceSummary } from '@/lib/financeSummary';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { API_BASE_URL, storeContextHeaders, versionApiPath } from '@/lib/api';
+import { fetchStatementCsv, statementErrorLabel, statementFilename, STATEMENT_CSV_PATH } from '@/lib/financeStatement';
+import { saveCsvFile } from '@/lib/saveCsvFile';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -37,7 +40,7 @@ export default function FinanceScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
-  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId, getToken } = useAuth();
   // ?bt_preview=seller with no real signed-in account: no token to fetch
   // real finance data with — resolve straight to the honest $0.00/empty
   // state instead of a "couldn't load" retry banner (same convention as
@@ -101,10 +104,26 @@ export default function FinanceScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  // The statement route requires auth, so fetch it with the Bearer token
+  // (a bare Linking.openURL got a 401) and surface failures inline.
+  const [statementDownloading, setStatementDownloading] = useState(false);
+  const [statementError, setStatementError] = useState<string | null>(null);
   const handleDownloadStatement = async () => {
-    const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-    const url  = `${BASE}/api/finance/statement.csv`;
-    try { await Linking.openURL(url); } catch { /* ignore */ }
+    if (statementDownloading) return;
+    setStatementDownloading(true);
+    setStatementError(null);
+    try {
+      const csv = await fetchStatementCsv({
+        url: `${API_BASE_URL}${versionApiPath(STATEMENT_CSV_PATH)}`,
+        token: await getToken(),
+        headers: storeContextHeaders(),
+      });
+      await saveCsvFile(csv, statementFilename(), 'Finance statement');
+    } catch (err) {
+      setStatementError(statementErrorLabel(err));
+    } finally {
+      setStatementDownloading(false);
+    }
   };
 
   // Build overview cards from real data
@@ -309,9 +328,16 @@ export default function FinanceScreen() {
                   <Feather name={item.icon} size={15} color={colors.mutedForeground} />
                 </View>
                 <Text style={[styles.docLabel, { color: colors.foreground }]}>{item.label}</Text>
-                <Feather name="download" size={15} color={colors.mutedForeground} />
+                {item.onPress === handleDownloadStatement && statementDownloading
+                  ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  : <Feather name="download" size={15} color={colors.mutedForeground} />}
               </TouchableOpacity>
             ))}
+            {statementError && (
+              <View style={{ paddingHorizontal: 16, paddingBottom: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }}>
+                <RetryRow label={statementError} onRetry={() => { void handleDownloadStatement(); }} />
+              </View>
+            )}
           </View>
         </>
       )}

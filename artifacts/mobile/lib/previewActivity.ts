@@ -228,7 +228,7 @@ function seedPreviewActivity(): ActivityItem[] {
     },
     {
       id: 'preview-act-mention-01', category: 'social', type: 'mention',
-      title: `${p[4].name} mentioned you in a comment`, body: `check out @you's fit from last week`, isRead: true,
+      title: `${p[4].name} mentioned you in a comment`, body: 'check out your fit from last week', isRead: true,
       actorId: p[4].userId, actorName: p[4].name, actorInitials: p[4].initials, actorColor: p[4].color, actorAvatarUrl: p[4].avatarUrl,
       targetId: 'preview-post-05', targetType: 'post', targetImageUrl: posterUri(4), createdAt: minutesAgo(60 * 24 * 3),
       commentId: 'preview-comment-act-02',

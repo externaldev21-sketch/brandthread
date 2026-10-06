@@ -12,6 +12,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreviewHtml } = require('./sharePreview');
 const { landingPathFor, shouldServeLanding } = require('./landing');
+const { legacyRedirectTarget } = require('./legacyRedirects');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -139,6 +140,12 @@ const server = http.createServer(async (req, res) => {
     requestedPath = decodeURIComponent(pathname);
   } catch {
     send(res, 400, 'Bad Request');
+    return;
+  }
+  const legacyTarget = legacyRedirectTarget(requestedPath, requestUrl.search);
+  if (legacyTarget) {
+    res.writeHead(301, { location: `${basePath}${legacyTarget}`, 'cache-control': 'public, max-age=3600' });
+    res.end();
     return;
   }
   const acceptEncoding = String(req.headers['accept-encoding'] || '');

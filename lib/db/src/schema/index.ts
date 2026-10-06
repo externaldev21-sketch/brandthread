@@ -1699,6 +1699,10 @@ export const storefronts = pgTable('storefronts', {
   // SHA-256 fingerprint of the one currently valid public preview token.
   // The raw bearer token is never stored in the database.
   sharePreviewTokenHash: text('share_preview_token_hash'),
+  // Set when the seller claims `slug` as their <slug>.brandthread.app
+  // subdomain (PUT /api/store/subdomain). Null = still the auto-assigned slug.
+  // Case-insensitive uniqueness: UNIQUE INDEX on lower(slug), migration 270.
+  subdomainClaimedAt: timestamp('subdomain_claimed_at', { withTimezone: true }),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
   updatedAt:     timestamp('updated_at').defaultNow().notNull(),
 });

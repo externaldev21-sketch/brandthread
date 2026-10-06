@@ -33,6 +33,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { resolveShareProfileAccount } from '@/lib/shareProfileAccount';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,9 +66,20 @@ export default function ShareProfileScreen() {
   const mountedAccountRef = useRef<string | null>(null);
 
   // Load profile from API (not from Clerk metadata — we need the DB username).
+  const account = resolveShareProfileAccount({
+    authLoaded,
+    userId: user?.id,
+    preview: isSellerDevPreview() || isBuyerDevPreview(),
+  });
+  const accountKey = account.status === 'ready' ? account.key : null;
   const loadProfile = useCallback(async () => {
-    if (!authLoaded || !user?.id) return;
-    const currentUserId = user.id;
+    if (account.status === 'wait') return;
+    if (account.status === 'signedOut') {
+      setError(true);
+      setLoading(false);
+      return;
+    }
+    const currentUserId = account.key;
     setError(false);
     setLoading(true);
     try {
@@ -83,17 +96,17 @@ export default function ShareProfileScreen() {
     } finally {
       if (mountedAccountRef.current === currentUserId) setLoading(false);
     }
-  }, [api, authLoaded, user?.id]);
+  }, [api, account.status, accountKey]);
 
   // On mount: record which account this page was opened for.
   useEffect(() => {
-    mountedAccountRef.current = user?.id ?? null;
+    mountedAccountRef.current = accountKey;
     autoCopyFiredRef.current = false;
     setProfile(null);
     setCopied(false);
     setAutoCopied(false);
     loadProfile();
-  }, [user?.id, loadProfile]);
+  }, [accountKey, loadProfile]);
 
   // Auto-copy exactly once after a valid URL is ready.
   const canonicalUrl = buildCanonicalProfileUrl(profile?.username);

@@ -2,7 +2,7 @@
  * Brandthread Design Studio — Edit with Prompt
  * Route: /design-prompt-edit
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -21,7 +21,9 @@ import {
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
-import { applyPromptEdit } from '@/services/designService';
+import { applyPromptEdit, getProjects } from '@/services/designService';
+import { recentProjectSources, type RecentProjectSource } from '@/lib/designProjectSource';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import type { AIGenerationResult } from '@/services/designTypes';
 
 const EXAMPLE_PROMPTS = [
@@ -31,13 +33,6 @@ const EXAMPLE_PROMPTS = [
   'Remove wrinkles',
   'Make image look like a campaign photo',
   'Put the model in a studio',
-];
-
-const RECENT_PROJECTS = [
-  'Summer Drop Hoodie',
-  'Logo Tee — White',
-  'Fall Collection Jacket',
-  'Streetwear Lookbook',
 ];
 
 export default function DesignPromptEditScreen() {
@@ -60,6 +55,17 @@ export default function DesignPromptEditScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<AIGenerationResult | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  // The seller's own design projects that carry a real image — the "Recent
+  // projects" option is hidden when there are none.
+  const [recentProjects, setRecentProjects] = useState<RecentProjectSource[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    getProjects()
+      .then(projects => { if (active) setRecentProjects(recentProjectSources(projects)); })
+      .catch(() => { if (active) setRecentProjects([]); });
+    return () => { active = false; };
+  }, []);
 
   async function pickImage() {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -72,13 +78,13 @@ export default function DesignPromptEditScreen() {
   }
 
   function chooseFromRecent() {
-    Alert.alert(
-      'Recent Projects',
+    showActionSheet(
+      'Recent projects',
       'Choose a project to edit',
       [
-        ...RECENT_PROJECTS.map((p) => ({
-          text: p,
-          onPress: () => setImageUri(`mock://project/${p.replace(/\s/g, '-').toLowerCase()}`),
+        ...recentProjects.map((p) => ({
+          text: p.name,
+          onPress: () => setImageUri(p.uri),
         })),
         { text: 'Cancel', style: 'cancel' as const },
       ],
@@ -138,7 +144,9 @@ export default function DesignPromptEditScreen() {
           )}
           <View style={s.uploadActions}>
             <PrimaryButton label={imageUri ? 'Change image' : 'Upload image'} onPress={pickImage} icon="upload" style={s.uploadBtn} />
-            <SecondaryButton label="Recent projects" onPress={chooseFromRecent} icon="folder" style={s.uploadBtn} />
+            {recentProjects.length > 0 && (
+              <SecondaryButton label="Recent projects" onPress={chooseFromRecent} icon="folder" style={s.uploadBtn} />
+            )}
           </View>
         </BrandthreadCard>
 

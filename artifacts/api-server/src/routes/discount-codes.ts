@@ -29,6 +29,26 @@ function statusOf(code: typeof discountCodes.$inferSelect, now = new Date()): st
   return "active";
 }
 
+/**
+ * Validates a discount's active window. `undefined` means "not supplied";
+ * `null`/"" means "no bound". Returns an error message for a 400, or null.
+ * The window is [startsAt, expiresAt): redemption is refused once
+ * expiresAt <= now (see statusOf / lib/discounts), so clients send the end
+ * date as the end of the seller's local day to make it inclusive.
+ */
+export function discountDateWindowError(
+  startsAt: string | Date | null | undefined,
+  expiresAt: string | Date | null | undefined,
+): string | null {
+  const toDate = (v: string | Date | null | undefined) => (v ? new Date(v) : null);
+  const start = toDate(startsAt);
+  const end = toDate(expiresAt);
+  if (start && Number.isNaN(start.getTime())) return "startsAt must be a valid date";
+  if (end && Number.isNaN(end.getTime())) return "expiresAt must be a valid date";
+  if (start && end && end.getTime() <= start.getTime()) return "expiresAt must be after startsAt";
+  return null;
+}
+
 function decorate(code: typeof discountCodes.$inferSelect) {
   return { ...code, status: statusOf(code) };
 }
@@ -82,6 +102,11 @@ router.post("/", requirePermission("marketing"), async (req, res) => {
 
     if (!VALID_TYPES.includes(type as any)) {
       res.status(400).json({ error: `type must be one of: ${VALID_TYPES.join(", ")}` });
+      return;
+    }
+    const dateError = discountDateWindowError(startsAt, expiresAt);
+    if (dateError) {
+      res.status(400).json({ error: dateError });
       return;
     }
     if (type === "percentage") {
@@ -259,6 +284,28 @@ router.patch("/:id", requirePermission("marketing"), async (req, res) => {
       productIds?: string[];
       value?: number;
     };
+
+    if (startsAt !== undefined || expiresAt !== undefined) {
+      let effectiveStart: string | Date | null | undefined = startsAt;
+      let effectiveEnd: string | Date | null | undefined = expiresAt;
+      // Only one bound changed: check it against the stored other bound.
+      if (startsAt === undefined || expiresAt === undefined) {
+        const [existing] = await db
+          .select({ startsAt: discountCodes.startsAt, expiresAt: discountCodes.expiresAt })
+          .from(discountCodes)
+          .where(and(eq(discountCodes.id, id), eq(discountCodes.sellerId, sellerId)))
+          .limit(1);
+        if (existing) {
+          if (startsAt === undefined) effectiveStart = existing.startsAt;
+          if (expiresAt === undefined) effectiveEnd = existing.expiresAt;
+        }
+      }
+      const dateError = discountDateWindowError(effectiveStart, effectiveEnd);
+      if (dateError) {
+        res.status(400).json({ error: dateError });
+        return;
+      }
+    }
 
     const updates: Record<string, unknown> = {};
     if (active !== undefined) updates.active = active;

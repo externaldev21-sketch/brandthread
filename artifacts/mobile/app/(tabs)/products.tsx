@@ -36,6 +36,8 @@ import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
+import { useApi } from '@/lib/api';
+import { setPendingMockup, takePendingMockup, attachMockupToListedProduct } from '@/lib/mockupProductHandoff';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -402,7 +404,8 @@ export default function ProductsScreen() {
   const contentWidth = Math.min(screenWidth, 1080) - gridGutter * 2;
   const cardWidth = (contentWidth - gridGap * (gridColumns - 1)) / gridColumns;
 
-  const params = useLocalSearchParams<{ filter?: ProductFilter }>();
+  const params = useLocalSearchParams<{ filter?: ProductFilter; pickForMockup?: string; projectId?: string }>();
+  const api = useApi();
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
@@ -630,8 +633,20 @@ export default function ProductsScreen() {
       showPreviewOnlyFeedback();
       return;
     }
+    // Opened from Mockup preview "Add to product → Existing product": the
+    // tapped product receives the mockup photo, then opens.
+    const mockup = params.pickForMockup === '1' ? takePendingMockup(params.projectId) : null;
+    if (mockup) {
+      attachMockupToListedProduct({ api, updateLocal: updateProduct }, product, mockup.uri)
+        .then(() => {
+          router.setParams({ pickForMockup: undefined, projectId: undefined } as never);
+          router.push(('/product-detail?id=' + product.id) as never);
+        })
+        .catch(() => { setPendingMockup(mockup); showActionSheet('Couldn’t add the mockup', 'Check your connection and try again.', [{ text: 'OK', style: 'cancel' }]); });
+      return;
+    }
     router.push(('/product-detail?id=' + product.id) as never);
-  }, [router, previewOnly, showPreviewOnlyFeedback]);
+  }, [router, previewOnly, showPreviewOnlyFeedback, params.pickForMockup, params.projectId, api]);
 
   const openActionSheet = useCallback((product: Product) => {
     if (previewOnly) {

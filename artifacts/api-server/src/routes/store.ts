@@ -2,11 +2,13 @@ import dns from "dns/promises";
 import { Router } from "express";
 import {
   db, storefronts, storefrontVersions, storefrontCustomDomains,
-  products, productVariants,
+  products, productVariants, users,
 } from "@workspace/db";
-import { eq, and, desc, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, isNull, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getWebOrigin } from "../lib/webOrigin";
+import { isUniqueViolation } from "../lib/dbErrors";
+import { buildSubdomainState, subdomainFromHandle, validateSubdomain } from "../lib/storeSubdomain";
 import crypto from "crypto";
 
 const router = Router();
@@ -119,6 +121,14 @@ const SAFE_FONT_RE = /^[A-Za-z0-9 ,\-_'"]+$/;
 function safeFontFamily(val: unknown, fallback: string): string {
   const s = String(val ?? "").trim();
   return SAFE_FONT_RE.test(s) && s.length <= 200 ? s : fallback;
+}
+
+/** Shallow-merge a partial JSON object into a stored JSON column value. */
+function mergeJsonObject(stored: unknown, incoming: unknown): unknown {
+  const isObj = (v: unknown): v is Record<string, unknown> =>
+    !!v && typeof v === "object" && !Array.isArray(v);
+  if (!isObj(incoming)) return incoming;
+  return { ...(isObj(stored) ? stored : {}), ...incoming };
 }
 
 // Brand-new, never-customized storefronts (getOrCreateStorefront's own
@@ -792,12 +802,17 @@ router.put("/", async (req, res) => {
   ];
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const key of allowedFields) {
-    if (key in req.body) {
+    // An omitted (or undefined) field must leave the stored value alone.
+    if (key in req.body && req.body[key] !== undefined) {
       // camelCase → snake_case mapping for DB columns
       const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
       update[dbKey] = key === "theme"
         ? normalizeThreadTheme(req.body[key])
-        : req.body[key];
+        : (key === "branding" || key === "seo")
+          // Partial objects merge into what's stored, so a client that only
+          // sends e.g. { logoUrl } doesn't wipe tagline / mission / keywords.
+          ? mergeJsonObject((sf as Record<string, unknown>)[key], req.body[key])
+          : req.body[key];
     }
   }
 
@@ -1119,6 +1134,97 @@ router.delete("/share-preview", async (req, res): Promise<void> => {
     })
     .where(eq(storefronts.id, sf.id));
   res.json({ ok: true, revokedAt: new Date().toISOString() });
+});
+
+// ─── Brandthread subdomain (<slug>.brandthread.app) ──────────────────────────
+// The storefront slug is the subdomain. It's platform-owned, so once claimed
+// here it is 'active' — there is no client-reported verification state.
+
+/** Case-insensitive lookup of the storefront (if any) that owns `subdomain`. */
+async function findSlugOwner(subdomain: string): Promise<{ id: string } | undefined> {
+  const [row] = await db
+    .select({ id: storefronts.id })
+    .from(storefronts)
+    .where(sql`lower(${storefronts.slug}) = ${subdomain}`)
+    .limit(1);
+  return row;
+}
+
+async function suggestSubdomain(ownerId: string, sf: { id: string; title?: string | null }): Promise<string | null> {
+  const [user] = await db
+    .select({ username: users.username, brandName: users.brandName })
+    .from(users)
+    .where(eq(users.clerkId, ownerId))
+    .limit(1);
+  const candidates = [user?.username, user?.brandName, sf.title]
+    .map(subdomainFromHandle)
+    .filter((c): c is string => !!c && validateSubdomain(c).ok);
+  for (const candidate of [...new Set(candidates)]) {
+    const owner = await findSlugOwner(candidate);
+    if (!owner || owner.id === sf.id) return candidate;
+  }
+  return null;
+}
+
+// GET /api/store/subdomain — the seller's subdomain + state
+router.get("/subdomain", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const sf = await getOrCreateStorefront(ownerId);
+  const suggestion = sf.subdomainClaimedAt ? null : await suggestSubdomain(ownerId, sf);
+  res.json(buildSubdomainState(sf, suggestion));
+});
+
+// GET /api/store/subdomain/availability?name=foo
+router.get("/subdomain/availability", async (req, res): Promise<void> => {
+  const ownerId = (req as any).clerkUserId as string;
+  const check = validateSubdomain(req.query.name);
+  if (!check.ok) {
+    res.json({ subdomain: String(req.query.name ?? ""), available: false, reason: check.error, message: check.message });
+    return;
+  }
+  const sf = await getOrCreateStorefront(ownerId);
+  const owner = await findSlugOwner(check.subdomain);
+  const available = !owner || owner.id === sf.id;
+  res.json({
+    subdomain: check.subdomain,
+    available,
+    ...(available ? {} : { reason: "taken", message: "That subdomain is already taken." }),
+  });
+});
+
+// PUT /api/store/subdomain — claim or change the subdomain. Body: { subdomain }
+router.put("/subdomain", async (req, res): Promise<void> => {
+  const ownerId = (req as any).clerkUserId as string;
+  const check = validateSubdomain(req.body?.subdomain);
+  if (!check.ok) {
+    res.status(400).json({ error: check.message, reason: check.error });
+    return;
+  }
+  const sf = await getOrCreateStorefront(ownerId);
+  const owner = await findSlugOwner(check.subdomain);
+  if (owner && owner.id !== sf.id) {
+    res.status(409).json({ error: "That subdomain is already taken.", reason: "taken" });
+    return;
+  }
+  if (sf.subdomainClaimedAt && sf.slug === check.subdomain) {
+    res.json(buildSubdomainState(sf, null));
+    return;
+  }
+  try {
+    const [updated] = await db
+      .update(storefronts)
+      .set({ slug: check.subdomain, subdomainClaimedAt: new Date(), updatedAt: new Date() })
+      .where(eq(storefronts.id, sf.id))
+      .returning();
+    res.json(buildSubdomainState(updated, null));
+  } catch (err) {
+    // Lost a race with another seller claiming the same name.
+    if (isUniqueViolation(err)) {
+      res.status(409).json({ error: "That subdomain is already taken.", reason: "taken" });
+      return;
+    }
+    throw err;
+  }
 });
 
 // GET /api/store/public/:slug — public storefront (no auth)

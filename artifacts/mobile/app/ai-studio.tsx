@@ -8,7 +8,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FONT, FS } from '@/lib/theme';
-import { getProjects } from '@/services/designService';
+import { getProjects, createProject, updateProject } from '@/services/designService';
+import { makeDurableUri } from '@/lib/imageUri';
+import { canvasPixelSize, buildImageLayer } from '@/lib/aiStudioCanvas';
 import { DesignProject } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -61,13 +63,27 @@ export default function AIStudioScreen() {
     router.push(`/design-canvas?id=${project.id}` as never);
   }
 
-  function openCanvas(preset: SizePreset) {
+  // The canvas screen opens saved projects by `?id=`, so every entry here
+  // creates the project first (same as the Design gallery's new-canvas flows).
+  async function openCanvas(preset: SizePreset) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setNewCanvasVisible(false);
-    router.push({
-      pathname: '/design-canvas',
-      params: { label: preset.label, dims: preset.dims, ratio: String(preset.ratio) },
-    } as never);
+    try {
+      const proj = await createProject('canvas', preset.label, { ...canvasPixelSize(preset.dims), backgroundHex: '#FFFFFF' });
+      router.push(`/design-canvas?id=${proj.id}` as never);
+    } catch { Alert.alert('Error', 'Could not create canvas.'); }
+  }
+
+  async function openImageCanvas(asset: ImagePicker.ImagePickerAsset, name: string) {
+    try {
+      const uri = await makeDurableUri(asset.uri);
+      const width = asset.width || 1080, height = asset.height || 1080;
+      const proj = await createProject('canvas', name, { width, height, backgroundHex: '#FFFFFF' });
+      await updateProject(proj.id, {
+        layers: [buildImageLayer({ id: `uid_${Date.now()}`, name, uri, width, height, now: new Date().toISOString() })],
+      });
+      router.push(`/design-canvas?id=${proj.id}` as never);
+    } catch { Alert.alert('Error', 'Could not import photo.'); }
   }
 
   async function importFromLibrary() {
@@ -76,10 +92,7 @@ export default function AIStudioScreen() {
     const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.9, allowsEditing: false });
     if (!res.canceled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      router.push({
-        pathname: '/design-canvas',
-        params: { label: 'Imported', dims: SCREEN_SIZE.dims, ratio: String(SCREEN_SIZE.ratio), imageUri: res.assets[0].uri },
-      } as never);
+      await openImageCanvas(res.assets[0], 'Imported');
     }
   }
 
@@ -89,10 +102,7 @@ export default function AIStudioScreen() {
     const res = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true });
     if (!res.canceled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      router.push({
-        pathname: '/design-canvas',
-        params: { label: 'Photo', dims: SCREEN_SIZE.dims, ratio: String(SCREEN_SIZE.ratio), imageUri: res.assets[0].uri },
-      } as never);
+      await openImageCanvas(res.assets[0], 'Photo');
     }
   }
 
