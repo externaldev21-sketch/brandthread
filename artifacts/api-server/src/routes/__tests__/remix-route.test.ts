@@ -80,7 +80,7 @@ describe("GET /api/remix/posts/:postId", () => {
       allowed: true, canPostVideo: true, source: { postId: POST_ID, authorId: "author", authorUsername: "maison" },
     });
     state.accountType = "buyer";
-    expect((await (await fetch(`${base}/posts/${POST_ID}`)).json()).canPostVideo).toBe(false);
+    expect(((await (await fetch(`${base}/posts/${POST_ID}`)).json()) as { canPostVideo: boolean }).canPostVideo).toBe(false);
   });
 
   it("reports the author's refusal", async () => {
@@ -108,7 +108,7 @@ describe("POST /api/remix/posts/:postId/clip", () => {
     state.check = { allowed: false, code: "REMIX_NOT_ALLOWED", status: 403, message: "No remixes." };
     const res = await fetch(`${base}/posts/${POST_ID}/clip`, { method: "POST" });
     expect(res.status).toBe(403);
-    expect((await res.json()).code).toBe("REMIX_NOT_ALLOWED");
+    expect(((await res.json()) as { code: string }).code).toBe("REMIX_NOT_ALLOWED");
     expect(state.created).toEqual([]);
   });
 
@@ -116,6 +116,6 @@ describe("POST /api/remix/posts/:postId/clip", () => {
     state.accountType = "buyer";
     const res = await fetch(`${base}/posts/${POST_ID}/clip`, { method: "POST" });
     expect(res.status).toBe(403);
-    expect((await res.json()).code).toBe("SELLER_REQUIRED");
+    expect(((await res.json()) as { code: string }).code).toBe("SELLER_REQUIRED");
   });
 });

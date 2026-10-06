@@ -230,8 +230,8 @@ describe("tag approval, remix and snooze settings", () => {
 
   it("counts and lists pending tags", async () => {
     state.pending = [{ kind: "post", id: TAG_ID }, { kind: "story", id: POST_ID }];
-    expect((await (await fetch(base)).json()).pendingTagCount).toBe(2);
-    const list = await (await fetch(`${base}/pending-tags`)).json();
+    expect(((await (await fetch(base)).json()) as { pendingTagCount: number }).pendingTagCount).toBe(2);
+    const list = await (await fetch(`${base}/pending-tags`)).json() as { items: Array<{ kind: string }> };
     expect(list.items.map((t: { kind: string }) => t.kind)).toEqual(["post", "story"]);
   });
 
