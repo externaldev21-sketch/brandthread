@@ -22,15 +22,15 @@ const root = path.resolve(__dirname, '..');
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 describe('Messages "Options" menus use showActionSheet, not the dead-on-web Alert.alert', () => {
-  it('buyer-conversation.tsx header "..." menu (openOptions)', () => {
-    const src = read('app/buyer-conversation.tsx');
+  it('conversation thread header "..." menu (openOptions) — buyer and seller share it', () => {
+    const src = read('components/chat/ConversationThread.tsx');
     const fn = src.slice(src.indexOf('function openOptions()'), src.indexOf('function openOptions()') + 800);
     expect(fn).toContain("showActionSheet('Options'");
     expect(fn).not.toMatch(/Alert\.alert\(\s*'Options'/);
   });
 
   it('(buyer)/inbox.tsx row long-press menu (longPressConversation)', () => {
-    const src = read('app/(buyer)/inbox.tsx');
+    const src = read('components/inbox/MessagesInbox.tsx');
     const fn = src.slice(src.indexOf('function longPressConversation'), src.indexOf('function longPressConversation') + 600);
     expect(fn).toContain("showActionSheet('Options'");
     expect(fn).not.toMatch(/Alert\.alert\(\s*'Options'/);
@@ -58,17 +58,16 @@ describe('Messages "Options" menus use showActionSheet, not the dead-on-web Aler
     expect(voiceBubble).toContain('onViewTranscription?: () => void');
     expect(voiceBubble).toContain('onPress={onViewTranscription ?? (() => Alert.alert(');
 
-    const buyerConv = read('app/buyer-conversation.tsx');
-    expect(buyerConv).toContain('onViewTranscription={() => {');
-    expect(buyerConv).toContain('setTranscriptionToast(true)');
-
-    const sellerConv = read('app/seller-conversation.tsx');
-    expect(sellerConv).toContain('onViewTranscription={() => {');
-    expect(sellerConv).toContain('setTranscriptionToast(true)');
+    // Both sides render the one shared thread screen.
+    const thread = read('components/chat/ConversationThread.tsx');
+    expect(thread).toContain('onViewTranscription={() => {');
+    expect(thread).toContain('setTranscriptionToast(true)');
+    expect(read('app/buyer-conversation.tsx')).toContain('<ConversationThread variant="buyer" />');
+    expect(read('app/seller-conversation.tsx')).toContain('<ConversationThread variant="seller" />');
   });
 
   it('inbox "Filter messages" pill gives real feedback instead of a dead Alert.alert', () => {
-    const src = read('app/(buyer)/inbox.tsx');
+    const src = read('components/inbox/MessagesInbox.tsx');
     const fn = src.slice(src.indexOf('function openFilterMenu()'), src.indexOf('function openFilterMenu()') + 600);
     expect(fn).toContain('showSnackbar(');
     expect(fn).not.toMatch(/Alert\.alert\(\s*'/);

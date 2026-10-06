@@ -212,7 +212,6 @@ export default function BuyerReturnRequestScreen() {
   const header = (
     <ScreenHeader
       title="Request a return"
-      subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
       onBack={() => goBackOr(router)}
     />
   );

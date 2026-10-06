@@ -19,7 +19,6 @@ const SCREENS: Record<string, string> = {
   Payouts: 'app/payouts.tsx',
   Discounts: 'app/discounts.tsx',
   Collections: 'app/store-collections.tsx',
-  Messages: 'app/seller-inbox.tsx',
 };
 
 describe('Every seller list screen uses the shared layout EmptyState', () => {
@@ -30,6 +29,20 @@ describe('Every seller list screen uses the shared layout EmptyState', () => {
       expect(source).toContain('<EmptyState');
     });
   }
+});
+
+// Seller Messages = buyer Messages (Dev's override): the seller inbox renders
+// the shared buyer inbox, so its empty states are the buyer inbox's own
+// (same EmptyStateBadge app-wide), with seller copy.
+describe('Messages empty states come from the shared buyer inbox', () => {
+  it('the seller route renders MessagesInbox, whose empty states carry seller copy', () => {
+    expect(read('app/seller-inbox.tsx')).toContain('<MessagesInbox variant="seller" />');
+    const inbox = read('components/inbox/MessagesInbox.tsx');
+    expect(inbox).toContain('<EmptyState');
+    expect(inbox).toContain('No messages yet');
+    expect(inbox).toContain('Messages from buyers show up here');
+    expect(inbox).toContain('"Requests from buyers who don\'t follow you appear here"');
+  });
 });
 
 describe('Orders empty state has a title, matching Products/Collections/Messages', () => {

@@ -11,7 +11,7 @@ export default function AutomationScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Automation" subtitle="Set it and forget it — your brand runs itself" />
+      <ScreenHeader title="Automation" />
       <View style={styles.body}>
         <EmptyState
           icon="cpu"

@@ -1,0 +1,237 @@
+{
+  "inboxLayout": {
+    "[data-testid=\"inbox-header-search\"]": {
+      "buyer": {
+        "x": 281,
+        "y": 71,
+        "w": 44,
+        "h": 44
+      },
+      "seller": {
+        "x": 281,
+        "y": 71,
+        "w": 44,
+        "h": 44
+      }
+    },
+    "[data-testid=\"inbox-header-compose\"]": {
+      "buyer": {
+        "x": 333,
+        "y": 71,
+        "w": 44,
+        "h": 44
+      },
+      "seller": {
+        "x": 333,
+        "y": 71,
+        "w": 44,
+        "h": 44
+      }
+    },
+    "[data-testid=\"inbox-tab-inbox\"]": {
+      "buyer": {
+        "x": 60,
+        "y": 279,
+        "w": 70,
+        "h": 44
+      },
+      "seller": {
+        "x": 16,
+        "y": 279,
+        "w": 70,
+        "h": 44
+      }
+    },
+    "[data-testid=\"inbox-tab-requests\"]": {
+      "buyer": {
+        "x": 138,
+        "y": 279,
+        "w": 118,
+        "h": 44
+      },
+      "seller": {
+        "x": 94,
+        "y": 279,
+        "w": 118,
+        "h": 44
+      }
+    },
+    "back": {
+      "buyer": null,
+      "seller": {
+        "x": 16,
+        "y": 71,
+        "w": 32,
+        "h": 44
+      }
+    },
+    "filter": {
+      "buyer": {
+        "x": 16,
+        "y": 279,
+        "w": 36,
+        "h": 44
+      },
+      "seller": null
+    }
+  },
+  "threadLayout": {
+    "[data-testid=\"conversation-back\"]": {
+      "buyer": {
+        "x": 4,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      },
+      "seller": {
+        "x": 4,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-header-name\"]": {
+      "buyer": {
+        "x": 48,
+        "y": 63,
+        "w": 181,
+        "h": 44
+      },
+      "seller": {
+        "x": 48,
+        "y": 63,
+        "w": 181,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-call-voice\"]": {
+      "buyer": {
+        "x": 229,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      },
+      "seller": {
+        "x": 229,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-call-video\"]": {
+      "buyer": {
+        "x": 285,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      },
+      "seller": {
+        "x": 285,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-options\"]": {
+      "buyer": {
+        "x": 341,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      },
+      "seller": {
+        "x": 341,
+        "y": 63,
+        "w": 36,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-attach\"]": {
+      "buyer": {
+        "x": 12,
+        "y": 776,
+        "w": 36,
+        "h": 44
+      },
+      "seller": {
+        "x": 12,
+        "y": 776,
+        "w": 36,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-mic\"]": {
+      "buyer": {
+        "x": 242,
+        "y": 775,
+        "w": 32,
+        "h": 44
+      },
+      "seller": {
+        "x": 242,
+        "y": 775,
+        "w": 32,
+        "h": 44
+      }
+    },
+    "[data-testid=\"conversation-gallery\"]": {
+      "buyer": {
+        "x": 274,
+        "y": 775,
+        "w": 32,
+        "h": 44
+      },
+      "seller": {
+        "x": 274,
+        "y": 775,
+        "w": 32,
+        "h": 44
+      }
+    },
+    "requestPanel": {
+      "buyer": [
+        {
+          "w": 115,
+          "h": 44,
+          "padL": 40,
+          "padR": 40
+        },
+        {
+          "w": 115,
+          "h": 44,
+          "padL": 37,
+          "padR": 37
+        },
+        {
+          "w": 115,
+          "h": 44,
+          "padL": 34.5,
+          "padR": 34.5
+        }
+      ],
+      "seller": [
+        {
+          "w": 115,
+          "h": 44,
+          "padL": 40,
+          "padR": 40
+        },
+        {
+          "w": 115,
+          "h": 44,
+          "padL": 37,
+          "padR": 37
+        },
+        {
+          "w": 115,
+          "h": 44,
+          "padL": 34.5,
+          "padR": 34.5
+        }
+      ]
+    }
+  },
+  "tabBarSelectedOnMessages": [
+    "seller-tab-profile"
+  ]
+}

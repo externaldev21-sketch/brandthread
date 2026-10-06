@@ -23,6 +23,27 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
+import { SellerDashboardRangePills, type SellerDashboardRange } from '@/components/SellerDashboardRangePills';
+import { DATE_RANGE_OPTIONS, type DateRangeKey } from '@/services/analyticsTypes';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+
+/** The Dashboard's Today/Week/Month/Year/All pills mapped onto the analytics
+ *  service's own date-range presets. */
+const DATE_RANGE_KEY_FOR_RANGE: Record<SellerDashboardRange, DateRangeKey> = {
+  today: 'today',
+  week: '7d',
+  month: 'this_month',
+  year: 'this_year',
+  all: 'all',
+};
+function dateRangeForRange(range: SellerDashboardRange) {
+  return DATE_RANGE_OPTIONS.find((o) => o.key === DATE_RANGE_KEY_FOR_RANGE[range]) ?? DATE_RANGE_OPTIONS[0];
+}
+/** services/analyticsService.ts throws this for a section the server doesn't
+ *  serve yet — for this screen that is "no views yet", not a load failure
+ *  (there is nothing to retry), so it renders the empty state instead of
+ *  the error card. Any other failure still shows ErrorState + Retry. */
+const NOT_AVAILABLE_RE = /not available yet/i;
 
 function PostCard({ p }: { p: ContentPostRow }) {
   const colors = useColors();
@@ -88,8 +109,12 @@ function RetentionGraph({ points }: { points: VideoRetentionPoint[] }) {
 
 export default function AnalyticsContentScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
+  const router = useRouter();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const { isLoaded: authLoaded, userId } = useAuth();
+  // Same range control as the Dashboard, opening on Today (Dev).
+  const [range, setRange] = useState<SellerDashboardRange>('today');
 
   const [data,       setData]       = useState<ContentAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
@@ -105,7 +130,10 @@ export default function AnalyticsContentScreen() {
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const f = filter ?? await getFilterState();
+      const base = filter ?? await getFilterState();
+      // The pill row owns the period; the stored filter keeps its other
+      // settings (comparison, grouping).
+      const f = { ...base, dateRange: dateRangeForRange(range) };
       if (!filter) setFilter(f);
       const next = await getContentAnalytics(f);
       if (requestUser.current !== requestedUser) return;
@@ -113,9 +141,14 @@ export default function AnalyticsContentScreen() {
       setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-      setLoadError(true);
+      if (NOT_AVAILABLE_RE.test(err instanceof Error ? err.message : String(err))) {
+        setData(null);
+        setLoadError(false);
+      } else {
+        setLoadError(true);
+      }
         } finally { setLoading(false); setRefreshing(false); }
-  }, [filter, authLoaded, userId]);
+  }, [filter, authLoaded, userId, range]);
 
   useEffect(() => {
     requestUser.current = null;
@@ -124,13 +157,22 @@ export default function AnalyticsContentScreen() {
     if (authLoaded && userId) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
+  // A range change re-fetches for the new period (the first load above
+  // already used the initial range).
+  const isFirstRangeRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRangeRender.current) { isFirstRangeRender.current = false; return; }
+    if (authLoaded && userId) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
+
   const posts: ContentPostRow[] = data
     ? (tab === 'videos' ? data.topVideos : tab === 'slideshows' ? data.topSlideshows : data.highestRevenuePosts)
     : [];
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Content Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
+      <ScreenHeader title="Content Analytics" divider={false} />
       {loading ? (
         <AnalyticsSkeleton kpiCount={3} listRows={3} />
       ) : loadError && !data ? (
@@ -144,12 +186,16 @@ export default function AnalyticsContentScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
+      <SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} style={s.rangePills} />
       {!data ? (
         <EmptyState
           icon="video"
-          title="No content views yet"
-          description="We'll show post performance once your Seller posts start getting views."
+          title="No views yet"
+          description="Post a Thread to see how it performs."
+          action={{ label: 'Create post', onPress: () => router.push('/create-post' as never) }}
+          actionVariant="pill"
           style={{ marginTop: SP.lg }}
+          testID="content-analytics-empty"
         />
       ) : (
         <>
@@ -166,7 +212,7 @@ export default function AnalyticsContentScreen() {
             <Feather name="dollar-sign" size={16} color={colors.warning} />
             <View style={{ flex: 1 }}>
               <Text style={s.attrTitle}>Content-attributed revenue</Text>
-              <Text style={s.attrSub}>Purchases that started from a Seller post in the last 7 days</Text>
+              <Text style={s.attrSub}>Purchases that started from one of your posts in this period</Text>
             </View>
             <Text style={s.attrValue}>{data.revenueAttributed.formatted}</Text>
           </View>
@@ -223,6 +269,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   scroll:   { flex: 1, backgroundColor: 'transparent' },
   loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
+  // Sits directly under the (divider-less) header; the pill row's own
+  // default top margin is for its place under the Dashboard chart.
+  rangePills: { marginTop: 0, marginBottom: SP.sm },
   attrCard: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: colors.elevated, borderRadius: RADIUS.md, padding: SP.sm + 2, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
   attrTitle:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
   attrSub:  { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },

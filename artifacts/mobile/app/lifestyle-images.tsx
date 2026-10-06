@@ -236,7 +236,7 @@ export default function LifestyleImagesScreen() {
       style={[styles.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScreenHeader title="Lifestyle Images" subtitle="Contextual lifestyle shots for any product" />
+      <ScreenHeader title="Lifestyle Images" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Step indicator */}

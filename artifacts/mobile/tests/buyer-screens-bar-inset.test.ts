@@ -9,7 +9,7 @@ describe('screens behind the floating buyer bar', () => {
     const screens: Record<string, string> = {
       'app/(buyer)/discover.tsx': 'paddingBottom: barInset + SP.md',
       'app/(buyer)/profile.tsx': 'paddingBottom: barInset + SP.lg',
-      'app/(buyer)/inbox.tsx': '{ paddingBottom: barInset + SP.md }',
+      'components/inbox/MessagesInbox.tsx': '{ paddingBottom: barInset + SP.md }',
       'app/(buyer)/orders.tsx': 'paddingBottom: barInset + SP.md',
       // Phase 2 design-system pass migrated these two screens from the legacy
       // `SP` alias (lib/theme.ts) to the canonical `SPACING` token
@@ -26,7 +26,15 @@ describe('screens behind the floating buyer bar', () => {
     for (const [file, padding] of Object.entries(screens)) {
       const source = read(file);
       expect(source, file).toContain("from '@/components/buyer-nav/buyerTabBarMetrics'");
-      expect(source, file).toContain('const barInset = useBuyerTabBarInset();');
+      if (file === 'components/inbox/MessagesInbox.tsx') {
+        // Shared buyer/seller inbox: the buyer variant pads by the buyer bar
+        // inset; the seller variant (a pushed scene that already sits above
+        // the seller bar) by the safe-area inset.
+        expect(source, file).toContain('const buyerBarInset = useBuyerTabBarInset();');
+        expect(source, file).toContain('const barInset = isSeller ? insets.bottom : buyerBarInset;');
+      } else {
+        expect(source, file).toContain('const barInset = useBuyerTabBarInset();');
+      }
       expect(source, file).toContain(padding);
     }
   });

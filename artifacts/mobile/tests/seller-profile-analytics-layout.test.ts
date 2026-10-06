@@ -76,10 +76,10 @@ describe('seller profile action layout', () => {
 
   it('reaches post creation from the Studio control center instead of a top action button', () => {
     expect(profileSource).not.toContain('Share something with');
-    // The empty Post tab offers "Create your first post" through the shared
+    // The empty Posts tab offers a slim "Create post" pill through the shared
     // profile empty-state table (components/profile/profileEmptyStates.ts).
     expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
-      .toContain("label: 'Create your first post', route: '/create-post'");
+      .toContain("cta: { label: 'Create post', route: '/create-post' }");
     const controlCenterSource = fs.readFileSync(
       path.resolve(__dirname, '../lib/sellerControlCenter.ts'),
       'utf8',
@@ -98,10 +98,16 @@ describe('seller analytics overview layout', () => {
     expect(analyticsSource).not.toContain("label: '14 Days'");
     expect(analyticsSource).not.toContain("label: 'Custom'");
     expect(analyticsSource).not.toContain('label="Leads"');
-    expect(analyticsSource).toContain('Last 7 days');
+    // Header is bare (no "Last 7 days" subtitle); the period is the
+    // Dashboard's own Today/Week/Month/Year/All pills, opening on Today, and
+    // the chart is titled "Revenue" so it follows the selected range.
+    expect(analyticsSource).not.toContain('Last 7 days');
+    expect(analyticsSource).toContain('<SellerDashboardRangePills');
+    expect(analyticsSource).toContain("useState<SellerDashboardRange>('today')");
     expect(analyticsSource).toContain('label="Visits"');
     expect(analyticsSource).toContain('label="Revenue"');
-    expect(analyticsSource).toContain('Daily Revenue');
+    expect(analyticsSource).toContain('<SectionTitle>Revenue</SectionTitle>');
+    expect(analyticsSource).not.toContain('Daily Revenue');
   });
 
   it('uses zero-safe data and omits fabricated trends and traffic sources', () => {

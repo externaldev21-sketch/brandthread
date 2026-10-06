@@ -88,7 +88,6 @@ export default function AnalyticsStoreScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="Store Analytics"
-        subtitle={filter?.dateRange.label ?? '30 days'}
         rightElement={<HeaderPillButton label="Edit Store" onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} />}
       />
       {loading ? (

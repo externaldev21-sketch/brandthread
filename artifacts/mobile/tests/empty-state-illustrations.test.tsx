@@ -42,7 +42,9 @@ describe('the old colored icon-in-a-square + two dots decoration is gone', () =>
     expect(src).not.toContain('esS.orbit');
     expect(src).not.toContain('esS.spark');
     expect(src).not.toContain('esS.artCard');
-    expect(src).toContain('esS.artCircle');
+    // Every empty state now draws the one shared badge (2px silver ring,
+    // optically-centred Feather-family stroke icon).
+    expect(src).toContain('<EmptyStateBadge');
   });
 });
 
@@ -53,7 +55,7 @@ describe('each named screen wires its thread-motif illustration through the shar
     ['../app/(buyer)/friends.tsx', 'illustration="friends"'],
     ['../app/buyer-search.tsx', 'illustration="search"'],
     ['../components/discover/DiscoverGrid.tsx', 'illustration="trending"'],
-    ['../app/(buyer)/inbox.tsx', 'illustration="envelope"'],
+    ['../components/inbox/MessagesInbox.tsx', 'illustration="envelope"'],
     ['../app/activity-center.tsx', 'illustration="bell"'],
     ['../app/(buyer)/orders.tsx', 'illustration="tee"'],
     ['../app/buyer-saved.tsx', 'illustration="bookmark"'],

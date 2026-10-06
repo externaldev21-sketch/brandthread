@@ -150,23 +150,43 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'login-methods': 'profile',
   'account-type-settings': 'profile',
   'seller-verification': 'profile',
-  // Design Studio → no primary tab active (returns 'index' as safe fallback)
-  // All other seller screens default to 'index'
+  // Messages are opened from the Profile tab's own Messages button.
+  'seller-inbox': 'profile',
+  'seller-conversation': 'profile',
+  // Every other seller screen has no fixed owner: it shows the tab the user
+  // actually came from (see getActiveTab / lastOwnedTabRef below) — never a
+  // silent Dashboard fallback (Dev: Messages lit up the Dashboard's bar-chart
+  // icon, which read as "Analytics").
 };
+
+const PRIMARY_TAB_NAMES = new Set(TABS.map((t) => t.name));
 
 /**
  * Derive which tab name is active from the current segments array.
  * The first non-group segment is the route key for all root Stack screens.
  * Inside (tabs), the second segment is the actual tab.
  */
-function getActiveTab(segments: string[]): string {
+export function getActiveTab(segments: string[]): string | null {
   // Strip leading group segments like "(tabs)"
   const first = segments[0] ?? '';
   if (first === '(tabs)') {
     const second = segments[1] ?? 'index';
-    return ROUTE_TO_TAB[second] ?? 'index';
+    // One of the four primary tabs, or a tab-group page with a fixed owner;
+    // other tab-group pages (analytics, marketing, more, …) are owned by
+    // wherever they were opened from.
+    if (PRIMARY_TAB_NAMES.has(second)) return second;
+    return ROUTE_TO_TAB[second] ?? null;
   }
-  return ROUTE_TO_TAB[first] ?? 'index';
+  return ROUTE_TO_TAB[first] ?? null;
+}
+
+/**
+ * The tab that should read as active: the route's fixed owner when it has
+ * one, else the tab the user came from (the last route that had an owner),
+ * else none — e.g. a cold deep link straight into an unowned screen.
+ */
+export function resolveActiveTab(segments: string[], lastOwnedTab: string | null): string | null {
+  return getActiveTab(segments) ?? lastOwnedTab;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -200,8 +220,14 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
   const { userId } = useAuth();
   const { theme } = useAppTheme();
 
-  const activeTab = getActiveTab(segments as string[]);
-  const activeIndex = TABS.findIndex((tabDef) => tabDef.name === activeTab);
+  // Where the user came from: updated whenever the current route has a fixed
+  // owner, read (unchanged) while they're on an unowned pushed screen.
+  const lastOwnedTabRef = useRef<string | null>(null);
+  const ownedTab = getActiveTab(segments as string[]);
+  if (ownedTab) lastOwnedTabRef.current = ownedTab;
+  const activeTab = resolveActiveTab(segments as string[], lastOwnedTabRef.current);
+  // -1 = no tab active: the indicator fades out (useTabBarActiveIndex).
+  const activeIndex = activeTab ? TABS.findIndex((tabDef) => tabDef.name === activeTab) : -1;
   const reducedMotion = useReducedMotion();
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the screen swap — see the hook's doc in TabBarParts.
@@ -291,9 +317,11 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
     // itself; anything else falls back to 'general' ("Brandthread AI").
     const segmentStrings = segments as string[];
     const onDashboard = segmentStrings[0] === '(tabs)' && (segmentStrings[1] ?? 'index') === 'index';
+    // The route's OWN owner, not the tab inherited from where the user came
+    // from — an unowned screen opened from Products is not "products".
     const screen =
-      activeTab === 'products' ? 'products' :
-      activeTab === 'orders' ? 'orders' :
+      ownedTab === 'products' ? 'products' :
+      ownedTab === 'orders' ? 'orders' :
       onDashboard ? 'home' :
       'general';
     router.push({

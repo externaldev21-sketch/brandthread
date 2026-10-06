@@ -36,8 +36,8 @@ describe('app background theme', () => {
   it('isolates every root stack scene on an opaque background plane', () => {
     const rootLayout = readFileSync(appPath('_layout.tsx'), 'utf8');
 
-    expect(rootLayout).toContain('screenLayout={({ children }) => (');
-    expect(rootLayout).toContain('<IsolatedStackScene>{children}</IsolatedStackScene>');
+    expect(rootLayout).toContain('screenLayout={({ children, route, options }) => (');
+    expect(rootLayout).toMatch(/<IsolatedStackScene routeName=\{route\.name\}[^>]*>\s*\{children\}\s*<\/IsolatedStackScene>/);
     expect(rootLayout).not.toContain('AnimatedGradientBackground');
     expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');
     expect(rootLayout).not.toContain("contentStyle: { backgroundColor: 'transparent' }");
@@ -89,7 +89,7 @@ describe('app background theme', () => {
     const sellerLayout = readFileSync(appPath('(tabs)/_layout.tsx'), 'utf8');
     const buyerLayout = readFileSync(appPath('(buyer)/_layout.tsx'), 'utf8');
     const sellerHome = readFileSync(appPath('(tabs)/index.tsx'), 'utf8');
-    const buyerInbox = readFileSync(appPath('(buyer)/inbox.tsx'), 'utf8');
+    const buyerInbox = readFileSync(resolve(process.cwd(), 'components/inbox/MessagesInbox.tsx'), 'utf8');
 
     expect(sellerLayout).toContain('sceneStyle: { backgroundColor: theme.background }');
     expect(buyerLayout).toContain('sceneStyle: { backgroundColor: colors.background }');

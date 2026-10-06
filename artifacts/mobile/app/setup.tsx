@@ -191,7 +191,6 @@ export default function SetupScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
         title="Store setup"
-        subtitle={`${done} of ${total} required completed`}
         variant="modal"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
         rightElement={

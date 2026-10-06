@@ -111,7 +111,6 @@ export default function RequestSampleScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title="Request Sample"
-        subtitle={manufacturer.name}
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

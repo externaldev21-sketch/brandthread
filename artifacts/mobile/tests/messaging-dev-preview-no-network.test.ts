@@ -22,21 +22,25 @@ const read = (relativePath: string) =>
  * network call regardless of how Clerk is stubbed.
  */
 describe('messaging screens never hit the real API in dev-preview, however Clerk is stubbed', () => {
-  it('seller-inbox: isSellerDevPreview() gates the conversations list load, not just !myId', () => {
-    const src = read('app/seller-inbox.tsx');
-    expect(src).toContain("import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
-    expect(src).toContain('if (!myId || isSellerDevPreview()) {');
+  // Both inboxes render the one shared components/inbox/MessagesInbox.tsx;
+  // `isPreviewSession()` is isBuyerDevPreview() for the buyer variant and
+  // isSellerDevPreview() for the seller variant.
+  it('the shared inbox resolves the preview session per variant', () => {
+    const src = read('components/inbox/MessagesInbox.tsx');
+    expect(src).toContain("import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
+    expect(src).toContain('() => (isSeller ? isSellerDevPreview() : isBuyerDevPreview()),');
+    expect(read('app/seller-inbox.tsx')).toContain('<MessagesInbox variant="seller" />');
+    expect(read('app/(buyer)/inbox.tsx')).toContain('<MessagesInbox variant="buyer" />');
   });
 
-  it('(buyer)/inbox: isBuyerDevPreview() gates the conversations list load, story tray, suggested people and compose directory', () => {
-    const src = read('app/(buyer)/inbox.tsx');
-    expect(src).toContain("import { isBuyerDevPreview } from '@/lib/devPreview';");
-    expect(src).toContain('if (!userId || isBuyerDevPreview()) {');
-    // loadStoryTray and loadSuggested each have their own identical guard.
-    expect(src.match(/if \(!userId \|\| isBuyerDevPreview\(\)\) {/g)?.length).toBeGreaterThanOrEqual(3);
+  it('inbox: the preview session gates the conversations list load, story tray, suggested people and compose directory', () => {
+    const src = read('components/inbox/MessagesInbox.tsx');
+    expect(src).toContain('if (!userId || isPreviewSession()) {');
+    // loadData, loadStoryTray and loadSuggested each have their own guard.
+    expect(src.match(/if \(!userId \|\| isPreviewSession\(\)/g)?.length).toBeGreaterThanOrEqual(3);
     // The compose sheet's follow-graph directory fetch (following/followers/
     // suggested) never reaches the real endpoints in dev-preview either.
-    expect(src).toContain('] = isBuyerDevPreview()');
+    expect(src).toContain('] = isPreviewSession()');
     expect(src).toContain('? [Promise.resolve([]), Promise.resolve([]), Promise.resolve([])]');
   });
 

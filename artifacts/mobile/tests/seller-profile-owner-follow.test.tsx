@@ -131,6 +131,8 @@ vi.mock("expo-linear-gradient", () => ({
 vi.mock("react-native-svg", () => ({
   default: ({ children }: { children?: React.ReactNode }) => React.createElement("Svg", {}, children),
   Line: (props: Record<string, unknown>) => React.createElement("SvgLine", props),
+  // The shared empty-state badge (components/layout/EmptyStateBadge.tsx) draws with these.
+  ...Object.fromEntries(["G", "Path", "Rect", "Circle", "Polyline", "Polygon", "Ellipse"].map((n) => [n, (props: Record<string, unknown>) => React.createElement(`Svg${n}`, props)])),
 }));
 
 vi.mock("react-native-reanimated", () => {
