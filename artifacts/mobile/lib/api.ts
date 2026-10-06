@@ -19,7 +19,7 @@ import type { FinanceSummary } from '@/lib/financeSummary';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
-import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashLedger, ThreadCashLedgerKind, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
 import type {
@@ -2976,6 +2976,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<ThreadCashCheckInResult>('/api/thread-cash/daily/claim', body),
       history: (limit = 50) =>
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
+      ledger: (opts: { kind?: ThreadCashLedgerKind; offset?: number; limit?: number } = {}) =>
+        get<ThreadCashLedger>(`/api/thread-cash/ledger?limit=${opts.limit ?? 50}&offset=${opts.offset ?? 0}${opts.kind ? `&kind=${opts.kind}` : ''}`),
       redeem: (body: { amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
       /** Return an unused, unattached redemption's amount to the balance (idempotent). */
