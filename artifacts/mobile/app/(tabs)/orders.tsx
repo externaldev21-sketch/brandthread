@@ -37,6 +37,8 @@ import { DeadlineChip } from '@/components/orders/SellerDelivery';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
+import { seedDetailOnInteraction, type DetailSeedSnapshot } from '@/lib/seedDetailOnInteraction';
+import { groupByLocalDate } from '@/lib/groupByLocalDate';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
@@ -91,12 +93,12 @@ type OrderListOrder = Order & {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+function fmtDate(iso: string): string { return dateFormatter.format(new Date(iso)); }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return timeFormatter.format(new Date(iso));
 }
 
 function fmtMoney(cents: number): string {
@@ -163,31 +165,7 @@ function computeStats(orders: Order[]): OrderStats {
 
 /** Group a sorted order list into date-labelled sections. */
 function groupByDate(orders: Order[]): OrderSection[] {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-
-  const fmt = (d: Date) =>
-    d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-
-  const todayStr = fmt(today);
-  const yesterdayStr = fmt(yesterday);
-
-  const buckets = new Map<string, Order[]>();
-
-  for (const order of orders) {
-    const d = new Date(order.createdAt);
-    const label = fmt(d) === todayStr
-      ? 'Today'
-      : fmt(d) === yesterdayStr
-        ? 'Yesterday'
-        : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-
-    if (!buckets.has(label)) buckets.set(label, []);
-    buckets.get(label)!.push(order);
-  }
-
-  return Array.from(buckets.entries()).map(([title, data]) => ({ title, data }));
+  return groupByLocalDate(orders);
 }
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
@@ -373,12 +351,12 @@ export function OrderRow({
 
   return (
     <>
+      <View style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}>
       <TouchableOpacity
         activeOpacity={0.86}
         onPress={onPress}
         onPressIn={onPressIn}
         onLongPress={onLongPress}
-        style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
         accessibilityRole="button"
         accessibilityLabel={`Order ${order.orderNumber}, ${order.customer.name}, ${fmtMoney(order.payment.totalCents)}`}
       >
@@ -441,8 +419,17 @@ export function OrderRow({
           </View>
         </View>
 
+      </TouchableOpacity>
         {/* Status pills row */}
         <View style={s.orderStatusRow}>
+          <TouchableOpacity
+            onPress={onPress}
+            onPressIn={onPressIn}
+            onLongPress={onLongPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View status for order ${order.orderNumber}`}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: SP.xs }}
+          >
           <View style={s.statusPill}>
             <View style={[s.statusDot, { backgroundColor: payColor }]} />
             <Text style={[s.statusText, { color: payColor }]}>{getPaymentLabel(order.paymentStatus)}</Text>
@@ -470,6 +457,7 @@ export function OrderRow({
           )}
 
           {/* Quick action — pushed right */}
+          </TouchableOpacity>
           <View style={{ flex: 1 }} />
           {(order.status === 'processing' || order.status === 'ready_to_ship') && (
             <Button
@@ -496,7 +484,7 @@ export function OrderRow({
         <View style={s.cardTimelineWrap}>
           <OrderStatusTimeline status={order.status} compact />
         </View>
-      </TouchableOpacity>
+      </View>
     </>
   );
 }
@@ -737,6 +725,7 @@ export default function OrdersScreen() {
   const generationRef = useRef(0);
   const requestGenerationRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
+  const detailSeedRef = useRef<DetailSeedSnapshot | null>(null);
 
   const loadData = useCallback(async (generation: number) => {
     // Design-preview bypass with no real signed-in account: there is no
@@ -751,8 +740,11 @@ export default function OrdersScreen() {
       // are summed from (lib/previewSellerOrders.ts); fresh mode is empty.
       const rows = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
       const preview = rows.map(apiRowToOrder);
-      rows.forEach((raw) => queryClient.setQueryData(queryKeys.order(raw.id), raw));
       if (generationRef.current === generation) {
+        detailSeedRef.current = {
+          ownerId: userId ?? null,
+          rows: new Map(rows.map(raw => [raw.id, raw])),
+        };
         setOrders(preview);
         setOrdersOwnerId(userId ?? null);
         setStats(computeStats(preview));
@@ -772,14 +764,13 @@ export default function OrdersScreen() {
       if (generationRef.current !== generation) return;
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
-      // Seed order-detail.tsx's cache from data already in hand — no extra
-      // network call — so opening any row it renders can paint immediately
-      // instead of showing its own spinner first (stale-while-revalidate;
-      // order-detail.tsx still refetches in the background on mount).
-      (rows as unknown[]).forEach((raw) => {
-        const rawId = (raw as { id?: string })?.id;
-        if (rawId) queryClient.setQueryData(queryKeys.order(rawId), raw);
-      });
+      // Keep the raw snapshot outside the shared cache. Seed only the tapped
+      // order; hundreds of cache updates synchronously dehydrate the cache
+      // hundreds of times, despite throttled AsyncStorage writes.
+      detailSeedRef.current = {
+        ownerId: requestOwnerId,
+        rows: new Map((rows as { id: string }[]).filter(raw => !!raw.id).map(raw => [raw.id, raw])),
+      };
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
       setUpdatesPaused(false);
@@ -963,21 +954,23 @@ export default function OrdersScreen() {
         prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
       );
     } else {
+      seedDetailOnInteraction(queryClient, queryKeys.order(order.id), order.id, detailSeedRef.current, userId ?? null);
       router.push(('/order-detail?id=' + order.id) as never);
     }
-  }, [selectedIds, router]);
+  }, [selectedIds, router, queryClient, userId]);
 
   // Fires ~100-200ms before onPress (finger-down vs. finger-up): warms the
   // query cache order-detail.tsx reads on mount, so by the time the tap
   // completes and the screen mounts, its data is often already there.
   const handleCardPressIn = useCallback((order: Order) => {
     if (selectedIds.length > 0) return;
+    if (seedDetailOnInteraction(queryClient, queryKeys.order(order.id), order.id, detailSeedRef.current, userId ?? null)) return;
     prefetchOnPressIn(
       queryClient,
       queryKeys.order(order.id),
       () => api.orders.get(order.id),
     )();
-  }, [selectedIds, queryClient, api]);
+  }, [selectedIds, queryClient, api, userId]);
 
   const handleLongPress = useCallback((orderId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);

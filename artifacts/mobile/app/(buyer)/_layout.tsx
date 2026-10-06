@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, usePathname } from 'expo-router';
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useColors } from '@/hooks/useColors';
@@ -58,7 +58,7 @@ function BuyerTabLayout() {
     // interpolation before the Tabs navigator's own effect starts the
     // transitionSpec animation — an effect-based unsettle would race that.
     prevPathnameRef.current = pathname;
-    settled.unsettle();
+    if (Platform.OS !== 'web') settled.unsettle();
   }
   useEffect(() => {
     if (settled.value) return;
@@ -118,8 +118,9 @@ function BuyerTabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
-        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
+        animation: Platform.OS === 'web' ? 'none' : undefined,
+        transitionSpec: Platform.OS === 'web' ? undefined : reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
+        sceneStyleInterpolator: Platform.OS === 'web' ? undefined : reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
         sceneStyle: { backgroundColor: colors.background },
       }}
     >

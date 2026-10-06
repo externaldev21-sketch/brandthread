@@ -173,10 +173,10 @@ const swStyles = StyleSheet.create({
 
 export default function StoreEditor() {
   const { theme } = useAppTheme();
-  const styles = makeStyles(theme);
-  const sectionStyles = makeSectionStyles(theme);
-  const panelStyles = makePanelStyles(theme);
-  const brandStyles = makeBrandStyles(theme);
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  const sectionStyles = React.useMemo(() => makeSectionStyles(theme), [theme]);
+  const panelStyles = React.useMemo(() => makePanelStyles(theme), [theme]);
+  const brandStyles = React.useMemo(() => makeBrandStyles(theme), [theme]);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -208,7 +208,7 @@ export default function StoreEditor() {
   const [inlineHeadingDraft, setInlineHeadingDraft] = useState('');
 
   async function load() {
-    const s = await getStorefront();
+    const s = await getStorefront({ refreshRemote: false });
     setStore(s);
     setUndoAvailable(s.undoStack.length > 0);
     setRedoAvailable(s.redoStack.length > 0);

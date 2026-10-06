@@ -95,3 +95,5 @@
 - [Expo DevTools on Nix](expo-devtools-nix.md) — the optional RN DevTools binary can lack libglib while Metro and the web preview still work.
 - [Large source exports](large-source-exports.md) — downloadable asset registration rejected a project archive above 100 MiB; package runnable source separately from visual-reference captures.
 - [Merge-only test boundary](merge-only-test-boundary.md) — report stale test contracts separately rather than changing product behavior during a requested upstream sync.
+- [Store responsiveness boundary](store-responsiveness-boundary.md) — draft interactions must not wait on publication reads; fast draft rendering is not proof of live publication.
+- [Shared performance boundaries](shared-performance-boundaries.md) — cache persistence throttles storage, not dehydration; frozen scenes need imperative animation cleanup.

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,16 +48,22 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
     const value: CookieConsent = { version: COOKIE_CONSENT_VERSION, timestamp: Date.now(), necessary: true, ...choices };
     await AsyncStorage.setItem(KEY, JSON.stringify(value)); setConsent(value); setCustomizing(false);
   }, []);
-  if (Platform.OS !== 'web') return <>{children}</>;
+  const openPreferences = useCallback(() => {
+    setAnalytics(consent?.analytics ?? false);
+    setMarketing(consent?.marketing ?? false);
+    setCustomizing(true);
+  }, [consent]);
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
-  const openPreferences = () => { setAnalytics(consent?.analytics ?? false); setMarketing(consent?.marketing ?? false); setCustomizing(true); };
   const showNotice = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);
   // The banner is outside the navigation tree. Screens with bottom controls
   // can reserve its actual rendered height without guessing text wrapping.
   const noticeClearance = showNotice && bannerHeight ? tabBarInset + SP.sm + bannerHeight + SP.sm : 0;
+  const value = useMemo(() => ({ consent, saveConsent, openPreferences, noticeClearance }),
+    [consent, saveConsent, openPreferences, noticeClearance]);
+  if (Platform.OS !== 'web') return <>{children}</>;
   return (
-    <Context.Provider value={{ consent, saveConsent, openPreferences, noticeClearance }}>
+    <Context.Provider value={value}>
       {children}
       {showNotice && (
         <View

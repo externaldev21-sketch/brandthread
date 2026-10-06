@@ -40,6 +40,7 @@ import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useFocusedAnimationLoop } from '@/lib/useFocusedAnimationLoop';
 import { radius } from '@/constants/radii';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
@@ -160,7 +161,13 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
     const { width, height } = e.nativeEvent.layout;
     const padX = Math.max(0, (COMP.minTouchTarget - width) / 2);
     const padY = Math.max(0, (COMP.minTouchTarget - height) / 2);
-    setAutoHitSlop((padX === 0 && padY === 0) ? undefined : { top: padY, bottom: padY, left: padX, right: padX });
+    setAutoHitSlop(previous => {
+      if (padX === 0 && padY === 0) return undefined;
+      // Repeated layout notifications must not allocate new state and trigger
+      // another render when the touch target hasn't actually changed.
+      if (previous?.top === padY && previous.left === padX) return previous;
+      return { top: padY, bottom: padY, left: padX, right: padX };
+    });
   }, [hitSlop]);
   // Text-crispness fix: this wrapper used to carry `transform: [{ scale }]`
   // (plus `opacity`) unconditionally, even fully at rest (scale===1,
@@ -810,14 +817,10 @@ export function BrandedLoader({ label = 'Stitching things together…', style }:
 }) {
   const { theme } = useAppTheme();
   const pulse = useRef(new Animated.Value(0.72)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0.72, duration: 650, useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, []);
+  useFocusedAnimationLoop(() => Animated.loop(Animated.sequence([
+    Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: NATIVE_DRIVER, isInteraction: false }),
+    Animated.timing(pulse, { toValue: 0.72, duration: 650, useNativeDriver: NATIVE_DRIVER, isInteraction: false }),
+  ])), [pulse]);
   return (
     <View style={[brLoaderS.root, style]}>
       <Animated.View style={[brLoaderS.mark, { backgroundColor: theme.accentDim, borderColor: theme.accent + '70', opacity: pulse, transform: [{ scale: pulse }] }]}>
@@ -1196,16 +1199,12 @@ const ncS = StyleSheet.create({
 
 export function LoadingSkeleton({ height = 80, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
   const anim = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
+  useFocusedAnimationLoop(() => Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: NATIVE_DRIVER, isInteraction: false }),
+        Animated.timing(anim, { toValue: 0.4, duration: 800, useNativeDriver: NATIVE_DRIVER, isInteraction: false }),
       ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
+    ), [anim]);
   return (
     <Animated.View
       style={[{ height, backgroundColor: SKELETON_GLASS, borderRadius: RADIUS.md, opacity: anim }, style]}
@@ -1438,16 +1437,12 @@ export function BrandedLoadingState({ message, style }: { message?: string; styl
   const pulse = useRef(new Animated.Value(0.45)).current;
   const { theme } = useAppTheme();
   const colors = useColors();
-  useEffect(() => {
-    const anim = Animated.loop(
+  useFocusedAnimationLoop(() => Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 950, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.45, duration: 950, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 950, useNativeDriver: NATIVE_DRIVER, isInteraction: false }),
+        Animated.timing(pulse, { toValue: 0.45, duration: 950, useNativeDriver: NATIVE_DRIVER, isInteraction: false }),
       ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []);
+    ), [pulse]);
   return (
     <View style={[blS.root, { backgroundColor: colors.background }, style]}>
       <Animated.View style={{ opacity: pulse }}>

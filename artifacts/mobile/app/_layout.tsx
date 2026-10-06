@@ -192,7 +192,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
     }
   }, [theme.accent]);
 
-  const navigationTheme = {
+  const navigationTheme = React.useMemo(() => ({
     ...DarkTheme,
     dark: true,
     colors: {
@@ -204,7 +204,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
       border: palette.border ?? 'rgba(255,255,255,0.12)',
       notification: theme.accent,
     },
-  };
+  }), [theme]);
 
   if (!isHydrated) return <BootScreen />;
   return (
@@ -1302,6 +1302,26 @@ function RootLayoutNav() {
       <ActionSheetHost />
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
+          <AppStack />
+        </View>
+      </Pressable>
+      <SellerBarGate />
+      <AuthGate />
+      <ServiceConfigurer />
+      <PushRegistrar />
+      <AffiliateRefCapture />
+      <MarketingPixelTracker />
+      <AnalyticsBridge />
+      <LegalAcceptanceGate />
+      <AppLockGate />
+    </View>
+  );
+}
+
+// Route observers above must update on navigation. The static registration of
+// hundreds of screens must not be rebuilt with them on every tap.
+const AppStack = React.memo(function AppStack() {
+  return (
       <Stack
         screenLayout={({ children }) => (
           <IsolatedStackScene>{children}</IsolatedStackScene>
@@ -1628,20 +1648,8 @@ function RootLayoutNav() {
         {/* Account switching is a sheet on the profile screen now — see
             components/AccountSwitcherSheet.tsx — not a pushed route. */}
       </Stack>
-        </View>
-      </Pressable>
-      <SellerBarGate />
-      <AuthGate />
-      <ServiceConfigurer />
-      <PushRegistrar />
-      <AffiliateRefCapture />
-      <MarketingPixelTracker />
-      <AnalyticsBridge />
-      <LegalAcceptanceGate />
-      <AppLockGate />
-    </View>
   );
-}
+});
 
 function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
