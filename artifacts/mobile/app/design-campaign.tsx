@@ -300,6 +300,8 @@ export default function CreateAdScreen() {
   const [storeName, setStoreName] = useState('');
   useEffect(() => {
     if (isPreviewDemoMode()) { setStoreName('Preview Studio'); return; }
+    // Signed-out web preview never calls protected store APIs.
+    if (isSellerDevPreview()) return;
     getStorefront().then(sf => { if (sf?.settings?.storeName) setStoreName(sf.settings.storeName); }).catch(() => {});
   }, []);
   const brandName = storeName || user?.fullName || (user as any)?.username || 'Your store';
