@@ -113,6 +113,13 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/return-detail?returnId=ret-abc');
   });
 
+  it('routes a chargeback notification to the dispute screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('dispute-1', { targetType: 'dispute', targetId: 'dsp-1' }));
+    expect(router.push).toHaveBeenCalledWith('/dispute-detail?disputeId=dsp-1');
+  });
+
   it('opens social pushes at the same exact place the Activity row does', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

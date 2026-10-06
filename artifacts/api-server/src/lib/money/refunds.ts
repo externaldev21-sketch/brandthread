@@ -230,7 +230,10 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       // The order's own transfer; what the seller still holds from it is its
       // paid-out balance (net of label recoveries and earlier reversals).
       const stillPaidOut = await accountBalanceCents(tx, { account: "seller_paid_out", partyId: order.owner_id, orderId: order.id });
-      release = { id: "", amount: Math.max(0, stillPaidOut), reversed: 0, transferId: order.stripe_transfer_id, state: "paid" };
+      // A Thread Cash top-up is a separate transfer (reversed on its own
+      // below), so it is not part of what this order's transfer can return.
+      const topup = order.stripe_thread_cash_transfer_id ? order.thread_cash_applied_cents : 0;
+      release = { id: "", amount: Math.max(0, stillPaidOut - topup), reversed: 0, transferId: order.stripe_transfer_id, state: "paid" };
     }
     return { kind: "go" as const, refund: refund!, order, release };
   });
@@ -430,7 +433,7 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       // that made the seller whole (lib/threadCash/checkoutTopup.ts) is a
       // SEPARATE transfer, so it needs its own reversal — the seller must
       // not keep money for an item that was fully refunded.
-      if (destination && locked.stripe_thread_cash_transfer_id) {
+      if ((destination || locked.charge_model === "transfer") && locked.stripe_thread_cash_transfer_id) {
         try {
           await stripeClient.transfers.createReversal(locked.stripe_thread_cash_transfer_id, {
             amount: locked.thread_cash_applied_cents,
