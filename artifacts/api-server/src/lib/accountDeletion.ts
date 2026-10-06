@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/express";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { accountDeletionCodes, db, users } from "@workspace/db";
 import { isMailerConfigured, sendAccountDeletionCodeEmail } from "./mailer";
+import { AppleTokenError, verifyAppleIdentityToken } from "./appleAuth";
 
 /** The destructive endpoint deliberately accepts no aliases or whitespace. */
 export function hasDeletionConfirmation(body: unknown): boolean {
@@ -64,6 +65,9 @@ export async function getDeletionBlockers(clerkUserId: string): Promise<Deletion
       WHERE owner_id = ${clerkUserId}
         AND paid_at IS NOT NULL
         AND status NOT IN ('delivered', 'cancelled', 'refunded', 'returned')
+        -- Delivered (carrier or buyer confirmed) is settled, whatever the status says.
+        AND delivered_at IS NULL
+        AND COALESCE(tracking_status, '') <> 'delivered'
         AND NOT (
           status IN ('shipped', 'fulfilled')
           AND COALESCE(shipped_at, updated_at) < NOW() - (${SHIPPED_ORDER_SETTLEMENT_DAYS} * INTERVAL '1 day')
@@ -323,6 +327,62 @@ export async function getReauthMethod(clerkUserId: string): Promise<ReauthMethod
   return clerkUser.passwordEnabled ? "password" : "email_code";
 }
 
+/** A sign-in this recent counts as re-authentication (QA-0074). */
+export const RECENT_SIGN_IN_MINUTES = 10;
+
+/** What the signed-in request already proves, from Clerk's session. */
+export type ReauthContext = {
+  /** Clerk `fva`: minutes since the first / second factor was verified (-1 = never). */
+  factorVerificationAge?: [number, number] | null;
+  sessionId?: string | null;
+  now?: Date;
+};
+
+/**
+ * Ways an account without a password can prove it's them (QA-0074). Email is
+ * not the only road: Apple users re-run Sign in with Apple on the device, and
+ * anyone can sign in again (a fresh sign-in counts for 10 minutes).
+ */
+export type ReauthOptions = { apple: boolean; recentSignIn: boolean; emailCode: boolean };
+
+type ClerkLikeUser = { passwordEnabled?: boolean; externalAccounts?: Array<{ provider?: string; providerUserId?: string; externalId?: string }> };
+
+/** Apple `sub` of the account's linked Sign in with Apple identity, if any. */
+export function appleSubjectOf(user: ClerkLikeUser): string | null {
+  const acct = (user.externalAccounts ?? []).find((a) => a.provider === "oauth_apple" || a.provider === "apple");
+  return acct?.providerUserId || acct?.externalId || null;
+}
+
+/** Pure: does Clerk's factor age say the first factor was verified just now? */
+export function factorAgeIsRecent(fva: [number, number] | null | undefined): boolean {
+  if (!fva) return false;
+  const first = fva[0];
+  return typeof first === "number" && first >= 0 && first <= RECENT_SIGN_IN_MINUTES;
+}
+
+export async function isRecentSignIn(ctx: ReauthContext): Promise<boolean> {
+  if (factorAgeIsRecent(ctx.factorVerificationAge)) return true;
+  if (!ctx.sessionId) return false;
+  try {
+    // Older session tokens carry no fva: fall back to when this session began.
+    const session = await clerkClient.sessions.getSession(ctx.sessionId);
+    const createdAt = Number((session as { createdAt?: number }).createdAt);
+    const now = (ctx.now ?? new Date()).getTime();
+    return Number.isFinite(createdAt) && now - createdAt <= RECENT_SIGN_IN_MINUTES * 60_000;
+  } catch {
+    return false;
+  }
+}
+
+export async function getReauthOptions(clerkUserId: string, ctx: ReauthContext): Promise<ReauthOptions> {
+  const clerkUser = await clerkClient.users.getUser(clerkUserId);
+  return {
+    apple: !!appleSubjectOf(clerkUser as ClerkLikeUser),
+    recentSignIn: await isRecentSignIn(ctx),
+    emailCode: isMailerConfigured(),
+  };
+}
+
 function isClerkRejection(err: unknown): boolean {
   const status = (err as { status?: number })?.status;
   return status === 400 || status === 403 || status === 404 || status === 422;
@@ -334,9 +394,11 @@ function isClerkRejection(err: unknown): boolean {
  */
 export async function verifyDeletionReauth(
   clerkUserId: string,
-  body: { password?: unknown; code?: unknown },
+  body: { password?: unknown; code?: unknown; appleIdentityToken?: unknown },
+  ctx: ReauthContext = {},
 ): Promise<ReauthResult> {
-  const method = await getReauthMethod(clerkUserId);
+  const clerkUser = await clerkClient.users.getUser(clerkUserId);
+  const method: ReauthMethod = clerkUser.passwordEnabled ? "password" : "email_code";
 
   if (method === "password") {
     const password = typeof body.password === "string" ? body.password : "";
@@ -351,8 +413,26 @@ export async function verifyDeletionReauth(
     }
   }
 
+  // Sign in with Apple, re-run on the device just now (QA-0074).
+  if (typeof body.appleIdentityToken === "string" && body.appleIdentityToken) {
+    const expected = appleSubjectOf(clerkUser as ClerkLikeUser);
+    if (!expected) return fail(403, "APPLE_NOT_LINKED", "This account doesn't use Sign in with Apple.");
+    try {
+      const { sub } = await verifyAppleIdentityToken(body.appleIdentityToken);
+      if (sub !== expected) return fail(403, "APPLE_MISMATCH", "That Apple ID isn't the one on this account.");
+      return { ok: true };
+    } catch (err) {
+      if (err instanceof AppleTokenError) {
+        return fail(403, "APPLE_REAUTH_FAILED", "We couldn't confirm it's you with Apple. Try again.");
+      }
+      throw err;
+    }
+  }
+
   const code = typeof body.code === "string" ? body.code.trim() : "";
-  if (!code) return fail(401, "REAUTH_REQUIRED", "Enter the 6-digit code we emailed you.");
+  // Signed in moments ago (e.g. "Sign in again" from the delete screen): that is the proof.
+  if (!code && await isRecentSignIn(ctx)) return { ok: true };
+  if (!code) return fail(401, "REAUTH_REQUIRED", "Confirm it's you to delete your account.");
   if (!/^\d{6}$/.test(code)) return fail(403, "INVALID_CODE", "Enter the 6-digit code.");
 
   const [latest] = await db.select().from(accountDeletionCodes)

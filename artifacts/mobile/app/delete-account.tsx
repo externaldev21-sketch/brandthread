@@ -5,8 +5,10 @@
  * 1. Overview: explains exactly what is deleted and what the law requires us
  *    to keep, and lists anything that must be settled first (open orders,
  *    held drop funds, disputes, payouts in flight…) with a shortcut to fix it.
- * 2. Confirm: type DELETE, acknowledge, and re-authenticate (password, or an
- *    emailed code for accounts that sign in without one).
+ * 2. Confirm: type DELETE, acknowledge, and re-authenticate: password, or for
+ *    accounts without one (Apple / Google) Sign in with Apple on iPhone, a
+ *    fresh sign-in, or an emailed code (QA-0074). A store-billed plan shows how
+ *    to cancel it in the store, since deletion cannot (QA-0073).
  * 3. Done: the account is hidden and scheduled for deletion in 30 days, every
  *    session is signed out, and signing back in within 30 days cancels it.
  *    The hard delete runs server-side after the grace period.
@@ -14,10 +16,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform,
+  View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Platform, Linking,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -31,6 +33,12 @@ import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/Bra
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import {
+  DELETE_ACCOUNT_REAUTH_ROUTE, deletionReauthPlan, deletionReauthSatisfied,
+} from '@/lib/deletionReauth';
+import { storeSubscriptionsUrl } from '@/lib/currentPlan';
+import { isOAuthCancellationError } from '@/lib/oauthFlow';
 
 type Step = 'overview' | 'confirm' | 'done';
 
@@ -63,6 +71,8 @@ export default function DeleteAccountScreen() {
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
+  const [appleProof, setAppleProof] = useState<{ identityToken: string; authorizationCode: string | null } | null>(null);
+  const [appleBusy, setAppleBusy] = useState(false);
 
   const loadCheck = useCallback(async () => {
     setLoading(true);
@@ -84,8 +94,10 @@ export default function DeleteAccountScreen() {
   const blockers = check?.blockers ?? [];
   const canContinue = !!check && check.canDelete;
   const graceDays = check?.graceDays ?? 30;
-  const usesCode = check?.reauth === 'email_code';
-  const reauthFilled = usesCode ? /^\d{6}$/.test(code.trim()) : password.length > 0;
+  const reauthPlan = deletionReauthPlan({ reauth: check?.reauth, reauthOptions: check?.reauthOptions, os: Platform.OS });
+  const usesCode = reauthPlan.mode === 'sso';
+  const reauthFilled = deletionReauthSatisfied(reauthPlan, { password, code, appleIdentityToken: appleProof?.identityToken ?? null });
+  const storeManageUrl = storeSubscriptionsUrl(Platform.OS);
   const confirmValid = typed.trim() === CONFIRM_WORD && acknowledged && reauthFilled;
 
   async function sendCode() {
@@ -102,12 +114,45 @@ export default function DeleteAccountScreen() {
     }
   }
 
+  async function confirmWithApple() {
+    if (appleBusy) return;
+    setAppleBusy(true);
+    setDeleteError(null);
+    try {
+      // Fresh Sign in with Apple on this iPhone. The server checks Apple's
+      // signature and that it is the Apple ID on this account, and uses the
+      // one-time code to revoke our Apple tokens (App Store 5.1.1(v)).
+      const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+      if (!credential.identityToken) throw new Error('Apple did not return a sign-in token.');
+      setAppleProof({ identityToken: credential.identityToken, authorizationCode: credential.authorizationCode ?? null });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      if (!isOAuthCancellationError(err) && (err as { code?: string })?.code !== 'ERR_REQUEST_CANCELED') {
+        setDeleteError('We couldn’t confirm it’s you with Apple. Try again.');
+      }
+    } finally {
+      setAppleBusy(false);
+    }
+  }
+
+  async function signInAgain() {
+    // A fresh sign-in counts as confirmation for 10 minutes; sign-in brings
+    // the person straight back here.
+    await signOut().catch(() => {});
+    router.replace(DELETE_ACCOUNT_REAUTH_ROUTE as never);
+  }
+
   async function deleteNow() {
     if (!confirmValid || deleting) return;
     setDeleting(true);
     setDeleteError(null);
     try {
-      const result = await api.auth.deleteAccount(usesCode ? { code: code.trim() } : { password });
+      const result = await api.auth.deleteAccount(
+        !usesCode ? { password }
+          : appleProof ? { appleIdentityToken: appleProof.identityToken, appleAuthorizationCode: appleProof.authorizationCode ?? undefined }
+            : code.trim() ? { code: code.trim() }
+              : {},
+      );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await clearAccountLifecycleState().catch(() => {});
       setScheduledFor(result.scheduledFor);
@@ -222,6 +267,26 @@ export default function DeleteAccountScreen() {
               </View>
             )}
 
+            {check?.subscriptionNotice ? (
+              <View style={s.blockerCard}>
+                <View style={s.blockerHeader}>
+                  <Feather name="credit-card" size={16} color={theme.text} />
+                  <Text style={s.blockerHeading}>{check.subscriptionNotice.title}</Text>
+                </View>
+                <Text style={s.blockerIntro}>{check.subscriptionNotice.detail}</Text>
+                {storeManageUrl ? (
+                  <PressableScale
+                    onPress={() => { void Linking.openURL(storeManageUrl); }}
+                    style={[s.blockerBtn, { alignSelf: 'flex-start' }]}
+                    accessibilityRole="link"
+                    accessibilityLabel="Manage subscription"
+                  >
+                    <Text style={s.blockerBtnText}>Manage subscription</Text>
+                  </PressableScale>
+                ) : null}
+              </View>
+            ) : null}
+
             {check ? (
               <>
                 <Text style={s.sectionLabel}>WHAT WE DELETE</Text>
@@ -289,9 +354,48 @@ export default function DeleteAccountScreen() {
               accessibilityLabel="Type DELETE to confirm"
             />
 
-            {usesCode ? (
+            {usesCode && reauthPlan.alreadyConfirmed ? (
+              <View style={s.readyCard}>
+                <Feather name="check-circle" size={16} color={theme.success} />
+                <Text style={s.readyText}>You just signed in, so it’s confirmed it’s you.</Text>
+              </View>
+            ) : usesCode ? (
               <>
-                <Text style={s.fieldLabel}>Enter the 6-digit code we email you</Text>
+                <Text style={s.fieldLabel}>Confirm it’s you</Text>
+                {appleProof ? (
+                  <View style={s.readyCard}>
+                    <Feather name="check-circle" size={16} color={theme.success} />
+                    <Text style={s.readyText}>Confirmed with Apple.</Text>
+                  </View>
+                ) : reauthPlan.showApple ? (
+                  <PressableScale
+                    onPress={confirmWithApple}
+                    disabled={appleBusy}
+                    style={s.appleBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Continue with Apple"
+                  >
+                    {appleBusy
+                      ? <ActivityIndicator color="#FFFFFF" />
+                      : (
+                        <>
+                          <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                          <Text style={s.appleBtnText}>Continue with Apple</Text>
+                        </>
+                      )}
+                  </PressableScale>
+                ) : null}
+                {!appleProof && reauthPlan.showSignInAgain ? (
+                  <PressableScale onPress={signInAgain} style={s.codeLink} accessibilityRole="button">
+                    <Text style={s.link}>Sign in again</Text>
+                  </PressableScale>
+                ) : null}
+              </>
+            ) : null}
+
+            {usesCode && !reauthPlan.alreadyConfirmed && !appleProof && reauthPlan.showEmailCode ? (
+              <>
+                <Text style={s.fieldLabel}>Or enter the 6-digit code we email you</Text>
                 <TextInput
                   style={s.input}
                   value={code}
@@ -310,7 +414,7 @@ export default function DeleteAccountScreen() {
                     : <Text style={s.link}>{codeSent ? 'Send a new code' : 'Email me a code'}</Text>}
                 </PressableScale>
               </>
-            ) : (
+            ) : usesCode ? null : (
               <>
                 <Text style={s.fieldLabel}>Enter your password to confirm it’s you</Text>
                 <TextInput
@@ -430,6 +534,13 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   passwordInput: { fontFamily: FONT.medium, fontSize: FS.base, letterSpacing: 0 },
   codeLink: { alignSelf: 'flex-start', marginTop: SP.sm, minHeight: 28, justifyContent: 'center' },
+  // Sign in with Apple button per Apple HIG: solid black, white logo + label.
+  appleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
+    minHeight: 50, borderRadius: RADIUS.lg, backgroundColor: '#000000',
+    borderWidth: 1, borderColor: theme.border,
+  },
+  appleBtnText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginTop: SP.lg },
   checkbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.muted,

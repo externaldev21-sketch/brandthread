@@ -113,6 +113,10 @@ export interface AccountDeletionCheck {
   graceDays?: number;
   /** Proof required to delete: the account password, or an emailed code. */
   reauth?: 'password' | 'email_code';
+  /** Password-less accounts: every way they can confirm it's them (QA-0074). */
+  reauthOptions?: { apple: boolean; recentSignIn: boolean; emailCode: boolean } | null;
+  /** Store-billed plan that deletion cannot cancel (QA-0073). */
+  subscriptionNotice?: { provider: 'store'; title: string; detail: string } | null;
   /** Set when signing back in recently cancelled a scheduled deletion. */
   deletionCancelledAt?: string | null;
   blockers: DeletionBlocker[];
