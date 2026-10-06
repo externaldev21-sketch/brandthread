@@ -16,7 +16,8 @@ import {
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { getStorefront, validateStore, publishStore, unpublishStore, StoreValidationResult } from '@/services/storeService';
 import { Storefront } from '@/services/storeTypes';
-import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
+import { isSellerSetupOrigin, leaveSetupFlow, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { storeHostFrom, storeViewUrl } from '@/lib/storeAddress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { minHitSlop } from '@/lib/hitSlop';
@@ -146,10 +147,9 @@ export default function StorePublishScreen() {
 
   const handlePublish = () => {
     if (!store) return;
-    const storeUrl = store.settings.storeUrl || 'yourstore';
     Alert.alert(
       'Publish your store?',
-      `Your store will be live at https://${storeUrl}.brandthread.app`,
+      `Your store will be live at https://${storeHostFrom(store.settings.storeUrl)}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -190,7 +190,8 @@ export default function StorePublishScreen() {
     );
   };
 
-  const storeUrl = store?.settings.storeUrl || 'yourstore';
+  const storeHost = storeHostFrom(store?.settings.storeUrl);
+  const viewUrl = storeViewUrl(store?.settings.storeUrl);
 
   return (
     <View style={pub.root}>
@@ -315,9 +316,9 @@ export default function StorePublishScreen() {
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live!</Text>
-              <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
+              <Text style={pub.successUrl}>https://{storeHost}</Text>
               <View style={pub.successActions}>
-                <SecondaryButton label="View store" onPress={() => Linking.openURL(`https://${storeUrl}.brandthread.app`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                <SecondaryButton label="View store" onPress={() => Linking.openURL(viewUrl ?? `https://${storeHost}`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
                 <PrimaryButton
                   label={isSellerSetupOrigin(params.from) ? 'Done' : 'Continue Editing'}
                   onPress={leaveSetupDestination}
@@ -330,7 +331,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
-              <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeUrl}.brandthread.app</Text>
+              <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeHost}</Text>
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}
