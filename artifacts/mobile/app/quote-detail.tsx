@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { plural } from '@/lib/plural';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, Alert, TextInput,
@@ -411,8 +412,8 @@ export default function QuoteDetailScreen() {
           <SectionHeader title="Terms" style={s.sectionHeader} />
           <BrandthreadCard style={s.section}>
             <InfoRow label="MOQ" value={`${quote.moq} units`} />
-            <InfoRow label="Lead Time" value={`${quote.leadTimeDays} days`} />
-            <InfoRow label="Production Time" value={`${quote.productionDays} days`} />
+            <InfoRow label="Lead Time" value={plural(quote.leadTimeDays, 'day')} />
+            <InfoRow label="Production Time" value={plural(quote.productionDays, 'day')} />
             <InfoRow label="Payment Terms" value={quote.paymentTerms} />
             {quote.notes && (
               <>
@@ -444,7 +445,7 @@ export default function QuoteDetailScreen() {
                     <InfoRow label="Desired MOQ" value={`${co.desiredMoq} units`} />
                   )}
                   {co.desiredProductionDays !== undefined && (
-                    <InfoRow label="Desired Production Days" value={`${co.desiredProductionDays} days`} />
+                    <InfoRow label="Desired Production Days" value={plural(co.desiredProductionDays, 'day')} />
                   )}
                   {co.desiredPaymentTerms && (
                     <InfoRow label="Desired Payment Terms" value={co.desiredPaymentTerms} />

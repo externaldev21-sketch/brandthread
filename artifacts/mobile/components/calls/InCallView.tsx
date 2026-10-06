@@ -120,13 +120,9 @@ export function InCallView() {
             onPress={toggleMute}
             accessibilityLabel={muted ? 'Unmute microphone' : 'Mute microphone'}
           />
-          {isVideo && (
-            <ControlButton
-              icon="refresh-cw"
-              onPress={switchCamera}
-              accessibilityLabel="Flip camera"
-            />
-          )}
+          {/* No "Flip camera" here: this overlay runs on the in-app call
+              provider, which has no camera to switch, so the button did
+              nothing. Real video calls use app/call-screen.tsx. */}
           <ControlButton
             icon={speakerOn ? 'volume-2' : 'volume-x'}
             active={speakerOn}

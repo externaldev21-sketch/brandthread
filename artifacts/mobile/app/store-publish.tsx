@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { storeAddressHost } from '@/lib/storeAddress';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -143,13 +144,14 @@ export default function StorePublishScreen() {
     }
   };
 
-  useEffect(() => { doValidate(); }, []);
+  useEffect(() => { doValidate().catch(() => {}); }, []);
 
   const handlePublish = () => {
     if (!store) return;
+    const host = storeAddressHost(store);
     Alert.alert(
       'Publish your store?',
-      `Your store will be live at https://${storeHostFrom(store.settings.storeUrl)}`,
+      host ? `Your store will be live at https://${host}` : 'Your store will be visible to buyers.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -160,10 +162,12 @@ export default function StorePublishScreen() {
               if (result.success) {
                 await completeSetupTaskWhen('publish_store', result.success);
                 setPublished(true);
-                await doValidate();
+                await doValidate().catch(() => {});
               } else {
                 Alert.alert('Cannot publish', result.message);
               }
+            } catch {
+              Alert.alert('Couldn’t publish', 'Check your connection and try again.');
             } finally {
               setPublishing(false);
             }
@@ -181,17 +185,24 @@ export default function StorePublishScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Unpublish', style: 'destructive', onPress: async () => {
-            await unpublishStore();
+            // Only flip the UI once the server confirms.
+            try {
+              await unpublishStore();
+            } catch {
+              Alert.alert('Couldn’t unpublish', 'Your store is still live. Check your connection and try again.');
+              return;
+            }
             setPublished(false);
-            await doValidate();
+            await doValidate().catch(() => {});
           },
         },
       ],
     );
   };
 
-  const storeHost = storeHostFrom(store?.settings.storeUrl);
-  const viewUrl = storeViewUrl(store?.settings.storeUrl);
+  // Real address only (Domains screen is the source); no placeholder host.
+  const storeHost = storeAddressHost(store);
+  const viewUrl = storeHost?.endsWith('.brandthread.app') ? storeViewUrl(storeHost) : storeHost ? `https://${storeHost}` : null;
 
   return (
     <View style={pub.root}>
@@ -316,9 +327,13 @@ export default function StorePublishScreen() {
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live!</Text>
-              <Text style={pub.successUrl}>https://{storeHost}</Text>
+              {storeHost ? <Text style={pub.successUrl}>https://{storeHost}</Text> : null}
               <View style={pub.successActions}>
-                <SecondaryButton label="View store" onPress={() => Linking.openURL(viewUrl ?? `https://${storeHost}`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                {storeHost ? (
+                  <SecondaryButton label="View store" onPress={() => Linking.openURL(viewUrl ?? `https://${storeHost}`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
+                ) : (
+                  <SecondaryButton label="Set address" onPress={() => router.push('/store-domain' as never)} icon="globe" style={{ flex: 1 }} />
+                )}
                 <PrimaryButton
                   label={isSellerSetupOrigin(params.from) ? 'Done' : 'Continue Editing'}
                   onPress={leaveSetupDestination}
@@ -331,7 +346,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
-              <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeHost}</Text>
+              {storeHost ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeHost}</Text> : null}
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}

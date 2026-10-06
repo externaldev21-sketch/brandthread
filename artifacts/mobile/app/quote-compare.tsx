@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { plural } from '@/lib/plural';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -31,7 +32,7 @@ import { formatCents } from '@/lib/money';
 function fmt(cents: number) { return formatCents(cents); }
 
 function fmtDays(d: number) {
-  return `${d} days`;
+  return plural(d, 'day');
 }
 
 // ─── Row data ──────────────────────────────────────────────────────────────────

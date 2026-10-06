@@ -22,6 +22,8 @@ import {
 } from 'react-native';
 import { Asset } from 'expo-asset';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+import { demoRunwayVideoUri } from '@/lib/demoMedia';
+import { getLiveViewerPrefs, setLiveViewerPrefs } from '@/lib/live/liveViewerPrefs';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -71,7 +73,7 @@ const SAMPLE_ROOMS_SOURCE = [
     sellerHandle: 'maisonvela',
     title: 'Evening silhouettes, live from the studio',
     viewerCount: 1204,
-    video: require('../assets/videos/fashion_runway_02.mp4'),
+    video: demoRunwayVideoUri(2),
     poster: require('../assets/videos/fashion_runway_02.jpg'),
     // Stand-in profile photo, same convention as lib/previewActivity.ts (no
     // real headshots in this seed set) — a different frame than the room's
@@ -88,7 +90,7 @@ const SAMPLE_ROOMS_SOURCE = [
     sellerHandle: 'ateliernoire',
     title: 'New arrivals — tailoring walkthrough',
     viewerCount: 862,
-    video: require('../assets/videos/fashion_runway_01.mp4'),
+    video: demoRunwayVideoUri(1),
     poster: require('../assets/videos/fashion_runway_01.jpg'),
     avatar: require('../assets/videos/fashion_runway_06.jpg'),
     productId: 'sample-product-sculpted-blazer',
@@ -580,6 +582,15 @@ function LiveRoomPage({
     if (dataSaver) player.pause(); else player.play();
   }, [dataSaver, player, isActive]);
 
+  // Captions / pause-video are the viewer's choices, not this room's: pick
+  // up the current ones whenever this room becomes the active page.
+  useEffect(() => {
+    if (!isActive) return;
+    const prefs = getLiveViewerPrefs();
+    setCaptionsOn(prefs.captions);
+    setDataSaver(prefs.dataSaver);
+  }, [isActive]);
+
   return (
     <View style={[styles.page, { height: pageHeight }]}>
       {room.videoSource ? (
@@ -740,9 +751,9 @@ function LiveRoomPage({
         onNotInterested={handleNotInterested}
         onCopyLink={handleCopyLink}
         captionsOn={captionsOn}
-        onToggleCaptions={() => setCaptionsOn(v => !v)}
+        onToggleCaptions={() => { const next = !captionsOn; setCaptionsOn(next); setLiveViewerPrefs({ captions: next }); }}
         dataSaverOn={dataSaver}
-        onToggleDataSaver={() => setDataSaver(v => !v)}
+        onToggleDataSaver={() => { const next = !dataSaver; setDataSaver(next); setLiveViewerPrefs({ dataSaver: next }); }}
       />
 
       {/* Bottom: chat overlay + input + pinned product. box-none: this

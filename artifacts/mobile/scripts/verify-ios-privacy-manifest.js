@@ -34,6 +34,7 @@ const REQUIRED_COLLECTED_TYPES = [
   'NSPrivacyCollectedDataTypeOtherUserContent',
   'NSPrivacyCollectedDataTypeCustomerSupport',
   'NSPrivacyCollectedDataTypeProductInteraction',
+  'NSPrivacyCollectedDataTypeSearchHistory',
   'NSPrivacyCollectedDataTypeOtherDiagnosticData',
   'NSPrivacyCollectedDataTypeCrashData',
   'NSPrivacyCollectedDataTypePerformanceData',

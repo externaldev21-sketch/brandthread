@@ -15,6 +15,7 @@ import { useAuth } from '@clerk/expo';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { billingAccess } from '@/lib/billingAccess';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { platformSubscriptionSettingsUrl } from '@/lib/subscriptionRecovery';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -82,8 +83,10 @@ export default function BillingScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (Platform.OS !== 'web') {
-        if (!managementURL) throw new Error('Subscription management is not available yet.');
-        await Linking.openURL(managementURL);
+        // No URL from RevenueCat yet: open the store's subscription page instead.
+        const url = managementURL ?? platformSubscriptionSettingsUrl(Platform.OS);
+        if (!url) throw new Error('No subscription page for this platform.');
+        await Linking.openURL(url);
         return;
       }
       const { url } = await api.seller.subscription.portal();

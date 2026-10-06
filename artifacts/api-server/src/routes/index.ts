@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { reviewTextModeration } from "../middlewares/reviewTextModeration";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import healthRouter from "./health";
@@ -175,6 +176,10 @@ import { sellerGiveawaysRouter, publicGiveawaysRouter } from "./giveaways";
 
 const router = Router();
 router.use(aiConsentGate);
+
+// Review and seller-reply text goes through the public content filter before
+// the reviews router (see middlewares/reviewTextModeration.ts).
+router.use("/reviews", reviewTextModeration);
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);

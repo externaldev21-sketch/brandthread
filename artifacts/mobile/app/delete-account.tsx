@@ -230,6 +230,13 @@ export default function DeleteAccountScreen() {
                 <Feather name="wifi-off" size={16} color={theme.error} />
                 <Text style={s.errorText}>{checkError}</Text>
                 <PressableScale onPress={loadCheck} accessibilityRole="button"><Text style={s.link}>Retry</Text></PressableScale>
+                {/* Never a dead end: if the check can't run, support deletes it for you. */}
+                <PressableScale
+                  onPress={() => { Linking.openURL('mailto:support@brandthread.app?subject=Delete%20my%20Brandthread%20account').catch(() => {}); }}
+                  accessibilityRole="link"
+                >
+                  <Text style={s.link}>Email support to delete</Text>
+                </PressableScale>
               </View>
             ) : blockers.length > 0 ? (
               <View style={s.blockerCard}>

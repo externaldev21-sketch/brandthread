@@ -3,6 +3,7 @@
  * Shows real counts of custom field definitions per resource type.
  */
 import React, { useState, useCallback } from 'react';
+import { Redirect } from 'expo-router';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -30,7 +31,17 @@ const DEFINITIONS: { key: string; icon: keyof typeof Feather.glyphMap; label: st
   { key: 'shop',              icon: 'home',     label: 'Shop' },
 ];
 
+/**
+ * Not linked from anywhere in the app and not finished (its rows and "Add definition" have no editor behind them), so release
+ * builds send a deep link here to the home screen. Development builds still
+ * open it for work on the feature.
+ */
 export default function MetafieldsScreen() {
+  if (!__DEV__) return <Redirect href={'/' as never} />;
+  return <MetafieldsScreenContent />;
+}
+
+function MetafieldsScreenContent() {
   const colors = useColors();
   const api = useApi();
   const [counts, setCounts] = useState<Record<string, number>>({});

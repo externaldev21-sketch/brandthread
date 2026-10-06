@@ -87,7 +87,7 @@ export default function SellerDataExportScreen() {
 
   return (
       <View style={styles.root}>
-      <ScreenHeader title="Export my data" />
+      <ScreenHeader title="Download my data" />
 
        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}

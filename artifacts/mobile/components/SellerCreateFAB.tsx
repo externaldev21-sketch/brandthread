@@ -44,14 +44,14 @@ export default function SellerCreateFAB() {
     '/seller-drop-create',
     '/create-post',
     '/buyer-checkout',
-    '/camera',
-    '/capture',
+    // Real route paths only (there is no /camera, /capture or /sign-up).
+    '/camera-capture',
     '/live',
     '/store-preview',
     '/design-canvas',
     '/onboarding',
     '/sign-in',
-    '/sign-up',
+    '/forgot-password',
   ].some(route => pathname.includes(route));
 
   if (!isRoleLoaded || role !== 'seller' || keyboardVisible || Platform.OS === 'web' || blockedRoute) return null;

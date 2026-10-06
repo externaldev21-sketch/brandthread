@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatCents } from '@/lib/money';
+import { plural } from '@/lib/plural';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -185,9 +187,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Managed in Stripe</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Managed in Stripe Tax</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Add or review where you collect tax (your nexus) in your Stripe Tax dashboard.
+                Where you're registered to collect tax (your nexus) is set in your Stripe Tax dashboard. Tap "Open Stripe" to add, remove, or review registrations.
               </Text>
             </View>
           </View>
@@ -203,7 +205,7 @@ export default function TaxesDutiesScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>Prices are tax-exclusive</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Tax is added on top of your listed prices at checkout.
+                Tax is calculated at checkout and added on top of your listed prices.
               </Text>
             </View>
           </View>
@@ -217,9 +219,9 @@ export default function TaxesDutiesScreen() {
           <View style={[styles.unavailableCard, { marginTop: 12 }, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Delivered At Place (DAP)</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>International orders ship DAP</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Duties aren't collected at checkout. Buyers may owe duties and import fees on delivery.
+                Customs duties aren't collected at checkout, so buyers may pay duties and import fees on delivery.
               </Text>
             </View>
           </View>
@@ -243,8 +245,8 @@ export default function TaxesDutiesScreen() {
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
                 {annualReport
-                  ? `${annualReport.year}: ${formatCents(Math.round(Number(annualReport.grossPaymentCents) || 0))} gross · ${annualReport.transactionCount} transaction${annualReport.transactionCount === 1 ? '' : 's'}`
-                  : "Couldn't load this year's totals."}
+                  ? `${annualReport.year}: ${formatCents(annualReport.grossPaymentCents)} gross · ${plural(annualReport.transactionCount, 'transaction')}`
+                  : 'Annual paid-order totals are unavailable.'}
               </Text>
               {annualReport?.threshold && (
                 <Text style={[styles.rowDescription, { color: annualReport.threshold?.meetsFederalThreshold ? colors.success : colors.mutedForeground }]}>

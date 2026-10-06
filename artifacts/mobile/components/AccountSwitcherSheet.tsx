@@ -39,7 +39,7 @@ import { useApi } from '@/hooks/useApi';
 import { SPACING } from '@/constants/spacing';
 import { TYPE_SCALE } from '@/constants/typography';
 import { FONT } from '@/lib/theme';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { useRole } from '@/contexts/RoleContext';
 import {
   MAX_ACCOUNTS_MESSAGE, getHandle, getDisplayName, resolveAccountTypeLabel, isAtAccountCap,
@@ -98,10 +98,20 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPreview, activeSessions.map((s) => s.id).join(',')]);
 
-  const previewAccounts: AccountRow[] = [
-    { id: 'preview-buyer', displayName: 'Ava', handle: '@ava', accountType: 'Buyer', current: role === 'buyer' },
-    { id: 'preview-seller', displayName: 'Atelier Noire', handle: '@atelier.noire', accountType: 'Seller', current: role === 'seller' },
-  ];
+  // Sample identities only in the demo preview (&demo=1); a fresh preview
+  // shows just the current, unnamed account.
+  const previewAccounts: AccountRow[] = isPreviewDemoMode()
+    ? [
+        { id: 'preview-buyer', displayName: 'Ava', handle: '@ava', accountType: 'Buyer', current: role === 'buyer' },
+        { id: 'preview-seller', displayName: 'Atelier Noire', handle: '@atelier.noire', accountType: 'Seller', current: role === 'seller' },
+      ]
+    : [{
+        id: role === 'seller' ? 'preview-seller' : 'preview-buyer',
+        displayName: role === 'seller' ? 'Your store' : 'Your account',
+        handle: role === 'seller' ? 'Your store' : 'Your account',
+        accountType: role === 'seller' ? 'Seller' : 'Buyer',
+        current: true,
+      }];
 
   const realAccounts: AccountRow[] = activeSessions.map((session) => {
     const sessionUser = session.user!;
@@ -147,14 +157,14 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
     if (isPreview || switchingId || loggingOutId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
-      `Log out @${account.handle.replace(/^@/, '')}?`,
+      `Sign out @${account.handle.replace(/^@/, '')}?`,
       account.current
-        ? "You'll stay logged into your other accounts."
+        ? "You'll stay signed in to your other accounts."
         : undefined,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Log out', style: 'destructive',
+          text: 'Sign out', style: 'destructive',
           onPress: async () => {
             setLoggingOutId(account.id);
             try {
@@ -163,7 +173,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
               // touching any other signed-in session.
               await clerk.signOut({ sessionId: account.id });
             } catch {
-              Alert.alert('Error', "Couldn't log out that account. Try again.");
+              Alert.alert('Error', "Couldn't sign out that account. Try again.");
             } finally {
               setLoggingOutId(null);
             }
@@ -290,7 +300,7 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
                         {!isPreview && (
                           <Pressable
                             accessibilityRole="button"
-                            accessibilityLabel={`Log out ${account.handle}`}
+                            accessibilityLabel={`Sign out ${account.handle}`}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             disabled={!!switchingId || !!loggingOutId}
                             onPress={() => handleLogOut(account)}

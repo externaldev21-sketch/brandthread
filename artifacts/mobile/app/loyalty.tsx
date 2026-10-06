@@ -112,10 +112,12 @@ export default function LoyaltyScreen() {
     // Redemptions are deliberately created in the cart, where they are
     // persisted with the checkout session and applied to Stripe immediately.
     // Never mint a detached code here: it could be lost before checkout.
-    router.navigate('/(buyer)/cart' as never);
+    router.navigate({ pathname: '/(buyer)/cart', params: { redeemPoints: String(pts) } } as never);
   }
 
-  const previewDiscount = parseInt(redeemPts, 10) || 0;
+  // Never more than the balance, and never a number formatCents can't take
+  // (it throws above Number.MAX_SAFE_INTEGER — a long paste crashed the screen).
+  const previewDiscount = Math.min(parseInt(redeemPts, 10) || 0, balance);
 
   if (loading) {
     return (
@@ -183,10 +185,11 @@ export default function LoyaltyScreen() {
             <TextInput
               style={s.redeemInput}
               value={redeemPts}
-              onChangeText={setRedeemPts}
+              onChangeText={(v) => setRedeemPts(v.replace(/\D/g, '').slice(0, 7))}
               placeholder="100"
               placeholderTextColor={theme.muted}
               keyboardType="number-pad"
+              maxLength={7}
             />
             {previewDiscount >= 100 && (
               <View style={s.discountPreview}>
