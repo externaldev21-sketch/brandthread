@@ -73,7 +73,8 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Notifications',
     items: [
-      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/push-notifications', audience: 'buyer' },
+      // The real, saved preferences screen (buyer toggles + promotional opt-in), QA-0057.
+      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/notifications-settings', audience: 'buyer' },
     ],
   },
   {
@@ -87,6 +88,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Who can message and see me', description: 'Messages, story replies, tags, mentions, comments, and sharing', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
       { label: 'Content you see', description: 'Favorites, content preferences, and suggested content', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
+      { label: 'AI data sharing', description: 'Whether Brandthread AI may send your content to its AI providers', aliases: ['ai', 'openai', 'consent', 'data sharing'], icon: 'cpu', route: '/ai-data-sharing', audience: 'buyer' },
     ],
   },
   {
@@ -225,6 +227,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
       { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'seller', requiresModerator: true },
       { label: 'Review promotions', description: 'Approve or reject paid boosts and Featured slots', aliases: ['promotions', 'boosts', 'featured', 'approve', 'admin'], icon: 'check-square', route: '/admin-promotions', audience: 'seller', requiresModerator: true },
+      { label: 'AI data sharing', description: 'Whether Brandthread AI may send your content to its AI providers', aliases: ['ai', 'openai', 'consent', 'data sharing'], icon: 'cpu', route: '/ai-data-sharing', audience: 'seller' },
     ],
   },
   {
