@@ -5,6 +5,12 @@ description: Preventing the mobile web preview from crashing during its first re
 
 # Expo root redirects
 
+Root Stack screen names must be unique after a merge, including when an older report is preserved alongside its replacement.
+
+**Why:** Typechecking can pass with duplicate registrations, but Expo Router then throws before any screen renders. The actual preview caught this when the combined reports registered the same name twice.
+
+**How to apply:** Check registration uniqueness after navigation merges and verify a real first render, not only TypeScript. Give preserved capabilities their own route rather than duplicating the replacement route.
+
 Do not call `router.replace()` synchronously from the root layout or from its first child effect. For the web preview role, wait until `useRootNavigationState()` has a key and defer the redirect briefly so the root `Stack` registers first.
 
 **Why:** a first-paint redirect can race Expo Router's own navigator mount and trip the “Attempted to navigate before mounting the Root Layout component” error, which is caught by the error boundary as a white screen.

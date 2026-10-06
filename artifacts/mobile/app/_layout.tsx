@@ -1497,7 +1497,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="analytics-advanced" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-goals" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-export" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-advanced"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-cohorts"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />

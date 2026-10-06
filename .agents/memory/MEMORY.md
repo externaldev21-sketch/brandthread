@@ -19,7 +19,7 @@
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; dev web preview defaults to seller and bypasses auth; ?bt_preview=buyer overrides for captures; static screenshots catch FOIT.
 - [Expo dependency repair](expo-dependency-repair.md) — avoid interrupted pnpm relinks; newly published SDK patches may be blocked by registry release age before online Expo checks advance.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
-- [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
+- [Expo root navigation readiness](expo-root-navigation-readiness.md) — wait for root registration before redirecting; merged Stack screen names must stay unique.
 - [Expo proxied device startup](expo-tunnel-fallback.md) — use direct proxied LAN startup; an Ngrok-first handoff can leave Expo Go white even when Metro later recovers.
 - [Expo Go iOS account parity](expo-go-account-parity.md) — physical iOS on SDK 57 requires Expo CLI and Expo Go on the same account; prefer a personal token over managed CLI login.
 - [Expo native prebuild guards](expo-native-prebuild-guards.md) — package lifecycle scripts do not intercept direct `expo prebuild`; invariant checks belong in Expo config plugins.
