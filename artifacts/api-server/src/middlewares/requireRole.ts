@@ -27,6 +27,7 @@ import type { Request, RequestHandler } from "express";
 import { db, teamMembers, users } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { teamMembershipOrderBy } from "../lib/teamMembership";
+import { actsAsSelf, teamRouteRuleFor } from "./teamRouteRules";
 
 export type TeamRole =
   | "owner"
@@ -54,6 +55,9 @@ const ROLE_ORDER: Record<TeamRole, number> = {
 
 /** The account owner is always granted full access to their own store. */
 export const TEAM_OWNER_BYPASS = true;
+
+/** Reads every member of a store may make (team rules gate the rest). */
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
  * Fine-grained capabilities, independent of the linear role hierarchy above.
@@ -175,7 +179,7 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
     (req as any).teamContext = ctx;
     (req as any).actorClerkId = ctx.actorClerkId;
     (req as any).actorRole = ctx.actorRole;
-    (req as any).clerkUserId = ctx.storeOwnerId;
+    (req as any).clerkUserId = (req as any).actAsSelf ? ctx.actorClerkId : ctx.storeOwnerId;
     return ctx;
   }
 
@@ -226,8 +230,9 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
   (req as any).teamContext = ctx;
   (req as any).actorClerkId = ctx.actorClerkId;
   (req as any).actorRole = ctx.actorRole;
-  // Act on the target store: downstream owner-scoped handlers keep working.
-  (req as any).clerkUserId = ctx.storeOwnerId;
+  // Act on the target store: downstream owner-scoped handlers keep working
+  // (unless this route acts for the signed-in person — see teamRouteRules.ts).
+  (req as any).clerkUserId = (req as any).actAsSelf ? ctx.actorClerkId : ctx.storeOwnerId;
   return ctx;
 }
 
@@ -236,6 +241,10 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
  * route's own path-literal param inference. */
 export function teamContext(): RequestHandler<any, any, any, any> {
   return async (req, res, next) => {
+    // Per-router team rules (middlewares/teamRouteRules.ts), looked up by the
+    // mount this middleware runs on.
+    const rule = teamRouteRuleFor(req.baseUrl);
+    if (actsAsSelf(rule, req.path)) (req as any).actAsSelf = true;
     try {
       await resolveTeamContext(req as Request);
     } catch (err) {
@@ -247,6 +256,15 @@ export function teamContext(): RequestHandler<any, any, any, any> {
         return;
       }
       throw err;
+    }
+    if ((req as any).actAsSelf) {
+      (req as any).clerkUserId = (req as any).actorClerkId ?? (req as any).clerkUserId;
+    } else if (rule?.writes && !SAFE_METHODS.has(req.method)) {
+      await requirePermission(rule.writes)(req, res, next);
+      return;
+    } else if (rule?.ownerWrites && !SAFE_METHODS.has(req.method)) {
+      await requireRole("owner")(req, res, next);
+      return;
     }
     next();
   };
@@ -395,71 +413,5 @@ export function requirePayoutsRead(): RequestHandler<any, any, any, any> {
       currentRole: role,
       message: "This action requires payouts access. Ask the store owner to change your access.",
     });
-  };
-}
-
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-/**
- * Mount-level gate for seller routers whose mutations predate team roles:
- * reads stay open to every member of the store (they already pass
- * teamContext()), while any write requires `permission` — so a `viewer` or
- * a `marketing` member can no longer publish the store, change returns or
- * buy boosts on someone else's store.
- */
-export function requirePermissionForWrites(permission: Permission): RequestHandler<any, any, any, any> {
-  const gate = requirePermission(permission);
-  return async (req, res, next) => {
-    if (SAFE_METHODS.has(req.method) || (req as any).actAsSelf) {
-      next();
-      return;
-    }
-    await gate(req, res, next);
-  };
-}
-
-/** Same as requirePermissionForWrites, for owner-only writes (identity verification). */
-export function requireOwnerForWrites(): RequestHandler<any, any, any, any> {
-  const gate = requireRole("owner");
-  return async (req, res, next) => {
-    if (SAFE_METHODS.has(req.method)) {
-      next();
-      return;
-    }
-    await gate(req, res, next);
-  };
-}
-
-/**
- * The route acts for the signed-in person themself, not for the store they
- * have selected — a buyer-side action (commenting in a Live, joining a
- * waitlist, writing a review, validating a discount code at checkout) by
- * someone who also works on another store's team. Restores req.clerkUserId
- * to the caller and tells requireAuth not to switch it back. Mount after
- * teamContext().
- */
-export function actAsSelf(): RequestHandler<any, any, any, any> {
-  return (req, _res, next) => {
-    (req as any).actAsSelf = true;
-    const actor = (req as any).actorClerkId as string | undefined;
-    if (actor) (req as any).clerkUserId = actor;
-    next();
-  };
-}
-
-/**
- * actAsSelf() for only some paths of a mixed router (relative to its mount),
- * e.g. a buyer joining a product waitlist on a router that otherwise serves
- * the seller's waitlist dashboard. Mount before requirePermissionForWrites.
- */
-export function actAsSelfFor(paths: Array<string | RegExp>): RequestHandler<any, any, any, any> {
-  const self = actAsSelf();
-  return (req, res, next) => {
-    const matches = paths.some((p) => (typeof p === "string" ? req.path === p : p.test(req.path)));
-    if (matches) {
-      self(req, res, next);
-      return;
-    }
-    next();
   };
 }

@@ -18,7 +18,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   // to the caller here used to silently undo the store switch, so a
   // permitted manager's reads and writes landed on their OWN (usually empty)
   // store. Keep the owner when the context belongs to this same caller,
-  // unless the route acts for the caller personally (actAsSelf()).
+  // unless the route acts for the caller personally (req.actAsSelf, set by
+  // teamContext() from middlewares/teamRouteRules.ts).
   const ctx = (req as any).teamContext as { actorClerkId: string; storeOwnerId: string } | undefined;
   (req as any).clerkUserId = ctx && ctx.actorClerkId === userId && !(req as any).actAsSelf
     ? ctx.storeOwnerId
