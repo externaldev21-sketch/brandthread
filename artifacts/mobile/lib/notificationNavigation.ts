@@ -129,6 +129,10 @@ export function createNotificationResponseHandler(
       router.push(`/giveaway?code=${encodeURIComponent(data.targetId)}`);
       return;
     }
+    if (data?.targetType === 'dispute' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/dispute-detail?disputeId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'return' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
       return;

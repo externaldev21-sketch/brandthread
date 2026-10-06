@@ -32,9 +32,41 @@ export async function applyDisputePause(orderId: string | null, stripeStatus: st
   }
 }
 
-/** Dispute updated/closed events only carry the dispute id; find its order. */
+/**
+ * Every order a dispute's payment paid for. One in-app cart PaymentIntent
+ * pays several sellers' orders, so a chargeback on it touches all of them —
+ * not just whichever order happened to be linked first.
+ */
+export async function ordersForDisputedPayment(
+  paymentIntentId: string | null,
+  chargeId: string | null,
+  fallbackOrderId: string | null = null,
+): Promise<Array<{ id: string; ownerId: string; orderNumber: string; grossChargedCents: number; totalCents: number }>> {
+  const conditions = [];
+  if (paymentIntentId) conditions.push(sql`${orders.stripePaymentIntentId} = ${paymentIntentId}`);
+  if (chargeId) conditions.push(sql`${orders.stripeChargeId} = ${chargeId}`);
+  if (fallbackOrderId) conditions.push(sql`${orders.id} = ${fallbackOrderId}::uuid`);
+  if (conditions.length === 0) return [];
+  return db.select({
+    id: orders.id,
+    ownerId: orders.ownerId,
+    orderNumber: orders.orderNumber,
+    grossChargedCents: orders.grossChargedCents,
+    totalCents: orders.totalCents,
+  }).from(orders)
+    .where(sql.join(conditions, sql` OR `))
+    .orderBy(orders.createdAt);
+}
+
+/** Dispute updated/closed events only carry the dispute id; pause or resume every order it covers. */
 export async function applyDisputePauseByDisputeId(stripeDisputeId: string, stripeStatus: string): Promise<void> {
-  const [row] = await db.select({ orderId: disputes.orderId }).from(disputes)
+  const [row] = await db.select({
+    orderId: disputes.orderId,
+    paymentIntentId: disputes.stripePaymentIntentId,
+    chargeId: disputes.stripeChargeId,
+  }).from(disputes)
     .where(eq(disputes.stripeDisputeId, stripeDisputeId)).limit(1);
-  await applyDisputePause(row?.orderId ?? null, stripeStatus);
+  if (!row) return;
+  const covered = await ordersForDisputedPayment(row.paymentIntentId, row.chargeId, row.orderId);
+  for (const order of covered) await applyDisputePause(order.id, stripeStatus);
 }

@@ -12,6 +12,8 @@
  * Every function is idempotent: a replayed webhook, a second poll or two
  * servers racing change nothing the second time.
  */
+import { notifySellerOrderDelivered } from "../sellerMoneyNotifications";
+import { payoutHoldApplies } from "./payoutGate";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, drops, orderItems, orderTrackingEvents, orders, productVariants, products } from "@workspace/db";
 import type { DbExecutor } from "../money/ledger";
@@ -174,6 +176,16 @@ export async function recordDelivery(input: {
 
   if (outcome.order && outcome.result.changed) {
     await notifyBuyerDelivered(outcome.order, !outcome.result.allDelivered).catch(() => {});
+    if (outcome.result.allDelivered && !outcome.order.deliveredAt) {
+      // The seller hears it too: delivery is what starts their payout clock.
+      await notifySellerOrderDelivered({
+        sellerId: outcome.order.ownerId,
+        orderId: outcome.order.id,
+        orderNumber: outcome.order.orderNumber,
+        payoutReleaseAt: payoutHoldApplies(outcome.order) ? computePayoutReleaseAt(at) : null,
+        byBuyer: input.source === "buyer",
+      }).catch(() => {});
+    }
     logger.info({ orderId: input.orderId, source: input.source, allDelivered: outcome.result.allDelivered }, "Order delivery recorded");
   }
   return outcome.result;

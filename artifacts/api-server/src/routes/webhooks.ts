@@ -46,7 +46,8 @@ import { finalizeGiftCardsForGroup } from "../lib/giftCards/checkout";
 import { giftCentsForCheckouts } from "../lib/giftCards/service";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
-import { applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
+import { applyDisputePause, applyDisputePauseByDisputeId, ordersForDisputedPayment } from "../lib/delivery/disputePause";
+import { notifySellerDisputeClosed, notifySellerDisputeOpened } from "../lib/sellerMoneyNotifications";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -1757,6 +1758,150 @@ async function handleDisputeEvent(event: { id: string; type: string; created?: n
   if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"].includes(event.type)) {
     await applyDisputePauseByDisputeId(event.data.object.id, event.data.object.status);
   }
+}
+
+/**
+ * The order (and seller) a dispute is recorded against, plus every order the
+ * disputed payment covered. A cart PaymentIntent can pay several sellers'
+ * orders: the dispute row goes to the order whose charge matches the
+ * disputed amount (else the largest), and every covered order is paused and
+ * its seller told.
+ */
+async function resolveDisputeOrders(
+  paymentIntentId: string | null,
+  chargeId: string | null,
+  amountCents: number,
+) {
+  const covered = await ordersForDisputedPayment(paymentIntentId, chargeId);
+  const exact = covered.filter((o) => (o.grossChargedCents || o.totalCents) === amountCents);
+  const primary = exact.length === 1
+    ? exact[0]
+    : [...covered].sort((a, b) => (b.grossChargedCents || b.totalCents) - (a.grossChargedCents || a.totalCents))[0];
+  return { primary: primary ?? null, covered };
+}
+
+async function handleDisputeCreated(dispute: any) {
+  const dueBy = dispute.evidence_details?.due_by
+    ? new Date(dispute.evidence_details.due_by * 1000)
+    : null;
+
+  const { primary, covered } = await resolveDisputeOrders(
+    dispute.payment_intent ?? null,
+    dispute.charge ?? null,
+    dispute.amount ?? 0,
+  );
+  const sellerId = primary?.ownerId ?? "unknown";
+  const orderId = primary?.id ?? null;
+
+  // Build human-readable claim from reason
+  const reasonLabels: Record<string, string> = {
+    credit_not_processed:    "Customer claims they did not receive a refund.",
+    duplicate:               "Customer claims this is a duplicate charge.",
+    fraudulent:              "Customer reports this as an unauthorized charge.",
+    general:                 "Customer filed a general dispute.",
+    product_not_received:    "Customer claims the product was not received.",
+    product_unacceptable:    "Customer claims the product was defective or not as described.",
+    subscription_canceled:   "Customer claims they canceled their subscription.",
+    unrecognized:            "Customer does not recognize this charge.",
+  };
+  const customerClaim = reasonLabels[dispute.reason] ?? `Dispute filed: ${dispute.reason}`;
+
+  const [inserted] = await db
+    .insert(disputes)
+    .values({
+      stripeDisputeId:       dispute.id,
+      stripeChargeId:        dispute.charge ?? null,
+      stripePaymentIntentId: dispute.payment_intent ?? null,
+      orderId,
+      sellerId,
+      amountCents:           dispute.amount,
+      currency:              dispute.currency,
+      reason:                dispute.reason,
+      status:                mapDisputeStatus(dispute.status),
+      evidenceDueBy:         dueBy,
+      stripeEvidenceDetails: dispute.evidence_details ?? {},
+      isChargeRefundable:    dispute.is_charge_refundable ?? true,
+      networkReasonCode:     dispute.network_reason_code ?? null,
+      customerClaim,
+    })
+    .onConflictDoNothing()
+    .returning({ id: disputes.id });
+
+  for (const order of covered) await applyDisputePause(order.id, dispute.status);
+
+  // First delivery only (a retried event inserts nothing): tell each seller
+  // whose order the disputed payment covered. The recorded seller can open
+  // the dispute to respond; others see the paused order.
+  if (inserted) {
+    const notified = new Set<string>();
+    for (const order of covered) {
+      if (notified.has(order.ownerId)) continue;
+      notified.add(order.ownerId);
+      const isPrimary = order.id === orderId;
+      await notifySellerDisputeOpened({
+        sellerId: order.ownerId,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        disputeId: isPrimary ? inserted.id : null,
+        amountCents: isPrimary ? dispute.amount : (order.grossChargedCents || order.totalCents),
+        reason: dispute.reason ?? null,
+        evidenceDueBy: dueBy,
+      });
+    }
+  }
+  logger.info({ disputeId: dispute.id, sellerId, orderId, coveredOrders: covered.length, reason: dispute.reason }, "Dispute created");
+}
+
+async function handleDisputeUpdated(stripeDispute: any) {
+  const dueBy = stripeDispute.evidence_details?.due_by
+    ? new Date(stripeDispute.evidence_details.due_by * 1000)
+    : null;
+
+  await db
+    .update(disputes)
+    .set({
+      status:                mapDisputeStatus(stripeDispute.status),
+      evidenceDueBy:         dueBy,
+      stripeEvidenceDetails: stripeDispute.evidence_details ?? {},
+      updatedAt:             new Date(),
+    })
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
+
+  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute updated");
+}
+
+async function handleDisputeClosed(stripeDispute: any) {
+  const outcome = mapDisputeStatus(stripeDispute.status);
+  const [before] = await db.select({ status: disputes.status }).from(disputes)
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id)).limit(1);
+  const [closed] = await db
+    .update(disputes)
+    .set({
+      status:    outcome,
+      updatedAt: new Date(),
+    })
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id))
+    .returning();
+  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
+
+  // Tell the seller how it ended (once: a retried event finds the outcome
+  // already recorded).
+  if (closed && before?.status !== outcome && closed.sellerId !== "unknown") {
+    const [order] = closed.orderId
+      ? await db.select({ orderNumber: orders.orderNumber }).from(orders).where(eq(orders.id, closed.orderId)).limit(1)
+      : [];
+    await notifySellerDisputeClosed({
+      sellerId: closed.sellerId,
+      orderId: closed.orderId,
+      orderNumber: order?.orderNumber ?? null,
+      disputeId: closed.id,
+      amountCents: closed.amountCents,
+      outcome,
+    });
+  }
+
+  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
 }
 
 /**
