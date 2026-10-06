@@ -35,6 +35,7 @@ import {
 } from "../lib/authProfile";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
+import { LEGAL_ACCEPTANCE_SOURCES, recordLegalAcceptance, type LegalAcceptanceSource } from "../lib/legalAcceptance";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -491,17 +492,17 @@ router.post("/account/restore", requireAuth, async (req, res) => {
 // and Privacy Policy version shown to them (sign-up checkbox or update prompt).
 const legalAcceptanceSchema = z.object({
   version: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:\.[0-9]+)?$/),
+  source: z.enum(LEGAL_ACCEPTANCE_SOURCES).optional(),
 }).passthrough();
 
 router.post("/legal-acceptance", requireAuth, validateRequest({ body: legalAcceptanceSchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const { version } = req.body as { version: string };
+  const { version, source } = req.body as { version: string; source?: LegalAcceptanceSource };
   const acceptedAt = new Date();
-  const rows = await db.update(users)
-    .set({ termsAcceptedAt: acceptedAt, termsVersion: version, updatedAt: acceptedAt })
-    .where(eq(users.clerkId, clerkUserId))
-    .returning({ id: users.id });
-  if (rows.length === 0) {
+  // Latest agreement on the user row, plus one history row per version.
+  const found = await db.transaction((tx) =>
+    recordLegalAcceptance(tx, { clerkId: clerkUserId, version, source, acceptedAt }));
+  if (!found) {
     res.status(404).json({ error: "User not found — call POST /auth/sync first" });
     return;
   }

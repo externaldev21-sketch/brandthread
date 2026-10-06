@@ -2190,7 +2190,8 @@ export const acceptLegalTermsBodyVersionRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-
 
 
 export const AcceptLegalTermsBody = zod.object({
-  "version": zod.string().regex(acceptLegalTermsBodyVersionRegExp)
+  "version": zod.string().regex(acceptLegalTermsBodyVersionRegExp),
+  "source": zod.enum(['signup', 'update_prompt']).optional()
 })
 
 export const AcceptLegalTermsResponse = zod.object({

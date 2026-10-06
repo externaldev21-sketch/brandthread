@@ -112,6 +112,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/orders.tsx',
   'app/privacy.tsx',
   'app/product-bundle-edit.tsx',
+  'app/refund-policy.tsx',
+  'app/seller-agreement.tsx',
   'app/product-bundles.tsx',
   'app/product-detail.tsx',
   'app/product-editor.tsx',

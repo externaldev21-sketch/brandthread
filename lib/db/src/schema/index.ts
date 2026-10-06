@@ -1294,6 +1294,21 @@ export const postUserTags = pgTable('post_user_tags', {
   uniq: uniqueIndex('post_user_tags_unique').on(table.postId, table.taggedUserId),
 }));
 
+// ─── Legal acceptance history ────────────────────────────────────────────────
+// One row per (account, legal document set version) the person agreed to, at
+// sign-up or from the "updated terms" prompt. users.terms_version /
+// terms_accepted_at keep the latest agreement; this table keeps the history.
+
+export const legalAcceptances = pgTable('legal_acceptances', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  clerkId:    text('clerk_id').notNull(),
+  version:    text('version').notNull(),
+  source:     text('source').notNull().default('signup'), // 'signup' | 'update_prompt'
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userVersionUnique: uniqueIndex('legal_acceptances_clerk_version_unique').on(table.clerkId, table.version),
+}));
+
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
 
 export const stories = pgTable('stories', {

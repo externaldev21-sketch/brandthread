@@ -246,6 +246,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'privacy',
   'terms',
   'community-guidelines',
+  'seller-agreement',
+  'refund-policy',
   // CI navigation isolation probe
   'navigation-isolation-probe',
   // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
@@ -587,7 +589,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
-const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
+const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -1365,6 +1367,8 @@ function RootLayoutNav() {
         <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="seller-agreement"        options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="refund-policy"           options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-collection"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />

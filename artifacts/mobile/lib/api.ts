@@ -951,8 +951,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       confirmPasswordReset: (body: { email: string; code: string; newPassword: string }) =>
         post<{ ok: true }>('/api/auth/password-reset/confirm', body),
       /** Record agreement to the Terms, Community Guidelines and Privacy Policy version shown. */
-      acceptLegal: (version: string) =>
-        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', { version }),
+      acceptLegal: (version: string, source?: 'signup' | 'update_prompt') =>
+        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', source ? { version, source } : { version }),
       /** Real Clerk sessions for this account (Login Activity). */
       sessions: () => freshGet<{ sessions: AccountSession[] }>('/api/auth/sessions'),
       revokeSession: (sessionId: string) =>

@@ -39,7 +39,8 @@ describe('public legal documents', () => {
   });
 
   it('does not claim GPS collection or cross-app advertising tracking', () => {
-    const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal.ts'), 'utf8');
+    // The policy text now lives in content/legal/privacy.md (the draft of record).
+    const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal', 'privacy.md'), 'utf8');
     expect(legal).toContain('We don’t request precise GPS location.');
     expect(legal).toContain('doesn’t use a device advertising identifier or track you across other companies’ apps');
   });
