@@ -56,6 +56,7 @@ import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
 import safetyRouter from "./safety";
 import socialRouter from "./social";
+import accountMutesRouter from "./account-mutes";
 import storyMentionsRouter from "./story-mentions";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
@@ -220,6 +221,7 @@ router.use("/reports",                   reportsRouter);
 router.use("/moderation",                auditModerationActions, moderationRouter);
 router.use("/admin",                     adminRouter); // platform admin dashboard API (users.role = admin)
 router.use("/safety",                    safetyRouter);
+router.use("/social/mutes",              accountMutesRouter);
 router.use("/social",                    socialRouter);
 router.use("/social",                    storyMentionsRouter);
 router.use("/referrals",                 referralsRouter);

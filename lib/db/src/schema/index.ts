@@ -961,10 +961,29 @@ export const conversationParticipants = pgTable('conversation_participants', {
   // independent. Polled, same as agentTypingUntil on `conversations` (no
   // websocket layer exists for DMs yet).
   typingUntil:    timestamp('typing_until', { withTimezone: true }),
+  // Migration 131 — per-viewer Archive / Delete-for-me (each side's own copy).
+  archivedAt:       timestamp('archived_at', { withTimezone: true }),
+  hiddenAt:         timestamp('hidden_at', { withTimezone: true }),
+  historyClearedAt: timestamp('history_cleared_at', { withTimezone: true }),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
   userUnreadIdx: index('conversation_participants_unread_idx').on(table.userId, table.unreadCount, table.lastReadAt),
+}));
+
+// ─── Account mutes (migration 131) ───────────────────────────────────────────
+// Instagram-style "Mute": the muted account isn't told; their posts leave my
+// Following feed, their stories leave my tray, and their DMs stop notifying me.
+export const accountMutes = pgTable('account_mutes', {
+  userId:       text('user_id').notNull(),
+  mutedUserId:  text('muted_user_id').notNull(),
+  mutePosts:    boolean('mute_posts').notNull().default(true),
+  muteStories:  boolean('mute_stories').notNull().default(true),
+  muteMessages: boolean('mute_messages').notNull().default(true),
+  createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.mutedUserId] }),
+  userIdx: index('account_mutes_user_idx').on(table.userId, table.createdAt),
 }));
 
 export const messages = pgTable('messages', {
