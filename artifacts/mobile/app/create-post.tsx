@@ -27,7 +27,7 @@ import { extractHashtags } from '@/lib/createPost/caption';
 import { publishCreatePost } from '@/lib/createPost/publish';
 import type { MediaDraft, PickedAsset, PostDetails, SlideDraft } from '@/lib/createPost/types';
 import { CP } from '@/components/create-post/ui';
-import { CaptureScreen } from '@/components/create-post/CaptureScreen';
+import { CreateCamera } from '@/components/create-post/CreateCamera';
 import { GalleryPicker } from '@/components/create-post/GalleryPicker';
 import { SlideEditor } from '@/components/create-post/SlideEditor';
 import { PostPicker } from '@/components/create-post/PostPicker';
@@ -75,8 +75,9 @@ export default function CreatePostScreen() {
   const modes = CREATE_MODES_BY_ROLE[roleKey];
   const editId = typeof params.editId === 'string' ? params.editId : undefined;
   const isWeb = Platform.OS === 'web';
-  // Web has no camera step (the gallery picker opens directly); `?capture=1` opts a browser with a camera in.
-  const noCameraStep = isWeb && params.capture !== '1';
+  // Camera-first on native and web; a browser without a camera still has
+  // the roll shortcut and permission placeholder. Keep a direct-gallery opt-out.
+  const noCameraStep = isWeb && params.capture === '0';
 
   const requested = params.mode === 'schedule' ? 'thread' : (params.mode as CreateMode | undefined);
   const [mode, setMode] = useState<CreateMode>(
@@ -246,13 +247,15 @@ export default function CreatePostScreen() {
     <View style={s.root} testID="create-post-screen">
       <StatusBar barStyle="light-content" />
       {step === 'capture' && !noCameraStep ? (
-        <CaptureScreen
-          modes={modes}
-          mode={mode}
-          onChangeMode={changeMode}
+        <CreateCamera
+          isBuyer={!isSeller}
+          mode={postMode}
+          onModeChange={changeMode}
           onClose={leave}
-          onOpenGallery={() => setStep('gallery')}
-          onCaptured={(asset) => buildFromAssets([asset], 'camera')}
+          onOpenLibrary={() => setStep('gallery')}
+          onGoLive={isSeller ? () => changeMode('live') : undefined}
+          onPhoto={(uri) => buildFromAssets([{ id: `cam-${Date.now()}`, uri, kind: 'photo', duration: 0, mimeType: 'image/jpeg' }], 'camera')}
+          onVideo={(uri, duration) => buildFromAssets([{ id: `cam-${Date.now()}`, uri, kind: 'video', duration, mimeType: uri.startsWith('blob:') ? 'video/webm' : 'video/mp4' }], 'camera')}
         />
       ) : null}
 
