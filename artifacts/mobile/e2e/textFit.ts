@@ -39,9 +39,8 @@ export async function collectTextOverflow(page: Page): Promise<TextOverflowIssue
       if (rect.bottom < 0 || rect.top > window.innerHeight) continue; // off-screen
       const style = getComputedStyle(el);
       if (style.visibility === 'hidden' || style.opacity === '0') continue;
-      // Deliberately scrolling rows (horizontal chip rails) are not truncation.
-      const scroller = el.closest<HTMLElement>('[style*="overflow-x: scroll"], [style*="overflow-x: auto"], [style*="overflow: scroll"], [style*="overflow: auto"]');
-      if (scroller) continue;
+      // Text inside a scrolling rail (chip rows) is still audited: a chip
+      // partly past the screen edge is fine, but its own label must fit.
       const testId = el.closest<HTMLElement>('[data-testid]')?.getAttribute('data-testid') ?? null;
       if (el.scrollWidth > el.clientWidth + 1) {
         issues.push({ kind: 'truncated', text: text.slice(0, 60), scrollWidth: el.scrollWidth, clientWidth: el.clientWidth, testId });
