@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/Button';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
-import { subscribeProfileEvents } from '@/lib/profileEvents';
+import { followingCountAfter, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
@@ -366,7 +366,7 @@ export default function ProfileScreen() {
     if (event.type !== 'follow' || !userId) return;
     if (event.viewerId && event.viewerId !== userId) return;
     if (event.targetId === userId) return;
-    setSocialCounts((counts) => ({ ...counts, following: Math.max(0, counts.following + (event.isFollowing ? 1 : -1)) }));
+    setSocialCounts((counts) => ({ ...counts, following: followingCountAfter(counts.following, event) }));
   }), [userId]);
 
   // Shop tab: the seller's live listings (same source as the full products page).

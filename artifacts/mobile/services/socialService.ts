@@ -918,6 +918,23 @@ export async function getSellerFollowState(sellerId: string): Promise<SellerFoll
   );
 }
 
+/**
+ * Follow state for many accounts in one request (GET /api/social/status?ids=),
+ * chunked at the server's 100-id cap. Keyed by the ids passed in.
+ */
+export async function getSellerFollowStates(sellerIds: string[]): Promise<Map<string, SellerFollowState>> {
+  const ids = [...new Set(sellerIds.filter(Boolean))];
+  const out = new Map<string, SellerFollowState>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const page = await serviceRequest<Record<string, SellerFollowState>>(
+      `/api/social/status?ids=${chunk.map(encodeURIComponent).join(',')}`,
+    );
+    for (const id of chunk) if (page?.[id]) out.set(id, page[id]);
+  }
+  return out;
+}
+
 export async function setSellerFollowing(
   sellerId: string,
   following: boolean,
@@ -948,6 +965,7 @@ export async function setSellerFollowing(
     isFollowing: state?.isFollowing ?? following,
     followersCount: typeof state?.followersCount === 'number' ? state.followersCount : undefined,
     viewerId: _socialUserId === 'anon' ? null : _socialUserId,
+    viewerFollowingCount: typeof (state as any)?.followingCount === 'number' ? (state as any).followingCount : undefined,
   });
   return state;
 }

@@ -157,6 +157,7 @@ describe("social follow concurrency", () => {
         ok: true,
         isFollowing: true,
         followersCount: 1,
+        followingCount: 1,
       })),
     );
   });

@@ -32,7 +32,7 @@ import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
-import { subscribeProfileEvents } from '@/lib/profileEvents';
+import { followingCountAfter, subscribeProfileEvents } from '@/lib/profileEvents';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   connectionsHref, messageSellerHref, productDetailHref, profileVideosHref, resolveStoreVisitSource,
@@ -308,7 +308,7 @@ export default function SellerProfileScreen() {
       setIsFollowing(event.isFollowing);
       if (typeof event.followersCount === 'number') setFollowers(event.followersCount);
     } else if (isOwner && event.viewerId === canonicalSellerId) {
-      setFollowing((count) => (count == null ? count : Math.max(0, count + (event.isFollowing ? 1 : -1))));
+      setFollowing((count) => (count == null ? count : followingCountAfter(count, event)));
     }
   }), [canonicalSellerId, isOwner]);
 

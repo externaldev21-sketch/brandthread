@@ -47,7 +47,7 @@ import type { BuyerOrderView } from '@/services/orderTypes';
 import type {
   BuyerSocialProfile, BuyerPost, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
-import { subscribeProfileEvents } from '@/lib/profileEvents';
+import { followingCountAfter, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
@@ -548,7 +548,7 @@ export default function ProfileScreen() {
     if (event.viewerId && event.viewerId !== user.id) return;
     if (event.targetId === user.id) return;
     setSocialCounts((counts) => counts
-      ? { ...counts, following: Math.max(0, counts.following + (event.isFollowing ? 1 : -1)) }
+      ? { ...counts, following: followingCountAfter(counts.following, event) }
       : counts);
   }), [user?.id]);
 

@@ -16,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createThreadFeedCursor,
-  getSellerFollowState,
+  getSellerFollowStates,
   getThreadPostsPage,
   setSellerFollowing,
   subscribeSocial,
@@ -2802,10 +2802,10 @@ export default function FeedScreen({
     const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
     if (sellerIds.length === 0) return;
     let cancelled = false;
-    void Promise.all(sellerIds.map(async sellerId => [sellerId, await getSellerFollowState(sellerId)] as const))
-      .then(states => {
+    // One batched request for the whole page (was one per seller).
+    void getSellerFollowStates(sellerIds)
+      .then(bySeller => {
         if (cancelled) return;
-        const bySeller = new Map(states);
         setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => {
           const sellerId = sellerFeedPosts.find(post => post.id === postId)?.sellerId;
           return [postId, sellerId && bySeller.has(sellerId)

@@ -24,6 +24,8 @@ import { useApi } from '@/lib/api';
 import { calcPricing } from '@/lib/productUtils';
 import { formatCents, integerPercent } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useAuth } from '@clerk/expo';
+import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -100,6 +102,44 @@ export default function ProductStoreScreen() {
       ?.then((p: any) => setSellerVerified(!!p?.verified))
       ?.catch(() => {});
   }, []);
+
+  // Follow the seller for real (was an alert-only placeholder): state is
+  // read from the server and the toggle goes through setSellerFollowing so
+  // every profile/count on screen updates from the confirmed result.
+  const { isSignedIn, userId: viewerId } = useAuth();
+  // This screen is also the seller's own "View store page" preview — there,
+  // Follow keeps its preview explanation (you can't follow yourself).
+  const isOwnStorePreview = !!product?.sellerId && product.sellerId === viewerId;
+  const [followingSeller, setFollowingSeller] = useState<boolean | null>(null);
+  const [followBusy, setFollowBusy] = useState(false);
+  useEffect(() => {
+    const sellerId = product?.sellerId;
+    if (!sellerId || !isSignedIn || sellerId === viewerId) { setFollowingSeller(null); return; }
+    let cancelled = false;
+    getSellerFollowState(sellerId)
+      .then((state) => { if (!cancelled) setFollowingSeller(!!state?.isFollowing); })
+      .catch(() => { if (!cancelled) setFollowingSeller(false); });
+    return () => { cancelled = true; };
+  }, [product?.sellerId, isSignedIn, viewerId]);
+
+  const handleFollowSeller = async () => {
+    const sellerId = product?.sellerId;
+    if (!sellerId || followBusy) return;
+    if (!isSignedIn) { router.push('/sign-in' as never); return; }
+    const was = followingSeller === true;
+    setFollowingSeller(!was);
+    setFollowBusy(true);
+    try {
+      const state = await setSellerFollowing(sellerId, !was);
+      setFollowingSeller(!!state?.isFollowing);
+      Haptics.selectionAsync();
+    } catch {
+      setFollowingSeller(was);
+      Alert.alert(was ? 'Could not unfollow' : 'Could not follow', 'Check your connection and try again.');
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   // Selected option values: { [optionId]: valueId }
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
@@ -349,8 +389,11 @@ export default function ProductStoreScreen() {
                 {sellerVerified && <Text style={s.sellerSub}>Verified Brand</Text>}
               </View>
               <SecondaryButton
-                label="Follow"
-                onPress={() => Alert.alert('Follow', 'Follow this seller to get drop alerts.')}
+                label={followingSeller ? 'Following' : 'Follow'}
+                onPress={() => {
+                  if (isOwnStorePreview) { Alert.alert('Follow', 'Follow this seller to get drop alerts.'); return; }
+                  void handleFollowSeller();
+                }}
                 small
                 style={s.followBtn}
               />

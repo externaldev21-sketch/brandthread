@@ -113,6 +113,12 @@ function countOne(arr: { n: number }[] | undefined) {
   return arr?.[0]?.n ?? 0;
 }
 
+async function followingCount(userId: string): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`cast(count(*) as int)` })
+    .from(follows).where(eq(follows.followerId, userId));
+  return row?.n ?? 0;
+}
+
 async function followerCount(userId: string): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`cast(count(*) as int)` })
@@ -233,10 +239,13 @@ async function buildBuyerPosts(
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
 router.post("/follow", rateLimit("follow"), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { userId } = req.body as { userId?: string };
-  if (!userId || typeof userId !== "string") {
+  const { userId: requestedUserId } = req.body as { userId?: string };
+  if (!requestedUserId || typeof requestedUserId !== "string") {
     res.status(400).json({ error: "userId required" }); return;
   }
+  // Same alias rule as GET /status and /profile: a users.id UUID resolves to
+  // the canonical Clerk id, so every surface can follow with whichever id it holds.
+  const userId = (await resolveToClerkId(requestedUserId)) ?? requestedUserId;
   if (userId === myId) {
     res.status(400).json({ error: "Cannot follow yourself" }); return;
   }
@@ -305,13 +314,13 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
     })();
   }
 
-  res.json({ ok: true, isFollowing: true, followersCount: result.followersCount });
+  res.json({ ok: true, isFollowing: true, followersCount: result.followersCount, followingCount: await followingCount(myId) });
 });
 
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
 router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
-  const target = req.params.userId as string;
+  const target = (await resolveToClerkId(req.params.userId as string)) ?? (req.params.userId as string);
   const followersCount = await db.transaction(async (tx) => {
     await tx.execute(sql`
       SELECT pg_advisory_xact_lock(
@@ -328,7 +337,9 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
         eq(notificationsFeed.userId, target),
         eq(notificationsFeed.type, "new_follower"),
         eq(notificationsFeed.actorId, myId),
-        eq(notificationsFeed.isRead, false),
+        // Read rows too: an already-seen "started following you" for a
+        // relationship that no longer exists made Activity disagree with
+        // the follower count (QA-0037).
       ));
     const [countRow] = await tx
       .select({ n: sql<number>`cast(count(*) as int)` })
@@ -336,7 +347,7 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
       .where(eq(follows.followingId, target));
     return countRow?.n ?? 0;
   });
-  res.json({ ok: true, isFollowing: false, followersCount });
+  res.json({ ok: true, isFollowing: false, followersCount, followingCount: await followingCount(myId) });
 });
 
 // ─── DELETE /api/social/followers/:userId — remove a follower ───────────────
@@ -409,6 +420,36 @@ router.post("/see-less", async (req, res) => {
 
 // ─── GET /api/social/status/:userId ──────────────────────────────────────────
 // Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId.
+// ─── GET /api/social/status?ids=a,b,c ────────────────────────────────────────
+// Batch follow state for a page of accounts (feed rail, suggestion lists):
+// one query instead of one GET /status/:id per row, so a Follow badge never
+// shows "not following" while dozens of per-row requests are in flight.
+// Ids may be Clerk ids or users.id aliases; the map is keyed by the id as sent.
+router.get("/status", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const raw = typeof req.query.ids === "string" ? req.query.ids : "";
+  const ids = [...new Set(raw.split(",").map((id) => id.trim()).filter(Boolean))].slice(0, 100);
+  if (ids.length === 0) { res.json({}); return; }
+  const canonical = new Map<string, string>();
+  await Promise.all(ids.map(async (id) => canonical.set(id, (await resolveToClerkId(id)) ?? id)));
+  const others = [...new Set(canonical.values())];
+  const rows = await db.select({ followerId: follows.followerId, followingId: follows.followingId })
+    .from(follows)
+    .where(or(
+      and(eq(follows.followerId, myId), inArray(follows.followingId, others)),
+      and(inArray(follows.followerId, others), eq(follows.followingId, myId)),
+    ));
+  const iFollow = new Set(rows.filter((r) => r.followerId === myId).map((r) => r.followingId));
+  const followsMe = new Set(rows.filter((r) => r.followingId === myId).map((r) => r.followerId));
+  const out: Record<string, { isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean }> = {};
+  for (const [id, other] of canonical) {
+    const isFollowing = iFollow.has(other);
+    const isFollowedBy = followsMe.has(other);
+    out[id] = { isFollowing, isFollowedBy, isMutual: isFollowing && isFollowedBy };
+  }
+  res.json(out);
+});
+
 router.get("/status/:userId", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
   const rawId = req.params.userId;
@@ -496,10 +537,15 @@ router.get("/profile/:userId", async (req, res) => {
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
 
+  // Every live post the account published (buyer or seller) — a seller's
+  // count was always 0 because of a buyer-only join.
   const [postsRow] = await db.select({ n: sql<number>`cast(count(*) as int)` })
     .from(posts)
-    .innerJoin(users, and(eq(users.clerkId, posts.userId), eq(users.accountType, "buyer")))
-    .where(eq(posts.userId, other));
+    .where(and(
+      eq(posts.userId, other),
+      sql`${posts.postStatus} NOT IN ('deleted', 'archived', 'draft')`,
+      ne(posts.moderationStatus, "removed"),
+    ));
   const likesCount = await publicProfileLikes(other);
 
   res.json({

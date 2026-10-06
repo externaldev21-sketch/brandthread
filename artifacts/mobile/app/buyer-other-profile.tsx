@@ -217,6 +217,7 @@ export default function BuyerOtherProfileScreen() {
         isFollowing: !wasFollowing,
         followersCount: confirmedCount,
         viewerId: currentUserId ?? null,
+        viewerFollowingCount: typeof result?.followingCount === 'number' ? result.followingCount : undefined,
       });
       // Becoming (or ceasing to be) friends changes which posts are visible.
       void videos.reload();
