@@ -56,6 +56,7 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { profileVideosHref } from '@/lib/profileNavigation';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -254,9 +255,11 @@ export default function BuyerSearchScreen() {
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
   // Blend in bundled preview posts/products when the live API has nothing
   // for this query — matched against name/author/brand, not just caption.
-  const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
+  // Preview mode only (same gate as PREVIEW_ACCOUNTS above): a real
+  // account's empty search must stay empty, never show sample posts.
+  const videoResults = videoResultsRaw.length > 0 || !previewMode ? videoResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
-  const productResults = productResultsRaw.length > 0 ? productResultsRaw
+  const productResults = productResultsRaw.length > 0 || !previewMode ? productResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   const tagRows = useMemo(() => deriveTags(videoResults, trimmedQuery), [videoResults, trimmedQuery]);
@@ -284,7 +287,9 @@ export default function BuyerSearchScreen() {
 
   function goToVideo(video: VideoResult) {
     hapticPrimaryAction();
-    router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
+    // Open the tapped video itself in the full-screen player (scoped to its
+    // creator), not the author's profile — that screen ignored postId.
+    router.push(profileVideosHref({ id: video.authorId, startPostId: video.postId, exactPost: true }) as never);
   }
 
   function handleResultPress(r: ProductResult | BrandResult) {

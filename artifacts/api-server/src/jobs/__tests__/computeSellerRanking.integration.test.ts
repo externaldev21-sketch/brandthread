@@ -80,6 +80,7 @@ describe("computeSellerRankingForToday", () => {
         { postId: "post-1", type: "like", createdAt: hourAgo },
         { postId: "post-1", type: "like", createdAt: hourAgo },
       ],
+      /* 4b. commentLevelRows (post_comments) */ [{ postId: "post-1", createdAt: hourAgo }],
       /* 5. shopClickRows */                       [],
       /* 6. saveRows */                            [],
       /* 7. followerRows */                        [{ sellerId: "seller-1", cnt: 10 }],

@@ -36,6 +36,7 @@ import { storyListedFor } from "../lib/storyVisibility";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { viewerPostStates } from "../lib/viewerPostState";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
 
@@ -192,6 +193,7 @@ async function buildBuyerPosts(
   const likes = counts(likeRows);
   const reposts = counts(repostRows);
   const comments = commentRows;
+  const stateFor = await viewerPostStates(viewerId, postIds);
   const mine = new Map<string, Set<string>>();
   for (const row of myRows) {
     if (!row.postId) continue;
@@ -221,7 +223,7 @@ async function buildBuyerPosts(
       repostsCount: reposts.get(row.id) ?? 0,
       likedByMe: mine.get(row.id)?.has("like") ?? false,
       repostedByMe: mine.get(row.id)?.has("repost") ?? false,
-      savedByMe: false,
+      savedByMe: stateFor(row.id).savedByMe,
       isArchived: false,
       isDraft: row.postStatus === "draft",
       createdAt: row.createdAt,

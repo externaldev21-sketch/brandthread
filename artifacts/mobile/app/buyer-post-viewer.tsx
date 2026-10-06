@@ -7,10 +7,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share, Animated, useWindowDimensions,
+  TextInput, Modal, Share, Animated, useWindowDimensions, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
@@ -187,19 +187,85 @@ export default function BuyerPostViewer() {
     }
   }, [loadPost, params.postId]);
 
+  // Real posts (UUID ids) engage through the API with rollback; seeded
+  // preview posts keep the local store behaviour they always had.
+  const realPostId = params.postId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.postId) ? params.postId : null;
+
+  // One view per open — the same signal the main feed records, so the
+  // owner's Content Analytics counts views from every surface.
+  useEffect(() => {
+    if (userId && realPostId) void api.posts.interact(realPostId, { type: 'view' }).catch(() => {});
+  }, [api, userId, realPostId]);
+
   const handleLike = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const wasLiked = liked;
+    const prevCount = likeCount;
     const newLiked = !liked;
     setLiked(newLiked);
     setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
-    if (params.postId) await likePost(params.postId);
+    if (!realPostId) {
+      if (params.postId) await likePost(params.postId);
+      return;
+    }
+    try {
+      const result = await api.posts.interact(realPostId, { type: 'like', value: newLiked ? 'add' : 'remove' });
+      if (typeof result?.count === 'number') setLikeCount(result.count);
+    } catch {
+      setLiked(wasLiked);
+      setLikeCount(prevCount);
+      Alert.alert('Could not update like', 'Check your connection and try again.');
+    }
+  };
+
+  const handleRepost = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const wasReposted = reposted;
+    setReposted(!wasReposted);
+    if (!realPostId) {
+      if (params.postId) await repostPost(params.postId);
+      return;
+    }
+    try {
+      const result = await api.posts.interact(realPostId, { type: 'repost', value: wasReposted ? 'remove' : undefined });
+      setReposted(result?.action === 'added');
+    } catch (error) {
+      setReposted(wasReposted);
+      Alert.alert('Could not update repost', error instanceof Error && error.message ? error.message : 'Try again.');
+    }
+  };
+
+  const handleSaveToggle = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!params.postId) return;
+    const wasSaved = saved;
+    setSaved(!wasSaved);
+    if (!realPostId) {
+      if (!wasSaved) await saveItem({ type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 });
+      return;
+    }
+    try {
+      if (wasSaved) {
+        await api.buyer.saved.remove(realPostId);
+      } else {
+        await api.buyer.saved.save({ type: 'post', targetId: realPostId, title: caption || 'Post', accentColor: mediaColor1 });
+        void requestContextualPushPermission(userId, api);
+      }
+    } catch {
+      setSaved(wasSaved);
+      Alert.alert(wasSaved ? 'Could not remove from saved' : 'Could not save', 'Check your connection and try again.');
+    }
   };
 
   const handleShare = async () => {
     const caption = post?.caption || params.postCaption || '';
     const handle = post?.authorHandle ? `@${post.authorHandle}` : MY_HANDLE;
     try {
-      await Share.share({ message: `${handle} on Brandthread: "${caption}"`, title: 'Share Post' });
+      const result = await Share.share({ message: `${handle} on Brandthread: "${caption}"`, title: 'Share Post' });
+      // Count the share for the owner (share count + Content Analytics) only
+      // when the sheet actually shared, not on dismiss.
+      const dismissed = (result as any)?.action === 'dismissedAction';
+      if (realPostId && userId && !dismissed) void api.posts.interact(realPostId, { type: 'share' }).catch(() => {});
     } catch {}
   };
 
@@ -340,10 +406,9 @@ export default function BuyerPostViewer() {
             accessibilityLabel="Repost"
             accessibilityState={{ selected: reposted }}
             onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setReposted(prev => !prev);
-              // repostPost is a toggle — call it for both directions so both are persisted
-              if (params.postId) await repostPost(params.postId);
+              // Explicit direction + rollback (handleRepost); this used to
+              // send "remove" for any post the viewer didn't own.
+              await handleRepost();
             }}
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
@@ -355,17 +420,15 @@ export default function BuyerPostViewer() {
             accessibilityLabel="Save post"
             accessibilityState={{ selected: saved }}
             onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (!saved && params.postId) {
-                setSaved(true);
-                await saveItem(
-                  { type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 },
-                  { onRemoteSaved: () => { void requestContextualPushPermission(userId, api); } },
-                );
-              }
+              // Save AND unsave, with rollback (handleSaveToggle).
+              await handleSaveToggle();
             }}
           >
-            <Feather name="bookmark" size={22} color={saved ? PURPLE : FG} />
+            {/* Filled when saved (same treatment as the Friends feed) — in the
+                monochrome theme a colour change alone was invisible. */}
+            {saved
+              ? <FontAwesome name="bookmark" size={22} color={PURPLE} />
+              : <Feather name="bookmark" size={22} color={FG} />}
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
           {!isOwner && (
