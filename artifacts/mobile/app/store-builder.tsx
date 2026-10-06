@@ -245,8 +245,11 @@ export default function StoreBuilderScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
       >
         {/* HEADER */}
+        {/* heroGradient (theme background tones), not primaryGradient — that
+            is the accent/button fill (pure white in Monochrome), which turned
+            this header into a solid white block under its white text. */}
         <LinearGradient
-          colors={[...theme.primaryGradient]}
+          colors={[...theme.heroGradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.header, { paddingTop: topInset + SP.md }]}
@@ -257,7 +260,7 @@ export default function StoreBuilderScreen() {
             activeOpacity={0.75}
             style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
           >
-            <Feather name="arrow-left" size={ICON.sm} color={theme.onAccent} />
+            <Feather name="arrow-left" size={ICON.sm} color={theme.text} />
           </TouchableOpacity>
           <Text style={s.headerSubtitle}>Store Builder</Text>
           <Text style={s.headerHeading}>Build your brand's home.</Text>
@@ -594,7 +597,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerHeading: {
     fontSize: FS.h2,
     fontFamily: FONT.bold,
-    color: theme.onAccent,
+    color: theme.text,
     letterSpacing: -0.5,
     marginBottom: SP.sm,
   },

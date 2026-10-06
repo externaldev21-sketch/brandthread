@@ -49,6 +49,7 @@ import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import { buildCanonicalLiveUrl } from '@/lib/shareLive';
 import Composer from '@/components/ui/Composer';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
@@ -434,7 +435,7 @@ function LiveRoomPage({
   const [moreOpen, setMoreOpen] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
   const [dataSaver, setDataSaver] = useState(false);
-  const roomLink = `https://brandthread.app/live/${room.streamId ?? room.id}`;
+  const roomLink = buildCanonicalLiveUrl(room.streamId ?? room.id, room.sellerId);
 
   async function handleShare() {
     hapticLight();
