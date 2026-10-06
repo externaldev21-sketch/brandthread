@@ -79,9 +79,10 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   contactSync: false,
   showShoppingActivity: false,
   personalizedRecommendations: true,
-  sizeTops: 'M',
-  sizeBottoms: '32',
-  sizeShoes: '10',
+  // No sizes until the shopper picks them (empty = nothing selected).
+  sizeTops: '',
+  sizeBottoms: '',
+  sizeShoes: '',
   preferredFit: 'regular',
   styleCategories: ['streetwear', 'vintage'],
   language: 'English',

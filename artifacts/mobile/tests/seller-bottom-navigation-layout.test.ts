@@ -65,7 +65,8 @@ describe('single global seller tab bar', () => {
 
 describe('Design Studio back arrow', () => {
   it('has a back button with correct testID', () => {
-    expect(designScreen).toContain('testID="design-gallery-back"');
+    // Shared ScreenHeader forwards backTestID to its back button.
+    expect(designScreen).toMatch(/(testID|backTestID)="design-gallery-back"/);
   });
 
   it('uses the shared goBackOr helper for history and a seller fallback when no history', () => {

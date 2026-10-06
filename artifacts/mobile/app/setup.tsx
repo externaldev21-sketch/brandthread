@@ -38,6 +38,8 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThreadProgress } from '@/components/onboarding/ThreadLine';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Task Step Card ───────────────────────────────────────────────────────────
 
@@ -92,7 +94,7 @@ function TaskCard({
               </View>
             )}
           </View>
-          <Text style={ts.desc} numberOfLines={1}>{task.description}</Text>
+          <Text style={ts.desc} numberOfLines={2}>{task.description}</Text>
         </View>
 
         {/* Right: action */}
@@ -139,6 +141,7 @@ export default function SetupScreen() {
   const api = useApi();
   const { theme } = useAppTheme();
   const [state, setState] = useState<SetupState | null>(null);
+  const tabBarInset = useSellerTabBarInset();
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -148,6 +151,8 @@ export default function SetupScreen() {
       // before the read now.
       let onboardingComplete = false;
       try {
+        // Signed-out preview has no session for the protected profile call.
+        if (isSellerDevPreview() || isBuyerDevPreview()) throw new Error('preview');
         const profile = await api.auth.me();
         onboardingComplete = profile.accountType === 'seller' && profile.onboardingComplete === true;
       } catch {
@@ -203,7 +208,7 @@ export default function SetupScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 80 }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + 80 + tabBarInset }}
       >
         {/* Progress bar */}
         <GradientCard colors={[colors.accent, colors.card]} style={s.progressCard} glow>

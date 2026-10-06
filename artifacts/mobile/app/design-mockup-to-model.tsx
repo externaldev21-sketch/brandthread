@@ -48,6 +48,7 @@ import type { Product } from '@/services/productTypes';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 /**
  * `TUTORIAL_ID` also doubles as the app-wide first-run tutorial system's
@@ -58,11 +59,13 @@ import { useHideTabBar } from '@/lib/tabBarVisibility';
 const TUTORIAL_ID = 'mockup-to-model';
 
 const MAX_REFS = 4;
+const FOOTER_DOCK = { position: 'relative', overflow: 'hidden' } as const;
 
 export default function MockupToModelScreen() {
   useHideTabBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const params = useLocalSearchParams<{ seedMockupUri?: string }>();
 
   // Form state
@@ -464,7 +467,7 @@ export default function MockupToModelScreen() {
       <ScreenHeader title="Mockup to Model" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + 140 }]}
+        contentContainerStyle={[s.content, { paddingBottom: SP.xl }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         accessibilityLabel="Mockup to Model form"
@@ -541,13 +544,11 @@ export default function MockupToModelScreen() {
         )}
       </ScrollView>
 
-      {/* This screen keeps the floating seller tab bar visible (it's a
-          normal pushed form screen, not a full-screen takeover — see
-          tests/seller-bottom-navigation-layout.test.ts's mustShowBar list),
-          so the button dock sits ABOVE the tab bar's own footprint
-          (COMP.tabBarH) instead of at bottom:0, which would otherwise
-          stack underneath it. */}
-      <AiButtonDock bottomInset={COMP.tabBarH + insets.bottom}>
+      {/* In-flow footer below the ScrollView (not floating over it), so the
+          form always ends above the button. The seller tab bar is hidden
+          here (useHideTabBar + root deny-list); the inset only applies if
+          it ever shows. */}
+      <AiButtonDock bottomInset={tabBarInset || insets.bottom} style={FOOTER_DOCK}>
         <AiPrimaryButton
           label={`Create ${refUris.length > 0 ? `${refUris.length} photo${refUris.length !== 1 ? 's' : ''}` : 'photos'}`}
           icon="zap"

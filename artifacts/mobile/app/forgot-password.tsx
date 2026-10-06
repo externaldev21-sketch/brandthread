@@ -113,7 +113,7 @@ export default function ForgotPasswordScreen() {
             <>
               <Text style={s.headline}>Reset your password.</Text>
               <Text style={s.subtitle}>
-                Enter your email and we'll send you a secure reset link.
+                Enter your email and we'll send you a reset code.
               </Text>
 
               <View style={s.fieldWrap}>

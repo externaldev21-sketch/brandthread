@@ -342,7 +342,8 @@ export default function ProfileScreen() {
     setSocialCounts({ followers: 0, following: 0, likes: 0 });
     setStatsInitialLoading(true);
     if (authLoaded && userId && !isSellerDevPreview()) void loadPage();
-    if (authLoaded && (!userId || isSellerDevPreview())) { setPostsLoading(false); setStatsInitialLoading(false); }
+    // Preview never loads Clerk (authLoaded stays false) — settle right away, not after the stall guard.
+    if ((authLoaded && !userId) || isSellerDevPreview()) { setPostsLoading(false); setStatsInitialLoading(false); }
     // New / edited / deleted posts publish through socialService — refresh.
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     // Belt-and-braces: if auth itself never resolves (a slow or stuck Clerk

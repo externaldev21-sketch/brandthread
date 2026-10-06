@@ -4,7 +4,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, Dimensions, ActivityIndicator } from 'react-native';
@@ -28,6 +27,7 @@ import { getProject, createBrandAsset } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { MissingItemState } from '@/components/states/MissingItemState';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -63,7 +63,12 @@ export default function DesignMockupPreviewScreen() {
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    let cancelled = false;
+    getProject(projectId)
+      .then(p => { if (!cancelled) setProject(p); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   // Flattens the on-screen preview panel (garment + composited design layers
@@ -145,20 +150,18 @@ export default function DesignMockupPreviewScreen() {
 
   if (!project) {
     return (
-      <View style={styles.root}>
-        <ScreenHeader title="Mockup Preview" />
-        <View style={styles.centered}>
-          <Feather name="image" size={48} color={SUBTLE} />
-          <Text style={styles.disclaimer}>Open a garment project to see the mockup preview.</Text>
-          <SecondaryButton label="Go back" onPress={() => goBackOr(router)} style={{ marginTop: SP.md }} />
-        </View>
-      </View>
+      <MissingItemState
+        headerTitle="Mockup preview"
+        title="No garment project"
+        message="Open a garment project to see the mockup preview."
+        icon="image"
+      />
     );
   }
 
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Mockup Preview" />
+      <ScreenHeader title="Mockup preview" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* View tabs */}

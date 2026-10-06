@@ -33,6 +33,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,13 @@ export default function ShareProfileScreen() {
 
   // Load profile from API (not from Clerk metadata — we need the DB username).
   const loadProfile = useCallback(async () => {
-    if (!authLoaded || !user?.id) return;
+    if (!user?.id) {
+      // No session (the signed-out web preview never loads Clerk): resolve to
+      // the no-username state instead of an endless skeleton.
+      if (authLoaded || isSellerDevPreview() || isBuyerDevPreview()) setLoading(false);
+      return;
+    }
+    if (!authLoaded) return;
     const currentUserId = user.id;
     setError(false);
     setLoading(true);

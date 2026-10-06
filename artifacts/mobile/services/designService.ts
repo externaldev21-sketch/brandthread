@@ -668,6 +668,11 @@ export async function recoverLegacyDesignProjects(): Promise<number> {
 export async function getProjects(): Promise<DesignProject[]> {
   const context = captureSyncContext();
   const keys = context.keys;
+  // Signed out (incl. the web preview): local projects only. The cloud call
+  // can only 401 — or, before auth is wired, stall the gallery for seconds.
+  if (_designUserId === 'anon') {
+    return (await seedIfEmpty(keys.projects)).filter(p => !p.deletedAt);
+  }
   await drainProjectDeletes(context);
   const pendingDeletes = new Set((await loadSyncState(keys.syncState)).deletedIds);
   let all: DesignProject[];

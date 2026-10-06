@@ -15,6 +15,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { getStorefront, updateSEO } from '@/services/storeService';
 import { Storefront, StoreSEO } from '@/services/storeTypes';
 import { useApi } from '@/lib/api';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { PREVIEW_STORE_HANDLE, PREVIEW_STORE_NAME } from '@/lib/previewStorefrontHtml';
 
 export default function StoreSEOScreen() {
   const colors = useColors();
@@ -26,6 +29,7 @@ export default function StoreSEOScreen() {
   const RED_DIM = `${RED}20`;
   const se = React.useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
+  const tabBarInset = useSellerTabBarInset();
   const [store, setStore] = useState<Storefront | null>(null);
   const [seo, setSeo] = useState<StoreSEO>({
     homepageTitle: '',
@@ -60,7 +64,10 @@ export default function StoreSEOScreen() {
     }
   };
 
-  const storeUrl = store?.settings.storeUrl ?? 'yourstore';
+  // Demo preview falls back to the shared demo store identity.
+  const demo = isPreviewDemoMode();
+  const storeUrl = store?.settings.storeUrl || (demo ? PREVIEW_STORE_HANDLE : 'yourstore');
+  const storeName = store?.settings.storeName || (demo ? PREVIEW_STORE_NAME : '');
 
   return (
     <View style={se.root}>
@@ -70,7 +77,7 @@ export default function StoreSEOScreen() {
         rightElement={<PrimaryButton label={saving ? 'Saving...' : 'Save'} onPress={handleSave} loading={saving} small style={{ minWidth: 72 }} />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={se.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[se.scroll, { paddingBottom: 60 + tabBarInset }]}>
 
         {/* HOMEPAGE SEO */}
         <SectionHeader title="HOMEPAGE SEO" style={se.sh} />
@@ -146,7 +153,7 @@ export default function StoreSEOScreen() {
         <SectionHeader title="GOOGLE PREVIEW" style={se.sh} />
         <BrandthreadCard style={[se.card, { backgroundColor: SURFACE }]}>
           <Text style={se.previewTitle} numberOfLines={1}>
-            {seo.homepageTitle || 'Your Store Name'}
+            {seo.homepageTitle || storeName || 'Your Store Name'}
           </Text>
           <Text style={se.previewUrl}>brandthread.app/{storeUrl}</Text>
           <Text style={se.previewDesc} numberOfLines={2}>
@@ -245,8 +252,6 @@ export default function StoreSEOScreen() {
             />
           </View>
         </BrandthreadCard>
-
-        <PrimaryButton label="Save SEO" onPress={handleSave} loading={saving} style={se.saveBtn} />
       </ScrollView>
     </View>
   );
@@ -279,10 +284,8 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
   },
   uploadBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   socialImagePreview: { width: '100%', height: 140, borderRadius: RADIUS.sm, marginBottom: SP.sm },
-  // Mimics Google's actual search-result snippet styling (its blue title / green
-  // URL), not app chrome — intentionally not theme-derived.
-  previewTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: '#4285F4' },
-  previewUrl: { fontSize: FS.sm, fontFamily: FONT.regular, color: '#34A853', marginTop: 2 },
+  previewTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  previewUrl: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   previewDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4, lineHeight: 18 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   switchLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
@@ -292,6 +295,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
     borderWidth: 1, borderRadius: RADIUS.sm, padding: SP.sm,
   },
   warnText: { fontSize: FS.sm, fontFamily: FONT.medium, flex: 1 },
-  saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
   });
 };

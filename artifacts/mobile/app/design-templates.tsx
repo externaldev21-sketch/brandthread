@@ -8,7 +8,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
   Alert, ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -22,6 +21,7 @@ import {
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
@@ -35,36 +35,35 @@ interface DesignTemplate {
   views?: number;
   garmentType?: string;
   presetId?: string;
-  gradColors: readonly [string, string, ...string[]];
 }
 
 const TEMPLATES: DesignTemplate[] = [
   // Garments
-  { id: 'gt1', name: 'Classic T-Shirt', category: 'Garments', subcategory: 'tshirt', dimensions: 'Front + Back', views: 4, garmentType: 'tshirt', gradColors: ['#1E3A5F', '#3B82F6'] },
-  { id: 'gt2', name: 'Pullover Hoodie', category: 'Garments', subcategory: 'hoodie', dimensions: 'Front + Back', views: 3, garmentType: 'hoodie', gradColors: ['#0C4A6E', '#0EA5E9'] },
-  { id: 'gt3', name: 'Crewneck Sweatshirt', category: 'Garments', subcategory: 'sweatshirt', dimensions: 'Front + Back', views: 3, garmentType: 'sweatshirt', gradColors: ['#134E4A', '#10B981'] },
-  { id: 'gt4', name: 'Bomber Jacket', category: 'Garments', subcategory: 'jacket', dimensions: 'Front + Back + Side', views: 4, garmentType: 'jacket', gradColors: ['#451A03', '#F97316'] },
-  { id: 'gt5', name: 'Snapback Cap', category: 'Garments', subcategory: 'hat', dimensions: 'Front + Back + Side', views: 4, garmentType: 'hat', gradColors: ['#1C1917', '#78716C'] },
-  { id: 'gt6', name: 'Tote Bag', category: 'Garments', subcategory: 'bag', dimensions: 'Front + Back', views: 3, garmentType: 'bag', gradColors: ['#0F172A', '#475569'] },
-  { id: 'gt7', name: 'Polo Shirt', category: 'Garments', subcategory: 'polo', dimensions: 'Front + Back', views: 3, garmentType: 'polo', gradColors: ['#0C4A6E', '#22D3EE'] },
-  { id: 'gt8', name: 'Athletic Tank', category: 'Garments', subcategory: 'tank', dimensions: 'Front + Back', views: 2, garmentType: 'tank', gradColors: ['#164E63', '#67E8F9'] },
+  { id: 'gt1', name: 'Classic T-Shirt', category: 'Garments', subcategory: 'tshirt', dimensions: 'Front + Back', views: 4, garmentType: 'tshirt' },
+  { id: 'gt2', name: 'Pullover Hoodie', category: 'Garments', subcategory: 'hoodie', dimensions: 'Front + Back', views: 3, garmentType: 'hoodie' },
+  { id: 'gt3', name: 'Crewneck Sweatshirt', category: 'Garments', subcategory: 'sweatshirt', dimensions: 'Front + Back', views: 3, garmentType: 'sweatshirt' },
+  { id: 'gt4', name: 'Bomber Jacket', category: 'Garments', subcategory: 'jacket', dimensions: 'Front + Back + Side', views: 4, garmentType: 'jacket' },
+  { id: 'gt5', name: 'Snapback Cap', category: 'Garments', subcategory: 'hat', dimensions: 'Front + Back + Side', views: 4, garmentType: 'hat' },
+  { id: 'gt6', name: 'Tote Bag', category: 'Garments', subcategory: 'bag', dimensions: 'Front + Back', views: 3, garmentType: 'bag' },
+  { id: 'gt7', name: 'Polo Shirt', category: 'Garments', subcategory: 'polo', dimensions: 'Front + Back', views: 3, garmentType: 'polo' },
+  { id: 'gt8', name: 'Athletic Tank', category: 'Garments', subcategory: 'tank', dimensions: 'Front + Back', views: 2, garmentType: 'tank' },
 
   // Social
-  { id: 'st1', name: 'Instagram Story', category: 'Social', subcategory: 'story', dimensions: '1080 × 1920', presetId: 'ig_story', gradColors: ['#0EA5E9', '#EC4899'] },
-  { id: 'st2', name: 'Instagram Post', category: 'Social', subcategory: 'post', dimensions: '1080 × 1080', presetId: 'ig_post', gradColors: ['#0EA5E9', '#0F766E'] },
-  { id: 'st3', name: 'IG Landscape', category: 'Social', subcategory: 'landscape', dimensions: '1080 × 566', presetId: 'ig_land', gradColors: ['#059669', '#22D3EE'] },
-  { id: 'st4', name: 'Facebook Post', category: 'Social', subcategory: 'facebook', dimensions: '1200 × 630', presetId: 'fb_post', gradColors: ['#1D4ED8', '#60A5FA'] },
-  { id: 'st5', name: 'Twitter / X Post', category: 'Social', subcategory: 'twitter', dimensions: '1600 × 900', presetId: 'twitter_post', gradColors: ['#0F172A', '#3B82F6'] },
+  { id: 'st1', name: 'Instagram Story', category: 'Social', subcategory: 'story', dimensions: '1080 × 1920', presetId: 'ig_story' },
+  { id: 'st2', name: 'Instagram Post', category: 'Social', subcategory: 'post', dimensions: '1080 × 1080', presetId: 'ig_post' },
+  { id: 'st3', name: 'IG Landscape', category: 'Social', subcategory: 'landscape', dimensions: '1080 × 566', presetId: 'ig_land' },
+  { id: 'st4', name: 'Facebook Post', category: 'Social', subcategory: 'facebook', dimensions: '1200 × 630', presetId: 'fb_post' },
+  { id: 'st5', name: 'Twitter / X Post', category: 'Social', subcategory: 'twitter', dimensions: '1600 × 900', presetId: 'twitter_post' },
 
   // Product
-  { id: 'pt1', name: 'Product Card', category: 'Product', subcategory: 'product_card', dimensions: '800 × 1000', presetId: 'product_card', gradColors: ['#0F172A', '#0EA5E9'] },
-  { id: 'pt2', name: 'Campaign Banner', category: 'Product', subcategory: 'banner', dimensions: '1200 × 400', presetId: 'banner', gradColors: ['#7C2D12', '#EA580C'] },
-  { id: 'pt3', name: 'Email Banner', category: 'Product', subcategory: 'email', dimensions: '600 × 200', presetId: 'email_banner', gradColors: ['#134E4A', '#34D399'] },
+  { id: 'pt1', name: 'Product Card', category: 'Product', subcategory: 'product_card', dimensions: '800 × 1000', presetId: 'product_card' },
+  { id: 'pt2', name: 'Campaign Banner', category: 'Product', subcategory: 'banner', dimensions: '1200 × 400', presetId: 'banner' },
+  { id: 'pt3', name: 'Email Banner', category: 'Product', subcategory: 'email', dimensions: '600 × 200', presetId: 'email_banner' },
 
   // Packaging
-  { id: 'pk1', name: 'Product Box', category: 'Packaging', subcategory: 'box', dimensions: 'Custom', presetId: 'custom', gradColors: ['#312E81', '#6366F1'] },
-  { id: 'pk2', name: 'Hang Tag', category: 'Packaging', subcategory: 'tag', dimensions: 'Custom', presetId: 'custom', gradColors: ['#1F2937', '#9CA3AF'] },
-  { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: 'Custom', presetId: 'custom', gradColors: ['#7C2D12', '#F97316'] },
+  { id: 'pk1', name: 'Product Box', category: 'Packaging', subcategory: 'box', dimensions: 'Custom', presetId: 'custom' },
+  { id: 'pk2', name: 'Hang Tag', category: 'Packaging', subcategory: 'tag', dimensions: 'Custom', presetId: 'custom' },
+  { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: 'Custom', presetId: 'custom' },
 ];
 
 const CATEGORIES: TemplateCategory[] = ['Garments', 'Social', 'Product', 'Packaging'];
@@ -74,6 +73,7 @@ export default function DesignTemplatesScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const ts = createStyles(theme);
   const insets = useSafeAreaInsets();
+  const tabBarInset = useSellerTabBarInset();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<TemplateCategory>('Garments');
@@ -152,18 +152,13 @@ export default function DesignTemplatesScreen() {
           data={filtered}
           keyExtractor={item => item.id}
           numColumns={2}
-          contentContainerStyle={[ts.gridContent, { paddingBottom: insets.bottom + SP.xl }]}
+          contentContainerStyle={[ts.gridContent, { paddingBottom: insets.bottom + SP.xl + tabBarInset }]}
           columnWrapperStyle={ts.columnWrapper}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={ts.templateCard}>
-              {/* Thumbnail */}
-              <LinearGradient
-                colors={item.gradColors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={ts.thumbnail}
-              >
+              {/* Thumbnail — neutral placeholder (no real template previews yet) */}
+              <View style={[ts.thumbnail, { backgroundColor: theme.borderSubtle }]}>
                 <View style={ts.thumbnailContent}>
                   <Feather
                     name={
@@ -172,10 +167,10 @@ export default function DesignTemplatesScreen() {
                       item.category === 'Packaging' ? 'box' : 'monitor'
                     }
                     size={ICON.xl}
-                    color="rgba(255,255,255,0.6)"
+                    color={theme.muted}
                   />
                 </View>
-              </LinearGradient>
+              </View>
 
               {/* Info */}
               <View style={ts.cardInfo}>
@@ -212,7 +207,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:          { flex: 1, backgroundColor: 'transparent' },
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
-  tabsScroll:    { flexGrow: 0 },
+  // flexShrink 0: the grid below is flex:1, and without this the chip row
+  // got squashed shorter than its chips (labels spilling below the pills).
+  tabsScroll:    { flexGrow: 0, flexShrink: 0 },
   tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
   tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

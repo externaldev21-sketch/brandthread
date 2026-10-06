@@ -52,7 +52,7 @@ export default function MetafieldsScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Metafields and metaobjects" />
+      <ScreenHeader title="Metafields" />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         {/* Metafield definitions */}
         <View style={s.section}>

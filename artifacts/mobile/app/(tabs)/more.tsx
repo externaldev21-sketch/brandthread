@@ -44,36 +44,35 @@ interface NavItem {
 
 // ─── Section definitions ──────────────────────────────────────────────────────
 // FIX: Payouts de-duplicated — appears only once, in Money.
-// FIX: Shipping → /shipping, Customers → /customer-accounts, Team → /team,
+// FIX: Shipping → /shipping, Customers → /customers, Team → /team,
 //      Taxes and Duties → /taxes-duties (all previously had no route).
 
 const STORE_ITEMS: NavItem[] = [
   { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront',  accent: 'accent', route: '/store-builder' },
   { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: 'secondary', route: '/store-collections' },
   { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: 'accentLight', route: '/store-domain' },
-  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'warning', route: '/discounts' },
+  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'muted', route: '/discounts' },
 ];
 
 const STUDIO_ITEMS: NavItem[] = [
   { icon: 'edit-3', label: 'Design Studio', desc: 'Create designs and mockups', accent: 'accent', route: '/design' },
   { icon: 'camera', label: 'AI Photoshoot', desc: 'Generate product photos', accent: 'accentLight', route: '/design-ai-photoshoot' },
   { icon: 'scissors', label: 'Background Removal', desc: 'Clean image backgrounds', accent: 'secondary', route: '/design-bg-removal' },
-  { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets', accent: 'warning', route: '/design-campaign' },
+  { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets', accent: 'muted', route: '/design-campaign' },
   { icon: 'layers', label: 'Brand Assets', desc: 'Logos, colors and graphics', accent: 'secondary', route: '/design-brand-assets' },
   { icon: 'facebook', label: 'Meta Ads', desc: 'Run Facebook & Instagram ads', accent: 'accent', route: '/meta-ads-manage' },
 ];
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { icon: 'truck', label: 'Shipping', desc: 'Rates, zones and carriers', accent: 'warning', route: '/shipping' },
+  { icon: 'truck', label: 'Shipping', desc: 'Rates, zones and carriers', accent: 'muted', route: '/shipping' },
   // FIX ↑ previously had no route — now wired to shipping.tsx
   { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },
-  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customer-accounts' },
-  // FIX ↑ previously had no route — now wired to customer-accounts.tsx
+  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customers' },
 ];
 
 const GROWTH_ITEMS: NavItem[] = [
   { icon: 'message-circle', label: 'Messages', desc: 'Read and reply to buyer DMs', accent: 'accent', route: '/seller-inbox' },
-  { icon: 'trending-up', label: 'Marketing', desc: 'Campaigns and promotions', accent: 'warning', route: '/(tabs)/marketing' },
+  { icon: 'trending-up', label: 'Marketing', desc: 'Campaigns and promotions', accent: 'muted', route: '/(tabs)/marketing' },
   { icon: 'bar-chart-2', label: 'Analytics', desc: 'Sales, traffic and insights', accent: 'accentLight', route: '/(tabs)/analytics' },
   { icon: 'video', label: 'Content', desc: 'Posts, drafts and scheduled', accent: 'secondary', route: '/content' },
   { icon: 'users', label: 'Community', desc: 'Join topic group chats', accent: 'secondary', route: '/community' },
@@ -82,7 +81,7 @@ const GROWTH_ITEMS: NavItem[] = [
 const MONEY_ITEMS: NavItem[] = [
   { icon: 'dollar-sign', label: 'Payouts', desc: 'Bank account and payout history', accent: 'success', route: '/payouts' },
   // ↑ De-duplicated: was also in OPERATIONS without a route — removed from there.
-  { icon: 'star', label: 'Subscription', desc: 'Manage your Brandthread plan', accent: 'warning', badge: true, route: '/subscription' },
+  { icon: 'star', label: 'Subscription', desc: 'Manage your Brandthread plan', accent: 'muted', badge: true, route: '/subscription' },
   { icon: 'percent', label: 'Taxes and Duties', desc: 'Tax rules and collection', accent: 'muted', route: '/taxes-duties' },
   // FIX ↑ previously had no route — now wired to taxes-duties.tsx
 ];
@@ -91,7 +90,7 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { icon: 'users', label: 'Team', desc: 'Invite collaborators', accent: 'accentLight', route: '/team' },
   // FIX ↑ previously had no route — now wired to team.tsx
   { icon: 'link', label: 'Integrations', desc: 'Connect third-party services', accent: 'accent', route: '/integrations/klaviyo' },
-  { icon: 'bell', label: 'Notifications', desc: 'Push and email preferences', accent: 'warning', route: '/notifications-settings' },
+  { icon: 'bell', label: 'Notifications', desc: 'Push and email preferences', accent: 'muted', route: '/notifications-settings' },
   { icon: 'settings', label: 'Settings', desc: 'App and account settings', accent: 'muted', route: '/settings' },
   { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us', accent: 'secondary', route: '/help' },
 ];
@@ -274,7 +273,8 @@ export default function MoreScreen() {
                         ? unreadMessages
                         : item.badge;
                     const description = item.label === 'Payouts' && threadCash.balanceCents != null
-                      ? `${item.desc} · ${formatCents(threadCash.balanceCents)} Thread Cash`
+                      // Short lead-in so the balance fits on the card's single line.
+                      ? `Payout history · ${formatCents(threadCash.balanceCents)} Thread Cash`
                       : item.desc;
                     return (
                       <NavigationCard
@@ -370,6 +370,7 @@ const createStyles = (theme: any) => {
   },
   editProfileBtn: {
     alignSelf: 'flex-start',
+    paddingHorizontal: SP.md,
   },
 
   // Store context switcher

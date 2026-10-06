@@ -4,7 +4,6 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, ShopifyImportJob } from '@/lib/api';
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
   StoreCollection, StorePage, StorePolicy, StoreMenu, StoreMenuItem,
@@ -373,6 +372,17 @@ function defaultStorefront(): Storefront {
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
+// Lazily imported (devPreview pulls in react-native) so narrowly-mocked tests
+// of this module keep working — same pattern as productService.
+async function inSignedOutPreview(): Promise<boolean> {
+  try {
+    const { isSellerDevPreview, isBuyerDevPreview } = await import('@/lib/devPreview');
+    return isSellerDevPreview() || isBuyerDevPreview();
+  } catch {
+    return false;
+  }
+}
+
 export async function getStorefront(): Promise<Storefront> {
   try {
     // Load from AsyncStorage first (local truth for complex UI state)
@@ -398,7 +408,7 @@ export async function getStorefront(): Promise<Storefront> {
 
     // Overlay server-side published state (non-blocking). The signed-out web
     // preview has no session, so it never calls the protected store API.
-    if (!isSellerDevPreview() && !isBuyerDevPreview()) {
+    if (!(await inSignedOutPreview())) {
       try {
         const remote = await api.store.get();
         if (remote?.status === 'published') {
