@@ -1,5 +1,13 @@
 import crypto from "node:crypto";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Local-only Stripe config: signatures are computed and checked in-process
+// (generateTestHeaderString / constructEvent), no network call is made. Without
+// it the route answers 503 "not configured" before it ever checks a signature.
+vi.hoisted(() => {
+  process.env.STRIPE_SECRET_KEY ||= "sk_test_webhook_ledger";
+  process.env.STRIPE_WEBHOOK_SECRET ||= "whsec_test_webhook_ledger";
+});
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";

@@ -98,6 +98,7 @@ export function createFakeStripe(): FakeStripe {
     "customers.update": (cid: string) => ({ id: cid }),
     "paymentMethods.list": () => ({ data: [], has_more: false }),
     "charges.retrieve": (cid: string) => ({ id: cid, balance_transaction: { fee: 0 } }),
+    "tax.calculations.create": () => ({ id: id("taxcalc_test"), tax_amount_exclusive: 0 }),
     "disputes.update": (did: string) => ({ id: did, status: "under_review" }),
     "webhooks.constructEvent": (body: Buffer | string) =>
       JSON.parse(Buffer.isBuffer(body) ? body.toString("utf8") : String(body)),
