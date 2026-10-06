@@ -61,7 +61,7 @@
 import {
   db, posts, users, interactions, follows, savedItems,
   postTaggedProducts, products, productVariants, reports,
-  sellerRankingCache,
+  sellerRankingCache, postComments,
 } from "@workspace/db";
 import { eq, and, inArray, count, gte, sql, isNull } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -266,7 +266,7 @@ export async function computeSellerRankingForToday(): Promise<void> {
     // ── 3. Post-level interactions (like/comment/repost/view/watch_time/share)
     //      on those recent posts, in the same window ─────────────────────────
     const POST_LEVEL_TYPES = ["like", "comment", "repost", "view", "watch_time", "share"];
-    const postLevelRows = allRecentPostIds.length === 0 ? [] : await db
+    const interactionLevelRows = allRecentPostIds.length === 0 ? [] : await db
       .select({
         postId:    interactions.postId,
         type:      interactions.type,
@@ -278,6 +278,20 @@ export async function computeSellerRankingForToday(): Promise<void> {
         gte(interactions.createdAt, since),
         inArray(interactions.type, POST_LEVEL_TYPES),
       ));
+    // Comments are stored in post_comments, not interactions — fold them in
+    // as "comment" rows so the comment weight is no longer always 0.
+    const commentLevelRows = allRecentPostIds.length === 0 ? [] : await db
+      .select({ postId: postComments.postId, createdAt: postComments.createdAt })
+      .from(postComments)
+      .where(and(
+        inArray(postComments.postId, allRecentPostIds),
+        gte(postComments.createdAt, since),
+        eq(postComments.moderationStatus, "visible"),
+      ));
+    const postLevelRows: Array<{ postId: string | null; type: string; createdAt: Date }> = [
+      ...interactionLevelRows,
+      ...commentLevelRows.map((row) => ({ postId: row.postId, type: "comment", createdAt: row.createdAt })),
+    ];
 
     // ── 4. shop_click ("product tap") events in the window, attributed to
     //      the TAGGED PRODUCT's owner (not necessarily the post's author) ────

@@ -15,7 +15,6 @@ import {
   SP,
   SUBTLE,
 } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 
 export function SellerDashboardSectionHeader({
   title,
@@ -32,7 +31,7 @@ export function SellerDashboardSectionHeader({
     <View style={styles.sectionHeaderRow} testID={`seller-dashboard-section-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <Text style={[styles.sectionHeaderTitle, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       {action && onAction ? (
-        <TouchableOpacity onPress={onAction} style={styles.sectionHeaderActionButton} accessibilityRole="button" accessibilityLabel={`${action} ${title.toLowerCase()}`} hitSlop={SECTION_ACTION_HIT_SLOP}>
+        <TouchableOpacity onPress={onAction} style={styles.sectionHeaderActionButton}>
            <Text style={[styles.sectionHeaderAction, { color: palette.subtle ?? SUBTLE }]} maxFontSizeMultiplier={2}>{action}</Text>
        </TouchableOpacity>
        ) : action ? <Text style={[styles.sectionHeaderAction, { color: palette.subtle ?? SUBTLE }]} maxFontSizeMultiplier={2}>{action}</Text> : null}
@@ -152,9 +151,6 @@ export function SellerDashboardListItem({
     </>
   );
 }
-
-// The "See all" link is drawn ~41×16pt; pad its touch area to 44×44.
-const SECTION_ACTION_HIT_SLOP = minHitSlop({ width: 41, height: 16 });
 
 const styles = StyleSheet.create({
   trendHeader: {

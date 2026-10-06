@@ -18,11 +18,6 @@ import { IconButton } from '@/components/ui/IconButton';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// 36pt-tall search pill → pad to 44 vertically (no visual change). Sized from
-// the 34pt padding box: on web the slop is laid out inside the 1pt border.
-const SEARCH_HIT_SLOP = minHitSlop({ height: 34 });
 
 export function DiscoverSearchHeader({
   title,
@@ -45,7 +40,6 @@ export function DiscoverSearchHeader({
         onPress={onSearchPress}
         accessibilityRole="button"
         accessibilityLabel="Search products and brands"
-        hitSlop={SEARCH_HIT_SLOP}
         style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}
         testID="discover-search-bar"
       >

@@ -6,7 +6,6 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
-import { minHitSlop } from '@/lib/hitSlop';
 import { getUnreadActivityCount, subscribeActivity, subscribeUnreadOverride, watchActivityRealtime } from '@/services/activityService';
 
 /**
@@ -86,8 +85,7 @@ export default function ActivityBellButton({
       testID={testID}
       style={[styles.button, style]}
       activeOpacity={0.7}
-      // Pads the default 34x34 box to the 44pt minimum (invisible).
-      hitSlop={BELL_HIT_SLOP}
+      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         router.push('/activity-center' as never);
@@ -115,8 +113,6 @@ export default function ActivityBellButton({
     </TouchableOpacity>
   );
 }
-
-const BELL_HIT_SLOP = minHitSlop({ width: 34, height: 34 });
 
 const styles = StyleSheet.create({
   button: {

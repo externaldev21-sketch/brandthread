@@ -104,6 +104,9 @@ import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { remixCreditLabel } from '@/lib/interactionSettings';
 
+/** Looped feed copies carry `<postId>__loopN` keys; every API call uses the real post id. */
+const feedPostId = (id: string) => id.replace(/__loop\d+$/, '');
+
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
  * videos that feature one product (product detail "Featured in"), opened at
@@ -2662,7 +2665,7 @@ export default function FeedScreen({
     if (!userId) return;
     const item = displayItems[activeIndex];
     if (!item || isDemandPageItem(item) || (item as LiveStreamFeedItem)._isLive) return;
-    const id = item.id;
+    const id = feedPostId(item.id);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
     if (viewedPostIdsRef.current.has(id)) return;
     viewedPostIdsRef.current.add(id);
@@ -2700,15 +2703,16 @@ export default function FeedScreen({
     // Optimistic update
     update(id, e => ({ liked: willLike, likes: willLike ? e.likes + 1 : Math.max(0, e.likes - 1) }));
     // Real post interaction — rollback on failure
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const postId = feedPostId(id);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
     if (isUUID) {
       try {
         const { api: _api } = require('@/lib/api');
-        await _api.posts.interact(id, { type: 'like', value: willLike ? 'add' : 'remove' });
+        await _api.posts.interact(postId, { type: 'like', value: willLike ? 'add' : 'remove' });
       } catch (error) {
         if (isRetryableFailure(error)) {
           // Offline/server outage — keep the optimistic state and replay once connectivity returns.
-          void enqueueEngagementRetry({ kind: 'like', targetId: id, payload: { value: willLike ? 'add' : 'remove' } });
+          void enqueueEngagementRetry({ kind: 'like', targetId: postId, payload: { value: willLike ? 'add' : 'remove' } });
         } else {
           update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
           showToast('Could not update like. Try again.', 'error');
@@ -2721,13 +2725,25 @@ export default function FeedScreen({
     setEngagements(prev => {
       const e = prev[id] ?? engagementFor(id);
       if (e.liked) return prev;
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      if (isUUID) {
-        try { const { api: _api } = require('@/lib/api'); _api.posts.interact(id, { type: 'like' }).catch(() => {}); } catch {}
+      const postId = feedPostId(id);
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId)) {
+        // Same contract as handleLike: queue on outage, roll back + say so on a real failure.
+        const { api: _api } = require('@/lib/api');
+        Promise.resolve().then(() => _api.posts.interact(postId, { type: 'like', value: 'add' })).catch((error: unknown) => {
+          if (isRetryableFailure(error)) {
+            void enqueueEngagementRetry({ kind: 'like', targetId: postId, payload: { value: 'add' } });
+            return;
+          }
+          setEngagements(cur => {
+            const now = cur[id] ?? e;
+            return { ...cur, [id]: { ...now, liked: false, likes: Math.max(0, now.likes - 1) } };
+          });
+          showToast('Could not update like. Try again.', 'error');
+        });
       }
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
-  }, [engagementFor, requireSignIn]);
+  }, [engagementFor, requireSignIn, showToast]);
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
     if (!requireSignIn()) return;
@@ -2736,7 +2752,8 @@ export default function FeedScreen({
     const snapshot = { saved: cur.saved, saves: cur.saves };
     // Optimistic update
     update(id, e => ({ saved: willSave, saves: willSave ? e.saves + 1 : Math.max(0, e.saves - 1) }));
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const postId = feedPostId(id);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
     if (isUUID) {
       try {
         const { api: _api } = require('@/lib/api');
@@ -2747,13 +2764,13 @@ export default function FeedScreen({
           // to display it.
           const item = itemsById.get(id);
           const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
-          await _api.buyer.saved.save({ type: 'post', targetId: id, title, subtitle: item?.creator, accentColor: item?.accentColor });
+          await _api.buyer.saved.save({ type: 'post', targetId: postId, title, subtitle: item?.creator, accentColor: item?.accentColor });
         } else {
-          await _api.buyer.saved.remove(id);
+          await _api.buyer.saved.remove(postId);
         }
       } catch (error) {
         if (isRetryableFailure(error)) {
-          void enqueueEngagementRetry({ kind: 'save', targetId: id, payload: { value: willSave ? 'add' : 'remove' } });
+          void enqueueEngagementRetry({ kind: 'save', targetId: postId, payload: { value: willSave ? 'add' : 'remove' } });
         } else {
           update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
           showToast('Could not update save. Try again.', 'error');
@@ -2781,10 +2798,11 @@ export default function FeedScreen({
     const snapshot = engagements[id] ?? engagementFor(id);
     const willRepost = !snapshot.reposted;
     update(id, e => ({ reposted: willRepost, reposts: willRepost ? e.reposts + 1 : Math.max(0, e.reposts - 1) }));
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const postId = feedPostId(id);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
     if (isUUID) {
       try {
-        const result = await api.posts.interact(id, {
+        const result = await api.posts.interact(postId, {
           type: 'repost',
           value: willRepost ? undefined : 'remove',
         });
@@ -2797,7 +2815,7 @@ export default function FeedScreen({
         if (result.action === 'added') await showRepostEducationOnce();
       } catch (error) {
         if (isRetryableFailure(error)) {
-          void enqueueEngagementRetry({ kind: 'repost', targetId: id, payload: { value: willRepost ? undefined : 'remove' } });
+          void enqueueEngagementRetry({ kind: 'repost', targetId: postId, payload: { value: willRepost ? undefined : 'remove' } });
           if (willRepost) await showRepostEducationOnce();
         } else {
           update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
@@ -3449,10 +3467,7 @@ export default function FeedScreen({
             <TouchableOpacity
               style={styles.topIconBtn}
               activeOpacity={0.7}
-              hitSlop={TOP_ICON_HIT_SLOP}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
-              accessibilityRole="button"
-              accessibilityLabel="Close search"
             >
               <Feather name="x" size={20} color={ON_DARK} />
             </TouchableOpacity>
@@ -3474,10 +3489,8 @@ export default function FeedScreen({
             <TouchableOpacity
               style={styles.topIconBtn}
               activeOpacity={0.7}
-              hitSlop={TOP_ICON_HIT_SLOP}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
-              accessibilityRole="button"
-              accessibilityLabel="Search"
             >
                 <Feather name="search" size={19} color={ON_DARK} />
             </TouchableOpacity>
@@ -3490,7 +3503,7 @@ export default function FeedScreen({
             <TouchableOpacity
               style={styles.cartHeaderBtn}
               activeOpacity={0.7}
-              hitSlop={TOP_ICON_HIT_SLOP}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/(buyer)/cart' as never);
@@ -3520,7 +3533,6 @@ export default function FeedScreen({
               <TouchableOpacity
                 key={key}
                 style={styles.feedTab}
-                hitSlop={FEED_TAB_HIT_SLOP}
                 onPress={() => {
                   setActiveIndex(0);
                   setFeedTab(key);
@@ -3625,11 +3637,6 @@ export default function FeedScreen({
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-
-// Invisible touch-area padding (a11y 44pt minimum) for the seller Home
-// header's 34x34 icon buttons and the ~25pt-tall Following/Threads tabs.
-const TOP_ICON_HIT_SLOP = minHitSlop({ width: 34, height: 34 });
-const FEED_TAB_HIT_SLOP = minHitSlop({ height: 25 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },

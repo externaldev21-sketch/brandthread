@@ -28,7 +28,7 @@
 
 import {
   db, posts, users, interactions, follows,
-  postTaggedProducts, products, boosts, trendingCache,
+  postTaggedProducts, products, boosts, trendingCache, postComments,
 } from "@workspace/db";
 import { eq, and, inArray, count, gte, desc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -194,6 +194,22 @@ export async function computeTrendingForToday(): Promise<void> {
       if (r.postId === null) continue;
       if (!engMap[r.postId]) engMap[r.postId] = {};
       engMap[r.postId][r.type] = Number(r.cnt);
+    }
+
+    // Comments live in post_comments (never as interactions rows), so the
+    // "comment" weight was always multiplied by 0. Count visible ones here.
+    const commentRows = await db
+      .select({ postId: postComments.postId, cnt: count() })
+      .from(postComments)
+      .where(and(
+        inArray(postComments.postId, postIds),
+        gte(postComments.createdAt, since24),
+        eq(postComments.moderationStatus, "visible"),
+      ))
+      .groupBy(postComments.postId);
+    for (const r of commentRows) {
+      if (!engMap[r.postId]) engMap[r.postId] = {};
+      engMap[r.postId].comment = (engMap[r.postId].comment ?? 0) + Number(r.cnt);
     }
 
     // ── 4. Primary category per post (from tagged products, then styleTags) ───

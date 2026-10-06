@@ -25,6 +25,7 @@ import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant }
 import { matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { blockedUserIds, isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
+import { viewerPostStates } from "../lib/viewerPostState";
 import {
   paginationMetadata,
   parsePagination,
@@ -732,7 +733,9 @@ router.get("/search", async (req, res): Promise<void> => {
           .where(and(eq(posts.mediaType, "video"), publicPostCondition(new Date(), viewerId), notBlockedWith(viewerId, posts.userId), match))
           .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
           .limit(VIDEO_SEARCH_PAGE);
-        const exact = await videoQuery(sql`${ilike(posts.caption, pattern)}`);
+        // Hashtags are stored on posts.hashtags (not always repeated in the
+        // caption), so a "#tag" / "tag" search matches them directly too.
+        const exact = await videoQuery(sql`(${ilike(posts.caption, pattern)} OR COALESCE(${posts.hashtags}::text, '') ILIKE ${containsSearchPattern(term.replace(/^#+/, "") || term)})`);
         if (exact.length >= VIDEO_SEARCH_PAGE) return exact;
         const tagged = await videoQuery(sql`${posts.id} IN (
           SELECT ptp.post_id FROM post_tagged_products ptp
@@ -1747,6 +1750,11 @@ router.get("/posts", async (req, res) => {
         ownerId ? undefined : eq(posts.surface, "thread"),
         publicPostCondition(),
         notBlockedWith(viewerId, posts.userId),
+        // "Not interested" in the general feed hides the post for this viewer
+        // for good (a creator's own grid, ?ownerId=, still lists it).
+        viewerId && !ownerId
+          ? sql`NOT EXISTS (SELECT 1 FROM feed_not_interested fni WHERE fni.user_id = ${viewerId} AND fni.post_id = ${posts.id})`
+          : undefined,
       ))
       .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)
@@ -1763,6 +1771,8 @@ router.get("/posts", async (req, res) => {
     }
 
     const postIds = rows.map((r) => r.id);
+    // This viewer's own like/save/repost state (lib/viewerPostState.ts).
+    const stateFor = await viewerPostStates(viewerId, postIds);
 
     // Fetch tagged products and interaction counts in parallel
     const [tagRows, likeRows, repostRows, shareRows, saveRows, commentRows] = await Promise.all([
@@ -1856,6 +1866,7 @@ router.get("/posts", async (req, res) => {
       sharesCount:   sharesByPost[p.id]   ?? 0,
       savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
+      ...stateFor(p.id),
     }));
 
     return res.json(await attachQuoteData(baseResult, viewerId));

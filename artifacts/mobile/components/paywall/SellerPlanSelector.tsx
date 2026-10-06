@@ -13,10 +13,6 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { weeklyEquivalentFor } from '@/lib/sellerPlansDisplay';
 import type { SellerPlanDefinition } from '@/lib/sellerPlans';
 import type { useAppTheme } from '@/contexts/AppThemeContext';
-import { minHitSlop } from '@/lib/hitSlop';
-
-// "View all plans" is a 32pt-tall full-width text link.
-const VIEW_ALL_HIT_SLOP = minHitSlop({ height: 32 });
 
 export interface PlanPricing {
   priceLabel: string | null;
@@ -142,8 +138,6 @@ export function SellerPlanSelector({
         <TouchableOpacity
           style={styles.viewAllRow}
           onPress={() => { haptic(); setShowAll(true); }}
-          hitSlop={VIEW_ALL_HIT_SLOP}
-          accessibilityRole="button"
           testID="seller-plans-view-all"
         >
           <Text style={styles.viewAllText}>View all plans</Text>

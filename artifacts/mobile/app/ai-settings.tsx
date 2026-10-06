@@ -116,8 +116,6 @@ function ToggleRow({
       <HapticSwitch
         value={value}
         onValueChange={onValueChange}
-        accessibilityLabel={label}
-        accessibilityHint={subtitle}
       />
     </View>
   );

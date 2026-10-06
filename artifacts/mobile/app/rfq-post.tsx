@@ -21,7 +21,6 @@ import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { minHitSlop } from '@/lib/hitSlop';
 import { FormInput, PrimaryButton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -29,9 +28,6 @@ import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from
 import { radius } from '@/constants/radii';
 
 const MAX_TARGETS = 10;
-// Garment-type chips are 34pt tall in a wrapping row with 8pt gaps — vertical slop only.
-// Sized off the 32pt padding box (web slop layer sits inside the 1pt border).
-const TYPE_CHIP_HIT_SLOP = minHitSlop({ height: 32 });
 
 // Example deadline a month out, in the yyyy-mm-dd form the field parses.
 const DEADLINE_EXAMPLE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
@@ -137,7 +133,7 @@ export default function RfqPostScreen() {
         <Text style={s.sectionLabel}>What are you sourcing?</Text>
         <View style={s.chipRow}>
           {GARMENT_TYPES.map((type) => (
-            <TouchableOpacity key={type} style={[s.typeChip, garmentType === type && s.typeChipActive]} onPress={() => setGarmentType(type)} activeOpacity={0.8} hitSlop={TYPE_CHIP_HIT_SLOP} accessibilityRole="radio" accessibilityState={{ checked: garmentType === type }} accessibilityLabel={type}>
+            <TouchableOpacity key={type} style={[s.typeChip, garmentType === type && s.typeChipActive]} onPress={() => setGarmentType(type)} activeOpacity={0.8}>
               <Text style={[s.typeChipText, garmentType === type && s.typeChipTextActive]}>{type}</Text>
             </TouchableOpacity>
           ))}

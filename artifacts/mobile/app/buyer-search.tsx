@@ -63,6 +63,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
+import { profileVideosHref } from '@/lib/profileNavigation';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -277,9 +278,11 @@ export default function BuyerSearchScreen() {
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
   // Blend in bundled preview posts/products when the live API has nothing
   // for this query — matched against name/author/brand, not just caption.
-  const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
+  // Preview mode only (same gate as PREVIEW_ACCOUNTS above): a real
+  // account's empty search must stay empty, never show sample posts.
+  const videoResults = videoResultsRaw.length > 0 || !previewMode ? videoResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
-  const productResults = productResultsRaw.length > 0 ? productResultsRaw
+  const productResults = productResultsRaw.length > 0 || !previewMode ? productResultsRaw
     : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
   const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
   // Server-side hashtag search first (real post counts), then tags derived
@@ -322,7 +325,9 @@ export default function BuyerSearchScreen() {
 
   function goToVideo(video: VideoResult) {
     hapticPrimaryAction();
-    router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
+    // Open the tapped video itself in the full-screen player (scoped to its
+    // creator), not the author's profile — that screen ignored postId.
+    router.push(profileVideosHref({ id: video.authorId, startPostId: video.postId, exactPost: true }) as never);
   }
 
   function handleResultPress(r: ProductResult | BrandResult) {
@@ -662,9 +667,7 @@ export default function BuyerSearchScreen() {
           onPress={() => goBackOr(router)}
           accessibilityRole="button"
           accessibilityLabel="Back"
-          // 26×28 chevron → 44×44 tap area; only 8pt toward the search field
-          // (the header's gap) so it never covers the field itself.
-          hitSlop={{ top: 8, bottom: 8, left: 10, right: 8 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="buyer-search-back"
         >
           <Feather name="chevron-left" size={26} color={fg} />
@@ -709,9 +712,6 @@ export default function BuyerSearchScreen() {
             onPress={() => router.push('/(buyer)/friends' as never)}
             accessibilityRole="button"
             accessibilityLabel="Add friends"
-            // 24×24 icon → 44×44 tap area; 8pt toward the field (the header's
-            // gap), the rest into the right gutter.
-            hitSlop={{ top: 10, bottom: 10, left: 8, right: 12 }}
             testID="buyer-search-add-person"
             style={styles.headerSideButton}
           >

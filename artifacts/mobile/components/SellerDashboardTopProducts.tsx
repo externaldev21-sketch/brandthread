@@ -6,7 +6,6 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { TopProductSummary } from '@/lib/sellerDashboardStats';
-import { minHitSlop } from '@/lib/hitSlop';
 
 export function SellerDashboardTopProducts({
   products,
@@ -25,7 +24,7 @@ export function SellerDashboardTopProducts({
     <View testID="seller-dashboard-top-products">
       <View style={styles.headerRow}>
         <Text style={[styles.sectionHeader, { color: theme.muted }]}>Top products</Text>
-        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all products" hitSlop={SEE_ALL_HIT_SLOP}>
+        <TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all products">
           <Text style={[styles.seeAll, { color: theme.subtle }]}>See all</Text>
         </TouchableOpacity>
       </View>
@@ -60,9 +59,6 @@ export function SellerDashboardTopProducts({
     </View>
   );
 }
-
-// The "See all" link is drawn ~41×16pt; pad its touch area to 44×44.
-const SEE_ALL_HIT_SLOP = minHitSlop({ width: 41, height: 16 });
 
 const styles = StyleSheet.create({
   headerRow: {
