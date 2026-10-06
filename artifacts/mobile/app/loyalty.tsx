@@ -19,7 +19,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
-import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 type PointEntry = {
   id: string;
@@ -72,7 +72,7 @@ export default function LoyaltyScreen() {
     // session, so skip the network round-trip and show clearly fresh/demo
     // data instead — same convention as thread-cash.tsx. Never reachable
     // outside __DEV__ web preview.
-    if (isBuyerDevPreview()) {
+    if (isBuyerDevPreview() || isSellerDevPreview()) {
       Promise.resolve().then(() => {
         if (isPreviewDemoMode()) {
           setBalance(1240);

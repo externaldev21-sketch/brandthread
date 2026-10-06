@@ -16,6 +16,8 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewAccount } from '@/lib/previewAccount';
 
 /** Fields stored in BuyerProfileFields — everything editable is persisted. */
 type PersistedKey = keyof Omit<BuyerProfileFields, 'aiCreator' | 'avatarUri'>;
@@ -56,19 +58,23 @@ export default function BuyerPersonalDetails() {
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  // The signed-out buyer preview stands in for the preview account
+  // (lib/previewAccount.ts): its name and username, plus the rest with demo=1.
+  const [previewAccount] = useState(() => (!user && isBuyerDevPreview() ? getPreviewAccount('buyer', isPreviewDemoMode()) : null));
 
   useEffect(() => {
     // Seed from BOTH sources; social profile is authoritative for shared identity.
     Promise.all([loadBuyerProfile(), getMyProfile()]).then(([local, social]) => {
       setFields({
         ...local,
-        name:     local.name || social.name,
-        username: local.username || social.username || DEFAULT_BUYER_PROFILE.username,
-        pronouns: local.pronouns || social.pronouns,
+        name:     local.name || social.name || previewAccount?.name || '',
+        username: local.username || social.username || previewAccount?.username || DEFAULT_BUYER_PROFILE.username,
+        pronouns: local.pronouns || social.pronouns || previewAccount?.pronouns || '',
+        phone:    local.phone || previewAccount?.phone || '',
       });
       setLoaded(true);
     });
-  }, []);
+  }, [previewAccount]);
 
   function set(key: string, val: string) {
     setFields(prev => ({ ...prev, [key]: val }));
@@ -76,7 +82,7 @@ export default function BuyerPersonalDetails() {
   }
 
   function getValue(key: string): string {
-    if (key === 'email') return maskEmail(user?.primaryEmailAddress?.emailAddress);
+    if (key === 'email') return maskEmail(user?.primaryEmailAddress?.emailAddress ?? (previewAccount?.email || undefined));
     if (key === 'birthday') return '';
     const val = (fields as unknown as Record<string, unknown>)[key];
     return typeof val === 'string' ? val : '';

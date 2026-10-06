@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -49,11 +49,29 @@ export default function BrandScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const router = useRouter();
-  const [nameInput, setNameInput] = useState('Brandthread');
+  // Starts empty: the generator input and name ideas only fill in once the
+  // seller types or taps Generate — never with sample names.
+  const [nameInput, setNameInput] = useState('');
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
-  const [suggestedNames, setSuggestedNames] = useState<string[]>(['ThreadCraft', 'Corevox', 'Moodwear', 'Rawline', 'Grainhaus']);
+  const [suggestedNames, setSuggestedNames] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const api = useApi();
+  // The brand card shows the seller's own brand, not a sample one.
+  const [brand, setBrand] = useState<{ name: string; category: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    api.seller.getProfile()
+      .then((p) => {
+        if (!active) return;
+        setBrand({ name: (p.brandName || p.displayName || '').trim(), category: (p.category ?? '').trim() });
+      })
+      .catch(() => { /* card keeps its neutral state */ });
+    return () => { active = false; };
+  }, [api]);
+  const brandName = brand?.name ?? '';
+  const brandInitials = brandName
+    ? brandName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('')
+    : '';
   const [logoStyle, setLogoStyle] = useState('Minimalist');
   const [logoGenerating, setLogoGenerating] = useState(false);
   const [logoImages, setLogoImages] = useState<string[]>([]); // base64 strings
@@ -119,11 +137,17 @@ export default function BrandScreen() {
       {/* Brand Profile */}
       <LinearGradient colors={theme.heroGradient} style={[styles.profileCard, { borderColor: theme.accent }]}>
         <View style={[styles.logoCircle, { borderColor: colors.primary }]}>
-          <Text style={[styles.logoText, { color: colors.primary }]}>BT</Text>
+          {brandInitials ? (
+            <Text style={[styles.logoText, { color: colors.primary }]}>{brandInitials}</Text>
+          ) : (
+            <Feather name="feather" size={18} color={colors.primary} />
+          )}
         </View>
         <View>
-          <Text style={[styles.brandName, { color: colors.primary }]}>Brandthread</Text>
-          <Text style={[styles.brandStyle, { color: theme.accentLight }]}>Minimalist · Est. 2025</Text>
+          <Text style={[styles.brandName, { color: colors.primary }]}>{brandName || 'Your brand'}</Text>
+          {brand?.category ? (
+            <Text style={[styles.brandStyle, { color: theme.accentLight }]}>{brand.category}</Text>
+          ) : null}
         </View>
         <View style={[styles.completeBadge, { backgroundColor: theme.accentDim }]}>
           <Text style={[styles.completeText, { color: colors.primary }]}>{completionPct}%</Text>

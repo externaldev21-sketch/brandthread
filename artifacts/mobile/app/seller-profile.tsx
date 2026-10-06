@@ -190,7 +190,9 @@ export default function SellerProfileScreen() {
   // ── Profile load ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    if (loadOwnProfile && (!authLoaded || !userId)) {
+    // The signed-out preview has no Clerk session; its own profile comes from
+    // the preview data layer (lib/previewApiData.ts) instead of an error.
+    if (loadOwnProfile && !devPreview && (!authLoaded || !userId)) {
       if (authLoaded) { setProfileLoading(false); setProfileError(true); }
       return () => { active = false; };
     }
@@ -201,7 +203,7 @@ export default function SellerProfileScreen() {
         let view: SellerView;
         if (loadOwnProfile) {
           const own = await api.seller.getProfile();
-          const publicData = await api.publicSellers.get(own.clerkId).catch(() => null);
+          const publicData = devPreview ? null : await api.publicSellers.get(own.clerkId).catch(() => null);
           // The public read carries the signed avatar URL, live counts and the
           // derived verified badge; the owner read adds private fields.
           view = toSellerView({ ...own, ...(publicData?.profile ?? {}) }, own.clerkId);
@@ -230,7 +232,7 @@ export default function SellerProfileScreen() {
       }
     })();
     return () => { active = false; };
-  }, [api, authLoaded, loadOwnProfile, routeSellerId, userId, reloadTick]);
+  }, [api, authLoaded, devPreview, loadOwnProfile, routeSellerId, userId, reloadTick]);
 
   // ── Social counts + follow state (public counts for everyone; follow
   // state only once signed in) ──────────────────────────────────────────────
