@@ -11,6 +11,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { Button } from '@/components/ui/Button';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -33,6 +34,7 @@ import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
+import { InboxPillRow, type InboxTab } from '@/components/inbox/InboxPillRow';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
 import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
 import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
@@ -70,86 +72,6 @@ import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 // circle read as an unwanted extra layer of chrome on these dense list rows
 // and pill controls. Scale/opacity press feedback is unaffected.
 const NO_RIPPLE = false;
-
-// ─── Inbox / Requests pill row (Threads-style chips, replaces the old
-// underline-tab segmented control) ──────────────────────────────────────────
-
-type InboxTab = 'inbox' | 'requests';
-
-function InboxPillRow({
-  value, onChange, requestsCount, theme, gutter, onFilterPress,
-}: {
-  value: InboxTab;
-  onChange: (tab: InboxTab) => void;
-  requestsCount: number;
-  theme: ReturnType<typeof useAppTheme>['theme'];
-  gutter: number;
-  onFilterPress: () => void;
-}) {
-  const pills: { key: InboxTab; label: string; count?: number }[] = [
-    { key: 'inbox', label: 'Inbox' },
-    { key: 'requests', label: 'Requests', count: requestsCount },
-  ];
-  return (
-    <View style={[pillS.row, { paddingHorizontal: gutter }]}>
-      <PressableScale
-        style={[pillS.iconPill, { borderColor: theme.border }]}
-        onPress={onFilterPress}
-        rippleEnabled={NO_RIPPLE}
-        accessibilityRole="button"
-        accessibilityLabel="Filter messages"
-        testID="inbox-filter-pill"
-      >
-        <Feather name="sliders" size={15} color={theme.text} />
-      </PressableScale>
-      {pills.map(pill => {
-        const active = value === pill.key;
-        return (
-          <PressableScale
-            key={pill.key}
-            style={[
-              pillS.pill,
-              active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
-                : { backgroundColor: 'transparent', borderColor: theme.border },
-            ]}
-            onPress={() => onChange(pill.key)}
-            rippleEnabled={NO_RIPPLE}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            testID={`inbox-tab-${pill.key}`}
-          >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
-              {pill.label}
-            </Text>
-            {!!pill.count && pill.count > 0 && (
-              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
-                <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
-                  {pill.count > 99 ? '99+' : pill.count}
-                </Text>
-              </View>
-            )}
-          </PressableScale>
-        );
-      })}
-    </View>
-  );
-}
-
-const pillS = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  iconPill: {
-    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
-  },
-  pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
-  pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
-});
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
 // Friends/followers/following come from the follow-graph endpoints in
@@ -1373,11 +1295,12 @@ export default function InboxScreen() {
         <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
           Send a message to someone in your network
         </Text>
-        <PrimaryButton
+        <Button
           label="Send a message"
-          onPress={openCompose}
+          onPress={() => openCompose()}
+          size="small"
           style={s.inboxEmptyButton}
-          small
+          testID="inbox-empty-send-message"
         />
       </View>
     );
@@ -1575,7 +1498,7 @@ export default function InboxScreen() {
                   ]}>
                     <Text
                       style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
-                      numberOfLines={1}
+                      numberOfLines={2}
                     >
                       {myNote ? myNote.text : 'Your thoughts go here...'}
                     </Text>
@@ -1626,7 +1549,7 @@ export default function InboxScreen() {
                     {note ? (
                       <>
                         <View style={[s.noteBubble, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={1}>
+                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={2}>
                             {note.text}
                           </Text>
                         </View>
@@ -1713,6 +1636,7 @@ export default function InboxScreen() {
           theme={theme}
           gutter={gutter}
           onFilterPress={openFilterMenu}
+          rippleEnabled={NO_RIPPLE}
         />
       )}
 
@@ -2000,13 +1924,16 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   // (and empty) even for authors with no active note, so every avatar in
   // the row still lines up on the same baseline regardless of who has a
   // note bubble floating above them.
-  activeRailNoteWrap: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
-  noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  // Tall enough for a two-line bubble (notes wrap to 2 lines instead of
+  // ellipsizing after one word like "Location..."); 84pt wide = the 72pt
+  // column + most of the 16pt rail gap, so neighbouring bubbles never touch.
+  activeRailNoteWrap: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  noteBubbleTouchable: { height: 46, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
     maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
-  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
+  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14, textAlign: 'center' },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
@@ -2058,8 +1985,11 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     maxWidth: 300,
     marginBottom: SP.md,
   },
+  // Content-width pill — the shared Button carries its own horizontal
+  // padding (PrimaryButton's gradient inner had none, so the label touched
+  // both edges of the pill).
   inboxEmptyButton: {
-    width: '100%',
+    alignSelf: 'center',
   },
 
   // "Suggested" section (people to message) — below the conversation list,

@@ -14,7 +14,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, Linking, AppState, AppStateStatus, Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -22,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
@@ -30,6 +29,7 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import { formatCents } from '@/lib/money';
 import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
@@ -55,7 +55,8 @@ export default function SubscriptionScreen() {
     success: SUCCESS, warning: ORANGE, error: RED, background: BG,
   } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
+  // Clears the floating seller tab bar so the legal footer stays tappable.
+  const tabBarInset = useSellerTabBarInset();
   const router = useRouter();
   const api    = useApi();
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
@@ -298,7 +299,7 @@ export default function SubscriptionScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + SP.xl }]}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarInset + SP.lg }]}>
 
         {/* ── Plan tab ── */}
         {activeTab === 'plan' && (
@@ -311,8 +312,8 @@ export default function SubscriptionScreen() {
                 <>
                   <View style={styles.currentPlanRow}>
                     <View>
-                      <Text style={[styles.currentPlanLabel, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Current plan</Text>
-                      <Text style={[styles.currentPlanName, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{currentPlan.name}</Text>
+                      <Text style={[styles.currentPlanLabel, { color: theme.onAccent }]}>Current plan</Text>
+                      <Text style={[styles.currentPlanName, { color: theme.onAccent }]}>{currentPlan.name}</Text>
                     </View>
                     <View style={[styles.statusPill, { backgroundColor: `${statusColor}30` }]}>
                       <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
@@ -321,25 +322,25 @@ export default function SubscriptionScreen() {
 
                   {/* Trial end or renewal line */}
                   {currentPlan.status === 'canceled' ? (
-                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }]}>
                       Access continues until {currentPlan.renewsOn}
                     </Text>
                   ) : currentPlan.trialEnd ? (
-                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }]}>
                       Free trial ends {currentPlan.trialEnd} · then {currentPlan.price}/mo
                     </Text>
                   ) : currentPlan.status === 'active' ? (
-                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }]}>
                       Renews {currentPlan.renewsOn} · {currentPlan.price}/mo
                     </Text>
                   ) : (
-                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }]}>
                       Upgrade to unlock more features
                     </Text>
                   )}
 
                   {/* Commission reminder */}
-                  <Text style={[styles.currentPlanRenews, { color: theme.onAccent, marginTop: 8, opacity: 0.6 }, getOnAccentTextStyle(theme)]}>
+                  <Text style={[styles.currentPlanRenews, { color: theme.onAccent, marginTop: 8, opacity: 0.6 }]}>
                     + 5% platform commission on sales
                   </Text>
                 </>
@@ -421,8 +422,8 @@ export default function SubscriptionScreen() {
 
               {growthStudioTools.map((tool) => (
                 <View key={tool.id} style={styles.growthFeatureRow}>
-                  <View style={[styles.growthToolIcon, { backgroundColor: tool.accentDim }]}>
-                    <Feather name={tool.icon} size={16} color={tool.accent} />
+                  <View style={styles.growthToolIcon}>
+                    <Feather name={tool.icon} size={16} color={FG} />
                   </View>
                   <View style={styles.growthFeatureLabels}>
                     <Text style={styles.growthFeatureTitle}>{tool.title}</Text>
@@ -590,7 +591,7 @@ const createStyles = (theme: AppThemePreset) => {
   scroll:             { padding: SP.md },
   currentPlanCard:    { borderRadius: RADIUS.xl, padding: SP.lg, marginBottom: SP.lg },
   currentPlanRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.sm },
-  // Text colour here is always overridden inline with theme.onAccent (+ getOnAccentTextStyle)
+  // Text colour here is always overridden inline with theme.onAccent (flat, no shadow)
   // since this card sits on primaryGradient; the base value just needs to be theme-safe.
   currentPlanLabel:   { color: ON_ACCENT, fontSize: FS.xs, fontFamily: FONT.medium },
   currentPlanName:    { color: ON_ACCENT, fontSize: FS.xxl, fontFamily: FONT.semibold },
@@ -599,7 +600,7 @@ const createStyles = (theme: AppThemePreset) => {
   statusText:         { fontSize: FS.xs, fontFamily: FONT.medium },
   sectionTitle:       { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   planCard:           { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
-  planCardHighlight:  { borderColor: SUCCESS, backgroundColor: CARD_ELEVATED },
+  planCardHighlight:  { borderColor: MUTED, backgroundColor: CARD_ELEVATED },
   planCardFeatured:   {
     borderColor: PURPLE,
     backgroundColor: CARD_ELEVATED,
@@ -618,7 +619,7 @@ const createStyles = (theme: AppThemePreset) => {
    growthComparisonTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.semibold },
    growthComparisonSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
    growthFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.md },
-   growthToolIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+   growthToolIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER },
    growthFeatureLabels: { flex: 1, paddingTop: 1 },
    growthFeatureTitle: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
    growthFeatureDescription: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 16, marginTop: 2 },
@@ -631,8 +632,8 @@ const createStyles = (theme: AppThemePreset) => {
    growthPerkText: { color: FG, fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
    growthPerkTextDim: { color: SUBTLE },
    growthPerkStatus: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.medium },
-  popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${SUCCESS}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
-  popularText:        { color: SUCCESS, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.5 },
+  popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${FG}1F`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
+  popularText:        { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.5 },
   planHeader:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.md },
   planName:           { color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
   planTagline:        { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },

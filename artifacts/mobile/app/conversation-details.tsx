@@ -19,7 +19,6 @@ import { View, Text, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale, HapticSwitch} from '@/components/BrandthreadUI';
@@ -39,7 +38,9 @@ import {
 import { muteConversation, setConversationTheme, setConversationDisappearing } from '@/services/socialService';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { pickAvatarColor } from '@/lib/avatarColors';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { firstParam, resolveConversationParticipant, type ParticipantLike } from '@/lib/conversationParticipant';
 
 type MuteOption = { label: string; minutes: number | null };
 const MUTE_OPTIONS: MuteOption[] = [
@@ -53,7 +54,6 @@ export default function ConversationDetailsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{
@@ -81,53 +81,73 @@ export default function ConversationDetailsScreen() {
   // session there is never a real conversation to fetch, so treat ANY
   // preview session as preview here too rather than relying on the id
   // string happening to look like a seeded one.
-  const isPreview = isPreviewConversationId(params.id) || isSellerDevPreview() || isBuyerDevPreview();
-  const displayName = params.participantName ?? 'Conversation';
+  const conversationId = firstParam(params.id);
+  const isPreview = isPreviewConversationId(conversationId ?? undefined) || isSellerDevPreview() || isBuyerDevPreview();
+  // The loaded conversation's other participant — fills in whatever the
+  // opening screen didn't put in the URL (a bare `?id=` deep link, etc.).
+  const [loadedParticipant, setLoadedParticipant] = useState<ParticipantLike | null>(null);
+  // 'loading' only matters when the URL carries no participant name: until
+  // the conversation resolves there's nothing honest to show in the header.
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notFound' | 'error'>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
+  const participant = resolveConversationParticipant(params, loadedParticipant);
+  const displayName = participant?.name ?? '';
 
   useEffect(() => {
     let cancelled = false;
+    if (!conversationId) { setLoadState('notFound'); return; }
+    setLoadState('loading');
     (async () => {
       if (isPreview) {
-        const conv = getPreviewConversation(params.id);
+        const conv = getPreviewConversation(conversationId);
         if (!cancelled) {
           setMutedUntil(conv?.mutedUntil ?? null);
           setThemeId(conv?.themeId ?? null);
           setDisappearing(!!conv?.disappearingEnabled);
+          setLoadedParticipant(conv?.participants?.[0] ?? null);
+          setLoadState(conv ? 'ready' : 'notFound');
         }
         return;
       }
       try {
-        const conv = await api.conversations.get(params.id) as {
+        const conv = await api.conversations.get(conversationId) as {
           mutedUntil?: string; themeId?: string | null; disappearingEnabled?: boolean;
+          participants?: ParticipantLike[];
         };
         if (!cancelled) {
           setMutedUntil(conv?.mutedUntil ?? null);
           setThemeId(conv?.themeId ?? null);
           setDisappearing(!!conv?.disappearingEnabled);
+          setLoadedParticipant(conv?.participants?.[0] ?? null);
+          setLoadState(conv ? 'ready' : 'notFound');
         }
-      } catch { /* best-effort — rows just read as "Off"/Default */ }
+      } catch {
+        // Best-effort when the URL already names the participant (rows just
+        // read as "Off"/Default); otherwise surfaced as a retryable error.
+        if (!cancelled) setLoadState('error');
+      }
     })();
     return () => { cancelled = true; };
-  }, [params.id, isPreview, api]);
+  }, [conversationId, isPreview, api, reloadKey]);
 
   const isMuted = !!mutedUntil && new Date(mutedUntil).getTime() > Date.now();
 
   function openProfile() {
-    if (!params.participantUserId) return;
+    if (!participant?.userId) return;
     hapticPrimaryAction();
     const qs = new URLSearchParams({
-      userId: params.participantUserId,
-      name: params.participantName ?? '',
-      handle: params.participantHandle ?? '',
-      initials: params.participantInitials ?? '',
-      color: params.participantColor ?? pickAvatarColor(params.participantUserId ?? params.participantName),
+      userId: participant.userId,
+      name: participant.name,
+      handle: participant.handle ?? '',
+      initials: participant.initials,
+      color: participant.color,
     });
     router.push(('/buyer-other-profile?' + qs.toString()) as never);
   }
 
   function openSearch() {
     hapticPrimaryAction();
-    router.push(('/conversation-search?id=' + encodeURIComponent(params.id) + '&role=' + (params.role ?? 'buyer')) as never);
+    router.push(('/conversation-search?id=' + encodeURIComponent(conversationId ?? '') + '&role=' + (params.role ?? 'buyer')) as never);
   }
 
   async function applyMute(minutes: number | null) {
@@ -141,7 +161,7 @@ export default function ConversationDetailsScreen() {
           : new Date(Date.now() + minutes * 60_000).toISOString();
         setMutedUntil(until);
       } else {
-        const until = await muteConversation(params.id, minutes);
+        const until = await muteConversation(conversationId!, minutes);
         setMutedUntil(until);
       }
     } catch (e) {
@@ -155,15 +175,15 @@ export default function ConversationDetailsScreen() {
     setApplyingTheme(true);
     try {
       if (isPreview) {
-        setPreviewConversationTheme(params.id, nextThemeId);
-        appendPreviewMessage(params.id, {
-          id: `local-theme-${Date.now()}`, conversationId: params.id,
+        setPreviewConversationTheme(conversationId!, nextThemeId);
+        appendPreviewMessage(conversationId!, {
+          id: `local-theme-${Date.now()}`, conversationId: conversationId!,
           fromId: 'me', fromName: 'You', fromInitials: 'Y', fromColor: theme.accent,
           text: '', attachment: { type: 'system', title: 'theme_changed', meta: { themeId: nextThemeId ?? '' } },
           reactions: [], status: 'sent', ts: Date.now(), deletedForMe: false,
         });
       } else {
-        await setConversationTheme(params.id, nextThemeId);
+        await setConversationTheme(conversationId!, nextThemeId);
       }
       setThemeId(nextThemeId);
       hapticSuccessAction();
@@ -181,15 +201,15 @@ export default function ConversationDetailsScreen() {
     setDisappearing(next);
     try {
       if (isPreview) {
-        setPreviewConversationDisappearing(params.id, next);
-        appendPreviewMessage(params.id, {
-          id: `local-disappearing-${Date.now()}`, conversationId: params.id,
+        setPreviewConversationDisappearing(conversationId!, next);
+        appendPreviewMessage(conversationId!, {
+          id: `local-disappearing-${Date.now()}`, conversationId: conversationId!,
           fromId: 'me', fromName: 'You', fromInitials: 'Y', fromColor: theme.accent,
           text: '', attachment: { type: 'system', title: next ? 'disappearing_on' : 'disappearing_off', meta: {} },
           reactions: [], status: 'sent', ts: Date.now(), deletedForMe: false,
         });
       } else {
-        await setConversationDisappearing(params.id, next);
+        await setConversationDisappearing(conversationId!, next);
       }
     } catch (e) {
       setDisappearing(!next);
@@ -200,11 +220,11 @@ export default function ConversationDetailsScreen() {
   function openNicknames() {
     hapticPrimaryAction();
     const qs = new URLSearchParams({
-      id: params.id,
+      id: conversationId ?? '',
       role: params.role ?? 'buyer',
-      participantUserId: params.participantUserId ?? '',
-      participantName: params.participantName ?? '',
-      participantNickname: params.participantNickname ?? '',
+      participantUserId: participant?.userId ?? '',
+      participantName: displayName,
+      participantNickname: participant?.nickname ?? '',
     });
     router.push(('/conversation-nicknames?' + qs.toString()) as never);
   }
@@ -212,9 +232,9 @@ export default function ConversationDetailsScreen() {
   function openPrivacySafety() {
     hapticPrimaryAction();
     const qs = new URLSearchParams({
-      id: params.id,
-      participantUserId: params.participantUserId ?? '',
-      participantName: params.participantName ?? '',
+      id: conversationId ?? '',
+      participantUserId: participant?.userId ?? '',
+      participantName: displayName,
     });
     router.push(('/conversation-privacy-safety?' + qs.toString()) as never);
   }
@@ -226,11 +246,11 @@ export default function ConversationDetailsScreen() {
 
   function reportConversation() {
     hapticSelection();
-    if (!params.participantUserId) return;
+    if (!participant?.userId) return;
     router.push(reportHref({
       targetType: 'profile',
-      targetId: params.participantUserId,
-      ownerId: params.participantUserId,
+      targetId: participant.userId,
+      ownerId: participant.userId,
       ownerName: displayName,
     }) as never);
   }
@@ -245,8 +265,8 @@ export default function ConversationDetailsScreen() {
         text: isBlocked ? `Unblock ${displayName}` : `Block ${displayName}`,
         style: isBlocked ? 'default' : 'destructive',
         onPress: async () => {
-          if (!params.participantUserId) return;
-          const subject = { userId: params.participantUserId, name: displayName };
+          if (!participant?.userId) return;
+          const subject = { userId: participant.userId, name: displayName };
           const ok = isBlocked
             ? await confirmUnblock(subject, api.social.unblock)
             : await confirmBlock(subject, api.social.block);
@@ -256,35 +276,63 @@ export default function ConversationDetailsScreen() {
     ]);
   }
 
+  const goBack = () => { hapticPrimaryAction(); goBackOr(router); };
+  const header = (
+    <ScreenHeader title="Details" onBack={goBack} backTestID="chat-details-back" />
+  );
+
+  // No conversation named (bare /conversation-details), or one that doesn't
+  // exist / failed to load with nothing in the URL to show instead: never a
+  // blank avatar over a generic "Conversation" placeholder.
+  if (!participant) {
+    if (loadState === 'loading') {
+      return <View style={[s.root, { backgroundColor: theme.background }]}>{header}</View>;
+    }
+    return (
+      <View style={[s.root, { backgroundColor: theme.background }]}>
+        {header}
+        {loadState === 'error' ? (
+          <EmptyState
+            variant="error"
+            icon="alert-circle"
+            title="Couldn’t load this conversation"
+            message="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => setReloadKey(k => k + 1)}
+            style={s.stateFill}
+            testID="chat-details-error"
+          />
+        ) : (
+          <EmptyState
+            icon="message-circle"
+            title="Conversation not found"
+            message="This conversation may have been deleted or the link is incomplete."
+            actionLabel="Go back"
+            onAction={goBack}
+            style={s.stateFill}
+            testID="chat-details-not-found"
+          />
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
-      <View style={[s.header, { paddingTop: headerTopPad + SP.xs }]}>
-        <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.roundBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="chat-details-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-        </PressableScale>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Details</Text>
-        <View style={s.roundBtn} />
-      </View>
+      {header}
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
         <View style={s.profileBlock}>
-          <View style={[s.bigAvatar, { backgroundColor: params.participantColor ?? theme.accent }]}>
-            {params.participantAvatarUri ? (
-              <CachedImage source={{ uri: params.participantAvatarUri }} style={s.bigAvatarImg} />
+          <View style={[s.bigAvatar, { backgroundColor: participant.color }]}>
+            {participant.avatarUri ? (
+              <CachedImage source={{ uri: participant.avatarUri }} style={s.bigAvatarImg} />
             ) : (
-              <Text style={s.bigAvatarInitials}>{params.participantInitials ?? '?'}</Text>
+              <Text style={s.bigAvatarInitials}>{participant.initials}</Text>
             )}
           </View>
-          <Text style={[s.bigName, { color: theme.text }]} testID="chat-details-name">{displayName}</Text>
-          {!!params.participantHandle && (
-            <Text style={[s.bigHandle, { color: theme.muted }]}>{params.participantHandle}</Text>
+          <Text style={[s.bigName, { color: theme.text }]} numberOfLines={2} testID="chat-details-name">{displayName}</Text>
+          {!!participant.handle && (
+            <Text style={[s.bigHandle, { color: theme.muted }]}>{participant.handle}</Text>
           )}
 
           <View style={s.actionRow}>
@@ -438,12 +486,7 @@ const StyleSheetHairline = 0.5;
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingBottom: SP.sm,
-  },
-  roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
+  stateFill: { flex: 1, justifyContent: 'center' },
   profileBlock: { alignItems: 'center', paddingTop: SP.md, paddingBottom: SP.lg, gap: 4 },
   bigAvatar: {
     width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center',
@@ -451,7 +494,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   bigAvatarImg: { width: 88, height: 88 },
   bigAvatarInitials: { fontSize: FS.xl, fontFamily: FONT.bold, color: '#FFFFFF' },
-  bigName: { fontSize: FS.lg, fontFamily: FONT.bold },
+  bigName: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center', paddingHorizontal: SP.lg },
   bigHandle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: SP.sm },
   actionRow: { flexDirection: 'row', gap: SP.lg, marginTop: SP.sm },
   actionBtn: { alignItems: 'center', gap: 6, width: 64 },

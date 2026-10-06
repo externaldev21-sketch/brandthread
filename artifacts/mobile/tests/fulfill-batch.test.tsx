@@ -35,9 +35,27 @@ vi.mock('expo-haptics', () => ({
 }));
 
 const routerReplace = vi.fn();
+const searchParams = vi.hoisted(() => ({ current: { orderIds: 'order-1,order-2' } as { orderIds?: string } }));
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ orderIds: 'order-1,order-2' }),
-  useRouter: () => ({ push: vi.fn(), replace: routerReplace }),
+  useLocalSearchParams: () => searchParams.current,
+  useRouter: () => ({ push: vi.fn(), replace: routerReplace, back: vi.fn(), canGoBack: () => false }),
+}));
+
+vi.mock('@/components/ScreenHeader', () => ({
+  ScreenHeader: ({ title }: any) => React.createElement('ScreenHeader', { title }),
+}));
+
+vi.mock('@/components/layout/EmptyState', () => ({
+  EmptyState: (props: any) => React.createElement('EmptyState', props),
+}));
+
+vi.mock('@/components/ui/Button', () => ({
+  Button: ({ label, onPress, disabled, loading, variant, size }: any) =>
+    React.createElement('Button', { label, onPress, disabled, loading, variant, size, accessibilityLabel: label }),
+}));
+
+vi.mock('@/hooks/useSellerTabBarInset', () => ({
+  useSellerTabBarInset: () => 96,
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -126,6 +144,7 @@ function findByLabel(renderer: ReactTestRenderer, type: string, label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  searchParams.current = { orderIds: 'order-1,order-2' };
 });
 
 describe('fulfill-batch per-row summary', () => {
@@ -138,7 +157,7 @@ describe('fulfill-batch per-row summary', () => {
     await act(async () => { renderer = create(<FulfillBatchScreen />); });
     await flush();
 
-    const shipBtn = findByLabel(renderer, 'SecondaryButton', 'Mark shipped');
+    const shipBtn = findByLabel(renderer, 'Button', 'Mark shipped');
     await act(async () => { await shipBtn.props.onPress(); });
     await flush();
 
@@ -168,7 +187,7 @@ describe('fulfill-batch per-row summary', () => {
     await act(async () => { renderer = create(<FulfillBatchScreen />); });
     await flush();
 
-    const printBtn = findByLabel(renderer, 'PrimaryButton', 'Print labels');
+    const printBtn = findByLabel(renderer, 'Button', 'Print labels');
     await act(async () => { await printBtn.props.onPress(); });
     await flush();
 
@@ -178,5 +197,50 @@ describe('fulfill-batch per-row summary', () => {
     const messages = renderer.root.findAllByType('Text' as any).map(n => (Array.isArray(n.props.children) ? n.props.children.join('') : n.props.children));
     expect(messages).toContain('Already labeled');
     expect(messages).toContain('USPS Priority purchased');
+  });
+
+  it('renders the two bulk actions as equal siblings (same variant and size)', async () => {
+    orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, id)));
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    const print = findByLabel(renderer, 'Button', 'Print labels');
+    const ship = findByLabel(renderer, 'Button', 'Mark shipped');
+    expect(print.props.variant).toBe(ship.props.variant);
+    expect(print.props.size).toBe(ship.props.size);
+    const header = renderer.root.findAll(n => (n.type as any) === 'ScreenHeader')[0];
+    expect(header.props.title).toBe('Fulfill 2 orders');
+  });
+});
+
+describe('fulfill-batch with nothing selected', () => {
+  it('shows an empty state (no spinner, no actions) and a sentence-case title', async () => {
+    searchParams.current = {};
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    expect(orderGetMock).not.toHaveBeenCalled();
+    const header = renderer.root.findAll(n => (n.type as any) === 'ScreenHeader')[0];
+    expect(header.props.title).toBe('Fulfill orders');
+    const empty = renderer.root.findAll(n => (n.type as any) === 'EmptyState');
+    expect(empty).toHaveLength(1);
+    expect(empty[0].props.title).toBe('No orders selected');
+    expect(renderer.root.findAll(n => (n.type as any) === 'ActivityIndicator')).toHaveLength(0);
+    expect(findByLabel(renderer, 'Button', 'Mark shipped')).toBeUndefined();
+    expect(findByLabel(renderer, 'SecondaryButton', 'Done')).toBeUndefined();
+  });
+
+  it('shows a retryable error when none of the selected orders load', async () => {
+    orderGetMock.mockRejectedValue(new Error('offline'));
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    const empty = renderer.root.findAll(n => (n.type as any) === 'EmptyState')[0];
+    expect(empty.props.variant).toBe('error');
+    expect(empty.props.actionLabel).toBe('Retry');
+    orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, id)));
+    await act(async () => { empty.props.onAction(); });
+    await flush();
+    expect(findByLabel(renderer, 'Button', 'Mark shipped')).toBeDefined();
   });
 });

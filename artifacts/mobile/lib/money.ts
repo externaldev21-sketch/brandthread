@@ -75,3 +75,13 @@ export function integerPercent(numerator: number, denominator: number, rounding:
   const value = scaledNumerator / denominator;
   return rounding === 'down' ? Math.floor(value) : rounding === 'up' ? Math.ceil(value) : Math.round(value);
 }
+/**
+ * Format a deduction (fees, refunds) as a negative amount: "-$3.20".
+ * Accepts the magnitude or a signed value. Zero renders as a plain "$0.00",
+ * never "-$0.00" — a negative zero reads as a charge that never happened.
+ */
+export function formatDeductionCents(cents: number, currency = 'USD'): string {
+  assertCents(cents);
+  const magnitude = Math.abs(cents);
+  return magnitude === 0 ? formatCents(0, currency) : formatCents(-magnitude, currency);
+}

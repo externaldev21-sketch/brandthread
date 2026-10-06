@@ -892,3 +892,56 @@ export function createDeferredDelete(options: DeferredDeleteOptions): DeferredDe
     },
   };
 }
+
+// ─── Suggested people ─────────────────────────────────────────────────────────
+
+/**
+ * "Suggested for you" never lists someone already in the loaded feed — a
+ * person who just liked, followed or commented isn't a discovery, and a
+ * "New on Brandthread" reason under someone who liked your post six weeks
+ * ago contradicts itself.
+ */
+export function excludeActivityActors<T extends { userId: string }>(
+  people: readonly T[],
+  items: readonly Pick<ActivityItem, 'actorId'>[],
+): T[] {
+  const actors = new Set(items.map((item) => item.actorId).filter((id): id is string => !!id));
+  if (actors.size === 0) return [...people];
+  return people.filter((person) => !actors.has(person.userId));
+}
+
+// ─── Filter chip spacing ──────────────────────────────────────────────────────
+
+const CHIP_GAP_DEFAULT = 8;
+const CHIP_GAP_TIGHT = 6;
+/** A chip must show at least this much to read as "the row scrolls". */
+const CHIP_MIN_PEEK = 8;
+
+function chipRowReads(widths: readonly number[], containerWidth: number, inset: number, gap: number): boolean {
+  let left = inset;
+  for (const width of widths) {
+    const right = left + width;
+    // The first chip reaching the screen edge must be visibly cut by it
+    // (peeking in), never ending flush against it with the next chip
+    // entirely off-screen — that reads as a clipped last chip.
+    if (right > containerWidth - CHIP_MIN_PEEK) {
+      return right > containerWidth && left <= containerWidth - CHIP_MIN_PEEK;
+    }
+    left = right + gap;
+  }
+  return true; // everything fits
+}
+
+/**
+ * Gap for a horizontally scrolling chip row. A row whose last visible chip
+ * ends right at the screen edge with the next one fully off-screen looks
+ * clipped and hides that it scrolls; when the default 8pt gap lands there,
+ * a 6pt gap makes the next chip peek in instead (the two gaps' "flush"
+ * widths never overlap).
+ */
+export function chipRowGap(widths: readonly number[], containerWidth: number, inset = 16): number {
+  if (widths.length === 0 || containerWidth <= 0) return CHIP_GAP_DEFAULT;
+  if (chipRowReads(widths, containerWidth, inset, CHIP_GAP_DEFAULT)) return CHIP_GAP_DEFAULT;
+  if (chipRowReads(widths, containerWidth, inset, CHIP_GAP_TIGHT)) return CHIP_GAP_TIGHT;
+  return CHIP_GAP_DEFAULT;
+}

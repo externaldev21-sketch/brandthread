@@ -7,13 +7,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
+import { BrandthreadCard, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { Button } from '@/components/ui/Button';
+import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
 import { getShippingRates, purchaseShippingLabel } from '@/services/orderService';
@@ -27,7 +30,7 @@ export default function FulfillBatchScreen() {
   const s = useMemo(() => createStyles(theme), [theme]);
   const { orderIds } = useLocalSearchParams<{ orderIds: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const bottomInset = useSellerTabBarInset();
   const api = useApi();
 
   const ids = useMemo(() => (orderIds ?? '').split(',').map(id => id.trim()).filter(Boolean), [orderIds]);
@@ -36,10 +39,18 @@ export default function FulfillBatchScreen() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<'labels' | 'ship' | null>(null);
   const [results, setResults] = useState<RowResult[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Nothing selected (opened directly, or every order was deselected):
+      // resolve immediately to the empty state instead of a spinner.
+      if (ids.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const loaded: Order[] = [];
       for (const id of ids) {
@@ -56,7 +67,7 @@ export default function FulfillBatchScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [api, ids]);
+  }, [api, ids, reloadKey]);
 
   async function handlePrintLabels() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -115,8 +126,35 @@ export default function FulfillBatchScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={`Fulfill ${ids.length} Order${ids.length === 1 ? '' : 's'}`} />
-      <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: insets.bottom + SP.xxl }}>
+      <ScreenHeader
+        title={ids.length === 0 ? 'Fulfill orders' : `Fulfill ${ids.length} order${ids.length === 1 ? '' : 's'}`}
+        onBack={() => goBackOr(router, '/(tabs)/orders')}
+      />
+      {ids.length === 0 ? (
+        <View style={[s.stateWrap, { paddingBottom: bottomInset }]}>
+          <EmptyState
+            icon="package"
+            title="No orders selected"
+            message="Select orders from your orders list to fulfill them together."
+            actionLabel="Back to orders"
+            onAction={() => goBackOr(router, '/(tabs)/orders')}
+            testID="fulfill-batch-empty"
+          />
+        </View>
+      ) : !loading && orders.length === 0 ? (
+        <View style={[s.stateWrap, { paddingBottom: bottomInset }]}>
+          <EmptyState
+            variant="error"
+            icon="alert-circle"
+            title="Couldn't load these orders"
+            message="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => setReloadKey(k => k + 1)}
+            testID="fulfill-batch-error"
+          />
+        </View>
+      ) : (
+      <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: bottomInset + SP.lg }}>
         {loading ? (
           <View style={s.centered}>
             <ActivityIndicator color={ACCENT} size="large" />
@@ -132,8 +170,13 @@ export default function FulfillBatchScreen() {
             ))}
 
             <View style={s.actionRow}>
-              <PrimaryButton label="Print labels" icon="tag" onPress={handlePrintLabels} loading={running === 'labels'} disabled={running !== null || orders.length === 0} style={{ flex: 1 }} />
-              <SecondaryButton label="Mark shipped" icon="send" onPress={handleMarkShipped} disabled={running !== null || orders.length === 0} style={{ flex: 1 }} />
+              {/* Equal siblings: same variant/size, each taking half the row. */}
+              <View style={s.actionCell}>
+                <Button label="Print labels" icon="tag" variant="secondary" size="small" fullWidth onPress={handlePrintLabels} loading={running === 'labels'} disabled={running !== null || orders.length === 0} />
+              </View>
+              <View style={s.actionCell}>
+                <Button label="Mark shipped" icon="send" variant="secondary" size="small" fullWidth onPress={handleMarkShipped} loading={running === 'ship'} disabled={running !== null || orders.length === 0} />
+              </View>
             </View>
 
             {results.length > 0 && (
@@ -160,6 +203,7 @@ export default function FulfillBatchScreen() {
           </>
         )}
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -173,6 +217,8 @@ const createStyles = (theme: { text: string; muted: string }) => {
     orderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     orderNumber: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
     actionRow: { flexDirection: 'row', gap: SP.sm },
+    actionCell: { flex: 1 },
+    stateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     resultRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   });
 };

@@ -24,6 +24,7 @@ import { RADII } from '@/constants/radii';
 import { apiErrorMessage } from '@/lib/safety';
 import type { AccountSession } from '@/lib/safetyTypes';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+import { describeUserAgent } from '@/lib/deviceLabel';
 
 /**
  * Dev-preview has no real Clerk session list to show (and this app's audit/
@@ -33,11 +34,18 @@ import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
  * currently open IS a real, current session, just with nothing else to
  * report (no other devices, no location/IP worth fabricating).
  */
-const PREVIEW_CURRENT_SESSION: AccountSession = {
-  id: 'this-device', current: true, status: 'active', device: 'This device',
-  browser: null, isMobile: false, location: null, ipAddress: null,
-  lastActiveAt: new Date().toISOString(), createdAt: new Date().toISOString(),
-};
+function previewCurrentSession(): AccountSession {
+  // Title the row with the real device/browser of the open tab; the
+  // "This device" marker is the pill, so it isn't repeated as the title.
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const { device, browser, isMobile } = describeUserAgent(ua);
+  const now = new Date().toISOString();
+  return {
+    id: 'this-device', current: true, status: 'active', device,
+    browser, isMobile, location: null, ipAddress: null,
+    lastActiveAt: now, createdAt: now,
+  };
+}
 
 function lastActiveLabel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -80,7 +88,7 @@ export default function LoginActivity() {
     // at all) would otherwise reach the real, backend-less
     // /api/auth/sessions endpoint and log a console 404.
     if (isSellerDevPreview() || isBuyerDevPreview()) {
-      setSessions([PREVIEW_CURRENT_SESSION]);
+      setSessions([previewCurrentSession()]);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -267,8 +275,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   iconWrapCurrent: { backgroundColor: theme.accent, borderColor: theme.accent },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   device: { color: theme.text, ...TYPE_SCALE.body, fontFamily: FONT.semibold, flexShrink: 1 },
-  currentPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADII.pill, backgroundColor: theme.success + '22' },
-  currentText: { color: theme.success, fontFamily: FONT.semibold, fontSize: 11 },
+  currentPill: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADII.pill,
+    backgroundColor: theme.cardElevated, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+  },
+  currentText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: 11 },
   meta: { color: theme.muted, ...TYPE_SCALE.footnote, marginTop: 2 },
   metaSub: { color: theme.subtle, ...TYPE_SCALE.caption, marginTop: 1 },
   emptyCard: {

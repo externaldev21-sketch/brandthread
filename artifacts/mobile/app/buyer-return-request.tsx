@@ -107,7 +107,7 @@ function makeRadioStyles(theme: AppThemePreset) {
   });
 }
 
-type Phase = 'loading' | 'error' | 'ineligible' | 'existing' | 'form' | 'submitted';
+type Phase = 'loading' | 'error' | 'not_found' | 'ineligible' | 'existing' | 'form' | 'submitted';
 
 export default function BuyerReturnRequestScreen() {
   const { theme } = useAppTheme();
@@ -130,13 +130,19 @@ export default function BuyerReturnRequestScreen() {
   const [attempted, setAttempted] = useState(false);
 
   const load = useCallback(async () => {
-    if (!orderId) { setPhase('error'); return; }
+    // No order id (opened directly / incomplete link) is "not found" — never
+    // the connection-error state, which is reserved for a request that
+    // actually failed.
+    if (!orderId) { setPhase('not_found'); return; }
     setPhase('loading');
     try {
       const [loaded, existing] = await Promise.all([
         getBuyerOrder(orderId),
         api.returns.listBuyer().then(rows => activeReturnFor(Array.isArray(rows) ? rows : [], orderId)).catch(() => null),
       ]);
+      // getBuyerOrder swallows request failures and returns undefined, so an
+      // empty result here can still be a network failure — keep the retryable
+      // error state for it.
       if (!loaded) { setPhase('error'); return; }
       setOrder(loaded);
       if (existing?.id) { setExistingReturnId(existing.id); setPhase('existing'); return; }
@@ -235,6 +241,20 @@ export default function BuyerReturnRequestScreen() {
           title="Couldn’t load this order"
           description="Check your connection and try again."
           action={{ label: 'Try again', onPress: () => { void load(); } }}
+        />
+      </BrandthreadScreen>
+    );
+  }
+
+  if (phase === 'not_found') {
+    return (
+      <BrandthreadScreen noSafeTop>
+        {header}
+        <EmptyState
+          icon="package"
+          title="Order not found"
+          description="This order may have been removed or the link is incomplete."
+          action={{ label: 'Go back', onPress: () => goBackOr(router) }}
         />
       </BrandthreadScreen>
     );

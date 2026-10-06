@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { useRole } from '@/contexts/RoleContext';
 
 type Role = 'buyer' | 'seller';
 
@@ -59,7 +60,13 @@ export default function NotificationsSettingsScreen() {
   const api    = useApi();
   const colors = useColors();
   const s = React.useMemo(() => makeStyles(), []);
-  const [role, setRole] = useState<Role>('seller');
+  // The server's role (from the auth token) decides which preference keys
+  // apply once loaded; until then — or when the request can't run, e.g. a
+  // signed-out preview — fall back to the app's active role so a buyer never
+  // sees seller-only categories.
+  const { role: activeRole } = useRole();
+  const [serverRole, setRole] = useState<Role | null>(null);
+  const role: Role = serverRole ?? (activeRole === 'buyer' ? 'buyer' : 'seller');
   const [pushEnabled, setPushEnabled] = useState(true);
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [categories, setCategories] = useState<Record<string, boolean>>({});
@@ -128,7 +135,7 @@ export default function NotificationsSettingsScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Master switch ── */}
-        <View style={s.section}>
+        <View style={[s.section, s.sectionFirst]}>
           <Card>
             <ListRow
               icon={pushEnabled ? 'bell' : 'bell-off'}
@@ -139,8 +146,6 @@ export default function NotificationsSettingsScreen() {
             />
           </Card>
         </View>
-
-        <View style={s.divider} />
 
         {/* ── Notification types ── */}
         <View style={s.section}>
@@ -163,8 +168,6 @@ export default function NotificationsSettingsScreen() {
           </Card>
         </View>
 
-        <View style={s.divider} />
-
         {/* ── Quiet hours ── */}
         <View style={s.section}>
           <Text style={[TYPE_SCALE.footnote, s.sectionTitle, { color: colors.foreground }]}>Quiet hours</Text>
@@ -186,10 +189,11 @@ export default function NotificationsSettingsScreen() {
 function makeStyles() {
   return StyleSheet.create({
     container:        { flex: 1 },
-    section:          { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md + 2 },
+    // One consistent 24pt gap between stacked sections (16pt below the header).
+    section:          { paddingHorizontal: SPACING.md, paddingTop: SPACING.xl },
+    sectionFirst:     { paddingTop: SPACING.md },
     sectionTitle:     { fontFamily: FONT.semibold, marginBottom: SPACING.xxs + 2 },
     sectionSubtitle:  { marginBottom: SPACING.sm + 2, lineHeight: 17 },
-    divider:          { height: 10 },
     listCard:         { padding: SPACING.sm },
     rowDivider:       { height: StyleSheet.hairlineWidth },
   });
