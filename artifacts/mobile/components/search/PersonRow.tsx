@@ -9,6 +9,10 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// FollowPill is 32pt tall → pad to 44 vertically (no visual change).
+const FOLLOW_PILL_HIT_SLOP = minHitSlop({ height: 32 });
 
 export type SearchPerson = {
   userId: string;
@@ -142,6 +146,7 @@ export function FollowPill({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ busy: loading }}
+      hitSlop={FOLLOW_PILL_HIT_SLOP}
       testID={testID}
     >
       <Animated.View style={[pillStyles.pill, following ? pillStyles.following : pillStyles.notFollowing, { transform: [{ scale }] }]}>

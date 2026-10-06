@@ -27,8 +27,12 @@ export function SellerDashboardSetupCard({
       onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
-      accessibilityRole="button"
-      accessibilityLabel="List your first product to start selling"
+      // The card stays tappable as a whole, but it holds its own
+      // "Add a product" button — announcing the card as a button too would
+      // nest one button inside another (invalid <button> HTML on web, two
+      // overlapping targets for screen readers). The inner button is the
+      // accessible action; the card reads as its title and copy.
+      accessibilityRole="none"
     >
       <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
         <Feather name="plus-circle" size={20} color={theme.accent} />

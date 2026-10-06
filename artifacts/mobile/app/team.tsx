@@ -12,6 +12,11 @@ import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { FONT } from '@/lib/theme';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Header "Invite" pill is 30pt tall; error-state "Retry" pill is 36pt tall.
+const INVITE_HIT_SLOP = minHitSlop({ height: 30 });
+const RETRY_HIT_SLOP = minHitSlop({ height: 36 });
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -317,7 +322,7 @@ export default function TeamScreen() {
       {/* Members */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff Accounts</Text>
-        <TouchableOpacity onPress={openInvite} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
+        <TouchableOpacity onPress={openInvite} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} hitSlop={INVITE_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Invite staff member">
           <Feather name="user-plus" size={14} color={colors.primaryForeground} />
           <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Invite</Text>
         </TouchableOpacity>
@@ -336,6 +341,7 @@ export default function TeamScreen() {
               onPress={() => { setLoading(true); load(); }}
               accessibilityRole="button"
               accessibilityLabel="Retry loading team"
+              hitSlop={RETRY_HIT_SLOP}
               style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
             >
               <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: FONT.semibold }}>Retry</Text>

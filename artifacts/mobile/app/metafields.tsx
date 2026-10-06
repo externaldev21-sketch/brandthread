@@ -11,6 +11,11 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// "Add definition" renders ~43pt tall incl. its 1pt border; size off the
+// ~41pt padding box (web slop layer sits inside the border).
+const ADD_DEFINITION_HIT_SLOP = minHitSlop({ height: 41 });
 
 const DEFINITIONS: { key: string; icon: keyof typeof Feather.glyphMap; label: string }[] = [
   { key: 'products',          icon: 'tag',      label: 'Products' },
@@ -108,6 +113,8 @@ export default function MetafieldsScreen() {
             onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
             activeOpacity={0.7}
             style={[s.addMetaBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
+            hitSlop={ADD_DEFINITION_HIT_SLOP}
+            accessibilityRole="button"
           >
             <Feather name="plus" size={16} color={colors.primary} />
             <Text style={[s.addMetaBtnText, { color: colors.primary }]}>Add definition</Text>

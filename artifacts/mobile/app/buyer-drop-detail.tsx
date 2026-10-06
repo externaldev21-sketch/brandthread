@@ -28,6 +28,11 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Error-state buttons draw ~43pt tall (12pt padding + text) → pad to 44.
+// Sized from the 41pt padding box: on web the slop sits inside the 1pt border.
+const ERROR_BUTTON_HIT_SLOP = minHitSlop({ height: 41 });
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -452,6 +457,7 @@ export default function BuyerDropDetail() {
               onPress={() => setReloadGeneration(g => g + 1)}
               accessibilityRole="button"
               accessibilityLabel="Try again"
+              hitSlop={ERROR_BUTTON_HIT_SLOP}
               style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: theme.accent }}
             >
               <Text style={[{ fontWeight: '600' }, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Try again</Text>
@@ -461,6 +467,7 @@ export default function BuyerDropDetail() {
             onPress={() => goBackOr(router)}
             accessibilityRole="button"
             accessibilityLabel="Back"
+            hitSlop={ERROR_BUTTON_HIT_SLOP}
             style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
           >
             <Text style={{ color: theme.text, fontWeight: '600' }}>Back</Text>

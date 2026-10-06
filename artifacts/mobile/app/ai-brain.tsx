@@ -42,6 +42,7 @@ import * as Haptics from 'expo-haptics';
 import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import Composer from '@/components/ui/Composer';
+import { minHitSlop } from '@/lib/hitSlop';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -326,6 +327,10 @@ interface EmptyStateProps {
   isTablet: boolean;
 }
 
+// Suggestion pills are 42pt tall (8pt gap between them). Sized off the
+// 40pt padding box: the web hitSlop layer is positioned inside the 1pt border.
+const PILL_HIT_SLOP = minHitSlop({ height: 40 });
+
 function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -359,6 +364,8 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
             style={styles.pill}
             onPress={() => onPillPress(prompt)}
             activeOpacity={0.75}
+            hitSlop={PILL_HIT_SLOP}
+            accessibilityRole="button"
           >
             <Text style={styles.pillText} numberOfLines={2}>{prompt}</Text>
           </TouchableOpacity>

@@ -19,6 +19,7 @@ import { getStorefront, validateStore, publishStore, unpublishStore, StoreValida
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { minHitSlop } from '@/lib/hitSlop';
 
 const ERROR_ROUTES: Record<string, string> = {
   'Store name is required.': '/store-settings',
@@ -26,6 +27,31 @@ const ERROR_ROUTES: Record<string, string> = {
   'No store URL configured.': '/store-domain',
   'No logo uploaded.': '/store-editor',
 };
+
+// Invisible a11y touch padding (44pt minimum), no layout change.
+// "Validate Again" (32pt tall): more slop upward into the card margin above,
+// only 4pt down so it doesn't reach into the preview card below.
+const REVALIDATE_HIT_SLOP = { top: 8, bottom: 4, left: 0, right: 0 };
+const REVOKE_HIT_SLOP = minHitSlop({ height: 32 });
+const ISSUE_ROW_GAP_SLOP = 4; // half of the 8pt gap between stacked error rows
+
+/** Error rows are 18pt (1 line) or 36pt (2 lines) tall and stacked 8pt apart:
+ *  give each 4pt into the shared gaps and put the rest of the deficit on the
+ *  outer edge (above the first row — the section title — or below the last). */
+function errorRowHitSlop(height: number | undefined, index: number, count: number) {
+  if (!height) return undefined;
+  const deficit = Math.max(0, 44 - height);
+  if (deficit === 0) return undefined;
+  const isFirst = index === 0;
+  const isLast = index === count - 1;
+  let top = isFirst ? 0 : Math.min(ISSUE_ROW_GAP_SLOP, deficit);
+  let bottom = isLast ? 0 : Math.min(ISSUE_ROW_GAP_SLOP, deficit);
+  const rest = Math.max(0, deficit - top - bottom);
+  if (isFirst && isLast) { top += Math.ceil(rest / 2); bottom += Math.floor(rest / 2); }
+  else if (isFirst) top += rest;
+  else if (isLast) bottom += rest;
+  return { top, bottom, left: 0, right: 0 };
+}
 
 export default function StorePublishScreen() {
   const { theme } = useAppTheme();
@@ -42,6 +68,9 @@ export default function StorePublishScreen() {
   const params = useLocalSearchParams<{ from?: string }>();
   const [store, setStore] = useState<Storefront | null>(null);
   const [validation, setValidation] = useState<StoreValidationResult | null>(null);
+  // Measured heights of the tappable error rows (1 or 2 text lines), used only
+  // to size their invisible hitSlop up to the 44pt minimum.
+  const [errorRowHeights, setErrorRowHeights] = useState<Record<number, number>>({});
   const [validating, setValidating] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
@@ -200,6 +229,12 @@ export default function StorePublishScreen() {
                     <TouchableOpacity
                       key={i}
                       style={pub.issueRow}
+                      onLayout={(e) => {
+                        const h = Math.round(e.nativeEvent.layout.height);
+                        setErrorRowHeights((prev) => (prev[i] === h ? prev : { ...prev, [i]: h }));
+                      }}
+                      hitSlop={errorRowHitSlop(errorRowHeights[i], i, validation.errors.length)}
+                      accessibilityRole="button"
                       onPress={() => {
                         const route = Object.keys(ERROR_ROUTES).find(k => err.startsWith(k.slice(0, 10)));
                         if (route) router.push(ERROR_ROUTES[route] as never);
@@ -240,7 +275,7 @@ export default function StorePublishScreen() {
           ) : null}
         </BrandthreadCard>
 
-        <TouchableOpacity style={pub.revalidateBtn} onPress={doValidate}>
+        <TouchableOpacity style={pub.revalidateBtn} onPress={doValidate} hitSlop={REVALIDATE_HIT_SLOP} accessibilityRole="button">
           <Feather name="refresh-cw" size={ICON.xs} color={MUTED} />
           <Text style={pub.revalidateText}>Validate Again</Text>
         </TouchableOpacity>
@@ -261,7 +296,7 @@ export default function StorePublishScreen() {
                 style={{ flex: 1 }}
               />
               {!previewRevoked && (
-                <TouchableOpacity onPress={handleRevokePreview} disabled={revokingPreview} style={pub.revokeBtn}>
+                <TouchableOpacity onPress={handleRevokePreview} disabled={revokingPreview} style={pub.revokeBtn} hitSlop={REVOKE_HIT_SLOP} accessibilityRole="button">
                   <Text style={pub.revokeText}>{revokingPreview ? 'Revoking…' : 'Revoke'}</Text>
                 </TouchableOpacity>
               )}

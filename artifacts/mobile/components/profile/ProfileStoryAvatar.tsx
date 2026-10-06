@@ -129,7 +129,9 @@ export function ProfileStoryAvatar({
           onPress={onPressBadge}
           accessibilityRole="button"
           accessibilityLabel="Add to your story"
-          hitSlop={6}
+          // Padded mostly outward so it overlaps the avatar's own tap area
+          // as little as possible (see BADGE_HIT_SLOP).
+          hitSlop={BADGE_HIT_SLOP}
           testID={`${testID}-badge`}
           style={({ pressed }) => [
             styles.badge,
@@ -143,6 +145,9 @@ export function ProfileStoryAvatar({
     </View>
   );
 }
+
+// 22pt badge → 44pt touch area, padded mostly outward (right/bottom).
+const BADGE_HIT_SLOP = { top: 8, left: 8, bottom: 14, right: 14 };
 
 const styles = StyleSheet.create({
   avatar: { overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },

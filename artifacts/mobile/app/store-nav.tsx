@@ -25,6 +25,11 @@ import {
 import { getMenus, updateMenu } from '@/services/storeService';
 import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/storeTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Menu tabs draw 32pt tall with a 1pt border (web slop sits inside the
+// border) → vertical-only slop up to 44, no visual change.
+const MENU_TAB_HIT_SLOP = minHitSlop({ height: 30 });
 
 const MENU_TABS: { type: MenuType; label: string }[] = [
   { type: 'main', label: 'Main Menu' },
@@ -331,6 +336,9 @@ export default function StoreNavScreen() {
               key={tab.type}
               style={[styles.menuTab, isActive && styles.menuTabActive]}
               onPress={() => { Haptics.selectionAsync(); if (menu) setActiveMenuId(menu.id); }}
+              hitSlop={MENU_TAB_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
             >
               <Text style={[styles.menuTabText, isActive && styles.menuTabTextActive]}>
                 {tab.label}

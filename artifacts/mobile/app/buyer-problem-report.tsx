@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { minHitSlop } from '@/lib/hitSlop';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Image, Platform } from 'react-native';
@@ -157,6 +158,8 @@ export default function BuyerProblemReportScreen() {
           style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }]}
           onPress={pickEvidence}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          hitSlop={minHitSlop({ height: 35 })}
         >
           <Feather name="camera" size={16} color={PURPLE_LIGHT} />
           <Text style={[s.evidenceNoteText, { color: PURPLE_LIGHT }]}>

@@ -34,6 +34,7 @@ import { replaceBackground } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { minHitSlop } from '@/lib/hitSlop';
 
 type BgTab = 'color' | 'gradient' | 'upload' | 'ai';
 
@@ -60,6 +61,10 @@ const GRADIENT_PRESETS = [
 ];
 
 const AI_SCENES = ['Studio', 'Street', 'Luxury interior', 'Outdoor', 'Industrial', 'Minimal', 'Runway', 'Night'];
+
+// 34pt-tall Color/Gradient/Upload/AI Scene segments → invisible 44pt touch height.
+// Minus the active tab's 1pt top+bottom border (web slop sits inside the border box).
+const BG_TAB_HIT_SLOP = minHitSlop({ height: 34 - 2 });
 
 const BG_TABS: { key: BgTab; label: string }[] = [
   { key: 'color',    label: 'Color' },
@@ -286,7 +291,7 @@ export default function DesignBgReplaceScreen({
         <View style={s.ph}>
           <View style={s.tabRow}>
             {BG_TABS.map((tab) => (
-              <TouchableOpacity key={tab.key} onPress={() => setBgTab(tab.key)} style={[s.tab, bgTab === tab.key && s.tabActive]} activeOpacity={0.8}>
+              <TouchableOpacity key={tab.key} onPress={() => setBgTab(tab.key)} style={[s.tab, bgTab === tab.key && s.tabActive]} activeOpacity={0.8} hitSlop={BG_TAB_HIT_SLOP} accessibilityRole="tab" accessibilityState={{ selected: bgTab === tab.key }}>
                 <Text style={[s.tabText, bgTab === tab.key && s.tabTextActive]}>{tab.label}</Text>
               </TouchableOpacity>
             ))}
@@ -303,6 +308,9 @@ export default function DesignBgReplaceScreen({
                   onPress={() => { setSelectedSwatchHex(sw.hex); setCustomColor(sw.hex); }}
                   style={[s.swatch, { backgroundColor: sw.hex }, selectedSwatchHex === sw.hex && s.swatchSelected]}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={sw.label}
+                  accessibilityState={{ selected: selectedSwatchHex === sw.hex }}
                 >
                   {selectedSwatchHex === sw.hex && <Feather name="check" size={14} color={sw.hex === '#FFFFFF' || sw.hex === '#F5F0E8' || sw.hex === '#F4A7B9' ? '#000' : '#FFF'} />}
                 </TouchableOpacity>

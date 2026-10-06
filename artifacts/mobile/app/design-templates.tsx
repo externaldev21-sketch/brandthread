@@ -22,6 +22,7 @@ import {
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { minHitSlop } from '@/lib/hitSlop';
 
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
@@ -66,6 +67,12 @@ const TEMPLATES: DesignTemplate[] = [
   { id: 'pk2', name: 'Hang Tag', category: 'Packaging', subcategory: 'tag', dimensions: 'Custom', presetId: 'custom', gradColors: ['#1F2937', '#9CA3AF'] },
   { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: 'Custom', presetId: 'custom', gradColors: ['#7C2D12', '#F97316'] },
 ];
+
+// 32pt-tall "Use Template" buttons → invisible 44pt touch height. The slop
+// stays inside the card (8pt bottom margin, info block above), so the card's
+// overflow: 'hidden' doesn't clip it.
+// Minus the 1pt top+bottom border (web slop sits inside the border box).
+const USE_BTN_HIT_SLOP = minHitSlop({ height: 32 - 2 });
 
 const CATEGORIES: TemplateCategory[] = ['Garments', 'Social', 'Product', 'Packaging'];
 
@@ -131,6 +138,9 @@ export default function DesignTemplatesScreen() {
             key={cat}
             style={[ts.tab, activeCategory === cat && ts.tabActive]}
             onPress={() => { Haptics.selectionAsync(); setActiveCategory(cat); }}
+            hitSlop={CATEGORY_TAB_HIT_SLOP}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeCategory === cat }}
           >
             <Text style={[ts.tabText, activeCategory === cat && { color: PURPLE_LIGHT }]}>{cat}</Text>
           </TouchableOpacity>
@@ -190,6 +200,9 @@ export default function DesignTemplatesScreen() {
                 style={ts.useBtn}
                 onPress={() => handleUseTemplate(item)}
                 activeOpacity={0.8}
+                hitSlop={USE_BTN_HIT_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel={`Use template, ${item.name}`}
                 disabled={creatingId === item.id}
               >
                 {creatingId === item.id ? (
@@ -206,14 +219,21 @@ export default function DesignTemplatesScreen() {
   );
 }
 
+// Category pills draw 34pt tall; pad the touch area to 44pt.
+const CATEGORY_TAB_HIT_SLOP = minHitSlop({ height: 34 });
+
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
-  tabsScroll:    { flexGrow: 0 },
-  tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
+  // flexShrink 0: the grid below used to squeeze this row to ~18pt and clip
+  // the pill labels. The 5pt top padding (offset by the -5 margin, so the row
+  // sits exactly where it did) gives the tabs' hitSlop room inside the
+  // horizontal ScrollView, which clips.
+  tabsScroll:    { flexGrow: 0, flexShrink: 0, marginTop: -5 },
+  tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm, paddingTop: 5 },
   tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   tabText:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },

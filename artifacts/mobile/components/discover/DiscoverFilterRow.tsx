@@ -7,6 +7,11 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// 34pt-tall pills with 8pt gaps → vertical-only slop up to 44 (no visual change).
+// Sized from the 32pt padding box: on web the slop sits inside the 1pt border.
+const PILL_HIT_SLOP = minHitSlop({ height: 32 });
 
 export type DiscoverFilterKey = 'forYou' | 'fits' | 'brands' | 'people' | 'drops';
 
@@ -53,6 +58,7 @@ export function DiscoverFilterRow({
                 onChange(filter.key);
               }}
               activeOpacity={0.8}
+              hitSlop={PILL_HIT_SLOP}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={`${filter.label} filter`}

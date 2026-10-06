@@ -4,6 +4,10 @@ import { useColors } from '@/hooks/useColors';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// The action is an 18pt-tall text link; pad its touch area (not its box) to 44pt.
+const ACTION_HIT_SLOP = minHitSlop({ width: 40, height: 18 });
 
 /**
  * NOTE: for new screens, prefer the `SectionHeader` exported from
@@ -27,7 +31,7 @@ export function SectionHeader({ title, action, onAction, colors: colorsProp }: S
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       </View>
       {action && (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn}>
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn} hitSlop={ACTION_HIT_SLOP} accessibilityRole="button">
           <Text style={[styles.action, { color: colors.primary }]} numberOfLines={1}>{action}</Text>
         </TouchableOpacity>
       )}

@@ -113,6 +113,8 @@ export default function VacationModeScreen() {
           <HapticSwitch
             value={vacationMode}
             onValueChange={setVacationMode}
+            accessibilityLabel="Enable Vacation Mode"
+            accessibilityHint="Pause new orders without hiding your listings"
             trackColor={{ false: BORDER, true: ORANGE }}
             thumbColor="#fff"
           />

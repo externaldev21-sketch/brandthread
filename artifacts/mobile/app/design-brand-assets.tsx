@@ -28,6 +28,12 @@ import {
 } from '@/services/designService';
 import { BRAND_ASSET_TYPES } from '@/services/designTypes';
 import type { BrandAsset, BrandAssetType } from '@/services/designTypes';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// Category pills draw 34pt tall (8pt gaps → vertical-only slop); the Upload
+// Asset FAB draws 39pt tall. Pad touch areas to 44pt without changing layout.
+const TAB_HIT_SLOP = minHitSlop({ height: 32 }); // 34pt pill minus its 1pt border (web slop is measured from the padding box)
+const FAB_HIT_SLOP = minHitSlop({ height: 39 });
 
 function formatDate(iso: string): string {
   try {
@@ -239,6 +245,7 @@ export default function DesignBrandAssetsScreen() {
           <TouchableOpacity
             key={tab.key}
             style={[bas.tab, activeTab === tab.key && bas.tabActive]}
+            hitSlop={TAB_HIT_SLOP}
             onPress={() => { Haptics.selectionAsync(); setActiveTab(tab.key); }}
           >
             <Text style={[bas.tabText, activeTab === tab.key && { color: PURPLE_LIGHT }]}>{tab.label}</Text>
@@ -277,6 +284,7 @@ export default function DesignBrandAssetsScreen() {
         style={[bas.fab, { bottom: insets.bottom + SP.lg }]}
         onPress={handleAddAsset}
         activeOpacity={0.85}
+        hitSlop={FAB_HIT_SLOP}
       >
         <Feather name="upload" size={ICON.md} color={theme.onAccent} />
         <Text style={bas.fabText}>Upload Asset</Text>
@@ -319,8 +327,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:          { flex: 1, backgroundColor: 'transparent' },
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
-  tabsScroll:    { flexGrow: 0 },
-  tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
+  // 5pt top padding offset by a -5 margin: the row doesn't move, but the
+  // (clipping) ScrollView has room for the pills' 44pt touch areas.
+  tabsScroll:    { flexGrow: 0, marginTop: -5 },
+  tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm, paddingTop: 5 },
   tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
   tabText:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },

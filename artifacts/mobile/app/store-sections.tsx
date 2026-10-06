@@ -24,6 +24,10 @@ import {
 import { createSection, getStorefront } from '@/services/storeService';
 import { StoreSectionType, SECTION_TYPE_LABELS } from '@/services/storeTypes';
 
+// 'Add' pill draws 27pt tall with a 1pt border (web slop is measured from the
+// 25pt padding box); 10/9pt top/bottom reaches 44pt inside the card's 16pt padding.
+const ADD_BTN_HIT_SLOP = { top: 10, bottom: 9, left: 6, right: 6 };
+
 const SECTION_CATALOG = [
   {
     category: 'Hero', sections: [
@@ -133,7 +137,8 @@ export default function StoreSectionsScreen() {
                       style={[styles.addBtn, isAdding && styles.addBtnDisabled]}
                       onPress={() => handleAdd(item.type)}
                       disabled={isAdding}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      hitSlop={ADD_BTN_HIT_SLOP}
+                      accessibilityLabel={`Add ${sectionLabel} section`}
                     >
                       <Feather name="plus" size={ICON.xs} color={isAdding ? MUTED : PURPLE} />
                       <Text style={[styles.addBtnText, isAdding && { color: MUTED }]}>

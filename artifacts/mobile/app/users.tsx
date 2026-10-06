@@ -8,6 +8,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { minHitSlop } from '@/lib/hitSlop';
+
+// 40pt round header button with a 1pt border (web slop sits inside the
+// border) → pad to 44 without changing its size.
+const HEADER_BTN_HIT_SLOP = minHitSlop({ width: 38, height: 38 });
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -243,6 +248,9 @@ export default function UsersScreen() {
                 ]);
               }}
               activeOpacity={0.7}
+              hitSlop={HEADER_BTN_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <Feather name="more-horizontal" size={17} color={colors.foreground} />

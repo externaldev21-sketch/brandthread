@@ -15,6 +15,7 @@ import {
   type DropBroadcastState,
 } from '@/lib/dropBroadcastState';
 import { FS } from '@/lib/theme';
+import { minHitSlop } from '@/lib/hitSlop';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { useRouter } from 'expo-router';
@@ -451,7 +452,7 @@ export default function PaymentsScreen() {
                 No payout account on file
               </Text>
             </View>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/payouts' as never)}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/payouts' as never)} hitSlop={minHitSlop({ height: 15 })} accessibilityRole="button">
               <Text style={[styles.viewPayoutsLink, { color: primary }]}>Add account</Text>
             </TouchableOpacity>
           </View>

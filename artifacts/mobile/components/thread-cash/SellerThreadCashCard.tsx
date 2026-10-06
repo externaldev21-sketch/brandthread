@@ -53,7 +53,9 @@ export function SellerThreadCashCard({
         <Pressable
           onPress={() => { hapticLight(); router.push('/thread-cash-history' as never); }}
           style={[styles.historyBtn, { borderColor: theme.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // 28pt pill with a 1pt border: web slop is measured from the padding
+          // box (26pt), so 9pt top/bottom reaches 44pt.
+          hitSlop={{ top: 9, bottom: 9, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel="Thread Cash history"
           testID="seller-thread-cash-history-button"

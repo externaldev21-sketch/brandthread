@@ -20,6 +20,7 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { minHitSlop } from '@/lib/hitSlop';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -45,6 +46,13 @@ const CATEGORIES = [
   { key: 'business', label: 'Business Casual', emoji: '👔' },
 ];
 
+// Invisible a11y touch padding to 44pt height: 36pt size bubbles (slop stays
+// inside the card's padding, so its overflow: 'hidden' doesn't clip it) and
+// ~37pt category chips. Vertical only — both wrap in rows 8pt apart.
+// Heights minus the 1pt top+bottom border (web slop sits inside the border box).
+const SIZE_BUBBLE_HIT_SLOP = minHitSlop({ height: 36 - 2 });
+const CAT_CHIP_HIT_SLOP = minHitSlop({ height: 37 - 2 });
+
 function SizeSelector({
   label, options, selected, onSelect,
 }: {
@@ -65,6 +73,10 @@ function SizeSelector({
             key={opt}
             style={[s.sizeBubble, selected === opt && s.sizeBubbleActive]}
             onPress={() => { Haptics.selectionAsync(); onSelect(opt); }}
+            hitSlop={SIZE_BUBBLE_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={`${label}, ${opt}`}
+            accessibilityState={{ selected: selected === opt }}
           >
             <Text style={[s.sizeBubbleText, selected === opt && s.sizeBubbleTextActive]}>{opt}</Text>
           </TouchableOpacity>
@@ -170,6 +182,10 @@ export default function ShoppingPreferences() {
               style={[s.catChip, selectedCats.has(cat.key) && s.catChipActive]}
               onPress={() => toggleCat(cat.key)}
               activeOpacity={0.7}
+              hitSlop={CAT_CHIP_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={cat.label}
+              accessibilityState={{ selected: selectedCats.has(cat.key) }}
             >
               <Text style={s.catEmoji}>{cat.emoji}</Text>
               <Text style={[s.catLabel, selectedCats.has(cat.key) && s.catLabelActive]}>
@@ -198,6 +214,8 @@ export default function ShoppingPreferences() {
                 <HapticSwitch
                   value={Boolean(settings[item.key])}
                   onValueChange={v => patch({ [item.key]: v })}
+                  accessibilityLabel={item.label}
+                  accessibilityHint={item.sub}
                 />
               </View>
               {i < arr.length - 1 && <View style={s.divider} />}
@@ -216,6 +234,8 @@ export default function ShoppingPreferences() {
             <HapticSwitch
               value={Boolean(settings.showShoppingActivity)}
               onValueChange={v => patch({ showShoppingActivity: v })}
+              accessibilityLabel="Shopping activity"
+              accessibilityHint="Let brands see what you've viewed and saved"
             />
           </View>
           <View style={s.divider} />
@@ -228,6 +248,8 @@ export default function ShoppingPreferences() {
             <HapticSwitch
               value={Boolean(settings.personalizedRecommendations)}
               onValueChange={v => patch({ personalizedRecommendations: v })}
+              accessibilityLabel="Personalized recommendations"
+              accessibilityHint="Use your activity to surface relevant products"
             />
           </View>
         </View>
