@@ -83,6 +83,8 @@ describe('ChipRail geometry', () => {
 
   it('snaps each chip leading edge to the 16px gutter; first chip at 0', () => {
     expect(chipSnapOffsets([{ x: 16 }, { x: 70 }, { x: 160 }])).toEqual([0, 54, 144]);
+    // Inset viewport (ChipRail): content starts at 0.
+    expect(chipSnapOffsets([{ x: 0 }, { x: 54 }, { x: 144 }], 0)).toEqual([0, 54, 144]);
   });
 
   it('centres a tapped chip, clamped to the scrollable range', () => {

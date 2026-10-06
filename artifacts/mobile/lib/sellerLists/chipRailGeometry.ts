@@ -3,9 +3,13 @@
 /** Page gutter the first chip sits on and the last chip keeps after it. */
 export const CHIP_RAIL_GUTTER = 16;
 
-/** Leading-edge snap offsets: each chip's x minus the gutter, first is 0. */
-export function chipSnapOffsets(layouts: readonly { x: number }[]): number[] {
-  return layouts.map((l) => Math.max(0, Math.round(l.x - CHIP_RAIL_GUTTER)));
+/**
+ * Leading-edge snap offsets: each chip's x minus the content's leading
+ * inset, first is 0. ChipRail insets the whole scroll viewport by the gutter
+ * (so chips clip at the gutter line, never at the screen edge) and passes 0.
+ */
+export function chipSnapOffsets(layouts: readonly { x: number }[], inset: number = CHIP_RAIL_GUTTER): number[] {
+  return layouts.map((l) => Math.max(0, Math.round(l.x - inset)));
 }
 
 /** Scroll offset that centres a chip, clamped to the scrollable range. */

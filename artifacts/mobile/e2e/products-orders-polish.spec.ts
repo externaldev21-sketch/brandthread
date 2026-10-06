@@ -144,7 +144,8 @@ for (const tab of [
     test('16px gutter at both ends, equal chip heights, no zero badges', async ({ browser }) => {
       const page = await openSeller(browser, tab.path);
       const start = await railMetrics(page);
-      expect(Math.round(start.chips[0].left - start.left)).toBe(16);
+      // Measured from the screen edges: the rail viewport is inset by the gutter.
+      expect(Math.round(start.chips[0].left)).toBe(16);
       const heights = new Set(start.chips.map((c) => Math.round(c.height)));
       expect(heights.size, `chip heights ${[...heights]}`).toBe(1);
       for (const c of start.chips) expect(c.label, 'count badge shown for 0').not.toMatch(/, 0$/);
@@ -153,7 +154,7 @@ for (const tab of [
       await page.waitForTimeout(200);
       const end = await railMetrics(page);
       const last = end.chips[end.chips.length - 1];
-      expect(Math.round(end.right - last.right)).toBe(16);
+      expect(Math.round(VIEWPORT.width - last.right)).toBe(16);
     });
 
     test('tapping a chip selects it and scrolls it fully into view', async ({ browser }) => {

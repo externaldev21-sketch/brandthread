@@ -4,7 +4,9 @@
  * - Finger drag scrolls the row with native momentum; no scroll indicator.
  * - Snaps so a chip's leading edge lands on the 16px page gutter
  *   (native: `snapToOffsets` + fast deceleration; web: CSS scroll-snap).
- * - First chip sits on the 16px gutter, the last one has 16px trailing room.
+ * - The scroll viewport itself is inset by the 16px page gutter, so chips
+ *   clip at the gutter line (aligned with the search bar) and nothing — not
+ *   even the white selected chip — ever touches the screen edge.
  * - Tapping a chip selects it and scrolls it into view (centred, clamped).
  * - Web preview: touch scrolls natively; a mouse drag scrolls too (with a
  *   short momentum glide) and never counts as a tap on the chip under it.
@@ -41,7 +43,7 @@ export function ChipRail({ chips, style, testID = 'chip-rail' }: { chips: ChipRa
 
   const recomputeSnaps = useCallback(() => {
     const ordered = chips.map((c) => layoutsRef.current[c.key]).filter(Boolean) as { x: number; width: number }[];
-    if (ordered.length === chips.length) setSnapOffsets(chipSnapOffsets(ordered));
+    if (ordered.length === chips.length) setSnapOffsets(chipSnapOffsets(ordered, 0));
   }, [chips]);
 
   const scrollChipIntoView = useCallback((key: string) => {
@@ -151,7 +153,7 @@ export function ChipRail({ chips, style, testID = 'chip-rail' }: { chips: ChipRa
       onScroll={(e) => { scrollXRef.current = e.nativeEvent.contentOffset.x; }}
       onLayout={(e: LayoutChangeEvent) => { viewportWidthRef.current = e.nativeEvent.layout.width; }}
       onContentSizeChange={(w) => { contentWidthRef.current = w; }}
-      style={[Platform.OS === 'web' ? (webRailStyle as ViewStyle) : null, style]}
+      style={[styles.viewport, Platform.OS === 'web' ? (webRailStyle as ViewStyle) : null, style]}
       contentContainerStyle={styles.row}
       testID={testID}
     >
@@ -186,12 +188,14 @@ export function ChipRail({ chips, style, testID = 'chip-rail' }: { chips: ChipRa
 }
 
 // CSS-only properties (react-native-web passes them through to the DOM).
-const webRailStyle = { scrollSnapType: 'x proximity', scrollPaddingLeft: GUTTER, scrollPaddingRight: GUTTER, overscrollBehaviorX: 'contain' };
+const webRailStyle = { scrollSnapType: 'x proximity', overscrollBehaviorX: 'contain' };
 const webChipStyle = { scrollSnapAlign: 'start' };
 
 const styles = StyleSheet.create({
+  viewport: {
+    marginHorizontal: GUTTER,
+  },
   row: {
-    paddingHorizontal: GUTTER,
     paddingBottom: SP.sm,
     paddingTop: 2,
     gap: SP.sm,
