@@ -1799,6 +1799,7 @@ export default function DesignGalleryScreen() {
         title="Brandthread Studio"
         onBack={() => goBackOr(router, '/(tabs)/' as never)}
         backTestID="design-gallery-back"
+        backAccessibilityLabel="Back"
       />
       <View style={s.header}>
         <View style={s.actionRow}>

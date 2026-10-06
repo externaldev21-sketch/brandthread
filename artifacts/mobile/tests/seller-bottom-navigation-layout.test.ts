@@ -81,7 +81,7 @@ describe('Design Studio back arrow', () => {
   });
 
   it('has accessible back button label', () => {
-    expect(designScreen).toContain('accessibilityLabel="Back"');
+    expect(designScreen).toMatch(/(accessibilityLabel|backAccessibilityLabel)="Back"/);
   });
 });
 
