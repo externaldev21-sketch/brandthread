@@ -5,6 +5,7 @@
  */
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from './devPreview';
 import { resolvePreviewApiResponse, type PreviewApiHit } from './previewApiData';
+import { getPreviewSellerProducts } from './previewSellerProducts';
 
 /** True in the dev web preview (`?bt_preview=…`). */
 export function isWebPreviewSession(): boolean {
@@ -15,5 +16,24 @@ export function isWebPreviewSession(): boolean {
 export function resolveSignedOutPreviewGet(resolvedPath: string): PreviewApiHit | null {
   const role = isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null;
   if (!role) return null;
-  return resolvePreviewApiResponse(resolvedPath, { role, demo: isPreviewDemoMode() });
+  return resolvePreviewApiResponse(resolvedPath, { role, demo: isPreviewDemoMode(), demoProducts });
+}
+
+/** The demo catalog (the Products tab's seed) as GET /api/products rows. */
+function demoProducts(): unknown[] {
+  return getPreviewSellerProducts().map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    status: p.status,
+    images: p.media.map((m) => m.uri).filter(Boolean),
+    tags: p.tags,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    variantCount: p.variants.length,
+    totalStock: p.variants.length > 0
+      ? p.variants.reduce((sum, v) => sum + (v.inventoryQuantity ?? 0), 0)
+      : p.inventory.totalStock,
+    lowStockCount: p.variants.filter((v) => (v.inventoryQuantity ?? 0) <= p.inventory.lowStockThreshold).length,
+  }));
 }

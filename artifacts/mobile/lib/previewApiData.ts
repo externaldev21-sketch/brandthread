@@ -29,6 +29,13 @@ export interface PreviewApiContext {
   demo: boolean;
   /** Injected so tests are deterministic. */
   now?: Date;
+  /**
+   * Demo only: the seeded seller catalog the Products tab shows
+   * (lib/previewSellerProducts.ts), already in GET /api/products row shape.
+   * Injected by lib/previewApiSession.ts so this module stays free of
+   * bundled-asset imports.
+   */
+  demoProducts?: () => unknown[];
 }
 
 type Resolver = (ctx: Required<PreviewApiContext>, account: PreviewAccount) => unknown;
@@ -227,7 +234,7 @@ const RESOLVERS: Record<string, Resolver> = {
   'store': store,
   'store/versions': () => [],
   'store/domains': () => [],
-  'products': () => [],
+  'products': (ctx, a) => (ctx.demo && a.role === 'seller' ? ctx.demoProducts() : []),
   'bundles': () => [],
   'drops': () => [],
   'discount-codes': () => [],
@@ -316,7 +323,7 @@ export type PreviewApiHit = { data: unknown };
 export function resolvePreviewApiResponse(path: string, ctx: PreviewApiContext): PreviewApiHit | null {
   const resolver = RESOLVERS[normalizeApiPath(path)];
   if (!resolver) return null;
-  const full: Required<PreviewApiContext> = { ...ctx, now: ctx.now ?? new Date() };
+  const full: Required<PreviewApiContext> = { ...ctx, now: ctx.now ?? new Date(), demoProducts: ctx.demoProducts ?? (() => []) };
   return { data: resolver(full, getPreviewAccount(ctx.role, ctx.demo)) };
 }
 

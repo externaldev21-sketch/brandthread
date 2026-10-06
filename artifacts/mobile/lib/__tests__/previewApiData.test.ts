@@ -64,6 +64,12 @@ describe('previewApiData', () => {
     expect(resolvePreviewApiResponse('/api/orders', demo('buyer'))!.data).toEqual([]);
   });
 
+  it('demo products are the Products tab seed; fresh has none (QA-0044)', () => {
+    const seed = [{ id: 'preview-product-1', name: 'Coat' }];
+    expect(resolvePreviewApiResponse('/api/products', { ...demo(), demoProducts: () => seed })!.data).toBe(seed);
+    expect(resolvePreviewApiResponse('/api/products', { ...fresh(), demoProducts: () => seed })!.data).toEqual([]);
+  });
+
   it('demo seller is coherent: paid orders imply connected payouts and a published store', () => {
     expect(resolvePreviewApiResponse('/api/seller/connect/status', demo())!.data).toMatchObject({ connected: true, payoutsEnabled: true });
     expect(resolvePreviewApiResponse('/api/seller/connect/status', fresh())!.data).toMatchObject({ connected: false, status: 'not_started' });
