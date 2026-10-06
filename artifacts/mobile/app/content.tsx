@@ -227,7 +227,7 @@ export default function ContentScreen() {
             { label: 'Published', value: stats.published, color: colors.foreground },
             { label: 'Scheduled', value: stats.scheduled, color: colors.foreground },
             { label: 'Drafts',    value: stats.drafts,    color: colors.foreground },
-            { label: 'Archived',  value: stats.archived,  color: colors.mutedForeground },
+            { label: 'Archived',  value: stats.archived,  color: colors.foreground },
           ].map(item => (
             <View
               key={item.label}
@@ -406,7 +406,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   // Create new
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   typeCard: {
-    width: '31%', minWidth: 96, borderRadius: RADIUS.md, borderWidth: 1,
+    flex: 1, minWidth: 96, borderRadius: RADIUS.md, borderWidth: 1,
     alignItems: 'center', paddingVertical: SP.md, gap: SP.sm,
   },
   typeIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },

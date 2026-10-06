@@ -54,7 +54,7 @@ const AXIS_LABEL_COUNT: Record<SellerDashboardRange, number> = {
 // Evenly spaced horizontal gridlines drawn behind the empty state — a
 // genuinely-zero chart (a fresh store) reads as an intentional, correctly
 // laid-out chart with no data yet, not as a rendering glitch.
-const EMPTY_GRIDLINE_COUNT = 3;
+const EMPTY_GRIDLINE_COUNT = 2;
 
 export function SellerDashboardChart({
   values,

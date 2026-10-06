@@ -261,6 +261,9 @@ export default function AddProductScreen() {
   // time (up to 10) via the quiet "+" tile at the end — see renderPhotos().
   // Never allowed to drop below however many photos are already filled in.
   const [photoSlotCount, setPhotoSlotCount] = useState(3);
+  // Measured width of the photos row, so the 3 default tiles + the "+" tile
+  // are 4 equal squares that span the full content width at any screen size.
+  const [photoRowWidth, setPhotoRowWidth] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -1039,8 +1042,10 @@ export default function AddProductScreen() {
     const media = draftData.media ?? [];
     const visibleSlotCount = Math.min(10, Math.max(photoSlotCount, media.length));
     const canAddSlot = visibleSlotCount < 10;
+    const tileSize = photoRowWidth > 0 ? Math.floor((photoRowWidth - 3 * SP.sm) / 4) : 84;
+    const tileDims = { width: tileSize, height: tileSize };
     return (
-      <View style={{ gap: SP.sm }}>
+      <View style={{ gap: SP.sm }} onLayout={e => setPhotoRowWidth(e.nativeEvent.layout.width)}>
         <View style={s.photoRowHeader}>
           <Text style={s.photoRowTitle}>Photos</Text>
           <Text style={s.photoRowCount}>{media.length}/10</Text>
@@ -1052,7 +1057,7 @@ export default function AddProductScreen() {
               return (
                 <TouchableOpacity
                   key={`empty-${idx}`}
-                  style={s.photoAddSlot}
+                  style={[s.photoAddSlot, tileDims]}
                   onPress={pickPhotos}
                   accessibilityLabel="Add photo"
                   accessibilityRole="button"
@@ -1069,7 +1074,7 @@ export default function AddProductScreen() {
             return (
               <TouchableOpacity
                 key={m.id}
-                style={s.photoSlot}
+                style={[s.photoSlot, tileDims]}
                 onPress={() => openCropperFor(m)}
                 onLongPress={() => openPhotoActionsFor(m)}
                 accessibilityLabel={`Photo ${idx + 1}${m.isCover ? ', cover' : ''}. Tap to crop, hold for more options.`}
@@ -1140,7 +1145,7 @@ export default function AddProductScreen() {
 
           {canAddSlot && (
             <TouchableOpacity
-              style={s.photoMoreSlot}
+              style={[s.photoMoreSlot, tileDims]}
               onPress={() => { hapticToggle(); setPhotoSlotCount(c => Math.min(10, c + 1)); }}
               accessibilityLabel="Add another photo slot"
               accessibilityRole="button"
@@ -2338,7 +2343,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // "Add photo" slots (no label, thin dim "+", faint border) so it reads
   // as a minor affordance rather than competing with the real action rows.
   photoMoreSlot: {
-    width: 40, height: 84, borderRadius: RADIUS.md,
+    width: 84, height: 84, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },

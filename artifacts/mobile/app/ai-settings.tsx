@@ -141,7 +141,7 @@ function ActionRow({
 }) {
   const s = React.useMemo(() => makeRowStyles(colors), [colors]);
   return (
-    <Pressable style={s.row} onPress={onPress}>
+    <Pressable style={s.row} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
       <Text style={s.actionLabel}>{label}</Text>
     </Pressable>
   );
@@ -178,7 +178,7 @@ function makeRowStyles(colors: Colors) {
       fontFamily: FONT.regular,
       fontSize: FS.base,
       lineHeight: 19,
-      color: colors.mutedForeground,
+      color: colors.foreground,
     },
     infoValue: {
       fontFamily: FONT.regular,
@@ -250,7 +250,7 @@ export default function AiSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="AI Settings" onBack={() => goBackOr(router, '/ai-brain')} />
+      <ScreenHeader title="AI settings" onBack={() => goBackOr(router, '/ai-brain')} />
 
       <ScrollView
         style={styles.scroll}
@@ -283,7 +283,7 @@ export default function AiSettingsScreen() {
           />
           <RowDivider colors={colors} />
           <ToggleRow
-            label="Brand Memory"
+            label="Brand memory"
             subtitle="Your brand voice, audience, and style"
             value={settings.brandMemoryEnabled}
             onValueChange={v => update(s => ({ ...s, brandMemoryEnabled: v }))}
@@ -291,7 +291,7 @@ export default function AiSettingsScreen() {
           />
           <RowDivider colors={colors} />
           <NavRow
-            label="Manage Brand Memory"
+            label="Manage brand memory"
             onPress={() => router.push('/ai-brand-memory')}
             colors={colors}
           />
@@ -299,7 +299,7 @@ export default function AiSettingsScreen() {
 
         {/* Section: Data Sources */}
         <SettingSection
-          title="Data Sources"
+          title="Data sources"
           subtitle="AI may reference data from these areas"
           colors={colors}
         >

@@ -6,11 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 interface NativeOnlyFeatureProps {
   title: string;
   description: string;
   icon?: keyof typeof Feather.glyphMap;
+  /** Renders the shared back-arrow header with this title above the message. */
+  headerTitle?: string;
 }
 
 /**
@@ -21,19 +24,20 @@ export default function NativeOnlyFeature({
   title,
   description,
   icon = 'smartphone',
+  headerTitle,
 }: NativeOnlyFeatureProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
 
-  return (
+  const body = (
     <View
       style={[
         styles.root,
         {
           backgroundColor: colors.background,
-          paddingTop: headerTopInset + 24,
+          paddingTop: headerTitle ? 24 : headerTopInset + 24,
           paddingBottom: insets.bottom + 24,
         },
       ]}
@@ -58,6 +62,13 @@ export default function NativeOnlyFeature({
           Open Brandthread on iOS or Android to use this feature.
         </Text>
       )}
+    </View>
+  );
+  if (!headerTitle) return body;
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader title={headerTitle} />
+      {body}
     </View>
   );
 }

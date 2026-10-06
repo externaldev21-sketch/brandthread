@@ -34,7 +34,7 @@ export function getCategoryColors(category: string, theme: AppThemePreset): read
 }
 
 export function statusVariant(status: string): 'success' | 'warning' | 'purple' | 'neutral' {
-  if (status === 'active') return 'success';
+  if (status === 'active') return 'neutral';
   if (status === 'draft') return 'warning';
   if (status === 'scheduled') return 'purple';
   return 'neutral';
@@ -72,7 +72,7 @@ export const ProductCard = React.memo(function ProductCard({
 
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
-  const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
+  const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.muted;
   const stockLabel = stock === 0 ? 'Out of stock' : stock <= threshold ? `${stock} in stock` : `${stock} in stock`;
 
   const price = product.pricing.priceCents;
@@ -134,7 +134,7 @@ export const ProductCard = React.memo(function ProductCard({
             )}
 
             {/* Status chip */}
-            <View style={s.chipTopLeft}>
+            <View style={[s.chipTopLeft, { backgroundColor: theme.background, borderRadius: RADIUS.pill }]}>
               <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
             </View>
 

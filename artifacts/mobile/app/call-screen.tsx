@@ -73,9 +73,10 @@ export default function CallScreen() {
   if (Platform.OS === 'web') {
     return (
       <NativeOnlyFeature
+        headerTitle="Call"
         icon="phone-off"
         title="Calls are available in the mobile app"
-        description="Voice and video calls use native device audio and video. Continue your conversation by message on web, or open Brandthread on iOS or Android to call."
+        description="Voice and video calls use native device audio and video. Continue your conversation by message on web."
       />
     );
   }
