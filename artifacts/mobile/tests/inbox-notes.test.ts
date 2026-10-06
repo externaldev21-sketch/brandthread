@@ -103,13 +103,13 @@ describe('notes bubble wiring', () => {
 
   it('the 60-char cap is shared, not re-guessed, across type, preview data and UI', () => {
     expect(NOTE_MAX_CHARS).toBe(60);
-    const inbox = read('app/(buyer)/inbox.tsx');
+    const inbox = read('components/inbox/MessagesInbox.tsx');
     expect(inbox).toContain('NOTE_MAX_CHARS');
     expect(inbox).toContain('maxLength={NOTE_MAX_CHARS}');
   });
 
   it('renders the note bubble as an addition above the tray, not a replacement of its chrome', () => {
-    const inbox = read('app/(buyer)/inbox.tsx');
+    const inbox = read('components/inbox/MessagesInbox.tsx');
     // Existing tray chrome (avatar sizing, story ring, LIVE badge) is untouched.
     expect(inbox).toContain('activeRailAvatar1');
     expect(inbox).toContain('storyRingUnseen');
@@ -121,7 +121,7 @@ describe('notes bubble wiring', () => {
   });
 
   it('never passes a function-style `style` prop to PressableScale (the app-wide bug this repo already reverted once)', () => {
-    const inbox = read('app/(buyer)/inbox.tsx');
+    const inbox = read('components/inbox/MessagesInbox.tsx');
     // A function-style style would look like `style={({ pressed }) => ...}`
     // or `style={state =>`. Every PressableScale usage in this file (old and
     // new) must pass a plain array/object instead.
@@ -130,7 +130,7 @@ describe('notes bubble wiring', () => {
   });
 
   it('the note bubble sits in a plain wrapper for "Your note" — never nested inside another Pressable', () => {
-    const inbox = read('app/(buyer)/inbox.tsx');
+    const inbox = read('components/inbox/MessagesInbox.tsx');
     // "Your note" and "Your story" must be sibling Pressables under a plain
     // View (activeRailItemWrap), since they trigger different flows
     // (compose vs. story) and nesting Pressables is disallowed app-wide.
@@ -143,7 +143,7 @@ describe('notes bubble wiring', () => {
   });
 
   it('posting a note shows a real error, not a dead end, on failure', () => {
-    const inbox = read('app/(buyer)/inbox.tsx');
+    const inbox = read('components/inbox/MessagesInbox.tsx');
     expect(inbox).toContain("Alert.alert('Couldn’t post your note'");
   });
 });

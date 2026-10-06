@@ -89,7 +89,7 @@ describe('app background theme', () => {
     const sellerLayout = readFileSync(appPath('(tabs)/_layout.tsx'), 'utf8');
     const buyerLayout = readFileSync(appPath('(buyer)/_layout.tsx'), 'utf8');
     const sellerHome = readFileSync(appPath('(tabs)/index.tsx'), 'utf8');
-    const buyerInbox = readFileSync(appPath('(buyer)/inbox.tsx'), 'utf8');
+    const buyerInbox = readFileSync(resolve(process.cwd(), 'components/inbox/MessagesInbox.tsx'), 'utf8');
 
     expect(sellerLayout).toContain('sceneStyle: { backgroundColor: theme.background }');
     expect(buyerLayout).toContain('sceneStyle: { backgroundColor: colors.background }');

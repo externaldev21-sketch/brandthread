@@ -13,6 +13,10 @@ import { BUYER_USER, DEMO_NOW, DEMO_TIME_ZONE, IMAGE_HOST, SELLER_USER, localSto
 export const MOBILE_ROOT = path.resolve(import.meta.dirname, '../..');
 export const WORK_DIR = path.join(MOBILE_ROOT, '.store-screenshots');
 export const DEFAULT_BUILD_DIR = path.join(WORK_DIR, 'web-build');
+/** The same preview build exported in dev mode (`{ dev: true }`) — needed
+ *  wherever the dev-only preview seeds (lib/previewInbox.ts, __DEV__) must
+ *  render, e.g. e2e/seller-messages-parity.spec.ts. */
+export const DEV_BUILD_DIR = path.join(WORK_DIR, 'web-build-dev');
 
 // A syntactically valid Clerk key for a domain that does not exist. The real
 // Clerk script is never loaded; clerk-stub.mjs stands in for it.
@@ -25,7 +29,7 @@ const DEMO_API = 'https://api.brandthread.test';
  * tests use) and every service pointed at demo hosts. `--clear` matters:
  * Metro otherwise reuses transforms that inlined other EXPO_PUBLIC_* values.
  */
-export function buildPreviewWeb(outputDir = DEFAULT_BUILD_DIR, cwd = MOBILE_ROOT) {
+export function buildPreviewWeb(outputDir = DEFAULT_BUILD_DIR, cwd = MOBILE_ROOT, { dev = false } = {}) {
   rmSync(outputDir, { recursive: true, force: true });
   const env = {
     ...process.env,
@@ -38,7 +42,7 @@ export function buildPreviewWeb(outputDir = DEFAULT_BUILD_DIR, cwd = MOBILE_ROOT
     EXPO_PUBLIC_META_PIXEL_ID: '',
     EXPO_PUBLIC_TIKTOK_PIXEL_ID: '',
   };
-  const args = ['exec', 'expo', 'export', '--clear', '--platform', 'web', '--output-dir', outputDir];
+  const args = ['exec', 'expo', 'export', '--clear', ...(dev ? ['--dev'] : []), '--platform', 'web', '--output-dir', outputDir];
   const result = process.platform === 'win32'
     ? spawnSync(`pnpm ${args.join(' ')}`, { cwd, env, stdio: 'inherit', shell: true })
     : spawnSync('pnpm', args, { cwd, env, stdio: 'inherit' });

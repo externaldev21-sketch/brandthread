@@ -30,6 +30,7 @@ const SOCIAL_MESSAGING_FILES = [
   'app/seller-profile.tsx',
   'app/connections.tsx',
   'app/(buyer)/inbox.tsx',
+  'components/inbox/MessagesInbox.tsx',
   'app/seller-inbox.tsx',
   'app/buyer-conversation.tsx',
   'app/seller-conversation.tsx',
