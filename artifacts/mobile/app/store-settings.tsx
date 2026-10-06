@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput,
@@ -16,6 +16,12 @@ import { ListRow } from '@/components/ui/ListRow';
 import { hapticToggle } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
+import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import {
+  DEFAULT_SELLER_CHECKOUT_SETTINGS, checkoutAccountSwitchesFor, checkoutModeForSwitch, sellerCheckoutSettingsFrom,
+  type CheckoutMode,
+} from '@/lib/checkoutSettings';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -80,18 +86,57 @@ export default function StoreSettingsScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const api = useApi();
+  const previewOnly = isSellerDevPreview();
+  // "Require Account" / "Guest Checkout" are views of the store's real
+  // checkout mode (the same seller setting the Checkout screen edits and the
+  // API enforces) — not the local storefront copy. null = couldn't load it.
+  const [checkoutMode, setCheckoutMode] = useState<CheckoutMode | null>(null);
+  const checkoutModeRef = useRef<CheckoutMode | null>(null);
+  checkoutModeRef.current = checkoutMode;
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    getStorefront().then(s => {
+    // The signed-out seller web preview never calls the API (like the Checkout screen).
+    const modeLoad: Promise<CheckoutMode | null> = previewOnly
+      ? Promise.resolve(checkoutModeRef.current ?? DEFAULT_SELLER_CHECKOUT_SETTINGS.checkoutMode)
+      : api.seller.getSettings()
+        .then(data => sellerCheckoutSettingsFrom(data?.settings).checkoutMode)
+        .catch(() => checkoutModeRef.current);
+    Promise.all([getStorefront(), modeLoad]).then(([s, mode]) => {
       if (!active) return;
-      setForm(s.settings);
+      setCheckoutMode(mode);
+      setForm(mode ? { ...s.settings, ...accountFlags(mode) } : s.settings);
       setLoading(false);
     }).catch(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []));
+  }, [api, previewOnly]));
 
   const patch = (partial: Partial<StoreSettings>) => setForm(f => ({ ...f, ...partial }));
+
+  /** Saves a flipped account switch as the store's checkout mode, right away (like the Checkout screen). */
+  const saveAccountSwitch = async (change: { requireAccount: boolean } | { guestCheckout: boolean }) => {
+    const prior = checkoutModeRef.current;
+    if (!prior) return;
+    const next = checkoutModeForSwitch(prior, change);
+    if (next === prior) return;
+    setCheckoutMode(next);
+    patch(accountFlags(next));
+    if (previewOnly) return;
+    try {
+      const result = await api.seller.updateSettings({ checkoutMode: next });
+      if (result?.settings) {
+        const saved = sellerCheckoutSettingsFrom(result.settings).checkoutMode;
+        setCheckoutMode(saved);
+        patch(accountFlags(saved));
+      }
+    } catch {
+      setCheckoutMode(prior);
+      patch(accountFlags(prior));
+      Alert.alert('Could not save', 'Your checkout settings were not changed. Try again.');
+    }
+  };
+  const accountSwitches = checkoutMode ? checkoutAccountSwitchesFor(checkoutMode) : null;
 
   const handleSave = async () => {
     setSaving(true);
@@ -282,15 +327,17 @@ export default function StoreSettingsScreen() {
           <SwitchRow
             label="Require Account"
             description="Buyers must create an account to check out"
-            value={form.checkoutRequireAccount}
-            onValueChange={v => patch({ checkoutRequireAccount: v })}
+            value={accountSwitches?.requireAccount ?? form.checkoutRequireAccount}
+            onValueChange={v => { void saveAccountSwitch({ requireAccount: v }); }}
+            disabled={!accountSwitches}
           />
           <View style={ss.divider} />
           <SwitchRow
             label="Guest Checkout"
             description="Allow guest checkout"
-            value={form.checkoutGuestAllowed}
-            onValueChange={v => patch({ checkoutGuestAllowed: v })}
+            value={accountSwitches?.guestCheckout ?? form.checkoutGuestAllowed}
+            onValueChange={v => { void saveAccountSwitch({ guestCheckout: v }); }}
+            disabled={!accountSwitches}
           />
           <View style={ss.divider} />
           <SwitchRow
@@ -324,14 +371,21 @@ function FieldRow({ ss, label, children }: { ss: ReturnType<typeof makeStyles>; 
   );
 }
 
-function SwitchRow({ label, description, value, onValueChange }: {
-  label: string; description: string; value: boolean; onValueChange: (v: boolean) => void;
+/** The local storefront copy of the checkout-mode switches, kept in step with the real mode. */
+function accountFlags(mode: CheckoutMode): Pick<StoreSettings, 'checkoutRequireAccount' | 'checkoutGuestAllowed'> {
+  const { requireAccount, guestCheckout } = checkoutAccountSwitchesFor(mode);
+  return { checkoutRequireAccount: requireAccount, checkoutGuestAllowed: guestCheckout };
+}
+
+function SwitchRow({ label, description, value, onValueChange, disabled }: {
+  label: string; description: string; value: boolean; onValueChange: (v: boolean) => void; disabled?: boolean;
 }) {
   return (
     <ListRow
       title={label}
       subtitle={description}
       toggle={{ value, onChange: onValueChange }}
+      disabled={disabled}
       style={{ minHeight: 48 }}
     />
   );

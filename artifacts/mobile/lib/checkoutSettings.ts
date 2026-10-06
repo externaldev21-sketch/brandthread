@@ -40,6 +40,38 @@ export function nextCheckoutMode(mode: CheckoutMode): CheckoutMode {
   return CHECKOUT_MODE_OPTIONS[(index + 1) % CHECKOUT_MODE_OPTIONS.length].id;
 }
 
+/**
+ * Store Settings → "CHECKOUT & ACCOUNTS" shows the checkout mode as two
+ * switches. Both are views of the one saved checkoutMode:
+ *   - Require Account is on exactly when the mode is accounts_required;
+ *   - Guest Checkout is on exactly when it isn't (guest_only or
+ *     accounts_optional both let buyers check out as a guest).
+ */
+export interface CheckoutAccountSwitches {
+  requireAccount: boolean;
+  guestCheckout: boolean;
+}
+
+export function checkoutAccountSwitchesFor(mode: CheckoutMode): CheckoutAccountSwitches {
+  const required = mode === 'accounts_required';
+  return { requireAccount: required, guestCheckout: !required };
+}
+
+/**
+ * The mode a flipped switch saves. Turning Require Account on (or Guest
+ * Checkout off) means accounts_required; turning Require Account off (or
+ * Guest Checkout on) from accounts_required means accounts_optional. A flip
+ * that already matches the current mode keeps it, so guest_only survives.
+ */
+export function checkoutModeForSwitch(
+  current: CheckoutMode,
+  change: { requireAccount: boolean } | { guestCheckout: boolean },
+): CheckoutMode {
+  const requireAccount = 'requireAccount' in change ? change.requireAccount : !change.guestCheckout;
+  if (requireAccount) return 'accounts_required';
+  return current === 'accounts_required' ? 'accounts_optional' : current;
+}
+
 /** GET /api/seller/settings → the screen's values (defaults for anything unset or invalid). */
 export function sellerCheckoutSettingsFrom(raw: unknown): SellerCheckoutSettings {
   const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};

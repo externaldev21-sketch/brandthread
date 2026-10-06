@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_SELLER_CHECKOUT_SETTINGS, checkoutModeOption, nextCheckoutMode, sellerCheckoutSettingsFrom, storeLanguageName,
+  DEFAULT_SELLER_CHECKOUT_SETTINGS, checkoutAccountSwitchesFor, checkoutModeForSwitch, checkoutModeOption, nextCheckoutMode, sellerCheckoutSettingsFrom, storeLanguageName,
 } from './checkoutSettings';
 
 describe('seller checkout settings', () => {
@@ -25,5 +25,34 @@ describe('seller checkout settings', () => {
     expect(storeLanguageName('en')).toBe('English');
     expect(storeLanguageName('ja')).toBe('Japanese');
     expect(storeLanguageName('xx')).toBe('XX');
+  });
+
+  it('shows the checkout mode as the Store Settings account switches', () => {
+    expect(checkoutAccountSwitchesFor('accounts_required')).toEqual({ requireAccount: true, guestCheckout: false });
+    expect(checkoutAccountSwitchesFor('accounts_optional')).toEqual({ requireAccount: false, guestCheckout: true });
+    expect(checkoutAccountSwitchesFor('guest_only')).toEqual({ requireAccount: false, guestCheckout: true });
+  });
+
+  it('maps a flipped account switch to the mode it saves', () => {
+    for (const mode of ['guest_only', 'accounts_optional', 'accounts_required'] as const) {
+      expect(checkoutModeForSwitch(mode, { requireAccount: true })).toBe('accounts_required');
+      expect(checkoutModeForSwitch(mode, { guestCheckout: false })).toBe('accounts_required');
+    }
+    expect(checkoutModeForSwitch('accounts_required', { requireAccount: false })).toBe('accounts_optional');
+    expect(checkoutModeForSwitch('accounts_required', { guestCheckout: true })).toBe('accounts_optional');
+    expect(checkoutModeForSwitch('guest_only', { requireAccount: false })).toBe('guest_only');
+    expect(checkoutModeForSwitch('guest_only', { guestCheckout: true })).toBe('guest_only');
+    expect(checkoutModeForSwitch('accounts_optional', { guestCheckout: true })).toBe('accounts_optional');
+  });
+
+  it('keeps the two switches consistent with each other after any flip', () => {
+    for (const mode of ['guest_only', 'accounts_optional', 'accounts_required'] as const) {
+      for (const change of [{ requireAccount: true }, { requireAccount: false }, { guestCheckout: true }, { guestCheckout: false }]) {
+        const next = checkoutAccountSwitchesFor(checkoutModeForSwitch(mode, change));
+        expect(next.requireAccount).toBe(!next.guestCheckout);
+        if ('requireAccount' in change) expect(next.requireAccount).toBe(change.requireAccount);
+        else expect(next.guestCheckout).toBe(change.guestCheckout);
+      }
+    }
   });
 });
