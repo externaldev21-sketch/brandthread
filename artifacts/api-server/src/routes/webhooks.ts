@@ -278,16 +278,16 @@ router.post("/stripe", async (req: Request, res: Response) => {
           // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
           break;
         }
-        // ── AI credit pack checkout ──────────────────────────────────────────
-        if (cs.metadata?.kind === "ai_credits") {
-          if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
-          break;
-        }
         // ── Featured slot checkout ───────────────────────────────────────────
         if (cs.metadata?.kind === "featured_slot") {
           if (cs.payment_status === "paid" || cs.payment_status === "no_payment_required") {
             await activateFeaturedSlotFromCheckoutSession(cs, paidAt);
           }
+          break;
+        }
+        // ── AI credit pack checkout ──────────────────────────────────────────
+        if (cs.metadata?.kind === "ai_credits") {
+          if (cs.payment_status === "paid") await fulfilCreditCheckoutSession(cs);
           break;
         }
         // ── Regular buyer checkout ───────────────────────────────────────────

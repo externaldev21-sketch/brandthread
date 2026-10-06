@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildFeaturedReturnUrl, featuredStateLabel } from '@/services/featuredSlotService';
+import {
+  buildFeaturedReturnUrl, featuredStateLabel, needsStoreRefund, storeName, storeRefundUrl,
+} from '@/services/featuredSlotService';
 
 describe('featuredSlotService', () => {
   it('builds the deep link and web return URLs the server allowlist expects', () => {
@@ -13,5 +15,20 @@ describe('featuredSlotService', () => {
     expect(featuredStateLabel('live')).toBe('Live');
     expect(featuredStateLabel('rejected')).toBe('Rejected');
     expect(featuredStateLabel('ended')).toBe('Ended');
+  });
+
+  // QA-0004: store-paid slots are refunded by Apple / Google, never by us.
+  it('sends store-paid refunds to the right store', () => {
+    expect(storeRefundUrl('ios')).toBe('https://reportaproblem.apple.com');
+    expect(storeRefundUrl('android')).toContain('play.google.com');
+    expect(storeRefundUrl('web')).toBeNull();
+    expect(storeName('android')).toBe('Google Play');
+    expect(storeName('ios')).toBe('the App Store');
+  });
+
+  it('knows which slots need a store refund', () => {
+    expect(needsStoreRefund({ paidVia: 'store', refundStatus: 'none' })).toBe(true);
+    expect(needsStoreRefund({ paidVia: null, refundStatus: 'store' })).toBe(true);
+    expect(needsStoreRefund({ paidVia: 'stripe', refundStatus: 'refunded' })).toBe(false);
   });
 });

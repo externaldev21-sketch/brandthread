@@ -69,6 +69,10 @@ vi.mock('react-native', () => {
   };
 });
 
+vi.mock('@/components/ui/RetryRow', () => ({
+  RetryRow: (props: Record<string, unknown>) => require('react').createElement('RetryRow', props),
+}));
+
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'user_test' }),
 }));

@@ -38,7 +38,7 @@ describe('useTeamRole never calls the protected team-context API without a sessi
   it('signed out: no request, not stuck loading, no role', () => {
     const { result } = renderHook(() => useTeamRole());
     expect(api.team.context).not.toHaveBeenCalled();
-    expect(result.current).toEqual({ currentRole: null, isLoadingRole: false });
+    expect(result.current).toMatchObject({ currentRole: null, isLoadingRole: false, roleError: false });
   });
 
   it('Clerk not loaded yet: no request', () => {

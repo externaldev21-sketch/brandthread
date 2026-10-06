@@ -31,8 +31,7 @@ import {
   materialiseEntryFor,
   redrawWinner,
   SHARE_BASE_URL,
-  validateGiveawayInput,
-} from "../lib/giveaways";
+  validateGiveawayInput, withPlatformDisclaimer } from "../lib/giveaways";
 
 type GiveawayRow = typeof giveaways.$inferSelect;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,7 +48,8 @@ function serialize(g: GiveawayRow, now = new Date()) {
     postId: g.postId,
     startsAt: g.startsAt.toISOString(),
     endsAt: g.endsAt.toISOString(),
-    rulesText: g.rulesText,
+    // Rows saved before QA-0100 get the Apple / Google disclaimer on the way out.
+    rulesText: withPlatformDisclaimer(g.rulesText),
     eligibility: g.eligibility,
     region: g.region,
     winnerCount: g.winnerCount,

@@ -31,6 +31,7 @@ import { requirePermission } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
+import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
 
 const router = Router();
 router.use(requireAuth);
@@ -452,7 +453,7 @@ router.post("/:id/reorder-media", requirePermission("marketing"), express.json({
 //   A still-open session is reused so retries never create duplicate charges.
 //   Campaign stays pending_payment until /pay/verify or webhook confirms paid.
 
-router.post("/:id/pay", requirePermission("marketing"), express.json({ limit: "4kb" }), async (req, res) => {
+router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeCheckout, express.json({ limit: "4kb" }), async (req, res) => {
   try {
     const owner = sellerId(req);
     const campaign = await findOwnedCampaign(req.params.id, owner);

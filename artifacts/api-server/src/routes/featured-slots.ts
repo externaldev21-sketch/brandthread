@@ -28,6 +28,7 @@ import {
   FEATURED_DURATIONS, FEATURED_PLACEMENT_DISCOVER, FEATURED_PRICE_LIST, earliestStart, featuredCapacity,
   featuredPriceCents, hasCapacity, occupiesCapacity, slotDisplayState, type Window,
 } from "../lib/promotions/featured";
+import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
 
 const router = Router();
 
@@ -45,6 +46,8 @@ function serializeSlot(s: SlotRow, now = new Date()) {
     status: s.status,
     displayState: slotDisplayState(s, now),
     paid: s.paidAt != null,
+    // 'store' = bought in the iOS / Android app; only Apple / Google can refund it.
+    paidVia: s.paidAt == null ? null : s.paymentRail === "store" ? "store" : "stripe",
     rejectionReason: s.rejectionReason,
     refundStatus: s.refundStatus,
     createdAt: s.createdAt,
@@ -255,14 +258,45 @@ export async function confirmFeaturedSlotPaid(checkoutSessionId: string, paidAt:
     await lockPlacement(tx, slot.placement);
     const w = await settleSlotWindow(tx, slot, paidAt);
     const [updated] = await tx.update(featuredSlots)
-      .set({ status: "in_review", paidAt, startsAt: w.startsAt, endsAt: w.endsAt })
+      .set({ status: "in_review", paidAt, paymentRail: "stripe", startsAt: w.startsAt, endsAt: w.endsAt })
       .where(and(eq(featuredSlots.id, slot.id), eq(featuredSlots.status, "pending_payment")))
       .returning();
     return updated ?? slot;
   });
 }
 
-router.post("/:id/pay", express.json({ limit: "4kb" }), async (req, res) => {
+/**
+ * Store purchase granted (App Store / Google Play via RevenueCat, QA-0004) ->
+ * in_review, same window rules as Stripe. Called from lib/iapPromotionsStore.
+ * Never live until an admin approves.
+ */
+export async function activateFeaturedSlotFromStore(
+  slotId: string,
+  paidAt: Date,
+): Promise<"activated" | "already_active" | "ineligible"> {
+  let openSessionId: string | null = null;
+  const result = await db.transaction(async (tx) => {
+    const [slot] = await tx.select().from(featuredSlots).where(eq(featuredSlots.id, slotId)).limit(1);
+    if (!slot) return "ineligible" as const;
+    if (slot.paidAt) return "already_active" as const;
+    if (slot.status !== "pending_payment") return "ineligible" as const;
+    await lockPlacement(tx, slot.placement);
+    const w = await settleSlotWindow(tx, slot, paidAt);
+    const [updated] = await tx.update(featuredSlots)
+      .set({ status: "in_review", paidAt, paymentRail: "store", startsAt: w.startsAt, endsAt: w.endsAt })
+      .where(and(eq(featuredSlots.id, slot.id), eq(featuredSlots.status, "pending_payment")))
+      .returning({ id: featuredSlots.id });
+    if (updated) openSessionId = slot.stripeCheckoutSessionId;
+    return updated ? "activated" as const : "already_active" as const;
+  });
+  if (openSessionId) {
+    // Reserved on web first: close that Stripe page so the slot cannot be paid twice.
+    try { await requireStripe().checkout.sessions.expire(openSessionId); } catch { /* best effort */ }
+  }
+  return result;
+}
+
+router.post("/:id/pay", rejectNativeStripeCheckout, express.json({ limit: "4kb" }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const slot = await findOwnedSlot(req.params.id, sellerId);
@@ -361,6 +395,14 @@ router.post("/:id/pay/verify", express.json({ limit: "4kb" }), async (req, res) 
 /** Refund a slot that has already been moved to a terminal state. Re-callable when refund_status='failed'. */
 export async function refundSlotRecord(slot: SlotRow, context: string): Promise<SlotRow> {
   if (slot.refundStatus === "refunded" || !slot.paidAt) return slot;
+  if (slot.paymentRail === "store") {
+    // App Store / Google Play purchases can only be refunded by the store; the
+    // app tells the seller where to request it (QA-0004).
+    if (slot.refundStatus === "store") return slot;
+    const [u] = await db.update(featuredSlots).set({ refundStatus: "store" })
+      .where(eq(featuredSlots.id, slot.id)).returning();
+    return u ?? slot;
+  }
   try {
     const result = await refundPromotionPayment(requireStripe(), {
       kind: "featured_slot", targetId: slot.id, checkoutSessionId: slot.stripeCheckoutSessionId, context,

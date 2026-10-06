@@ -36,13 +36,13 @@ Stripe object-creation sites in the API (complete list): `freelancer-jobs.ts:203
   - `POST /api/webhooks/revenuecat` handles `NON_RENEWING_PURCHASE` for these product ids (`routes/webhooks.ts`).
   - `POST /api/iap-promotions/{boost|campaign}/:id/verify` re-reads the purchase from RevenueCat (REST, through the existing connector) and grants. The client retries briefly, and if RevenueCat is slow the webhook grants it; the screen's existing "Payment pending" state covers the gap.
   - Both go through `lib/iapPromotions.ts` `grantPromotionPurchase`, idempotent on the store transaction id (`iap_promotion_purchases`, migration `230_iap_promotion_purchases.sql`). Rules covered by `lib/__tests__/iapPromotions.test.ts`: double delivery, amount mismatch, another account claiming a transaction, non-promotion products, ineligible post, team member buying for the owner.
-- Feature flags (both must be on, everything is inert otherwise and nothing crashes when products are missing):
-  - Mobile build env `EXPO_PUBLIC_IAP_PROMOTIONS=1`. Unset means native keeps today's Stripe flow (so flipping nothing changes nothing).
-  - API env `IAP_PROMOTIONS_ENABLED=true`. When off, verify returns 503 and promotion webhook events are ignored.
+- No build flag (QA-0001/0003/0004): iOS and Android **always** use the store rail; there is no setting that sends a native user to Stripe. A missing store product fails the purchase sheet with the existing "Payment failed" alert, never a Stripe fallback.
+  - The app sends `X-Brandthread-Platform: ios|android` on native requests, and the Stripe `/pay` routes for boosts, ad campaigns and Featured slots answer `409 store_purchase_required` to those requests (`middlewares/nativeStoreRail.ts`).
+  - API env `IAP_PROMOTIONS_ENABLED` is on by default; `false` is an emergency kill switch only (verify returns 503 and promotion webhook events are ignored).
 
 ### What Dev must create
 
-Seven budget tiers for each of two features. Create each as a **Consumable** in App Store Connect and Google Play, then add each to RevenueCat (Products, same identifier) and attach to an offering (not required for `getProducts`, but keeps the dashboard tidy). Price tier = the dollar amount in the id.
+Seven budget tiers for each of Boost and Create ad, plus three Featured lengths. Create each as a **Consumable** in App Store Connect and Google Play, then add each to RevenueCat (Products, same identifier) and attach to an offering (not required for `getProducts`, but keeps the dashboard tidy). Price tier = the dollar amount in the id.
 
 | Boost | Create ad | Price (USD) |
 |-------|-----------|-------------|
@@ -54,13 +54,23 @@ Seven budget tiers for each of two features. Create each as a **Consumable** in 
 | `brandthread_boost_250` | `brandthread_ad_250` | 249.99 |
 | `brandthread_boost_500` | `brandthread_ad_500` | 499.99 |
 
+Featured slots (QA-0004), one consumable per length, priced at the server price list:
+
+| Featured | Price (USD) |
+|----------|-------------|
+| `brandthread_featured_3d` | 29.00 (nearest store tier) |
+| `brandthread_featured_7d` | 59.00 (nearest store tier) |
+| `brandthread_featured_14d` | 99.00 (nearest store tier) |
+
+Featured slots bought in the store cannot be refunded by Brandthread (Apple and Google own store refunds). A rejected or cancelled store-paid slot is marked `refund_status = 'store'` and the screen tells the seller to request the refund from Apple or Google Play.
+
 Note on pricing: the product id tier drives the budget the seller receives ($25 of reach for `..._25`). Store prices cannot be exactly $5/$10/..., so either price at the nearest store tier and accept the small gap, or price each tier higher to cover Apple/Google's 15-30% cut (recommended: decide before creating the products; ids do not change).
 
-Also in RevenueCat: webhook to `https://<api>/api/webhooks/revenuecat` with `REVENUECAT_WEBHOOK_AUTHORIZATION` (already required for plans), `REVENUECAT_PROJECT_ID` set (already required). Sandbox test with a sandbox Apple ID before flipping either flag.
+Also in RevenueCat: webhook to `https://<api>/api/webhooks/revenuecat` with `REVENUECAT_WEBHOOK_AUTHORIZATION` (already required for plans), `REVENUECAT_PROJECT_ID` set (already required). Sandbox test with a sandbox Apple ID before submitting the build.
 
 ### Touches existing UI
 
-Only when `EXPO_PUBLIC_IAP_PROMOTIONS=1` on iOS/Android. With the flag unset (default) there is no visible change.
+On iOS/Android only (always, since QA-0001). Web is unchanged.
 
 - `app/boost.tsx`: the small "Secure payment via Stripe. You'll be redirected..." caption under the CTA is hidden; tapping "Boost post" opens the store purchase sheet instead of the Stripe browser sheet; the slider value/price shown on the button snaps to the nearest sellable tier on tap.
 - `app/design-campaign.tsx`: same store sheet instead of Stripe; the "confirming with Stripe now" sub-line on the verifying stage is hidden; budget snaps the same way.

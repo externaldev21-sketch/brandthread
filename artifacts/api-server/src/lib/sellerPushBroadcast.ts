@@ -245,6 +245,9 @@ export async function deliverBroadcast(
       userId,
       category: "announcements",
       type: BROADCAST_FEED_TYPE,
+      // Seller-to-follower marketing: only followers who opted in to
+      // promotional notifications get the push (App Store 4.5.4, QA-0148).
+      pushKind: "promotional",
       title: input.title,
       body: input.body,
       actorId: sellerId,

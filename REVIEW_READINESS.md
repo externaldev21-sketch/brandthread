@@ -23,7 +23,7 @@ Legend: PASS (already compliant) · FIXED (open PR) · RISK (decision needed) ·
 
 | # | Guideline | Status | Notes |
 |---|---|---|---|
-| 1 | 3.1.1 IAP | **FIXED (flagged OFF)** | Seller plans already RevenueCat. Boost and Create-ad were Stripe on native; #597 routes native to RevenueCat consumables behind `EXPO_PUBLIC_IAP_PROMOTIONS` / `IAP_PROMOTIONS_ENABLED`. Thread Cash cannot be bought with money (PASS). Physical goods stay on Stripe. Freelancer jobs = **RISK** (service marketplace on Stripe; mention in review notes). Open: refund revocation for consumables; server does not reject Stripe digital checkout from native clients. Full table: `docs/review-readiness/iap-rails.md` (#597). |
+| 1 | 3.1.1 IAP | **FIXED** | Seller plans already RevenueCat. Boost, Create-ad and Featured slots always use RevenueCat consumables on iOS/Android (no flag; QA-0001/0003/0004), and the API refuses Stripe promo checkout from native clients. Thread Cash cannot be bought with money (PASS). Physical goods stay on Stripe. Freelancer jobs = **RISK** (service marketplace on Stripe; mention in review notes). Open: refund revocation for consumables. Full table: `docs/review-readiness/iap-rails.md` (#597). |
 | 2 | 4.8 Sign in with Apple | **PASS** + small fix | Apple already offered above Google everywhere. #597 hides Google on iOS if the Apple flag is ever off. Apple token revocation on account deletion is not implemented (`routes/auth.ts:477`, trust/safety session). |
 | 3 | 1.2 UGC | **PASS / FIXED** | Existing signup consent + "zero tolerance" wording kept untouched. #605: 24h SLA due-by/overdue in admin queue, block filtering extended to product/video/trending/discover endpoints, client cache purge on block. |
 | 4 | Generative AI | **FIXED, gaps** | #601: shared server guard (prompt filter incl. celebrity/brand/logo, output image moderation, `ai_generated` flag, "AI" tag). Gaps: no `ai_generated` column on posts (create flow owned elsewhere); bg-removal stores its result before the guard (`routes/bg-removal.ts:171`); no tag on mockup-to-model results; blocked results show each tool's generic failure message. |
@@ -40,7 +40,7 @@ Legend: PASS (already compliant) · FIXED (open PR) · RISK (decision needed) ·
 
 **Apple / Google accounts and consoles**
 1. Apple Developer: org enrollment (needs D-U-N-S), enable Sign in with Apple on the App ID, create Services ID + key, enter in Clerk production dashboard (steps: `docs/review-readiness/apple-signin.md`).
-2. Create 14 consumable products in App Store Connect, Play and RevenueCat: `brandthread_boost_{5,10,25,50,100,250,500}` and `brandthread_ad_{5,10,25,50,100,250,500}` (Apple max consumable is $999.99, so native tops out at $500). Then set `EXPO_PUBLIC_IAP_PROMOTIONS=1` and `IAP_PROMOTIONS_ENABLED=true`.
+2. Create 17 consumable products in App Store Connect, Play and RevenueCat: `brandthread_boost_{5,10,25,50,100,250,500}`, `brandthread_ad_{5,10,25,50,100,250,500}` and `brandthread_featured_{3,7,14}d` (Apple max consumable is $999.99, so native tops out at $500). No flag to flip: native always uses them.
 3. Answer the age-rating questionnaire (UGC, AI-generated content, user-to-user messaging, commerce).
 4. Enter Data safety answers and `https://brandthread.app/account-deletion` in Play Console; decide `READ_MEDIA_IMAGES/VIDEO` declaration; confirm current target-API deadline.
 5. Register a DMCA designated agent with the US Copyright Office.

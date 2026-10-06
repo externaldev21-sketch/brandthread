@@ -100,6 +100,7 @@ import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
+import AiConsentSheet from '@/components/AiConsentSheet';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 import { StatusBarMask, useSceneBottomClearance } from '@/components/layout/ScreenChrome';
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
@@ -1363,6 +1364,7 @@ function RootLayoutNav() {
       <MarketingPixelTracker />
       <AnalyticsBridge />
       <LegalAcceptanceGate />
+      <AiConsentSheet />
       <AppLockGate />
     </View>
   );

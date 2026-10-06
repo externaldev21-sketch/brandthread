@@ -8,6 +8,7 @@ import {
   getDeletionBlockers,
   purgeAccount,
 } from "../lib/accountDeletion";
+import { cancelSubscriptionAtPurge, getDeletionSubscription } from "../lib/accountDeletionBilling";
 
 const INTERVAL_MS = 60 * 60 * 1000;
 const BATCH_SIZE = 25;
@@ -53,6 +54,9 @@ export async function runAccountPurge(now = new Date()): Promise<AccountPurgeRes
           result.postponed += 1;
           continue;
         }
+        // Never keep charging a purged account (QA-0073). Throws -> retried next run.
+        const subscription = await getDeletionSubscription(row.clerkId);
+        if (subscription?.provider === "stripe") await cancelSubscriptionAtPurge(subscription.subscriptionId);
         await purgeAccount(row.clerkId);
       }
       try {

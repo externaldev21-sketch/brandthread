@@ -5,10 +5,11 @@
  *                                               whether to use the store sheet
  * POST /api/iap-promotions/boost/:id/verify    — body { transactionId }
  * POST /api/iap-promotions/campaign/:id/verify — body { transactionId }
+ * POST /api/iap-promotions/featured/:id/verify — body { transactionId } (QA-0004)
  *
  * verify re-reads the purchase from RevenueCat (never trusts the device) and
  * grants through lib/iapPromotions, idempotent on the store transaction id.
- * Everything is inert until IAP_PROMOTIONS_ENABLED=true.
+ * On by default; IAP_PROMOTIONS_ENABLED=false is an emergency kill switch.
  */
 import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
@@ -97,5 +98,8 @@ function verifyHandler(kind: PromoKind): express.RequestHandler {
 
 router.post("/boost/:id/verify", requirePlan("pro"), express.json({ limit: "4kb" }), verifyHandler("boost"));
 router.post("/campaign/:id/verify", requirePermission("marketing"), express.json({ limit: "4kb" }), verifyHandler("ad_campaign"));
+// Featured slots belong to the seller account itself (featured-slots.ts checks
+// the same); the slot lookup is scoped to the signed-in owner.
+router.post("/featured/:id/verify", express.json({ limit: "4kb" }), verifyHandler("featured_slot"));
 
 export default router;

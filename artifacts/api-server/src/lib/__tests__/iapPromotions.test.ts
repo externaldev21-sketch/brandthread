@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allPromoProductIds,
+  featuredProductId,
   findPurchaseInPayload,
   grantPromotionPurchase,
   iapPromotionsEnabled,
@@ -46,12 +47,44 @@ function memoryStore(opts: {
 }
 
 describe("promotion product ids", () => {
-  it("round-trips every tier for both kinds", () => {
+  it("round-trips every tier for both budget kinds", () => {
     for (const id of allPromoProductIds()) {
       const parsed = parsePromoProductId(id)!;
+      if (parsed.kind === "featured_slot") continue;
       expect(promoProductId(parsed.kind, parsed.amountCents / 100)).toBe(id);
     }
-    expect(allPromoProductIds()).toHaveLength(14);
+    // 7 boost + 7 ad tiers + 3 Featured lengths (QA-0004).
+    expect(allPromoProductIds()).toHaveLength(17);
+  });
+
+  it("sells Featured slots per length at the server price list (QA-0004)", () => {
+    expect(featuredProductId(7)).toBe("brandthread_featured_7d");
+    expect(parsePromoProductId("brandthread_featured_3d")).toEqual({ kind: "featured_slot", amountCents: 2900 });
+    expect(parsePromoProductId("brandthread_featured_7d")).toEqual({ kind: "featured_slot", amountCents: 5900 });
+    expect(parsePromoProductId("brandthread_featured_14d")).toEqual({ kind: "featured_slot", amountCents: 9900 });
+    expect(parsePromoProductId("brandthread_featured_5d")).toBeNull();
+    expect(allPromoProductIds()).toEqual(expect.arrayContaining([
+      "brandthread_featured_3d", "brandthread_featured_7d", "brandthread_featured_14d",
+    ]));
+  });
+
+  it("grants a Featured purchase against the seller's pending slot", async () => {
+    const { store, activated } = memoryStore({
+      targets: [{ kind: "featured_slot", id: "f1", ownerId: "user_1", budgetCents: 5900 }],
+    });
+    expect(await grantPromotionPurchase(store, {
+      appUserId: "user_1", transactionId: "tx_f", productId: "brandthread_featured_7d", source: "webhook",
+    })).toEqual({ status: "granted", kind: "featured_slot", targetId: "f1" });
+    expect(activated).toEqual(["f1"]);
+  });
+
+  it("refuses a Featured product bought for a different length", async () => {
+    const { store } = memoryStore({
+      targets: [{ kind: "featured_slot", id: "f1", ownerId: "user_1", budgetCents: 9900 }],
+    });
+    expect(await grantPromotionPurchase(store, {
+      appUserId: "user_1", transactionId: "tx_g", productId: "brandthread_featured_3d", source: "webhook",
+    })).toEqual({ status: "amount_mismatch", kind: "featured_slot" });
   });
 
   it("rejects unknown tiers, other products and non-strings", () => {
@@ -61,10 +94,11 @@ describe("promotion product ids", () => {
     expect(parsePromoProductId("brandthread_ad_25:base")).toEqual({ kind: "ad_campaign", amountCents: 2500 });
   });
 
-  it("is off unless IAP_PROMOTIONS_ENABLED is exactly true", () => {
-    expect(iapPromotionsEnabled({})).toBe(false);
-    expect(iapPromotionsEnabled({ IAP_PROMOTIONS_ENABLED: "1" })).toBe(false);
+  // QA-0001/0003: on by default; only an explicit "false" turns it off.
+  it("is on unless IAP_PROMOTIONS_ENABLED is explicitly false", () => {
+    expect(iapPromotionsEnabled({})).toBe(true);
     expect(iapPromotionsEnabled({ IAP_PROMOTIONS_ENABLED: "true" })).toBe(true);
+    expect(iapPromotionsEnabled({ IAP_PROMOTIONS_ENABLED: "false" })).toBe(false);
   });
 });
 

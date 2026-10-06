@@ -9,7 +9,7 @@
 /** Path prefixes (after `/api[/vN]`) that need a signed-in account. */
 const SIGNED_IN_ONLY_PREFIXES = [
   // Paid / AI generation
-  'ai', 'logo', 'mockup', 'photography', 'bg-removal', 'lifestyle', 'techpack',
+  'ai', 'ai-consent', 'logo', 'mockup', 'photography', 'bg-removal', 'lifestyle', 'techpack',
   'design-studio', 'store/ai', 'brandthread-agent', 'meta-ads', 'ad-campaigns', 'boosts',
   // Account-scoped buyer data
   'conversations', 'notifications', 'notification-prefs', 'push',

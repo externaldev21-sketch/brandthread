@@ -17,6 +17,7 @@ import {
   recentDeletionCancellation,
   getDeletionBlockers,
   getReauthMethod,
+  getReauthOptions,
   graceSyncUpdates,
   hasDeletionConfirmation,
   isPendingDeletion,
@@ -27,6 +28,34 @@ import {
   verifyDeletionReauth,
 } from "../lib/accountDeletion";
 import { getAuth } from "@clerk/express";
+import {
+  deletionSubscriptionCopy,
+  getDeletionSubscription,
+  resumeRenewalAfterRestore,
+  stopRenewalForDeletion,
+} from "../lib/accountDeletionBilling";
+import { revokeAppleTokens } from "../lib/appleAuth";
+
+/** Clerk session facts that count as re-authentication for account deletion (QA-0074). */
+function reauthContext(req: Parameters<typeof getAuth>[0]) {
+  try {
+    const auth = getAuth(req) as { factorVerificationAge?: [number, number] | null; sessionId?: string | null };
+    return { factorVerificationAge: auth.factorVerificationAge ?? null, sessionId: auth.sessionId ?? null };
+  } catch {
+    // No Clerk session facts on this request: it simply doesn't count as a recent sign-in.
+    return { factorVerificationAge: null, sessionId: null };
+  }
+}
+
+/** Undo the renewal stop that scheduling deletion applied (never throws). */
+async function resumeSubscriptionAfterRestore(clerkUserId: string, log: { warn: (...a: any[]) => void }) {
+  try {
+    const sub = await getDeletionSubscription(clerkUserId);
+    if (sub?.provider === "stripe") await resumeRenewalAfterRestore(sub.subscriptionId);
+  } catch (err) {
+    log.warn({ err, clerkUserId }, "Could not resume subscription renewal after restoring account");
+  }
+}
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import {
@@ -209,6 +238,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
       if (!updated) throw new Error("User record disappeared during sync");
       return { user: updated, created: false, deletionCancelled: cancelledDeletion };
     });
+    if (deletionCancelled) void resumeSubscriptionAfterRestore(clerkUserId, req.log);
     if (created) {
       void sendWelcomeEmail({
         to: user.email,
@@ -285,22 +315,30 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Account record was not found." });
       return;
     }
-    const [blockers, reauth] = await Promise.all([
+    const [blockers, reauth, reauthOptions, subscription] = await Promise.all([
       getDeletionBlockers(clerkUserId),
       getReauthMethod(clerkUserId),
+      getReauthOptions(clerkUserId, reauthContext(req)),
+      getDeletionSubscription(clerkUserId),
     ]);
     const isSeller = account.accountType === "seller";
+    const subscriptionCopy = deletionSubscriptionCopy(subscription);
     res.json({
       canDelete: blockers.length === 0,
       accountType: account.accountType,
       graceDays: DELETION_GRACE_DAYS,
       reauth,
+      // Password-less accounts: every way they can confirm it's them (QA-0074).
+      reauthOptions: reauth === "password" ? null : reauthOptions,
+      // Store-billed plans keep renewing unless the person cancels in the store (QA-0073).
+      subscriptionNotice: subscriptionCopy.notice,
       deletionCancelledAt: recentDeletionCancellation(account.deletionCancelledAt),
       blockers,
       willDelete: [
         "Your profile, posts, comments and messages",
         "Your saved items, addresses and settings",
         ...(isSeller ? ["Your storefront and product listings"] : []),
+        ...subscriptionCopy.willDelete,
         "Your sign-in",
       ],
       willRetain: [
@@ -377,7 +415,7 @@ export async function accountDeletionHandler(req: Request, res: Response) {
     const emailLinkVerified = (req as Request & { deletionEmailVerified?: boolean }).deletionEmailVerified === true;
     const reauth = emailLinkVerified
       ? { ok: true as const }
-      : await verifyDeletionReauth(clerkUserId, req.body ?? {});
+      : await verifyDeletionReauth(clerkUserId, req.body ?? {}, reauthContext(req));
     if (!reauth.ok) {
       res.status(reauth.status).json({ error: reauth.error, code: reauth.code });
       return;
@@ -396,7 +434,31 @@ export async function accountDeletionHandler(req: Request, res: Response) {
       return;
     }
 
+    // A deleted account is never charged again (QA-0073): stop Stripe renewal
+    // before scheduling, so a Stripe failure leaves nothing half-done.
+    const subscription = await getDeletionSubscription(clerkUserId);
+    if (subscription?.provider === "stripe") {
+      try {
+        await stopRenewalForDeletion(subscription.subscriptionId);
+      } catch (err) {
+        req.log.error({ err, clerkUserId }, "Could not stop subscription renewal for account deletion");
+        res.status(502).json({
+          error: "We couldn't cancel your Brandthread plan, so your account wasn't deleted. Try again in a moment.",
+          code: "SUBSCRIPTION_CANCEL_FAILED",
+        });
+        return;
+      }
+    }
+
     const scheduledFor = await scheduleAccountDeletion(clerkUserId);
+    // App Store 5.1.1(v): revoke the Sign in with Apple tokens with the code
+    // from the re-authentication. Best effort; never blocks deletion.
+    const appleCode = typeof req.body?.appleAuthorizationCode === "string" ? req.body.appleAuthorizationCode : null;
+    if (appleCode) {
+      void revokeAppleTokens(appleCode).then((result) => {
+        req.log.info({ clerkUserId, result }, "Sign in with Apple token revocation");
+      });
+    }
     try {
       await revokeAllSessions(clerkUserId);
     } catch (err) {
@@ -424,6 +486,7 @@ router.post("/account/restore", requireAuth, async (req, res) => {
       res.status(409).json({ error: "This account isn't scheduled for deletion.", code: "NOT_PENDING_DELETION" });
       return;
     }
+    await resumeSubscriptionAfterRestore(clerkUserId, req.log);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err, clerkUserId }, "Account restore failed");

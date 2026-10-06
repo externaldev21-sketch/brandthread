@@ -92,3 +92,14 @@ describe('explicit store context propagation', () => {
     expect(storeContextHeaders()).toEqual({ 'X-Store-Context': 'own' });
   });
 });
+describe('clientPlatformHeaders (QA-0001)', () => {
+  it('identifies the native apps and adds nothing on web', async () => {
+    const { clientPlatformHeaders } = await import('./api');
+    expect(clientPlatformHeaders('ios')).toEqual({ 'X-Brandthread-Platform': 'ios' });
+    expect(clientPlatformHeaders('android')).toEqual({ 'X-Brandthread-Platform': 'android' });
+    expect(clientPlatformHeaders('web')).toEqual({});
+    expect(clientPlatformHeaders(null)).toEqual({});
+    // Unit tests resolve the web build of lib/clientPlatform: no header.
+    expect(clientPlatformHeaders()).toEqual({});
+  });
+});

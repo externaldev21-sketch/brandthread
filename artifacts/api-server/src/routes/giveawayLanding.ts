@@ -42,7 +42,7 @@ h1{font-size:28px;line-height:1.2;margin:22px 0 8px}.prize{font-size:18px;margin
 </style></head><body><main>
 <div class="brand">BRANDTHREAD</div><span class="tag">${status}</span>
 <h1>${title}</h1><p class="prize">${prize}</p><p class="host">Hosted by ${brand}</p>
-<p class="meta">${escapeHtml(how)}<br>Ends ${escapeHtml(ends)} (UTC)<br>No purchase necessary.</p>
+<p class="meta">${escapeHtml(how)}<br>Ends ${escapeHtml(ends)} (UTC)<br>No purchase necessary. Apple and Google are not sponsors of, and are not involved in, this giveaway.</p>
 <a class="button" href="brandthread://giveaway?code=${encodeURIComponent(g.shareCode)}">Open in Brandthread</a>
 <p class="link">${escapeHtml(url)}</p>
 </main></body></html>`);

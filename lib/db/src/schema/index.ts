@@ -25,6 +25,7 @@ export * from './giftCards';
 export * from './productBulkSeo';
 export * from './promotions';
 export * from './sellerPushGiveaways';
+export * from './aiConsent';
 export * from './admin';
 export * from './aiSettings';
 export * from './interactionSettings';

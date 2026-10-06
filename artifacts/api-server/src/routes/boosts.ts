@@ -41,6 +41,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 import { promotionReviewRequired, refundPromotionPayment } from "../lib/promotions/refund";
+import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
 
 const router = Router();
 router.use(requireAuth);
@@ -456,7 +457,7 @@ router.post("/", express.json({ limit: "16kb" }), async (req, res) => {
 // A still-open session is reused; expired sessions are rotated.
 // Boost stays pending_payment until /pay/verify or webhook confirms paid.
 
-router.post("/:id/pay", express.json({ limit: "4kb" }), async (req, res) => {
+router.post("/:id/pay", rejectNativeStripeCheckout, express.json({ limit: "4kb" }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
     const boost = await findOwnedBoost(req.params.id, sellerId);

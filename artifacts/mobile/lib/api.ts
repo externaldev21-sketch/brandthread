@@ -12,6 +12,8 @@ import type {
   ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
 } from './safetyTypes';
 import { useMemo, useRef } from 'react';
+import { CLIENT_PLATFORM } from '@/lib/clientPlatform';
+import { withAiConsent } from '@/lib/aiConsent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadChunked, type ChunkedTransport, type ResumeStore } from '@/lib/createPost/chunkedUpload';
 import {
@@ -317,6 +319,15 @@ export function storeContextStorageKey(userId: string): string {
   return `@brandthread/store_context:${userId}`;
 }
 
+/**
+ * Tells the API which app is calling, so it can refuse Stripe Checkout for
+ * digital promotions from the iOS / Android apps (App Store 3.1.1, QA-0001).
+ * Web sends nothing extra.
+ */
+export function clientPlatformHeaders(os: string | null = CLIENT_PLATFORM): Record<string, string> {
+  return os === 'ios' || os === 'android' ? { 'X-Brandthread-Platform': os } : {};
+}
+
 export function storeContextHeaders(): Record<string, string> {
   return _storeContext && _storeContext !== 'joined'
     ? { 'X-Store-Context': _storeContext }
@@ -449,7 +460,12 @@ function request<T = any>(
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
-  if (!isRead || options.cache === 'no-store') {
+  if (!isRead) {
+    // AI endpoints need a one-time permission to send content to the AI
+    // provider (QA-0043): ask through the consent sheet and retry once.
+    return withAiConsent(() => doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs));
+  }
+  if (options.cache === 'no-store') {
     return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs);
   }
   const dedupeKey = `${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
@@ -540,6 +556,7 @@ async function doRequest<T = any>(
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...storeContextHeaders(),
+    ...clientPlatformHeaders(),
     // Normalize any HeadersInit shape (Headers instance, string[][], or plain object).
     ...(options.headers
       ? options.headers instanceof Headers
@@ -1314,7 +1331,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
       /** Schedule deletion (30-day grace) after the typed DELETE confirmation plus
        *  fresh proof: `password`, or `code` for accounts without a password. */
-      deleteAccount: (reauth: { password?: string; code?: string } = {}) => request<{ ok: true; scheduledFor: string | null; graceDays: number }>(
+      deleteAccount: (reauth: { password?: string; code?: string; appleIdentityToken?: string; appleAuthorizationCode?: string } = {}) => request<{ ok: true; scheduledFor: string | null; graceDays: number }>(
         '/api/auth/account',
         { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE', ...reauth }) },
         getToken,
@@ -1669,6 +1686,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         eventType: 'receipt' | 'open' | 'tap';
         occurredAt?: string;
       }) => post<{ ok: boolean; recorded: boolean }>('/api/notifications/events', body),
+    },
+    /** Permission to send AI-tool content to the AI providers (QA-0043). */
+    aiConsent: {
+      get: () => freshGet<AiConsentStatus>('/api/ai-consent'),
+      set: (granted: boolean) => put<AiConsentStatus>('/api/ai-consent', { granted }),
     },
     notificationPrefs: {
       get: () =>
@@ -3941,6 +3963,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ sessionId: string; url: string | null; paymentStatus: string; status: string }>(
           `/api/featured-slots/${encodeURIComponent(id)}/pay`, { returnUrl }),
       verify: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/pay/verify`, {}),
+      /** Native (iOS / Android): confirm an App Store / Play purchase for this slot (QA-0004). */
+      iapVerify: (id: string, transactionId: string) =>
+        post<{ status: string }>(`/api/iap-promotions/featured/${encodeURIComponent(id)}/verify`, { transactionId }),
       cancel: (id: string) => post<FeaturedSlot>(`/api/featured-slots/${encodeURIComponent(id)}/cancel`, {}),
     },
     /** Sponsored placement in For You: slots to splice in + impression confirmation. */
@@ -4395,11 +4420,15 @@ export interface PlacePage { place: PlaceInfo; postCount: number; sort: 'top' | 
 
 // ─── Promotions (featured slots + admin approval) ─────────────────────────────
 export type FeaturedBrand = { slotId: string; sellerId: string; name: string; imageUrl: string | null; verified: boolean };
+export type AiConsentStatus = { granted: boolean; version: string; grantedAt: string | null; providers: string[] };
 export type FeaturedSlot = {
   id: string; placement: string; durationDays: number; priceCents: number;
   startsAt: string; endsAt: string; status: string;
   displayState: 'awaiting_payment' | 'in_review' | 'scheduled' | 'live' | 'rejected' | 'ended' | 'cancelled';
-  paid: boolean; rejectionReason: string | null; refundStatus: string; createdAt: string;
+  paid: boolean;
+  /** 'store' = bought in the iOS / Android app, refunded only by Apple / Google. */
+  paidVia?: 'stripe' | 'store' | null;
+  rejectionReason: string | null; refundStatus: string; createdAt: string;
 };
 export type FeaturedAvailability = {
   placement: string; capacity: number;

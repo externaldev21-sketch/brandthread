@@ -9,6 +9,8 @@ import {
   readDemoEnv,
   renderNotes,
   summarize,
+  isSettledDemoOrder,
+  orderTimeline,
 } from "../reviewDemo/plan";
 
 const goodEnv = {
@@ -77,7 +79,8 @@ describe("catalogue", () => {
 
 describe("orders and summary", () => {
   it("covers varied states with unique order numbers", () => {
-    expect(new Set(DEMO_ORDERS.map((o) => o.status)).size).toBeGreaterThanOrEqual(4);
+    // Delivered, refunded and cancelled: varied, but nothing left open (QA-0072).
+    expect(new Set(DEMO_ORDERS.map((o) => o.status)).size).toBeGreaterThanOrEqual(3);
     expect(new Set(DEMO_ORDERS.map((o) => o.orderNumber)).size).toBe(DEMO_ORDERS.length);
   });
   it("every order points at a real product and variant", () => {
@@ -94,6 +97,21 @@ describe("orders and summary", () => {
   it("computes totals and marks cancelled orders unpaid", () => {
     expect(orderTotals(1000, 2, "shipped")).toMatchObject({ subtotalCents: 2000, totalCents: 2600, paid: true });
     expect(orderTotals(1000, 1, "cancelled").paid).toBe(false);
+  });
+  // QA-0072: App Review must be able to delete both demo accounts.
+  it("leaves no open order that would block deleting either demo account", () => {
+    for (const o of DEMO_ORDERS) expect(isSettledDemoOrder(o)).toBe(true);
+    expect(DEMO_ORDERS.some((o) => o.status === "processing" || o.status === "pending" || o.status === "shipped")).toBe(false);
+  });
+  it("gives delivered orders a real shipped / delivered timeline", () => {
+    const now = new Date("2026-10-06T00:00:00Z");
+    for (const o of DEMO_ORDERS.filter((x) => x.trackingStatus === "delivered")) {
+      const t = orderTimeline(o, now);
+      expect(t.shippedAt).not.toBeNull();
+      expect(t.deliveredAt!.getTime()).toBeGreaterThan(t.shippedAt!.getTime());
+      expect(t.deliveredAt!.getTime()).toBeLessThan(now.getTime());
+      expect(t.updatedAt).toEqual(t.deliveredAt);
+    }
   });
   it("summarizes the plan", () => {
     const s = summarize(null);

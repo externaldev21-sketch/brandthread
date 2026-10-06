@@ -33,6 +33,7 @@ import {
   DEMO_BRAND_NAME,
   DEMO_BUYER_USERNAME,
   DEMO_ORDERS,
+  orderTimeline,
   DEMO_POSTS,
   DEMO_SELLER_USERNAME,
   buildProducts,
@@ -177,8 +178,21 @@ async function seed(env: DemoEnv) {
     const variant = product.variants[o.variantIndex];
     const variantId = variantIds.get(o.productKey)![o.variantIndex];
     const totals = orderTotals(variant.priceCents, o.quantity, o.status);
-    const placedAt = new Date(Date.now() - o.daysAgo * 86_400_000);
+    const { placedAt, shippedAt, deliveredAt, updatedAt } = orderTimeline(o);
     let [order] = await db.select({ id: orders.id }).from(orders).where(and(eq(orders.ownerId, sellerClerkId), eq(orders.orderNumber, o.orderNumber))).limit(1);
+    if (order) {
+      // Re-running the seed brings older demo orders to the current plan, so a
+      // previously seeded open order cannot keep blocking account deletion (QA-0072).
+      await db.update(orders).set({
+        status: o.status,
+        trackingStatus: o.trackingStatus,
+        trackingNumber: o.trackingStatus ? `DEMO${o.orderNumber.replace(/\D/g, "")}` : null,
+        carrier: o.trackingStatus ? "USPS" : null,
+        shippedAt, deliveredAt,
+        deliveryConfirmedBy: deliveredAt ? "carrier" : null,
+        updatedAt,
+      }).where(eq(orders.id, order.id));
+    }
     if (!order) {
       [order] = await db.insert(orders).values({
         ownerId: sellerClerkId,
@@ -195,7 +209,10 @@ async function seed(env: DemoEnv) {
         trackingNumber: o.trackingStatus ? `DEMO${o.orderNumber.replace(/\D/g, "")}` : null,
         carrier: o.trackingStatus ? "USPS" : null,
         shippingAddress: { name: "Review Buyer", street: "1 Demo Street", city: "Brooklyn", state: "NY", zip: "11201", country: "US" },
+        shippedAt, deliveredAt,
+        deliveryConfirmedBy: deliveredAt ? "carrier" : null,
         createdAt: placedAt,
+        updatedAt,
       }).returning({ id: orders.id });
       await db.insert(orderItems).values({
         orderId: order.id,

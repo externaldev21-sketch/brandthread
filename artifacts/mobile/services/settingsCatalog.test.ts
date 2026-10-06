@@ -27,4 +27,17 @@ describe('settings catalog', () => {
     expect(items.find(item => item.aliases.includes('away'))?.route).toBe('/vacation-mode');
     expect(items.find(item => item.aliases.includes('2fa'))?.route).toBe('/login-methods');
   });
+
+  // QA-0057: buyers reach the real, saved preferences — not the old local mock.
+  it('sends buyers to the persisted notification preferences', () => {
+    const buyerNotifications = items.find(item => item.audience === 'buyer' && item.label === 'Notifications');
+    expect(buyerNotifications?.route).toBe('/notifications-settings');
+    expect(items.some(item => item.route === '/push-notifications')).toBe(false);
+  });
+
+  // QA-0043: AI consent can be withdrawn from Settings by buyers and sellers.
+  it('lets both roles manage AI data sharing', () => {
+    const rows = items.filter(item => item.route === '/ai-data-sharing');
+    expect(rows.map(r => r.audience).sort()).toEqual(['buyer', 'seller']);
+  });
 });

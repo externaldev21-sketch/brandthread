@@ -5,18 +5,23 @@ vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
 import {
   IAP_PROMO_TIERS_CENTS,
   confirmNativePromotion,
+  featuredProductId,
   nativePromotionsEnabled,
   nearestPromoTierCents,
   promoProductId,
 } from './iapPromotions';
 
 describe('native promotion rail', () => {
-  it('is off on web and whenever the flag is unset', () => {
-    expect(nativePromotionsEnabled('web', '1')).toBe(false);
-    expect(nativePromotionsEnabled('ios', undefined)).toBe(false);
-    expect(nativePromotionsEnabled('ios', '0')).toBe(false);
-    expect(nativePromotionsEnabled('ios', '1')).toBe(true);
-    expect(nativePromotionsEnabled('android', '1')).toBe(true);
+  // QA-0001/0003: native must never depend on a build flag to avoid Stripe.
+  it('is always on for iOS and Android, and off on web', () => {
+    expect(nativePromotionsEnabled('ios')).toBe(true);
+    expect(nativePromotionsEnabled('android')).toBe(true);
+    expect(nativePromotionsEnabled('web')).toBe(false);
+  });
+
+  it('maps Featured lengths to their store products', () => {
+    expect(featuredProductId(3)).toBe('brandthread_featured_3d');
+    expect(featuredProductId(14)).toBe('brandthread_featured_14d');
   });
 
   it('maps budgets to the product ids Dev creates in the stores', () => {
