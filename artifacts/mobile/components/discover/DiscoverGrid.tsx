@@ -25,10 +25,32 @@ import { ShopByCategoryRail, TrendingProductsRail } from './DiscoverShopRails';
 import type { DiscoveryCategory } from '@/lib/discoveryShelves';
 import type { DiscoverPost, DiscoverPersonSuggestion, DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
+import type { SponsoredFeedItem } from '@/lib/feedAds';
 
 export type { GridRow } from '@/lib/discoverGridPacking';
 
 const GAP = 1;
+
+type SponsoredRow = { key: string; type: 'sponsored'; item: SponsoredFeedItem };
+type Row = GridRow | SponsoredRow;
+
+/** Puts each Sponsored row right after the grid row holding the post it follows. */
+function withSponsoredRows(rows: GridRow[], anchors: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }>): Row[] {
+  if (anchors.length === 0) return rows;
+  const byPost = new Map(anchors.map((a) => [a.afterId, a.item]));
+  const out: Row[] = [];
+  for (const row of rows) {
+    out.push(row);
+    const ids = row.type === 'normal' ? row.tiles.map((t) => t.id)
+      : row.type === 'feature' ? [row.big.id, ...row.small.map((t) => t.id)]
+      : [];
+    for (const id of ids) {
+      const item = byPost.get(id);
+      if (item) out.push({ key: item.id, type: 'sponsored', item });
+    }
+  }
+  return out;
+}
 
 function RailHeader({ title, sub }: { title: string; sub?: string }) {
   const { theme } = useAppTheme();
@@ -40,7 +62,9 @@ function RailHeader({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
+const EMPTY_SPONSORED: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }> = [];
+
+export const DiscoverGrid = forwardRef<FlatList<Row>, {
   posts: DiscoverPost[];
   loading: boolean;
   loadingMore?: boolean;
@@ -62,6 +86,9 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   ListHeaderComponent?: React.ComponentType<any> | React.ReactElement;
   /** Rendered after the last row (and the load-more skeleton). */
   ListFooterExtra?: React.ReactElement | null;
+  /** Sponsored ads (hooks/useFeedAds), each placed after the row holding `afterId`. */
+  sponsored?: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }>;
+  renderSponsored?: (item: SponsoredFeedItem) => React.ReactElement;
 }>(function DiscoverGrid({
   posts,
   loading,
@@ -83,6 +110,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   contentContainerStyle,
   ListHeaderComponent,
   ListFooterExtra,
+  sponsored = EMPTY_SPONSORED,
+  renderSponsored,
 }, ref) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -104,11 +133,11 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
     return map;
   }, [posts]);
 
-  const rows = useMemo(() => {
+  const rows = useMemo((): Row[] => {
     if (loading) {
       return [0, 1, 2].map((i): GridRow => ({ key: `skeleton-${i}`, type: 'normal', tiles: [] }));
     }
-    return buildGridRows(posts, {
+    return withSponsoredRows(buildGridRows(posts, {
       showRails,
       hasJustDropped: justDroppedItems.length > 0,
       hasHighDemand: highDemandItems.length > 0,
@@ -117,8 +146,10 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       hasTrendingProducts: trendingProducts.length > 0,
       hasShopCategories: shopCategories.length > 0,
       hasPeople: people.length > 0,
-    });
+    }), renderSponsored ? sponsored : EMPTY_SPONSORED);
   }, [
+    sponsored,
+    renderSponsored,
     posts,
     loading,
     showRails,
@@ -156,6 +187,9 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
               {[0, 1, 2].map((col) => <DiscoverTileSkeleton key={col} width={cell} height={cellHeight} />)}
             </View>
           );
+        }
+        if (row.type === 'sponsored') {
+          return renderSponsored ? renderSponsored(row.item) : null;
         }
         if (row.type === 'normal') {
           return (

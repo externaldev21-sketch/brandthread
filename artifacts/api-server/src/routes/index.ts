@@ -148,6 +148,7 @@ import featuredSlotsRouter from "./featured-slots";
 import adminPromotionsRouter from "./admin-promotions";
 import adCampaignsRouter from "./ad-campaigns";
 import iapPromotionsRouter from "./iap-promotions";
+import adsServeRouter from "./ads-serve";
 import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
 import { quickRepliesRouter, awayMessageRouter } from "./seller-messaging-tools";
@@ -420,6 +421,7 @@ router.use("/featured-slots",            tc, featuredSlotsRouter); // /active is
 router.use("/admin/promotions",          adminPromotionsRouter); // platform admins only
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/iap-promotions",            tc, iapPromotionsRouter);
+router.use("/ads",                       adsServeRouter); // buyer feed ad delivery; no tc
 router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/quick-replies",     tc, quickRepliesRouter);
