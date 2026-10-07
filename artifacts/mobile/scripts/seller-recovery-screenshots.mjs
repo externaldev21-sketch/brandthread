@@ -145,7 +145,8 @@ async function run() {
   {
     const { context, page } = await open('/recoveries', 'CHARGEBACKS');
     await shot(page, '02-recoveries');
-    await page.mouse.wheel(0, 600);
+    await page.mouse.move(195, 500);
+    await page.mouse.wheel(0, 700);
     await page.waitForTimeout(600);
     await shot(page, '03-recoveries-scrolled');
     await context.close();
