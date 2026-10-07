@@ -31,7 +31,7 @@ function Tile({
 }: { uid: number | null; name: string; avatarUrl?: string | null; RtcSurfaceView: any; chip: 'top' | 'bottom'; testID?: string }) {
   const { theme } = useAppTheme();
   return (
-    <View style={[styles.tile, { backgroundColor: theme.card }]} testID={testID}>
+    <View style={[styles.tile, { backgroundColor: theme.cardElevated ?? theme.card }]} testID={testID}>
       {RtcSurfaceView && uid != null ? (
         <RtcSurfaceView canvas={{ uid, renderMode: 1 }} style={StyleSheet.absoluteFill} zOrderMediaOverlay={uid !== 0} />
       ) : (
@@ -40,7 +40,7 @@ function Tile({
         </View>
       )}
       {/* Name chips sit on the seam between the halves, clear of the top bar and the chat. */}
-      <View style={[styles.nameChip, chip === 'top' ? styles.chipTop : styles.chipBottom, { backgroundColor: theme.background }]}>
+      <View style={[styles.nameChip, chip === 'top' ? styles.chipTop : styles.chipBottom, { backgroundColor: theme.background, borderColor: theme.border }]}>
         <Text style={[styles.nameText, { color: theme.text }]} numberOfLines={1}>{name}</Text>
       </View>
     </View>
@@ -51,7 +51,7 @@ export function LiveCohostSplit({ hostUid, hostName, hostAvatarUrl, cohosts, Rtc
   const { theme } = useAppTheme();
   if (!cohosts.length) return null;
   return (
-    <View style={[StyleSheet.absoluteFill, styles.root, { backgroundColor: theme.background }]} testID="live-cohost-split">
+    <View style={[StyleSheet.absoluteFill, styles.root, { backgroundColor: theme.border }]} testID="live-cohost-split">
       <View style={styles.half}>
         <Tile uid={hostUid} name={hostName} avatarUrl={hostAvatarUrl} RtcSurfaceView={RtcSurfaceView} chip="bottom" testID="live-split-host" />
       </View>
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   nameChip: {
     position: 'absolute', left: 10, maxWidth: '80%',
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth,
   },
   chipTop: { top: 10 },
   chipBottom: { bottom: 10 },

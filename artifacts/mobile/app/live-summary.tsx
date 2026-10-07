@@ -125,7 +125,7 @@ export default function LiveSummaryScreen() {
     <View style={s.root}>
       <ScreenHeader title="Live summary" onBack={back} />
       <ScrollView
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + SP.xl * 2 }]}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={colors.foreground} />}
         testID="live-summary"
