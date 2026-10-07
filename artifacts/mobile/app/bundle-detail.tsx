@@ -153,10 +153,9 @@ export default function BundleDetailScreen() {
                       <Text style={st.itemName} numberOfLines={2}>{item.productName}</Text>
                       <Text style={st.itemMeta}>
                         {[
-                          item.quantity > 1 ? `${item.quantity} ×` : null,
-                          formatCents(chosen?.priceCents ?? item.priceCents),
-                          !needsChoice && chosen ? variantLabel(chosen) : null,
-                        ].filter(Boolean).join(' ')}
+                          `${item.quantity > 1 ? `${item.quantity} × ` : ''}${formatCents(chosen?.priceCents ?? item.priceCents)}`,
+                          chosen && (chosen.size || chosen.color) ? `Size ${variantLabel(chosen)}` : null,
+                        ].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
                     <Feather name="chevron-right" size={16} color={theme.muted} />

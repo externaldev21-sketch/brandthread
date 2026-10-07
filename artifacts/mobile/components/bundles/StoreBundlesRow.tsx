@@ -64,12 +64,11 @@ export function StoreBundlesRow({ sellerId }: { sellerId: string | null | undefi
               </View>
               <Text style={st.name} numberOfLines={1}>{bundle.name}</Text>
               <Text style={st.meta} numberOfLines={1}>
-                {`${bundle.items.reduce((n, i) => n + i.quantity, 0)} items`}
+                {`${bundle.items.reduce((n, i) => n + i.quantity, 0)} items · Save ${formatCents(bundle.savingsCents)}`}
               </Text>
               <View style={st.priceRow}>
                 <Text style={st.price}>{formatCents(bundle.bundlePriceCents)}</Text>
                 <Text style={st.was}>{formatCents(bundle.itemsTotalCents)}</Text>
-                <Text style={st.save}>Save {formatCents(bundle.savingsCents)}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -95,7 +94,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SP.xs + 2, marginTop: 4 },
   price: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text },
   was: { fontFamily: FONT.medium, fontSize: FS.meta, color: theme.subtle, textDecorationLine: 'line-through' },
-  save: { fontFamily: FONT.semibold, fontSize: FS.meta, color: theme.text },
 });
 
 export default StoreBundlesRow;

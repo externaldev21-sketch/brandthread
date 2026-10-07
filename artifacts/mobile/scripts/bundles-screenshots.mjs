@@ -89,8 +89,8 @@ const SELLER_BUNDLES = [
 const ORDER_ID = '1d9e4b2a-7c3f-4a81-b5e6-2f8c0d7a9e13';
 const ORDER = {
   id: ORDER_ID, ownerId: SELLER_ID, buyerId: 'user_jordan', orderNumber: 'BT-00142', status: 'pending',
-  totalCents: 18_388, subtotalCents: 22_600, shippingCents: 1_200, taxCents: 1_588, grossChargedCents: 18_388,
-  discountAmountCents: 7_000, bundleDiscountCents: 3_000,
+  totalCents: 22_388, subtotalCents: 22_600, shippingCents: 1_200, taxCents: 1_588, grossChargedCents: 22_388,
+  discountAmountCents: 3_000, bundleDiscountCents: 3_000,
   bundleLines: [{ bundleId: BUNDLE_ID, name: BUNDLE.name, sets: 1, itemsCents: 22_600, bundlePriceCents: 19_600, discountCents: 3_000 }],
   paidAt: '2026-10-06T15:20:00.000Z', createdAt: '2026-10-06T15:20:00.000Z', updatedAt: '2026-10-06T15:20:00.000Z',
   shippingAddress: { name: 'Jordan Reyes', street: '148 Mercer Street', city: 'New York', state: 'NY', zip: '10012', country: 'US' },
@@ -136,6 +136,22 @@ async function navigate(page, role, target) {
   }, { url: `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}` });
 }
 
+/** Client-side navigation, retried: the app can still be settling on "/" after sign-in. */
+async function go(page, role, target, locator, { timeout = 12_000, state = 'attached' } = {}) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    if (attempt > 0 || !(await locator.count())) await navigate(page, role, target);
+    try {
+      await locator.first().waitFor({ state, timeout });
+      return;
+    } catch (error) {
+      if (attempt === 5) {
+        await page.screenshot({ path: path.join(OUT, 'debug.png') });
+        throw error;
+      }
+    }
+  }
+}
+
 const shot = async (page, name) => {
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
@@ -159,26 +175,23 @@ async function run() {
 
       await openScreen(page, activity, origin, 'buyer', '/buyer-product-detail?productId=prod_nl_hoodie_ember');
       const section = page.locator('[data-testid="product-bundle-section"]');
-      await section.waitFor({ timeout: 30_000 });
+      await go(page, 'buyer', '/buyer-product-detail?productId=prod_nl_hoodie_ember', section);
       await settle(page, activity);
       await section.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       await settle(page, activity, 400);
       await shot(page, '01-buyer-product-bundle-section');
 
-      await navigate(page, 'buyer', `/seller-profile?id=${SELLER_ID}`);
-      await page.waitForTimeout(2500);
-      const productsTab = page.getByRole('tab', { name: /products/i }).first();
-      if (await productsTab.count()) await productsTab.click();
-      else await page.getByLabel(/^Products/).first().click();
+      const productsTab = page.locator('[data-testid="profile-tab-shop"]').first();
+      await go(page, 'buyer', `/seller-profile?id=${SELLER_ID}`, productsTab, { state: 'visible' });
+      await productsTab.click();
       const row = page.locator('[data-testid="store-bundles-row"]');
-      await row.waitFor({ timeout: 30_000 });
+      await row.waitFor({ state: 'attached', timeout: 60_000 });
       await settle(page, activity);
       await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       await settle(page, activity, 400);
       await shot(page, '02-buyer-storefront-bundles-row');
 
-      await navigate(page, 'buyer', `/bundle-detail?bundleId=${BUNDLE_ID}`);
-      await page.locator('[data-testid="bundle-add"]').waitFor({ timeout: 30_000 });
+      await go(page, 'buyer', `/bundle-detail?bundleId=${BUNDLE_ID}`, page.locator('[data-testid="bundle-add"]'));
       await settle(page, activity);
       await shot(page, '03-buyer-bundle-detail');
       await page.locator('[data-testid="bundle-variant-v-hoodie-m"]').click();
@@ -186,8 +199,7 @@ async function run() {
       await page.getByText(/In your bag/).first().waitFor({ timeout: 15_000 });
       await shot(page, '04-buyer-bundle-added');
 
-      await navigate(page, 'buyer', '/(buyer)/cart');
-      await page.getByText(/^Cart \(\d+\)$/).first().waitFor({ timeout: 30_000 });
+      await go(page, 'buyer', '/(buyer)/cart', page.locator('[data-testid="cart-order-summary"]'));
       await settle(page, activity);
       const summary = page.locator('[data-testid="cart-order-summary"]');
       await summary.evaluate((el) => el.scrollIntoView({ block: 'center' }));
@@ -205,7 +217,7 @@ async function run() {
 
       await openScreen(page, activity, origin, 'seller', '/(tabs)/products');
       const title = page.getByLabel('Products, choose a view').first();
-      await title.waitFor({ timeout: 30_000 });
+      await go(page, 'seller', '/(tabs)/products', title, { state: 'visible' });
       await settle(page, activity);
       await title.click();
       await page.getByText('Bundles', { exact: true }).first().waitFor({ timeout: 10_000 });
@@ -216,8 +228,7 @@ async function run() {
       await settle(page, activity);
       await shot(page, '07-seller-bundles-list-with-sales');
 
-      await navigate(page, 'seller', `/order-detail?id=${ORDER_ID}`);
-      await page.getByText(/BT-00142/).first().waitFor({ timeout: 30_000 }).catch(() => {});
+      await go(page, 'seller', `/order-detail?id=${ORDER_ID}`, page.getByText(/BT-00142/)).catch(() => {});
       await settle(page, activity);
       const bundleTag = page.getByText(/^Bundle: Ember Season Fit$/).first();
       if (await bundleTag.count()) {
