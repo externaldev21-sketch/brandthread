@@ -38,6 +38,7 @@ const SELLER_ROWS: NotifRow[] = [
   { key: 'production_milestones',  icon: 'package',        label: 'Production milestones',  description: 'Sampling and production' },
   { key: 'payout_confirmations',   icon: 'credit-card',    label: 'Payout confirmations',   description: 'Payout sent or delayed' },
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'Messages from customers' },
+  { key: 'friend_activity',        icon: 'users',          label: 'Social',                 description: 'New followers, likes, comments and mentions' },
   { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'Disputes and case updates' },
   { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low and out of stock' },
   { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
