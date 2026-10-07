@@ -95,6 +95,7 @@ import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
 import adCampaignsRouter from "./ad-campaigns";
+import adsServeRouter from "./ads-serve";
 import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
@@ -263,6 +264,7 @@ router.use("/live",                      tc, liveRouter);
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
+router.use("/ads",                       adsServeRouter); // buyer feed ad delivery; no tc
 router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);

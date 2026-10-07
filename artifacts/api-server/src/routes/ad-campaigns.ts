@@ -11,6 +11,12 @@
  * POST   /api/ad-campaigns/:id/reorder-media       — reorder media slots
  * POST   /api/ad-campaigns/:id/pay                 — create (or reuse) Stripe Checkout Session
  * POST   /api/ad-campaigns/:id/pay/verify          — verify payment after redirect; activates idempotently
+ * POST   /api/ad-campaigns/:id/pause               — pause an active campaign (stops serving)
+ * POST   /api/ad-campaigns/:id/resume              — resume a paused campaign (budget left, before endsAt)
+ * POST   /api/ad-campaigns/:id/stop                — stop for good (completed, seller_stopped)
+ * GET    /api/ad-campaigns/:id/results             — delivered results (impressions, reach, clicks, spend, …)
+ *
+ * Delivery into buyer feeds lives in routes/ads-serve.ts + lib/ads/.
  *
  * Activation is performed ONLY in two places:
  *   1. /pay/verify endpoint — poll after Checkout redirect, validates payment_status === "paid"
@@ -31,6 +37,8 @@ import { requirePermission } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
+import { pauseRefusal, resumeRefusal, stopRefusal } from "../lib/ads/adDelivery";
+import { adCampaignResults, adResultsSummaries, completeEndedAdCampaigns } from "../lib/ads/adDeliveryService";
 
 const router = Router();
 router.use(requireAuth);
@@ -138,6 +146,7 @@ router.post("/", requirePermission("marketing"), express.json({ limit: "32kb" })
 
 router.get("/", async (req, res) => {
   const owner = sellerId(req);
+  await completeEndedAdCampaigns(new Date(), owner);
   const rows = await db
     .select()
     .from(adCampaigns)
@@ -145,8 +154,13 @@ router.get("/", async (req, res) => {
     .orderBy(desc(adCampaigns.createdAt))
     .limit(50);
 
-  const hydrated = await Promise.all(rows.map(hydrateCampaign));
-  return res.json({ campaigns: hydrated });
+  const [hydrated, summaries] = await Promise.all([
+    Promise.all(rows.map(hydrateCampaign)),
+    adResultsSummaries(rows),
+  ]);
+  return res.json({
+    campaigns: hydrated.map((c) => ({ ...c, results: summaries.get(c.id) ?? null })),
+  });
 });
 
 // ─── GET /api/ad-campaigns/:id ────────────────────────────────────────────────
@@ -267,9 +281,9 @@ router.delete("/:id", requirePermission("marketing"), async (req, res) => {
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
 
-  if (campaign.status === "active") {
+  if (campaign.status === "active" || campaign.status === "paused") {
     return res.status(409).json({
-      error: "Active campaigns cannot be deleted. Pause or cancel them first.",
+      error: "Running campaigns cannot be deleted. Stop them first.",
     });
   }
 
@@ -692,6 +706,87 @@ router.post("/:id/pay/verify", express.json({ limit: "4kb" }), async (req, res) 
   } catch (err) {
     req.log?.error?.({ err, campaignId: req.params.id }, "Failed to verify ad campaign payment");
     return res.status(500).json({ error: "Failed to verify payment. Please try again." });
+  }
+});
+
+// ─── Delivery lifecycle: pause / resume / stop ───────────────────────────────
+
+const LIFECYCLE_MESSAGES: Record<string, string> = {
+  not_active: "Only running campaigns can be changed",
+  not_paused: "Only paused campaigns can be resumed",
+  budget_spent: "This campaign has spent its budget",
+  ended: "This campaign has reached its end date",
+  already_completed: "This campaign has already completed",
+};
+
+router.post("/:id/pause", requirePermission("marketing"), async (req, res) => {
+  const owner = sellerId(req);
+  const now = new Date();
+  await completeEndedAdCampaigns(now, owner);
+  const campaign = await findOwnedCampaign(req.params.id, owner);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  const refusal = pauseRefusal(campaign);
+  if (refusal) return res.status(409).json({ error: LIFECYCLE_MESSAGES[refusal], code: refusal });
+  const [updated] = await db.update(adCampaigns)
+    .set({ status: "paused", pausedAt: now, updatedAt: now })
+    .where(and(eq(adCampaigns.id, campaign.id), eq(adCampaigns.sellerId, owner), eq(adCampaigns.status, "active")))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "Campaign changed; refresh and try again", code: "conflict" });
+  return res.json({ campaign: await hydrateCampaign(updated) });
+});
+
+router.post("/:id/resume", requirePermission("marketing"), async (req, res) => {
+  const owner = sellerId(req);
+  const now = new Date();
+  await completeEndedAdCampaigns(now, owner);
+  const campaign = await findOwnedCampaign(req.params.id, owner);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  const refusal = resumeRefusal(campaign, now);
+  if (refusal) return res.status(409).json({ error: LIFECYCLE_MESSAGES[refusal], code: refusal });
+  const [updated] = await db.update(adCampaigns)
+    .set({ status: "active", pausedAt: null, updatedAt: now })
+    .where(and(
+      eq(adCampaigns.id, campaign.id), eq(adCampaigns.sellerId, owner), eq(adCampaigns.status, "paused"),
+      sql`${adCampaigns.endsAt} > ${now}`,
+    ))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "Campaign changed; refresh and try again", code: "conflict" });
+  return res.json({ campaign: await hydrateCampaign(updated) });
+});
+
+router.post("/:id/stop", requirePermission("marketing"), async (req, res) => {
+  const owner = sellerId(req);
+  const now = new Date();
+  await completeEndedAdCampaigns(now, owner);
+  const campaign = await findOwnedCampaign(req.params.id, owner);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  const refusal = stopRefusal(campaign);
+  if (refusal) return res.status(409).json({ error: LIFECYCLE_MESSAGES[refusal], code: refusal });
+  const [updated] = await db.update(adCampaigns)
+    .set({ status: "completed", completionReason: "seller_stopped", completedAt: now, pausedAt: null, updatedAt: now })
+    .where(and(
+      eq(adCampaigns.id, campaign.id), eq(adCampaigns.sellerId, owner),
+      sql`${adCampaigns.status} IN ('active', 'paused')`,
+    ))
+    .returning();
+  if (!updated) return res.status(409).json({ error: "Campaign changed; refresh and try again", code: "conflict" });
+  return res.json({ campaign: await hydrateCampaign(updated) });
+});
+
+// ─── GET /api/ad-campaigns/:id/results ───────────────────────────────────────
+
+router.get("/:id/results", async (req, res) => {
+  const owner = sellerId(req);
+  const now = new Date();
+  await completeEndedAdCampaigns(now, owner);
+  const campaign = await findOwnedCampaign(req.params.id, owner);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  try {
+    const results = await adCampaignResults(campaign, now);
+    return res.json({ campaign: await hydrateCampaign(campaign), results });
+  } catch (err) {
+    req.log?.error?.({ err, campaignId: campaign.id }, "Failed to load ad campaign results");
+    return res.status(500).json({ error: "Failed to load results" });
   }
 });
 
