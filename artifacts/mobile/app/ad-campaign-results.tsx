@@ -183,22 +183,26 @@ export default function AdCampaignResultsScreen() {
           </View>
           {(campaign.status === 'active' || campaign.status === 'paused') && (
             <View style={s.actions}>
-              <SecondaryButton
-                small
-                label="Stop"
-                onPress={() => void runAction('stop')}
-                disabled={busy !== null}
-                accent={colors.foreground}
-                style={{ flex: 1 }}
-              />
-              <SecondaryButton
-                small
-                label={campaign.status === 'paused' ? 'Resume' : 'Pause'}
-                onPress={() => void runAction(campaign.status === 'paused' ? 'resume' : 'pause')}
-                disabled={busy !== null}
-                accent={colors.foreground}
-                style={{ flex: 1 }}
-              />
+              <View style={{ flex: 1 }}>
+                <SecondaryButton
+                  small
+                  label="Stop"
+                  onPress={() => void runAction('stop')}
+                  disabled={busy !== null}
+                  accent={colors.foreground}
+                  style={{ width: '100%' }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <SecondaryButton
+                  small
+                  label={campaign.status === 'paused' ? 'Resume' : 'Pause'}
+                  onPress={() => void runAction(campaign.status === 'paused' ? 'resume' : 'pause')}
+                  disabled={busy !== null}
+                  accent={colors.foreground}
+                  style={{ width: '100%' }}
+                />
+              </View>
             </View>
           )}
         </Card>
