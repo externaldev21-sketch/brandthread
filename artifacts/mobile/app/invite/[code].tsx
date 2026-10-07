@@ -17,6 +17,8 @@ import { API_BASE_URL } from '@/lib/api';
 import { FONT, FS, SP } from '@/lib/theme';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { referralInviteePath } from '@/lib/referralCopy';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function InviteDeepLinkScreen() {
   const { theme } = useAppTheme();
@@ -47,7 +49,9 @@ export default function InviteDeepLinkScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.lg }]}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <ScreenHeader title="Invite" onBack={() => goBackOr(router, '/buyer-invite')} />
+      <View style={[styles.root, { paddingBottom: insets.bottom + SP.lg }]}>
       <Text style={[styles.title, { color: theme.text }]}>You are already on Brandthread</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
         Invite links are for new members. Share yours and you both get $10 Thread Cash.
@@ -57,6 +61,7 @@ export default function InviteDeepLinkScreen() {
         onPress={() => router.replace('/buyer-invite' as never)}
         style={{ alignSelf: 'stretch', marginTop: SP.lg }}
       />
+      </View>
     </View>
   );
 }

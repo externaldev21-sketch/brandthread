@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -196,7 +198,7 @@ export function ShipItemsSheet({
 
 function sheetStyles(theme: AppThemePreset) {
   return StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+    backdrop: { flex: 1, backgroundColor: mediaAlpha(MEDIA.background, 0.7), justifyContent: 'flex-end' },
     sheet: {
       backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
       padding: SP.lg, paddingBottom: SP.xl + 20,

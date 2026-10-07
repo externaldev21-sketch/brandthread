@@ -41,7 +41,8 @@ const {
 vi.mock("@/components/profile/ProfileCover", async () =>
   (await import("./helpers/profileCoverMock")).profileCoverMockModule);
 
-vi.mock("react-native", () => {
+vi.mock("react-native", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-native")>();
   const React = require("react") as any;
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
@@ -65,6 +66,7 @@ vi.mock("react-native", () => {
   }
   MockPressable.displayName = "Pressable";
   return {
+    ...actual,
     ActivityIndicator: nativeComponent("ActivityIndicator"),
     Alert: { alert: vi.fn() },
     Animated: {
@@ -87,6 +89,7 @@ vi.mock("react-native", () => {
     Share: { share: vi.fn() },
     StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {}, hairlineWidth: 1 },
     Text: nativeComponent("Text"),
+    NativeModules: actual.NativeModules,
     TouchableOpacity: nativeComponent("TouchableOpacity"),
     View: nativeComponent("View"),
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   fileName: { fontSize: FS.sm, fontFamily: FONT.semibold },
   meta: { fontSize: FS.meta, fontFamily: FONT.regular },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip: { paddingHorizontal: SP.md, paddingVertical: SP.sm + 2, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.pill, borderWidth: 1 },
+  chip: { paddingHorizontal: SP.md, paddingVertical: SP.sm + 2, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: ControlRadius.md, borderWidth: 1 },
   chipText: { fontSize: FS.meta, textAlign: 'center', fontFamily: FONT.medium },
   actions: { flexDirection: 'row', gap: SP.sm },
   action: {

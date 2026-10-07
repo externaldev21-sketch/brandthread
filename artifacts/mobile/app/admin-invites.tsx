@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Invites and waitlist — platform moderators run the invite-only launch from
  * here: the signup switch (feature flag `inviteOnlySignup`), access codes
@@ -335,7 +336,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     flexDirection: 'row', marginHorizontal: SP.md, marginTop: SP.xs, padding: 4,
     backgroundColor: theme.card, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
   },
-  segmentItem: { flex: 1, height: 36, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
+  segmentItem: { flex: 1, height: 36, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
   segmentItemActive: { backgroundColor: theme.accent },
   segmentText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.base },
   segmentTextActive: { color: theme.onAccent },

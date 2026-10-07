@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * AI helper — captions + hashtags, product descriptions from photos and size
  * charts. One screen, three modes:
@@ -269,7 +270,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     demo: { fontFamily: FONT.semibold, fontSize: FS.meta, color: c.mutedForeground },
     area: { minHeight: 120, textAlignVertical: 'top', padding: SP.md, borderRadius: RADIUS.lg, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, color: c.foreground, fontFamily: FONT.regular, fontSize: FS.base },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-    chip: { paddingHorizontal: SP.md, height: 40, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+    chip: { paddingHorizontal: SP.md, height: 40, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
     chipOn: { backgroundColor: c.foreground, borderColor: c.foreground },
     chipText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.foreground, },
     chipTextOn: { color: c.background },
@@ -294,9 +295,9 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     link: { fontFamily: FONT.semibold, fontSize: FS.sm, color: c.foreground, textDecorationLine: 'underline' },
     footer: { paddingHorizontal: SP.md, paddingTop: SP.md, borderTopWidth: StyleSheet.hairlineWidth },
     footerRow: { flexDirection: 'row', gap: SP.sm },
-    btn: { height: 52, borderRadius: RADIUS.pill, backgroundColor: c.foreground, alignItems: 'center', justifyContent: 'center' },
+    btn: { height: 52, borderRadius: ControlRadius.md, backgroundColor: c.foreground, alignItems: 'center', justifyContent: 'center' },
     btnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.background },
-    btnGhost: { height: 52, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+    btnGhost: { height: 52, paddingHorizontal: SP.lg, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
     btnGhostText: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   });
 }

@@ -37,6 +37,7 @@ vi.mock('@/lib/haptics', () => ({ hapticToggle: vi.fn() }));
 vi.mock('@/components/ui', () => ({ ListRow: nativeComponent('ListRow'), ChipGroup: nativeComponent('ChipGroup') }));
 vi.mock('@/components/ui/Card', () => ({ Card: nativeComponent('Card') }));
 vi.mock('@/components/ui/RetryRow', () => ({ RetryRow: nativeComponent('RetryRow') }));
+vi.mock('@/components/ui/ErrorState', () => ({ ErrorState: nativeComponent('ErrorState') }));
 vi.mock('@/constants/typography', () => ({ TYPE_SCALE: { footnote: {} } }));
 vi.mock('@/constants/spacing', () => ({ SPACING: { md: 16, sm: 8, xxs: 2 } }));
 vi.mock('@/lib/theme', async (importOriginal) => ({
@@ -77,7 +78,11 @@ describe('notification settings for buyers (QA-0057)', () => {
   it('offers a retry instead of guessing when loading fails', async () => {
     prefs.get.mockRejectedValue(new Error('offline'));
     await act(async () => { tree = create(<NotificationsSettingsScreen />); });
-    expect(tree!.root.findAllByType('RetryRow' as never)).toHaveLength(1);
+    const error = tree!.root.findByType('ErrorState' as never);
+    expect(error.props.message).toContain("Couldn't load your notification settings");
     expect(titles()).toEqual([]);
+    prefs.get.mockResolvedValue({ role: 'buyer', pushEnabled: true, promotionalPush: false, quietHours: { start: null, end: null }, categories: {}, digest: 'realtime' });
+    await act(async () => { error.props.onRetry(); });
+    expect(titles()).toContain('Messages');
   });
 });

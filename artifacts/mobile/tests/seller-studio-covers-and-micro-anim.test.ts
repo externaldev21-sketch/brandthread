@@ -21,9 +21,9 @@ describe('Studio card covers: one shared "album cover" art direction, built in c
 
   it('the cover backdrop is a diagonal black gradient + a soft silver radial glow — monochrome only', () => {
     expect(cover).toContain("from 'expo-linear-gradient'");
-    expect(cover).toContain("colors={['#000000', '#020202', '#050505', '#020202', '#000000']}");
+    expect(cover).toContain("colors={[MEDIA.background, '#020202', '#050505', '#020202', MEDIA.background]}");
     expect(cover).toContain('RadialGradient');
-    expect(cover).toContain('stopColor="#ffffff"');
+    expect(cover).toContain('stopColor={MEDIA.foreground}');
     // No bitmap image assets — everything is a gradient/vector composition.
     expect(cover).not.toContain('require(');
     expect(cover).not.toMatch(/<Image\b/);

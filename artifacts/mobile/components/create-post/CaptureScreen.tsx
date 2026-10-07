@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Step 1 — full-bleed camera (TikTok's capture screen): black canvas, X top
  * left, white tool rail on the right, duration pills above the record button,
@@ -173,7 +174,7 @@ const s = StyleSheet.create({
   countdownText: { color: CP.white, fontFamily: FONT.bold, fontSize: 120 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   durations: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 14 },
-  durPill: { paddingHorizontal: 12, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  durPill: { paddingHorizontal: 12, height: 30, borderRadius: ControlRadius.sm, alignItems: 'center', justifyContent: 'center' },
   durPillOn: { backgroundColor: CP.surface2 },
   durText: { fontFamily: FONT.semibold, fontSize: 14 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, marginBottom: 12 },

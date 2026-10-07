@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -78,7 +79,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    height: 36, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, borderWidth: StyleSheet.hairlineWidth,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },

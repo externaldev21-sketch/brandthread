@@ -30,7 +30,7 @@ describe('QA-0110 live share link', () => {
 
 describe('QA-0118 seller /activity', () => {
   it('AuthGate rewrites a seller in (buyer)/<rest> to (tabs)/<rest>, so (tabs)/activity must exist', () => {
-    expect(read('app/_layout.tsx')).toContain("router.replace(`/(tabs)/${rest}` as never)");
+    expect(read('app/_layout.tsx')).toContain("router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never)");
     expect(existsSync(resolve(root, 'app/(buyer)/activity.tsx'))).toBe(true);
     const seller = read('app/(tabs)/activity.tsx');
     expect(seller).toContain("export { default } from '../activity-center';");
@@ -118,7 +118,7 @@ describe('QA-0149 share profile account resolution', () => {
 describe('QA-0161 store builder header', () => {
   it('uses the hero gradient (not the white accent fill) behind its white header text', () => {
     const src = read('app/store-builder.tsx');
-    expect(src).toContain('colors={[...theme.heroGradient]}');
+    expect(src).toContain('<ScreenHeader title="Store Builder" onBack={leaveSetupDestination}');
     expect(src).not.toContain('colors={[...theme.primaryGradient]}');
   });
 });

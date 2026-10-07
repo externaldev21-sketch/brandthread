@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Share Profile — full-screen page opened from the "Share profile" action on
  * both the buyer and seller profile screens (same component, same props,
@@ -555,7 +556,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     height: 34,
-    borderRadius: RADIUS.pill,
+    borderRadius: ControlRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

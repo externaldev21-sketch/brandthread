@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button';
 /**
  * Brandthread — Integrations
  * Lists third-party integrations with real connected status from backend.
@@ -146,9 +147,7 @@ export default function IntegrationsScreen() {
             <View style={s.errorBox}>
               <Feather name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
               <Text style={[s.errorText, { color: colors.mutedForeground }]}>Couldn't load your integrations.</Text>
-              <TouchableOpacity onPress={load} style={[s.retryBtn, { borderColor: colors.border }]}>
-                <Text style={[s.retryBtnText, { color: colors.foreground }]}>Retry</Text>
-              </TouchableOpacity>
+              <Button label="Retry" variant="secondary" size="compact" onPress={load} style={s.retryBtn} />
             </View>
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

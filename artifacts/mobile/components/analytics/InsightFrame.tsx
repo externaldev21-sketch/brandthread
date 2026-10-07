@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Shared chrome for the seller analytics report screens: the app's standard
  * header (bare back arrow, no subtitle), the Dashboard's Today / Week / Month
@@ -79,7 +80,7 @@ export function SegmentedPills<T extends string>({ options, value, onChange, tes
             accessibilityLabel={o.label}
             onPress={() => { Haptics.selectionAsync(); onChange(o.key); }}
             style={{
-              flex: 1, minHeight: 40, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center',
+              flex: 1, minHeight: 40, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center',
               paddingHorizontal: SP.xs, borderWidth: 1,
               backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border,
             }}

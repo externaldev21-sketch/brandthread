@@ -132,6 +132,7 @@ beforeAll(async () => {
     ...[buyerA, buyerOptOut, buyerItemOff, buyerBlocked, buyerUnsaved].map((id) => ({
       clerkId: id, email: `${id}@test.local`, name: id, displayName: id, username: id.replace(/-/g, "_"),
       accountType: "buyer", role: "buyer",
+      promoPushOptIn: true,
       notificationPreferences: id === buyerOptOut ? { price_alerts: false } : undefined,
     })),
   ]);

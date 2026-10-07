@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Seller-only pill on the order screen when Stripe Radar / review signals
  * make an order worth a second look before it ships. Rendered only for
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
   wrap: { marginTop: SP.sm, alignSelf: 'stretch' },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: SP.xs + 2, alignSelf: 'flex-start',
-    borderRadius: RADIUS.pill, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs + 2, minHeight: 28,
+    borderRadius: ControlRadius.sm, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs + 2, minHeight: 28,
   },
   pillText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   panel: { marginTop: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, gap: SP.sm },

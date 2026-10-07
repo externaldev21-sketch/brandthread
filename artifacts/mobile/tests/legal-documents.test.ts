@@ -71,8 +71,11 @@ describe('agreement at sign-up', () => {
     const onboarding = read('app/onboarding.tsx');
     expect((onboarding.match(/<LegalContinueNotice /g) ?? []).length).toBe(3);
     // email, Google and Apple sign-up each remember the agreement when continuing
-    expect((onboarding.match(/recordConsent\(\);/g) ?? []).length).toBe(4);
-    expect(onboarding).not.toContain('agreedToTerms');
+    expect((onboarding.match(/recordConsent\(\);/g) ?? []).length).toBe(2);
+    expect((onboarding.match(/function requireConsent\(\)/g) ?? []).length).toBe(2);
+    // Each role has one email handler and one shared Google/Apple handler.
+    expect((onboarding.match(/!requireConsent\(\)/g) ?? []).length).toBe(4);
+    expect(onboarding).toContain('if (!agreedToTerms)');
     const consent = read('components/legal/LegalConsent.tsx');
     const notice = consent.slice(consent.indexOf('export function LegalContinueNotice'));
     expect(notice).toContain('By continuing you agree to our');

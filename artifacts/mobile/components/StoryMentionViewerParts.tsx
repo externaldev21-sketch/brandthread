@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { CARD, BORDER, FG, FONT, FS, MUTED, ON_DARK, RADIUS, SP } from '@/lib/theme';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { MentionStickerView, ReshareCard, RESHARE_CARD_HEIGHT, RESHARE_CARD_WIDTH } from '@/components/StoryMentionSticker';
@@ -107,13 +108,14 @@ export function MentionPopover({
   onViewProfile: (p: TaggedPerson) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   if (!target) return null;
   const { person, anchor } = target;
   const cardW = 232;
   const cardH = 136;
   const left = Math.max(SP.md, Math.min(W - cardW - SP.md, anchor.x - cardW / 2));
   const below = anchor.y + 32 + cardH < H - insets.bottom - SP.md;
-  const top = Math.max(insets.top + SP.md, below ? anchor.y + 32 : anchor.y - 32 - cardH);
+  const top = Math.max(headerTopInset + SP.md, below ? anchor.y + 32 : anchor.y - 32 - cardH);
   return (
     <View style={styles.popoverLayer} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />

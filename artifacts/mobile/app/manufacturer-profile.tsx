@@ -150,7 +150,7 @@ export default function ManufacturerProfileScreen() {
     if (!id) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isSellerDevPreview()) {
-      Alert.alert('Offline in preview', 'Manufacturer messaging is unavailable in the signed-out demo.');
+      Alert.alert('Sign in required', 'Sign in to message this manufacturer.');
       return;
     }
     try {

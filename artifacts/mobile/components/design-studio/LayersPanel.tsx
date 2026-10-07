@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/Button';
+import { MEDIA } from '@/lib/theme';
 /**
  * LayersPanel.tsx — Procreate's own Layers panel: a full-height dark sheet
  * (not a small floating popover), title "Layers" + Done, a "New layer" text
@@ -210,7 +212,7 @@ export default function LayersPanel(props: LayersPanelProps) {
               <View style={s.rowWrap}>
                 <View style={s.swipeActions} testID={`layer-swipe-actions-${layer.id}`}>
                   <TouchableOpacity
-                    style={[s.swipeBtn, { backgroundColor: '#2A2A2A' }]}
+                    style={[s.swipeBtn, { backgroundColor: MEDIA.background }]}
                     onPress={() => { onToggleLocked(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-lock-${layer.id}`}
                   >
@@ -218,21 +220,18 @@ export default function LayersPanel(props: LayersPanelProps) {
                     <Text style={s.swipeBtnText}>{layer.locked ? 'Unlock' : 'Lock'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[s.swipeBtn, { backgroundColor: '#3A3A3A' }]}
+                    style={[s.swipeBtn, { backgroundColor: MEDIA.background }]}
                     onPress={() => { onDuplicateLayer(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-duplicate-${layer.id}`}
                   >
                     <Feather name="copy" size={ICON.xs} color={FG} />
                     <Text style={s.swipeBtnText}>Duplicate</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.swipeBtn, { backgroundColor: '#8A1F1F' }]}
+                  <Button label="Delete" icon="trash-2" variant="destructive" size="compact"
+                    style={s.swipeBtn}
                     onPress={() => { onDeleteLayer(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-delete-${layer.id}`}
-                  >
-                    <Feather name="trash-2" size={ICON.xs} color={FG} />
-                    <Text style={s.swipeBtnText}>Delete</Text>
-                  </TouchableOpacity>
+                  />
                 </View>
 
                 <Animated.View

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Shown when nobody is live (or every stream in the pager has ended). Never
  * a blank page: an explanation, upcoming scheduled lives with "Remind me",
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   heroSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, textAlign: 'center', marginTop: SP.xs, maxWidth: 300 },
   retry: { marginTop: SP.md, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2 },
   retryText: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  browse: { marginTop: SP.md, minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, alignItems: 'center', justifyContent: 'center' },
+  browse: { marginTop: SP.md, minHeight: 44, borderRadius: ControlRadius.md, paddingHorizontal: SP.lg, alignItems: 'center', justifyContent: 'center' },
   section: { marginTop: SP.lg, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.base, marginBottom: 2 },
   upRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: RADIUS.md, padding: 10 },

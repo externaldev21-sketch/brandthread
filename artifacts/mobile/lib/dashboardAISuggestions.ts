@@ -31,7 +31,7 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-/** In-app routes only: "/inventory", "/(tabs)/orders" — never "//host" or a URL. */
+/** In-app routes only: "/(tabs)/products", "/(tabs)/orders" — never "//host" or a URL. */
 export function safeSuggestionRoute(route: unknown): string | undefined {
   const r = str(route);
   if (!r.startsWith('/') || r.startsWith('//') || /\s/.test(r)) return undefined;

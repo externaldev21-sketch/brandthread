@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Brandthread Design Studio — Remove Background
  * Route: /design-bg-removal
@@ -637,11 +638,11 @@ const s = StyleSheet.create({
   dock: { paddingHorizontal: SP.md, paddingTop: SP.md },
   group: { gap: SP.sm },
   grid: { flexDirection: 'row', gap: SP.sm },
-  cell: { flex: 1, height: COMP.buttonH, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  cell: { flex: 1, height: COMP.buttonH, borderRadius: ControlRadius.md, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   cellOutline: { borderWidth: 1, borderColor: BORDER, backgroundColor: BG },
   cellSolid: { backgroundColor: FG, borderWidth: 1, borderColor: FG },
   cellText: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  pill: { height: COMP.buttonH, borderRadius: RADIUS.pill, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
+  pill: { height: COMP.buttonH, borderRadius: ControlRadius.md, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
   pillDisabled: { opacity: 0.4 },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.md, color: BG },
   swatches: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.xs, height: 44 },

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAgeStatus } from '@/lib/ageGate';
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
@@ -581,7 +582,7 @@ const createStyles = (theme: AppThemePreset) => {
   balancePendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   balancePendingLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium },
   balancePendingAmount: { color: muted, fontSize: FS.sm, fontFamily: FONT.semibold },
-  pausedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: border },
+  pausedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: border },
   pausedRowText: { color: text, fontSize: FS.xs, fontFamily: FONT.medium, flexShrink: 1 },
   balanceLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 4 },
   balanceAmount:{ color: text, fontSize: FS.xl, fontFamily: FONT.semibold, marginBottom: 2 },

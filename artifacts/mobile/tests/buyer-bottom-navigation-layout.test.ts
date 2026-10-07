@@ -119,7 +119,7 @@ describe('buyer navigation contract', () => {
 
 describe('buyer search page', () => {
   it('is a standalone full-screen page, not a tab-bar morph', () => {
-    expect(search).toContain('router.back()');
+    expect(search).toContain('goBackOr(router)');
     expect(search).toContain("testID=\"buyer-search-field\"");
     expect(search).toContain('keyboardDismissMode="on-drag"');
     expect(bar).not.toContain('setFieldMounted');

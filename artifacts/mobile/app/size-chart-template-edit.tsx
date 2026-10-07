@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Size chart template editor — create from a preset / blank, or edit a saved template.
  *
@@ -293,7 +294,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     input: { minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground },
     notes: { minHeight: 84, paddingTop: SP.sm, textAlignVertical: 'top' },
     segment: { flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.pill, padding: 3, marginTop: SP.md, borderWidth: 1, borderColor: c.border },
-    segmentItem: { flex: 1, height: 38, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+    segmentItem: { flex: 1, height: 38, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
     segmentItemOn: { backgroundColor: c.foreground },
     segmentText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: c.mutedForeground },
     segmentTextOn: { color: c.background },
@@ -304,7 +305,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     th: { fontFamily: FONT.semibold, fontSize: FS.meta, color: c.foreground, paddingHorizontal: SP.sm },
     thCol: { paddingVertical: SP.sm },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.md },
-    chip: { width: '48.5%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 40, paddingHorizontal: 14, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border },
+    chip: { width: '48.5%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 40, paddingHorizontal: 14, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: c.border },
     chipText: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.sm, color: c.foreground },
     td: { height: 48, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground },
     tdSize: { fontFamily: FONT.semibold },

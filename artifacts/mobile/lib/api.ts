@@ -980,6 +980,8 @@ export type MetaAdsConnectionStatus = 'pending_selection' | 'connected' | 'needs
 
 export interface MetaAdsConnection {
   connected: boolean;
+  configured?: boolean;
+  configurationError?: string;
   status?: MetaAdsConnectionStatus;
   businessName?: string;
   adAccountName?: string;

@@ -26,9 +26,10 @@ describe('seller screens make no protected API call when signed out / Clerk not 
 
   it('products.tsx: signed-out preview loads nothing and blocks mutations', () => {
     const s = read('app/(tabs)/products.tsx');
-    expect(s).toContain('const previewOnly = sellerPreview && (!authLoaded || !isSignedIn || !userId);');
+    expect(s).toContain('const previewOnly = sellerPreview;');
+    expect(s).toContain('const sellerPreview = isSellerDevPreview();');
     before(s, 'const loadStats = useCallback', 'if (previewOnly || previewOnlyRef.current)', 'await getProductStats()');
-    before(s, 'const loadProducts = useCallback', 'if (previewOnly || previewOnlyRef.current)', 'await getProducts(');
+    before(s.slice(s.indexOf('const loadProducts = useCallback')), 'const loadProducts = useCallback', "if ((previewOnly || previewOnlyRef.current) && Platform.OS !== 'web')", 'await getProducts(');
     before(s, 'async function handleDuplicate(id: string)', 'if (previewOnly)', 'await duplicateProduct');
     before(s, 'async function handleDelete(product: Product)', 'if (previewOnly)', 'Alert.alert(');
     before(s, 'async function handleQuickArchive(product: Product)', 'if (previewOnly)', 'await ');
@@ -43,10 +44,10 @@ describe('seller screens make no protected API call when signed out / Clerk not 
 
   it('finance.tsx: skips summary/balance/transactions reads', () => {
     const s = read('app/finance.tsx');
-    expect(s).toContain('const skipProtectedReads = isSignedOutSellerPreview;');
+    expect(s).toContain('const skipProtectedReads = isPreviewMode || isSignedOutSellerPreview;');
     expect(s).toContain('(!isAuthLoaded || !isSignedIn)');
     before(s, 'const load = useCallback', 'if (skipProtectedReads)', 'api.');
-    expect(s).toContain('[api, skipProtectedReads]');
+    expect(s).toContain('[api, isDemoPreview, skipProtectedReads]');
   });
 
   it('payouts.tsx: skips balance, payouts, connect status and onboarding', () => {

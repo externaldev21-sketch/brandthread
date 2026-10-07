@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 /**
  * `gesture` variant — small footprint, animated hand/finger glyph performing
  * the real gesture over the real underlying UI, with a short caption beside
@@ -12,6 +14,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -34,6 +37,7 @@ export function GestureHintTip({
   visible, onDismiss, gesture, title, body, placement = 'bottom-center', reduceMotion = false, testID,
 }: GestureHintTipProps) {
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const tabBarInset = useBuyerTabBarInset();
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -44,7 +48,7 @@ export function GestureHintTip({
   if (!visible) return null;
 
   const positionStyle =
-    placement === 'top-center' ? { top: insets.top + SP.xl } :
+    placement === 'top-center' ? { top: headerTopInset + SP.xl } :
     placement === 'center' ? { top: '42%' as const } :
     { bottom: tabBarInset + SP.xl };
 
@@ -67,7 +71,7 @@ export function GestureHintTip({
           <Text style={styles.title}>{title}</Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
         </View>
-        <Feather name="x" size={14} color="rgba(255,255,255,0.6)" />
+        <Feather name="x" size={14} color={mediaAlpha(MEDIA.foreground, 0.6)} />
       </Pressable>
     </Animated.View>
   );
@@ -77,14 +81,14 @@ const styles = StyleSheet.create({
   root: { position: 'absolute', left: SP.lg, right: SP.lg, alignItems: 'center', zIndex: 9998, elevation: 9998 },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: 'rgba(20,20,20,0.92)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: mediaAlpha(MEDIA.background, 0.92),
+    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.14),
     borderRadius: RADIUS.lg,
     paddingVertical: 10, paddingHorizontal: 14,
     maxWidth: 340,
   },
   glyphSlot: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },
-  title: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.sm },
-  body: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  title: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.sm },
+  body: { color: mediaAlpha(MEDIA.foreground, 0.7), fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
 });

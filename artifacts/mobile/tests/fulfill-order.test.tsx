@@ -286,7 +286,7 @@ describe('fulfill-order shipping label purchase', () => {
     await act(async () => { await rateRow!.props.onPress(); });
     await flush();
 
-    expect(purchaseShippingLabelMock).toHaveBeenCalledWith('order-1', expect.objectContaining({ id: 'rate-1' }), 'fulfill-order-1');
+    expect(purchaseShippingLabelMock).toHaveBeenCalledWith('order-1', expect.objectContaining({ id: 'rate-1' }), 'fulfill-order-1', undefined);
 
     await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Continue').props.onPress(); });
     await flush();

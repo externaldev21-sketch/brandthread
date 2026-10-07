@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Brandthread Design Studio — Main Canvas Editor
  * Route: /design-canvas?id=<projectId>
@@ -5851,7 +5852,7 @@ const styles = StyleSheet.create({
 
   // Dark workspace the artboard sits on — Procreate never shows a canvas
   // edge-to-edge; it's always a page framed by margin on a dark surface.
-  canvasOuter: { flex: 1, flexDirection: 'row', backgroundColor: '#0A0A0A' },
+  canvasOuter: { flex: 1, flexDirection: 'row', backgroundColor: MEDIA.background },
 
   // Procreate's own sidebar: a slim column of handles, vertically centred,
   // hugging the left edge with a small inset so the size handle never gets

@@ -103,6 +103,10 @@ function oauthErrorRedirect(message: string): string {
 // ─── GET /connection ────────────────────────────────────────────────────────
 
 router.get("/connection", async (req, res) => {
+  if (!hasMetaTokenEncryptionKey()) {
+    res.json({ connected: false, configured: false, configurationError: "Meta / Instagram is not configured." });
+    return;
+  }
   const owner = sellerId(req);
   const [row] = await db.select().from(metaAdAccounts).where(eq(metaAdAccounts.sellerId, owner)).limit(1);
   if (!row) {
@@ -128,7 +132,7 @@ router.get("/oauth/start", async (req, res) => {
   const owner = sellerId(req);
   const appId = process.env.META_APP_ID;
   const redirectUri = process.env.META_REDIRECT_URI;
-  if (!appId || !redirectUri) {
+  if (!appId || !redirectUri || !hasMetaTokenEncryptionKey()) {
     res.status(503).json({ error: "Meta Ads is not configured." });
     return;
   }

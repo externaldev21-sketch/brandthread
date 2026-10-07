@@ -109,7 +109,7 @@ vi.mock('@clerk/expo', async (importOriginal) => ({
   // see its own comment for why: useUser()'s isLoaded can lag well behind
   // userId itself, which left the seller inbox stuck on its web-preview
   // loading skeleton forever whenever that happened.
-  useAuth: () => ({ userId: 'seller-user' }),
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'seller-user' }),
 }));
 
 // previewInbox.ts imports expo-asset and requires bundled image assets at
@@ -129,6 +129,7 @@ vi.mock('@/lib/previewInbox', async (importOriginal) => ({
 }));
 
 vi.mock('@/services/socialService', () => ({
+  getConversations: async () => await apiMock.conversations.list(),
   subscribeSocial: vi.fn(() => () => {}),
   markConversationRead: vi.fn().mockResolvedValue(undefined),
   archiveConversation: vi.fn().mockResolvedValue(undefined),
@@ -297,25 +298,25 @@ describe('seller inbox unread state', () => {
     renderer = undefined;
   });
 
-  it('clears the opened row badge and total unread subtitle immediately', async () => {
+  it('clears the opened unread row immediately and leaves other unread rows intact', async () => {
     apiMock.conversations.list.mockResolvedValue([
       conversation('unread-thread', 2),
       conversation('another-thread', 1),
     ]);
     renderer = await renderScreen();
 
-    expect(textContent(renderer)).toContain('3 unread');
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-another-thread' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-unread-thread' }, { deep: false }))
       .toHaveLength(1);
 
-    const row = renderer.root.findByProps({ testID: 'seller-conversation-unread-thread' });
+    const row = renderer.root.findByProps({ testID: 'inbox-conversation-unread-thread' });
     await act(async () => {
       row.props.onPress();
       await flushPromises();
     });
 
-    expect(textContent(renderer)).not.toContain('3 unread');
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-another-thread' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-unread-thread' }, { deep: false }))
       .toHaveLength(0);
     expect(routerMock.push).toHaveBeenCalledWith('/seller-conversation?id=unread-thread');
   });
@@ -327,8 +328,8 @@ describe('seller inbox unread state', () => {
     ]);
     renderer = await renderScreen();
 
-    const unreadRow = renderer.root.findByProps({ testID: 'seller-conversation-unread-thread' });
-    const readRow = renderer.root.findByProps({ testID: 'seller-conversation-read-thread' });
+    const unreadRow = renderer.root.findByProps({ testID: 'inbox-conversation-unread-thread' });
+    const readRow = renderer.root.findByProps({ testID: 'inbox-conversation-read-thread' });
 
     const unreadName = unreadRow.findAllByType('Text' as never).find((n) => n.props.children === 'Buyer');
     const readName = readRow.findAllByType('Text' as never).find((n) => n.props.children === 'Buyer');
@@ -337,13 +338,13 @@ describe('seller inbox unread state', () => {
     expect(fontFamilyOf(unreadName!)).toContain('Test-Bold');
     expect(fontFamilyOf(readName!)).toContain('Test-Regular');
 
-    const unreadPreview = unreadRow.findAllByType('Text' as never).find((n) => n.props.children === 'Can you help with sizing?');
-    const readPreview = readRow.findAllByType('Text' as never).find((n) => n.props.children === 'Can you help with sizing?');
+    const unreadPreview = unreadRow.findAllByType('Text' as never).find((n) => Array.isArray(n.props.children) && n.props.children.join('') === 'Can you help with sizing?');
+    const readPreview = readRow.findAllByType('Text' as never).find((n) => Array.isArray(n.props.children) && n.props.children.join('') === 'Can you help with sizing?');
     expect(fontFamilyOf(unreadPreview!)).toContain('Test-Bold');
     expect(fontFamilyOf(readPreview!)).not.toContain('Test-Bold');
 
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false })).toHaveLength(1);
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-read-thread' }, { deep: false })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-unread-thread' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-read-thread' }, { deep: false })).toHaveLength(0);
   });
 
   it('does not restore a stale badge when a later inbox load is delayed or fails', async () => {
@@ -354,7 +355,7 @@ describe('seller inbox unread state', () => {
     renderer = await renderScreen();
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'seller-conversation-unread-thread' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'inbox-conversation-unread-thread' }).props.onPress();
       await flushPromises();
     });
     expect(textContent(renderer)).not.toContain('3 unread');
@@ -389,7 +390,7 @@ describe('seller inbox unread state', () => {
     renderer = await renderScreen();
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'seller-conversation-unread-thread' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'inbox-conversation-unread-thread' }).props.onPress();
       await flushPromises();
     });
     expect(textContent(renderer)).not.toContain('3 unread');
@@ -404,8 +405,8 @@ describe('seller inbox unread state', () => {
     });
     await refocusScreen();
 
-    expect(textContent(renderer)).toContain('3 unread');
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }).length)
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-another-thread' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-unread-thread' }, { deep: false }).length)
       .toBeGreaterThan(0);
   });
 
@@ -414,16 +415,17 @@ describe('seller inbox unread state', () => {
   // present while the preview's backend is unreachable/401s. Before this fix,
   // that combination (myId truthy + API failure) left the seller inbox stuck
   // showing nothing but its own error state forever, unlike the buyer inbox's
-  // identical scenario, which has always fallen back to the seeded preview
-  // conversations. See app/seller-inbox.tsx's `load()` catch block.
-  it('falls back to seeded preview conversations when the API fails and the web preview is active', async () => {
+  // A signed-in account must retain its real error state even when a
+  // development preview flag was previously enabled on this device.
+  it('never substitutes seeded preview conversations for a signed-in account whose API fails', async () => {
     previewMock.isPreviewInboxEnabled.mockReturnValue(true);
     apiMock.conversations.list.mockRejectedValue(new Error('401 Unauthorized'));
     renderer = await renderScreen();
 
-    expect(textContent(renderer)).toContain('Can you help with sizing?');
-    expect(renderer.root.findAllByProps({ testID: 'seller-conversation-preview-seller-conversation-01' }).length)
-      .toBeGreaterThan(0);
+    expect(textContent(renderer)).not.toContain('Can you help with sizing?');
+    expect(renderer.root.findAllByProps({ testID: 'inbox-conversation-preview-seller-conversation-01' }).length)
+      .toBe(0);
+    expect(apiMock.conversations.list).toHaveBeenCalled();
   });
 
   it('shows the real error state (not seeded data) when the API fails outside preview', async () => {

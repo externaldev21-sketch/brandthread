@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Buyer Order Detail
  *
@@ -433,7 +434,7 @@ const rvs = StyleSheet.create({
   },
   charCount: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md },
   chipRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, flexWrap: 'wrap' },
-  chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.meta },
   photoRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md, alignItems: 'center', flexWrap: 'wrap' },
   photoWrap: { width: 56, height: 56 },
@@ -951,6 +952,12 @@ export default function BuyerOrderDetailScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={theme.accent} colors={[theme.accent]} />
         }
       >
+      {isFetching && (
+        <View testID="buyer-order-refresh-progress" style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, marginBottom: SP.sm }}>
+          <ActivityIndicator size="small" color={theme.muted} />
+          <Text style={{ color: theme.muted, fontSize: 12 }}>Updating order status…</Text>
+        </View>
+      )}
       {/* Centers content in a max-width column on iPad/landscape; each section
           below keeps its own SP.md gutter so phones render unchanged. */}
       <ResponsiveContainer style={{ paddingHorizontal: 0 }}>

@@ -20,6 +20,10 @@ const {
   addToCartMock: vi.fn(),
   alertMock: vi.fn(),
   apiMock: {
+    bundles: { publicByProduct: vi.fn().mockResolvedValue({ bundles: [] }) },
+    productVideos: { publicGet: vi.fn().mockResolvedValue({ video: null }) },
+    productQa: { list: vi.fn().mockResolvedValue({ questions: [], totalCount: 0 }) },
+    productPairings: { publicList: vi.fn().mockResolvedValue([]) },
     productLaunches: { state: vi.fn().mockResolvedValue({ launching: false, launchAt: null, serverNow: new Date().toISOString() }) },
     publicProducts: {
       get: vi.fn(),
@@ -215,6 +219,17 @@ vi.mock('@/lib/previewCatalog', () => ({
   isPreviewCatalogEnabled: previewCatalogEnabledMock,
   getPreviewCatalogProduct: previewCatalogProductMock,
 }));
+vi.mock('@/lib/previewProducts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/previewProducts')>();
+  return {
+    ...actual,
+    getPreviewRelatedProducts: () => [],
+    getPreviewBuyerProduct: (id: string) => {
+      const row = previewCatalogEnabledMock() ? previewCatalogProductMock(id) : null;
+      return row ? actual.previewBuyerProductFromCatalog(row) : null;
+    },
+  };
+});
 
 vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({
@@ -368,6 +383,8 @@ describe('buyer product detail when seller payments are unavailable', () => {
   let renderer!: ReactTestRenderer;
 
   beforeEach(() => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 0));
     addToCartMock.mockReset();
     addToCartMock.mockResolvedValue({
       success: true,
@@ -407,6 +424,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     await act(async () => {
       renderer?.unmount();
     });
+    vi.unstubAllGlobals();
   });
 
   it('warns about payments, disables Buy Now, and still lets the buyer add the item to cart', async () => {
@@ -467,6 +485,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
 
     const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Buy now' });
     expect(buyNow.props.disabled).toBe(false);
+    const cartReadsBeforeBuyNow = getCartMock.mock.calls.length;
 
     await act(async () => {
       await buyNow.props.onPress();
@@ -477,7 +496,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
       'Unable to verify payments',
       'We could not confirm this seller can accept payments. Check your connection and try again.',
     );
-    expect(getCartMock).not.toHaveBeenCalled();
+    expect(getCartMock).toHaveBeenCalledTimes(cartReadsBeforeBuyNow);
     expect(createBuyNowSessionMock).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
   });
@@ -514,10 +533,13 @@ describe('buyer product detail when seller payments are unavailable', () => {
     expect(apiMock.reviews.forProduct).not.toHaveBeenCalled();
     expect(apiMock.buyer.sellerPaymentStatus).not.toHaveBeenCalled();
 
-    const previewOnly = renderer.root.findByProps({ accessibilityLabel: 'Preview item only' });
+    const previewOnly = renderer.root.findByProps({ accessibilityLabel: 'Add to cart unavailable in preview' });
     expect(previewOnly.props.disabled).toBe(true);
-    const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Preview only' });
+    const buyNow = renderer.root.findByProps({ testID: 'product-seller-preview-buy' });
     expect(buyNow.props.disabled).toBe(true);
+    // The signed-in bag provider may read the real account's bag on mount;
+    // neither synthetic product action may initiate another read.
+    const cartReadsBeforePreviewActions = getCartMock.mock.calls.length;
 
     await act(async () => {
       previewOnly.props.onPress();
@@ -525,7 +547,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
       await flushPromises();
     });
     expect(addToCartMock).not.toHaveBeenCalled();
-    expect(getCartMock).not.toHaveBeenCalled();
+    expect(getCartMock).toHaveBeenCalledTimes(cartReadsBeforePreviewActions);
     expect(createBuyNowSessionMock).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
   });

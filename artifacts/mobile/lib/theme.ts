@@ -75,6 +75,27 @@ export const CREATE_CANVAS = {
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
 
+/**
+ * Fixed-contrast media/artwork colors. These are deliberately independent of
+ * the selected page theme: video scrims, exported artwork, and provider-brand
+ * buttons must retain their foreground/background contrast.
+ */
+export const MEDIA = {
+  background: BG,
+  foreground: FG,
+  legacyReshareMarker: '#0B0B0B',
+  muted: MUTED,
+  border: BORDER,
+  line: CREATE_CANVAS.line,
+  metal: {
+    mid: '#B8B8B8',
+    highlight: '#F2F2F2',
+    shadow: '#6E6E6E',
+    outline: '#E6E6E6',
+    seam: '#3A3A3A',
+  },
+} as const;
+
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
 export const ACCENT        = '#FFFFFF';
 export const ACCENT_LIGHT  = '#FFFFFF';

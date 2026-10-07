@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Buyer onboarding — optional "Your sizes" step (between Style and Brands).
  * Tap a size to pick it, tap again to clear. Choices are held in onboarding
@@ -69,7 +70,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs },
   cell: { width: '31.5%' },
   chip: {
-    width: '100%', minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12,
+    width: '100%', minHeight: 44, borderRadius: ControlRadius.md, paddingHorizontal: 12,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },

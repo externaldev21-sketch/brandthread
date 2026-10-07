@@ -35,8 +35,8 @@ describe('temporary seller preview flag', () => {
     const services = readFileSync(resolve(root, 'lib/serviceConfig.ts'), 'utf8');
     const generated = readFileSync(resolve(root, '../../lib/api-client-react/src/custom-fetch.ts'), 'utf8');
     const layout = readFileSync(resolve(root, 'app/_layout.tsx'), 'utf8');
-    expect(api).toContain("error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' }");
-    expect(services).toContain("error: { message: 'This action is unavailable in the signed-out seller preview.', code: 'dev_preview_offline' }");
+    expect(api).toContain('throw new ApiError(401, signedOutErrorBody())');
+    expect(services).toContain('signedOutGate');
     expect(generated).toContain('if (_requestGuard?.())');
     expect(layout).toContain('setRequestGuard(() => isSellerDevPreview())');
   });
@@ -48,7 +48,7 @@ describe('temporary seller preview flag', () => {
     const orders = readFileSync(resolve(root, 'lib/previewSellerOrders.ts'), 'utf8');
     const products = readFileSync(resolve(root, 'lib/previewSellerProducts.ts'), 'utf8');
     expect(aiService).toContain('if (isSellerDevPreview())');
-    expect(memory).toContain('!isSellerDevPreview() && API_BASE && authToken');
+    expect(memory).toContain("if (!API_BASE || !authToken) throw new Error('Sign in to rebuild brand memory.')");
     expect(removal).toContain('const demo = isSellerDevPreview() && isPreviewDemoMode()');
     expect(orders).toContain('allPreviewSellerOrders');
     expect(products).toContain('getPreviewSellerProducts');

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * The Dashboard's range pill row — Today / Week / Month / Year / All with
  * the sliding glass-pill active indicator — extracted verbatim from
@@ -130,7 +131,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
+    borderRadius: ControlRadius.md,
   },
   rangeText: {
     fontFamily: FONT.semibold,

@@ -86,6 +86,7 @@ vi.mock("../../lib/metaAdsLaunch", () => ({
 }));
 
 import metaAdsRouter from "../meta-ads";
+import { hasMetaTokenEncryptionKey } from "../../lib/metaCrypto";
 
 let server: Server;
 let baseUrl = "";
@@ -116,6 +117,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  vi.mocked(hasMetaTokenEncryptionKey).mockReturnValue(true);
   process.env.META_OAUTH_STATE_SECRET = "test-oauth-state-secret";
   process.env.META_REDIRECT_URI = "https://api.brandthread.app/meta-ads/oauth/callback";
   process.env.META_APP_ID = "test-app-id";
@@ -125,6 +127,26 @@ beforeEach(() => {
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
   vi.clearAllMocks();
+});
+
+describe("Meta configuration guards", () => {
+  it("keeps connection status available and explicitly unconfigured without the encryption key", async () => {
+    vi.mocked(hasMetaTokenEncryptionKey).mockReturnValue(false);
+    const res = await fetch(`${baseUrl}/meta-ads/connection`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      connected: false,
+      configured: false,
+      configurationError: "Meta / Instagram is not configured.",
+    });
+  });
+
+  it("rejects OAuth startup without the encryption key rather than starting an unrecoverable connection", async () => {
+    vi.mocked(hasMetaTokenEncryptionKey).mockReturnValue(false);
+    const res = await fetch(`${baseUrl}/meta-ads/oauth/start`);
+    expect(res.status).toBe(503);
+    expect(await res.text()).toMatch(/not configured/i);
+  });
 });
 
 describe("GET /meta-ads/oauth/callback", () => {

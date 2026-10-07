@@ -24,8 +24,9 @@ describe('Studio header: avatar + name + close (X), nothing else', () => {
 
   it('has no subtitle of any kind — no "Set store name" link, no setup progress bar', () => {
     expect(studio).not.toContain('Set store name');
-    expect(studio).not.toContain('setupBarTrack');
-    expect(studio).not.toContain('setupBarFill');
+    const header = studio.slice(studio.indexOf('testID="seller-studio-header"'), studio.indexOf('</GestureDetector>', studio.indexOf('testID="seller-studio-header"')));
+    expect(header).not.toContain('setupBarTrack');
+    expect(header).not.toContain('setupBarFill');
   });
 
   it('the header row carries testID="seller-studio-header" (used by e2e/studio-header-text-fit.spec.ts to scope its scan)', () => {

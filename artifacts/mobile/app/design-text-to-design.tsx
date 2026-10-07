@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/Button';
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Brandthread AI Design — chat-first design agent
  * Route: /design-text-to-design
@@ -334,10 +336,7 @@ export default function AiDesignChatScreen() {
           <View style={[s.assistantBubble, s.errorBubble]}>
             <Feather name="alert-circle" size={14} color={colors.destructive} />
             <Text style={s.errorText}>{item.error}</Text>
-            <TouchableOpacity onPress={handleRetry} style={s.retryBtn}>
-              <Feather name="refresh-cw" size={12} color={theme.accent} />
-              <Text style={[s.retryText, { color: theme.accent }]}>Retry</Text>
-            </TouchableOpacity>
+            <Button label="Retry" icon="refresh-cw" variant="tertiary" size="compact" onPress={handleRetry} style={s.retryBtn} />
           </View>
         </View>
       );
@@ -538,7 +537,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     gap: 6,
     height: 32,
     paddingHorizontal: 12,
-    borderRadius: 16,
+    borderRadius: ControlRadius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     backgroundColor: colors.background,
@@ -552,7 +551,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   option: {
     height: 32,
     paddingHorizontal: 14,
-    borderRadius: 16,
+    borderRadius: ControlRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
@@ -599,7 +598,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     height: 40,
     width: (SCREEN_W_FOR_GRID - SCREEN_PAD * 2 - SP.sm * 2) / 3,
     paddingHorizontal: 12,
-    borderRadius: 20,
+    borderRadius: ControlRadius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     backgroundColor: colors.background,

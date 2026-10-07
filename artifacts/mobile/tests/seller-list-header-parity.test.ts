@@ -84,10 +84,7 @@ describe('Count row is hidden on an empty list', () => {
 
 describe('Products empty state has no preview wording', () => {
   it('never mentions "preview" anywhere near the empty-state copy', () => {
-    const emptyCopySection = productsSource.slice(
-      productsSource.indexOf('emptyCopy'),
-      productsSource.indexOf('emptyCopy') + 1500,
-    );
+    const emptyCopySection = readFileSync(resolve(__dirname, '..', 'lib/sellerLists/emptyCopy.ts'), 'utf8');
     expect(emptyCopySection.toLowerCase()).not.toContain('preview');
   });
 

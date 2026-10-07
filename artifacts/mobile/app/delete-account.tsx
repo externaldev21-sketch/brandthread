@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Delete account (App Store guideline 5.1.1(v)) — fully in-app for buyer and
  * seller accounts.
@@ -388,10 +389,10 @@ export default function DeleteAccountScreen() {
                     accessibilityLabel="Continue with Apple"
                   >
                     {appleBusy
-                      ? <ActivityIndicator color="#FFFFFF" />
+                      ? <ActivityIndicator color={MEDIA.foreground} />
                       : (
                         <>
-                          <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                          <Ionicons name="logo-apple" size={20} color={MEDIA.foreground} />
                           <Text style={s.appleBtnText}>Continue with Apple</Text>
                         </>
                       )}
@@ -549,10 +550,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // Sign in with Apple button per Apple HIG: solid black, white logo + label.
   appleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
-    minHeight: 50, borderRadius: RADIUS.lg, backgroundColor: '#000000',
+    minHeight: 50, borderRadius: RADIUS.lg, backgroundColor: MEDIA.background,
     borderWidth: 1, borderColor: theme.border,
   },
-  appleBtnText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
+  appleBtnText: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.base },
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginTop: SP.lg },
   checkbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.muted,

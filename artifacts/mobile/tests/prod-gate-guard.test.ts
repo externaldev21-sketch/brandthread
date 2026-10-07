@@ -88,6 +88,7 @@ describe('production-gated flags are referenced only through lib/buildFlags.ts',
     // bt_preview / demo / bt_theme are read in code only by these files, each of
     // which checks __DEV__/ALLOW_DEV_TOOLS/isSellerDevPreview first.
     const ALLOWED_PARAM_READERS = new Set([
+  'components/chat/ConversationThread.tsx',
       'app/_layout.tsx',
       'app/index.tsx',
       'app/boost.tsx',

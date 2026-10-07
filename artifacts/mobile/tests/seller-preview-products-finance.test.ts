@@ -48,12 +48,12 @@ describe('seller demo products and finance fixtures', () => {
     const root = resolve(__dirname, '..');
     const screen = readFileSync(resolve(root, 'app/(tabs)/products.tsx'), 'utf8');
     const navigation = screen.slice(screen.indexOf('const openProduct ='), screen.indexOf('const openActionSheet ='));
-    expect(navigation).toContain('if (previewOnly && !previewDemo)');
+    expect(navigation).toContain("if (previewOnly && !previewDemo && Platform.OS !== 'web')");
     expect(navigation).toContain("router.push(('/product-detail?id=' + product.id)");
-    expect(screen).toContain("onPress: () => router.push('/add-product' as never)");
+    expect(screen).toContain("onPress: () => router.push('/add-product?from=products' as never)");
     const detail = readFileSync(resolve(root, 'app/product-detail.tsx'), 'utf8');
     expect(detail.indexOf('getPreviewSellerProducts().find')).toBeLessThan(
-      detail.indexOf('if (!id || !userId)'),
+      detail.indexOf('if (!id || (!userId && !isSellerDevPreview()))'),
     );
   });
 });

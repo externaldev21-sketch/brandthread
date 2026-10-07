@@ -78,7 +78,7 @@ describe('finance.tsx (QA-0090)', () => {
 describe('ip-report.tsx (QA-0140)', () => {
   it('pads the scroll content past the floating tab bar', () => {
     const s = read('app/ip-report.tsx');
-    expect(s).toContain('COMP.tabBarH');
-    expect(s).toContain('paddingBottom: tabBarClearance');
+    expect(s).toContain('useSellerTabBarInset()');
+    expect(s).toContain('paddingBottom: SP.xl + tabBarInset');
   });
 });

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -170,7 +171,7 @@ const styles = StyleSheet.create({
   askButton: {
     minHeight: 32,
     paddingHorizontal: SP.sm,
-    borderRadius: RADIUS.pill,
+    borderRadius: ControlRadius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',

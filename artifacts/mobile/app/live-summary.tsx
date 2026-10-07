@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Live summary — the host's numbers for one live: how long it ran, who
  * watched, what sold. Opened when the host ends a live (seller-live.tsx)
@@ -245,8 +246,8 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   heroTitle: { color: colors.foreground, fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
   heroMeta: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: LIVE_RED },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
-  livePillText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.2 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: MEDIA.foreground },
+  livePillText: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.2 },
   cardTitle: { color: colors.foreground, fontFamily: FONT.semibold, fontSize: FS.base, marginBottom: SP.md },
   cardTitleInset: { paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.xs },
   headline: { alignItems: 'center', marginBottom: SP.lg, gap: 2 },

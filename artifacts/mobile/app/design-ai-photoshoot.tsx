@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Brandthread Design Studio — AI Photoshoot
  * Route: /design-ai-photoshoot
@@ -488,7 +489,7 @@ export default function AIPhotoshootScreen() {
                 accessibilityLabel={`Scene: ${opt.label}`}
               >
                 <LinearGradient
-                  colors={active ? ['#4a4a4a', '#1c1c1c'] : ['#2e2e2e', '#101010']}
+                  colors={active ? ['#4a4a4a', MEDIA.background] : [MEDIA.background, MEDIA.background]}
                   style={[s.presetTileImg, active && s.presetTileImgActive]}
                 >
                   <Feather name={SCENE_ICONS[opt.value]} size={20} color="#fff" />

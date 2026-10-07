@@ -16,16 +16,18 @@ describe('broken controls and error-state regressions', () => {
   });
 
   it('does not render unimplemented create-post tools', () => {
-    const source = read('app/create-post.tsx');
-    const toolbar = source.slice(
-      source.indexOf('{/* Right floating toolbar */}'),
-      source.indexOf('{/* Overlay canvas'),
-    );
+    const source = read('components/create-post/SlideEditor.tsx');
+    expect(read('app/create-post.tsx')).toContain('<SlideEditor');
+    const toolbar = source;
 
     expect(toolbar).not.toContain('icon="settings"');
     expect(toolbar).not.toContain('icon="sliders"');
     expect(toolbar).not.toContain('icon="film"');
-    expect(toolbar).toContain('accessibilityLabel="Add text overlay"');
+    expect(toolbar).toContain('onAspect(a)');
+    expect(toolbar).toContain('testID={`aspect-${a.replace');
+    expect(toolbar).toContain('label="Delete"');
+    expect(toolbar).toContain('slides.filter((sl) => sl.id !== active.id)');
+    expect(toolbar).toContain('onSlides(next)');
   });
 
   it('separates address load failures from a genuinely empty account', () => {

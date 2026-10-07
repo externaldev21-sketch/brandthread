@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -27,7 +29,7 @@ function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles:
         { borderColor: ring.seen ? theme.border : theme.text },
       ]}
     >
-      <View style={[styles.avatar, { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }]}>
+      <View style={[styles.avatar, { width: inner, height: inner, borderRadius: inner / 2, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.18) }]}>
         {tagger.avatarUrl ? (
           <CachedImage source={{ uri: tagger.avatarUrl }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors />
         ) : (

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -375,7 +376,7 @@ const createStyles = (theme: AppThemePreset) => {
     radioOn: { borderColor: text },
     radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: text },
     dayRow: { flexDirection: 'row', gap: DAY_GAP, marginTop: SP.md, flexWrap: 'wrap' },
-    dayChip: { height: 40, paddingHorizontal: 12, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
+    dayChip: { height: 40, paddingHorizontal: 12, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
     dayChipOn: { backgroundColor: text, borderColor: text },
     dayText: { color: text, fontSize: FS.sm, fontFamily: FONT.medium },
     dayTextOn: { color: onAccent },

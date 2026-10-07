@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Thread Cash ledger — every earn, spend and expiry with the balance after
  * each one, what expires soon, and filters. Layout follows Klarna's cashback
@@ -191,7 +192,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   heroValue: {},
   heroSub: { fontFamily: FONT.medium, fontSize: FS.sm, marginTop: 4 },
   pills: { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
-  pill: { paddingHorizontal: 16, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  pill: { paddingHorizontal: 16, height: 36, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   section: { paddingHorizontal: SP.md, marginTop: SP.md },
   sectionTitle: { fontFamily: FONT.semibold, fontSize: 20, marginBottom: SP.xs },

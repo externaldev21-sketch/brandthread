@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Renders the caption segment that is active at `currentTime` (seconds) as
  * white text on a solid black pill, centered near the bottom of the video.
@@ -32,11 +33,11 @@ export function CaptionsOverlay({
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: SP.md, right: SP.md, alignItems: 'center' },
   pill: {
-    backgroundColor: '#000000',
+    backgroundColor: MEDIA.background,
     borderRadius: RADII.card,
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs + 2,
     maxWidth: '100%',
   },
-  text: { color: '#FFFFFF', fontFamily: FONT.medium, fontSize: FS.base, lineHeight: 22, textAlign: 'center' },
+  text: { color: MEDIA.foreground, fontFamily: FONT.medium, fontSize: FS.base, lineHeight: 22, textAlign: 'center' },
 });

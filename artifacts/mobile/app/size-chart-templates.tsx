@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Size chart templates — seller list of reusable charts plus starter presets.
  *
@@ -149,7 +150,7 @@ function makeStyles(c: ReturnType<typeof useColors>) {
     rowTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
     rowMeta: { fontFamily: FONT.regular, fontSize: FS.sm, color: c.mutedForeground },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
-    retry: { paddingHorizontal: SP.lg, height: 44, justifyContent: 'center', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border },
+    retry: { paddingHorizontal: SP.lg, height: 44, justifyContent: 'center', borderRadius: ControlRadius.md, borderWidth: 1, borderColor: c.border },
     retryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: c.foreground },
   });
 }

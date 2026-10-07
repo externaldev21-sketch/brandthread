@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Live Moderation — host screen pushed from seller-live's rail.
  * Slow mode, blocked words, and the muted / banned lists for one stream.
@@ -217,7 +218,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     textTransform: 'uppercase', marginTop: SP.lg, marginBottom: SP.sm,
   },
   segmentRow: { flexDirection: 'row', gap: SP.sm },
-  segment: { flex: 1, height: 44, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  segment: { flex: 1, height: 44, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   segmentText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   rowBtn: { width: 112 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },

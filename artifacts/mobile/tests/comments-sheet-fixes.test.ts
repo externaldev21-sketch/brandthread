@@ -85,12 +85,13 @@ describe('Time and Reply share one baseline (the 6px-higher-Reply bug)', () => {
 
 describe('Like heart: its own column near the comment text, solid when liked, never clipped', () => {
   it('uses Ionicons filled/outline heart instead of Feather\'s outline-only glyph', () => {
-    expect(comments).toContain("import { Feather, Ionicons } from '@expo/vector-icons';");
-    expect(comments).toContain("name={liked ? 'heart' : 'heart-outline'}");
+    expect(comments).toContain('FontAwesome');
+    expect(comments).toMatch(/liked\s*\?\s*<FontAwesome name="heart" size=\{16\}/);
+    expect(comments).toContain('<Feather name="heart" size={16}');
   });
 
   it('is a 16pt icon, not inline in the meta row', () => {
-    expect(comments).toContain("Ionicons name={liked ? 'heart' : 'heart-outline'} size={16}");
+    expect(comments).toContain('<FontAwesome name="heart" size={16}');
     const metaStart = comments.indexOf('<View style={s.commentMeta}>');
     const metaEnd = comments.indexOf('</View>', metaStart);
     expect(comments.slice(metaStart, metaEnd)).not.toContain('LikeHeart');
@@ -149,7 +150,7 @@ describe('Row and username/text typography', () => {
   });
 
   it('username is 13pt semibold gray (#8a8a8a)', () => {
-    expect(comments).toContain("authorName: { fontFamily: FONT.semibold, fontSize: 13, color: '#8a8a8a'");
+    expect(comments).toContain('authorName: { fontFamily: FONT.semibold, fontSize: 13, color: MUTED');
   });
 
   it('comment text is 15pt regular white with lineHeight 19', () => {

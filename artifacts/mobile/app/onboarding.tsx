@@ -1560,11 +1560,6 @@ function SharedAuthStep({
         </Reveal>
 
         <Reveal index={9}>
-          <AgeDobField
-            value={dobText}
-            onChange={(t) => { setDobText(t); setDobError(null); }}
-            error={dobError}
-          />
           <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginTop: SPACE.xs, marginBottom: SPACE.md }} />
         </Reveal>
 

@@ -28,7 +28,7 @@ describe('messaging screens never hit the real API in dev-preview, however Clerk
   it('the shared inbox resolves the preview session per variant', () => {
     const src = read('components/inbox/MessagesInbox.tsx');
     expect(src).toContain("import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';");
-    expect(src).toContain('() => (isSeller ? isSellerDevPreview() : isBuyerDevPreview()),');
+    expect(src).toContain('() => !userId && (isSeller ? isSellerDevPreview() : isBuyerDevPreview()),');
     expect(read('app/seller-inbox.tsx')).toContain('<MessagesInbox variant="seller" />');
     expect(read('app/(buyer)/inbox.tsx')).toContain('<MessagesInbox variant="buyer" />');
   });

@@ -148,16 +148,16 @@ describe('buyer-post-comments — posting progress and failure', () => {
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/buyer-post-comments.tsx'), 'utf8');
     expect(src).toContain('sending');
-    expect(src).toMatch(/disabled=\{!inputText\.trim\(\)\s*\|\|\s*sending\}/);
+    expect(src).toContain('canSend={inputText.trim().length > 0 && !sending}');
   });
 
   it('shows InlineSpinner on the send button while sending', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/buyer-post-comments.tsx'), 'utf8');
-    expect(src).toContain('InlineSpinner');
-    // Rendered conditionally inside the send button area
-    expect(src).toMatch(/sending[\s\S]{0,60}InlineSpinner|InlineSpinner[\s\S]{0,20}sending/m);
+    expect(src).toContain('<Composer');
+    expect(src).toContain('canSend={inputText.trim().length > 0 && !sending}');
+    expect(src).toContain('busy={sending}');
   });
 
   it('has sendError state for posting failure', async () => {

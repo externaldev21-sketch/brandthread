@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Buy a store gift card. Reached from a store's profile menu ("Gift cards").
  * Layout follows the Blue Apron / Givingli gift flows (Mobbin): the card on
@@ -240,7 +241,7 @@ function Chip({ label, selected, onPress, ck }: { label: string; selected: boole
       accessibilityState={{ selected }}
       accessibilityLabel={label}
       style={{
-        minHeight: 44, paddingHorizontal: SP.md, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+        minHeight: 44, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
         borderColor: selected ? ck.text : ck.fieldBorder, backgroundColor: selected ? ck.text : 'transparent',
       }}
     >

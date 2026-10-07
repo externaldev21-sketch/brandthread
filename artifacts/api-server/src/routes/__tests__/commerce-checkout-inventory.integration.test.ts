@@ -16,6 +16,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import crypto from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import { drainSavedProductAlerts } from "../../lib/savedProductAlerts";
 
 vi.hoisted(() => {
   process.env.PAYOUT_MODE = "hold";
@@ -169,6 +170,7 @@ describe("stock alerts across both sides", () => {
 
     // Restock, then sell out again: the seller is alerted a second time.
     await app.asSeller("PATCH", `/api/inventory/${variantId}/adjust`, { delta: 1 });
+    await drainSavedProductAlerts();
     expect((await feedFor(app.seller)).filter((n) => n.type === "low_stock" && n.targetId === productId)).toHaveLength(0);
     await app.buyViaHostedCheckout([{ productId, variantId, quantity: 1 }]);
     expect((await feedFor(app.seller)).filter((n) => n.type === "low_stock" && n.targetId === productId)).toHaveLength(1);
@@ -186,6 +188,7 @@ describe("stock alerts across both sides", () => {
     const cancel = await app.asBuyer("POST", `/api/buyer/orders/${orderId}/cancel`, {});
     expect(cancel.status, JSON.stringify(cancel.body)).toBe(200);
     expect(await stockOf(variantId)).toBe(1);
+    await drainSavedProductAlerts();
 
     const saverFeed = await feedFor(saver);
     expect(saverFeed.map((n) => n.type)).toContain("back_in_stock");

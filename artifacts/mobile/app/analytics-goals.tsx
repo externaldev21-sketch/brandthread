@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Goals — several targets per seller (revenue, orders, units, visits, new
  * followers) for this week / month / quarter / year, with real progress and a
@@ -168,7 +169,7 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   sheetTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: colors.foreground, marginBottom: SP.md },
   fieldLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: SP.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.md },
-  chip: { minHeight: 36, paddingHorizontal: SP.sm + 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  chip: { minHeight: 36, paddingHorizontal: SP.sm + 4, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: colors.mutedForeground },
   chipTextOn: { color: colors.primaryForeground, fontFamily: FONT.semibold },

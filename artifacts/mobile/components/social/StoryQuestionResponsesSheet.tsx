@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Author-only sheet listing the answers to a story's question stickers, with a
  * Reply button per answer that opens the DM with that person.
@@ -76,6 +77,6 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
   answer: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
-  replyBtn: { height: 36, minWidth: 72, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  replyBtn: { height: 36, minWidth: 72, borderRadius: ControlRadius.md, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   replyText: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });

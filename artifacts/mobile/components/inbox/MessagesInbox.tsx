@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * MessagesInbox — the ONE Messages inbox, shared by the buyer Messages tab
  * (app/(buyer)/inbox.tsx, variant "buyer") and the seller's Messages screen
@@ -176,7 +177,7 @@ const pillS = StyleSheet.create({
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    height: 36, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, borderWidth: StyleSheet.hairlineWidth,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
@@ -328,8 +329,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // ── Variant swaps (see the header comment) ──────────────────────────────
   /** This variant's dev/web preview session (never real network calls). */
   const isPreviewSession = useCallback(
-    () => (isSeller ? isSellerDevPreview() : isBuyerDevPreview()),
-    [isSeller],
+    () => !userId && (isSeller ? isSellerDevPreview() : isBuyerDevPreview()),
+    [isSeller, userId],
   );
   /** Seeded preview conversation ids (no backend record) for this variant. */
   const isPreviewId = useCallback(
@@ -338,7 +339,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   );
   /** Seeded people/stories/notes in a seller preview only with &demo=1
    *  (Dev: no fake data in the default fresh preview). */
-  const sellerFreshPreview = isSeller && isSellerDevPreview() && !isPreviewDemoMode();
+  const sellerFreshPreview = isSeller && !userId && isSellerDevPreview() && !isPreviewDemoMode();
   /** The other person in the thread. */
   const participantOf = (conv: Conversation) => (isSeller
     ? (conv.participants.find(p => p.userId !== userId) ?? conv.participants[0])
@@ -350,6 +351,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // skeleton exactly as before.
   const cachedInbox = isSeller ? null : getCachedTabData<{ conversations: Conversation[] }>('inbox');
   const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
+  const localReadClaims = useRef(new Map<string, { signature: string }>());
+  useEffect(() => { localReadClaims.current.clear(); }, [userId]);
   const [loading, setLoading] = useState(!cachedInbox);
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
   // window (lib/pendingRequestDeletes.ts) before the real delete actually
@@ -566,7 +569,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       // preview inbox was unreachable no matter what getConversations()
       // would have returned, and every preview load showed "No messages
       // yet". Real accounts always have a userId and never hit this branch.
-      if (isPreviewInboxEnabled()) {
+      if (!userId && isPreviewInboxEnabled()) {
         setConversations(getPreviewConversations());
         setLoading(false);
         return;
@@ -579,9 +582,19 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     try {
       const all = await getConversations();
       if (accountRef.current !== userId) return;
+      const visibleConversations = all.map(conversation => {
+        const claim = localReadClaims.current.get(conversation.id);
+        if (!claim) return conversation;
+        const signature = JSON.stringify([conversation.lastMessageTs, conversation.lastMessageSenderId, conversation.lastMessage, conversation.lastMessageType]);
+        if (claim.signature !== signature) {
+          localReadClaims.current.delete(conversation.id);
+          return conversation;
+        }
+        return { ...conversation, unreadCount: 0 };
+      });
       if (isSeller) {
         // Sellers only handle buyer↔seller threads.
-        const relevant = all.filter(c => c.type !== 'buyer_to_buyer');
+        const relevant = visibleConversations.filter(c => c.type !== 'buyer_to_buyer');
         setConversations(relevant);
         // An unread thread from a buyer is the moment to ask for push.
         if (relevant.some(c => c.unreadCount > 0 && c.participants.some(p => p.userId !== userId && p.accountType === 'buyer'))) {
@@ -589,11 +602,11 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         }
         return;
       }
-      const convs = all;
+      const convs = visibleConversations;
       // Dev/preview only, and only when the real API genuinely has nothing to
       // show (see lib/previewInbox.ts) — never for a real signed-in account,
       // never when the API returned real rows, and dead code in production.
-      if (isPreviewInboxEnabled() && convs.length === 0) {
+      if (!userId && isPreviewInboxEnabled() && convs.length === 0) {
         setConversations(getPreviewConversations());
       } else {
         setConversations(convs);
@@ -662,7 +675,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     return unsub;
   }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]);
 
-  useEffect(() => subscribeConversationReadFailure(() => {
+  useEffect(() => subscribeConversationReadFailure(conversationId => {
+    localReadClaims.current.delete(conversationId);
     if (isSeller) void loadData();
   }), [isSeller, loadData]);
 
@@ -709,7 +723,19 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     // Don't open request conversations inline — user must accept first
     if (conv.isRequest) return;
     hapticPrimaryAction();
-    markReadSafely(conv.id);
+    const claim = { signature: JSON.stringify([conv.lastMessageTs, conv.lastMessageSenderId, conv.lastMessage, conv.lastMessageType]) };
+    const subject = userId;
+    localReadClaims.current.set(conv.id, claim);
+    setConversations(previous => previous.map(row => row.id === conv.id ? { ...row, unreadCount: 0 } : row));
+    if (!isPreviewConversationId(conv.id) && !isSellerPreviewConversationId(conv.id)) {
+      void markConversationRead(conv.id).catch(() => {
+        // A failed receipt must not mask the server's unread count on refocus.
+        // An older failure must not remove a later read or another account's claim.
+        if (accountRef.current === subject && localReadClaims.current.get(conv.id) === claim) {
+          localReadClaims.current.delete(conv.id);
+        }
+      });
+    }
     router.push((isSeller
       ? `/seller-conversation?id=${encodeURIComponent(conv.id)}`
       : `/buyer-conversation?id=${conv.id}`) as never);

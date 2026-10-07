@@ -9,7 +9,7 @@ import { db, notificationsFeed, productVariants, products, savedItems, waitlistE
 import { productThumbnail } from "./activityEvents";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
-import { noteVariantPriceLowered, noteVariantStockRaised } from "./savedProductAlerts";
+import { noteVariantPriceLowered, noteVariantStockRaised, trackStockNotificationWork } from "./savedProductAlerts";
 
 async function likersOf(productId: string): Promise<string[]> {
   const rows = await db
@@ -47,7 +47,11 @@ export function isRestock(input: { previousStock: number; newStock: number }): b
 }
 
 /** Seller-facing low/out-of-stock alert, fired once when the level first crosses the threshold. */
-export async function notifyStockLevelChanged(input: {
+export function notifyStockLevelChanged(input: Parameters<typeof notifyStockLevelChangedWork>[0]): Promise<void> {
+  return trackStockNotificationWork(notifyStockLevelChangedWork(input));
+}
+
+async function notifyStockLevelChangedWork(input: {
   productId: string;
   ownerId: string;
   productName: string;
@@ -145,7 +149,11 @@ export async function rearmLowStockAlert(ownerId: string, productId: string): Pr
 }
 
 /** Buyer-facing restock alert for savers and waitlist members. */
-export async function notifyBackInStock(input: {
+export function notifyBackInStock(input: Parameters<typeof notifyBackInStockWork>[0]): Promise<void> {
+  return trackStockNotificationWork(notifyBackInStockWork(input));
+}
+
+async function notifyBackInStockWork(input: {
   productId: string;
   ownerId: string;
   productName: string;

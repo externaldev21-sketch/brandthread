@@ -22,8 +22,66 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+
+const headerCache = new Map<string, boolean>();
+/** Follow rendered local frames and default route aliases, not unused imports. */
+function usesSharedHeader(full: string, visiting = new Set<string>()): boolean {
+  if (headerCache.has(full)) return headerCache.get(full)!;
+  if (visiting.has(full)) return false;
+  visiting.add(full);
+  const source = readFileSync(full, 'utf8');
+  const tree = ts.createSourceFile(full, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const rendered = new Set<string>();
+  function visit(node: ts.Node) {
+    // A header inside a dialog is not the route's page header.
+    if (ts.isJsxElement(node) && /^(Modal|BottomSheet)$|(?:Sheet|Dialog|Overlay)$/.test(node.openingElement.tagName.getText(tree))) return;
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) rendered.add(node.tagName.getText(tree));
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  let result = source.includes('ScreenHeader');
+  for (const node of tree.statements) {
+    if (result) break;
+    let specifier: string | undefined;
+    let used = false;
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      specifier = node.moduleSpecifier.text;
+      const clause = node.importClause;
+      if (specifier === '@/components/layout' || specifier === '@/components/layout/Header') {
+        if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)
+          && clause.namedBindings.elements.some(binding => (binding.propertyName ?? binding.name).text === 'Header' && rendered.has(binding.name.text))) {
+          result = true;
+          break;
+        }
+      }
+      const isPageFrame = (name: string) => /(?:Frame|Screen|Page|Route)$/.test(name);
+      used = !!clause?.name && rendered.has(clause.name.text) && isPageFrame(clause.name.text);
+      if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        used ||= clause.namedBindings.elements.some(binding => !binding.isTypeOnly && rendered.has(binding.name.text) && isPageFrame(binding.name.text));
+      }
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      specifier = node.moduleSpecifier.text;
+      used = !!node.exportClause && ts.isNamedExports(node.exportClause)
+        && node.exportClause.elements.some(binding => binding.name.text === 'default');
+    }
+    if (!used || !specifier || (!specifier.startsWith('.') && !specifier.startsWith('@/'))) continue;
+    const base = specifier.startsWith('@/') ? path.join(ROOT, specifier.slice(2)) : path.resolve(path.dirname(full), specifier);
+    const dependency = [base + '.tsx', base + '.ts', path.join(base, 'index.tsx'), path.join(base, 'index.ts')]
+      .find(candidate => existsSync(candidate));
+    if (dependency) result = usesSharedHeader(dependency, visiting);
+  }
+  visiting.delete(full);
+  headerCache.set(full, result);
+  return result;
+}
+
+function isRedirectOnly(source: string): boolean {
+  return /<Redirect\b/.test(source) || /router\.(replace|push)\(/.test(source)
+    && !/<[A-Z][A-Za-z0-9]*(?:\s|\/?>)/.test(source);
+}
 
 function walk(dir: string, filter: (full: string, entry: string) => boolean, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -50,15 +108,11 @@ function rel(full: string): string {
 // 01Cdzzzi (s-v) are migrating these onto ScreenHeader — delete a file's line
 // here in the same change that migrates it.
 const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
-  'app/(buyer)/activity.tsx',
   'app/(buyer)/discover-feed.tsx',
   'app/(buyer)/discover.tsx',
   'app/(buyer)/feed.tsx',
-  'app/(buyer)/following.tsx',
-  'app/(buyer)/friends.tsx',
   'app/(buyer)/inbox.tsx',
   'app/(buyer)/index.tsx',
-  'app/(buyer)/orders.tsx',
   'app/(buyer)/profile.tsx',
   'app/(tabs)/feed.tsx',
   'app/(tabs)/index.tsx',
@@ -66,22 +120,14 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(tabs)/orders.tsx',
   'app/(tabs)/products.tsx',
   'app/(tabs)/profile.tsx',
-  'app/(tabs)/studio.tsx',
   'app/account-type.tsx',
   'app/add-product.tsx',
   'app/app-icon.tsx',
   'app/app-theme.tsx',
   'app/automation.tsx', // redirect-only route
-  'app/ai-assistant.tsx',
-  'app/push-notifications.tsx', // redirect-only route (QA-0057), renders no screen
-  'app/bg-removal.tsx',
-  'app/buyer-account-control.tsx',
   // Renders the shared components/chat/ConversationThread.tsx (own chat header).
   'app/buyer-conversation.tsx',
-  'app/buyer-drop-detail.tsx',
   'app/buyer-live.tsx',
-  'app/buyer-login-activity.tsx',
-  'app/buyer-post-comments.tsx',
   'app/buyer-product-detail.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
@@ -90,53 +136,28 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/call-screen.tsx',
   'app/camera-capture.tsx',
   'app/community-guidelines.tsx',
-  'app/conversation-search.tsx',
-  'app/customer-accounts.tsx', // redirect-only route
-  'app/customer-events.tsx', // redirect-only route
-  'app/customer-privacy.tsx', // redirect-only route
   'app/design-canvas.tsx',
-  'app/design-project.tsx',
-  'app/dispute-detail.tsx',
-  'app/design-prompt-edit.tsx',
-  'app/design-upload-sketch.tsx',
-  'app/design.tsx',
-  'app/drops/[dropId].tsx',
   'app/forgot-password.tsx',
-  'app/index.tsx',
   'app/live-feed.tsx',
   'app/live.tsx',
-  'app/login-activity.tsx',
-  'app/manufacturer-profile.tsx',
   'app/manufacturer.tsx',
-  'app/navigation-isolation-probe.tsx',
   'app/onboarding.tsx',
-  'app/orders.tsx',
   'app/privacy.tsx',
-  'app/product-bundle-edit.tsx',
   'app/refund-policy.tsx',
   'app/seller-agreement.tsx',
-  'app/product-bundles.tsx',
   'app/product-editor.tsx',
-  'app/product-store.tsx',
   'app/profile-videos.tsx',
-  'app/return-request.tsx',
   'app/seller-conversation.tsx',
-  'app/seller-drop-preview.tsx',
-  'app/seller-go-live.tsx',
   // Renders the shared components/inbox/MessagesInbox.tsx (TabPageHeader, like (buyer)/inbox).
   'app/seller-inbox.tsx',
   'app/seller-live.tsx',
   'app/seller-profile.tsx',
   'app/settings.tsx',
-  'app/shipping-delivery.tsx',
   'app/sign-in.tsx',
   'app/splash.tsx',
   'app/store-generating.tsx',
   'app/store-preview.tsx',
-  'app/store/product/[productId].tsx',
-  'app/team-invite.tsx',
   'app/terms.tsx',
-  'app/thread-checkout.tsx',
   'app/thread-explainer.tsx',
   'app/thread-product-detail.tsx',
 ]);
@@ -159,7 +180,6 @@ function isRouteFile(full: string, entry: string): boolean {
 // yet reference useSafeAreaInsets/useHeaderTopInset/SafeAreaView anywhere.
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
-  'app/design-bg-replace.tsx',
   'app/help.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
@@ -188,7 +208,7 @@ describe('every app/ route renders its title through the shared ScreenHeader', (
     for (const full of routeFiles.map((r) => path.join(ROOT, r))) {
       const r = rel(full);
       const source = readFileSync(full, 'utf8');
-      if (source.includes('ScreenHeader')) continue;
+      if (usesSharedHeader(full) || isRedirectOnly(source)) continue;
       if (!SCREENHEADER_MIGRATION_ALLOWLIST.has(r)) offenders.push(r);
     }
     expect(offenders, 'new/regressed route(s) not using ScreenHeader and not on the migration allowlist').toEqual([]);
@@ -200,7 +220,7 @@ describe('every app/ route renders its title through the shared ScreenHeader', (
       const full = path.join(ROOT, r);
       if (!existsSync(full)) { stale.push(`${r} (file no longer exists — delete this line)`); continue; }
       const source = readFileSync(full, 'utf8');
-      if (source.includes('ScreenHeader')) stale.push(`${r} (already migrated — delete this line)`);
+      if (usesSharedHeader(full) || isRedirectOnly(source)) stale.push(`${r} (already migrated — delete this line)`);
     }
     expect(stale, 'allowlist entries that no longer need to be there — delete them').toEqual([]);
   });
@@ -214,7 +234,7 @@ describe('every in-screen <Modal> respects safe-area insets', () => {
 
   function hasInsetsRef(source: string): boolean {
     return source.includes('useSafeAreaInsets') || source.includes('useHeaderTopInset') || source.includes('SafeAreaView')
-      || source.includes('ModalSafeArea');
+      || source.includes('ModalSafeArea') || source.includes('SafeAreaProvider');
   }
 
   it('a <Modal> without an insets reference is on the migration allowlist', () => {

@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Visuals shared by the story composer and the story viewer so a mention
  * sticker / reshare card looks identical on both sides.
@@ -69,7 +70,7 @@ const styles = StyleSheet.create({
 
   card: {
     width: RESHARE_CARD_WIDTH, height: RESHARE_CARD_HEIGHT, overflow: 'hidden',
-    backgroundColor: '#0B0B0B', borderWidth: 1, borderColor: 'rgba(192,192,192,0.28)',
+    backgroundColor: MEDIA.background, borderWidth: 1, borderColor: 'rgba(192,192,192,0.28)',
     shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   },

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Shared chrome for the create flow (capture → gallery → edit → post).
  * TikTok's layout with our palette: true black, white, silver — the only
@@ -108,7 +109,7 @@ export function SubPage({ title, onBack, children, right, testID }: {
 }
 
 const s = StyleSheet.create({
-  pill: { height: 52, borderRadius: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  pill: { height: 52, borderRadius: ControlRadius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   pillText: { fontFamily: FONT.semibold, fontSize: 16 },
   rail: { alignItems: 'center', width: 52, gap: 3 },
   railLabel: { color: CP.white, fontFamily: FONT.semibold, fontSize: 11 },

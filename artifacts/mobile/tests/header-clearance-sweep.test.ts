@@ -33,7 +33,8 @@ describe('headers: bare back arrow + title — no subtitle, no divider', () => {
   it('ScreenHeader has no subtitle prop at all and its divider is off by default', () => {
     const src = read('components/ScreenHeader.tsx');
     expect(src).not.toMatch(/\bsubtitle\??:/);
-    expect(src).toContain("variant = 'push', divider = false,");
+    expect(src).toMatch(/variant\s*=\s*'push'/);
+    expect(src).toMatch(/divider\s*=\s*false/);
   });
 
   it('no ScreenHeader call site anywhere passes a subtitle', () => {
@@ -86,7 +87,10 @@ describe('nothing under the tab bar: one shared clearance', () => {
 
   it('the seller tab screens pad their scroll content with the same helper', () => {
     for (const f of ['app/(tabs)/analytics.tsx', 'app/(tabs)/more.tsx', 'app/(tabs)/studio.tsx', 'app/(tabs)/marketing.tsx']) {
-      expect(read(f), f).toContain('useTabBarClearance(2)');
+      if (f === 'app/(tabs)/analytics.tsx') {
+        expect(read(f), f).toContain('useReportBottomInset()');
+        expect(read('components/analytics/InsightFrame.tsx')).toContain('useTabBarClearance(2)');
+      } else expect(read(f), f).toContain('useTabBarClearance(2)');
     }
   });
 });
@@ -94,12 +98,13 @@ describe('nothing under the tab bar: one shared clearance', () => {
 describe('Analytics tab', () => {
   const src = read('app/(tabs)/analytics.tsx');
   it('Visits and Revenue are two EQUAL columns (both wrapped in flex: 1 cells)', () => {
-    expect(src.match(/style=\{s\.statCell\}/g)?.length).toBe(2);
-    expect(src).toContain('statCell: { flex: 1, minWidth: 0 },');
+    expect(src).toMatch(/<View style=\{\{ flex: 1, minWidth: 0 \}\}>\s*<StatTile label="Visits"/);
+    expect(src).toMatch(/ref=\{revenueTileRef\}[^>]*style=\{\{ flex: 1 \}\}/);
+    expect(src).toContain('<StatTile label="Visits"');
+    expect(src).toContain('<StatTile label="Revenue"');
   });
   it('the empty chart is the shorter ~120px band', () => {
-    expect(src).toContain('const EMPTY_CHART_HEIGHT = 120;');
-    expect(src).toContain('height={chartEmpty ? EMPTY_CHART_HEIGHT : CHART_HEIGHT}');
+    expect(src).toContain('height={bars.some(b => b.cents > 0) ? 140 : 120}');
   });
 });
 

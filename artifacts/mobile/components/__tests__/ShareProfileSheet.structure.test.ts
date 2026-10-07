@@ -11,8 +11,9 @@ const sellerProfile = readFileSync(resolve(process.cwd(), 'app/seller-profile.ts
 describe('Share profile screen — Mobbin 1:1 structure', () => {
   it('has an X close, a cycling style pill, and a scan-QR icon in the header', () => {
     expect(sheet).toContain('accessibilityLabel="Close"');
-    expect(sheet).toContain('share-profile-style-pill');
-    expect(sheet).toContain('handleCyclePill');
+    expect(sheet).toContain('testID={`share-profile-style-${option}`}');
+    expect(sheet).toContain('onPress={() => handleSelectVariant(option)}');
+    expect(sheet).toContain('accessibilityState={{ selected: variant === option }}');
     expect(sheet).toContain("VARIANTS: BackgroundVariant[] = ['color', 'emoji', 'selfie']");
     expect(sheet).toContain('accessibilityLabel="Scan QR code"');
   });

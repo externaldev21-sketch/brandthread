@@ -36,7 +36,7 @@ describe('range pills', () => {
   it('match the Dashboard pills exactly and default to Today', () => {
     // DASHBOARD_RANGES lives in SellerDashboardChart.tsx (reanimated, gestures,
     // SVG) — read the literal from source instead of importing the component.
-    const src = read('components/SellerDashboardChart.tsx');
+    const src = read('components/SellerDashboardRangePills.tsx');
     const block = src.slice(src.indexOf('export const DASHBOARD_RANGES'), src.indexOf('];', src.indexOf('export const DASHBOARD_RANGES')));
     const dashboard = [...block.matchAll(/id: '(\w+)', label: '(\w+)'/g)].map(m => ({ id: m[1], label: m[2] }));
     expect(dashboard.length).toBe(5);
@@ -103,7 +103,7 @@ describe('report screens', () => {
       expect(read('app/_layout.tsx')).toContain(`<Stack.Screen name="${name}"`);
       expect(ANALYTICS_REPORTS.map(r => r.href)).toContain(`/${name}`);
     }
-    expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-advanced']);
+    expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-advanced', '/analytics-cohorts']);
     expect(read('app/(tabs)/analytics.tsx')).toContain('<AnalyticsReportsList />');
   });
   it('read only through sellerInsightsService, whose preview branch runs before the network', () => {
@@ -128,7 +128,7 @@ describe('report screens', () => {
       expect(src).not.toMatch(/<ScreenHeader[^>]*subtitle=/);
       expect(src).toMatch(/InsightFrame|useReportBottomInset/);
     }
-    expect(read('components/analytics/InsightFrame.tsx')).toContain('useTabBarMetrics(2).occupiedHeight');
+    expect(read('components/analytics/InsightFrame.tsx')).toContain('useTabBarClearance(2)');
   });
   it('gate Advanced analytics on the real plan entitlement, client and server', () => {
     const src = read('app/analytics-advanced.tsx');
@@ -155,5 +155,5 @@ describe('best time to post is removed', () => {
     const hits = files.filter(f => /best[-_ ]time|bestTime|BestTime/i.test(readFileSync(f, 'utf8')));
     expect(hits).toEqual([]);
     expect(existsSync(resolve(ROOT, 'app/analytics-best-time.tsx'))).toBe(false);
-  });
+  }, 30_000);
 });

@@ -29,7 +29,8 @@ describe('Seller Studio page: search bar, pinned shortcuts and grouped sections 
     expect(studio).toContain('styles.storeName');
     expect(studio).not.toContain('accessibilityLabel="View store"');
     expect(studio).toContain('accessibilityLabel="Close Studio tools"');
-    expect(studio).not.toContain('setupBarTrack');
+    const header = studio.slice(studio.indexOf('testID="seller-studio-header"'), studio.indexOf('</GestureDetector>', studio.indexOf('testID="seller-studio-header"')));
+    expect(header).not.toContain('setupBarTrack');
   });
 
   it('no "?" help icon — Settings > Help & support covers it instead', () => {

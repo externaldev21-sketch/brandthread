@@ -45,6 +45,7 @@ const {
 
   const api = {
     auth: {
+      checkUsernamePublic: vi.fn(async () => ({ available: true })),
       sync: vi.fn(async (body?: { name?: string }) => {
         apiCalls.push({ name: 'auth.sync', args: [body] });
         return { clerkId: 'user_test_clerk_id', displayName: body?.name ?? '', name: body?.name ?? '', username: null, bio: '' };
@@ -439,7 +440,8 @@ async function driveThroughSignUp(renderer: ReactTestRenderer, role: 'buyer' | '
   await fill(findByLabel(renderer, 'Password'), 'Walkthrough!Pass1');
   await fill(findByLabel(renderer, 'Confirm password'), 'Walkthrough!Pass1');
   await fill(findByTestId(renderer, 'onboarding-username-input'), `wt_${role}_flow`);
-  await fill(findByTestId(renderer, 'age-dob-input'), '01/01/1990');
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 500)); });
+  await fill(findByTestId(renderer, 'onboarding-dob-input'), '01/01/1990');
 
   await press(renderer, findByTestId(renderer, 'legal-consent-checkbox'));
   await press(renderer, findButtonByLabel(renderer, 'Create account'));
@@ -480,6 +482,9 @@ describe('onboarding flow (buyer)', () => {
 
     // Style interests step — skippable, just continue with the defaults.
     await press(renderer, findButtonByLabel(renderer, 'Continue'));
+
+    // The approved buyer flow now includes optional size preferences.
+    await press(renderer, findButtonByLabel(renderer, 'Skip for now'));
 
     // Brands-to-follow step (mocked) — skippable, continue.
     await press(renderer, findButtonByLabel(renderer, 'Continue'));

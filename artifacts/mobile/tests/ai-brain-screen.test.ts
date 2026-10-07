@@ -51,11 +51,12 @@ describe('ai-brain uses a full-screen composer', () => {
   });
 
   it('keeps the input focusable and submits text from the keyboard or send button', () => {
-    expect(composer).toContain('pointerEvents="none"');
-    expect(composer).toContain('submitBehavior="submit"');
+    expect(composer).toContain("pointerEvents={showAction ? 'auto' : 'none'}");
+    expect(screen).toContain('enterToSend={false}');
+    expect(composer).toContain('multiline');
     expect(composer).toContain('onChangeText={onChangeText}');
-    expect(composer).toContain('onPress={isGenerating ? onStop : onSend}');
-    expect(composer).toContain('zIndex: 1');
+    expect(composer).toContain('onPress={busy ? onStop : onSend}');
+    expect(composer).toContain('onKeyPress={handleKeyPress}');
     expect(sharedComposer).toContain('COMPOSER_PILL_MIN_HEIGHT = 40');
     expect(sharedComposer).toContain('minHeight: COMPOSER_PILL_MIN_HEIGHT');
   });

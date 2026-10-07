@@ -1336,6 +1336,7 @@ export default function BuyerPostCommentsScreen() {
                 value={inputText}
                 onChangeText={setInputText}
                 onSend={handleSend}
+                busy={sending}
                 canSend={inputText.trim().length > 0 && !sending}
                 placeholder={replyingTo ? `Reply to ${replyingTo.author.name}…` : 'Add comment…'}
                 accessibilityLabel="Comment"

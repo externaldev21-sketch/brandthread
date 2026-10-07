@@ -2193,6 +2193,7 @@ export default function AddProductScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          testID="add-product-form"
           ref={scrollRef}
           style={s.scrollView}
           contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + SP.xl }]}

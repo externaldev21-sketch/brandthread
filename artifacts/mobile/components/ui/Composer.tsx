@@ -1,3 +1,4 @@
+import { InlineSpinner } from '@/components/InlineFeedback';
 /**
  * Composer — the one slim text-entry bar for every "type at the bottom" screen
  * (DMs, group chats, comment sheets, AI chats, story replies, live chat).
@@ -171,14 +172,16 @@ export default function Composer({
           >
             <Pressable
               onPress={busy ? onStop : onSend}
-              disabled={!showAction || (!busy && !sendable)}
+              disabled={!showAction || (busy && !onStop) || (!busy && !sendable)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
-              accessibilityLabel={busy ? 'Stop' : 'Send'}
+              accessibilityLabel={busy ? (onStop ? 'Stop' : 'Sending') : 'Send'}
               style={[styles.send, { backgroundColor: theme.accent }]}
               testID={`${testID}-send`}
             >
-              <Feather name={busy ? 'square' : 'arrow-up'} size={busy ? 14 : 18} color={theme.onAccent} />
+              {busy && !onStop
+                ? <InlineSpinner />
+                : <Feather name={busy ? 'square' : 'arrow-up'} size={busy ? 14 : 18} color={theme.onAccent} />}
             </Pressable>
           </Animated.View>
         </View>

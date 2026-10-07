@@ -166,7 +166,7 @@ describe('native permission, encryption and Android config', () => {
     const deps = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
     for (const pkg of ['expo-tracking-transparency', 'expo-location']) expect(deps).not.toContain(pkg);
     expect(deps).toContain('expo-contacts');
-    const contacts = fs.readFileSync(path.join(projectRoot, 'app', 'buyer-find-friends.tsx'), 'utf8');
-    expect(contacts).toContain('requestPermissionsAsync');
+    const contacts = fs.readFileSync(path.join(projectRoot, 'app', 'find-friends-contacts.tsx'), 'utf8');
+    expect(contacts).toContain('await requestContactsPermission()');
   });
 });

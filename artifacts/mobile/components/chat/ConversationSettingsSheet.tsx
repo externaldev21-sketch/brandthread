@@ -1,3 +1,6 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -198,7 +201,7 @@ export function ConversationSettingsSheet({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.62)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: mediaAlpha(MEDIA.background, 0.62) },
   sheet: { width: '100%', maxWidth: 480, alignSelf: 'center', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, paddingHorizontal: SP.lg, paddingTop: SP.sm, gap: SP.xs },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
@@ -213,6 +216,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginTop: SP.sm },
   confirmText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 23, marginVertical: SP.md },
   confirmActions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm },
-  confirmButton: { flex: 1, height: 48, borderWidth: 1, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  confirmButton: { flex: 1, height: 48, borderWidth: 1, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: SP.sm },
 });

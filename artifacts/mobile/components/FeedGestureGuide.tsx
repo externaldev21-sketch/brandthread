@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * FeedGestureGuide — first-time buyer coach screen for the video feed.
  * Modeled on Instagram's "Watching stories" coach mark, but on an opaque
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
   rowTitle: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.base },
   rowSubtitle: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
   dismissBtn: {
-    marginTop: 48, minHeight: 48, paddingHorizontal: SP.xl, borderRadius: 999,
+    marginTop: 48, minHeight: 48, paddingHorizontal: SP.xl, borderRadius: ControlRadius.md,
     backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch',
   },
   dismissText: { color: '#000000', fontFamily: FONT.semibold, fontSize: FS.base },

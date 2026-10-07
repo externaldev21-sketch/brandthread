@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiMock, routerMock } = vi.hoisted(() => {
   const apiMock = {
+    publicDiscovery: {
+      categories: vi.fn().mockResolvedValue({ categories: [] }),
+      trendingProducts: vi.fn().mockResolvedValue({ products: [] }),
+      trendingBrands: vi.fn().mockResolvedValue({ brands: [] }),
+    },
     public: {
       search: vi.fn(),
       recent: vi.fn(),

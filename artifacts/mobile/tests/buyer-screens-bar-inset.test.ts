@@ -68,9 +68,9 @@ describe('buyer Home feed behind the bar', () => {
   const feed = read('app/(tabs)/feed.tsx');
 
   it('keeps the upstream thin search bar above the tabs', () => {
-    expect(feed).toContain('style={styles.buyerSearchBarThin}');
-    expect(feed).toContain('placeholder="Search…"');
-    expect(feed).toContain('const buyerHeaderHeight = previewTopInset + 4 + TOP_SEARCH_BAR_HEIGHT + TOP_SEARCH_TO_TABS_GAP + TOP_TABS_ROW_HEIGHT + 6;');
+    expect(feed).toContain('accessibilityLabel="Search"');
+    expect(feed).toContain('setShowSearch(true)');
+    expect(feed).toContain('const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;');
   });
 
   it('plays edge to edge and starts every overlay above the bar', () => {
@@ -90,8 +90,8 @@ describe('buyer Home feed behind the bar', () => {
     // Gap values (16/12) and the rail/shop-tab sizing itself come from dev
     // PR #129 (TikTok-exact feed sizing) — see the RightActionRail.tsx and
     // ShopSideTab.tsx component files, ported from that PR's inline JSX.
-    expect(feed).toContain('<RightActionRail\n        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}');
-    expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}');
+    expect(feed).toMatch(/<RightActionRail\s+style=\{\[chromeStyle, \{ bottom: bottomClearance \+ RAIL_BOTTOM_GAP, right: 10 \+ insets\.right \}\]\}/);
+    expect(feed).toMatch(/<CaptionBlock\s+style=\{\[chromeStyle, \{ bottom: bottomClearance \+ CAPTION_BOTTOM_GAP \}\]\}/);
     // Round-2 feed fixes raised RAIL_BOTTOM_GAP again (16 -> 24) for more
     // headroom above the tab bar and to track the caption block's first
     // line rather than its last.

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -38,7 +39,7 @@ export function AiCreditsChip({ overview: given }: { overview?: AiCreditsOvervie
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   chip: {
-    alignSelf: 'flex-start', minHeight: 32, paddingHorizontal: 12, borderRadius: RADIUS.pill,
+    alignSelf: 'flex-start', minHeight: 32, paddingHorizontal: 12, borderRadius: ControlRadius.sm,
     borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, justifyContent: 'center',
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },

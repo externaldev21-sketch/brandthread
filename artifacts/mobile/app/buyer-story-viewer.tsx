@@ -245,12 +245,13 @@ export default function BuyerStoryViewer() {
   const recordedViewsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const id = currentStory?.id;
-    if (!id || !myUserId || currentStory?.authorId === myUserId || currentStory?.authorId === 'me') return;
+    if (isHighlight || !id || !myUserId || currentStory?.authorId === myUserId || currentStory?.authorId === 'me') return;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
-    if (recordedViewsRef.current.has(id)) return;
-    recordedViewsRef.current.add(id);
-    api.social.viewStory(id).catch(() => { recordedViewsRef.current.delete(id); });
-  }, [api, currentStory?.id, currentStory?.authorId, myUserId]);
+    const viewKey = `${myUserId}:${id}`;
+    if (recordedViewsRef.current.has(viewKey)) return;
+    recordedViewsRef.current.add(viewKey);
+    api.social.viewStory(id).catch(() => { recordedViewsRef.current.delete(viewKey); });
+  }, [api, currentStory?.id, currentStory?.authorId, myUserId, isHighlight]);
 
   // Seed like state from server story data
   useEffect(() => {

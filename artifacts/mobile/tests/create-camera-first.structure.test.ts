@@ -11,28 +11,29 @@ const camera = readFileSync(resolve(process.cwd(), 'components/create-post/Creat
  */
 describe('camera-first Create screen wiring', () => {
   it('opens a fresh Thread in the camera step and keeps the edit entry unchanged', () => {
-    expect(createPost).toContain("type Step = 'camera' | 'media-pick'");
-    expect(createPost).toContain("const cameraFirst = !editId;");
-    expect(createPost).toContain("useState<Step>(cameraFirst ? 'camera' : 'media-pick')");
-    expect(createPost).toContain("if (step === 'camera')");
+    expect(createPost).toContain("useState<Step>(editId ? 'post' : noCameraStep ? 'gallery' : 'capture')");
+    expect(createPost).toContain("step === 'capture'");
     expect(createPost).toContain('<CreateCamera');
   });
 
   it('keeps the existing picker (All/Videos/Photos grid) and opens it as a sheet from the camera roll', () => {
-    expect(createPost).toContain("if (step === 'media-pick')");
-    expect(createPost).toContain('<MediaGrid');
-    expect(createPost).toContain('const PickerRoot = cameraFirst ? SheetRise : View;');
-    expect(createPost).toContain("onOpenLibrary={() => haptic(() => setStep('media-pick'))}");
-    expect(createPost).toContain("haptic(cameraFirst ? () => setStep('camera') : leaveSetupDestination)");
+    expect(createPost).toContain("step === 'gallery'");
+    expect(createPost).toContain('<GalleryPicker');
+    expect(createPost).toContain('<PostPicker');
+    expect(createPost).toContain("onOpenLibrary={() => setStep('gallery')}");
+    expect(createPost).toContain("setStep('capture')");
   });
 
   it('routes a capture into the existing editor steps', () => {
-    expect(createPost).toContain("setStep('slide-edit');");
-    expect(createPost).toContain("setStep('video-edit');");
-    expect(createPost).toContain('onPhoto={handleCameraPhoto}');
-    expect(createPost).toContain('onVideo={handleCameraVideo}');
+    expect(createPost).toContain("setStep('edit')");
+    expect(createPost).toContain("kind: 'slides', slides");
+    expect(createPost).toContain("kind: 'video'");
+    expect(createPost).toContain("onPhoto={(uri) => buildFromAssets(");
+    expect(createPost).toContain("onVideo={(uri, duration) => buildFromAssets(");
     // Snapped photos get the same 3:4 crop pass as picked ones.
-    expect(createPost).toMatch(/function handleCameraPhoto[\s\S]*setCropQueue\(\[id\]\);[\s\S]*setCropTargetId\(id\);/);
+    expect(createPost).toContain('aspect: DEFAULT_SLIDE_ASPECT');
+    expect(readFileSync(resolve(process.cwd(), 'constants/postLimits.ts'), 'utf8')).toContain("DEFAULT_SLIDE_ASPECT: PostAspect = '3:4'");
+    expect(readFileSync(resolve(process.cwd(), 'lib/createPost/slides.ts'), 'utf8')).toContain('crop: DEFAULT_SLIDE_CROP');
   });
 
   it('switches Story in place through the same story composer handoff as the picker pill', () => {

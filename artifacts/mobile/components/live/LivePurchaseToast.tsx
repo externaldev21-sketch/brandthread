@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * "<first name> bought <product>" — shown on the live when a purchase made
  * from it is paid (the server's `purchase` socket event, see
@@ -45,7 +46,7 @@ export function LivePurchaseToast({ purchase, top }: { purchase: LivePurchaseEve
       testID="live-purchase-toast"
     >
       <View style={styles.icon}>
-        <Feather name="shopping-bag" size={13} color="#FFFFFF" />
+        <Feather name="shopping-bag" size={13} color={MEDIA.foreground} />
       </View>
       <Text style={styles.text} numberOfLines={2}>
         <Text style={styles.name}>{purchase.buyerFirstName || 'Someone'}</Text>
@@ -61,13 +62,13 @@ const styles = StyleSheet.create({
   wrap: {
     position: 'absolute', left: 16, zIndex: 12, maxWidth: '72%',
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FFFFFF', borderRadius: RADIUS.md,
+    backgroundColor: MEDIA.foreground, borderRadius: RADIUS.md,
     paddingLeft: 6, paddingRight: 12, paddingVertical: 6,
   },
   icon: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#000000',
+    width: 24, height: 24, borderRadius: 12, backgroundColor: MEDIA.background,
     alignItems: 'center', justifyContent: 'center',
   },
-  text: { flexShrink: 1, color: '#000000', fontFamily: FONT.medium, fontSize: 13, lineHeight: 17 },
+  text: { flexShrink: 1, color: MEDIA.background, fontFamily: FONT.medium, fontSize: 13, lineHeight: 17 },
   name: { fontFamily: FONT.bold },
 });

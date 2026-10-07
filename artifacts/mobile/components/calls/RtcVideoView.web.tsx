@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Live call video on web (agora-rtc-sdk-ng plays each track into a DOM
  * element). The engine is handed this view's element and plays the track
@@ -24,7 +25,7 @@ export function RtcVideoView({ engine, which, style }: {
   }, [engine, on, which]);
 
   if (!engine || !on) return null;
-  return <View ref={ref} style={[{ overflow: 'hidden', backgroundColor: '#000' }, style]} />;
+  return <View ref={ref} style={[{ overflow: 'hidden', backgroundColor: MEDIA.background }, style]} />;
 }
 
 export function useHasVideo(engine: RtcEngine | null, which: 'local' | 'remote'): boolean {

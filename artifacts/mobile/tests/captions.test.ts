@@ -40,8 +40,8 @@ describe('autoCaptions wiring', () => {
 
   it('keeps the overlay monochrome: solid black pill, white text', () => {
     const src = read('components/social/CaptionsOverlay.tsx');
-    expect(src).toContain("backgroundColor: '#000000'");
-    expect(src).toContain("color: '#FFFFFF'");
+    expect(src).toContain('backgroundColor: MEDIA.background');
+    expect(src).toContain('color: MEDIA.foreground');
     expect(src).not.toMatch(/rgba\(|opacity|#[0-9a-f]{8}\b/i);
   });
 

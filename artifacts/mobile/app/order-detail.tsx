@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Order Detail — full rewrite
  * Tabs: overview | customer | payment | fulfillment | timeline | returns | disputes | notes
@@ -2123,7 +2124,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   trackingStatusOptions: { gap: SP.sm },
   trackingStatusRow: { flexDirection: 'row', gap: SP.sm },
   trackingStatusCell: { flex: 1, flexBasis: 0, minWidth: 0 },
-  trackingStatusOption: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
+  trackingStatusOption: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
   trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   trackingStatusOptionTextSelected: { color: FG },

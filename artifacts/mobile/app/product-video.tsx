@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button';
 /**
  * Product video manager — one short silent video per product, shown under the
  * product page. Upload / replace / remove with progress and a preview.
@@ -169,10 +170,7 @@ export default function ProductVideoScreen() {
                 <Feather name="refresh-cw" size={16} color={colors.foreground} />
                 <Text style={s.secondaryLabel}>Replace</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.secondaryBtn} onPress={remove} disabled={removing} accessibilityRole="button" accessibilityLabel="Remove video">
-                <Feather name="trash-2" size={16} color={colors.destructive} />
-                <Text style={[s.secondaryLabel, { color: colors.destructive }]}>Remove</Text>
-              </TouchableOpacity>
+              <Button label="Remove" icon="trash-2" variant="destructive" size="compact" onPress={remove} disabled={removing} loading={removing} accessibilityLabel="Remove video" style={s.secondaryBtn} />
             </View>
           ) : null}
         </View>

@@ -61,7 +61,7 @@ describe('Studio title exit motion', () => {
     expect(retractBody).toContain('labelExit.value = withTiming(0, { duration: 120');
     const cancelEnterBody = studio.slice(studio.indexOf('const cancelEnter = useCallback'), studio.indexOf('}, [traceProgress, zoomScale, enterFade, labelExit]);'));
     expect(cancelEnterBody).toContain('labelExit.value = 0;');
-    const openReset = studio.slice(studio.indexOf('// Reset to the first card every time the page opens fresh'), studio.indexOf('}, [open]);'));
+    const openReset = studio.slice(studio.indexOf('// Fresh opens start at the first card'), studio.indexOf('}, [open]);'));
     expect(openReset).toContain('labelExit.value = 0;');
   });
 });

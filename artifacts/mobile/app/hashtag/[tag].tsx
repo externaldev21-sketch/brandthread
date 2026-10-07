@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Hashtag page — #tag title, post count, Follow, Top / Recent tabs and a
  * 3-column grid of public posts. Layout follows Instagram's hashtag page
@@ -253,7 +254,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   titleLong: { ...TYPE_SCALE.title2, fontFamily: FONT.bold, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.sm },
   count: { ...TYPE_SCALE.body, color: theme.muted, marginTop: 2 },
   followRow: { paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.md, paddingBottom: SPACING.md },
-  followBtn: { height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
+  followBtn: { height: 38, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
   // Primary pill: inverted text/background so it is white-on-black in dark and black-on-white in light.
   followBtnOff: { backgroundColor: theme.text },
   followBtnOn: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },

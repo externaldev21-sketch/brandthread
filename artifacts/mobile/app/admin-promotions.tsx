@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Promotion review — platform admins approve or reject paid boosts and
  * Featured slots. Rejecting needs a reason the seller will see, and refunds
@@ -205,7 +206,7 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     screen: { flex: 1, backgroundColor: theme.background },
     center: { paddingTop: SP.xl, alignItems: 'center' },
     tabs: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm },
-    tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border },
+    tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: ControlRadius.sm, borderWidth: 1, borderColor: theme.border },
     tabOn: { backgroundColor: theme.text, borderColor: theme.text },
     tabText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
     tabTextOn: { color: theme.background },
@@ -219,7 +220,7 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     caption: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, marginTop: 4 },
     actions: { flexDirection: 'row', gap: SP.sm },
     cell: { flex: 1 },
-    btn: { width: '100%', minHeight: 44, paddingHorizontal: 16, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+    btn: { width: '100%', minHeight: 44, paddingHorizontal: 16, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center' },
     btnGhost: { borderWidth: 1, borderColor: theme.border },
     btnGhostText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
     btnSolid: { backgroundColor: theme.text },

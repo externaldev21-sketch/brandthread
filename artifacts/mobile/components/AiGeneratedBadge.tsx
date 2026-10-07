@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -32,11 +33,11 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: MEDIA.background,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#C0C0C0',
   },
   topLeft: { top: 6, left: 6 },
   bottomLeft: { bottom: 6, left: 6 },
-  label: { color: '#FFFFFF', fontSize: 10, lineHeight: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' },
+  label: { color: MEDIA.foreground, fontSize: 10, lineHeight: 12, fontWeight: '600', fontFamily: 'Inter_600SemiBold' },
 });

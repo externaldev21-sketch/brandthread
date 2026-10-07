@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 /**
  * ReportSheet — the one reusable "Report" bottom sheet.
  *
@@ -201,7 +203,7 @@ export function useReportSheet(): ReportSheetContextValue {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  backdrop: { flex: 1, backgroundColor: mediaAlpha(MEDIA.background, 0.55) },
   sheet: {
     backgroundColor: theme.background, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
     borderWidth: 1, borderColor: theme.border, paddingTop: SP.sm, maxHeight: '88%',

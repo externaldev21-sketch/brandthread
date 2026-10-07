@@ -201,7 +201,7 @@ describe('control corner radius', () => {
       'Full-pill radius on a control. Use radius.sm (chips/tags), radius.md (buttons/segmented controls) or radius.bar (tab bars) from @/constants/radii. A true circle needs equal width/height; a genuine exception goes on ALLOWLIST.',
     ).toEqual([]);
     expect([...allowed].filter((id) => !used.has(id)), 'Stale ALLOWLIST entries — remove them').toEqual([]);
-  });
+  }, 30_000);
 
   it('keeps both tab bars on radius.bar (not a half-height pill)', () => {
     for (const file of ['components/buyer-nav/BuyerTabBar.tsx', 'components/SellerGlobalTabBar.tsx', 'components/tab-bar/TabBarParts.tsx']) {

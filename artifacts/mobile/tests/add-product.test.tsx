@@ -56,8 +56,8 @@ vi.mock('react-native', async (importOriginal) => {
 vi.mock('@/components/ui/Button', () => {
   const React = require('react') as typeof import('react');
   return {
-    Button: ({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) =>
-      React.createElement('Button', { testID, onPress, accessibilityLabel: label }, label),
+    Button: ({ label, ...props }: { label: string; onPress: () => void; testID?: string; disabled?: boolean }) =>
+      React.createElement('Button', { ...props, accessibilityLabel: label }, label),
     StickyBottomCTA: ({ header }: { header?: React.ReactNode }) =>
       React.createElement('View', null, header),
   };
@@ -373,17 +373,16 @@ describe('AddProduct draft exit protection', () => {
 
     expect(form.findByProps({ testID: 'product-input-Title' })).toBeTruthy();
     expect(form.findByProps({ testID: 'product-input-Price *' })).toBeTruthy();
-    expect(form.findByProps({ testID: 'product-input-Weight (grams)' })).toBeTruthy();
-    expect(form.findAllByProps({ label: 'Publish product' }).filter(button => typeof button.type === 'string')).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'add-product-save' }).filter(button => typeof button.type === 'string')).toHaveLength(1);
     expect(form.findAllByProps({ label: 'Next' })).toHaveLength(0);
     expect(form.findAllByProps({ label: 'Cancel' })).toHaveLength(0);
-    expect(renderer.root.findByProps({ testID: 'add-product-save-draft' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'add-product-status-pill' })).toBeTruthy();
 
     await act(async () => {
-      form.findAllByProps({ testID: 'add-product-variants-toggle' })
-        .find(node => typeof node.props.onPress === 'function')!.props.onPress();
+      form.findByProps({ title: 'Shipping' }).props.onToggle();
     });
-    const options = form.findAllByProps({ title: 'Options' })
+    expect(form.findByProps({ testID: 'product-input-Weight (grams)' })).toBeTruthy();
+    const options = form.findAllByProps({ title: 'Variants' })
       .find(node => typeof node.props.action?.onPress === 'function')!;
     await act(async () => {
       options.props.action.onPress();
@@ -392,10 +391,10 @@ describe('AddProduct draft exit protection', () => {
     expect(form.findByProps({ testID: 'product-input-Title' })).toBeTruthy();
 
     await act(async () => {
-      await form.findAllByProps({ label: 'Publish product' })
+      await renderer.root.findAllByProps({ testID: 'add-product-save' })
         .find(node => typeof node.props.onPress === 'function')!.props.onPress();
     });
     expect(alertMock).toHaveBeenCalledWith('Invalid price', expect.stringContaining('Enter a valid price'));
-    expect(form.findByProps({ testID: 'add-product-publish-error' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'add-product-publish-error' })).toBeTruthy();
   });
 });

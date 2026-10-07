@@ -7,7 +7,8 @@ describe('seller demo navigation', () => {
     const root = readFileSync(join(__dirname, '../app/_layout.tsx'), 'utf8');
     const tabs = readFileSync(join(__dirname, '../app/(tabs)/_layout.tsx'), 'utf8');
 
-    expect(root).toContain('<IsolatedStackScene>{children}</IsolatedStackScene>');
+    expect(root).toContain('<IsolatedStackScene routeName={route.name}');
+    expect(root).toContain('</IsolatedStackScene>');
     expect(root).not.toContain('SellerPreviewRouteGate');
     expect(tabs).not.toContain('SellerPreviewRouteGate');
   });

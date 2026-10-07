@@ -15,7 +15,9 @@ const studio = readFileSync(resolve(process.cwd(), 'components/SellerStudioRadia
 describe('Studio carousel: every card has a distinct icon', () => {
   it('no two ids in CARD_ORDER resolve to the same Feather icon', () => {
     const orderBlock = studio.slice(studio.indexOf('const CARD_ORDER = ['), studio.indexOf('];', studio.indexOf('const CARD_ORDER = [')));
-    const cardOrderIds = Array.from(orderBlock.matchAll(/'([a-z0-9-]+)'/g), (m) => m[1]);
+    // A gated card is not in the shipped carousel until its real route exists.
+    const enabledOrderBlock = orderBlock.replace(/\.\.\.\(SELLER_ACTIVITY_ROUTE_LIVE \? \['activity'\] : \[\]\)/, '');
+    const cardOrderIds = Array.from(enabledOrderBlock.matchAll(/'([a-z0-9-]+)'/g), (m) => m[1]);
     expect(cardOrderIds.length).toBeGreaterThan(0);
 
     const byId = new Map(ALL_ITEMS.map((item) => [item.id, item]));

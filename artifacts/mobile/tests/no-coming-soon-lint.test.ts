@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
@@ -50,18 +51,27 @@ function rel(full: string): string {
 const BANNED_PHRASE_RE = /\b(coming soon|on the way|stay tuned)\b/i;
 
 function hasBannedWording(source: string): boolean {
-  // Strip comments (block + line) so doc comments/code notes never trip the
-  // check — this scans actual code and string literals, not prose about it.
-  const stripped = source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n')
+  // Check copy, not identifiers such as the real expiring-credit `soon`
+  // variable. Parsing also avoids treating "//" inside a URL as a comment.
+  const tree = ts.createSourceFile('copy.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const copy: string[] = [];
+  function visit(node: ts.Node) {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+      if (!ts.isImportDeclaration(node.parent) && !ts.isExportDeclaration(node.parent) && !ts.isLiteralTypeNode(node.parent)
+        && !/^(?:https?:|\/|@\/)/.test(node.text)) copy.push(node.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  const stripped = copy.join('\n')
     // "as soon as X" is a real temporal conjunction ("as soon as it loads"),
     // not a coming-soon promise — strip it before the bare-"soon" check.
     .replace(/as soon as/gi, '');
   if (BANNED_PHRASE_RE.test(stripped)) return true;
-  return /\bsoon\b/i.test(stripped);
+  // Expiration warnings and scheduled drops describe real dated events,
+  // not unimplemented features. A bare "soon" in other copy is still banned.
+  return /\bsoon\b/i.test(stripped
+    .replace(/\b(?:expires|expiring|drops)\s+soon\b/gi, ''));
 }
 
 // Generated from the state of the tree when this lint was added. Rewrite the
@@ -76,17 +86,8 @@ const COMING_SOON_ALLOWLIST = new Set([
   'app/buyer-drop-detail.tsx',
   'app/buyer-report.tsx',
   'app/buyer-settings.tsx',
-  'app/buyer-story-create.tsx',
-  'app/create-post.tsx',
-  'app/manufacturer-messages.tsx',
-  'app/quote-detail.tsx',
-  'app/seller-settings.tsx',
-  'components/ShopProductSheet.tsx',
-  'components/onboarding/BrandsToFollowStep.tsx',
-  'components/settings/SettingsKit.tsx',
   'lib/financeSummary.ts',
   'lib/previewNotes.ts',
-  'services/settingsCatalog.ts',
 ]);
 
 describe('no "coming soon" wording outside the tracked allowlist', () => {

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Seller: store gift cards. Turn selling on or off, choose the amounts buyers
  * can pick, issue a card directly, and see / void the cards for this store.
@@ -216,7 +217,7 @@ function makeStyles(ck: CheckoutColors) {
     fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted, marginTop: 2 },
     error: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text, marginVertical: SP.sm },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.md },
-    chip: { minHeight: 40, paddingHorizontal: SP.md, borderRadius: 20, borderWidth: 1, borderColor: ck.fieldBorder, justifyContent: 'center' },
+    chip: { minHeight: 40, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: ck.fieldBorder, justifyContent: 'center' },
     chipText: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
     inlineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
     inlineButton: { marginTop: 25, minWidth: 84 },

@@ -28,8 +28,8 @@ describe('seller tab switch transition', () => {
 
   it('drives the seller tab layout with the shared directional-slide transitionSpec', () => {
     expect(sellerLayout).toContain("from '@/lib/tabSlideTransition'");
-    expect(sellerLayout).toContain('transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC');
-    expect(sellerLayout).toContain('sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value)');
+    expect(sellerLayout).toContain("transitionSpec: Platform.OS === 'web' ? undefined : reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC");
+    expect(sellerLayout).toContain("sceneStyleInterpolator: Platform.OS === 'web' ? undefined : reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value)");
   });
 
   it('buyer and seller tab layouts share the exact same transition module (can’t drift apart)', () => {

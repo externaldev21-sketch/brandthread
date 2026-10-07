@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Brandthread AI Tools — 2-step progress bar
  *
@@ -46,7 +47,7 @@ export function AiToolProgressBar({ step }: { step: 1 | 2 }) {
 const s = StyleSheet.create({
   track: {
     height: 3,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: MEDIA.background,
   },
   fill: {
     height: 3,

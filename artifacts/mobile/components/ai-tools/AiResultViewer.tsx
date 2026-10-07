@@ -11,6 +11,7 @@ import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, Text, Touch
 import { Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import type { AiResultSlot } from './AiResultTypes';
@@ -35,6 +36,7 @@ interface AiResultViewerProps {
 
 export function AiResultViewer({ visible, items, index, onIndexChange, onClose, actions }: AiResultViewerProps) {
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const [showBefore, setShowBefore] = useState(false);
   const current = items[index];
 
@@ -68,7 +70,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
           )}
         />
 
-        <View style={[s.topBar, { paddingTop: insets.top + SP.sm }]}>
+        <View style={[s.topBar, { paddingTop: headerTopInset + SP.sm }]}>
           <Glass variant="regular" radius={RADIUS.pill} style={s.glassBtn}>
             <TouchableOpacity onPress={onClose} accessibilityLabel="Close" style={s.glassBtnInner}>
               <Feather name="x" size={ICON.md} color="#fff" />

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     paddingHorizontal: SP.md,
-    borderRadius: 18,
+    borderRadius: ControlRadius.md,
   },
   actionPillLabel: { fontSize: FS.sm },
   actionLabel: {

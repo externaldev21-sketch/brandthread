@@ -51,10 +51,10 @@ describe('Studio tool return navigation', () => {
     expect(menu).toContain("pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN }");
     expect(menu).toContain('resumeCardOnOpenRef.current = true');
     expect(menu).toContain('if (!resumeCardOnOpenRef.current)');
-    expect(menu).toContain("setEnterState('hidden')");
+    expect(menu).toContain('setEntering(false)');
     expect(payouts).toContain('params.from === STUDIO_MENU_ORIGIN');
     expect(payouts).toContain('returnToStudioMenu(router)');
-    expect(payouts).toContain("goBackOr(router, '/(tabs)/more')");
+    expect(payouts).toContain("leaveSetupFlow(router, params.from, '/(tabs)/more')");
   });
 
   it('returns Analytics to Studio in both loaded and loading states, without changing ordinary visits', () => {
@@ -66,7 +66,8 @@ describe('Studio tool return navigation', () => {
     expect(analytics).toContain('params.from === STUDIO_MENU_ORIGIN ?');
     expect(analytics).toContain('returnToStudioMenu(router)');
     expect(analytics).toContain('router.setParams({ from: undefined })');
-    expect(analytics.match(/<ScreenHeader title="Analytics" subtitle="Last 7 days" onBack=\{onBack\}/g)).toHaveLength(2);
+    expect(analytics.match(/<ScreenHeader title="Analytics" onBack=\{onBack\}/g)).toHaveLength(2);
+    expect(analytics).not.toMatch(/<ScreenHeader[^>]*subtitle=/);
     expect(analytics).toContain('} : undefined');
   });
 

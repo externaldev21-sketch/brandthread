@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 /**
  * SponsoredAdCard — the one Sponsored ad card used by every buyer feed.
  *
@@ -18,7 +20,7 @@ import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
-import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import type { FeedAd } from '@/lib/api';
@@ -91,7 +93,7 @@ function SellerAvatar({ ad, size }: { ad: FeedAd; size: number }) {
     <CachedImage source={{ uri: ad.seller.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" />
   ) : (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#2A2A2E', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: ON_DARK, fontFamily: FONT.bold, fontSize: Math.round(size * 0.42) }}>{initial}</Text>
+      <Text style={{ color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: Math.round(size * 0.42) }}>{initial}</Text>
     </View>
   );
 }
@@ -119,7 +121,7 @@ export function SponsoredAdCard(props: SponsoredAdCardProps) {
   if (props.variant === 'page') {
     const { pageWidth, pageHeight, bottomClearance } = props;
     return (
-      <View ref={ref} collapsable={false} style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }} testID="sponsored-ad-page">
+      <View ref={ref} collapsable={false} style={{ width: pageWidth, height: pageHeight, backgroundColor: MEDIA.background }} testID="sponsored-ad-page">
         <Pressable onPress={() => onPress(ad)} style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={a11y}>
           <AdMedia ad={ad} visible={visible} style={StyleSheet.absoluteFill} />
         </Pressable>
@@ -141,7 +143,7 @@ export function SponsoredAdCard(props: SponsoredAdCardProps) {
             testID="sponsored-ad-cta"
           >
             <Text style={pageStyles.ctaText}>{ad.ctaLabel}</Text>
-            <Feather name="chevron-right" size={18} color="#000" />
+            <Feather name="chevron-right" size={18} color={MEDIA.background} />
           </Pressable>
         </View>
       </View>
@@ -183,22 +185,22 @@ export function SponsoredAdCard(props: SponsoredAdCardProps) {
 }
 
 const textShadow = Platform.select({
-  default: { textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  default: { textShadowColor: mediaAlpha(MEDIA.background, 0.55), textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
 });
 
 const pageStyles = StyleSheet.create({
   bottom: { position: 'absolute', left: 12, right: 12 },
   info: { maxWidth: '78%', marginBottom: 12 },
   creatorRow: { minHeight: 22, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  creatorName: { fontSize: 14, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1, ...textShadow },
-  sponsored: { fontSize: FS.meta, fontFamily: FONT.medium, color: ON_DARK_MUTED, marginBottom: 6, ...textShadow },
-  headline: { fontSize: 15, fontFamily: FONT.semibold, color: ON_DARK, marginBottom: 4, lineHeight: 20, ...textShadow },
-  caption: { fontSize: 13, fontFamily: FONT.medium, color: ON_DARK, lineHeight: 17, letterSpacing: 0.1, ...textShadow },
+  creatorName: { fontSize: 14, fontFamily: FONT.semibold, color: MEDIA.foreground, flexShrink: 1, letterSpacing: 0.1, ...textShadow },
+  sponsored: { fontSize: FS.meta, fontFamily: FONT.medium, color: MEDIA.muted, marginBottom: 6, ...textShadow },
+  headline: { fontSize: 15, fontFamily: FONT.semibold, color: MEDIA.foreground, marginBottom: 4, lineHeight: 20, ...textShadow },
+  caption: { fontSize: 13, fontFamily: FONT.medium, color: MEDIA.foreground, lineHeight: 17, letterSpacing: 0.1, ...textShadow },
   cta: {
-    height: 44, borderRadius: RADIUS.sm, backgroundColor: '#FFFFFF',
+    height: 44, borderRadius: RADIUS.sm, backgroundColor: MEDIA.foreground,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md,
   },
-  ctaText: { fontSize: FS.base, fontFamily: FONT.semibold, color: '#000000' },
+  ctaText: { fontSize: FS.base, fontFamily: FONT.semibold, color: MEDIA.background },
 });
 
 const cardStyles = StyleSheet.create({

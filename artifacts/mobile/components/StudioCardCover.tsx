@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Full-bleed "album cover" backdrop shared by every Studio carousel card —
  * Dev's spec: all 16 covers should feel like ONE series, monochrome
@@ -32,7 +33,7 @@ export function StudioCoverBackdrop() {
   return (
     <>
       <LinearGradient
-        colors={['#000000', '#020202', '#050505', '#020202', '#000000']}
+        colors={[MEDIA.background, '#020202', '#050505', '#020202', MEDIA.background]}
         locations={[0, 0.3, 0.5, 0.7, 1]}
         start={{ x: 0.15, y: 0 }}
         end={{ x: 0.9, y: 1 }}
@@ -41,10 +42,10 @@ export function StudioCoverBackdrop() {
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
           <RadialGradient id="coverGlow" cx="50%" cy="34%" r="75%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.09} />
-            <Stop offset="35%" stopColor="#ffffff" stopOpacity={0.05} />
-            <Stop offset="70%" stopColor="#ffffff" stopOpacity={0.015} />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+            <Stop offset="0%" stopColor={MEDIA.foreground} stopOpacity={0.09} />
+            <Stop offset="35%" stopColor={MEDIA.foreground} stopOpacity={0.05} />
+            <Stop offset="70%" stopColor={MEDIA.foreground} stopOpacity={0.015} />
+            <Stop offset="100%" stopColor={MEDIA.foreground} stopOpacity={0} />
           </RadialGradient>
         </Defs>
         <Circle cx="50%" cy="34%" r="75%" fill="url(#coverGlow)" />
@@ -83,7 +84,7 @@ export function StudioCoverGrain() {
   return (
     <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
       {GRAIN_DOTS.map((d, i) => (
-        <Circle key={i} cx={`${d.x}%`} cy={`${d.y}%`} r={d.r} fill="#ffffff" opacity={d.o} />
+        <Circle key={i} cx={`${d.x}%`} cy={`${d.y}%`} r={d.r} fill={MEDIA.foreground} opacity={d.o} />
       ))}
     </Svg>
   );

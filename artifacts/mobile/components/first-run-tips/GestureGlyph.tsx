@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Animated white hand/finger glyph performing a real gesture (tap, swipe,
  * hold, drag, pinch) — the visual language for the `gesture` variant and the
@@ -31,7 +32,7 @@ const ICON_BY_GESTURE: Record<GestureKind, keyof typeof MaterialCommunityIcons.g
 export function GestureGlyph({
   gesture,
   size = 32,
-  color = '#FFFFFF',
+  color = MEDIA.foreground,
   reduceMotion = false,
 }: {
   gesture: GestureKind;

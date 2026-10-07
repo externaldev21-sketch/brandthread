@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Search — rebuilt to mirror Instagram's own search flow 1:1 (Mobbin
  * "Instagram iOS Searching Instagram" + "Instagram iOS Clearing search
@@ -846,7 +847,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   filterButton: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, height: 34,
-    paddingHorizontal: SPACING.md, borderRadius: RADII.pill,
+    paddingHorizontal: SPACING.md, borderRadius: ControlRadius.md,
     borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface,
   },
   filterBadge: { minWidth: 18, height: 18, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },

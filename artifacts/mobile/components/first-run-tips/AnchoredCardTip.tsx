@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 /**
  * `anchored` variant — a small card pointing at a specific control, with
  * multi-step Next/Skip navigation. Reskin of the Mesh
@@ -92,23 +94,23 @@ export function AnchoredCardTip({ visible, onDismiss, steps, targets = [], reduc
 }
 
 const styles = StyleSheet.create({
-  scrim: { backgroundColor: 'rgba(0,0,0,0.28)' },
+  scrim: { backgroundColor: mediaAlpha(MEDIA.background, 0.28) },
   cardWrap: { position: 'absolute', paddingHorizontal: SP.lg, zIndex: 9998, elevation: 9998 },
   card: {
     width: 280,
-    backgroundColor: 'rgba(15,15,15,0.96)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: mediaAlpha(MEDIA.background, 0.96),
+    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.14),
     borderRadius: RADIUS.lg,
     padding: SP.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  stepCount: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
-  skip: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.semibold, fontSize: FS.xs },
-  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
-  body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
+  stepCount: { color: mediaAlpha(MEDIA.foreground, 0.5), fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.3 },
+  skip: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.semibold, fontSize: FS.xs },
+  title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.md },
+  body: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
   dots: { flexDirection: 'row', gap: 5, marginTop: 14, marginBottom: 14 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
-  dotActive: { backgroundColor: '#FFFFFF', width: 14 },
-  nextButton: { backgroundColor: '#FFFFFF', borderRadius: RADIUS.md, paddingVertical: 10, alignItems: 'center' },
-  nextButtonText: { color: '#000000', fontFamily: FONT.bold, fontSize: FS.sm },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: mediaAlpha(MEDIA.foreground, 0.3) },
+  dotActive: { backgroundColor: MEDIA.foreground, width: 14 },
+  nextButton: { backgroundColor: MEDIA.foreground, borderRadius: RADIUS.md, paddingVertical: 10, alignItems: 'center' },
+  nextButtonText: { color: MEDIA.background, fontFamily: FONT.bold, fontSize: FS.sm },
 });

@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 /**
  * Renders the web `Alert.alert` / `Alert.prompt` queue from lib/webAlert.ts as
  * a centered dialog (the iOS alert layout: title, message, then the buttons —
@@ -150,7 +152,7 @@ function WebAlertDialog() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: mediaAlpha(MEDIA.background, 0.55),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SP.lg,

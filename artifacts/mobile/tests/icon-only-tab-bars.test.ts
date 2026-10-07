@@ -10,19 +10,21 @@ describe('icon-only bottom navigation', () => {
   it('keeps buyer icons, selected state, accessible names, and glass without visual tab labels', () => {
     expect(buyer).toContain('accessibilityLabel={label}');
     expect(buyer).toContain('focused={focused}');
-    expect(buyer).toContain("accessibilityLabel={searchActive ? 'Close search' : 'Profile tab'}");
-    expect(buyer).toMatch(/<BuyerNavIcon\s+name=\{item\.icon\}/);
+    expect(buyer).toContain('accessibilityLabel="Profile tab"');
+    expect(buyer).toContain('name={item.icon}');
+    expect(buyer).toContain('<CrossfadeNavIcon');
     expect(buyer).toContain('<TabBarGlass theme={theme}');
     expect(buyer).not.toContain('{item.label}\n');
     expect(buyer).not.toContain('{circleLabel}');
   });
 
   it('keeps seller icons, selected state, accessible names, and tinted bar without visual tab labels', () => {
-    expect(seller).toContain('accessibilityLabel="Open Studio tools"');
+    expect(seller).toContain("'Open Studio tools'");
+    expect(seller).toContain("'Close Studio tools'");
     expect(seller).toContain('accessibilityLabel="Open Brandthread AI"');
     expect(seller).toContain('`${tabDef.label} tab`');
     expect(seller).toContain('focused={isFocused}');
-    expect(seller).toContain('<TabBarIndicator activeIndex={activeIndex}');
+    expect(seller).toContain('<TabBarIndicator x={indicatorX} target={indicatorTarget}');
     expect(seller).toContain('<TabBarGlass theme={theme}');
     expect(seller).not.toContain('{tabDef.label}\n');
     expect(seller).not.toContain('styles.sideLabel');

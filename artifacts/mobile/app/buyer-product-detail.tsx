@@ -623,7 +623,13 @@ export default function BuyerProductDetailScreen() {
           }
         }
 
-        if (productId && !prod) {
+        // Synthetic catalog IDs have no server record. Resolve them only through
+        // the explicit web-demo gate, never through public commerce endpoints.
+        if (productId && !prod && isPreviewProductId(productId)) {
+          prod = getPreviewBuyerProduct(productId);
+          if (prod) previewKind = 'local';
+        }
+        if (productId && !prod && !isPreviewProductId(productId)) {
           // Load the live product from the public API.
           // DB product UUIDs from the discover feed carry real variant IDs
           // so the checkout server can look them up correctly.
@@ -1353,10 +1359,10 @@ export default function BuyerProductDetailScreen() {
 
           {/* Reviews — shared with the Shop sheet so review UI never drifts
               between the two surfaces. Renders nothing when there are none. */}
-          <ProductReviewsSection productId={product.id} productName={product.name} />
+          {!isPreviewProductId(product.id) && <ProductReviewsSection productId={product.id} productName={product.name} />}
 
           {/* Questions — public Q&A, answered by the seller. */}
-          <ProductQuestionsSection productId={product.id} productName={product.name} />
+          {!isPreviewProductId(product.id) && <ProductQuestionsSection productId={product.id} productName={product.name} />}
 
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
@@ -1683,6 +1689,11 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
 
   useEffect(() => {
     let cancelled = false;
+    if (isPreviewProductId(productId)) {
+      setVideos([]);
+      setLoading(false);
+      return () => { cancelled = true; };
+    }
     api.publicProducts.taggedVideos(productId, 10)
       .then((rows) => { if (!cancelled) setVideos(rows); })
       .catch(() => { if (!cancelled) setVideos([]); })
@@ -1785,7 +1796,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
     let cancelled = false;
     setLoading(true);
     const preview = isPreviewProductId(productId) ? getPreviewRelatedProducts(productId, 4) : [];
-    if (preview.length > 0) {
+    if (isPreviewProductId(productId)) {
       setProducts(preview);
       setLoading(false);
       return () => { cancelled = true; };

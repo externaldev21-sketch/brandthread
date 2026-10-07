@@ -64,11 +64,13 @@ export function formatUsd(cents: number): string {
 
 const inflight = new Set<Promise<unknown>>();
 
-function track<T>(promise: Promise<T>): Promise<T> {
+export function trackStockNotificationWork<T>(promise: Promise<T>): Promise<T> {
   inflight.add(promise);
   void promise.finally(() => inflight.delete(promise)).catch(() => undefined);
   return promise;
 }
+
+const track = trackStockNotificationWork;
 
 /** Resolves once every scheduled/coalesced alert fan-out has finished. */
 export async function drainSavedProductAlerts(): Promise<void> {

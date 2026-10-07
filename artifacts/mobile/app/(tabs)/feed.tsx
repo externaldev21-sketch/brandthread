@@ -1107,6 +1107,7 @@ export function VideoVisual(props: VideoVisualProps) {
 // frame was shrunk by the tab-bar strip (pre-full-bleed) would wrongly
 // letterbox perfectly ordinary vertical clips.
 const FULL_PAGE_COVER_CROP_THRESHOLD = 0.3;
+const IMMERSIVE_FRAME_COVER_CROP_THRESHOLD = 0.15;
 
 /**
  * Height of the sharp video frame. Full-bleed: the video always fills the
@@ -1142,7 +1143,8 @@ function PosterOnlyVisual({
   const frameHeight = immersiveFrameHeight(pageHeight, bottomStripHeight);
   const frameAspect = pageWidth != null && frameHeight ? pageWidth / frameHeight : pageAspect;
   const cropFraction = 1 - Math.min(videoAspect, frameAspect) / Math.max(videoAspect, frameAspect);
-  const fit = immersive && cropFraction <= FULL_PAGE_COVER_CROP_THRESHOLD ? 'cover' : 'contain';
+  const coverThreshold = bottomStripHeight > 0 ? IMMERSIVE_FRAME_COVER_CROP_THRESHOLD : FULL_PAGE_COVER_CROP_THRESHOLD;
+  const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
   const frameStyle = pageWidth != null && frameHeight != null
     ? { position: 'absolute' as const, top: 0, left: 0, width: pageWidth, height: frameHeight }
@@ -1230,7 +1232,8 @@ function LiveVideoVisual({
   const frameHeight = immersiveFrameHeight(pageHeight, bottomStripHeight);
   const frameAspect = pageWidth != null && frameHeight ? pageWidth / frameHeight : pageAspect;
   const cropFraction = 1 - Math.min(videoAspect, frameAspect) / Math.max(videoAspect, frameAspect);
-  const fit = immersive && cropFraction <= FULL_PAGE_COVER_CROP_THRESHOLD ? 'cover' : 'contain';
+  const coverThreshold = bottomStripHeight > 0 ? IMMERSIVE_FRAME_COVER_CROP_THRESHOLD : FULL_PAGE_COVER_CROP_THRESHOLD;
+  const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
   React.useEffect(() => {
     const subscription = player.addListener('playingChange', ({ isPlaying }) => {

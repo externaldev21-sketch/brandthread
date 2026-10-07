@@ -338,12 +338,13 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
     return;
   }
 
+  // Finish inbox routing before acknowledging the follow, so an immediate
+  // refresh cannot show the old pending request. Also retry idempotent routing
+  // on an already-existing follow if an earlier non-critical promotion failed.
+  await promotePendingRequestsOnFollow(myId, userId).catch(() => { /* non-critical */ });
+
   // Only notify when this is a genuinely new follow (not a duplicate/retry)
   if (result.inserted.length > 0) {
-    // myId now follows userId — if userId had sent myId a still-pending
-    // message request, this follow-back is exactly the condition that
-    // routes it to myId's main inbox instead (lib/conversationRouting.ts).
-    promotePendingRequestsOnFollow(myId, userId).catch(() => { /* non-critical */ });
     (async () => {
       try {
         const profile = (await profilesById([myId])).get(myId);

@@ -30,7 +30,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { buildMetaAdsReturnUrl } from '@/services/metaAdsService';
 import type { MetaAdsConnection, MetaBusiness, MetaAdAccount, MetaPage } from '@/lib/api';
 
-type Step = 'loading' | 'not_connected' | 'oauth_error' | 'picker' | 'connected';
+type Step = 'loading' | 'not_configured' | 'not_connected' | 'oauth_error' | 'picker' | 'connected';
 
 export default function MetaAdsConnectScreen() {
   const router = useRouter();
@@ -61,7 +61,9 @@ export default function MetaAdsConnectScreen() {
     try {
       const conn = await api.metaAds.connection();
       setConnection(conn);
-      if (conn.connected && conn.status === 'connected') {
+      if (conn.configured === false) {
+        setStep('not_configured');
+      } else if (conn.connected && conn.status === 'connected') {
         setStep('connected');
       } else if (conn.status === 'pending_selection') {
         setStep('picker');
@@ -233,6 +235,14 @@ export default function MetaAdsConnectScreen() {
             </View>
             <PrimaryButton label="Connect Meta" icon="link" onPress={handleConnect} loading={connecting} />
           </View>
+        )}
+
+        {step === 'not_configured' && (
+          <EmptyState
+            icon="link"
+            title="Meta / Instagram not configured"
+            description={connection?.configurationError ?? 'Facebook and Instagram connections are not configured for this app yet.'}
+          />
         )}
 
         {step === 'oauth_error' && (

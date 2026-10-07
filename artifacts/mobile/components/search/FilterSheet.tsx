@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -271,7 +272,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: SCREEN_GUTTER - SPACING.xxs,
   },
   cell: {
-    height: 44, borderRadius: RADII.pill, borderWidth: 1,
+    height: 44, borderRadius: ControlRadius.md, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.sm,
   },
   switchRow: {

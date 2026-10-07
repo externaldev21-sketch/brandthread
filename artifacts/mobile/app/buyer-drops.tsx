@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Drops browse screen — Live now / Upcoming / Recently dropped tabs.
  * Backed by api.publicDrops.list('live' | 'upcoming' | 'recent').
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
   tabItem: { flex: 1, paddingVertical: SP.sm + 2, alignItems: 'center' },
   tabText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   viewToggle: { flexDirection: 'row', gap: 8 },
-  viewPill: { paddingHorizontal: 16, minHeight: 36, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  viewPill: { paddingHorizontal: 16, minHeight: 36, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   tabUnderline: { height: 2, width: '60%', borderRadius: 1, marginTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1 },
   avatar: { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },

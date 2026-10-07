@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Variants & stock — seller management screen for one product (?productId=).
  *
@@ -496,9 +497,9 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   muted: { fontFamily: FONT.regular, fontSize: FS.sm, color: c.mutedForeground, lineHeight: 18 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: ControlRadius.sm, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
   chipText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.foreground },
-  addBtn: { minWidth: 72, height: 46, paddingHorizontal: 16, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { minWidth: 72, height: 46, paddingHorizontal: 16, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   addRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
   input: { fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground, backgroundColor: c.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, paddingHorizontal: SP.md, paddingVertical: 10 },
@@ -506,7 +507,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   addOption: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, paddingVertical: 12, paddingHorizontal: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' },
   addOptionText: { fontFamily: FONT.medium, fontSize: FS.base, color: c.foreground },
   sortRow: { flexDirection: 'row', gap: SP.xs, marginHorizontal: SP.md, marginBottom: SP.sm },
-  sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: c.border },
+  sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: ControlRadius.sm, borderWidth: 1, borderColor: c.border },
   sortChipOn: { backgroundColor: c.foreground, borderColor: c.foreground },
   sortText: { fontFamily: FONT.medium, fontSize: FS.sm, color: c.mutedForeground },
   sortTextOn: { color: c.background },

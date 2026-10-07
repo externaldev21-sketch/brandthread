@@ -57,7 +57,8 @@ const HEX_GREY = /#(0[Aa-fA-F]|1[0-9A-Fa-f]|2[0-9A-Fa-f]|3[0-9Aa])\1\1\b/;
 const RGB_GREY = /rgba?\(\s*(1[0-9]|[2-4][0-9]|5[0-8])\s*,\s*\1\s*,\s*\1\s*[,)]/;
 
 function hasHardcodedGrey(source: string): boolean {
-  return source.split('\n').some((line) => HEX_GREY.test(line) || RGB_GREY.test(line));
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').some((line) =>
+    !line.trimStart().startsWith('//') && (HEX_GREY.test(line) || RGB_GREY.test(line)));
 }
 
 // Generated from the state of the tree when this lint was added. Replace a
@@ -77,7 +78,6 @@ const HARDCODED_GREY_ALLOWLIST = new Set([
   'components/buyer-feed/ShopSideTab.tsx',
   'components/live/LiveOverlays.tsx',
   'components/profile/ProfileStoryAvatar.tsx',
-  'components/search/PersonRow.tsx',
   'components/thread-cash/ThreadCashStreakRow.tsx',
   'components/ui/SegmentedControl.tsx',
   'lib/conversationThemes.ts',

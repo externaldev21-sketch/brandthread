@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Reshare ("Add to your story") helpers: background sampling + fallbacks.
  *
@@ -8,7 +9,7 @@
 import { Platform } from 'react-native';
 import { loadSkia } from '@/lib/skiaAvailability';
 
-export const RESHARE_FALLBACK_COLORS: [string, string] = ['#0B0B0B', '#C7C7CC'];
+export const RESHARE_FALLBACK_COLORS: [string, string] = [MEDIA.background, '#C7C7CC'];
 export const RESHARE_CARD_RADIUS = 20;
 
 const toHex2 = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
@@ -55,7 +56,9 @@ export function reshareBackground(sampled: string | null | undefined): { colors:
  * colour is the marker for "sampling failed" → the black/silver gradient.
  */
 export function reshareGradientFromBackground(bg: string | null | undefined): [string, string] {
-  if (!bg || bg.toUpperCase() === RESHARE_FALLBACK_COLORS[0]) return RESHARE_FALLBACK_COLORS;
+  // Previously saved reshared slides used this near-black failure marker.
+  // Retain it while new slides use the semantic media background.
+  if (!bg || bg.toUpperCase() === MEDIA.legacyReshareMarker || bg.toUpperCase() === RESHARE_FALLBACK_COLORS[0]) return RESHARE_FALLBACK_COLORS;
   return reshareBackground(bg).colors;
 }
 

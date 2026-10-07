@@ -21,6 +21,7 @@ import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
 import { ChipRail } from '@/components/ChipRail';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ArrowUpDownIcon } from '@/components/icons/ArrowUpDownIcon';
 import { hapticSelection } from '@/lib/haptics';
 
@@ -153,6 +154,7 @@ export function SellerListHeader({
           animationType="fade"
           onRequestClose={closeTitleMenu}
         >
+          <ModalSafeArea>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeTitleMenu} accessibilityLabel="Close menu" />
           {menuAnchor && (
             <View
@@ -186,6 +188,7 @@ export function SellerListHeader({
               ))}
             </View>
           )}
+          </ModalSafeArea>
         </Modal>
       )}
 

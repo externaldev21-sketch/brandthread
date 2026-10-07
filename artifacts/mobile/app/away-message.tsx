@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Seller > Messages > Away message — the automatic reply a buyer gets when
  * they message while the seller is away (always-on, or outside business
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
   messageInput: { minHeight: 120 },
   chips: { flexDirection: 'row', gap: 6 },
   chipCell: { flex: 1 },
-  dayBtn: { height: 40, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dayBtn: { height: 40, borderRadius: ControlRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   hoursRow: { flexDirection: 'row', gap: 12 },
   tzRow: { justifyContent: 'center' },

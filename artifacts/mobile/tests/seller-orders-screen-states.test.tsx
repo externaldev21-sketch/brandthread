@@ -71,6 +71,7 @@ vi.mock('expo-router', async (importOriginal) => ({
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
@@ -293,7 +294,7 @@ describe('seller Orders screen states', () => {
 
     const empty = renderer.root.findAll((node: any) => node.type === 'EmptyState');
     expect(empty.length).toBe(1);
-    expect(empty[0].props.message).toContain('Orders show up here');
+    expect(empty[0].props.testID).toBe('orders-empty');
     expect(empty[0].props.title).toBe('No orders yet');
     expect(empty[0].props.variant).not.toBe('error');
   });
@@ -377,7 +378,7 @@ describe('seller Orders screen states', () => {
     // The real empty state, not the "couldn't load" error/retry one — a
     // deliberate no-account preview isn't a connectivity failure.
     expect(empty[0].props.variant).not.toBe('error');
-    expect(empty[0].props.message).toContain('Orders show up here');
+    expect(empty[0].props.testID).toBe('orders-empty');
     expect(empty[0].props.title).toBe('No orders yet');
   });
 

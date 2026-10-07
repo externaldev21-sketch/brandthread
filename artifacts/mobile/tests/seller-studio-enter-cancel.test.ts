@@ -29,9 +29,9 @@ describe('Studio auto-enter cancellation: edge-trace retracts and re-arms', () =
     const dismissGesture = studio.slice(studio.indexOf('const dismissGesture ='), studio.indexOf('const cardAreaPan ='));
     const headerStart = dismissGesture.slice(dismissGesture.indexOf('.onStart(() => {'), dismissGesture.indexOf('.onUpdate('));
 
-    expect(cardBegin).toContain('retractEnter(traceProgress, zoomScale, enterFade);');
+    expect(cardBegin).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);');
     expect(cardBegin).toContain('runOnJS(setEntering)(false);');
-    expect(headerStart).toContain('retractEnter(traceProgress, zoomScale, enterFade);');
+    expect(headerStart).toContain('retractEnter(traceProgress, zoomScale, enterFade, labelPunchScale, labelFlash, labelExit);');
     expect(headerStart).toContain('runOnJS(setEntering)(false);');
   });
 

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Brandthread Shared UI Components
  *
@@ -850,7 +851,7 @@ const esS = StyleSheet.create({
   btn:     { width: '100%' },
   // Slim, fit-to-text pill: 36px tall, equal 16px side padding, black text
   // on the theme's white (see actionVariant 'pill').
-  pill:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, paddingHorizontal: SP.md, borderRadius: 18, alignSelf: 'center' },
+  pill:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, alignSelf: 'center' },
   pillLabel: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });
 

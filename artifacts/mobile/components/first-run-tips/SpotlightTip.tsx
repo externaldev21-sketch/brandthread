@@ -1,3 +1,5 @@
+import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
+import { MEDIA } from '@/lib/theme';
 /**
  * `spotlight` variant — dims everything except one specific, real measured
  * control, with a caption and an arrow pointing at it. Reskin of the Rodeo
@@ -28,7 +30,7 @@ export interface SpotlightTipProps {
 }
 
 const HOLE_PADDING = 10;
-const DIM_COLOR = 'rgba(0,0,0,0.72)';
+const DIM_COLOR = mediaAlpha(MEDIA.background, 0.72);
 
 export function SpotlightTip({ visible, onDismiss, target, title, body, reduceMotion = false, testID }: SpotlightTipProps) {
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -95,7 +97,7 @@ export function SpotlightTip({ visible, onDismiss, target, title, body, reduceMo
               : { bottom: screenH - hole.y + SP.md },
           ]}
         >
-          <Feather name={captionBelow ? 'arrow-up' : 'arrow-down'} size={18} color="#FFFFFF" style={styles.arrow} />
+          <Feather name={captionBelow ? 'arrow-up' : 'arrow-down'} size={18} color={MEDIA.foreground} style={styles.arrow} />
           <Text style={styles.title}>{title}</Text>
           {body ? <Text style={styles.body}>{body}</Text> : null}
           <Text style={styles.dismissHint}>Tap anywhere to continue</Text>
@@ -107,10 +109,10 @@ export function SpotlightTip({ visible, onDismiss, target, title, body, reduceMo
 
 const styles = StyleSheet.create({
   dim: { position: 'absolute' },
-  ring: { position: 'absolute', borderRadius: RADIUS.lg, borderWidth: 2, borderColor: '#FFFFFF' },
+  ring: { position: 'absolute', borderRadius: RADIUS.lg, borderWidth: 2, borderColor: MEDIA.foreground },
   captionWrap: { position: 'absolute', left: SP.xl, right: SP.xl, alignItems: 'center' },
   arrow: { marginBottom: 6 },
-  title: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
-  body: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
-  dismissHint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14, letterSpacing: 0.3 },
+  title: { color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
+  body: { color: mediaAlpha(MEDIA.foreground, 0.75), fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 4 },
+  dismissHint: { color: mediaAlpha(MEDIA.foreground, 0.5), fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 14, letterSpacing: 0.3 },
 });

@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Link in bio editor with live preview.
  * Mobbin reference: Linktree "Links" editor (link cards with drag handle,
@@ -319,7 +320,7 @@ const s = StyleSheet.create({
   avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, marginTop: 26 },
   avatarPh: { alignItems: 'center', justifyContent: 'center' },
   linksHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.sm },
-  addPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, minHeight: 40, borderRadius: RADIUS.pill, marginBottom: SP.sm },
+  addPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, minHeight: 40, borderRadius: ControlRadius.md, marginBottom: SP.sm },
   linkRow: { flexDirection: 'row', alignItems: 'center', padding: SP.sm, gap: SP.sm },
   arrows: { alignItems: 'center' },
   arrowBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

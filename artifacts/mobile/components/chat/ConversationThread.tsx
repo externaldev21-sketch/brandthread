@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * The ONE 1:1 chat thread screen, shared by both sides of a DM.
  *
@@ -3236,7 +3237,7 @@ const requestPanelStyles = StyleSheet.create({
     alignSelf: 'stretch',
     paddingHorizontal: 12,
     height: 44,
-    borderRadius: RADIUS.pill,
+    borderRadius: ControlRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3388,7 +3389,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   requestProfilePill: {
     height: 34,
     paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
+    borderRadius: ControlRadius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
     alignItems: 'center',
@@ -3703,7 +3704,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 3,
     backgroundColor: theme.card,
-    borderRadius: RADIUS.pill,
+    borderRadius: ControlRadius.sm,
     borderWidth: 1,
     borderColor: theme.border,
     paddingHorizontal: SP.xs,
@@ -3930,7 +3931,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaSheetDesc:   { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   // Seller side's "Orders from <buyer>" sheet (same sheet chrome as above).
   ordersMetaRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4, flexWrap: 'wrap' },
-  ordersRetryBtn:   { marginTop: SP.sm, paddingHorizontal: 16, height: 36, borderRadius: 18, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center' },
+  ordersRetryBtn:   { marginTop: SP.sm, paddingHorizontal: 16, height: 36, borderRadius: ControlRadius.md, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center' },
   ordersRetryText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.background },
 
   // Photo grid

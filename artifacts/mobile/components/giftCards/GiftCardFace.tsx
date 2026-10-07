@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * The gift card itself: a solid black card with the store name and an amount.
  * Shared by the buy flow, the wallet and the store's manage screen.
@@ -8,8 +9,8 @@ import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 
-const CARD_BG = '#0A0A0A';
-const CARD_FG = '#FFFFFF';
+const CARD_BG = MEDIA.background;
+const CARD_FG = MEDIA.foreground;
 const CARD_MUTED = '#A8A8A8';
 
 export function GiftCardFace({
@@ -42,7 +43,7 @@ export function GiftCardFace({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: CARD_BG, borderRadius: 20, padding: SP.lg,
-    justifyContent: 'space-between', borderWidth: 1, borderColor: '#2A2A2A',
+    justifyContent: 'space-between', borderWidth: 1, borderColor: MEDIA.border,
   },
   cardFull: { aspectRatio: 1.6 },
   cardCompact: { minHeight: 112, gap: SP.md, padding: SP.md, borderRadius: 16 },

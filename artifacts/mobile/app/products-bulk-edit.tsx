@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Select products — bulk edit prices, archive and duplicate.
  *
@@ -527,7 +528,7 @@ function makeStyles(theme: any) {
     chips: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
     seg: { flexDirection: 'row', gap: SP.sm },
     segItem: {
-      flex: 1, height: 40, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center',
+      flex: 1, height: 40, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center',
       borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, paddingHorizontal: 12,
     },
     segItemActive: { backgroundColor: theme.text, borderColor: theme.text },

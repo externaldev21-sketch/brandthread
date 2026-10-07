@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Seeded PREVIEW data for the highlights "Select stories" grid and the
  * highlight viewer (?bt_preview=buyer&demo=1 only — never a real account).
@@ -30,7 +31,7 @@ export function previewHighlightStories(): Story[] {
     id: `preview-highlight-item-${i}`,
     authorId: 'preview-seller-01', authorName: 'Atelier Noire', authorHandle: '@atelier_noire',
     authorInitials: 'AN', authorColor: '#1C1C1E', authorAccountType: 'seller',
-    media: [{ id: `preview-highlight-item-${i}-slide`, type: 'photo', backgroundColor: '#000000', duration: 5, imageUri: posterUri(i + 1) }],
+    media: [{ id: `preview-highlight-item-${i}-slide`, type: 'photo', backgroundColor: MEDIA.background, duration: 5, imageUri: posterUri(i + 1) }],
     privacy: { visibility: 'public', replyPermission: 'everyone', hiddenFromUserIds: [], closeFriendsOnly: false },
     viewers: [], repliesDisabled: true,
     createdAt: now - (i + 3) * DAY, expiresAt: now + 365 * DAY,

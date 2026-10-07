@@ -214,10 +214,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   switcherScroll: {
     flexGrow: 0,
-    marginHorizontal: -22,
+    marginHorizontal: 0,
   },
   switcherScrollContent: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 0,
   },
   switchItem: {
     paddingHorizontal: 16,

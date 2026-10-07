@@ -1,3 +1,4 @@
+import { radius as ControlRadius } from '@/constants/radii';
 /**
  * Day + time chip picker over YYYY-MM-DD / HH:MM strings — the same pattern
  * as the drop scheduler (app/seller-drop-create.tsx), with a custom entry
@@ -105,7 +106,7 @@ const s = StyleSheet.create({
   // Rows run edge to edge (the parent has a SP.md gutter) so chips scroll off the screen edge, not a padded box.
   bleed: { marginHorizontal: -SP.md },
   chipRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SP.md },
-  chip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  chip: { borderWidth: 1, borderRadius: ControlRadius.md, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   customToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
   customText: { fontFamily: FONT.medium, fontSize: FS.xs },

@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * GarmentSilhouette — clean chrome/silver product silhouettes used as the
  * tappable starting points on the AI Design empty state. Pure SVG (no network,
@@ -70,7 +71,7 @@ export function GarmentSilhouette({ garment, size = 64 }: { garment: SilhouetteG
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
         <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="0" stopColor={MEDIA.foreground} />
           <Stop offset="0.35" stopColor="#B8B8B8" />
           <Stop offset="0.55" stopColor="#F2F2F2" />
           <Stop offset="1" stopColor="#6E6E6E" />
@@ -78,7 +79,7 @@ export function GarmentSilhouette({ garment, size = 64 }: { garment: SilhouetteG
       </Defs>
       <Path d={shape.body} fill={`url(#${id})`} stroke="#E6E6E6" strokeWidth={1} strokeLinejoin="round" />
       {shape.detail?.map((d) => (
-        <Path key={d} d={d} fill="none" stroke="#3A3A3A" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+        <Path key={d} d={d} fill="none" stroke={MEDIA.metal.seam} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
       ))}
     </Svg>
   );

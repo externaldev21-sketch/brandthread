@@ -1,3 +1,4 @@
+import { MEDIA } from '@/lib/theme';
 /**
  * Preview data layer for the signed-out guard in lib/api.ts.
  *
@@ -98,8 +99,8 @@ function store(ctx: Required<PreviewApiContext>, a: PreviewAccount) {
     title: ctx.demo ? a.name : 'My Store', subtitle: null, description: ctx.demo ? a.bio : null,
     status: ctx.demo ? 'published' : 'draft',
     theme: {
-      themeId: 'thread', primaryColor: '#000000', secondaryColor: '#C0C0C0', accentColor: '#000000',
-      backgroundColor: '#FFFFFF', textColor: '#000000', fontFamily: "'Inter', system-ui, sans-serif", borderRadius: 0,
+      themeId: 'thread', primaryColor: MEDIA.background, secondaryColor: '#C0C0C0', accentColor: MEDIA.background,
+      backgroundColor: MEDIA.foreground, textColor: MEDIA.background, fontFamily: "'Inter', system-ui, sans-serif", borderRadius: 0,
     },
     branding: { tagline: '', logoUrl: '', targetAudience: '' },
     sections: [
