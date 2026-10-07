@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, height: 52, gap: SP.xs,
   },
   dollarSign: { fontFamily: FONT.bold, fontSize: FS.lg },
-  input: { flex: 1, fontFamily: FONT.bold, fontSize: FS.lg, height: '100%' },
+  input: { flex: 1, minWidth: 0, fontFamily: FONT.bold, fontSize: FS.lg, height: '100%' },
   allChip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
   allChipText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   quoteRow: {

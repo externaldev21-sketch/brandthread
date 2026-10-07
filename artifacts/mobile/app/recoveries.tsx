@@ -86,11 +86,6 @@ export default function RecoveriesScreen() {
               <Row label="Recovered so far" value={formatCents(recovered)} />
               <Row label="Payouts" value={data?.payoutsPaused ? 'Paused' : 'Active'} last />
             </View>
-            {data?.payoutsPaused && (
-              <Text style={[styles.note, { color: colors.mutedForeground }]}>
-                Each new order payout pays this down first. Payouts resume on their own once it reaches $0.00.
-              </Text>
-            )}
 
             <Text style={[styles.section, { color: colors.mutedForeground }]}>CHARGEBACKS</Text>
             {recoveries.map((r) => (
@@ -162,7 +157,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, gap: SP.sm },
   rowLabel: { fontSize: FS.sm, flexShrink: 1 },
   rowValue: { fontSize: FS.sm },
-  note: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: -SP.xs, marginBottom: SP.md, paddingHorizontal: 2 },
   section: { fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 0.5, marginTop: SP.sm, marginBottom: SP.sm },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingTop: SP.sm, paddingBottom: SP.xs },
   cardTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
