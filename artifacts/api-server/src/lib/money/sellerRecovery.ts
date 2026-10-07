@@ -305,7 +305,13 @@ async function recordOrderLoss(input: {
     const sellerShare = Math.max(0, Math.min(shareRaw, input.disputedCents, held + paidOut));
     const fromHeld = Math.min(sellerShare, held);
     const fromPaid = sellerShare - fromHeld;
-    const owed = fromPaid + input.feeCents;
+    // Stripe's fee follows the part that was already paid out: the seller
+    // bears it on money they had received; while Brandthread still held the
+    // money (hold-until-delivered) the platform absorbs it.
+    const sellerFee = sellerShare > 0
+      ? Number((BigInt(input.feeCents) * BigInt(fromPaid)) / BigInt(sellerShare))
+      : 0;
+    const owed = fromPaid + sellerFee;
 
     const { posted } = await postLedgerTransaction(tx, {
       idempotencyKey: `chargeback-lost/${input.stripeDisputeId}/${order.id}`,
@@ -320,7 +326,7 @@ async function recordOrderLoss(input: {
         { account: "stripe_dispute_fees", amountCents: input.feeCents },
         { account: "seller_held", partyId: sellerId, orderId: order.id, amountCents: -fromHeld },
         { account: "seller_recoverable", partyId: sellerId, orderId: order.id, amountCents: -owed },
-        { account: "platform_dispute_losses", amountCents: -(input.disputedCents - sellerShare) },
+        { account: "platform_dispute_losses", amountCents: -(input.disputedCents - sellerShare + input.feeCents - sellerFee) },
       ],
     });
     if (!posted) return null;
@@ -353,12 +359,12 @@ async function recordOrderLoss(input: {
         orderId: order.id,
         paymentIntentId: input.paymentIntentId,
         amountCents: fromPaid,
-        feeCents: input.feeCents,
+        feeCents: sellerFee,
         heldCancelledCents: fromHeld,
       }).returning();
     }
     return {
-      orderId: order.id, sellerId, disputedCents: input.disputedCents, feeCents: input.feeCents,
+      orderId: order.id, sellerId, disputedCents: input.disputedCents, feeCents: sellerFee,
       heldCancelledCents: fromHeld, owedCents: owed, recovery, opened: Boolean(recovery),
     };
   });
@@ -518,16 +524,17 @@ export async function reinstateLostChargeback(
       const disputedCents = sum("buyer_payments");
       const feeCents = sum("stripe_dispute_fees");
       const fromHeld = -sum("seller_held");
-      const owedAtLoss = -sum("seller_recoverable");
-      const fromPaid = owedAtLoss - feeCents;
-      const sellerShare = fromHeld + fromPaid;
       const [recovery] = await tx.select().from(sellerRecoveries).where(and(
         eq(sellerRecoveries.stripeDisputeId, stripeDisputeId),
         eq(sellerRecoveries.orderId, loss.order_id),
       )).limit(1);
+      const fromPaid = recovery?.amountCents ?? 0;
+      const sellerFee = recovery?.feeCents ?? 0;
+      const sellerShare = fromHeld + fromPaid;
       const outstanding = recovery ? outstandingCents(recovery) : 0;
       const feeBack = feeReturned ? feeCents : 0;
-      const reduction = sellerShare + feeBack;
+      const sellerFeeBack = feeReturned ? sellerFee : 0;
+      const reduction = sellerShare + sellerFeeBack;
       const forgive = Math.min(outstanding, reduction);
       const credit = reduction - forgive;
       const { posted } = await postLedgerTransaction(tx, {
@@ -543,7 +550,7 @@ export async function reinstateLostChargeback(
           { account: "stripe_dispute_fees", amountCents: -feeBack },
           { account: "seller_recoverable", partyId: loss.seller_id, orderId: loss.order_id, amountCents: forgive },
           { account: "seller_held", partyId: loss.seller_id, orderId: loss.order_id, amountCents: credit },
-          { account: "platform_dispute_losses", amountCents: disputedCents - sellerShare },
+          { account: "platform_dispute_losses", amountCents: disputedCents - sellerShare + (feeBack - sellerFeeBack) },
         ],
       });
       if (!posted) return null;
