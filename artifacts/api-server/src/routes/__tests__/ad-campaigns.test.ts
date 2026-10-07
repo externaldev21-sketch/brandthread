@@ -99,6 +99,13 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
 }));
 
+// requirePermission reads Clerk's getAuth(), which needs clerkMiddleware; the
+// store owner always passes it (TEAM_OWNER_BYPASS), so stub it to pass.
+vi.mock("../../middlewares/requireRole", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  requirePermission: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 // ObjectStorage stub
 vi.mock("../../lib/objectStorage", () => ({
   ObjectStorageService: class {

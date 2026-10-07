@@ -2266,7 +2266,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
   estimatedReachHigh:     integer('estimated_reach_high').notNull().default(0),
 
   // ── Payment / Lifecycle ───────────────────────────────────────────────────
-  /** 'draft' | 'pending_payment' | 'active' | 'failed' | 'cancelled' */
+  /** 'draft' | 'pending_payment' | 'active' | 'paused' | 'completed' | 'failed' | 'cancelled' */
   status:                   text('status').notNull().default('draft'),
   /** Stripe Checkout Session ID — persisted after /pay so retries reuse the open session */
   stripeCheckoutSessionId:  text('stripe_checkout_session_id').unique(),
@@ -2281,11 +2281,65 @@ export const adCampaigns = pgTable('ad_campaigns', {
   /** { slideshow: { paths: string[] }, formatConfigs: { [format]: { w, h, ar } } } */
   creativeConfig:         json('creative_config').$type<Record<string, unknown>>(),
 
+  // ── Delivery (migration 303) ───────────────────────────────────────────────
+  // Status gains 'paused' | 'completed'. Spend is billed per confirmed
+  // viewable impression (artifacts/api-server/src/lib/ads/adDelivery.ts).
+  /** Integer cents billed so far — never exceeds budgetCents */
+  spentCents:             integer('spent_cents').notNull().default(0),
+  impressionsCount:       integer('impressions_count').notNull().default(0),
+  clicksCount:            integer('clicks_count').notNull().default(0),
+  pausedAt:               timestamp('paused_at', { withTimezone: true }),
+  completedAt:            timestamp('completed_at', { withTimezone: true }),
+  /** 'budget_spent' | 'ended' | 'seller_stopped' */
+  completionReason:       text('completion_reason'),
+  /** Feed surfaces the ad may run on: 'following' | 'for_you' | 'discover' */
+  surfaces:               jsonb('surfaces').$type<string[]>().notNull().default(['following', 'for_you', 'discover']),
+
   createdAt:              timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:              timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
   csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
+  statusEndsIdx:     index('ad_campaigns_status_ends_idx').on(table.status, table.endsAt),
+}));
+
+// ─── Ad delivery: serves / impressions (migration 303) ───────────────────────
+// One row per ad served into a buyer feed. `serveToken` is the one-time token
+// the client confirms a viewable impression with; `viewedAt` set = billed.
+// Unique (campaign, viewer, session) keeps a campaign from repeating within a
+// session even under concurrent serve requests.
+export const adImpressions = pgTable('ad_impressions', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  campaignId:  uuid('campaign_id').notNull().references(() => adCampaigns.id, { onDelete: 'cascade' }),
+  sellerId:    text('seller_id').notNull(),
+  viewerId:    text('viewer_id').notNull(),
+  /** 'following' | 'for_you' | 'discover' */
+  surface:     text('surface').notNull(),
+  sessionId:   text('session_id').notNull(),
+  serveToken:  text('serve_token').notNull().unique(),
+  /** Price quoted at serve time (cents per impression) */
+  costCents:   integer('cost_cents').notNull(),
+  /** Cents actually billed (0 until the viewable impression is confirmed) */
+  billedCents: integer('billed_cents').notNull().default(0),
+  servedAt:    timestamp('served_at', { withTimezone: true }).defaultNow().notNull(),
+  viewedAt:    timestamp('viewed_at', { withTimezone: true }),
+}, (table) => ({
+  sessionUnique:     uniqueIndex('ad_impressions_campaign_viewer_session_unique').on(table.campaignId, table.viewerId, table.sessionId),
+  viewerServedIdx:   index('ad_impressions_viewer_served_idx').on(table.viewerId, table.servedAt),
+  campaignViewedIdx: index('ad_impressions_campaign_viewed_idx').on(table.campaignId, table.viewedAt),
+}));
+
+// One click per impression (unique impressionId).
+export const adClicks = pgTable('ad_clicks', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  campaignId:   uuid('campaign_id').notNull().references(() => adCampaigns.id, { onDelete: 'cascade' }),
+  impressionId: uuid('impression_id').notNull().references(() => adImpressions.id, { onDelete: 'cascade' }).unique(),
+  viewerId:     text('viewer_id').notNull(),
+  surface:      text('surface').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  campaignCreatedIdx: index('ad_clicks_campaign_created_idx').on(table.campaignId, table.createdAt),
+  viewerCreatedIdx:   index('ad_clicks_viewer_created_idx').on(table.viewerId, table.createdAt),
 }));
 
 // ─── Automatic media screening results (migration 115) ───────────────────────

@@ -550,7 +550,54 @@ export type AdFormatKind =
 export type AdMediaKind = 'video' | 'photos';
 
 export type AdCampaignStatus =
-  | 'draft' | 'pending_payment' | 'active' | 'failed' | 'cancelled';
+  | 'draft' | 'pending_payment' | 'active' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+export type AdSurface = 'following' | 'for_you' | 'discover';
+
+export type AdCompletionReason = 'budget_spent' | 'ended' | 'seller_stopped';
+
+/** Delivered results summary (GET /api/ad-campaigns list + /:id/results). */
+export interface AdResultsSummary {
+  impressions: number;
+  uniqueReach: number;
+  clicks: number;
+  ctrPercent: number;
+  spentCents: number;
+  budgetCents: number;
+  remainingCents: number;
+}
+
+export interface AdCampaignResults extends AdResultsSummary {
+  bySurface: { surface: AdSurface; impressions: number; clicks: number; spendCents: number }[];
+  daily: { date: string; impressions: number; clicks: number; spendCents: number }[];
+  attribution: { windowDays: number; orders: number; revenueCents: number };
+}
+
+export type AdDestination =
+  | { kind: 'product'; productId: string; sellerId: string }
+  | { kind: 'store'; sellerId: string }
+  | { kind: 'profile'; sellerId: string }
+  | { kind: 'contact'; sellerId: string };
+
+/** One Sponsored ad slot served into a buyer feed (GET /api/ads/serve). */
+export interface FeedAd {
+  /** Page-local organic index the ad goes after */
+  afterIndex: number;
+  /** One-time token for the impression / click calls */
+  token: string;
+  campaignId: string;
+  surface: AdSurface;
+  label: 'Sponsored';
+  headline: string | null;
+  description: string | null;
+  mediaKind: string;
+  mediaUrls: string[];
+  ctaKind: AdCtaKind | null;
+  ctaLabel: string;
+  destination: AdDestination;
+  seller: { id: string; displayName: string | null; username: string | null; avatarUrl: string | null };
+  product: { id: string; name: string; imageUrl: string | null; priceCents: number | null } | null;
+}
 
 export interface AdCampaign {
   id: string;
@@ -578,6 +625,16 @@ export interface AdCampaign {
   startsAt: string | null;
   endsAt: string | null;
   creativeConfig: Record<string, unknown> | null;
+  /** Delivery (billed per viewable impression) */
+  spentCents?: number;
+  impressionsCount?: number;
+  clicksCount?: number;
+  pausedAt?: string | null;
+  completedAt?: string | null;
+  completionReason?: AdCompletionReason | null;
+  surfaces?: AdSurface[];
+  /** Present on the list endpoint */
+  results?: AdResultsSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2881,6 +2938,34 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/ad-campaigns/${encodeURIComponent(id)}/pay/verify`,
           {},
         ),
+      /** Delivered results: impressions, unique reach, clicks, CTR, spend, by surface, daily. */
+      results: (id: string) =>
+        get<{ campaign: AdCampaign; results: AdCampaignResults }>(`/api/ad-campaigns/${encodeURIComponent(id)}/results`),
+      pause: (id: string) =>
+        post<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}/pause`, {}),
+      resume: (id: string) =>
+        post<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}/resume`, {}),
+      stop: (id: string) =>
+        post<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}/stop`, {}),
+    },
+    /**
+     * Sponsored ad delivery into buyer feeds (signed-in only). `serve` returns
+     * slots for one page of organic items; `impression` is called once the ad
+     * was >=50% on screen for ~1s; `click` returns the CTA destination.
+     */
+    ads: {
+      serve: (params: { surface: AdSurface; sessionId: string; organicOffset: number; organicCount: number }) =>
+        // Never cached: every serve mints fresh one-time tokens.
+        freshGet<{ ads: FeedAd[] }>(`/api/ads/serve?${new URLSearchParams({
+          surface: params.surface,
+          sessionId: params.sessionId,
+          organicOffset: String(params.organicOffset),
+          organicCount: String(params.organicCount),
+        }).toString()}`),
+      impression: (token: string) =>
+        post<{ counted: boolean; reason?: string; campaignCompleted?: boolean }>('/api/ads/impression', { token }),
+      click: (token: string) =>
+        post<{ counted: boolean; destination: AdDestination }>('/api/ads/click', { token }),
     },
     /**
      * Meta (Facebook & Instagram) Ads — OAuth connection, campaign builder,

@@ -46,7 +46,7 @@ function formatCount(n: number): string {
 
 function campaignStatusVariant(s: AdCampaign['status']) {
   if (s === 'active') return 'success';
-  if (s === 'pending_payment') return 'info';
+  if (s === 'pending_payment' || s === 'paused') return 'info';
   if (s === 'failed' || s === 'cancelled') return 'warning';
   return 'default';
 }
@@ -54,6 +54,11 @@ function campaignStatusVariant(s: AdCampaign['status']) {
 function campaignStatusLabel(s: AdCampaign['status']) {
   if (s === 'pending_payment') return 'pending payment';
   return s;
+}
+
+/** Paid campaigns (running or finished) open their results; drafts reopen the editor. */
+function campaignHasResults(s: AdCampaign['status']) {
+  return s === 'active' || s === 'paused' || s === 'completed';
 }
 
 function discountValueLabel(d: DiscountCode) {
@@ -192,7 +197,9 @@ export default function MarketingScreen() {
             <TouchableOpacity
               key={c.id}
               activeOpacity={0.8}
-              onPress={() => router.push(`/design-campaign?campaignId=${c.id}` as never)}
+              onPress={() => router.push((campaignHasResults(c.status)
+                ? `/ad-campaign-results?campaignId=${c.id}`
+                : `/design-campaign?campaignId=${c.id}`) as never)}
               style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
               <View style={[styles.campaignIcon, { backgroundColor: colors.accent }]}>
@@ -206,7 +213,14 @@ export default function MarketingScreen() {
                   <Badge label={campaignStatusLabel(c.status)} variant={campaignStatusVariant(c.status) as any} />
                 </View>
               </View>
-              <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.budgetCents)}</Text>
+              {campaignHasResults(c.status) ? (
+                <Text style={[styles.campaignStat, { color: colors.mutedForeground }]}>
+                  <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.results?.spentCents ?? c.spentCents ?? 0)}</Text>
+                  {` of ${formatCents(c.budgetCents)}`}
+                </Text>
+              ) : (
+                <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.budgetCents)}</Text>
+              )}
             </TouchableOpacity>
           ))}
         </View>
