@@ -376,6 +376,19 @@ export const dropAlertSubscriptions = pgTable('drop_alert_subscriptions', {
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
+/** One bundle applied to a checkout / order (api-server lib/money/bundlePricing.ts). */
+export type OrderBundleLine = {
+  bundleId: string;
+  name: string;
+  /** Complete bundle sets in the order. */
+  sets: number;
+  /** Full price of the lines the sets used. */
+  itemsCents: number;
+  bundlePriceCents: number;
+  /** itemsCents - sets × bundlePriceCents (never negative). */
+  discountCents: number;
+};
+
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: text('owner_id').notNull().default(''), // Clerk user ID of brand owner / seller
@@ -448,6 +461,10 @@ export const orders = pgTable('orders', {
   // portion — see lib/threadCash/wallet.ts). Refunded/cancelled orders return
   // this amount to the buyer's Thread Cash balance exactly once.
   threadCashAppliedCents: integer('thread_cash_applied_cents').notNull().default(0),
+  // Bundle savings on this order (already part of discountAmountCents) and
+  // one entry per bundle applied at checkout (migration 301).
+  bundleDiscountCents: integer('bundle_discount_cents').notNull().default(0),
+  bundleLines: jsonb('bundle_lines').$type<OrderBundleLine[]>().notNull().default([]),
   // The platform-funded supplemental transfer that topped the seller up to
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
@@ -488,6 +505,8 @@ export const orderItems = pgTable('order_items', {
   variantLabel: text('variant_label'),
   quantity: integer('quantity').notNull(),
   priceCents: integer('price_cents').notNull(), // server-resolved price at time of order
+  // The bundle this line was sold in (migration 301); NULL when bought alone.
+  bundleId: uuid('bundle_id'),
   // Delivery guarantee, per item so a partial shipment refunds only what
   // never arrived. Item-level tracking is set when the seller ships part of
   // an order separately; otherwise the order-level tracking covers the item.
@@ -636,6 +655,8 @@ export const checkoutSessions = pgTable('checkout_sessions', {
     variantLabel: string;
     quantity:     number;   // already aggregated by variantId
     priceCents:   number;
+    /** Bundle this line counted toward at checkout (migration 301). */
+    bundleId?:    string | null;
   }>>().notNull(),
   // Buyer-provided shipping address, persisted before Stripe session is opened.
   // The webhook uses this to attach a fulfillment address to the order.
@@ -680,6 +701,9 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
+  // Bundle savings decided when this checkout was priced (migration 301).
+  bundleDiscountCents: integer('bundle_discount_cents').notNull().default(0),
+  bundleLines: jsonb('bundle_lines').$type<OrderBundleLine[]>().notNull().default([]),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),
