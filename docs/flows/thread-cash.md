@@ -38,7 +38,13 @@ flowchart LR
   K -->|no| X[400 INSUFFICIENT_THREAD_CASH / THREAD_CASH_NOT_CASHABLE]
 ```
 
-**Cashable** is `min(balance, earned − cashed out)`. Earned means the `live_gift` and `send_received` sources. Reward credit (check-ins, streaks, refunds, admin adjustments) can be spent in the app but never cashed out.
+**Funding (migration 306).** Every entry is `promo` (platform rewards: check-ins, streaks, admin credit, refunds of promo spend) or `paid` (money a buyer actually paid). No purchase source exists yet, so every existing row is promo; a future one only writes `funding = 'paid'` (`lib/threadCash/funding.ts`).
+
+- Spending (checkout redemption, sends, live gifts) uses **promo first**, then paid. A mixed debit stays one row; a hidden zero-sum `funding_shift` pair records the paid part.
+- A gift or a claimed send credits the receiver with exactly the sender's mix (one `live_gift` / `send_received` row per funding), so promo a buyer gifts stays promo for the seller.
+- Cancelled redemptions/sends and expiries restore exactly what was used; a refund of checkout spend gives paid money back first.
+
+**Cashable (withdrawable)** is `min(balance, paid balance, paid received from others − paid cashed out)`. Promo is never cashable; a cash-out debits paid funds only. `GET /api/thread-cash` returns `balanceCents`, `promoCents`, `paidCents` and `cashableCents`. While a lost chargeback is being recovered, cash-out answers `409 PAYOUTS_PAUSED_RECOVERY` (see payments/money-flow.md §11).
 
 ## Breaks found and fixed
 

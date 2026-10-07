@@ -14,6 +14,7 @@ wrong before this change. Amounts are always **integer cents** (see
 - [8. Stripe limits and what the owner must confirm](#8-stripe-limits-and-what-the-owner-must-confirm)
 - [9. Audit: bugs and gaps found](#9-audit-bugs-and-gaps-found)
 - [10. Operating it](#10-operating-it)
+- [11. Lost chargebacks: seller recovery](#11-lost-chargebacks-seller-recovery)
 
 ---
 
@@ -410,3 +411,36 @@ SELECT * FROM order_refunds WHERE reason = 'stripe_dashboard' OR failure_code = 
 duplicate and over-limit refunds, duplicate, forged, replayed and wrong-mode webhooks, a failed drop,
 concurrent releases racing a refund, and a multi-seller cart. They use a real Postgres and an in-memory,
 test-mode Stripe fake; no network or real keys.
+
+## 11. Lost chargebacks: seller recovery
+
+Code: `lib/money/sellerRecovery.ts`. Tables: `seller_recoveries`, `seller_recovery_applications` (migration 306).
+
+**Rules (owner's decided defaults)**
+
+| Case | What happens |
+|---|---|
+| `charge.dispute.closed` with status `lost` | Each order the PaymentIntent paid gets its pro-rata share of the disputed amount and of Stripe's dispute fee. The seller's share = order seller net × disputed / gross. |
+| Part of that share still **held** (hold-until-delivered, preorders) | Never paid out: `seller_held` goes down, the order moves to `refunded` (or, for a partial chargeback, its pause lifts so the rest releases). |
+| Part already **paid out** | Pulled back right away by reversing that order's own transfer (`transfers.createReversal`, key `recovery-reversal/<recovery>`), up to what that transfer still holds. Whatever is left is an open recovery. |
+| Stripe's dispute fee | Follows the paid-out part: the seller bears it on money they had received; if Brandthread still held the money it absorbs the fee. |
+| Brandthread's 5% and processing on the lost sale | Brandthread's loss (`platform_dispute_losses`). |
+| While any recovery is open | Seller balance = available − owed (may be negative); `POST /api/finance/payout` and Thread Cash cash-out return `409 PAYOUTS_PAUSED_RECOVERY`; every order release (escrow and cart transfers, both `PAYOUT_MODE`s) nets the debt first, oldest recovery first, before the transfer (decided once and stored in `recovery_netted_cents`, so a retry sends the same amount). |
+| Fully recovered | Status `recovered`, payouts resume automatically, the seller is notified ("Chargeback recovered — payouts resumed"). Opening one notifies "Chargeback lost — $X will be recovered from upcoming payouts". |
+| `charge.dispute.funds_reinstated` | The seller is made whole: open debt forgiven, anything taken paid back by transfer (after netting other open recoveries). Stripe's fee stays with the seller only if Stripe kept it. |
+
+**Ledger** (all zero-sum; new accounts `seller_recoverable` (negative = owed), `platform_dispute_losses`, `stripe_dispute_fees`):
+
+| Event (key) | Postings |
+|---|---|
+| `chargeback-lost/<dispute>/<order>` | buyer_payments +disputed · stripe_dispute_fees +fee · seller_held −held part · seller_recoverable −(paid part + seller fee) · platform_dispute_losses −rest |
+| `recovery-reversal/<recovery>` | seller_paid_out −x · seller_recoverable +x |
+| `recovery-netting/order-release/<order>` or `…/order-transfer/<order>` | seller_held −n · seller_recoverable +n |
+| `chargeback-reinstated/<dispute>/<order>` | exact undo of the loss for the seller and the platform |
+| `recovery-write-off/<recovery>` | seller_recoverable +x · platform_dispute_losses −x |
+
+Stripe failures never throw out of the webhook (the debt just stays open); a database failure fails the event so Stripe retries, and every step is idempotent.
+
+**Endpoints**: `GET /api/finance/balance` and `/summary` add `recoveryOwedCents`, `payoutsPaused`, `balanceAfterRecovery`; `GET /api/finance/recoveries` lists recoveries with their applications.
+
+**Health check**: `SELECT party_id, SUM(amount_cents) FROM ledger_postings WHERE account = 'seller_recoverable' GROUP BY party_id` equals `−SUM(amount + fee − recovered − forgiven)` of that seller's open recoveries.
