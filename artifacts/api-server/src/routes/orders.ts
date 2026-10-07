@@ -363,7 +363,17 @@ router.get("/:id", async (req, res) => {
     fulfilledByPartner: shopifyLink.status === "sent" && Boolean(order.trackingNumber),
   } : null;
 
-  res.json({ ...order, items, customer, shopifyFulfillment });
+  // Bought from one of the seller's lives (lib/liveAttribution.ts): the
+  // order detail shows "From your live · <date>".
+  let sourceLive: { streamId: string; title: string; startedAt: string } | null = null;
+  if (order.sourceLiveStreamId) {
+    const [live] = await db.execute(sql`
+      SELECT id, title, started_at FROM live_streams WHERE id = ${order.sourceLiveStreamId}::uuid LIMIT 1
+    `).then((r) => r.rows as any[]);
+    if (live) sourceLive = { streamId: live.id, title: live.title, startedAt: new Date(live.started_at).toISOString() };
+  }
+
+  res.json({ ...order, items, customer, shopifyFulfillment, sourceLive });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts

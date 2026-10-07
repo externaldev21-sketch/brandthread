@@ -49,7 +49,7 @@ const hostPlan = requirePlan("pro");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateToken(
+export function generateToken(
   appId: string,
   appCert: string,
   channelName: string,
@@ -75,7 +75,7 @@ function generateToken(
   }
 }
 
-function uidFromClerkId(clerkId: string): number {
+export function uidFromClerkId(clerkId: string): number {
   let h = 0;
   for (let i = 0; i < clerkId.length; i++) {
     h = (Math.imul(31, h) + clerkId.charCodeAt(i)) | 0;

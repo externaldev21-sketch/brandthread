@@ -420,6 +420,12 @@ export const orders = pgTable('orders', {
   discountAmountCents: integer('discount_amount_cents').notNull().default(0),
   // Post/video that drove the Shop button click (attribution)
   sourcePostId: text('source_post_id'),
+  // Live stream the order was bought from (migration 304). Set only when the
+  // stream belongs to this order's seller (host, or an accepted co-host) and
+  // the payment landed while it was live or within the grace window after —
+  // see api-server lib/liveAttribution.ts. Not a foreign key, so deleting a
+  // stream never touches an order.
+  sourceLiveStreamId: uuid('source_live_stream_id'),
   // Cancellation fields
   cancellationReason: text('cancellation_reason'),
   cancellationNotes:  text('cancellation_notes'),
@@ -476,6 +482,8 @@ export const orders = pgTable('orders', {
 }, (table) => ({
   customerIdx: index('orders_customer_id_idx').on(table.customerId),
   dropIdx: index('orders_drop_id_idx').on(table.dropId),
+  sourceLiveStreamIdx: index('orders_source_live_stream_idx').on(table.sourceLiveStreamId)
+    .where(sql`${table.sourceLiveStreamId} IS NOT NULL`),
 }));
 
 // ─── Order Items ──────────────────────────────────────────────────────────────
@@ -680,6 +688,10 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   taxCents: integer('tax_cents'),
   stripeTaxCalculationId: text('stripe_tax_calculation_id'),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
+  // Live stream this seller group was bought from (migration 304), validated
+  // when the checkout was created and again by the paid webhook before it is
+  // copied onto the order (lib/liveAttribution.ts).
+  sourceLiveStreamId: uuid('source_live_stream_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),
@@ -2030,6 +2042,19 @@ export const liveViewers = pgTable('live_viewers', {
   streamLastSeenIdx: index('live_viewers_stream_last_seen_idx').on(table.streamId, table.lastSeen),
 }));
 
+// Everyone who was ever present in a live (migration 304). live_viewers only
+// holds who is watching right now (rows go on leave and on end), so unique
+// viewers for the seller's live summary are kept here. Filled by a trigger
+// on live_viewers inserts, so every presence path (join, WebSocket, HTTP
+// heartbeat) counts without each one writing it.
+export const liveStreamUniqueViewers = pgTable('live_stream_unique_viewers', {
+  streamId:     uuid('stream_id').notNull().references(() => liveStreams.id, { onDelete: 'cascade' }),
+  viewerId:     text('viewer_id').notNull(),
+  firstSeenAt:  timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.streamId, table.viewerId] }),
+}));
+
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────
 export const sellerTaxConfig = pgTable('seller_tax_config', {
   id:                  uuid('id').primaryKey().defaultRandom(),
@@ -2323,4 +2348,5 @@ export const mediaModerationResults = pgTable('media_moderation_results', {
   reviewIdx: index('media_moderation_results_review_idx').on(table.verdict, table.reviewedAt, table.createdAt),
 }));
 
+export * from './liveModeration';
 export * from './ranking';

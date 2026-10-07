@@ -76,8 +76,10 @@ async function touchHost(streamId: string, userId: string): Promise<void> {
 
 /**
  * Who may open a socket for this stream: it must exist and be live; the
- * host role is only for the stream's own seller; a viewer must not be in a
- * block relationship with the host (GET /live/feed already hides those).
+ * host role is only for the stream's own seller or one of its accepted
+ * co-hosts (routes/live-cohost.ts — they publish too, so they are never
+ * counted as viewers); a viewer must not be in a block relationship with
+ * the host (GET /live/feed already hides those).
  */
 async function admitToRoom(streamId: string, userId: string, isHost: boolean): Promise<boolean> {
   if (!/^[0-9a-f-]{36}$/i.test(streamId)) return false;
@@ -87,11 +89,15 @@ async function admitToRoom(streamId: string, userId: string, isHost: boolean): P
              SELECT 1 FROM blocks b
              WHERE (b.blocker_id = ${userId} AND b.blocked_id = ls.seller_id)
                 OR (b.blocker_id = ls.seller_id AND b.blocked_id = ${userId})
-           ) AS blocked
+           ) AS blocked,
+           EXISTS (
+             SELECT 1 FROM live_cohosts c
+             WHERE c.stream_id = ls.id AND c.cohost_id = ${userId} AND c.status = 'accepted'
+           ) AS cohost
     FROM live_streams ls WHERE ls.id = ${streamId}::uuid
-  `).then((r) => r.rows as Array<{ seller_id: string; status: string; blocked: boolean }>);
+  `).then((r) => r.rows as Array<{ seller_id: string; status: string; blocked: boolean; cohost: boolean }>);
   if (!row || row.status !== "live") return false;
-  if (isHost) return row.seller_id === userId;
+  if (isHost) return row.seller_id === userId || (row.cohost && !row.blocked);
   return !row.blocked;
 }
 
