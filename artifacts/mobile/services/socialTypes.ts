@@ -617,6 +617,8 @@ export interface SavedItem {
   /** Board this item is filed into, if any. */
   collectionId?: string;
   notifyOnPriceDrop?: boolean;
+  /** Per-item back-in-stock alert (Activity + push). Defaults on. */
+  notifyOnBackInStock?: boolean;
   // ── Live badge data (product items only) ────────────────────────────────
   image?: string;
   brand?: string;

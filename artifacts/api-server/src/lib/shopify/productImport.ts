@@ -9,6 +9,7 @@ import { ShopifyAdminClient } from "./adminClient";
 import { getVerifiedPlanAccess } from "../planAccess";
 import { remainingProductCapacity } from "../productCapacity";
 import { toBrandthreadProduct, deterministicSku } from "../shopifyImport";
+import { onProductStockPriceChanged, snapshotProduct } from "../savedProductAlerts";
 
 export type ImportSummary = {
   imported: number;
@@ -52,6 +53,8 @@ export async function importShopifyProducts(params: {
 
       if (existingLink) {
         // ── Update in place ────────────────────────────────────────────────
+        // Re-import can restock or reprice a product buyers saved.
+        const alertBefore = await snapshotProduct(existingLink.brandthreadProductId);
         await db.update(products).set({
           name: normalized.name,
           description: normalized.description,
@@ -95,6 +98,9 @@ export async function importShopifyProducts(params: {
         }
         await db.update(shopifyProductLinks).set({ variantMap, lastImportedAt: new Date() })
           .where(eq(shopifyProductLinks.id, existingLink.id));
+        onProductStockPriceChanged(
+          existingLink.brandthreadProductId, alertBefore, await snapshotProduct(existingLink.brandthreadProductId),
+        );
         summary.updated += 1;
         continue;
       }
