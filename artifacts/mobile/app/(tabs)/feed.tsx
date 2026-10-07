@@ -48,6 +48,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
+import { SponsoredAdCard } from '@/components/ads/SponsoredAdCard';
+import { useFeedAds } from '@/hooks/useFeedAds';
+import { isSponsoredFeedItem, type SponsoredFeedItem } from '@/lib/feedAds';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
@@ -771,7 +774,7 @@ function isJustDroppedItem(item: unknown): item is JustDroppedRailItem {
 }
 
 // Union of all possible displayable items in the FlatList
-type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem | JustDroppedRailItem;
+type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem | JustDroppedRailItem | SponsoredFeedItem;
 
 function JustDroppedRailPage({
   drops, pageWidth, pageHeight, bottomClearance, onOpenDrop, onSeeAll,
@@ -2501,6 +2504,14 @@ export default function FeedScreen({
       })
     : allItems;
 
+  // Sponsored ads (buyer Following / Threads only): 1 per 6 organic items, never first.
+  const feedAds = useFeedAds({
+    surface: feedTab === 'following' ? 'following' : 'for_you',
+    organic: filteredContentItems,
+    enabled: isBuyerSurface && !isCreatorFeed && !searchQuery.trim(),
+    resetKey: feedTab,
+  });
+
   // displayItems: sentinel at index 0 only when buyerMode=true.
   // Seller mode: if (!buyerMode) — sentinel never enters the array.
   // getItemLayout stays uniform using the measured tab-scene height for all items.
@@ -2515,15 +2526,15 @@ export default function FeedScreen({
   // to the single-creator/product player (a deliberate end there is fine).
   const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
-    const base = filteredContentItems as FeedItem[];
+    const base = feedAds.items as FeedItem[];
     const content = canLoopFeed
       ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
-          cycle === 0 ? base : base.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+          cycle === 0 ? base : base.filter(item => !isSponsoredFeedItem(item)).map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
         )).flat()
       : base;
     if (!buyerMode) return content;
     return [DEMAND_PAGE_SENTINEL, ...content];
-  }, [buyerMode, filteredContentItems, canLoopFeed]);
+  }, [buyerMode, feedAds.items, canLoopFeed]);
 
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
@@ -3077,6 +3088,19 @@ export default function FeedScreen({
           // Buyer demand page — full-screen at index 0 in buyer mode
           if (isDemandPageItem(item as FeedItem)) {
             return <BuyerHighDemandPage pageWidth={pageWidth} pageHeight={pageHeight} bottomClearance={bottomClearance} topInset={buyerHeaderHeight} />;
+          }
+          if (isSponsoredFeedItem(item)) {
+            return (
+              <SponsoredAdCard
+                variant="page"
+                ad={item.ad}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                bottomClearance={bottomClearance}
+                onViewable={feedAds.confirmImpression}
+                onPress={feedAds.openAd}
+              />
+            );
           }
           if (isJustDroppedItem(item)) {
             return (

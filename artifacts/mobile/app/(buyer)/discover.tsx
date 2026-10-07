@@ -52,6 +52,9 @@ import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SponsoredAdCard } from '@/components/ads/SponsoredAdCard';
+import { useFeedAds } from '@/hooks/useFeedAds';
+import { sponsoredAnchors, type SponsoredFeedItem } from '@/lib/feedAds';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
   composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
@@ -269,6 +272,13 @@ export default function DiscoverScreen() {
     });
   }
 
+  // Sponsored ads in the For You grid: 1 per 6 posts, never first (server-placed).
+  const feedAds = useFeedAds({ surface: 'discover', organic: forYouPosts, enabled: filter === 'forYou' && !forYouLoading });
+  const forYouSponsored = useMemo(() => sponsoredAnchors(feedAds.items, (p) => p.id), [feedAds.items]);
+  const renderSponsored = useCallback((item: SponsoredFeedItem) => (
+    <SponsoredAdCard variant="card" ad={item.ad} onViewable={feedAds.confirmImpression} onPress={feedAds.openAd} />
+  ), [feedAds.confirmImpression, feedAds.openAd]);
+
   const shopTheLookPosts = useMemo(
     () => forYouPosts.filter((p) => (p.productTags?.length ?? 0) > 0).slice(0, 12),
     [forYouPosts],
@@ -305,6 +315,8 @@ export default function DiscoverScreen() {
           shopTheLookPosts={shopTheLookPosts}
           onOpenShopTheLook={openShopTheLook}
           people={people}
+          sponsored={forYouSponsored}
+          renderSponsored={renderSponsored}
           onEndReached={() => {
             if (forYouLoadingMore || forYouLoading || forYouLimit.current >= 120) return;
             forYouLimit.current += 30;
