@@ -769,7 +769,7 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
+      ['buyer-product-detail', 'bundle-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     // PREVIEW_ROLE only reads the query string once, at module load — it
@@ -1437,6 +1437,7 @@ function RootLayoutNav() {
         <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="bundle-detail"      options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-members"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="community-create"   options={{ headerShown: false, animation: 'ios_from_right' }} />

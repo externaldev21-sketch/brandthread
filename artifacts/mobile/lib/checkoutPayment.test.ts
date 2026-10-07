@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GENERIC_DELIVERY_WINDOW, buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath,
-  deliveryWindowLabel, paymentErrorMessage, quoteTotals, walletContactToCheckout,
+  deliveryWindowLabel, paymentErrorMessage, paymentGroups, quoteTotals, walletContactToCheckout,
 } from './checkoutPayment';
 
 const TEST_CARD = '4242424242424242';
@@ -107,7 +107,20 @@ describe('quote totals and errors', () => {
         { sellerId: 'a', checkoutSessionId: '', subtotalCents: 1_000, shippingCents: 200, discountCents: 100, taxCents: 80, totalCents: 1_180, processingDays: 2 },
         { sellerId: 'b', checkoutSessionId: '', subtotalCents: 300, shippingCents: 0, discountCents: 0, taxCents: 20, totalCents: 320, processingDays: null },
       ],
-    })).toEqual({ subtotalCents: 1_300, shippingCents: 200, discountCents: 100, taxCents: 100, totalCents: 1_500 });
+    })).toEqual({ subtotalCents: 1_300, bundleDiscountCents: 0, shippingCents: 200, discountCents: 100, taxCents: 100, totalCents: 1_500 });
+  });
+  it('adds up bundle savings separately from the promo', () => {
+    expect(quoteTotals({
+      amountCents: 9_000,
+      groups: [{ sellerId: 'a', checkoutSessionId: '', subtotalCents: 10_000, bundleDiscountCents: 2_000, shippingCents: 1_000, discountCents: 0, taxCents: 0, totalCents: 9_000, processingDays: null }],
+    })).toMatchObject({ bundleDiscountCents: 2_000, discountCents: 0, totalCents: 9_000 });
+  });
+  it('sends each line\'s bundle id to the server', () => {
+    const groups = paymentGroups({
+      deliveryGroups: [{ sellerId: 'a', sellerName: 'A', items: [{ variantId: 'v', productId: 'p', quantity: 1, bundleId: 'b1' }], selectedMethodId: '', availableMethods: [], hasPreOrder: false }] as any,
+      discounts: [],
+    });
+    expect(groups[0].items).toEqual([{ variantId: 'v', productId: 'p', quantity: 1, bundleId: 'b1' }]);
   });
   it('explains declines in plain language', () => {
     expect(paymentErrorMessage('insufficient_funds')).toContain('insufficient funds');

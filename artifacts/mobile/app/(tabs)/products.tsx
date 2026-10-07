@@ -736,6 +736,7 @@ export default function ProductsScreen() {
         titleMenu={[
           { key: 'all', label: 'All products', selected: filter === 'all', onSelect: () => setFilter('all') },
           { key: 'collections', label: 'Collections', selected: false, onSelect: () => router.push('/store-collections' as never) },
+          { key: 'bundles', label: 'Bundles', selected: false, onSelect: () => router.push('/product-bundles' as never) },
         ]}
         titleAccessibilityLabel="Products, choose a view"
         actions={[

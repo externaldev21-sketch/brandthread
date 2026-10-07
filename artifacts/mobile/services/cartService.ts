@@ -21,6 +21,8 @@ import {
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
 import { formatCents } from '@/lib/money';
+import { bundleSavings, resolveBundleVariant, snapshotOf, variantLabel } from '@/lib/bundleCart';
+import type { PublicBundle } from '@/lib/api';
 import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
@@ -343,6 +345,68 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
   return { success: true, cart };
 }
 
+/**
+ * Adds every item of a bundle as its own cart line tagged with the bundle
+ * (a line already in the cart for the same variant is topped up and tagged).
+ * All or nothing: if one item can't be added, nothing is.
+ */
+export async function addBundleToCart(
+  bundle: PublicBundle,
+  selections: Record<string, string | undefined>,
+  seller?: { name?: string; handle?: string; avatarUri?: string },
+): Promise<{ success: boolean; message?: string; cart: Cart }> {
+  const k = keys();
+  const cart = await loadCart(k);
+  const snapshot = snapshotOf(bundle);
+  const next = cart.items.map(item => ({ ...item }));
+  for (const item of bundle.items) {
+    const variant = resolveBundleVariant(item, selections);
+    if (!variant) return { success: false, message: `Choose a size for ${item.productName}.`, cart };
+    const existing = next.find(line => line.variantId === variant.id);
+    const quantity = (existing?.quantity ?? 0) + item.quantity;
+    if (quantity > variant.stock) {
+      return { success: false, message: `Only ${variant.stock} of ${item.productName} left.`, cart };
+    }
+    if (existing) {
+      existing.quantity = quantity;
+      existing.maxQuantity = variant.stock || existing.maxQuantity;
+      existing.bundleId = existing.bundleId ?? bundle.id;
+      existing.bundle = existing.bundleId === bundle.id ? snapshot : existing.bundle;
+    } else {
+      next.push({
+        id: uid(),
+        productId: item.productId,
+        variantId: variant.id,
+        productName: item.productName,
+        variantTitle: variantLabel(variant),
+        imageUri: item.image ?? undefined,
+        sellerId: bundle.sellerId,
+        sellerName: seller?.name ?? bundle.sellerName ?? 'Seller',
+        sellerHandle: seller?.handle ?? '',
+        sellerAvatarUri: seller?.avatarUri,
+        priceCents: variant.priceCents,
+        quantity: item.quantity,
+        maxQuantity: variant.stock > 0 ? variant.stock : 99,
+        isPreOrder: false,
+        inventoryPolicy: 'deny',
+        isAvailable: true,
+        addedAt: now(),
+        bundleId: bundle.id,
+        bundle: snapshot,
+      });
+    }
+  }
+  cart.items = next;
+  await saveCart(cart, k);
+  const valueCents = bundle.bundlePriceCents;
+  void trackAndRelayConversionEvent(
+    'AddToCart',
+    { content_ids: bundle.items.map(item => item.productId), content_type: 'product', value: valueCents / 100, currency: 'usd' },
+    { productId: bundle.items[0]?.productId ?? bundle.id, valueCents, currency: 'usd' },
+  );
+  return { success: true, cart };
+}
+
 export async function updateCartItemQuantity(itemId: string, quantity: number): Promise<Cart> {
   const k = keys();
   const cart = await loadCart(k);
@@ -549,10 +613,14 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
 
 export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, shippingTotalCents = 0): CheckoutSummary {
   const subtotalCents = items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
+  // Every bundle item present at its quantity → the bundle price applies
+  // (estimate; checkout prices it server-side with the same rules).
+  const bundleSavingsCents = bundleSavings(items).totalCents;
   const taxTotalCents = 0; // Calculated accurately by Stripe at checkout; not estimated here
-  const totalCents = Math.max(0, subtotalCents - discountTotalCents + shippingTotalCents + taxTotalCents);
+  const totalCents = Math.max(0, subtotalCents - bundleSavingsCents - discountTotalCents + shippingTotalCents + taxTotalCents);
   return {
     subtotalCents,
+    bundleSavingsCents,
     discountTotalCents,
     shippingTotalCents,
     taxTotalCents,
@@ -606,6 +674,7 @@ export async function validateCart(items: CartItem[], discountCodes: string[] = 
           variantId: item.variantId,
           quantity: item.quantity,
           priceCents: item.priceCents,
+          ...(item.bundleId ? { bundleId: item.bundleId } : {}),
         })),
         discountCodes,
       }),

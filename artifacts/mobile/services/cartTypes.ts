@@ -1,3 +1,4 @@
+import type { CartBundleSnapshot } from '@/lib/bundleCart';
 /**
  * Brandthread Buyer Cart, Checkout & Commerce Types
  * Single source of truth for all buyer commerce data models.
@@ -30,6 +31,10 @@ export interface CartItem {
   sourcePostId?: string;     // attribution
   sourceTagId?: string;
   addedAt: string;
+  /** Added as part of this product bundle (priced at checkout, server-side). */
+  bundleId?: string;
+  /** Snapshot of that bundle, for the cart's "Bundle savings" estimate. */
+  bundle?: CartBundleSnapshot;
 }
 
 export interface SavedCartItem extends Omit<CartItem, 'id'> {
@@ -145,6 +150,8 @@ export interface CheckoutPaymentMethod {
 
 export interface CheckoutSummary {
   subtotalCents: number;
+  /** Bundle savings (lib/bundleCart.ts), already taken off totalCents. */
+  bundleSavingsCents?: number;
   discountTotalCents: number;
   shippingTotalCents: number;
   taxTotalCents: number;

@@ -59,6 +59,8 @@ export default function ProductBundleEditScreen() {
   const [description, setDescription] = useState('');
   const [priceStr,    setPriceStr]    = useState('');
   const [isActive,    setIsActive]    = useState(false);
+  // Sales (paid, not cancelled, net of refunds — GET /api/bundles/:id).
+  const [sales, setSales] = useState<{ setsSold: number; orderCount: number; revenueCents: number; discountCents: number } | null>(null);
 
   // Items: [{id, bundleId, productId, variantId, quantity, productName, images, priceCents, size, color}]
   const [items, setItems] = useState<any[]>([]);
@@ -78,6 +80,7 @@ export default function ProductBundleEditScreen() {
         setPriceStr(centsToDecimalInput(b.bundlePriceCents));
         setIsActive(b.status === 'active');
         setItems(b.items ?? []);
+        setSales(b.sales ?? null);
       })
       ?.catch(() => {})
       ?.finally(() => setLoading(false));
@@ -256,6 +259,17 @@ export default function ProductBundleEditScreen() {
             />
           </View>
         )}
+
+        {sales && sales.setsSold > 0 ? (
+          <View style={s.toggleRow} testID="bundle-edit-sales">
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>{sales.setsSold} sold · {formatCents(sales.revenueCents)}</Text>
+              <Text style={s.fieldHint}>
+                {sales.orderCount} order{sales.orderCount === 1 ? '' : 's'} · {formatCents(sales.discountCents)} in bundle savings
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Items */}
         <View style={s.itemsHeader}>
