@@ -73,6 +73,7 @@ import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
 import { recordPurchaseSignals } from "../lib/ranking/signals";
 import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
+import { announceLivePurchase, resolveLiveAttribution } from "../lib/liveAttribution";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -835,6 +836,12 @@ export async function handleCheckoutPaid(
     };
   }
 
+  // Bought from a live: re-checked against the payment time (the stream may
+  // have ended since checkout started) before it is copied onto the order.
+  const sourceLiveStreamId = csRecord.sourceLiveStreamId
+    ? await resolveLiveAttribution(csRecord.sourceLiveStreamId, ownerId, successfulPaymentAt)
+    : null;
+
   // ── All-or-nothing stock reservation inside transaction ───────────────────
   let oversoldItems: string[] = [];
   let createdOrderId: string | null = null;
@@ -900,6 +907,7 @@ export async function handleCheckoutPaid(
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
         ...(dropId ? { dropId } : {}),
+        ...(sourceLiveStreamId ? { sourceLiveStreamId } : {}),
       })
       .returning();
     createdOrderId = order.id;
@@ -1202,6 +1210,9 @@ export async function handleCheckoutPaid(
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
       }
+
+      // Bought from a live: the host (and the room) see it right away.
+      if (sourceLiveStreamId) await announceLivePurchase(createdOrderId);
 
       // This buyer now has a real paid order with this seller — if a
       // pending message request from this buyer is sitting in the seller's

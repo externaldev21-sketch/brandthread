@@ -30,7 +30,27 @@ import { API_BASE_URL } from '@/lib/api';
 export type LiveSocketEvent =
   | { type: 'comment'; comment: any }
   | { type: 'products'; productTags: any[] }
-  | { type: 'viewerCount'; count: number };
+  | { type: 'viewerCount'; count: number }
+  /** The stream ended (host ended it, restarted, or went silent). */
+  | { type: 'ended'; reason?: 'host' | 'restarted' | 'host_silent' | 'expired'; replayStatus?: 'ready' | 'pending' | 'unavailable'; replayPostId?: string | null }
+  | { type: 'likes'; likeCount: number; userId?: string; added?: number }
+  /** A viewer sent the host Thread Cash. */
+  | { type: 'gift'; gift: { fromUserId: string; displayName: string; amountCents: number } }
+  // Co-host (routes/live-cohost.ts): the accepted list, and who the host took off stage.
+  | { type: 'cohosts'; cohosts: any[] }
+  | { type: 'cohost_removed'; userId: string }
+  | { type: 'comment_removed'; commentId: string }
+  /** A purchase from this live was just paid (lib/liveAttribution.ts) — first name only. */
+  | { type: 'purchase'; purchase: LivePurchaseEvent };
+
+export interface LivePurchaseEvent {
+  id: string;
+  buyerFirstName: string;
+  productName: string;
+  units: number;
+  sellerId: string;
+  at: string;
+}
 
 interface UseLiveSocketOptions {
   streamId: string | undefined;

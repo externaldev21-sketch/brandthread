@@ -57,6 +57,8 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** A line in this seller group was added from a live (server validates it). */
+  liveStreamId?: string;
 };
 
 export type PaymentIntentAddress = {
@@ -98,6 +100,19 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
   }));
 }
 
+/** paymentGroups plus the live stream each seller group's lines were added from (server validates it). */
+export function paymentGroupsWithLive(session: SessionForPayment): PaymentIntentGroup[] {
+  return paymentGroups(session).map((group, index) => {
+    const liveStreamId = liveStreamIdForItems(session.deliveryGroups[index]?.items ?? []);
+    return liveStreamId ? { ...group, liveStreamId } : group;
+  });
+}
+
+/** The live stream a seller group's lines were added from, if any (first one wins). */
+export function liveStreamIdForItems(items: ReadonlyArray<{ sourceLiveStreamId?: string }>): string | undefined {
+  return items.find(item => typeof item.sourceLiveStreamId === 'string' && item.sourceLiveStreamId)?.sourceLiveStreamId;
+}
+
 export function recipientName(address: Partial<CheckoutAddress>): string {
   return [address.firstName, address.lastName].map(part => (part ?? '').trim()).filter(Boolean).join(' ');
 }
@@ -111,7 +126,7 @@ export function buildCreatePaymentIntentBody(input: {
 }): CreatePaymentIntentBody {
   const { address, contact } = input;
   return {
-    groups: paymentGroups(input.session),
+    groups: paymentGroupsWithLive(input.session),
     contactEmail: String(contact.email ?? '').trim(),
     contactPhone: String(contact.phone ?? '').trim(),
     shippingAddress: {
@@ -136,7 +151,7 @@ export function canQuote(address: Partial<CheckoutAddress>): boolean {
 
 export function buildQuoteBody(session: SessionForPayment, address: Partial<CheckoutAddress>): QuoteBody {
   return {
-    groups: paymentGroups(session),
+    groups: paymentGroupsWithLive(session),
     shippingAddress: {
       ...(address.line1?.trim() ? { street: address.line1.trim() } : {}),
       ...(address.city?.trim() ? { city: address.city.trim() } : {}),

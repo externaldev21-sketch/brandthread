@@ -21,6 +21,8 @@ import type {
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
+import type { LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
+import type { LiveAnalytics, LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
 
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
@@ -1403,6 +1405,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             threadCashToken?: string;
             /** Seller discount code, validated fresh server-side and applied to this charge. */
             discountCode?: string;
+            /** Live stream this was bought from; the server keeps it only if valid (lib/liveAttribution.ts). */
+            liveStreamId?: string;
           },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1416,6 +1420,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
             ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
             ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
+            ...(opts.liveStreamId          ? { liveStreamId:          opts.liveStreamId          } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -2717,6 +2722,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/live/${encodeURIComponent(id)}/comment`, data),
       comments:       (id: string, since?: string) =>
         get<{ comments: any[] }>(`/api/live/${encodeURIComponent(id)}/comments${since ? `?since=${encodeURIComponent(since)}` : ''}`),
+      /** Host only: one live's summary (routes/live-analytics.ts). */
+      analytics:      (id: string) => get<LiveAnalytics>(`/api/live/${encodeURIComponent(id)}/analytics`),
+      /** Host only: recent lives with headline numbers. */
+      recentAnalytics: (limit = 10) => get<{ lives: LiveAnalyticsListItem[] }>(`/api/live/analytics/recent?limit=${limit}`),
+    },
+    // ── Live co-host (routes/live-cohost.ts) ──
+    liveCohost: {
+      candidates:  (q: string) => get<{ sellers: LiveCohostCandidate[] }>(`/api/live/cohost-candidates?q=${encodeURIComponent(q)}`),
+      invites:     () => get<{ invites: LiveCohostInvite[] }>('/api/live/cohost-invites'),
+      list:        (id: string) => get<{ cohosts: LiveCohostPerson[] }>(`/api/live/${encodeURIComponent(id)}/cohosts`),
+      invite:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/invite`, { userId }),
+      cancel:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/cancel`, { userId }),
+      respond:     (id: string, accept: boolean) =>
+        post<{ ok: boolean; status: string; channelName?: string; agoraUid?: number; agoraAppId?: string; token?: string; tokenExpiresAt?: string }>(
+          `/api/live/${encodeURIComponent(id)}/cohost/respond`, { accept }),
+      /** Short-lived publisher token renewal (refused once no longer an accepted co-host of a live stream). */
+      token:       (id: string) =>
+        post<{ channelName: string; agoraUid: number; agoraAppId: string; token: string; tokenExpiresAt: string }>(`/api/live/${encodeURIComponent(id)}/cohost/token`, {}),
+      remove:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/remove`, { userId }),
+      leave:       (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/leave`, {}),
     },
     /** AI — brand memory, proactive suggestions */
     ai: {

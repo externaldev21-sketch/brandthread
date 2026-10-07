@@ -256,6 +256,12 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
+// Co-host + live analytics routers MUST be mounted before liveRouter: they own
+// literal paths (/cohost-*, /analytics/*) that liveRouter's GET /:id would otherwise swallow.
+import liveCohostRouter from "./live-cohost";
+import liveAnalyticsRouter from "./live-analytics";
+router.use("/live",                      tc, liveCohostRouter);
+router.use("/live",                      tc, liveAnalyticsRouter);
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
 router.use("/live",                      tc, liveRouter);

@@ -20,6 +20,9 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
+import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
+import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
+import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -32,7 +35,10 @@ try {
 interface Comment { id: string; display_name: string; message: string; created_at: string; }
 
 export default function SellerLiveScreen() {
-  if (Platform.OS === 'web') {
+  // `&demo=1` renders the broadcast screen in a browser (camera placeholder)
+  // for the screenshot harness; a real web visit still gets the notice.
+  const { demo } = useLocalSearchParams<{ demo?: string }>();
+  if (Platform.OS === 'web' && demo !== '1') {
     return (
       <NativeOnlyFeature
         icon="video-off"
@@ -69,10 +75,17 @@ function SellerLiveNativeScreen() {
   const [commentText, setCommentText]     = useState('');
   const [duration, setDuration]           = useState(0);
   const [productTags, setProductTags]     = useState<any[]>([]);
+  // Set when the SERVER ended this live (crash recovery / host silent), not
+  // the host's own End button.
+  const [streamEndedBy, setStreamEndedBy] = useState<'server' | null>(null);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [allProducts, setAllProducts]     = useState<any[]>([]);
   const [ending, setEnding]               = useState(false);
   const [agoraReady, setAgoraReady]       = useState(false);
+  // Accepted co-hosts on stage (routes/live-cohost.ts): split stage when any.
+  const [cohosts, setCohosts]             = useState<LiveCohostPerson[]>([]);
+  // "<first name> bought <product>" from purchases paid in this live.
+  const purchaseToasts = useLivePurchaseToasts();
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
@@ -140,6 +153,15 @@ function SellerLiveNativeScreen() {
     consecutiveFailuresRef.current = 0;
     timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
     loadProducts();
+    // Products lined up on the go-live screen are already on the stream —
+    // show them on the rail straight away (they used to appear only after
+    // the first socket broadcast).
+    (api as any).live.get(params.streamId)
+      .then((d: any) => {
+        if (Array.isArray(d?.stream?.product_tags)) setProductTags(d.stream.product_tags);
+        if (d?.stream && d.stream.status !== 'live') setStreamEndedBy('server');
+      })
+      .catch(() => {});
     return () => {
       clearInterval(timerRef.current!);
       if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
@@ -156,13 +178,36 @@ function SellerLiveNativeScreen() {
       setProductTags(event.productTags);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
+    } else if (event.type === 'ended' && event.reason !== 'host') {
+      setStreamEndedBy('server');
+    } else if (event.type === 'cohosts') {
+      setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
+    } else if (event.type === 'purchase') {
+      purchaseToasts.push(event.purchase);
+    } else if (event.type === 'gift') {
+      // A viewer's Thread Cash gift, announced by the server (not typed by
+      // anyone), shown in the chat for the host and every viewer.
+      const amount = `$${(event.gift.amountCents / 100).toFixed(2)}`;
+      setComments(prev => [...prev, {
+        id: `gift-${Date.now()}-${event.gift.fromUserId}`,
+        user_id: event.gift.fromUserId,
+        display_name: event.gift.displayName,
+        message: `sent ${amount} Thread Cash`,
+        created_at: new Date().toISOString(),
+      }].slice(-80));
+      setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, []);
 
   const startFallbackPolling = React.useCallback((active: boolean) => {
     if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
     if (!active) return;
-    fallbackPollRef.current = setInterval(() => { void pollComments(generationRef.current); }, 15000);
+    fallbackPollRef.current = setInterval(() => {
+      void pollComments(generationRef.current);
+      // Host presence over HTTP while the socket is down, so the stream
+      // isn't swept as abandoned (jobs/liveStaleStreams.ts).
+      void (api as any).live.heartbeat(params.streamId).catch(() => {});
+    }, 15000);
   }, []);
 
   useLiveSocket({
@@ -170,7 +215,10 @@ function SellerLiveNativeScreen() {
     enabled: !!params.streamId,
     asHost: true,
     onEvent: handleLiveEvent,
-    onConnected: () => { void pollComments(generationRef.current); },
+    onConnected: () => {
+      void pollComments(generationRef.current);
+      (api as any).liveCohost.list(params.streamId).then((r: any) => setCohosts(r?.cohosts ?? [])).catch(() => {});
+    },
     onFallback: startFallbackPolling,
   });
 
@@ -201,7 +249,8 @@ function SellerLiveNativeScreen() {
   async function loadProducts() {
     try {
       const r = await (api as any).products?.list?.() as any;
-      setAllProducts(r?.products ?? []);
+      const list = Array.isArray(r) ? r : (r?.products ?? []);
+      setAllProducts(list.filter((p: any) => !p?.status || p.status === 'active'));
     } catch {}
   }
 
@@ -225,20 +274,43 @@ function SellerLiveNativeScreen() {
     } catch {}
   }
 
+  useEffect(() => {
+    if (streamEndedBy !== 'server') return;
+    Alert.alert('Your live ended', 'This live was ended because the connection to it was lost. Go live again to keep streaming.', [
+      { text: 'Summary', onPress: () => openSummary() },
+      { text: 'OK', onPress: () => router.dismissTo('/(tabs)/' as any) },
+    ]);
+  }, [streamEndedBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The live summary (app/live-summary.tsx) replaces the broadcast screen. */
+  function openSummary() {
+    router.replace({ pathname: '/live-summary', params: { streamId: params.streamId } } as any);
+  }
+
+  /** Sends the rail to the server, which prices/names each product from the
+   *  catalogue; the server's copy replaces the optimistic one, or the rail
+   *  rolls back if it didn't reach viewers. */
+  async function saveProductTags(updated: any[], previous: any[], failTitle: string) {
+    setProductTags(updated);
+    try {
+      const res = await (api as any).live.updateProducts(
+        params.streamId,
+        updated.map(t => ({ productId: t.productId, highlighted: Boolean(t.highlighted) })),
+      );
+      if (Array.isArray(res?.productTags)) setProductTags(res.productTags);
+    } catch (e: any) {
+      setProductTags(previous);
+      Alert.alert(failTitle, e?.message ?? 'Please try again.');
+    }
+  }
+
   async function toggleProduct(product: any) {
     Haptics.selectionAsync();
     const exists = productTags.find(t => t.productId === product.id);
     const updated = exists
       ? productTags.filter(t => t.productId !== product.id)
-      : [...productTags, {
-          productId: product.id,
-          productName: product.name,
-          priceCents: product.priceCents ?? 0,
-        }];
-    setProductTags(updated);
-    try {
-      await (api as any).live.updateProducts(params.streamId, updated);
-    } catch {}
+      : [...productTags, { productId: product.id, productName: product.name }];
+    await saveProductTags(updated, productTags, 'Could not update products');
   }
 
   async function highlightProduct(productId: string) {
@@ -247,12 +319,7 @@ function SellerLiveNativeScreen() {
       ...tag,
       highlighted: tag.productId === productId,
     }));
-    setProductTags(updated);
-    try {
-      await (api as any).live.updateProducts(params.streamId, updated);
-    } catch {
-      Alert.alert('Could not feature product', 'The product highlight did not reach viewers. Please try again.');
-    }
+    await saveProductTags(updated, productTags, 'Could not feature product');
   }
 
   async function handleEnd() {
@@ -264,9 +331,14 @@ function SellerLiveNativeScreen() {
           setEnding(true);
           try {
             await (api as any).live.end(params.streamId);
-          } catch {}
+          } catch (e: any) {
+            // Leaving now would keep the live showing in buyers' feeds.
+            setEnding(false);
+            Alert.alert('Could not end live', e?.message ?? 'Check your connection and try again.');
+            return;
+          }
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.dismissTo('/(tabs)/' as any);
+          openSummary();
         },
       },
     ]);
@@ -278,8 +350,8 @@ function SellerLiveNativeScreen() {
 
   return (
     <View style={s.root}>
-      {/* Camera preview (Agora host view) */}
-      {LocalCameraView ? (
+      {/* Camera preview (Agora host view) — inside the split stage below while co-hosts are on */}
+      {cohosts.length > 0 ? null : LocalCameraView ? (
         <LocalCameraView
           canvas={{ uid: 0, renderMode: 1 }}
           style={StyleSheet.absoluteFill}
@@ -290,6 +362,15 @@ function SellerLiveNativeScreen() {
           <Text style={s.cameraPlaceholderText}>Camera preview available on device</Text>
         </View>
       )}
+
+      {/* Co-hosts on stage: host (local camera) on top, co-hosts below. */}
+      <LiveCohostSplit
+        hostUid={0}
+        hostName={user?.firstName ?? user?.username ?? 'You'}
+        hostAvatarUrl={user?.imageUrl ?? null}
+        cohosts={cohosts}
+        RtcSurfaceView={LocalCameraView}
+      />
 
       {/* Gradient overlay */}
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
@@ -335,7 +416,26 @@ function SellerLiveNativeScreen() {
         >
           <Feather name="refresh-cw" size={20} color="#fff" />
         </TouchableOpacity>
+        {/* Co-host: invite another seller onto this live */}
+        <TouchableOpacity
+          style={s.railBtn}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Invite a co-host"
+          testID="seller-live-cohost"
+          onPress={() => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any)}
+        >
+          <Feather name="user-plus" size={20} color="#fff" />
+          {cohosts.length > 0 && (
+            <View style={[s.railBadge, { backgroundColor: LIVE_RED }]}>
+              <Text style={s.railBadgeText}>{cohosts.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
+
+      {/* Purchases paid from this live */}
+      <LivePurchaseToast purchase={purchaseToasts.current} top={headerTopInset + 84} />
 
       {/* Tagged products strip */}
       {productTags.length > 0 && (
@@ -416,7 +516,9 @@ function SellerLiveNativeScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[s.pickerRowName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
-                       <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents ?? 0)}</Text>
+                       {typeof p.priceCents === 'number' && (
+                         <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents)}</Text>
+                       )}
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
                       {tagged && <Feather name="check" size={13} color={theme.onAccent} />}

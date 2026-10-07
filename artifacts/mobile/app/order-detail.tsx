@@ -22,6 +22,7 @@ import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReas
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
+import { formatLiveDate } from '@/lib/live/liveAnalytics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
@@ -458,6 +459,8 @@ export default function OrderDetailScreen() {
   const cachedOrder = id ? queryClient.getQueryData<any>(queryKeys.order(id)) : undefined;
   const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
   const [loading, setLoading] = useState(!cachedOrder);
+  // Bought from one of this seller's lives (GET /api/orders/:id → sourceLive).
+  const [sourceLive, setSourceLive] = useState<{ streamId: string; startedAt: string } | null>(cachedOrder?.sourceLive ?? null);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
   // Item 108: this order's real return requests (GET /api/returns, seller).
@@ -530,6 +533,7 @@ export default function OrderDetailScreen() {
       });
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      setSourceLive((raw as any)?.sourceLive ?? null);
       queryClient.setQueryData(queryKeys.order(id), raw);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
@@ -883,7 +887,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} sourceLive={sourceLive} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
@@ -984,8 +988,9 @@ export default function OrderDetailScreen() {
 // TAB: OVERVIEW
 // ═══════════════════════════════════════════════════════
 
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
+function OverviewTab({ order, sourceLive, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
   order: Order;
+  sourceLive?: { streamId: string; startedAt: string } | null;
   onMarkProcessing: () => void;
   onMarkReadyToShip: () => void;
   onMarkShipped: () => void;
@@ -1041,6 +1046,17 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
           <View style={s.preOrderBadge}>
             <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>
           </View>
+        )}
+        {sourceLive && (
+          <TouchableOpacity
+            style={s.liveSourceBadge}
+            onPress={() => router.push({ pathname: '/live-summary', params: { streamId: sourceLive.streamId } } as never)}
+            accessibilityRole="button"
+            testID="order-detail-live-source"
+          >
+            <Feather name="video" size={ICON.xs} color={FG} />
+            <Text style={s.liveSourceText}>From your live · {formatLiveDate(sourceLive.startedAt)}</Text>
+          </TouchableOpacity>
         )}
       </GradientCard>
 
@@ -1959,6 +1975,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   riskBadgeText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: RED },
   preOrderBadge:    { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.xs, alignSelf: 'flex-start' },
   preOrderBadgeText:{ fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE },
+  liveSourceBadge:  { flexDirection: 'row', alignItems: 'center', gap: SP.xs, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.sm, alignSelf: 'flex-start' },
+  liveSourceText:   { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 
   // Actions
   actionSection:    { gap: SP.sm },

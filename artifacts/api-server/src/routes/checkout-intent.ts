@@ -40,6 +40,7 @@ import {
 } from "../lib/money/cartCheckout";
 import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
 
+import { resolveLiveAttribution } from "../lib/liveAttribution";
 const router = Router();
 
 /** Refuses any request that carries card data, before auth, parsing or logging touch it. */
@@ -77,6 +78,8 @@ const addressSchema = z.object({
 const groupsSchema = z.array(z.object({
   items: z.array(itemSchema).min(1).max(100),
   discountCode: z.string().trim().min(1).max(64).optional(),
+  /** Live stream this seller's items were bought from (lib/liveAttribution.ts validates it; a bad id is ignored). */
+  liveStreamId: z.string().trim().max(64).nullable().optional(),
 })).min(1).max(MAX_CART_GROUPS);
 /** A quote only needs where the order goes (a wallet sheet shares no street until the buyer pays). */
 const quoteSchema = z.object({
@@ -274,6 +277,12 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
     return;
   }
 
+  // Bought from a live: kept per seller group only when the stream is that
+  // seller's (or they co-hosted it) and is live or just ended.
+  const liveSources = await Promise.all(priced.map((group, index) =>
+    resolveLiveAttribution(body.groups[index]?.liveStreamId, group.sellerId)));
+  const liveSourceByGroup = new Map(priced.map((group, index) => [group, liveSources[index]] as const));
+
   // ── Persist the groups and reserve their stock, all or nothing ───────────
   let rows: Array<typeof checkoutSessions.$inferSelect> = [];
   try {
@@ -299,6 +308,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,
           stripeTaxCalculationId: group.calculationId,
+          ...(liveSourceByGroup.get(group) ? { sourceLiveStreamId: liveSourceByGroup.get(group) } : {}),
         }).returning();
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,

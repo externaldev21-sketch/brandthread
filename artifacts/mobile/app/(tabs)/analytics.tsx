@@ -10,6 +10,9 @@
  */
 import React, { useState, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
+import { LiveSummaryRows } from '@/components/live/LiveSummaryRows';
+import type { LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
 import { useAuth } from '@clerk/expo';
 import { GRID_MAX_WIDTH, SP } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
@@ -96,6 +99,9 @@ export default function AnalyticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary]       = useState<SummaryData>({ visits: 0, revenueCents: 0 });
   const [bars, setBars]             = useState<DailyBar[]>([]);
+  // Recent lives (GET /api/live/analytics/recent); the card shows only when there is one.
+  const [lives, setLives]           = useState<LiveAnalyticsListItem[]>([]);
+  const router = useRouter();
 
   const filterRef = useRef<AnalyticsFilterState | null>(null);
   const loadGenerationRef = useRef(0);
@@ -128,10 +134,14 @@ export default function AnalyticsScreen() {
       filterRef.current = filter;
       await saveFilterState(filter);
 
-      const [home, sales] = await Promise.allSettled([
+      const [home, sales, recentLives] = await Promise.allSettled([
         api.analytics.home('week'),
         getSalesAnalytics(filter),
+        api.live.recentAnalytics(3),
       ]);
+      if (loadGenerationRef.current === generation && recentLives.status === 'fulfilled') {
+        setLives(Array.isArray(recentLives.value?.lives) ? recentLives.value.lives : []);
+      }
 
       if (loadGenerationRef.current !== generation) return;
       const homeData = home.status === 'fulfilled' ? home.value : null;
@@ -201,6 +211,16 @@ export default function AnalyticsScreen() {
             <SectionTitle>Daily Revenue</SectionTitle>
             <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" />
           </Card>
+
+          {/* ── Lives (only once the seller has gone live) ─────────────────── */}
+          {lives.length > 0 && (
+            <Card>
+              <LiveSummaryRows
+                lives={lives}
+                onOpen={(streamId) => router.push({ pathname: '/live-summary', params: { streamId } } as never)}
+              />
+            </Card>
+          )}
 
           <View style={{ height: 120 }} />
         </ResponsiveContainer>

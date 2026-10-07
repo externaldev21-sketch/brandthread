@@ -38,16 +38,67 @@ function leaveRoom(ws: LiveSocket): void {
   if (room.size === 0) rooms.delete(ws.streamId);
 }
 
-/** Broadcasts a JSON-serializable event to every socket subscribed to `streamId`. */
-export function broadcastToRoom(streamId: string, payload: Record<string, unknown>): void {
+/**
+ * Broadcasts a JSON-serializable event to every socket subscribed to
+ * `streamId`. `skipUserIds` keeps an event away from specific viewers — a
+ * chat line from someone they blocked (or who blocked them), matching what
+ * GET /api/live/:id/comments already filters for them.
+ */
+export function broadcastToRoom(
+  streamId: string,
+  payload: Record<string, unknown>,
+  opts: { skipUserIds?: ReadonlySet<string> } = {},
+): void {
   const room = rooms.get(streamId);
   if (!room || room.size === 0) return;
   const data = JSON.stringify(payload);
   for (const socket of room) {
+    if (opts.skipUserIds && socket.userId && opts.skipUserIds.has(socket.userId)) continue;
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(data);
     }
   }
+}
+
+/** Connected user ids in a stream's room (to compute per-viewer filters). */
+export function roomUserIds(streamId: string): string[] {
+  const room = rooms.get(streamId);
+  if (!room) return [];
+  return [...new Set([...room].map((s) => s.userId).filter((id): id is string => Boolean(id)))];
+}
+
+async function touchHost(streamId: string, userId: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE live_streams SET host_last_seen_at = now()
+    WHERE id = ${streamId}::uuid AND seller_id = ${userId} AND status = 'live'
+  `);
+}
+
+/**
+ * Who may open a socket for this stream: it must exist and be live; the
+ * host role is only for the stream's own seller or one of its accepted
+ * co-hosts (routes/live-cohost.ts — they publish too, so they are never
+ * counted as viewers); a viewer must not be in a block relationship with
+ * the host (GET /live/feed already hides those).
+ */
+async function admitToRoom(streamId: string, userId: string, isHost: boolean): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(streamId)) return false;
+  const [row] = await db.execute(sql`
+    SELECT ls.seller_id, ls.status,
+           EXISTS (
+             SELECT 1 FROM blocks b
+             WHERE (b.blocker_id = ${userId} AND b.blocked_id = ls.seller_id)
+                OR (b.blocker_id = ls.seller_id AND b.blocked_id = ${userId})
+           ) AS blocked,
+           EXISTS (
+             SELECT 1 FROM live_cohosts c
+             WHERE c.stream_id = ls.id AND c.cohost_id = ${userId} AND c.status = 'accepted'
+           ) AS cohost
+    FROM live_streams ls WHERE ls.id = ${streamId}::uuid
+  `).then((r) => r.rows as Array<{ seller_id: string; status: string; blocked: boolean; cohost: boolean }>);
+  if (!row || row.status !== "live") return false;
+  if (isHost) return row.seller_id === userId || (row.cohost && !row.blocked);
+  return !row.blocked;
 }
 
 /** Stream ids that currently have at least one connected socket. */
@@ -111,8 +162,15 @@ export function attachLiveWebSocket(httpServer: HttpServer): WebSocketServer {
         socket.destroy();
         return;
       }
-      wss.handleUpgrade(req, socket, head, (ws) => {
-        wss.emit("connection", ws, req, { streamId, userId, isHost });
+      return admitToRoom(streamId, userId, isHost).then((admitted) => {
+        if (!admitted) {
+          socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+          socket.destroy();
+          return;
+        }
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          wss.emit("connection", ws, req, { streamId, userId, isHost });
+        });
       });
     }).catch((err) => {
       logger.error({ err }, "Live WebSocket upgrade auth threw unexpectedly");
@@ -130,6 +188,10 @@ export function attachLiveWebSocket(httpServer: HttpServer): WebSocketServer {
       void upsertViewer(ctx.streamId, ctx.userId).catch((err) =>
         logger.error({ err, streamId: ctx.streamId }, "live_viewers upsert on connect failed"),
       );
+    } else {
+      void touchHost(ctx.streamId, ctx.userId).catch((err) =>
+        logger.error({ err, streamId: ctx.streamId }, "host presence on connect failed"),
+      );
     }
 
     ws.on("pong", () => { ws.isAlive = true; });
@@ -140,6 +202,10 @@ export function attachLiveWebSocket(httpServer: HttpServer): WebSocketServer {
       if (msg?.type === "heartbeat" && ws.streamId && ws.userId && !ctx.isHost) {
         void upsertViewer(ws.streamId, ws.userId).catch((err) =>
           logger.error({ err, streamId: ws.streamId }, "live_viewers heartbeat upsert failed"),
+        );
+      } else if (msg?.type === "heartbeat" && ws.streamId && ws.userId && ctx.isHost) {
+        void touchHost(ws.streamId, ws.userId).catch((err) =>
+          logger.error({ err, streamId: ws.streamId }, "host presence heartbeat failed"),
         );
       }
     });

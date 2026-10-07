@@ -300,7 +300,11 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     if (newQty > cap) {
       return { success: false, message: `You already have ${existing.quantity} in your cart. Can't add more.`, cart };
     }
-    cart.items[existingIdx] = { ...existing, quantity: newQty };
+    cart.items[existingIdx] = {
+      ...existing,
+      quantity: newQty,
+      ...(attribution?.sourceLiveStreamId ? { sourceLiveStreamId: attribution.sourceLiveStreamId } : {}),
+    };
   } else {
     const item: CartItem = {
       id: uid(),
@@ -323,6 +327,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
       isAvailable: true,
       sourcePostId: attribution?.sourcePostId,
       sourceTagId: attribution?.sourceTagId,
+      ...(attribution?.sourceLiveStreamId ? { sourceLiveStreamId: attribution.sourceLiveStreamId } : {}),
       addedAt: now(),
     };
     cart.items.push(item);
@@ -823,6 +828,7 @@ export async function createBuyNowSession(
   variant: BuyerProductVariant,
   quantity: number,
   currentCart: Cart,
+  attribution?: CheckoutAttribution,
 ): Promise<CheckoutSession> {
   const buyNowItem: CartItem = {
     id: uid(),
@@ -843,6 +849,7 @@ export async function createBuyNowSession(
     preOrderEstShipDate: product.preOrderEstShipDate,
     inventoryPolicy: 'deny',
     isAvailable: true,
+    ...(attribution?.sourceLiveStreamId ? { sourceLiveStreamId: attribution.sourceLiveStreamId } : {}),
     addedAt: now(),
   };
   // Create session with buy-now items, NOT touching the existing cart

@@ -62,5 +62,7 @@ export function liveShopSelection(stream: LiveStream, productId: string, isPrevi
     tags: isPreview ? [toTag(product)] : stream.products.map(toTag),
     activeTagIndex: isPreview ? 0 : index,
     previewProduct: isPreview ? previewLiveBuyerProduct(stream, product) : undefined,
+    // Real streams attribute the purchase to the live (validated server-side).
+    liveStreamId: isPreview ? undefined : stream.id,
   };
 }

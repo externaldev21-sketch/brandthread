@@ -29,6 +29,8 @@ export interface CartItem {
   unavailableReason?: string;
   sourcePostId?: string;     // attribution
   sourceTagId?: string;
+  /** Added from a live stream (server validates it — api-server lib/liveAttribution.ts). */
+  sourceLiveStreamId?: string;
   addedAt: string;
 }
 
@@ -220,6 +222,8 @@ export interface CheckoutAttribution {
   discountCode?: string;
   influencerId?: string;
   referralCode?: string;
+  /** Bought from a live stream. */
+  sourceLiveStreamId?: string;
   channel: 'thread' | 'discover' | 'search' | 'store' | 'profile' | 'direct';
 }
 
