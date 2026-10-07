@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const fetchMock = vi.fn();
 
 vi.mock('@/lib/devPreview', () => ({ isSellerDevPreview: () => true }));
-vi.mock('@/lib/api', () => ({
-  signedOutPreviewAnswer: async () => null,
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   storeContextHeaders: () => ({}),
   versionApiPath: (path: string) => path,
 }));
@@ -31,7 +31,7 @@ describe('central seller-preview API rejection', () => {
   it('rejects direct paid/service requests before fetch', async () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(serviceRequest('/api/manufacturers/samples/preview/pay', { method: 'POST' }))
-      .rejects.toThrow('dev_preview_offline');
+      .rejects.toThrow('Sign in');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

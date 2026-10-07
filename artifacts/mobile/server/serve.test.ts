@@ -101,13 +101,13 @@ describe("API routing trap — /api-shaped paths never get the SPA shell", () =>
     // NOT get the JSON 404 the /api guard above returns.
     const response = request("/apiary", { host: "brandthread.app", accept: "text/html" });
 
-    expect(response.headers["content-type"]).not.toContain("application/json");
+    expect(response.headers["content-type"] ?? "").not.toContain("application/json");
   });
 
   it("an ordinary unmatched route is never mistaken for an API path", () => {
     const response = request("/some-app-route", { host: "brandthread.app", accept: "text/html" });
 
-    expect(response.headers["content-type"]).not.toContain("application/json");
+    expect(response.headers["content-type"] ?? "").not.toContain("application/json");
   });
 });
 

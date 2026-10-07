@@ -28,10 +28,10 @@ const {
     MY_COLOR: '#3D3D42',
   },
   apiMock: {
-    conversations: { uploadMedia: vi.fn() },
+    conversations: { uploadMedia: vi.fn(), setTyping: vi.fn().mockResolvedValue(undefined) },
     products: { publicList: vi.fn().mockResolvedValue([]) },
     posts: { publicList: vi.fn().mockResolvedValue([]) },
-    social: { block: vi.fn(), unblock: vi.fn(), status: vi.fn().mockResolvedValue({ mutualFriends: false }) },
+    social: { block: vi.fn(), unblock: vi.fn(), status: vi.fn().mockResolvedValue({ isMutual: false }) },
   },
   routerMock: { back: vi.fn(), push: vi.fn() },
   focusEffects: { callbacks: [] as Array<() => void | (() => void)> },
@@ -109,7 +109,7 @@ vi.mock('react-native', async (importOriginal) => {
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
-    View: nativeComponent('View'),
+    View: actual.View,
     useWindowDimensions: () => ({ width: 375, height: 800 }),
   };
 });
@@ -375,7 +375,7 @@ describe('buyer conversation chat redesign', () => {
     renderer = await renderScreen();
     const content = textContent(renderer);
     expect(content).toContain('Vault Studio');
-    expect(content).toContain('online');
+    expect(content).toContain('Active now');
   });
 
   it('double-tapping a bubble calls the reactions API with "like"', async () => {
@@ -434,7 +434,7 @@ describe('buyer conversation chat redesign', () => {
       bubble.props.onLongPress();
     });
 
-    const loveChip = renderer.root.findByProps({ testID: 'reaction-bar-love' });
+    const loveChip = renderer.root.findByProps({ testID: 'reaction-emoji-love' });
     await act(async () => {
       loveChip.props.onPress();
       await flushPromises();
@@ -449,14 +449,14 @@ describe('buyer conversation chat redesign', () => {
 
     await act(async () => { bubble.props.onLongPress(); });
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'reaction-bar-fire' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'reaction-emoji-fire' }).props.onPress();
       await flushPromises();
     });
     expect(socialServiceMock.addReaction).toHaveBeenNthCalledWith(1, 'conv-1', 'msg-1', 'fire');
 
     await act(async () => { bubble.props.onLongPress(); });
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'reaction-bar-fire' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'reaction-emoji-fire' }).props.onPress();
       await flushPromises();
     });
     // Same call shape both times — the service layer (already covered by its

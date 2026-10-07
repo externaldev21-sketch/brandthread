@@ -159,6 +159,7 @@ function BuyerLiveNativeScreen() {
       mod.handleEvent(event);
     } else if (event.type === 'comment_pinned' || event.type === 'cohosts') {
       mod.handleEvent(event);
+      if (event.type === 'cohosts') setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
     } else if (event.type === 'removed' || (event.type === 'user_banned' && event.userId === user?.id)) {
       // The host banned this viewer: off the stream, no rejoin.
       Alert.alert('Removed from the live', 'The host removed you from this live.');
@@ -168,8 +169,6 @@ function BuyerLiveNativeScreen() {
     } else if (event.type === 'ended') {
       setReplayStatus(event.replayStatus ?? null);
       setEnded(true);
-    } else if (event.type === 'cohosts') {
-      setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
     } else if (event.type === 'purchase') {
       purchaseToasts.push(event.purchase);
     } else if (event.type === 'gift') {

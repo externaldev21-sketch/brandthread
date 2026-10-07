@@ -598,7 +598,7 @@ describe('buyer inbox', () => {
 
     expect(renderer!.root.findAllByProps({ testID: 'inbox-skeleton' }, { deep: false })).toHaveLength(0);
     expect(textContent(renderer!)).toContain('Keep it real in DMs');
-    const cta = renderer!.root.findByProps({ testID: 'primary-button-Send a message' });
+    const cta = renderer!.root.findByProps({ testID: 'inbox-empty-send-message' });
     expect(cta).toBeTruthy();
 
     await act(async () => {

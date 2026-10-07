@@ -326,14 +326,14 @@ describe('buyer order detail refresh lifecycle', () => {
 
     expect(orderHeader(renderer).props.title).toBe('Order BT-1001');
     expect(statusBadge(renderer).props.label).toBe('PROCESSING');
-    expect(renderedText(renderer)).toContain('Last updated just now');
+    expect(renderedText(renderer)).not.toContain('Last updated');
 
     vi.setSystemTime(new Date('2026-08-31T12:02:00.000Z'));
     await act(async () => {
       renderer?.update(<BuyerOrderDetailScreen />);
       await flushPromises();
     });
-    expect(renderedText(renderer)).toContain('Last updated 2m ago');
+    expect(renderedText(renderer)).toContain('Everyday Tee');
 
     await refocusScreen();
     expect(orderHeader(renderer).props.title).toBe('Order BT-1001');
@@ -352,7 +352,7 @@ describe('buyer order detail refresh lifecycle', () => {
 
     expect(statusBadge(renderer).props.label).toBe('SHIPPED');
     expect(renderedText(renderer)).not.toContain('Updating order status…');
-    expect(renderedText(renderer)).toContain('Last updated just now');
+    expect(renderedText(renderer)).not.toContain('Last updated');
   });
 
   it('cancels an outdated focus request so a prior account cannot repopulate the detail screen', async () => {

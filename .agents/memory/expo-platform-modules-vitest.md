@@ -22,3 +22,9 @@ Distinct SDK namespaces need distinct resolved module identities in Vitest, even
 **Why:** Aliasing gradient, blur, and video packages to one file made a mock for blur overwrite gradient exports. Vitest then reported a missing gradient export on the blur module, obscuring the actual cause.
 
 **How to apply:** Share implementation through re-exports from separate boundary modules. When an error names an unrelated package, check alias target collisions before adding exports or changing app imports.
+
+Order subpath aliases before a package's bare-name alias.
+
+**Why:** Vite's first matching prefix can redirect a navigation subpath to a nonexistent path inside the bare-package shim, turning previously working renderer tests into collection errors.
+
+**How to apply:** Keep specific subpaths ahead of broader aliases; isolate native router/browser boundaries without changing Metro's production resolution.

@@ -20,3 +20,9 @@ Stripe event dispatch claims need retryable failures, attempt fencing, and lease
 **Why:** A plain processed-ID check either drops crashed work or allows an expired lease to overlap a still-running handler.
 
 **How to apply:** Claim before dispatch, renew while active, fence renewal and terminal writes by the claim attempt, and preserve handler-level idempotency.
+
+Overlapping chargeback implementations must have one accounting owner, separate from dispute timeline and notification processing.
+
+**Why:** Booking a withdrawal when a dispute opens and booking another loss when it closes charges the seller twice. Final-loss recovery also needs to own fee allocation and debt collection.
+
+**How to apply:** Keep opening events for timeline and payout holds, book final lost outcomes once, and reverse historical withdrawal postings idempotently before adopting the final-loss recovery ledger.

@@ -1,4 +1,5 @@
 import React from 'react';
+vi.mock('@/components/first-run-tips/FirstRunTip', () => ({ FirstRunTip: () => null }));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,7 +24,8 @@ const { apiMock, focusState, routerMock, previewMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -33,6 +35,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ...actual,
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: vi.fn() },
     PanResponder: { create: (config: Record<string, unknown>) => ({ panHandlers: config }) },
@@ -126,6 +129,7 @@ vi.mock('@/lib/previewInbox', async (importOriginal) => ({
 }));
 
 vi.mock('@/services/socialService', () => ({
+  subscribeSocial: vi.fn(() => () => {}),
   markConversationRead: vi.fn().mockResolvedValue(undefined),
   archiveConversation: vi.fn().mockResolvedValue(undefined),
   muteUser: vi.fn().mockResolvedValue(undefined),
@@ -161,7 +165,8 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-vi.mock('@/contexts/AppThemeContext', () => ({
+vi.mock('@/contexts/AppThemeContext', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/contexts/AppThemeContext')>(),
   useAppTheme: () => ({
     theme: {
       accent: '#c7cdd5',

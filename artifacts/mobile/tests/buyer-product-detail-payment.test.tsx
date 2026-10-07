@@ -1,4 +1,5 @@
 import React from 'react';
+vi.mock('@/components/first-run-tips/FirstRunTip', () => ({ FirstRunTip: () => null }));
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +20,7 @@ const {
   addToCartMock: vi.fn(),
   alertMock: vi.fn(),
   apiMock: {
+    productLaunches: { state: vi.fn().mockResolvedValue({ launching: false, launchAt: null, serverNow: new Date().toISOString() }) },
     publicProducts: {
       get: vi.fn(),
       related: vi.fn(),
@@ -221,7 +223,8 @@ vi.mock('@/hooks/useColors', () => ({
   }),
 }));
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   useApi: () => apiMock,
   invalidateSellerPaymentStatusCache: invalidatePaymentCacheMock,
 }));

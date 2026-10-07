@@ -5,6 +5,7 @@ function host(name: string) {
     React.useImperativeHandle(ref, () => ({
       focus() {}, blur() {}, clear() {}, scrollTo() {}, scrollToEnd() {},
       setNativeProps() {}, measure(callback: Function) { callback(0, 0, 393, 852, 0, 0); },
+      measureInWindow(callback: Function) { callback(0, 100, 280, 56); },
     }));
     return React.createElement(name, props, props.children);
   });

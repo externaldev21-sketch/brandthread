@@ -4,18 +4,17 @@
  * mounting the real screen component.
  */
 import React from 'react';
+vi.mock('@/components/first-run-tips/FirstRunTip', () => ({ FirstRunTip: () => null }));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { nativeComponent } = vi.hoisted(() => ({
-  nativeComponent: (name: string) => {
+function nativeComponent(name: string) {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
     }
     MockNativeComponent.displayName = name;
     return MockNativeComponent;
-  },
-}));
+}
 
 vi.mock('react-native', async (importOriginal) => ({
   ...await importOriginal<typeof import('react-native')>(),

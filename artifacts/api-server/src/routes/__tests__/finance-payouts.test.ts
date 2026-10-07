@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   account: null as any,
   externalAccounts: [] as any[],
   available: 100_000,
+  recoveryOwedCents: 0,
   payoutRecord: null as any,
   balanceTxns: [] as any[],
   updateCalls: [] as any[],
@@ -53,6 +54,8 @@ vi.mock("@workspace/db", () => {
     users: table("users"),
     orderFundReservations: table("reservations"),
     sellerCashoutAttempts: table("attempts"),
+    sellerRecoveries: table("recoveries"),
+    sellerRecoveryApplications: table("recoveryApplications"),
     drops: table("drops"),
     orders: table("orders"),
     orderReleases: table("releases"),
@@ -63,6 +66,7 @@ vi.mock("@workspace/db", () => {
         if (name === "users") return [{ stripeAccountId: state.accountId }];
         if (name === "reservations") return [{ reserved: 0 }];
         if (name === "attempts") return state.attempts;
+        if (name === "recoveries") return [{ owed: state.recoveryOwedCents }];
         return [];
       };
       const db: any = {
@@ -163,6 +167,7 @@ beforeEach(() => {
   state.account = { id: "acct_1", payouts_enabled: true, settings: { payouts: { schedule: { interval: "daily", delay_days: 2 } } } };
   state.externalAccounts = [bank];
   state.available = 100_000;
+  state.recoveryOwedCents = 0;
   state.payoutRecord = null;
   state.balanceTxns = [];
   state.updateCalls.length = 0;
@@ -299,6 +304,13 @@ describe("GET /payouts/:id", () => {
 
 describe("POST /payout method", () => {
   const key = "cashout_test_key_000001";
+
+  it("refuses cash-out while a final chargeback recovery is owed", async () => {
+    state.recoveryOwedCents = 500;
+    const r = await call("POST", "/payout", { amount: 100_000, currency: "usd", idempotencyKey: key });
+    expect(r.status).toBe(409);
+    expect(state.payoutCreates).toHaveLength(0);
+  });
 
   it("rejects an unknown method", async () => {
     const r = await call("POST", "/payout", { amount: 100, currency: "usd", idempotencyKey: key, method: "wire" });

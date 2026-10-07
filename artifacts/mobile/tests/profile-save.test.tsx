@@ -383,7 +383,7 @@ describe("seller Profile content-state tabs (Posts / Drafts / Scheduled)", () =>
   const posts = [
     { id: "post-1", caption: "Published post", isDraft: false, isArchived: false, scheduledAt: null, contentType: "image", createdAt: "2026-01-01T00:00:00.000Z" },
     { id: "post-2", caption: "Draft post", isDraft: true, isArchived: false, scheduledAt: null, contentType: "image", createdAt: "2026-01-02T00:00:00.000Z" },
-    { id: "post-3", caption: "Scheduled post", isDraft: false, isArchived: false, scheduledAt: "2026-02-01T00:00:00.000Z", contentType: "video", createdAt: "2026-01-03T00:00:00.000Z" },
+    { id: "post-3", caption: "Scheduled post", isDraft: false, isArchived: false, scheduledAt: new Date(Date.now() + 86_400_000).toISOString(), contentType: "video", createdAt: "2026-01-03T00:00:00.000Z" },
   ];
 
   beforeEach(() => {

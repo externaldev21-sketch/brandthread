@@ -91,7 +91,8 @@ const {
 });
 
 // ── react-native and friends: minimal host-element stand-ins ───────────────
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const React = require('react') as typeof import('react');
   const host = (name: string) => {
     function Host(props: Record<string, unknown>) {
@@ -109,6 +110,7 @@ vi.mock('react-native', () => {
   }
   const timing = () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }) });
   return {
+    ...actual,
     ActivityIndicator: host('ActivityIndicator'),
     Alert: { alert: vi.fn() },
     Animated: {
@@ -437,7 +439,9 @@ async function driveThroughSignUp(renderer: ReactTestRenderer, role: 'buyer' | '
   await fill(findByLabel(renderer, 'Password'), 'Walkthrough!Pass1');
   await fill(findByLabel(renderer, 'Confirm password'), 'Walkthrough!Pass1');
   await fill(findByTestId(renderer, 'onboarding-username-input'), `wt_${role}_flow`);
+  await fill(findByTestId(renderer, 'age-dob-input'), '01/01/1990');
 
+  await press(renderer, findByTestId(renderer, 'legal-consent-checkbox'));
   await press(renderer, findButtonByLabel(renderer, 'Create account'));
   await fill(findByTestId(renderer, 'onboarding-code-cells'), '000000');
   await press(renderer, findButtonByLabel(renderer, 'Verify email'));

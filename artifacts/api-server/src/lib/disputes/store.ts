@@ -2,7 +2,7 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, disputes, disputeEvents, orders } from "@workspace/db";
 import { logger } from "../logger";
-import { recordDisputeReinstatement, recordDisputeWithdrawal } from "../money/disputes";
+import { recordDisputeReinstatement } from "../money/disputes";
 import type { DisputeDeps, DisputeStore } from "./webhook";
 
 const STATUS_EVENT_KINDS = ["created", "updated", "evidence_submitted", "won", "lost", "warning_closed"] as const;
@@ -86,7 +86,10 @@ export function buildDisputeDeps(notify: DisputeDeps["notify"]): DisputeDeps {
   return {
     store: dbDisputeStore,
     ledger: {
-      withdraw: (input) => recordDisputeWithdrawal(input),
+      // Final lost outcomes are booked by sellerRecovery, which also owns
+      // debt collection and dispute fees. Keep the timeline event, but never
+      // book the same chargeback again at funds_withdrawn.
+      withdraw: async () => ({ posted: false, reason: "awaiting_final_outcome" }),
       reinstate: (input) => recordDisputeReinstatement(input),
     },
     notify,

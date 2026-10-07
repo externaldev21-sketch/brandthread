@@ -68,6 +68,7 @@ vi.mock("react-native", () => {
     ActivityIndicator: nativeComponent("ActivityIndicator"),
     Alert: { alert: vi.fn() },
     Animated: {
+      createAnimatedComponent: (component: unknown) => component,
       Value: MockAnimatedValue,
       View: nativeComponent("Animated.View"),
       ScrollView: nativeComponent("Animated.ScrollView"),
@@ -144,6 +145,7 @@ vi.mock("react-native-reanimated", () => {
     (props: Record<string, unknown>) => React.createElement(name, props, props.children as React.ReactNode);
   return {
     default: {
+      createAnimatedComponent: (component: unknown) => component,
       View: makeAnimatedComponent("Animated.View"),
       Text: makeAnimatedComponent("Animated.Text"),
     },

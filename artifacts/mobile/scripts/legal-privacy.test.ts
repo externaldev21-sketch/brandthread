@@ -162,8 +162,11 @@ describe('native permission, encryption and Android config', () => {
     expect(appConfig.ios.infoPlist.LSApplicationQueriesSchemes).toContain('instagram-stories');
   });
 
-  it('does not depend on an ATT, contacts or location module', () => {
+  it('does not depend on ATT or location and keeps explicit opt-in contact matching', () => {
     const deps = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
-    for (const pkg of ['expo-tracking-transparency', 'expo-contacts', 'expo-location']) expect(deps).not.toContain(pkg);
+    for (const pkg of ['expo-tracking-transparency', 'expo-location']) expect(deps).not.toContain(pkg);
+    expect(deps).toContain('expo-contacts');
+    const contacts = fs.readFileSync(path.join(projectRoot, 'app', 'buyer-find-friends.tsx'), 'utf8');
+    expect(contacts).toContain('requestPermissionsAsync');
   });
 });

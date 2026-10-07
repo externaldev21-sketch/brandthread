@@ -50,6 +50,7 @@ import { applyDisputePause, applyDisputePauseByDisputeId, ordersForDisputedPayme
 import { notifySellerDisputeClosed, notifySellerDisputeOpened } from "../lib/sellerMoneyNotifications";
 import { mapDisputeStatus } from "../lib/disputes/webhook";
 import { recordLostChargeback, reinstateLostChargeback } from "../lib/money/sellerRecovery";
+import { recordDisputeReinstatement } from "../lib/money/disputes";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -473,17 +474,6 @@ router.post("/stripe", async (req: Request, res: Response) => {
           );
         } catch (err) {
           req.log.warn({ err, eventId: event.id }, "Radar review event could not update order risk");
-        }
-        break;
-
-      // Stripe returned the disputed money after a loss (the dispute was
-      // reversed): make the seller whole (lib/money/sellerRecovery.ts).
-      case "charge.dispute.funds_reinstated":
-        if (!await isManufacturerCardPayment(
-          stripeReferenceId(event.data.object.payment_intent),
-          stripeReferenceId(event.data.object.charge),
-        )) {
-          await reinstateLostChargeback(event.data.object);
         }
         break;
 
@@ -1812,6 +1802,14 @@ async function handleDisputeEvent(event: { id: string; type: string; created?: n
       });
     }
   }));
+  if (event.type === "charge.dispute.closed" && event.data.object.status === "lost") {
+    // Undo any pre-recovery withdrawal posting before adopting the final-loss
+    // ledger. Both operations have persistent idempotency keys across retries.
+    await recordDisputeReinstatement({ stripeDisputeId: event.data.object.id });
+    await recordLostChargeback(event.data.object);
+  } else if (event.type === "charge.dispute.funds_reinstated") {
+    await reinstateLostChargeback(event.data.object);
+  }
   // Delivery-guarantee hold: pause/resume the order's payout while a dispute is open.
   if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"].includes(event.type)) {
     await applyDisputePauseByDisputeId(event.data.object.id, event.data.object.status);
