@@ -753,15 +753,15 @@ export default function AddProductScreen() {
       name:        productPayload.name,
       description: productPayload.description,
       category:    typeof productPayload.category === 'string' ? productPayload.category : undefined,
+      // Price edits for the product's existing variants (matched by SKU on the
+      // server; unknown SKUs are ignored). Stock is left to the stock editor so
+      // a stale editor can't overwrite units sold meanwhile.
+      variants:    productVariantsForServer.map((v: any) => ({ sku: v.sku, priceCents: v.priceCents })),
       status:      finalStatus,
       images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
-      // Price edits for the product's existing variants (matched by SKU on the
-      // server; unknown SKUs are ignored). Stock is left to the stock editor so
-      // a stale editor can't overwrite units sold meanwhile.
-      variants:    productVariantsForServer.map((v: any) => ({ sku: v.sku, priceCents: v.priceCents })),
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,

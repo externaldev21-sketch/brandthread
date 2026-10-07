@@ -1,3 +1,5 @@
+// Ported from the replit-sync branch's tests/saved-products-store.test.ts (minus its Recently viewed case,
+// which covers a feature dev does not have yet). Drop this file when that branch lands.
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -109,7 +109,6 @@ vi.mock("@clerk/expo", () => ({
   useAuth: () => authMock(),
 }));
 
-
 // The save heart has its own coverage (saved-products-store.test.ts).
 vi.mock("@/components/SaveHeart", () => ({ SaveHeart: () => null }));
 vi.mock("@expo/vector-icons", () => ({
