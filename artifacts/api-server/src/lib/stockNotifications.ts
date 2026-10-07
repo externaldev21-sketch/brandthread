@@ -81,9 +81,13 @@ export async function notifyBackInStock(input: {
   newStock: number;
 }): Promise<void> {
   if (!isRestock(input)) return;
-  // Product-level semantics (0 -> any units), per-item opt-in, blocks,
-  // cooldown and the chunked after-response fan-out: ./savedProductAlerts.
-  noteVariantStockRaised(input.productId, input.newStock - input.previousStock);
+  const likers = await likersOf(input.productId);
+  // Stamp the Saved screen's "Back in stock" badge window for everyone who saved this.
+  // ./savedProductAlerts does that, and alerts the opted-in savers among
+  // `likers`, only on a product-level restock (0 -> any units) — with blocks,
+  // cooldown and a chunked fan-out that runs after the seller's response.
+  if (likers.length === 0) return;
+  noteVariantStockRaised(input.productId, input.newStock - input.previousStock, likers);
 }
 
 /** Buyer-facing price drop alert for everyone who saved/wishlisted the product. */

@@ -1062,6 +1062,20 @@ export const savedCollections = pgTable('saved_collections', {
   userIdx: index('saved_collections_user_id_idx').on(table.userId, table.sortOrder),
 }));
 
+// One row per saved-product alert fan-out (back in stock / price drop) and
+// how many buyers it reached — the seller's reach counts (migration 302).
+export const productSaveAlertRuns = pgTable('product_save_alert_runs', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  productId:      uuid('product_id').notNull(),
+  ownerId:        text('owner_id').notNull(),
+  kind:           text('kind').notNull(), // 'back_in_stock' | 'price_drop'
+  recipientCount: integer('recipient_count').notNull().default(0),
+  priceCents:     integer('price_cents'),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  productIdx: index('product_save_alert_runs_product_idx').on(table.productId, table.kind, table.createdAt),
+}));
+
 // ─── Saved / wishlisted items ─────────────────────────────────────────────────
 
 export const savedItems = pgTable('saved_items', {
@@ -1092,24 +1106,10 @@ export const savedItems = pgTable('saved_items', {
   backInStockNotifiedAt: timestamp('back_in_stock_notified_at'),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
-  collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
-  userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
   productTargetIdx: index('saved_items_product_target_idx').on(table.targetId)
     .where(sql`${table.itemType} = 'product'`),
-}));
-
-// One row per saved-product alert fan-out (back in stock / price drop) and
-// how many buyers it reached — the seller's reach counts (migration 302).
-export const productSaveAlertRuns = pgTable('product_save_alert_runs', {
-  id:             uuid('id').primaryKey().defaultRandom(),
-  productId:      uuid('product_id').notNull(),
-  ownerId:        text('owner_id').notNull(),
-  kind:           text('kind').notNull(), // 'back_in_stock' | 'price_drop'
-  recipientCount: integer('recipient_count').notNull().default(0),
-  priceCents:     integer('price_cents'),
-  createdAt:      timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  productIdx: index('product_save_alert_runs_product_idx').on(table.productId, table.kind, table.createdAt),
+  collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
+  userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
 }));
 
 // ─── First-run tips (per-account "seen" tracking) ─────────────────────────────

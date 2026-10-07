@@ -116,6 +116,8 @@ export function onProductStockPriceChanged(
 // ─── Variant-level entry points (via lib/stockNotifications.ts) ──────────────
 
 const pendingRestock = new Map<string, number>();
+/** Per product: savers the coalesced restock may alert (null = every saver). */
+const pendingRestockAudience = new Map<string, Set<string> | null>();
 const pendingPrice = new Set<string>();
 
 /**
@@ -123,19 +125,24 @@ const pendingPrice = new Set<string>();
  * COALESCE_MS are summed, then judged once: alert if the product had 0 units
  * before them and has units now.
  */
-export function noteVariantStockRaised(productId: string, delta: number): void {
+export function noteVariantStockRaised(productId: string, delta: number, onlyUserIds?: readonly string[]): void {
   if (!(delta > 0)) return;
   const existing = pendingRestock.get(productId);
   pendingRestock.set(productId, (existing ?? 0) + delta);
+  const audience = existing === undefined ? undefined : pendingRestockAudience.get(productId);
+  if (!onlyUserIds || audience === null) pendingRestockAudience.set(productId, null);
+  else pendingRestockAudience.set(productId, new Set([...(audience ?? []), ...onlyUserIds]));
   if (existing !== undefined) return;
   track(new Promise<void>((resolve) => {
     setTimeout(() => {
       const total = pendingRestock.get(productId) ?? 0;
+      const only = pendingRestockAudience.get(productId) ?? null;
       pendingRestock.delete(productId);
+      pendingRestockAudience.delete(productId);
       void (async () => {
         try {
           const now = await snapshotProduct(productId);
-          if (now.totalStock > 0 && now.totalStock - total <= 0) await runFanOut(productId, "back_in_stock");
+          if (now.totalStock > 0 && now.totalStock - total <= 0) await runFanOut(productId, "back_in_stock", only);
         } catch (err) {
           logger.warn({ err, productId }, "Back-in-stock evaluation failed");
         }
@@ -244,7 +251,11 @@ async function blockedWithSeller(ownerId: string, buyerIds: string[]): Promise<S
  * Sends one alert kind for one product to every eligible saver. Returns how
  * many buyers got an Activity row. Never throws.
  */
-export async function runFanOut(productId: string, kind: SavedProductAlertKind): Promise<number> {
+export async function runFanOut(
+  productId: string,
+  kind: SavedProductAlertKind,
+  onlyUserIds: ReadonlySet<string> | null = null,
+): Promise<number> {
   try {
     const product = await liveProduct(productId);
     if (!product) return 0;
@@ -253,7 +264,8 @@ export async function runFanOut(productId: string, kind: SavedProductAlertKind):
     const priceCents = snapshot.minPriceCents;
     if (kind === "price_drop" && priceCents == null) return 0;
 
-    const claimed = (await claimRecipients(product, kind, priceCents)).filter((id) => id !== product.ownerId);
+    const claimed = (await claimRecipients(product, kind, priceCents))
+      .filter((id) => id !== product.ownerId && (!onlyUserIds || onlyUserIds.has(id)));
     if (claimed.length === 0) return 0;
 
     let reached = 0;

@@ -106,8 +106,12 @@ function pushedTo(type: string, productId: string) {
     .map((m) => m.to);
 }
 
+/** Alerts run after the seller's response; let the route's fire-and-forget call schedule them, then drain. */
 async function settle() {
-  await drainSavedProductAlerts();
+  for (let i = 0; i < 2; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await drainSavedProductAlerts();
+  }
 }
 
 async function expectAlertReachedOnlyEligible(type: "back_in_stock" | "price_drop", productId: string) {

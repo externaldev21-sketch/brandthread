@@ -6,14 +6,14 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
+import { noteVariantStockRaised, productSaveStats } from "../lib/savedProductAlerts";
+import { applyProductLevelVariantEdits, parseProductLevelVariantEdits } from "../lib/productVariantEdits";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { notifyNewProduct } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
-import { noteVariantStockRaised, productSaveStats } from "../lib/savedProductAlerts";
-import { applyProductLevelVariantEdits, parseProductLevelVariantEdits } from "../lib/productVariantEdits";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -290,9 +290,6 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     // `sizeChart` table data above.
     sizeChartImageUrl,
   } = req.body;
-  // Product-level price/stock edits for existing variants (lib/productVariantEdits.ts).
-  const variantEdits = parseProductLevelVariantEdits(req.body?.variants);
-  if ("error" in variantEdits) { res.status(400).json({ error: variantEdits.error }); return; }
 
   {
     const [stored] = await db.select({ isPreOrder: products.isPreOrder, shipDate: products.preOrderEstShipDate })
@@ -308,6 +305,10 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       if (problem) { res.status(problem.status).json({ error: problem.error, code: problem.code }); return; }
     }
   }
+
+  // Product-level price/stock edits for existing variants (lib/productVariantEdits.ts).
+  const variantEdits = parseProductLevelVariantEdits(req.body?.variants);
+  if ("error" in variantEdits) { res.status(400).json({ error: variantEdits.error }); return; }
 
   const updateValues = {
       ...(name         && { name }),
@@ -515,9 +516,9 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
   const [variant] = await db.insert(productVariants)
     .values({ productId: req.params.id, size, color, sku, priceCents, stock, lowStockThreshold })
     .returning();
+  res.status(201).json(variant);
   // A new in-stock size on a sold-out product is a restock for its savers.
   if (variant.stock > 0) noteVariantStockRaised(req.params.id, variant.stock);
-  res.status(201).json(variant);
 });
 
 // PATCH /api/products/:id/variants/:variantId — update stock / price (ownership via product join)
