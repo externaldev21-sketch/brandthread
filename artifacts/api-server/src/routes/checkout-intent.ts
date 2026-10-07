@@ -281,13 +281,14 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   // seller's (or they co-hosted it) and is live or just ended.
   const liveSources = await Promise.all(priced.map((group, index) =>
     resolveLiveAttribution(body.groups[index]?.liveStreamId, group.sellerId)));
+  const liveSourceByGroup = new Map(priced.map((group, index) => [group, liveSources[index]] as const));
 
   // ── Persist the groups and reserve their stock, all or nothing ───────────
   let rows: Array<typeof checkoutSessions.$inferSelect> = [];
   try {
     rows = await db.transaction(async (tx) => {
       const inserted: Array<typeof checkoutSessions.$inferSelect> = [];
-      for (const [groupIndex, group] of priced.entries()) {
+      for (const group of priced) {
         const [row] = await tx.insert(checkoutSessions).values({
           buyerId,
           sellerId: group.sellerId,
@@ -307,7 +308,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
           shippingCents: group.shippingCents,
           taxCents: group.taxCents,
           stripeTaxCalculationId: group.calculationId,
-          ...(liveSources[groupIndex] ? { sourceLiveStreamId: liveSources[groupIndex] } : {}),
+          ...(liveSourceByGroup.get(group) ? { sourceLiveStreamId: liveSourceByGroup.get(group) } : {}),
         }).returning();
         await reserveStock(tx, row.id, group.items.map((item) => ({
           variantId: item.variantId, quantity: item.quantity, productName: item.productName,
