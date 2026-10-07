@@ -95,27 +95,36 @@ async function routeLive(context, origin, role) {
 }
 
 /** Fake live socket: answers the app's connection and sends server events. */
-async function fakeSocket(page, events) {
+async function fakeSocket(page, events, repeat) {
   await page.routeWebSocket(/\/ws\/live/, (ws) => {
     setTimeout(() => { for (const e of events) ws.send(JSON.stringify(e)); }, 600);
+    // Toasts rotate every few seconds, so keep purchases coming until the shot.
+    if (repeat) {
+      let n = 0;
+      const timer = setInterval(() => { try { ws.send(JSON.stringify(repeat(++n))); } catch { clearInterval(timer); } }, 2500);
+      timer.unref();
+      ws.onClose(() => clearInterval(timer));
+    }
     ws.onMessage(() => {});
   });
 }
 
-async function shot(page, activity, name) {
+async function shot(page, activity, name, waitText) {
   await waitForQuietNetwork(activity, 900, 20_000);
   await waitForImages(page);
   await page.waitForTimeout(1500);
+  // What the shot is about must be on screen at the moment it is taken.
+  if (waitText) await page.getByText(waitText).first().waitFor({ state: 'visible', timeout: 10_000 });
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
   console.log(`  ✓ ${name}`);
 }
 
-async function capture(browser, images, origin, { role, target, name, socket, waitText, apiRole }) {
+async function capture(browser, images, origin, { role, target, name, socket, repeat, waitText, apiRole, after }) {
   const device = { viewport: { width: 390, height: 844 }, scale: 2, isMobile: true };
   const { context, page, activity } = await openContext(browser, { device, role, origin, images });
   page.setDefaultNavigationTimeout(240_000);
   await routeLive(context, origin, apiRole ?? role);
-  if (socket) await fakeSocket(page, socket);
+  if (socket) await fakeSocket(page, socket, repeat);
   await openScreen(page, activity, origin, role, target);
   // The first client-side navigation can land before the app settles; re-push it.
   const url = `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`;
@@ -135,7 +144,8 @@ async function capture(browser, images, origin, { role, target, name, socket, wa
     console.log(`  ! ${name}: "${waitText}" not visible at ${page.url()}`);
     process.exitCode = 1;
   }
-  await shot(page, activity, name);
+  await shot(page, activity, name, waitText);
+  if (after) await after(page, activity);
   await context.close();
 }
 
@@ -160,9 +170,16 @@ async function run() {
         { type: 'viewerCount', count: 412 },
         { type: 'purchase', purchase: { id: 'o1', buyerFirstName: 'Jordan', productName: 'Wool Overshirt', units: 1, sellerId: 'user_northline', at: '2026-09-18T23:30:00Z' } },
       ],
+      repeat: (n) => ({ type: 'purchase', purchase: { id: `o-${n}`, buyerFirstName: 'Jordan', productName: 'Wool Overshirt', units: 1, sellerId: 'user_northline', at: '2026-09-18T23:30:00Z' } }),
     });
     await capture(browser, images, server.origin, {
       role: 'seller', target: `/live-summary?streamId=${STREAM}`, name: '05-live-summary', waitText: 'Live ended',
+      // Scrolled to the end: the last card clears the seller tab bar.
+      after: async (page, activity) => {
+        await page.mouse.move(195, 500);
+        for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 800); await page.waitForTimeout(150); }
+        await shot(page, activity, '05b-live-summary-scrolled-end');
+      },
     });
     await capture(browser, images, server.origin, {
       role: 'seller', target: '/order-detail?id=so-1', name: '06-order-detail-live-badge', waitText: 'From your live',

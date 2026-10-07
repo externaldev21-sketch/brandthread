@@ -23,7 +23,8 @@ import { broadcastToRoom } from "../ws/liveHub";
 import { publishNotification } from "./notifications-feed";
 import { generateToken, uidFromClerkId } from "./live";
 import {
-  checkInviteAllowed, transitionCohost, type CohostAction, type CohostActor, type CohostStatus,
+  checkInviteAllowed, transitionCohost, COHOST_TOKEN_TTL_SECONDS,
+  type CohostAction, type CohostActor, type CohostStatus,
 } from "../lib/liveCohost";
 import { logger } from "../lib/logger";
 
@@ -88,7 +89,9 @@ function publisherCreds(stream: any, userId: string) {
     channelName: stream.channel_name,
     agoraUid: uid,
     agoraAppId: appId,
-    token: generateToken(appId, appCert, stream.channel_name, uid, 1 /* PUBLISHER */),
+    token: generateToken(appId, appCert, stream.channel_name, uid, 1 /* PUBLISHER */, COHOST_TOKEN_TTL_SECONDS),
+    // Short-lived on purpose: renew via POST /:id/cohost/token before this.
+    tokenExpiresAt: new Date(Date.now() + COHOST_TOKEN_TTL_SECONDS * 1000).toISOString(),
   };
 }
 

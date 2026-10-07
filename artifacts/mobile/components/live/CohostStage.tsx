@@ -5,7 +5,9 @@
  * publisher token from POST /api/live/:id/cohost/respond, shows the local
  * camera, the live viewer count and the chat, and lets the co-host leave.
  * If the host removes the co-host (`cohost_removed` over the live socket) or
- * the stream ends, the co-host is taken off stage.
+ * the stream ends, the co-host is taken off stage. The publisher token is
+ * short-lived and renewed on Agora's token-privilege-will-expire through
+ * POST /api/live/:id/cohost/token; a refused renewal also ends the stage.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -69,7 +71,15 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
       engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
       engine.enableVideo();
       engine.startPreview();
-      engine.registerEventHandler({ onError: (err: any) => console.warn('[Agora cohost]', err) });
+      engine.registerEventHandler({
+        onError: (err: any) => console.warn('[Agora cohost]', err),
+        // Co-host tokens are short-lived (api-server lib/liveCohost.ts
+        // COHOST_TOKEN_TTL_SECONDS). Renew before expiry; the server refuses
+        // once the co-host was removed / left, the live ended or a block
+        // exists — then the co-host leaves the stage.
+        onTokenPrivilegeWillExpire: () => { void renewToken(); },
+        onRequestToken: () => { void renewToken(); },
+      });
       engine.joinChannel(creds.token || null, creds.channelName, creds.agoraUid, {
         clientRoleType: ClientRoleType.ClientRoleBroadcaster,
       });
@@ -81,6 +91,21 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
       try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch {}
     };
   }, [creds.agoraAppId, creds.channelName, creds.agoraUid, creds.token]);
+
+  const renewingRef = useRef(false);
+  async function renewToken() {
+    if (renewingRef.current || doneRef.current) return;
+    renewingRef.current = true;
+    try {
+      const fresh = await api.liveCohost.token(streamId);
+      engineRef.current?.renewToken(fresh.token);
+    } catch {
+      Alert.alert('You’re off stage', 'You’re no longer a co-host on this live.');
+      finish();
+    } finally {
+      renewingRef.current = false;
+    }
+  }
 
   const onEvent = React.useCallback((event: LiveSocketEvent) => {
     if (event.type === 'viewerCount') setViewerCount(event.count);

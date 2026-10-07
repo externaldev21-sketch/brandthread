@@ -2735,10 +2735,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       invite:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/invite`, { userId }),
       cancel:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/cancel`, { userId }),
       respond:     (id: string, accept: boolean) =>
-        post<{ ok: boolean; status: string; channelName?: string; agoraUid?: number; agoraAppId?: string; token?: string }>(
+        post<{ ok: boolean; status: string; channelName?: string; agoraUid?: number; agoraAppId?: string; token?: string; tokenExpiresAt?: string }>(
           `/api/live/${encodeURIComponent(id)}/cohost/respond`, { accept }),
+      /** Short-lived publisher token renewal (refused once no longer an accepted co-host of a live stream). */
       token:       (id: string) =>
-        post<{ channelName: string; agoraUid: number; agoraAppId: string; token: string }>(`/api/live/${encodeURIComponent(id)}/cohost/token`, {}),
+        post<{ channelName: string; agoraUid: number; agoraAppId: string; token: string; tokenExpiresAt: string }>(`/api/live/${encodeURIComponent(id)}/cohost/token`, {}),
       remove:      (id: string, userId: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/remove`, { userId }),
       leave:       (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/cohost/leave`, {}),
     },

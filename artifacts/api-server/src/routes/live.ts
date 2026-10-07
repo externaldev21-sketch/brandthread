@@ -55,13 +55,15 @@ export function generateToken(
   channelName: string,
   uid: number,
   role: number,
+  /** Token lifetime; defaults to the whole stream (host + viewers). Co-hosts pass a short one. */
+  expirySeconds: number = MAX_LIVE_HOURS * 3600,
 ): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
     // A live is ended by jobs/liveStaleStreams.ts once it reaches
-    // MAX_LIVE_HOURS, so the media token covers the whole stream.
-    const expireTs = Math.floor(Date.now() / 1000) + MAX_LIVE_HOURS * 3600;
+    // MAX_LIVE_HOURS, so by default the media token covers the whole stream.
+    const expireTs = Math.floor(Date.now() / 1000) + expirySeconds;
     return RtcTokenBuilder.buildTokenWithUid(
       appId,
       appCert,

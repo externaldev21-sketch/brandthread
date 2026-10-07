@@ -17,6 +17,14 @@ export type CohostAction = "accept" | "decline" | "cancel" | "remove" | "leave";
 /** Maximum simultaneous co-hosts (invited + accepted) per stream. */
 export const MAX_OPEN_COHOSTS = 3;
 
+/**
+ * Co-host publisher tokens are short-lived: the co-host app renews through
+ * POST /api/live/:id/cohost/token (Agora's token-privilege-will-expire), which
+ * refuses once the co-host was removed / left, the live ended, or a block
+ * exists — so a removed co-host can publish for at most this long.
+ */
+export const COHOST_TOKEN_TTL_SECONDS = 10 * 60;
+
 const TRANSITIONS: Record<CohostAction, { from: CohostStatus; actor: CohostActor; to: CohostStatus }> = {
   accept:  { from: "invited",  actor: "cohost", to: "accepted" },
   decline: { from: "invited",  actor: "cohost", to: "declined" },

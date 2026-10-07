@@ -18,11 +18,36 @@ import type { Server } from "node:http";
 import express from "express";
 import { eq, inArray, sql } from "drizzle-orm";
 import WS from "ws";
+import { COHOST_TOKEN_TTL_SECONDS } from "../../lib/liveCohost";
+import { MAX_LIVE_HOURS } from "../../jobs/liveStaleStreams";
 import {
   blocks, db, follows, liveCohosts, liveComments, liveStreams, liveViewers, notificationsFeed, users,
 } from "@workspace/db";
 
-vi.hoisted(() => { process.env.AGORA_APP_ID ??= "test-agora-app"; });
+vi.hoisted(() => {
+  process.env.AGORA_APP_ID ??= "test-agora-app";
+  // A real (test) certificate so real Agora tokens are minted and their expiry can be read back.
+  process.env.AGORA_APP_CERTIFICATE ??= "5cfd2fd1755d40ecb72977518be15d3b";
+});
+/**
+ * Seconds until an Agora "006" RTC token's join-channel privilege expires.
+ * Layout (little-endian): "006" + appId + base64(sig:u16-len bytes, crc_channel:u32,
+ * crc_uid:u32, m:u16-len bytes), m = salt:u32, ts:u32, count:u16, count × (key:u16, expireTs:u32).
+ */
+function tokenTtlSeconds(token: string): number {
+  const appId = process.env.AGORA_APP_ID!;
+  expect(token.startsWith(`006${appId}`)).toBe(true);
+  const buf = Buffer.from(token.slice(3 + appId.length), "base64");
+  let o = 0;
+  o += 2 + buf.readUInt16LE(o);   // signature
+  o += 8;                         // crc_channel + crc_uid
+  o += 2;                         // m length
+  o += 8;                         // salt + ts
+  const count = buf.readUInt16LE(o); o += 2;
+  const privileges = new Map<number, number>();
+  for (let i = 0; i < count; i++) { privileges.set(buf.readUInt16LE(o), buf.readUInt32LE(o + 2)); o += 6; }
+  return privileges.get(1)! - Math.floor(Date.now() / 1000);
+}
 
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, res: any, next: () => void) => {
@@ -132,6 +157,8 @@ describe("Live co-host — host ↔ invitee ↔ viewers", () => {
     expect(start.status).toBe(201);
     streamId = start.body.stream.id;
     hostUid = start.body.stream.agoraUid;
+    // The host's token still covers the whole live (unchanged).
+    expect(tokenTtlSeconds(start.body.token)).toBeGreaterThan(MAX_LIVE_HOURS * 3600 - 60);
 
     const found = await as(HOST, "/cohost-candidates?q=", undefined, "GET");
     expect(found.status).toBe(200);
@@ -185,10 +212,18 @@ describe("Live co-host — host ↔ invitee ↔ viewers", () => {
       expect(ev.cohosts[0]).toMatchObject({ userId: CO1, displayName: "Rue Studio", agoraUid: accepted.body.agoraUid });
       expect((await as(BUYER, `/${streamId}/cohosts`, undefined, "GET")).body.cohosts.map((c: any) => c.userId)).toEqual([CO1]);
 
-      // Rejoin: same uid, fresh token. Only an accepted co-host gets one.
+      // Co-host publisher tokens are short-lived (10 min) and say when they expire.
+      expect(COHOST_TOKEN_TTL_SECONDS).toBe(600);
+      const ttl = tokenTtlSeconds(accepted.body.token);
+      expect(ttl).toBeGreaterThan(COHOST_TOKEN_TTL_SECONDS - 30);
+      expect(ttl).toBeLessThanOrEqual(COHOST_TOKEN_TTL_SECONDS);
+      expect(Date.parse(accepted.body.tokenExpiresAt) - Date.now()).toBeLessThanOrEqual(COHOST_TOKEN_TTL_SECONDS * 1000);
+
+      // Renewal (Agora's token-privilege-will-expire): same uid, fresh short token.
       const token = await as(CO1, `/${streamId}/cohost/token`, {});
       expect(token.status).toBe(200);
       expect(token.body.agoraUid).toBe(accepted.body.agoraUid);
+      expect(tokenTtlSeconds(token.body.token)).toBeLessThanOrEqual(COHOST_TOKEN_TTL_SECONDS);
       expect((await as(BUYER, `/${streamId}/cohost/token`, {})).status).toBe(403);
     } finally {
       viewer.ws.close();
@@ -226,8 +261,11 @@ describe("Live co-host — host ↔ invitee ↔ viewers", () => {
       await waitForEvent(viewer.events, (e) => e.type === "cohosts" && e.cohosts.length === 1 && e.cohosts[0].userId === CO2);
       expect((await as(CO1, `/${streamId}/cohost/token`, {})).status).toBe(403);
 
+      expect((await as(CO2, `/${streamId}/cohost/token`, {})).status).toBe(200);
       expect((await as(CO2, `/${streamId}/cohost/leave`, {})).status).toBe(200);
       await waitForEvent(viewer.events, (e) => e.type === "cohosts" && e.cohosts.length === 0);
+      // A co-host who left can't renew either.
+      expect((await as(CO2, `/${streamId}/cohost/token`, {})).status).toBe(403);
       const rows = await db.select().from(liveCohosts).where(eq(liveCohosts.streamId, streamId));
       expect(Object.fromEntries(rows.filter((r) => r.cohostId !== CO3).map((r) => [r.cohostId, r.status])))
         .toEqual({ [CO1]: "removed", [CO2]: "left" });
@@ -246,6 +284,19 @@ describe("Live co-host — host ↔ invitee ↔ viewers", () => {
     } finally {
       await db.delete(blocks).where(eq(blocks.blockerId, CO3));
     }
+  });
+
+  it("an on-stage co-host's renewal is refused once a block exists", async () => {
+    expect((await as(HOST, `/${streamId}/cohost/invite`, { userId: CO2 })).status).toBe(201);
+    expect((await as(CO2, `/${streamId}/cohost/respond`, { accept: true })).status).toBe(200);
+    expect((await as(CO2, `/${streamId}/cohost/token`, {})).status).toBe(200);
+    await db.insert(blocks).values({ blockerId: HOST, blockedId: CO2 });
+    try {
+      expect((await as(CO2, `/${streamId}/cohost/token`, {})).status).toBe(403);
+    } finally {
+      await db.delete(blocks).where(eq(blocks.blockedId, CO2));
+    }
+    expect((await as(HOST, `/${streamId}/cohost/remove`, { userId: CO2 })).status).toBe(200);
   });
 
   it("ending the live takes every co-host off stage and closes open invites", async () => {
