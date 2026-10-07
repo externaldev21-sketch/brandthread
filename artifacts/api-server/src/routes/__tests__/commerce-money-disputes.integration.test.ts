@@ -159,11 +159,13 @@ describe("chargebacks reach every seller the payment covered", () => {
     expect(list.body[0]).toMatchObject({ orderId: mine.id, amountCents: mine.grossChargedCents });
     const disputeId = list.body[0].id;
     // …and both sellers are told; the owner's alert opens the dispute.
-    const mineAlert = (await feedFor(app.seller)).find((n) => n.type === "dispute_opened");
-    expect(mineAlert).toMatchObject({ targetType: "dispute", targetId: disputeId, category: "disputes" });
-    const theirAlert = (await feedFor(other)).find((n) => n.type === "dispute_opened");
-    expect(theirAlert).toMatchObject({ targetType: "order", targetId: theirs.id });
-    expect(fake.pushes.some((p) => p.userId === other && p.payload?.title?.startsWith("Chargeback"))).toBe(true);
+    await vi.waitFor(async () => {
+      const mineAlert = (await feedFor(app.seller)).find((n) => n.type === "dispute_created");
+      expect(mineAlert).toMatchObject({ targetType: "dispute", targetId: disputeId, category: "dispute" });
+      const theirAlert = (await feedFor(other)).find((n) => n.type === "dispute_created");
+      expect(theirAlert).toMatchObject({ targetType: "order", targetId: theirs.id });
+      expect(fake.pushes.some((p) => p.userId === other && p.payload?.data?.targetId === theirs.id)).toBe(true);
+    });
 
     // A retried event doesn't alert again.
     const before = (await feedFor(app.seller)).length;
@@ -180,7 +182,8 @@ describe("chargebacks reach every seller the payment covered", () => {
     expect(evidence.status, JSON.stringify(evidence.body)).toBe(200);
     const update = fake.stripe.callsTo("disputes.update").at(-1);
     expect(update.args[1].evidence.shipping_tracking_number).toBe("1Z999AA10123456786");
-    expect(update.args[1].evidence.shipping_documentation).toBe("Delivered to the front porch");
+    expect(update.args[1].evidence.shipping_documentation).toBeUndefined();
+    expect(update.args[1].evidence.uncategorized_text).toContain("Delivered to the front porch");
 
     // Won: payouts resume and the seller hears it.
     const won = await app.stripeEvent("charge.dispute.closed", {
@@ -189,8 +192,8 @@ describe("chargebacks reach every seller the payment covered", () => {
     expect(won.status).toBe(200);
     expect((await orderRow(mine.id)).disputePausedAt).toBeNull();
     expect((await orderRow(theirs.id)).disputePausedAt).toBeNull();
-    const outcome = (await feedFor(app.seller)).find((n) => n.type === "dispute_closed");
-    expect(outcome?.title).toContain("Chargeback won");
+    const outcome = (await feedFor(app.seller)).find((n) => n.type === "dispute_won");
+    expect(outcome?.title).toBe("Dispute won");
   });
 
   it("Accept concedes the dispute on Stripe instead of only flipping a local row", async () => {

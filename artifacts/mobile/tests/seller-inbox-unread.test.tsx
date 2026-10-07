@@ -99,7 +99,9 @@ vi.mock('react-native-svg', async (importOriginal) => {
   };
 });
 
-vi.mock('@clerk/expo', () => ({
+vi.mock('@clerk/expo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@clerk/expo')>()),
+  useUser: () => ({ isLoaded: true, user: { id: 'seller-user', fullName: 'Seller' } }),
   // seller-inbox.tsx reads useAuth().userId (not useUser()'s isLoaded) —
   // see its own comment for why: useUser()'s isLoaded can lag well behind
   // userId itself, which left the seller inbox stuck on its web-preview

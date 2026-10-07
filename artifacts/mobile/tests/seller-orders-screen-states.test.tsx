@@ -57,7 +57,9 @@ vi.mock('expo-linear-gradient', () => ({
 }));
 
 let routerPush = vi.fn();
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('expo-router')>()),
+  usePathname: () => '/orders',
   // Real useFocusEffect only fires on focus, not every render. A test always
   // has exactly one screen "focused" once on mount, so useEffect(..., [])
   // models that without re-running (and looping) on every re-render.

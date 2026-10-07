@@ -1760,7 +1760,31 @@ async function handleIdentityFailed(session: any) {
 // database; this wires in the real store, ledger and notification publisher.
 
 async function handleDisputeEvent(event: { id: string; type: string; created?: number; data: { object: any } }) {
-  await processDisputeEvent(event, buildDisputeDeps(publishNotification));
+  await processDisputeEvent(event, buildDisputeDeps(async (notification) => {
+    await publishNotification(notification);
+    // The idempotent processor claims delivery for the whole event. Preserve
+    // shared-cart alerts: every affected seller needs to know their payout
+    // was paused, even though only one seller owns the dispute response.
+    if (event.type !== "charge.dispute.created") return;
+    const { covered } = await resolveDisputeOrders(
+      stripeReferenceId(event.data.object.payment_intent),
+      stripeReferenceId(event.data.object.charge),
+      event.data.object.amount ?? 0,
+    );
+    const notified = new Set([notification.userId]);
+    for (const order of covered) {
+      if (notified.has(order.ownerId)) continue;
+      notified.add(order.ownerId);
+      await publishNotification({
+        ...notification,
+        userId: order.ownerId,
+        targetType: "order",
+        targetId: order.id,
+        cta: `/order-detail?id=${encodeURIComponent(order.id)}`,
+        body: `The payment covering order #${order.orderNumber} has a dispute. Its payout is paused while the dispute is reviewed.`,
+      });
+    }
+  }));
   // Delivery-guarantee hold: pause/resume the order's payout while a dispute is open.
   if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"].includes(event.type)) {
     await applyDisputePauseByDisputeId(event.data.object.id, event.data.object.status);

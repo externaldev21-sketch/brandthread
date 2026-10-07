@@ -31,7 +31,7 @@ const {
     conversations: { uploadMedia: vi.fn() },
     products: { publicList: vi.fn().mockResolvedValue([]) },
     posts: { publicList: vi.fn().mockResolvedValue([]) },
-    social: { block: vi.fn(), unblock: vi.fn() },
+    social: { block: vi.fn(), unblock: vi.fn(), status: vi.fn().mockResolvedValue({ mutualFriends: false }) },
   },
   routerMock: { back: vi.fn(), push: vi.fn() },
   focusEffects: { callbacks: [] as Array<() => void | (() => void)> },

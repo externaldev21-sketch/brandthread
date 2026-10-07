@@ -18,6 +18,13 @@ import { db, liveStreams, notificationsFeed, threadCashEntries, users } from "@w
 
 const fakeStripe = vi.hoisted(() => ({ client: null as any }));
 
+// Exercise the enabled feature's real money routes. The OFF/error cases are
+// tested by live-tips-gate; never mutate the shared database flag.
+vi.mock("../../lib/liveTips", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/liveTips")>();
+  return { ...actual, liveTipsGate: () => actual.liveTipsGate(async () => true) };
+});
+
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, res: any, next: () => void) => {
     const id = req.header("x-test-user-id");

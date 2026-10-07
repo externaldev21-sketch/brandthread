@@ -120,7 +120,8 @@ vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ isSignedIn: true }),
 }));
 
-vi.mock('@expo/vector-icons', () => ({
+vi.mock('@expo/vector-icons', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@expo/vector-icons')>()),
   Feather: ({ name, color }: { name: string; color?: string }) =>
     React.createElement('Feather', { name, color }),
 }));
@@ -372,6 +373,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     alertMock.mockReset();
     createBuyNowSessionMock.mockReset();
     getCartMock.mockReset();
+    getCartMock.mockResolvedValue({ id: 'cart-1', items: [], savedItems: [], updatedAt: '2026-08-31T00:00:00.000Z' });
     apiMock.publicProducts.get.mockReset();
     apiMock.publicProducts.get.mockResolvedValue(product);
     apiMock.publicProducts.related.mockReset();

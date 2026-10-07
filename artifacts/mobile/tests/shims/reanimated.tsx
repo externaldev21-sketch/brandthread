@@ -35,6 +35,24 @@ export function useAnimatedReaction() {
   // no-op in tests
 }
 
+export function useReducedMotion() {
+  return false;
+}
+
+export const Extrapolation = { CLAMP: "clamp", EXTEND: "extend", IDENTITY: "identity" };
+export function interpolate(value: number, input: number[], output: number[], extrapolation = "extend") {
+  const last = input.length - 1;
+  if (extrapolation === "clamp") {
+    if (value <= input[0]) return output[0];
+    if (value >= input[last]) return output[last];
+  }
+  let index = 0;
+  while (index < last - 1 && value > input[index + 1]) index++;
+  const width = input[index + 1] - input[index];
+  const fraction = width === 0 ? 0 : (value - input[index]) / width;
+  return output[index] + fraction * (output[index + 1] - output[index]);
+}
+
 export function useAnimatedProps<T>(fn: () => T): T {
   return fn();
 }

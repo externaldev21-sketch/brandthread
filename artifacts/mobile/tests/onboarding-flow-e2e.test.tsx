@@ -307,9 +307,11 @@ vi.mock('@/app/_layout', () => ({
   ONBOARDING_OWNER_KEY: 'onboarding_owner_id',
 }));
 
-vi.mock('@/components/legal/LegalConsent', () => {
+vi.mock('@/components/legal/LegalConsent', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/legal/LegalConsent')>();
   const React = require('react') as typeof import('react');
   return {
+    ...actual,
     // Sign-up shows one linked line; continuing is the agreement (no checkbox).
     LegalContinueNotice: () => React.createElement('Text', { testID: 'legal-consent-line' }),
   };

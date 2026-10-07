@@ -8,6 +8,12 @@ import { blocks, db, follows, users } from "@workspace/db";
 
 const auth = vi.hoisted(() => ({ userId: "" }));
 
+// Deliberately burst above the follow quota to test transaction races.
+// Rate-limit enforcement is covered separately; keep production limits intact.
+vi.mock("../../middlewares/rateLimit", () => ({
+  rateLimit: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, res: any, next: () => void) => {
     req.clerkUserId = req.header("x-test-user-id") || auth.userId;

@@ -137,7 +137,8 @@ vi.mock("@/components/buyer-nav/buyerTabBarMetrics", () => ({
   useTabBarMetrics: () => ({ occupiedHeight: 80 }),
 }));
 
-vi.mock("@clerk/expo", () => ({
+vi.mock("@clerk/expo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@clerk/expo")>()),
   useAuth: () => ({ isLoaded: true, userId: "seller-1" }),
 }));
 
@@ -401,7 +402,7 @@ describe("seller Profile content-state tabs (Posts / Drafts / Scheduled)", () =>
     });
   });
 
-  it("filters the grid by content state as each index-based tab is pressed", async () => {
+  it("shows published posts and keeps drafts and scheduled posts in the Drafts destination", async () => {
     renderer = await renderScreen();
 
     // Defaults to the Posts tab (index 0): everything not a draft or archived
@@ -410,16 +411,10 @@ describe("seller Profile content-state tabs (Posts / Drafts / Scheduled)", () =>
     expect(textContent(renderer.toJSON())).toContain("Published post");
     expect(textContent(renderer.toJSON())).not.toContain("Draft post");
 
+    expect(textContent(renderer.toJSON())).not.toContain("Scheduled post");
     await act(async () => {
-      renderer.root.findByProps({ testID: "profile-tab-draft" }).props.onPress();
+      renderer.root.findByProps({ testID: "seller-profile-drafts-tile" }).props.onPress();
     });
-    expect(textContent(renderer.toJSON())).toContain("Draft post");
-    expect(textContent(renderer.toJSON())).not.toContain("Published post");
-
-    await act(async () => {
-      renderer.root.findByProps({ testID: "profile-tab-schedule" }).props.onPress();
-    });
-    expect(textContent(renderer.toJSON())).toContain("Scheduled post");
-    expect(textContent(renderer.toJSON())).not.toContain("Draft post");
+    expect(routerMock.push).toHaveBeenCalledWith("/content?tab=draft");
   });
 });

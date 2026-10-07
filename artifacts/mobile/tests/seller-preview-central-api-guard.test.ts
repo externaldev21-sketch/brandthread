@@ -4,6 +4,7 @@ const fetchMock = vi.fn();
 
 vi.mock('@/lib/devPreview', () => ({ isSellerDevPreview: () => true }));
 vi.mock('@/lib/api', () => ({
+  signedOutPreviewAnswer: async () => null,
   storeContextHeaders: () => ({}),
   versionApiPath: (path: string) => path,
 }));

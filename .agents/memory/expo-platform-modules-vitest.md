@@ -16,3 +16,9 @@ Externalized native SDK packages may load React Native through Node's own resolv
 **Why:** A root React Native alias alone still allowed Expo native globals and Flow syntax to prevent suite collection; sparse mocks also hid newly shared components.
 
 **How to apply:** Use test-only boundary implementations or explicit provider mocks. Keep production Metro resolution untouched and continue testing real screen logic.
+
+Distinct SDK namespaces need distinct resolved module identities in Vitest, even when their test boundaries share implementation.
+
+**Why:** Aliasing gradient, blur, and video packages to one file made a mock for blur overwrite gradient exports. Vitest then reported a missing gradient export on the blur module, obscuring the actual cause.
+
+**How to apply:** Share implementation through re-exports from separate boundary modules. When an error names an unrelated package, check alias target collisions before adding exports or changing app imports.
