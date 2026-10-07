@@ -136,6 +136,7 @@ describe("chargebacks reach every seller the payment covered", () => {
     const other = await app.addSeller();
     const { pi, mine, theirs } = await payTwoSellerCart(other);
 
+    const createdEventId = `evt_dispute_created_${crypto.randomUUID()}`;
     const opened = await app.stripeEvent("charge.dispute.created", {
       id: `dp_${crypto.randomUUID()}`,
       object: "dispute",
@@ -146,7 +147,7 @@ describe("chargebacks reach every seller the payment covered", () => {
       reason: "product_not_received",
       status: "needs_response",
       evidence_details: { due_by: Math.floor(Date.now() / 1000) + 7 * 86_400 },
-    });
+    }, { id: createdEventId });
     expect(opened.status, JSON.stringify(opened.body)).toBe(200);
 
     // Both sellers' payouts are paused…
@@ -169,11 +170,13 @@ describe("chargebacks reach every seller the payment covered", () => {
 
     // A retried event doesn't alert again.
     const before = (await feedFor(app.seller)).length;
+    const otherBefore = (await feedFor(other)).length;
     await app.stripeEvent("charge.dispute.created", {
       id: list.body[0].stripeDisputeId, object: "dispute", payment_intent: pi.id, amount: mine.grossChargedCents,
       currency: "usd", reason: "product_not_received", status: "needs_response",
-    });
+    }, { id: createdEventId });
     expect((await feedFor(app.seller)).length).toBe(before);
+    expect((await feedFor(other)).length).toBe(otherBefore);
 
     // Evidence carries the real tracking number to Stripe.
     const evidence = await app.asSeller("POST", `/api/disputes/${disputeId}/evidence`, {
