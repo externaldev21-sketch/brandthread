@@ -102,12 +102,20 @@ export function createNotificationResponseHandler(
       }
       return;
     }
+    if (data?.targetType === 'dispute' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/dispute-detail?disputeId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'return' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
       return;
     }
     if (data?.targetType === 'payout') {
       router.push('/payouts');
+      return;
+    }
+    if (data?.targetType === 'recovery') {
+      router.push('/recoveries');
       return;
     }
     // Social pushes (likes, comments, replies, mentions, reposts, story likes,

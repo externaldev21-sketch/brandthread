@@ -55,6 +55,21 @@ export const LEDGER_ACCOUNTS = {
    * `thread_cash_seller_topup` — see lib/threadCash/cashOut.ts.
    */
   thread_cash_seller_cash_out: "thread_cash_seller_cash_out",
+  /**
+   * What a seller owes Brandthread from a chargeback lost after they were
+   * paid (party = seller, order = the disputed order). Negative = owed. Goes
+   * back up as the debt is recovered (transfer reversal, netting from a later
+   * release), forgiven or reinstated — see lib/money/sellerRecovery.ts.
+   */
+  seller_recoverable: "seller_recoverable",
+  /**
+   * Brandthread's own cost of lost chargebacks: its commission and the
+   * processing fee on the disputed sale, plus any seller debt written off.
+   * Negative = cost to the platform.
+   */
+  platform_dispute_losses: "platform_dispute_losses",
+  /** Stripe's dispute fees (positive = paid to Stripe; negative = returned). */
+  stripe_dispute_fees: "stripe_dispute_fees",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 

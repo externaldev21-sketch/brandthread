@@ -452,6 +452,9 @@ export const orders = pgTable('orders', {
   // the full item price (destination charges only). A full refund reverses
   // exactly this transfer in addition to the buyer's card refund.
   stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
+  // Kept back from this order's seller transfer to pay a seller recovery
+  // (lost chargeback); decided once before the transfer (migration 306).
+  recoveryNettedCents: integer('recovery_netted_cents'),
   // ── Delivery guarantee (see api-server lib/delivery, migration 110) ───────
   // deliverBy is stamped at purchase: paid_at + 15 days (60 for a pre-order).
   // NULL on orders that predate the guarantee.

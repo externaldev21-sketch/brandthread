@@ -8,6 +8,11 @@
  * GET  /statement.csv           download CSV of transactions
  * POST /payout                  manually trigger a payout (if manual schedule)
  * GET  /summary                 held vs releasing vs available vs paid out
+ * GET  /recoveries              lost-chargeback recoveries the seller owes (and their history)
+ *
+ * While a lost-chargeback recovery is open (lib/money/sellerRecovery.ts) the
+ * seller's balance is shown net of it (it may be negative), POST /payout
+ * answers 409 PAYOUTS_PAUSED_RECOVERY, and upcoming order releases net it.
  */
 import { Router } from "express";
 import { db } from "@workspace/db";
@@ -21,6 +26,7 @@ import { requirePermission, requirePayoutsRead, teamContext } from "../middlewar
 import { stripe } from "../lib/stripe";
 import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
 import { publishNotification } from "./notifications-feed";
+import { listSellerRecoveries, payoutPauseForRecovery } from "../lib/money/sellerRecovery";
 
 const router = Router();
 router.use(requireAuth);
@@ -48,6 +54,11 @@ function formatCents(cents: number, currency = "usd"): string {
   }).format(cents / 100);
 }
 
+/** "−$42.10" for a negative balance (a lost chargeback still being recovered). */
+function formatSignedCents(cents: number): string {
+  return cents < 0 ? `−${formatCents(-cents)}` : formatCents(cents);
+}
+
 function findEligibleBankAccount(accounts: any[]): any | undefined {
   return accounts.find((externalAccount) =>
     externalAccount?.object === "bank_account"
@@ -66,6 +77,7 @@ type CashoutResult =
       code: string;
       message: string;
       availableAfterReservations?: number;
+      recoveryOwedCents?: number;
     }
   | {
       kind: "success";
@@ -92,6 +104,18 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
+    // Lost chargebacks still owed: the balance is shown net of them (it can
+    // go negative) and payouts are paused until they are recovered.
+    const recovery = await payoutPauseForRecovery(db, sellerId);
+    const recoveryFields = (availableCents: number) => ({
+      recoveryOwedCents: recovery.owedCents,
+      payoutsPaused: recovery.paused,
+      balanceAfterRecovery: {
+        amount: availableCents - recovery.owedCents,
+        currency: PAYOUT_CURRENCY,
+        formatted: formatSignedCents(availableCents - recovery.owedCents),
+      },
+    });
 
     if (!stripe || !accountId) {
       res.json({
@@ -99,6 +123,7 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
         pending:   { amount: 0, currency: "usd", formatted: "$0.00" },
         nextPayout: null,
         connected:  false,
+        ...recoveryFields(0),
       });
       return;
     }
@@ -176,6 +201,7 @@ router.get("/balance", requirePayoutsRead(), async (req, res) => {
         currency: processingCashout.currency,
         formatted: formatCents(processingCashout.amountCents, processingCashout.currency),
       } : null,
+      ...recoveryFields(availableAfterReservations),
     });
   } catch (err: any) {
     req.log.error({ err }, "Failed to load balance");
@@ -266,7 +292,7 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
         sellerEffectCents: sql<string>`COALESCE((
           SELECT SUM(p.amount_cents) FROM ledger_postings p
           WHERE p.transaction_id = ledger_transactions.id AND p.party_id = ${sellerId}
-            AND p.account IN ('seller_held', 'seller_paid_out', 'platform_funds_advanced')
+            AND p.account IN ('seller_held', 'seller_paid_out', 'platform_funds_advanced', 'seller_recoverable')
         ), 0)`,
       }).from(ledgerTransactions)
         .where(eq(ledgerTransactions.sellerId, sellerId))
@@ -305,10 +331,19 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
     }
 
     const money = (cents: number) => ({ amount: cents, formatted: formatCents(cents) });
+    const recovery = await payoutPauseForRecovery(db, sellerId);
+    const availableForBalance = stripeBalance?.available ?? 0;
     res.json({
       currency: PAYOUT_CURRENCY,
       connected: Boolean(accountId),
       stripeError,
+      // Lost chargebacks still owed (lib/money/sellerRecovery.ts). Additive.
+      recoveryOwedCents: recovery.owedCents,
+      payoutsPaused: recovery.paused,
+      balanceAfterRecovery: {
+        amount: availableForBalance - recovery.owedCents,
+        formatted: formatSignedCents(availableForBalance - recovery.owedCents),
+      },
       held: {
         ...money(heldTotal),
         drops: dropRows.map((row) => {
@@ -354,6 +389,24 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to load finance summary");
     res.status(500).json({ error: "Failed to load finance summary" });
+  }
+});
+
+// ─── GET /api/finance/recoveries ──────────────────────────────────────────────
+// Lost chargebacks the seller owes, newest open first, each with what was
+// recovered so far and how (transfer reversal, netted from an order payout…).
+
+router.get("/recoveries", requirePayoutsRead(), async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const [recoveries, pause] = await Promise.all([
+      listSellerRecoveries(sellerId),
+      payoutPauseForRecovery(db, sellerId),
+    ]);
+    res.json({ recoveries, recoveryOwedCents: pause.owedCents, payoutsPaused: pause.paused });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load recoveries");
+    res.status(500).json({ error: "Failed to load recoveries" });
   }
 });
 
@@ -557,6 +610,18 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
         }
         return { kind: "continue" as const };
       } else {
+        // A lost chargeback the seller still owes pauses every payout until
+        // upcoming order releases have covered it.
+        const recovery = await payoutPauseForRecovery(tx, sellerId);
+        if (recovery.paused) {
+          return {
+            kind: "error" as const,
+            httpStatus: 409,
+            code: "PAYOUTS_PAUSED_RECOVERY",
+            message: `Payouts are paused while ${formatCents(recovery.owedCents)} from a lost chargeback is recovered from your upcoming order payouts.`,
+            recoveryOwedCents: recovery.owedCents,
+          };
+        }
         if (!currentAccountId) {
           return {
             kind: "error" as const,
@@ -811,6 +876,7 @@ router.post("/payout", requirePermission("payouts"), async (req, res) => {
         ...("availableAfterReservations" in result
           ? { availableAfterReservations: result.availableAfterReservations }
           : {}),
+        ...(result.recoveryOwedCents !== undefined ? { recoveryOwedCents: result.recoveryOwedCents } : {}),
       });
       return;
     }

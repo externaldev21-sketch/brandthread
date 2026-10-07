@@ -320,7 +320,7 @@ export function activityDetail(row: ActivityRow): string | null {
 // ─── Classification ───────────────────────────────────────────────────────────
 
 /** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
-const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns']);
+const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns', 'disputes', 'money']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
 
 /**
@@ -485,7 +485,10 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'orders':
     case 'order': return 'package';
     case 'payout':
+    case 'payouts':
+    case 'money':
     case 'payment': return 'dollar-sign';
+    case 'disputes': return 'alert-circle';
     case 'production': return 'tool';
     case 'returns': return 'rotate-ccw';
     case 'subscription': return 'credit-card';
@@ -585,6 +588,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
     case 'return':
       // Same screen the return-status push opens (lib/notificationNavigation.ts).
       return id ? `/return-detail?returnId=${q(id)}` : null;
+    case 'dispute':
+      // Chargeback opened/closed (seller) — same screen the push opens.
+      return id ? `/dispute-detail?disputeId=${q(id)}` : null;
     case 'buyer_order':
       return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
     case 'sample_order':
@@ -631,6 +637,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return '/(tabs)/products?filter=low-stock';
     case 'payout':
       return '/payouts';
+    case 'recovery':
+      // Lost-chargeback recovery opened / cleared (seller).
+      return '/recoveries';
     case 'subscription_invoice':
       return '/subscription';
     default:

@@ -16,7 +16,8 @@ import type Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";
 import { db, threadCashEntries, users } from "@workspace/db";
 import { postLedgerTransaction } from "../money/ledger";
-import { ThreadCashError, assertThreadCashNotFrozen, getBalanceCents } from "./wallet";
+import { ThreadCashError, assertThreadCashNotFrozen, balanceLockKey, getBalanceCents, getCashableBalanceCents } from "./wallet";
+import { payoutPauseForRecovery } from "../money/sellerRecovery";
 
 type StripeLike = {
   transfers: {
@@ -67,16 +68,22 @@ export async function cashOutThreadCash(
   }
 
   return db.transaction(async (tx) => {
-    // Serializes concurrent cash-out attempts for this seller so two
-    // in-flight requests can never both pass the balance check below and
-    // jointly overdraw the balance (mirrors sendThreadCash's own lock).
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-cash-out:${sellerId}`}))`);
+    // The same per-user balance lock sends, live gifts and checkout
+    // redemptions take — a cash-out racing any of them could otherwise
+    // pass its balance check while the other also spends the same cents,
+    // leaving a negative balance after a real transfer was already paid.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${balanceLockKey(sellerId)}))`);
 
     const [existing] = await tx.select()
       .from(threadCashEntries)
       .where(eq(threadCashEntries.idempotencyKey, idempotencyKey))
       .limit(1);
     if (existing) {
+      // Keys are unique across every user's entries: only this seller's own
+      // earlier cash-out may be replayed, never someone else's transfer.
+      if (existing.buyerId !== sellerId || existing.source !== "cash_out") {
+        throw new ThreadCashError("This request key was already used. Try again.", 409, "THREAD_CASH_IDEMPOTENCY_KEY_REUSED");
+      }
       const debitedCents = -existing.amountCents;
       const { payoutCents, feeCents } = computeCashOutPayoutCents(debitedCents);
       return { threadCashCents: debitedCents, payoutCents, feeCents, transferId: existing.referenceId ?? "" };
@@ -90,6 +97,28 @@ export async function cashOutThreadCash(
         `Insufficient Thread Cash. You have $${(balance / 100).toFixed(2)}.`,
         400,
         "INSUFFICIENT_THREAD_CASH",
+      );
+    }
+    // Only paid Thread Cash received from other people is real money owed
+    // to the seller; promo credit (rewards, and promo a buyer gifted) is
+    // spendable in Brandthread but never withdrawable (./funding.ts).
+    const cashable = await getCashableBalanceCents(tx, sellerId);
+    if (threadCashCents > cashable) {
+      throw new ThreadCashError(
+        cashable > 0
+          ? `You can withdraw up to $${(cashable / 100).toFixed(2)}. Promo credit isn't withdrawable — it can be spent in Brandthread.`
+          : "Promo credit isn't withdrawable — it can be spent in Brandthread. Only Thread Cash buyers paid for can be cashed out.",
+        400,
+        "THREAD_CASH_NOT_CASHABLE",
+      );
+    }
+    // A lost chargeback still being recovered pauses every payout, this one too.
+    const recovery = await payoutPauseForRecovery(tx, sellerId);
+    if (recovery.paused) {
+      throw new ThreadCashError(
+        `Payouts are paused while $${(recovery.owedCents / 100).toFixed(2)} from a lost chargeback is recovered from your upcoming order payouts.`,
+        409,
+        "PAYOUTS_PAUSED_RECOVERY",
       );
     }
 
@@ -120,6 +149,8 @@ export async function cashOutThreadCash(
       buyerId: sellerId,
       amountCents: -threadCashCents,
       source: "cash_out",
+      // Cash-outs only ever spend paid Thread Cash (cashable ≤ paid balance).
+      funding: "paid",
       referenceId: transfer.id,
       idempotencyKey,
       note: feeCents > 0

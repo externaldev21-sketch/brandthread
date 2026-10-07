@@ -28,6 +28,9 @@ import { logger } from "../logger";
 import { orderHeldCents, postLedgerTransaction } from "./ledger";
 import { orderFundsMachine } from "./stateMachines";
 import { payoutMayRelease, payoutReleasableSql } from "../delivery/payoutGate";
+import { applyThreadCashSellerTopup } from "../threadCash/checkoutTopup";
+import { notifySellerPayoutTransferred } from "../sellerMoneyNotifications";
+import { announceRecovered, netRecoveriesFromRelease } from "./sellerRecovery";
 import { isDefinitiveStripeRejection, stripeErrorCode } from "./stripeMoney";
 import {
   expiredReservationCheckouts, releaseStockReservation,
@@ -72,8 +75,30 @@ export async function settleTransferOrder(
     return "not_ready";
   }
 
+  // A seller with an open lost-chargeback recovery has it netted from this
+  // transfer first (oldest recovery first; ledger seller_held → seller_
+  // recoverable, so the held balance below shrinks by exactly that much).
+  // Decided once, before the first attempt, so a retried transfer sends the
+  // same amount under the same idempotency key.
+  const net = await db.transaction(async (tx) => {
+    const [locked] = ((await tx.execute(sql`
+      SELECT funds_state, stripe_transfer_id, recovery_netted_cents FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
+    `)) as unknown as { rows: Array<{ funds_state: string | null; stripe_transfer_id: string | null; recovery_netted_cents: number | null }> }).rows;
+    if (!locked || locked.funds_state !== "held" || locked.stripe_transfer_id) return null;
+    if (locked.recovery_netted_cents !== null) return { recovered: [] };
+    const available = Math.max(0, await orderHeldCents(tx, orderId, order.ownerId));
+    const result = await netRecoveriesFromRelease(tx, {
+      sellerId: order.ownerId, orderId, availableCents: available, ledgerKey: `order-transfer/${orderId}`,
+    });
+    await tx.update(orders).set({ recoveryNettedCents: result.nettedCents }).where(eq(orders.id, orderId));
+    return { recovered: result.recovered };
+  });
+  if (!net) return "already";
+  await announceRecovered(order.ownerId, net.recovered);
+
   // What this order still holds for the seller: its net, minus anything a
-  // partial refund already took from it before the transfer went out.
+  // partial refund already took from it before the transfer went out (and
+  // anything netted for a recovery just above).
   const amount = Math.max(0, await orderHeldCents(db, orderId, order.ownerId));
   let transfer: Stripe.Transfer | null = null;
   if (amount > 0) {
@@ -126,6 +151,18 @@ export async function settleTransferOrder(
       });
     }
   });
+  if (settled && amount > 0) {
+    const [paid] = await db.select({ orderNumber: orders.orderNumber }).from(orders).where(eq(orders.id, orderId)).limit(1);
+    await notifySellerPayoutTransferred({
+      sellerId: order.ownerId, orderId, orderNumber: paid?.orderNumber ?? "", amountCents: amount,
+    });
+  }
+  if (settled) {
+    // Thread Cash the buyer spent is platform-funded: pay the seller that
+    // part now, with the rest of the order (idempotent; no-op without it).
+    await applyThreadCashSellerTopup(stripeClient, orderId).catch((err) =>
+      logger.error({ err, orderId }, "Thread Cash top-up after order transfer failed"));
+  }
   return settled ? "transferred" : "already";
 }
 
