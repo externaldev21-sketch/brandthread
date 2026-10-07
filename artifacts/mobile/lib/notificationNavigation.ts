@@ -155,7 +155,8 @@ export function createNotificationResponseHandler(
     // of a generic feed.
     if (
       (data?.targetType === 'post' || data?.targetType === 'story' || data?.targetType === 'user'
-        || data?.targetType === 'thread_cash_transfer' || data?.targetType === 'referral' || data?.targetType === 'live_stream')
+        || data?.targetType === 'thread_cash_transfer' || data?.targetType === 'referral' || data?.targetType === 'live_stream'
+        || data?.targetType === 'live_cohost')
       && typeof data.targetId === 'string' && data.targetId
     ) {
       const href = activityHref({

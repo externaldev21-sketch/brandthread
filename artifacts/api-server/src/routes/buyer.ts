@@ -54,6 +54,7 @@ import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricing";
 import { priceGroupBundles } from "../lib/money/bundleLoader";
 
+import { liveStreamIdFromItems, resolveLiveAttribution } from "../lib/liveAttribution";
 const router = Router();
 router.use(requireAuth);
 
@@ -98,7 +99,8 @@ const checkoutBodySchema = z.object({
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
   threadCashToken: z.string().trim().min(1).max(512).optional(),
   discountCode: z.string().trim().min(1).max(64).optional(),
-  liveStreamId: requestPrimitives.uuid.nullable().optional(),
+  /** Live stream this purchase was made from (lib/liveAttribution.ts validates it; a bad id is ignored). */
+  liveStreamId: z.string().trim().max(64).nullable().optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -1127,6 +1129,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
       platformFeeBps,
     });
+    // Bought from a live (the stream id, or a cart line's live source):
+    // kept only if the stream is this seller's (or they co-hosted it) and
+    // is live or just ended — otherwise silently dropped.
+    const sourceLiveStreamId = await resolveLiveAttribution(
+      liveStreamId ?? liveStreamIdFromItems(items), sellerId,
+    );
     const insertValues = {
       buyerId,
       sellerId,
@@ -1154,6 +1162,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
+      ...(sourceLiveStreamId ? { sourceLiveStreamId } : {}),
     };
     let checkoutRecord: { id: string } | undefined;
     try {

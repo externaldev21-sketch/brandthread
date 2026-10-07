@@ -41,7 +41,7 @@ describe('Thread shop drawer purchase actions', () => {
       sheetSource.indexOf('// View full detail'),
     );
 
-    expect(buyNowHandler).toContain('createBuyNowSession(product, variant, qty, cart)');
+    expect(buyNowHandler).toContain('createBuyNowSession(product, variant, qty, cart, attribution)');
     // Uses the thread-pull `push` (not plain router.push) so the checkout
     // push follows the same motion contract as the sheet's other thread-pull
     // navigations, and fires immediately (navigateAndDismiss) instead of

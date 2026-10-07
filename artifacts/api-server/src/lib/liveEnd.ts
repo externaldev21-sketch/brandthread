@@ -7,7 +7,8 @@
  * callers can't double-finalize), tells everyone in the room right away
  * (`{ type: "ended" }` — viewers no longer have to infer it from Agora's
  * onUserOffline, which also fires on a host network blip), clears presence
- * rows, and stops the cloud recording / creates the replay when it's ready.
+ * rows, takes any co-hosts off stage, and stops the cloud recording /
+ * creates the replay when it's ready.
  */
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
@@ -44,6 +45,16 @@ export async function endLiveStream(streamId: string, reason: LiveEndReason): Pr
   } catch (err) {
     logger.error({ err, streamId }, "stopCloudRecordingAndMaybeFinalize threw unexpectedly");
   }
+
+  // Co-hosts go off stage with the stream: open invites are cancelled and
+  // accepted co-hosts are marked left (routes/live-cohost.ts state machine).
+  await db.execute(sql`
+    UPDATE live_cohosts
+    SET status = CASE WHEN status = 'invited' THEN 'cancelled' ELSE 'left' END,
+        ended_at = now()
+    WHERE stream_id = ${streamId}::uuid AND status IN ('invited', 'accepted')
+  `).catch((err) => logger.warn({ err, streamId }, "Ending co-hosts on live end failed"));
+  broadcastToRoom(streamId, { type: "cohosts", cohosts: [] });
 
   broadcastToRoom(streamId, { type: "ended", reason, replayStatus, replayPostId });
   await db.execute(sql`DELETE FROM live_viewers WHERE stream_id = ${streamId}::uuid`).catch((err) =>

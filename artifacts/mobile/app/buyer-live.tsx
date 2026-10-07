@@ -39,6 +39,9 @@ import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { radius } from '@/constants/radii';
+import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
+import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
+import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -49,7 +52,10 @@ interface Comment { id: string; user_id?: string; display_name: string; message:
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
 
 export default function BuyerLiveScreen() {
-  if (Platform.OS === 'web') {
+  // `&demo=1` renders the viewer screen in a browser (video placeholders)
+  // for the screenshot harness; a real web visit still gets the notice.
+  const { demo } = useLocalSearchParams<{ demo?: string }>();
+  if (Platform.OS === 'web' && demo !== '1') {
     return (
       <NativeOnlyFeature
         icon="video-off"
@@ -103,7 +109,13 @@ function BuyerLiveNativeScreen() {
   const lastHighlightedRef = useRef<string | null>(null);
   // Moderation + co-host: pinned comment above chat, co-host tiles, removal.
   const mod = useLiveModeration(params.streamId);
+  // Co-hosts on stage (routes/live-cohost.ts): the screen splits host / co-hosts.
+  const [cohosts, setCohosts]             = useState<LiveCohostPerson[]>([]);
+  // With co-hosts there are several publishers on the channel: only the
+  // host's uid is the main video, and only the host going offline matters.
   const hostUidRef = useRef<number | null>(null);
+  // Social proof: "<first name> bought <product>" from this live.
+  const purchaseToasts = useLivePurchaseToasts();
 
   const engineRef       = useRef<any>(null);
   const scrollRef       = useRef<ScrollView>(null);
@@ -156,6 +168,10 @@ function BuyerLiveNativeScreen() {
     } else if (event.type === 'ended') {
       setReplayStatus(event.replayStatus ?? null);
       setEnded(true);
+    } else if (event.type === 'cohosts') {
+      setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
+    } else if (event.type === 'purchase') {
+      purchaseToasts.push(event.purchase);
     } else if (event.type === 'gift') {
       // A viewer's Thread Cash gift, announced by the server (not typed by
       // anyone), shown in the chat for the host and every viewer.
@@ -188,7 +204,11 @@ function BuyerLiveNativeScreen() {
     streamId: params.streamId,
     enabled: !loading && !ended && !!params.streamId,
     onEvent: handleLiveEvent,
-    onConnected: () => { void poll(); mod.refresh(); },
+    onConnected: () => {
+      void poll();
+      mod.refresh();
+      (api as any).liveCohost.list(params.streamId).then((r: any) => setCohosts(r?.cohosts ?? [])).catch(() => {});
+    },
     onFallback: startFallbackPolling,
   });
 
@@ -226,6 +246,9 @@ function BuyerLiveNativeScreen() {
               const uid: number = typeof a === 'number' ? a : (b as number);
               if (hostUidRef.current == null || uid === hostUidRef.current) { setBroadcastUid(uid); setAgoraReady(true); }
             },
+            // The host's video dropping is not the same as the live ending
+            // (a network blip looks identical); confirm with the server.
+            // A co-host dropping never ends anything.
             onUserOffline: (a: any, b?: number) => {
               const uid: number = typeof a === 'number' ? a : (b as number);
               if (hostUidRef.current != null && uid !== hostUidRef.current) return;
@@ -432,6 +455,8 @@ function BuyerLiveNativeScreen() {
             phone: buyerPhone.trim(),
           },
           clientIdempotencyKey: `live_${params.streamId}_${purchaseProduct.id}_${Date.now()}`,
+          // Attributes the order to this live (validated server-side).
+          liveStreamId: params.streamId,
         },
       );
       const browser = await WebBrowser.openBrowserAsync(result.url);
@@ -493,8 +518,8 @@ function BuyerLiveNativeScreen() {
 
   return (
     <View style={s.root}>
-      {/* Video — Agora remote view or placeholder */}
-      {RemoteVideoView && broadcastUid != null ? (
+      {/* Video — Agora remote view or placeholder (inside the split stage below while co-hosts are on) */}
+      {cohosts.length > 0 ? null : RemoteVideoView && broadcastUid != null ? (
         <RemoteVideoView
           canvas={{ uid: broadcastUid, renderMode: 1 }}
           style={StyleSheet.absoluteFill}
@@ -508,8 +533,14 @@ function BuyerLiveNativeScreen() {
         </View>
       )}
 
-      {/* Co-host tiles */}
-      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={RemoteVideoView} top={headerTopInset + 96} />
+      {/* Co-hosts on stage: host on top, co-hosts below. */}
+      <LiveCohostSplit
+        hostUid={broadcastUid ?? hostUidRef.current}
+        hostName={stream?.brand_name ?? stream?.seller_name ?? 'Host'}
+        hostAvatarUrl={stream?.avatar_url ?? null}
+        cohosts={cohosts}
+        RtcSurfaceView={RemoteVideoView}
+      />
 
       {/* Dark overlay */}
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
@@ -558,6 +589,9 @@ function BuyerLiveNativeScreen() {
       <View style={[s.titleRow, { paddingTop: headerTopInset + 48 }]}>
         <Text style={s.streamTitle} numberOfLines={2}>{stream?.title}</Text>
       </View>
+
+      {/* Purchases from this live */}
+      <LivePurchaseToast purchase={purchaseToasts.current} top={headerTopInset + 96} />
 
       {/* Product tags strip */}
       {productTags.length > 0 && (

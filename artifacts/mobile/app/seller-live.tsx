@@ -27,6 +27,9 @@ import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationO
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import { radius } from '@/constants/radii';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
+import { LiveCohostSplit } from '@/components/live/LiveCohostSplit';
+import { LivePurchaseToast, useLivePurchaseToasts } from '@/components/live/LivePurchaseToast';
+import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -36,7 +39,10 @@ const AgoraModule = loadAgoraModule();
 interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 
 export default function SellerLiveScreen() {
-  if (Platform.OS === 'web') {
+  // `&demo=1` renders the broadcast screen in a browser (camera placeholder)
+  // for the screenshot harness; a real web visit still gets the notice.
+  const { demo } = useLocalSearchParams<{ demo?: string }>();
+  if (Platform.OS === 'web' && demo !== '1') {
     return (
       <NativeOnlyFeature
         icon="video-off"
@@ -101,6 +107,10 @@ function SellerLiveNativeScreen() {
   // Moderation + co-host (pinned comment, co-host tiles, comment actions sheet).
   const mod = useLiveModeration(params.streamId);
   const [actionComment, setActionComment] = useState<CommentActionTarget | null>(null);
+  // Accepted co-hosts on stage (routes/live-cohost.ts): split stage when any.
+  const [cohosts, setCohosts]             = useState<LiveCohostPerson[]>([]);
+  // "<first name> bought <product>" from purchases paid in this live.
+  const purchaseToasts = useLivePurchaseToasts();
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
@@ -198,6 +208,10 @@ function SellerLiveNativeScreen() {
       mod.handleEvent(event);
     } else if (event.type === 'ended' && event.reason !== 'host') {
       setStreamEndedBy('server');
+    } else if (event.type === 'cohosts') {
+      setCohosts(Array.isArray(event.cohosts) ? event.cohosts : []);
+    } else if (event.type === 'purchase') {
+      purchaseToasts.push(event.purchase);
     } else if (event.type === 'gift') {
       // A viewer's Thread Cash gift, announced by the server (not typed by
       // anyone), shown in the chat for the host and every viewer.
@@ -231,7 +245,11 @@ function SellerLiveNativeScreen() {
     enabled: !!params.streamId,
     asHost: true,
     onEvent: handleLiveEvent,
-    onConnected: () => { void pollComments(generationRef.current); mod.refresh(); },
+    onConnected: () => {
+      void pollComments(generationRef.current);
+      mod.refresh();
+      (api as any).liveCohost.list(params.streamId).then((r: any) => setCohosts(r?.cohosts ?? [])).catch(() => {});
+    },
     onFallback: startFallbackPolling,
   });
 
@@ -290,9 +308,15 @@ function SellerLiveNativeScreen() {
   useEffect(() => {
     if (streamEndedBy !== 'server') return;
     Alert.alert('Your live ended', 'This live was ended because the connection to it was lost. Go live again to keep streaming.', [
+      { text: 'Summary', onPress: () => openSummary() },
       { text: 'OK', onPress: () => router.dismissTo('/(tabs)/' as any) },
     ]);
   }, [streamEndedBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The live summary (app/live-summary.tsx) replaces the broadcast screen. */
+  function openSummary() {
+    router.replace({ pathname: '/live-summary', params: { streamId: params.streamId } } as any);
+  }
 
   /** Sends the rail to the server, which prices/names each product from the
    *  catalogue; the server's copy replaces the optimistic one, or the rail
@@ -364,7 +388,7 @@ function SellerLiveNativeScreen() {
             return;
           }
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.dismissTo('/(tabs)/' as any);
+          openSummary();
         },
       },
     ]);
@@ -376,8 +400,8 @@ function SellerLiveNativeScreen() {
 
   return (
     <View style={s.root}>
-      {/* Camera preview (Agora host view) */}
-      {LocalCameraView ? (
+      {/* Camera preview (Agora host view) — inside the split stage below while co-hosts are on */}
+      {cohosts.length > 0 ? null : LocalCameraView ? (
         <LocalCameraView
           canvas={{ uid: 0, renderMode: 1 }}
           style={StyleSheet.absoluteFill}
@@ -388,6 +412,15 @@ function SellerLiveNativeScreen() {
           <Text style={s.cameraPlaceholderText}>Camera preview available on device</Text>
         </View>
       )}
+
+      {/* Co-hosts on stage: host (local camera) on top, co-hosts below. */}
+      <LiveCohostSplit
+        hostUid={0}
+        hostName={user?.firstName ?? user?.username ?? 'You'}
+        hostAvatarUrl={user?.imageUrl ?? null}
+        cohosts={cohosts}
+        RtcSurfaceView={LocalCameraView}
+      />
 
       {/* Gradient overlay */}
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
@@ -463,14 +496,20 @@ function SellerLiveNativeScreen() {
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Invite a co-host"
+          testID="seller-live-cohost"
           onPress={() => router.push({ pathname: '/live-cohost', params: { streamId: params.streamId } } as any)}
         >
           <Feather name="user-plus" size={20} color="#fff" />
+          {cohosts.length > 0 && (
+            <View style={[s.railBadge, { backgroundColor: LIVE_RED }]}>
+              <Text style={s.railBadgeText}>{cohosts.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* Co-host tiles */}
-      <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={headerTopInset + 86} />
+      {/* Purchases paid from this live */}
+      <LivePurchaseToast purchase={purchaseToasts.current} top={headerTopInset + 84} />
 
       {/* Tagged products strip */}
       {productTags.length > 0 && (

@@ -78,7 +78,7 @@ import {
   type CheckoutDisplayTotals,
 } from '@/lib/checkoutReadiness';
 import {
-  buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
+  buildCreatePaymentIntentBody, buildQuoteBody, liveStreamIdForItems, canQuote, choosePaymentPath, paymentErrorMessage,
   isCartQuote, quoteKey, quoteOffersBnpl, quoteTipCents, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
@@ -771,6 +771,8 @@ export default function BuyerCheckoutScreen() {
                 phone: contact.phone!,
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
+              // A line added from a live attributes this seller's order to it.
+              ...(liveStreamIdForItems(group.items) ? { liveStreamId: liveStreamIdForItems(group.items) } : {}),
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),

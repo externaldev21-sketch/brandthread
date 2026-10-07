@@ -94,6 +94,8 @@ export interface ShopSheetSelection {
    *  when this isn't available (e.g. a caller outside the feed). */
   postCreatorName?: string;
   postCreatorVerified?: boolean;
+  /** Opened from a live stream: purchases carry it for live attribution. */
+  liveStreamId?: string;
 }
 
 interface ShopProductSheetProps {
@@ -710,6 +712,7 @@ export function ShopProductSheet({
     sourcePostId: selection.postId,
     sourceTagId: activeTag?.tagId ?? activeTag?.productId,
     channel: 'thread',
+    ...(selection.liveStreamId ? { sourceLiveStreamId: selection.liveStreamId } : {}),
   };
 
   /**
@@ -856,7 +859,7 @@ export function ShopProductSheet({
     setPhase('buying');
     try {
       const cart = await getCart();
-      await createBuyNowSession(product, variant, qty, cart);
+      await createBuyNowSession(product, variant, qty, cart, attribution);
       // Use the thread-pull push, fired immediately so Checkout's own
       // skeleton is already mounted before the incoming screen's
       // slide_from_bottom cover animation starts — and tear the sheet down

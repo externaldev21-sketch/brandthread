@@ -1570,6 +1570,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="live-moderation"    options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-cohost"        options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-cohost-invite" options={{ headerShown: false, animation: 'ios_from_right', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live-summary"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
 
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />

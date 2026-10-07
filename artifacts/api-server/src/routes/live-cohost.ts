@@ -23,7 +23,8 @@ import { broadcastToRoom } from "../ws/liveHub";
 import { publishNotification } from "./notifications-feed";
 import { generateToken, uidFromClerkId } from "./live";
 import {
-  checkInviteAllowed, transitionCohost, type CohostAction, type CohostActor, type CohostStatus,
+  checkInviteAllowed, transitionCohost, COHOST_TOKEN_TTL_SECONDS,
+  type CohostAction, type CohostActor, type CohostStatus,
 } from "../lib/liveCohost";
 import { logger } from "../lib/logger";
 
@@ -67,6 +68,15 @@ async function broadcastCohosts(streamId: string) {
   catch (err) { logger.warn({ err, streamId }, "cohost broadcast failed"); }
 }
 
+async function blockedEitherWay(a: string, b: string): Promise<boolean> {
+  const r = await db.execute(sql`
+    SELECT 1 FROM blocks
+    WHERE (blocker_id = ${a} AND blocked_id = ${b}) OR (blocker_id = ${b} AND blocked_id = ${a})
+    LIMIT 1
+  `);
+  return r.rows.length > 0;
+}
+
 function cohostUid(streamId: string, userId: string): number {
   return uidFromClerkId(`${userId}_cohost_${streamId}`);
 }
@@ -79,7 +89,9 @@ function publisherCreds(stream: any, userId: string) {
     channelName: stream.channel_name,
     agoraUid: uid,
     agoraAppId: appId,
-    token: generateToken(appId, appCert, stream.channel_name, uid, 1 /* PUBLISHER */),
+    token: generateToken(appId, appCert, stream.channel_name, uid, 1 /* PUBLISHER */, COHOST_TOKEN_TTL_SECONDS),
+    // Short-lived on purpose: renew via POST /:id/cohost/token before this.
+    tokenExpiresAt: new Date(Date.now() + COHOST_TOKEN_TTL_SECONDS * 1000).toISOString(),
   };
 }
 
@@ -236,6 +248,10 @@ router.post("/:id/cohost/respond", requireAuth, wrap(async (req, res) => {
   if (!stream) return;
   const accept = req.body?.accept === true;
   if (accept && stream.status !== "live") return res.status(410).json({ error: "Stream has ended" });
+  // A block placed after the invite went out (either way) means no joining.
+  if (accept && await blockedEitherWay(me, stream.seller_id)) {
+    return res.status(403).json({ error: "You can't join this live" });
+  }
   const to = await applyTransition(req, res, stream, me, accept ? "accept" : "decline", "cohost");
   if (!to) return;
   if (accept) {
@@ -254,6 +270,7 @@ router.post("/:id/cohost/token", requireAuth, wrap(async (req, res) => {
     SELECT 1 FROM live_cohosts WHERE stream_id = ${stream.id}::uuid AND cohost_id = ${me} AND status = 'accepted' LIMIT 1
   `);
   if (!r.rows.length) return res.status(403).json({ error: "You are not a co-host of this live" });
+  if (await blockedEitherWay(me, stream.seller_id)) return res.status(403).json({ error: "You can't join this live" });
   return res.json(publisherCreds(stream, me));
 }));
 

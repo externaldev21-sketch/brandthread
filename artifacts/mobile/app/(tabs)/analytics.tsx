@@ -16,6 +16,8 @@ import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { LiveSummaryRows } from '@/components/live/LiveSummaryRows';
+import type { LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
 import { useAuth } from '@clerk/expo';
 import { GRID_MAX_WIDTH, SP, FONT, FS, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
@@ -99,6 +101,8 @@ export default function AnalyticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary]       = useState<SummaryData>({ visits: 0, revenueCents: 0 });
   const [bars, setBars]             = useState<RevenueBar[]>([]);
+  // Recent lives (GET /api/live/analytics/recent); the card shows only when there is one.
+  const [lives, setLives]           = useState<LiveAnalyticsListItem[]>([]);
 
   const loadGenerationRef = useRef(0);
   const { ref: revenueTileRef, rect: revenueTileRect, onLayout: revenueTileOnLayout } = useMeasuredTarget();
@@ -128,6 +132,13 @@ export default function AnalyticsScreen() {
           visitsChangePct: changePct(home.visitorCount, home.previous.visitorCount, hasPrevious),
           revenueChangePct: changePct(home.totalCents, home.previous.totalCents, hasPrevious),
         });
+      }
+      if (preview || !userId) {
+        setLives([]);
+      } else {
+        const recentLives = await api.live.recentAnalytics(3);
+        if (loadGenerationRef.current !== generation) return;
+        setLives(Array.isArray(recentLives?.lives) ? recentLives.lives : []);
       }
     } catch {
       // silent read failure: keep whatever state was last set
@@ -197,6 +208,16 @@ export default function AnalyticsScreen() {
 
           {/* ── Reports (appended) ─────────────────────────────────────────── */}
           <AnalyticsReportsList />
+          {/* ── Lives (only once the seller has gone live) ─────────────────── */}
+          {lives.length > 0 && (
+            <Card>
+              <LiveSummaryRows
+                lives={lives}
+                onOpen={(streamId) => router.push({ pathname: '/live-summary', params: { streamId } } as never)}
+              />
+            </Card>
+          )}
+
         </ResponsiveContainer>
       </ScrollView>
       <FirstRunTip

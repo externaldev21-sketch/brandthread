@@ -399,6 +399,8 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
 import liveCommerceRouter from "./live-commerce";
+import liveAnalyticsRouter from "./live-analytics";
+router.use("/live",                      tc, liveAnalyticsRouter);
 // Watching is open to every signed-in user; the host-only routes inside
 // (start / end / products) apply requirePlan("pro") themselves.
 // Moderation + co-host routers MUST be mounted before liveRouter: they own

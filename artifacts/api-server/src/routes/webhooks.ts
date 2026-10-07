@@ -96,6 +96,7 @@ import { applyReviewToOrders, enrichOrderRisk } from "../lib/risk/orderRiskStore
 import { dbEnrichDeps, dbReviewDeps } from "../lib/risk/orderRiskDb";
 import { amountBucket, captureServerEvent } from "../lib/analytics";
 import { sendPurchaseConversions } from "../lib/conversionTracking";
+import { announceLivePurchase, resolveLiveAttribution } from "../lib/liveAttribution";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -974,6 +975,12 @@ export async function handleCheckoutPaid(
     };
   }
 
+  // Bought from a live: re-checked against the payment time (the stream may
+  // have ended since checkout started) before it is copied onto the order.
+  const sourceLiveStreamId = csRecord.sourceLiveStreamId
+    ? await resolveLiveAttribution(csRecord.sourceLiveStreamId, ownerId, successfulPaymentAt)
+    : null;
+
   // ── All-or-nothing stock reservation inside transaction ───────────────────
   let oversoldItems: string[] = [];
   let createdOrderId: string | null = null;
@@ -1042,6 +1049,7 @@ export async function handleCheckoutPaid(
         ...(dropId ? { dropId } : {}),
         // An accepted post-purchase offer (lib/postPurchaseOffer.ts) links to the order it adds to.
         ...(csRecord.upsellOfOrderId ? { upsellOfOrderId: csRecord.upsellOfOrderId } : {}),
+        ...(sourceLiveStreamId ? { sourceLiveStreamId } : {}),
       })
       .returning();
     createdOrderId = order.id;
@@ -1358,6 +1366,8 @@ export async function handleCheckoutPaid(
       // scripts): a server-to-server Purchase event per configured provider.
       // Best effort, never blocks the order (lib/conversionTracking.ts).
       void sendPurchaseConversions(createdOrderId);
+      // Bought from a live: the host (and the room) see it right away.
+      if (sourceLiveStreamId) await announceLivePurchase(createdOrderId);
 
       // This buyer now has a real paid order with this seller — if a
       // pending message request from this buyer is sitting in the seller's
