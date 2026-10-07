@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { db, savedItems } from "@workspace/db";
 import { publishNotification } from "../routes/notifications-feed";
 import { logger } from "./logger";
+import { noteVariantPriceLowered, noteVariantStockRaised } from "./savedProductAlerts";
 
 async function likersOf(productId: string): Promise<string[]> {
   const rows = await db
@@ -80,25 +81,9 @@ export async function notifyBackInStock(input: {
   newStock: number;
 }): Promise<void> {
   if (!isRestock(input)) return;
-  const likers = await likersOf(input.productId);
-  // Stamp the Saved screen's "Back in stock" badge window for everyone who saved this.
-  await db.update(savedItems)
-    .set({ backInStockAt: new Date() })
-    .where(and(eq(savedItems.itemType, "product"), eq(savedItems.targetId, input.productId)));
-  await Promise.all(likers.map((userId) =>
-    publishNotification({
-      userId,
-      category: "stock",
-      type: "back_in_stock",
-      title: "Back in stock",
-      body: `${input.productName} is back in stock — get it before it's gone again.`,
-      targetId: input.productId,
-      targetType: "product",
-      cta: "Shop now",
-      analyticsOwnerId: input.ownerId,
-      pushChannelId: "stock",
-    }).catch((err) => logger.warn({ err, userId, productId: input.productId }, "Back-in-stock notification failed"))
-  ));
+  // Product-level semantics (0 -> any units), per-item opt-in, blocks,
+  // cooldown and the chunked after-response fan-out: ./savedProductAlerts.
+  noteVariantStockRaised(input.productId, input.newStock - input.previousStock);
 }
 
 /** Buyer-facing price drop alert for everyone who saved/wishlisted the product. */
@@ -110,20 +95,7 @@ export async function notifyPriceDrop(input: {
   newPriceCents: number;
 }): Promise<void> {
   if (input.newPriceCents >= input.previousPriceCents) return;
-  const likers = await likersOf(input.productId);
-  const formatted = (input.newPriceCents / 100).toFixed(2);
-  await Promise.all(likers.map((userId) =>
-    publishNotification({
-      userId,
-      category: "stock",
-      type: "price_drop",
-      title: "Price drop",
-      body: `${input.productName} just dropped to $${formatted}.`,
-      targetId: input.productId,
-      targetType: "product",
-      cta: "Shop now",
-      analyticsOwnerId: input.ownerId,
-      pushChannelId: "stock",
-    }).catch((err) => logger.warn({ err, userId, productId: input.productId }, "Price drop notification failed"))
-  ));
+  // Only savers opted in, below their own reference price by the minimum
+  // drop, deduped via last_notified_price_cents: ./savedProductAlerts.
+  noteVariantPriceLowered(input.productId);
 }

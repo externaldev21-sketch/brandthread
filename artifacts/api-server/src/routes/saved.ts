@@ -2,7 +2,8 @@
  * Buyer saved / wishlisted items.
  * GET    /api/buyer/saved                     — list, enriched with live price/stock badges
  * POST   /api/buyer/saved                     — save (optionally into a collection)
- * PATCH  /api/buyer/saved/:targetId           — move to a collection (or null to un-file)
+ * PATCH  /api/buyer/saved/:targetId           — move to a collection (or null to un-file) and/or
+ *                                              set per-item alerts { notifyOnPriceDrop, notifyOnBackInStock }
  * DELETE /api/buyer/saved/:targetId           — unsave
  */
 import { Router } from "express";
@@ -13,6 +14,7 @@ import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { blockRelation } from "../lib/safety";
 import { publicPostCondition as visiblePostCondition } from "../lib/postVisibility";
 import { applyEventToProfile } from "../lib/ranking/forYou";
+import { currentProductPriceCents } from "../lib/savedProductAlerts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -29,7 +31,7 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { type, targetId, title, subtitle, accentColor, collectionId, priceCents } = req.body as {
+  let { type, targetId, title, subtitle, accentColor, collectionId, priceCents } = req.body as {
     type: string;
     targetId: string;
     title: string;
@@ -54,6 +56,12 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ error: "Post not found" });
     }
     savedPost = post;
+  }
+  if ((type ?? "product") === "product" && typeof targetId === "string" && UUID_RE.test(targetId)) {
+    // The server's live lowest price is the snapshot a future price drop is
+    // measured against — never a stale client-side number.
+    const live = await currentProductPriceCents(targetId);
+    if (live != null) priceCents = live;
   }
 
   try {
@@ -93,10 +101,23 @@ router.post("/", async (req, res) => {
 
 router.patch("/:targetId", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { collectionId } = req.body as { collectionId?: string | null };
+  const body = (req.body ?? {}) as {
+    collectionId?: string | null;
+    notifyOnPriceDrop?: unknown;
+    notifyOnBackInStock?: unknown;
+  };
+  const patch: Partial<typeof savedItems.$inferInsert> = {};
+  if ("collectionId" in body) patch.collectionId = body.collectionId ?? null;
+  for (const key of ["notifyOnPriceDrop", "notifyOnBackInStock"] as const) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== "boolean") return res.status(400).json({ error: `${key} must be a boolean` });
+    patch[key] = body[key];
+  }
+  // Legacy callers sent `{}` to un-file; keep that meaning.
+  if (Object.keys(patch).length === 0) patch.collectionId = null;
 
   const [row] = await db.update(savedItems)
-    .set({ collectionId: collectionId ?? null })
+    .set(patch)
     .where(and(eq(savedItems.userId, userId), eq(savedItems.targetId, req.params.targetId)))
     .returning();
   if (!row) return res.status(404).json({ error: "Saved item not found" });
