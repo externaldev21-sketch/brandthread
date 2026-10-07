@@ -270,6 +270,9 @@ router.get("/:id", async (req, res) => {
 // how many the back-in-stock / price-drop alerts have reached.
 router.get("/:id/save-stats", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+    res.status(404).json({ error: "Not found" }); return;
+  }
   const [product] = await db.select({ id: products.id }).from(products)
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
     .limit(1);
