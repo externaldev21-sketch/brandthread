@@ -686,12 +686,12 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   amountTotalCents: integer('amount_total_cents'),
   shippingCents: integer('shipping_cents'),
   taxCents: integer('tax_cents'),
-  stripeTaxCalculationId: text('stripe_tax_calculation_id'),
-  stripePaymentIntentId: text('stripe_payment_intent_id'),
   // Live stream this seller group was bought from (migration 304), validated
   // when the checkout was created and again by the paid webhook before it is
   // copied onto the order (lib/liveAttribution.ts).
   sourceLiveStreamId: uuid('source_live_stream_id'),
+  stripeTaxCalculationId: text('stripe_tax_calculation_id'),
+  stripePaymentIntentId: text('stripe_payment_intent_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),

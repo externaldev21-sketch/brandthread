@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatConversion, formatCount, formatLiveDuration, purchaseLine,
 } from '@/lib/live/liveAnalytics';
-import { liveStreamIdForItems, paymentGroups } from '@/lib/checkoutPayment';
+import { liveStreamIdForItems, paymentGroupsWithLive } from '@/lib/checkoutPayment';
 import { liveShopSelection } from '@/lib/live/liveShop';
 import { activityHref } from '@/lib/activity';
 
@@ -31,7 +31,7 @@ describe('cart checkout carries the live source per seller group', () => {
   it('uses the first line added from a live', () => {
     expect(liveStreamIdForItems([{}, { sourceLiveStreamId: 's1' }, { sourceLiveStreamId: 's2' }])).toBe('s1');
     expect(liveStreamIdForItems([{}])).toBeUndefined();
-    const groups = paymentGroups({
+    const groups = paymentGroupsWithLive({
       discounts: [],
       deliveryGroups: [
         { sellerId: 'a', items: [{ variantId: 'v1', productId: 'p1', quantity: 1, sourceLiveStreamId: 'live-1' }] },

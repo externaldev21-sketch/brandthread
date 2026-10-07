@@ -90,17 +90,21 @@ type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
 /** One group per seller. A promo code applies to single-seller orders, as before. */
 export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
   const code = session.deliveryGroups.length === 1 ? session.discounts.find(d => d.isValid)?.code : undefined;
-  return session.deliveryGroups.map(group => {
-    const liveStreamId = liveStreamIdForItems(group.items);
-    return {
-      items: group.items.map(item => ({
-        variantId: String(item.variantId),
-        productId: String(item.productId),
-        quantity: Number(item.quantity),
-      })),
-      ...(code ? { discountCode: String(code) } : {}),
-      ...(liveStreamId ? { liveStreamId } : {}),
-    };
+  return session.deliveryGroups.map(group => ({
+    items: group.items.map(item => ({
+      variantId: String(item.variantId),
+      productId: String(item.productId),
+      quantity: Number(item.quantity),
+    })),
+    ...(code ? { discountCode: String(code) } : {}),
+  }));
+}
+
+/** paymentGroups plus the live stream each seller group's lines were added from (server validates it). */
+export function paymentGroupsWithLive(session: SessionForPayment): PaymentIntentGroup[] {
+  return paymentGroups(session).map((group, index) => {
+    const liveStreamId = liveStreamIdForItems(session.deliveryGroups[index]?.items ?? []);
+    return liveStreamId ? { ...group, liveStreamId } : group;
   });
 }
 
@@ -122,7 +126,7 @@ export function buildCreatePaymentIntentBody(input: {
 }): CreatePaymentIntentBody {
   const { address, contact } = input;
   return {
-    groups: paymentGroups(input.session),
+    groups: paymentGroupsWithLive(input.session),
     contactEmail: String(contact.email ?? '').trim(),
     contactPhone: String(contact.phone ?? '').trim(),
     shippingAddress: {
@@ -147,7 +151,7 @@ export function canQuote(address: Partial<CheckoutAddress>): boolean {
 
 export function buildQuoteBody(session: SessionForPayment, address: Partial<CheckoutAddress>): QuoteBody {
   return {
-    groups: paymentGroups(session),
+    groups: paymentGroupsWithLive(session),
     shippingAddress: {
       ...(address.line1?.trim() ? { street: address.line1.trim() } : {}),
       ...(address.city?.trim() ? { city: address.city.trim() } : {}),
