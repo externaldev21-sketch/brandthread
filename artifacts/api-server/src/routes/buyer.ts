@@ -39,11 +39,11 @@ import {
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
-import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricing";
-import { priceGroupBundles } from "../lib/money/bundleLoader";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricing";
+import { priceGroupBundles } from "../lib/money/bundleLoader";
 import { buyerCancellationEligibility } from "../lib/buyerCancellationPolicy";
 
 const router = Router();
@@ -65,12 +65,12 @@ const addressPatchSchema = addressBodySchema.partial();
 const uuidParamsSchema = z.object({ id: requestPrimitives.uuid });
 const checkoutItemSchema = z.object({
   id: requestPrimitives.id.optional(),
+  /** The bundle the buyer added this line with (priced server-side, lib/money/bundlePricing.ts). */
+  bundleId: requestPrimitives.uuid.nullable().optional(),
   variantId: requestPrimitives.uuid,
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
   price: z.number().nonnegative().optional(),
-  /** The bundle the buyer added this line with (priced server-side, lib/money/bundlePricing.ts). */
-  bundleId: requestPrimitives.uuid.nullable().optional(),
 }).passthrough();
 // Stripe's minimum charge for a USD card payment. Thread Cash is a discount,
 // never a full payment method: applying it can never bring the card charge
