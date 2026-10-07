@@ -1,9 +1,9 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
+import { SaveHeart } from '@/components/SaveHeart';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -17,6 +17,8 @@ export const GRID_CARD_ASPECT = 0.8;
 
 export type SearchProductTileItem = {
   id: string;
+  /** Real product id when it differs from the row id. */
+  productId?: string;
   name: string;
   brand: string;
   color: string;
@@ -27,7 +29,7 @@ export type SearchProductTileItem = {
 };
 
 /** Product grid card — a 4:5 image, price chip overlay, name and brand row. */
-export function ProductTile({ item, accent, onPress, width }: {
+export function ProductTile({ item, accent: _accent, onPress, width }: {
   item: SearchProductTileItem;
   accent: string;
   onPress: () => void;
@@ -38,6 +40,7 @@ export function ProductTile({ item, accent, onPress, width }: {
   const scale = React.useRef(new Animated.Value(1)).current;
 
   return (
+    <View style={{ width }}>
     <Pressable
       onPress={() => { hapticPrimaryAction(); onPress(); }}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
@@ -65,10 +68,18 @@ export function ProductTile({ item, accent, onPress, width }: {
         <View style={styles.brandRow}>
           <View style={[styles.brandDot, { backgroundColor: item.color }]} />
           <Text style={styles.brand} numberOfLines={1}>{item.brand}</Text>
-          <Feather name="bookmark" size={13} color={accent} />
         </View>
       </Animated.View>
     </Pressable>
+    {/* Sibling of the card Pressable (never nested): bottom-right of the photo. */}
+    <SaveHeart
+      productId={item.productId ?? item.id}
+      title={item.name}
+      brand={item.brand}
+      priceCents={item.priceCents}
+      style={{ position: 'absolute', right: SPACING.xs + 1, top: width / GRID_CARD_ASPECT - 30 - SPACING.xs - 1 }}
+    />
+    </View>
   );
 }
 

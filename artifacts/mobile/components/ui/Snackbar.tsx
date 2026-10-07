@@ -31,9 +31,11 @@ export interface SnackbarProps {
   actionLabel?: string;
   onAction?: () => void;
   onDismiss?: () => void;
+  /** Distance from the bottom edge. Defaults to just above the safe area; pass a larger value to clear a tab bar or sticky footer. */
+  bottomOffset?: number;
 }
 
-export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss }: SnackbarProps) {
+export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction, onDismiss, bottomOffset }: SnackbarProps) {
   const insets = useSafeAreaInsets();
   const palette = useColors();
   const opacity = useSharedValue(0);
@@ -54,7 +56,7 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.root, { bottom: Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
+      style={[styles.root, { bottom: bottomOffset ?? Math.max(insets.bottom, SPACING.md) + SPACING.xl }, style]}
     >
       <View style={[styles.pill, { backgroundColor: palette.elevated }]} accessibilityLiveRegion="polite">
         {thumbnailUri && <Image source={{ uri: thumbnailUri }} style={styles.thumb} />}

@@ -14,7 +14,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import {
   getSavedItems, removeSavedItem, subscribeSocial,
-  getCollections, createCollection,
+  getCollections, createCollection, setSavedItemAlerts,
 } from '@/services/socialService';
 import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { getBuyerProduct, addToCart, createBuyNowSession, getCart } from '@/services/cartService';
@@ -186,6 +186,21 @@ export default function BuyerSaved() {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setActionsBusy(false);
+    }
+  }
+
+  // Per-item alerts — optimistic, rolled back if the server says no.
+  async function toggleAlert(item: SavedItem, key: 'notifyOnPriceDrop' | 'notifyOnBackInStock', next: boolean) {
+    const apply = (value: boolean) => {
+      setItems(prev => prev.map(i => (i.id === item.id ? { ...i, [key]: value } : i)));
+      setActionsFor(prev => (prev && prev.id === item.id ? { ...prev, [key]: value } : prev));
+    };
+    apply(next);
+    try {
+      await setSavedItemAlerts(item.targetId, { [key]: next });
+    } catch (error) {
+      apply(!next);
+      reportNetworkError(error);
     }
   }
 
@@ -395,6 +410,24 @@ export default function BuyerSaved() {
               });
               setActionsFor(null);
             }}
+          />
+          <ListRow
+            icon="trending-down"
+            title="Price drop alerts"
+            toggle={{
+              value: actionsFor?.notifyOnPriceDrop !== false,
+              onChange: (next) => { if (actionsFor) void toggleAlert(actionsFor, 'notifyOnPriceDrop', next); },
+            }}
+            testID="saved-alert-price-drop"
+          />
+          <ListRow
+            icon="bell"
+            title="Back in stock alerts"
+            toggle={{
+              value: actionsFor?.notifyOnBackInStock !== false,
+              onChange: (next) => { if (actionsFor) void toggleAlert(actionsFor, 'notifyOnBackInStock', next); },
+            }}
+            testID="saved-alert-back-in-stock"
           />
           <ListRow icon="trash-2" title="Remove" destructive onPress={() => { const it = actionsFor; setActionsFor(null); if (it) removeSaved(it); }} />
         </View>

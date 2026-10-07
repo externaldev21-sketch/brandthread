@@ -40,6 +40,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
+import { SaveHeart } from '@/components/SaveHeart';
 import { CachedImage } from '@/components/CachedImage';
 import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -961,6 +962,18 @@ export default function BuyerProductDetailScreen() {
               style={s.mediaChromeBtn}
             />
           </View>
+          {/* Save heart — sits left of the cart button on the same chrome row
+              (tap saves, long-press files into a collection). */}
+          <SaveHeart
+            productId={product.id}
+            title={product.name}
+            brand={product.sellerName}
+            priceCents={product.priceCents > 0 ? product.priceCents : undefined}
+            size={44}
+            iconColor="#FFFFFF" // theme-exempt: same fixed chrome as the back/cart buttons over the photo
+            style={[s.mediaChromeBtn, { position: 'absolute', top: headerTopInset + SP.sm, right: SP.md + insets.right + 44 + SP.sm, borderWidth: 0 }]}
+            testID="product-save-heart"
+          />
           {/* Cart button */}
           <Animated.View
             ref={cartTargetRef}
