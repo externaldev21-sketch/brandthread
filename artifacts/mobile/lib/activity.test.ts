@@ -351,6 +351,10 @@ describe('classification and routing', () => {
     expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('orders');
     expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
       .toBe('/return-detail?returnId=r1');
+    // Chargeback rows (seller): Orders filter, open the dispute screen.
+    expect(activityKind({ category: 'disputes', type: 'dispute_opened' })).toBe('orders');
+    expect(activityHref(item({ type: 'dispute_opened', category: 'disputes', targetType: 'dispute', targetId: 'd1' })))
+      .toBe('/dispute-detail?disputeId=d1');
     expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
     expect(activityIcon({ type: 'order_auto_refunded', category: 'orders' })).toBe('rotate-ccw');
     expect(activityIcon({ type: 'order_refund_warning', category: 'orders' })).toBe('clock');
