@@ -32,6 +32,11 @@ export type FinanceSummary = {
   paidOut: MoneyAmount & { toBank: MoneyAmount | null };
   owed: MoneyAmount;
   credit: MoneyAmount;
+  /** Lost chargebacks still being recovered from upcoming payouts. Older servers omit these. */
+  recoveryOwedCents?: number;
+  payoutsPaused?: boolean;
+  /** Available minus what is owed — can be negative. */
+  balanceAfterRecovery?: MoneyAmount;
   lifetime: {
     grossSales: MoneyAmount;
     refunded: MoneyAmount;
@@ -194,6 +199,12 @@ const ACTIVITY_LABELS: Record<string, string> = {
   legacy_release: 'Earlier release',
   legacy_bulk_payment: 'Earlier bulk payment',
   legacy_label: 'Earlier shipping label',
+  chargeback_lost: 'Chargeback lost',
+  recovery_transfer_reversed: 'Chargeback recovered from the order payout',
+  recovery_release_netted: 'Kept from a payout for a chargeback',
+  recovery_written_off: 'Chargeback balance waived',
+  chargeback_reinstated: 'Chargeback reversed',
+  chargeback_reinstated_paid: 'Chargeback money paid back',
 };
 
 export function activityLabel(kind: string, description: string | null): string {

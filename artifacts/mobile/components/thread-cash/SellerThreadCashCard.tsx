@@ -21,11 +21,15 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { hapticLight } from '@/lib/haptics';
 
 export function SellerThreadCashCard({
-  balanceCents, cashableCents, loading, error, onReload, onCashOutPress,
+  balanceCents, cashableCents, promoCents, paused = false, loading, error, onReload, onCashOutPress,
 }: {
   balanceCents: number | null;
-  /** What may actually be cashed out (earned, not reward credit). Defaults to the balance. */
+  /** What may actually be cashed out (paid Thread Cash received, never promo). Defaults to the balance. */
   cashableCents?: number | null;
+  /** Promo credit: spendable in Brandthread, never withdrawable. Older servers omit it. */
+  promoCents?: number | null;
+  /** Payouts are paused while a lost chargeback is recovered. */
+  paused?: boolean;
   loading: boolean;
   error: boolean;
   onReload: () => void;
@@ -77,15 +81,31 @@ export function SellerThreadCashCard({
           <Text style={[styles.subtitle, { color: theme.muted }]}>
             {cashOutValueCents != null ? `Cash out for ${formatCents(cashOutValueCents)}` : ' '}
           </Text>
+          {promoCents != null && (
+            <View style={[styles.splitBox, { borderColor: theme.border }]} testID="seller-thread-cash-split">
+              <View style={styles.splitRow}>
+                <Text style={[styles.splitLabel, { color: theme.text }]}>Withdrawable</Text>
+                <Text style={[styles.splitValue, { color: THREAD_CASH_GREEN_MID }]} testID="seller-thread-cash-withdrawable">
+                  {formatCents(quotedCents ?? 0)}
+                </Text>
+              </View>
+              <View style={styles.splitRow}>
+                <Text style={[styles.splitLabel, { color: theme.muted }]}>Promo credit · spendable in Brandthread</Text>
+                <Text style={[styles.splitValue, { color: theme.muted }]} testID="seller-thread-cash-promo">
+                  {formatCents(promoCents)}
+                </Text>
+              </View>
+            </View>
+          )}
         </>
       )}
 
       <Pressable
         onPress={() => { hapticLight(); onCashOutPress(); }}
-        disabled={loading || error || !balanceCents}
+        disabled={loading || error || !balanceCents || !quotedCents || paused}
         style={[
           styles.cashOutBtn,
-          (loading || error || !balanceCents)
+          (loading || error || !balanceCents || !quotedCents || paused)
             ? [styles.cashOutBtnDisabled, { borderColor: theme.border }]
             : { backgroundColor: theme.accent },
         ]}
@@ -96,15 +116,15 @@ export function SellerThreadCashCard({
         <Feather
           name="arrow-down-circle"
           size={16}
-          color={(loading || error || !balanceCents) ? theme.muted : theme.onAccent}
+          color={(loading || error || !balanceCents || !quotedCents || paused) ? theme.muted : theme.onAccent}
         />
         <Text
           style={[
             styles.cashOutBtnText,
-            { color: (loading || error || !balanceCents) ? theme.muted : theme.onAccent },
+            { color: (loading || error || !balanceCents || !quotedCents || paused) ? theme.muted : theme.onAccent },
           ]}
         >
-          Cash out
+          {paused ? 'Payouts paused' : 'Cash out'}
         </Text>
       </Pressable>
     </View>
@@ -126,6 +146,10 @@ const styles = StyleSheet.create({
   historyBtnText: { fontFamily: FONT.medium, fontSize: FS.xs },
   balance: { fontFamily: FONT.bold, fontSize: FS.h1, letterSpacing: -0.5 },
   subtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  splitBox: { borderTopWidth: 1, marginTop: SP.sm, paddingTop: SP.sm, gap: 6 },
+  splitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
+  splitLabel: { fontFamily: FONT.medium, fontSize: FS.xs, flexShrink: 1 },
+  splitValue: { fontFamily: FONT.semibold, fontSize: FS.sm },
   cashOutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, borderRadius: RADIUS.pill, marginTop: SP.md,

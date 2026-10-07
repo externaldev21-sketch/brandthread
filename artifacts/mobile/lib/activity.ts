@@ -320,7 +320,7 @@ export function activityDetail(row: ActivityRow): string | null {
 // ─── Classification ───────────────────────────────────────────────────────────
 
 /** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
-const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns', 'disputes']);
+const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns', 'disputes', 'money']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
 
 /**
@@ -486,6 +486,7 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'order': return 'package';
     case 'payout':
     case 'payouts':
+    case 'money':
     case 'payment': return 'dollar-sign';
     case 'disputes': return 'alert-circle';
     case 'production': return 'tool';
@@ -636,6 +637,9 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return '/(tabs)/products?filter=low-stock';
     case 'payout':
       return '/payouts';
+    case 'recovery':
+      // Lost-chargeback recovery opened / cleared (seller).
+      return '/recoveries';
     case 'subscription_invoice':
       return '/subscription';
     default:

@@ -28,6 +28,11 @@ export type ThreadCashStatus = {
   /** The part of balanceCents a seller may cash out — Thread Cash earned
    *  from Live gifts and payments, never reward credit. Older servers omit it. */
   cashableCents?: number;
+  /** Promo credit (platform rewards, incl. promo a buyer gifted): spendable in
+   *  Brandthread, never withdrawable. Older servers omit it. */
+  promoCents?: number;
+  /** Paid-funded Thread Cash in the balance. Older servers omit it. */
+  paidCents?: number;
   /** Additive (item 109): older servers omit it. */
   openRedemptions?: ThreadCashOpenRedemption[];
   config: ThreadCashConfig;
@@ -56,8 +61,10 @@ export type ThreadCashEntry = {
     // credited by the Live-gifting flow, 'send_received' doubles as a
     // buyer-to-seller message payment, 'cash_out' is this seller debiting
     // their balance into their Stripe payout balance.
-    | 'live_gift' | 'cash_out';
+    | 'live_gift' | 'cash_out' | 'live_gift_sent' | 'purchase';
   referenceId: string | null;
+  /** 'promo' (rewards) or 'paid' (bought with real money). Older servers omit it. */
+  funding?: 'promo' | 'paid';
   note: string | null;
   createdAt: string;
 };

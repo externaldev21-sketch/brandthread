@@ -19,6 +19,7 @@ import { zeroFinanceSummary } from '@/lib/financeSummary';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { RecoveryPauseCard } from '@/components/finance/RecoveryPauseCard';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -212,6 +213,16 @@ export default function FinanceScreen() {
             <Feather name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginTop: 8 }} />
           </View>
         </TouchableOpacity>
+      )}
+
+      {/* A lost chargeback still being recovered: net (possibly negative)
+          balance + "Payouts paused" → Recoveries. Only while one is open. */}
+      {!isSignedOutSellerPreview && (summary?.payoutsPaused || balance?.payoutsPaused) && (
+        <RecoveryPauseCard
+          owedCents={summary?.recoveryOwedCents ?? balance?.recoveryOwedCents ?? 0}
+          balanceCents={summary?.balanceAfterRecovery?.amount ?? balance?.balanceAfterRecovery?.amount ?? null}
+          onPress={() => router.push('/recoveries' as any)}
+        />
       )}
 
       {/* Where the money is — from the money ledger + live Stripe balance.

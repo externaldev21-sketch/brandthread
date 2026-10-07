@@ -114,6 +114,10 @@ export function createNotificationResponseHandler(
       router.push('/payouts');
       return;
     }
+    if (data?.targetType === 'recovery') {
+      router.push('/recoveries');
+      return;
+    }
     // Social pushes (likes, comments, replies, mentions, reposts, story likes,
     // follows, Thread Cash) open the same exact destination the Activity row
     // does — the post, the comment itself, the story, the profile — instead

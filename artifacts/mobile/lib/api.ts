@@ -16,6 +16,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { RecoveriesResponse } from '@/lib/recoveries';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -2680,6 +2681,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       statementCsvUrl: () => '/api/finance/statement.csv',
       payout: (data: { idempotencyKey: string; amount: number; currency: string }) =>
         post<any>('/api/finance/payout', data),
+      /** Lost chargebacks being recovered from upcoming payouts, with their history. */
+      recoveries: () => freshGet<RecoveriesResponse>('/api/finance/recoveries'),
     },
     /** Taxes & Duties — Stripe Tax integration */
     taxes: {
