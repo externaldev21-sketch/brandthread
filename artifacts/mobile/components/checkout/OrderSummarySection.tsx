@@ -137,6 +137,9 @@ export function OrderSummarySection({
           value={taxNote ? t(taxNote) : formatCents(totals.taxCents)}
           testID="checkout-tax-line"
         />
+        {(totals.bundleSavingsCents ?? 0) > 0 ? (
+          <Line styles={styles} label="Bundle savings" value={`−${formatCents(totals.bundleSavingsCents ?? 0)}`} testID="checkout-bundle-savings-line" />
+        ) : null}
         {totals.promoCents > 0 ? (
           <Line styles={styles} label={t('Discount')} value={`−${formatCents(totals.promoCents)}`} testID="checkout-discount-line" />
         ) : null}

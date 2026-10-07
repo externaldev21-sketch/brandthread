@@ -120,6 +120,8 @@ export interface OrderLineItem {
   trackingNumber?: string | null;
   carrier?: string | null;
   refundedAt?: string | null;
+  /** Name of the bundle this line was sold in (seller order detail). */
+  bundleName?: string | null;
 }
 
 // ─── Shipping ─────────────────────────────────────────────────────────────────
@@ -234,6 +236,8 @@ export interface HeldFundsRecord {
 export interface PaymentSummary {
   subtotalCents: number;
   discountTotalCents: number;
+  /** Bundles applied at checkout; their savings are inside discountTotalCents. */
+  bundleLines?: Array<{ bundleId: string; name: string; sets: number; discountCents: number }>;
   shippingTotalCents: number;
   taxTotalCents: number;
   totalCents: number;

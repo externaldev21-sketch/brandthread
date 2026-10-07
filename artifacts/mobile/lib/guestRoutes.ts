@@ -15,6 +15,7 @@ const GUEST_BUYER_TABS = new Set(['', 'index', 'feed', 'discover', 'discover-fee
 /** Top-level screens that only read public data. */
 const GUEST_TOP_LEVEL = new Set([
   'buyer-product-detail',
+  'bundle-detail',
   'buyer-checkout', // guest checkout exists (api.guest.checkout)
   'buyer-search',
   'buyer-post-viewer',

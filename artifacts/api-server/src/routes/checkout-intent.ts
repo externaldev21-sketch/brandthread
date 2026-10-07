@@ -71,6 +71,8 @@ const itemSchema = z.object({
   variantId: requestPrimitives.uuid,
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
+  /** The bundle the buyer added this line with (priced server-side, lib/money/bundlePricing.ts). */
+  bundleId: requestPrimitives.uuid.nullable().optional(),
 });
 const addressSchema = z.object({
   recipientName: requestPrimitives.shortText,
@@ -119,6 +121,9 @@ type GroupBreakdown = {
   sellerId: string;
   checkoutSessionId: string;
   subtotalCents: number;
+  /** Bundle savings, before the promo code (discountCents). */
+  bundleDiscountCents: number;
+  bundleLines: Array<{ bundleId: string; name: string; sets: number; discountCents: number }>;
   shippingCents: number;
   discountCents: number;
   taxCents: number;
@@ -139,6 +144,8 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>, gi
       sellerId: row.sellerId,
       checkoutSessionId: row.id,
       subtotalCents: subtotal,
+      bundleDiscountCents: row.bundleDiscountCents ?? 0,
+      bundleLines: (row.bundleLines ?? []).map(({ bundleId, name, sets, discountCents }) => ({ bundleId, name, sets, discountCents })),
       shippingCents: row.shippingCents ?? 0,
       discountCents: row.discountCodeAmountCents ?? 0,
       taxCents: row.taxCents ?? 0,
@@ -176,7 +183,7 @@ async function priceCart(
     }
     sellers.add(pricedGroup.sellerId);
     const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
-    const fullTotalCents = pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents;
+    const fullTotalCents = pricedGroup.subtotalCents - pricedGroup.bundleDiscountCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents;
     // A store gift card covers part of THIS seller's group only.
     const gift = group.giftCard
       ? await applyGiftCardToGroup({
@@ -218,6 +225,8 @@ function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): Gro
     sellerId: group.sellerId,
     checkoutSessionId: rows?.[index]?.id ?? "",
     subtotalCents: group.subtotalCents,
+    bundleDiscountCents: group.bundleDiscountCents,
+    bundleLines: group.bundleLines.map(({ bundleId, name, sets, discountCents }) => ({ bundleId, name, sets, discountCents })),
     shippingCents: group.shippingCents,
     discountCents: group.discountCents,
     taxCents: group.taxCents,
@@ -361,9 +370,11 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
         const [row] = await tx.insert(checkoutSessions).values({
           buyerId,
           sellerId: group.sellerId,
-          items: group.items.map(({ variantId, productName, variantLabel, quantity, priceCents }) => ({
-            variantId, productName, variantLabel, quantity, priceCents,
+          items: group.items.map(({ variantId, productName, variantLabel, quantity, priceCents, bundleId }) => ({
+            variantId, productName, variantLabel, quantity, priceCents, ...(bundleId ? { bundleId } : {}),
           })),
+          bundleDiscountCents: group.bundleDiscountCents,
+          bundleLines: group.bundleLines,
           shippingAddress: {
             name: shipping.name, street: shipping.street, line2: shipping.line2,
             city: shipping.city, state: shipping.state, zip: shipping.zip, country: shipping.country,

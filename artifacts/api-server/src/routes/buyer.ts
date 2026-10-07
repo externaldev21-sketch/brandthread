@@ -51,6 +51,8 @@ import {
 } from "../lib/buyerCancellationPolicy";
 import { consumeBuyerAddressListFailure } from "./release-test-control";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
+import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricing";
+import { priceGroupBundles } from "../lib/money/bundleLoader";
 
 const router = Router();
 router.use(requireAuth);
@@ -71,6 +73,8 @@ const addressPatchSchema = addressBodySchema.partial();
 const uuidParamsSchema = z.object({ id: requestPrimitives.uuid });
 const checkoutItemSchema = z.object({
   id: requestPrimitives.id.optional(),
+  /** The bundle the buyer added this line with (priced server-side, lib/money/bundlePricing.ts). */
+  bundleId: requestPrimitives.uuid.nullable().optional(),
   variantId: requestPrimitives.uuid,
   productId: requestPrimitives.uuid,
   quantity: z.coerce.number().int().min(1).max(100),
@@ -392,6 +396,8 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
   const sellerIds = new Set<string>();
   let subtotalCents = 0;
   const lines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
+  // Per seller: the priced lines, for bundle savings below.
+  const bundleLinesBySeller = new Map<string, Array<{ variantId: string; productId: string; quantity: number; priceCents: number; bundleId: string | null }>>();
 
   for (const item of items) {
     const [row] = await db
@@ -445,6 +451,32 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
     }
     subtotalCents += row.priceCents * quantity;
     lines.push({ productId: item.productId, priceCents: row.priceCents, quantity });
+    const sellerLines = bundleLinesBySeller.get(row.sellerId) ?? [];
+    sellerLines.push({
+      variantId: row.variantId, productId: item.productId, quantity, priceCents: row.priceCents,
+      bundleId: typeof item.bundleId === "string" ? item.bundleId : null,
+    });
+    bundleLinesBySeller.set(row.sellerId, sellerLines);
+  }
+  // Bundle savings exactly as checkout will apply them (same helper).
+  const bundles: Array<{ sellerId: string; bundleId: string; name: string; sets: number; discountCents: number }> = [];
+  let bundleDiscountCents = 0;
+  let singleSellerLineDiscounts: number[] | null = null;
+  for (const [sellerId, sellerLines] of bundleLinesBySeller) {
+    try {
+      const pricing = await priceGroupBundles({ sellerId, lines: sellerLines });
+      bundleDiscountCents += pricing.bundleDiscountCents;
+      for (const b of pricing.applied) {
+        bundles.push({ sellerId, bundleId: b.bundleId, name: b.name, sets: b.sets, discountCents: b.discountCents });
+      }
+      if (bundleLinesBySeller.size === 1) singleSellerLineDiscounts = pricing.lineDiscountCents;
+    } catch (err) {
+      if (!(err instanceof BundlePricingError)) throw err;
+      issues.push({
+        itemId: `bundle:${String((err.details as any).bundleId ?? "")}`,
+        productName: "Bundle", type: "unavailable", message: err.message, canContinue: false,
+      });
+    }
   }
   for (const sellerId of sellerIds) {
     const vacation = await getSellerVacationStatus(sellerId);
@@ -479,7 +511,8 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       if (!code) continue;
       try {
         await validateDiscountCode({
-          sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotalCents, lines,
+          sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotalCents - bundleDiscountCents,
+          lines: singleSellerLineDiscounts ? linesAfterBundles(lines, singleSellerLineDiscounts) : lines,
           liveStreamId: typeof req.body?.liveStreamId === "string" ? req.body.liveStreamId : null,
         });
       } catch (err) {
@@ -493,7 +526,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       }
     }
   }
-  res.json({ isValid: issues.length === 0, issues });
+  res.json({ isValid: issues.length === 0, issues, bundleDiscountCents, bundles });
 });
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────
@@ -586,6 +619,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       variantLabel: string;
       quantity: number;
       priceCents: number;
+      bundleId?: string;
     }> = [];
     const sellerIds = new Set<string>();
     const discountLines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
@@ -893,6 +927,35 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       (sum, item) => sum + item.priceCents * item.quantity,
       0,
     );
+    // ── Bundles (lib/money/bundlePricing.ts): the bundle price comes off
+    // first; the promo code then applies to what is left. Folded into the
+    // one combined Stripe coupon below, so Stripe Tax taxes the discounted
+    // amount and the charged total matches the server's.
+    let bundlePricing: Awaited<ReturnType<typeof priceGroupBundles>>;
+    try {
+      bundlePricing = await priceGroupBundles({
+        sellerId,
+        lines: cartItems.map((item, index) => ({
+          variantId: item.variantId,
+          productId: items[index].productId,
+          quantity: item.quantity,
+          priceCents: item.priceCents,
+          bundleId: typeof items[index].bundleId === "string" ? items[index].bundleId : null,
+        })),
+      });
+    } catch (bundleError) {
+      if (bundleError instanceof BundlePricingError) {
+        res.status(400).json({ error: bundleError.message, code: bundleError.code, ...bundleError.details });
+        return;
+      }
+      throw bundleError;
+    }
+    cartItems.forEach((item, index) => {
+      const bundleId = bundlePricing.lineBundleId[index];
+      if (bundleId) item.bundleId = bundleId;
+    });
+    const bundleDiscountCents = bundlePricing.bundleDiscountCents;
+    const afterBundlesCents = subtotalCents - bundleDiscountCents;
     // Prefer the seller's worldwide shipping zones; fall back to the legacy
     // single flat-rate row when they have no zones configured yet. This only
     // decides the shipping line item amount below — Stripe payment-intent
@@ -916,7 +979,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         weightTiers: weightTierRows,
         destinationCountry: validatedShipping.country,
         sellerHomeCountry: sellerHome?.country ?? "US",
-        subtotalCents,
+        subtotalCents: afterBundlesCents,
         weightGrams: cartWeightGrams,
       });
       if (resolved.unavailable) {
@@ -932,7 +995,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
         .limit(1);
       shippingCents = !configuredShippingRate ||
-        (configuredShippingRate.freeAboveCents != null && subtotalCents >= configuredShippingRate.freeAboveCents)
+        (configuredShippingRate.freeAboveCents != null && afterBundlesCents >= configuredShippingRate.freeAboveCents)
         ? 0
         : configuredShippingRate.flatRateCents;
       shippingLineName = configuredShippingRate?.name ?? "Shipping";
@@ -957,8 +1020,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           sellerId,
           code: discountCode,
           customerKey: buyerId,
-          cartSubtotalCents: subtotalCents,
-          lines: discountLines,
+          cartSubtotalCents: afterBundlesCents,
+          lines: linesAfterBundles(discountLines, bundlePricing.lineDiscountCents),
           liveStreamId: typeof liveStreamId === "string" ? liveStreamId : null,
         });
       } catch (err) {
@@ -971,10 +1034,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     }
     const discountShippingCents = discountApplication?.freeShipping ? 0 : shippingCents;
     const discountCodeAmountCents = discountApplication
-      ? Math.min(discountApplication.appliedAmountCents + (shippingCents - discountShippingCents), subtotalCents + shippingCents)
+      ? Math.min(discountApplication.appliedAmountCents + (shippingCents - discountShippingCents), afterBundlesCents + shippingCents)
       : 0;
 
-    const totalBeforeLoyaltyDiscountCents = subtotalCents + shippingCents;
+    // Already net of bundle savings, so loyalty, Thread Cash and the fee
+    // basis below all start from what the buyer pays for the bundle.
+    const totalBeforeLoyaltyDiscountCents = afterBundlesCents + shippingCents;
     const normalizedLoyaltyToken =
       typeof loyaltyToken === "string" && loyaltyToken.trim()
         ? loyaltyToken.trim().toUpperCase()
@@ -1049,7 +1114,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // seller) funds it. The gap this creates for destination charges is
     // topped up by a supplemental Stripe transfer once the order is paid
     // (routes/webhooks.ts) — see docs/payments/thread-cash-checkout-todo.md.
-    const stripeChargeDiscountCents = combinedDiscountCents + (threadCashRedemption?.discountCents ?? 0);
+    const stripeChargeDiscountCents = combinedDiscountCents + (threadCashRedemption?.discountCents ?? 0) + bundleDiscountCents;
 
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
@@ -1058,7 +1123,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
+      merchandiseCents: Math.max(0, afterBundlesCents - combinedDiscountCents),
       preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
       platformFeeBps,
     });
@@ -1082,6 +1147,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       ...(threadCashRedemption ? {
         threadCashToken: threadCashRedemption.token,
         threadCashDiscountCents: threadCashRedemption.discountCents,
+      } : {}),
+      ...(bundleDiscountCents > 0 ? {
+        bundleDiscountCents,
+        bundleLines: bundlePricing.applied,
       } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
@@ -1170,6 +1239,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     let combinedCouponId: string | undefined;
     if (stripeChargeDiscountCents > 0) {
       const nameParts = [
+        ...bundlePricing.applied.map((bundle) => `Bundle: ${bundle.name}`),
         loyaltyRedemption ? "Brandthread rewards" : null,
         discountApplication ? discountApplication.discount.code : null,
         threadCashRedemption ? "Thread Cash" : null,
@@ -1179,7 +1249,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         currency: "usd",
         duration: "once",
         max_redemptions: 1,
-        name: nameParts.join(" + "),
+        name: nameParts.join(" + ").slice(0, 40), // Stripe caps coupon names at 40 characters
       });
       combinedCouponId = coupon.id;
     }

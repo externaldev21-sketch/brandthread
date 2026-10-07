@@ -403,7 +403,7 @@ export default function BuyerCheckoutScreen() {
     redemption: session?.threadCashRedemption ?? null,
     ceilingCents: session && liveTotals
       ? threadCashCeilingCents({
-          subtotalCents: liveTotals.subtotalCents,
+          subtotalCents: liveTotals.subtotalCents - (liveTotals.bundleSavingsCents ?? 0),
           shippingCents: liveTotals.shippingCents,
           promoCents: liveTotals.promoCents,
           loyaltyCents: session.loyaltyRedemption?.discountCents ?? 0,
@@ -756,7 +756,7 @@ export default function BuyerCheckoutScreen() {
         let result: any;
         if (isSignedIn) {
           result = await api.buyer.checkout.createSession(
-            group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
+            group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity, ...(item.bundleId ? { bundleId: item.bundleId } : {}) })),
             {
               contactEmail: contact.email!,
               contactPhone: contact.phone!,
@@ -794,7 +794,7 @@ export default function BuyerCheckoutScreen() {
           // Guest checkout: signed-out buyers pay without an account; the
           // Contact section's email is where the receipt and order updates go.
           result = await api.guest.checkout.createSession(
-            group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
+            group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity, ...(item.bundleId ? { bundleId: item.bundleId } : {}) })),
             {
               contactEmail: contact.email!,
               contactPhone: contact.phone!,
@@ -1051,6 +1051,7 @@ export default function BuyerCheckoutScreen() {
         shippingCents: quoted.shippingCents,
         taxCents: quoted.taxCents,
         promoCents: quoted.discountCents,
+        bundleSavingsCents: quoted.bundleDiscountCents,
         rewardsCents: 0,
         threadCashCents: 0,
         orderTotalCents: quoted.totalCents,
@@ -1216,7 +1217,7 @@ export default function BuyerCheckoutScreen() {
           {!multiSeller && <PromoCodeSection
             discounts={current.discounts}
             onApply={async (code): Promise<CheckoutDiscount> => {
-              const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
+              const discount = await applyDiscount(code, current.summary.subtotalCents - (current.summary.bundleSavingsCents ?? 0), current.discounts);
               // Only a server-validated code is kept (the server takes one code per order).
               // A new code is a new order total: start a new payment attempt so a
               // payment opened earlier (with the old total) isn't reused.

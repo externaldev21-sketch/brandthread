@@ -48,6 +48,7 @@ import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
+import { StoreBundlesRow } from '@/components/bundles/StoreBundlesRow';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
@@ -729,6 +730,7 @@ export default function SellerProfileScreen() {
         actions={actions}
         extras={canonicalSellerId ? <BrandDropsCard sellerId={canonicalSellerId} sellerName={brandName} /> : null}
         tabsVariant="iconOnly"
+        belowTabs={activeTab === 'Shop' ? <StoreBundlesRow sellerId={canonicalSellerId} /> : undefined}
         tabs={{
           items: CONTENT_TAB_ITEMS,
           active: activeTab,

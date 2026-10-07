@@ -77,7 +77,9 @@ export function withThreadCashRedemption(
   redemption: CheckoutThreadCashRedemption | undefined,
   nextIdempotencyKey: string,
 ): CheckoutSession {
-  const { subtotalCents, shippingTotalCents, taxTotalCents } = session.summary;
+  const { shippingTotalCents, taxTotalCents } = session.summary;
+  // Bundle savings stay in the summary; rewards apply to what is left.
+  const subtotalCents = session.summary.subtotalCents - Math.max(0, session.summary.bundleSavingsCents ?? 0);
   const loyaltyCents = Math.max(0, session.loyaltyRedemption?.discountCents ?? 0);
   const threadCashCents = Math.max(0, redemption?.discountCents ?? 0);
   const discountTotalCents = Math.min(loyaltyCents + threadCashCents, subtotalCents + shippingTotalCents);
