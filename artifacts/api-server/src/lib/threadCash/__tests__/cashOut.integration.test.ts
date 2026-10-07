@@ -26,9 +26,10 @@ async function makeSeller(withStripeAccount = true): Promise<string> {
   return clerkId;
 }
 
+/** A Live gift of PAID Thread Cash (only paid funds a seller receives are withdrawable). */
 async function grant(sellerId: string, amountCents: number): Promise<void> {
   await db.insert(threadCashEntries).values({
-    buyerId: sellerId, amountCents, source: "live_gift", referenceId: crypto.randomUUID(),
+    buyerId: sellerId, amountCents, source: "live_gift", referenceId: crypto.randomUUID(), funding: "paid",
   });
 }
 

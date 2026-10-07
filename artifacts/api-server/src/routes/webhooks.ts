@@ -49,6 +49,7 @@ import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
 import { applyDisputePause, applyDisputePauseByDisputeId, ordersForDisputedPayment } from "../lib/delivery/disputePause";
 import { notifySellerDisputeClosed, notifySellerDisputeOpened } from "../lib/sellerMoneyNotifications";
 import { mapDisputeStatus } from "../lib/disputes/webhook";
+import { recordLostChargeback, reinstateLostChargeback } from "../lib/money/sellerRecovery";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -471,6 +472,17 @@ router.post("/stripe", async (req: Request, res: Response) => {
           );
         } catch (err) {
           req.log.warn({ err, eventId: event.id }, "Radar review event could not update order risk");
+        }
+        break;
+
+      // Stripe returned the disputed money after a loss (the dispute was
+      // reversed): make the seller whole (lib/money/sellerRecovery.ts).
+      case "charge.dispute.funds_reinstated":
+        if (!await isManufacturerCardPayment(
+          stripeReferenceId(event.data.object.payment_intent),
+          stripeReferenceId(event.data.object.charge),
+        )) {
+          await reinstateLostChargeback(event.data.object);
         }
         break;
 
@@ -1920,6 +1932,12 @@ async function handleDisputeClosed(stripeDispute: any) {
     .where(eq(disputes.stripeDisputeId, stripeDispute.id))
     .returning();
   await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
+
+  // Lost: the seller's share that is still held is never paid out; what was
+  // already paid out (+ Stripe's fee) is pulled back or recovered from their
+  // next payouts. Idempotent per (dispute, order); Stripe failures inside
+  // never throw — the debt just stays open.
+  if (stripeDispute.status === "lost") await recordLostChargeback(stripeDispute);
 
   // Tell the seller how it ended (once: a retried event finds the outcome
   // already recorded).

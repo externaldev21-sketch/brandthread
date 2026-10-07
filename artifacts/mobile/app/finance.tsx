@@ -26,6 +26,7 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { API_BASE_URL, storeContextHeaders, versionApiPath } from '@/lib/api';
 import { fetchStatementCsv, statementErrorLabel, statementFilename, STATEMENT_CSV_PATH } from '@/lib/financeStatement';
 import { saveCsvFile } from '@/lib/saveCsvFile';
+import { RecoveryPauseCard } from '@/components/finance/RecoveryPauseCard';
 
 function fmtDate(iso: string | number) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -252,6 +253,16 @@ export default function FinanceScreen() {
             <Feather name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginTop: 8 }} />
           </View>
         </TouchableOpacity>
+      )}
+
+      {/* A lost chargeback still being recovered: net (possibly negative)
+          balance + "Payouts paused" → Recoveries. Only while one is open. */}
+      {!isSignedOutSellerPreview && (summary?.payoutsPaused || balance?.payoutsPaused) && (
+        <RecoveryPauseCard
+          owedCents={summary?.recoveryOwedCents ?? balance?.recoveryOwedCents ?? 0}
+          balanceCents={summary?.balanceAfterRecovery?.amount ?? balance?.balanceAfterRecovery?.amount ?? null}
+          onPress={() => router.push('/recoveries' as any)}
+        />
       )}
 
       {/* Where the money is — from the money ledger + live Stripe balance.

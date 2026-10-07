@@ -232,6 +232,11 @@ export function createFakeStripe() {
       retrieve: async (id: string) => ({
         id, charges_enabled: true, payouts_enabled: true, details_submitted: true,
       }),
+      /** One verified default USD bank account (manual payout tests). */
+      listExternalAccounts: async () => ({
+        data: [{ id: "ba_test_default", object: "bank_account", currency: "usd", default_for_currency: true, status: "verified", last4: "6789" }],
+        has_more: false,
+      }),
     },
     balance: {
       retrieve: async () => ({
@@ -241,6 +246,11 @@ export function createFakeStripe() {
     },
     payouts: {
       list: async () => ({ data: state.payouts, has_more: false }),
+      create: async (params: any) => {
+        const payout = { id: nextId("po"), object: "payout", status: "pending", arrival_date: Math.floor(Date.now() / 1000) + 86_400, ...params };
+        state.payouts.push(payout);
+        return payout;
+      },
     },
     webhooks: signer.webhooks,
   };

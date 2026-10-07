@@ -555,6 +555,9 @@ export const orders = pgTable('orders', {
   riskScore: integer('risk_score'),
   riskFlags: jsonb('risk_flags').$type<Array<{ code: string; label: string; severity: 'info' | 'medium' | 'high' }>>().default([]),
   riskReviewed: boolean('risk_reviewed'),
+  // Kept back from this order's seller transfer to pay a seller recovery
+  // (lost chargeback); decided once before the transfer (migration 306).
+  recoveryNettedCents: integer('recovery_netted_cents'),
   // ── Delivery guarantee (see api-server lib/delivery, migration 110) ───────
   // deliverBy is stamped at purchase: paid_at + 15 days (60 for a pre-order).
   // NULL on orders that predate the guarantee.

@@ -29,6 +29,7 @@ import type { StatementDetail, StatementFormat, StatementList } from '@/lib/stat
 import type { PayoutDetail, PayoutScheduleInfo, WeeklyAnchor } from '@/lib/payoutScheduleView';
 import type { DisputeEvidenceFile, DisputeFileType, DisputeTimeline } from '@/lib/disputeTypes';
 import type { ReorderResolution } from '@/lib/reorderSummary';
+import type { RecoveriesResponse } from '@/lib/recoveries';
 import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
@@ -3863,6 +3864,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       feeSchedule: () => get<any>('/api/public/fee-schedule'),
       payout: (data: { idempotencyKey: string; amount: number; currency: string; method?: 'standard' | 'instant' }) =>
         post<any>('/api/finance/payout', data),
+      /** Lost chargebacks being recovered from upcoming payouts, with their history. */
+      recoveries: () => freshGet<RecoveriesResponse>('/api/finance/recoveries'),
       /** Current schedule, Instant eligibility and fee quote (optionally for an amount in cents), next payout estimate. */
       payoutSchedule: (amountCents?: number) =>
         freshGet<PayoutScheduleInfo>(`/api/finance/payout-schedule${amountCents ? `?amount=${amountCents}` : ''}`),

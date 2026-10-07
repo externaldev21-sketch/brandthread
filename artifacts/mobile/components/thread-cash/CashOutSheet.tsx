@@ -25,10 +25,13 @@ import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 
 export function CashOutSheet({
-  visible, balanceCents, onClose, onCashedOut,
+  visible, balanceCents, promoCents = 0, onClose, onCashedOut,
 }: {
   visible: boolean;
+  /** Withdrawable Thread Cash (paid funds received) — the most that can be cashed out. */
   balanceCents: number;
+  /** Promo credit the seller also holds: shown, never withdrawable. */
+  promoCents?: number;
   onClose: () => void;
   /** Fires once the cash-out actually succeeds; the caller refreshes the balance and shows a toast. */
   onCashedOut: (result: { threadCashCents: number; payoutCents: number; feeCents: number }) => void;
@@ -106,9 +109,14 @@ export function CashOutSheet({
         <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
           <ThreadCashBillIcon size={16} />
           <Text style={[styles.balanceText, { color: theme.text }]} testID="cash-out-balance">
-            {formatCents(balanceCents)} available
+            {formatCents(balanceCents)} withdrawable
           </Text>
         </View>
+        {promoCents > 0 && (
+          <Text style={[styles.promoNote, { color: theme.muted }]} testID="cash-out-promo-note">
+            {formatCents(promoCents)} promo credit · spendable in Brandthread, not withdrawable
+          </Text>
+        )}
 
         <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
           <Text style={[styles.dollarSign, { color: theme.text }]}>$</Text>
@@ -132,7 +140,7 @@ export function CashOutSheet({
           </Pressable>
         </View>
         {amountCents > balanceCents && (
-          <Text style={[styles.errorText, { color: theme.error }]}>That's more than your Thread Cash balance.</Text>
+          <Text style={[styles.errorText, { color: theme.error }]}>That's more than you can withdraw.</Text>
         )}
 
         <View style={[styles.quoteRow, { borderColor: theme.border }]}>
@@ -180,12 +188,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.md,
   },
   balanceText: { fontFamily: FONT.semibold, fontSize: FS.xs },
+  promoNote: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: -SP.sm + 2, marginBottom: SP.md },
   inputRow: {
     flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md,
     paddingHorizontal: SP.md, height: 52, gap: SP.xs,
   },
   dollarSign: { fontFamily: FONT.bold, fontSize: FS.lg },
-  input: { flex: 1, fontFamily: FONT.bold, fontSize: FS.lg, height: '100%' },
+  input: { flex: 1, minWidth: 0, fontFamily: FONT.bold, fontSize: FS.lg, height: '100%' },
   allChip: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
   allChipText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   quoteRow: {

@@ -21,6 +21,7 @@ export function useSellerThreadCashBalance() {
   const api = useApi();
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
   const [cashableCents, setCashableCents] = useState<number | null>(null);
+  const [promoCents, setPromoCents] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const generation = useRef(0);
@@ -35,6 +36,7 @@ export function useSellerThreadCashBalance() {
         setBalanceCents(status.balanceCents);
         // Older servers don't report it; they also don't enforce it.
         setCashableCents(status.cashableCents ?? status.balanceCents);
+        setPromoCents(status.promoCents ?? null);
       }
     } catch {
       if (generation.current !== gen) return;
@@ -51,7 +53,7 @@ export function useSellerThreadCashBalance() {
 
   useEffect(() => { void load(); }, [load]);
 
-  return { balanceCents, cashableCents, loading, error, reload: load };
+  return { balanceCents, cashableCents, promoCents, loading, error, reload: load };
 }
 
 export function useSellerThreadCashHistory(limit = 50) {

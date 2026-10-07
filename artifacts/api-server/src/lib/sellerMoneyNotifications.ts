@@ -124,3 +124,48 @@ export async function notifySellerPayoutTransferred(input: {
     targetType: "payout",
   });
 }
+
+/**
+ * seller · chargeback_recovery_opened — a chargeback was lost after the
+ * seller was paid and part of it couldn't be pulled back right away; payouts
+ * pause until upcoming releases cover it (lib/money/sellerRecovery.ts).
+ */
+export async function notifySellerRecoveryOpened(input: {
+  sellerId: string;
+  recoveryId: string;
+  owedCents: number;
+  orderNumber: string | null;
+}): Promise<void> {
+  const label = input.orderNumber ? ` on order #${input.orderNumber}` : "";
+  await send({
+    userId: input.sellerId,
+    category: "money",
+    type: "chargeback_recovery_opened",
+    title: `Chargeback lost — ${formatOrderCents(input.owedCents)} will be recovered from upcoming payouts`,
+    body: `The bank sided with the buyer${label}. Payouts are paused until ${formatOrderCents(input.owedCents)} is recovered from your next order payouts.`,
+    targetId: input.recoveryId,
+    targetType: "recovery",
+    cta: "View",
+    pushChannelId: "payout",
+  });
+}
+
+/** seller · chargeback_recovered — every open recovery is paid; payouts resume. */
+export async function notifySellerRecoveriesCleared(input: {
+  sellerId: string;
+  recoveryId: string;
+  recoveredCents: number;
+}): Promise<void> {
+  await send({
+    userId: input.sellerId,
+    category: "money",
+    type: "chargeback_recovered",
+    title: "Chargeback recovered — payouts resumed",
+    body: input.recoveredCents > 0
+      ? `${formatOrderCents(input.recoveredCents)} was recovered from your payouts. You can cash out again.`
+      : "Nothing is owed on your chargebacks any more. You can cash out again.",
+    targetId: input.recoveryId,
+    targetType: "recovery",
+    pushChannelId: "payout",
+  });
+}

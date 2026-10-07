@@ -33,6 +33,11 @@ export const threadCashEntries = pgTable('thread_cash_entries', {
   // Required for redeem/spend-style mutations so a client retry or double
   // tap can never post twice; enforced by a unique partial index.
   idempotencyKey: text('idempotency_key'),
+  // 'promo' (platform-funded rewards: check-ins, streaks, promo refunds,
+  // admin credit) | 'paid' (money a buyer actually paid for). Only paid funds
+  // a seller receives are withdrawable (migration 306; api-server
+  // lib/threadCash/funding.ts). Debits record which funds they consumed.
+  funding:     text('funding').notNull().default('promo'),
   createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

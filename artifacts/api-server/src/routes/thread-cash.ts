@@ -52,7 +52,6 @@ import {
   awardDailyActiveTimeClaimOnce,
   recordThreadCashHeartbeat,
   getBalanceCents,
-  getCashableBalanceCents,
   getHistory,
   getThreadCashConfig,
   isFeatureEnabled,
@@ -69,8 +68,10 @@ import { activeExpiryDays } from "../lib/threadCash/rules";
 import { logger } from "../lib/logger";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
+import { getFundingBalances } from "../lib/threadCash/funding";
 import { stripe } from "../lib/stripe";
 import { liveTipsGate } from "../lib/liveTips";
+import { broadcastToRoom } from "../ws/liveHub";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -103,9 +104,8 @@ router.get("/", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   // Post anything that has lapsed first so the balance never includes it.
   await expireThreadCashForBuyer(buyerId).catch((err) => logger.warn({ err, buyerId }, "Thread Cash lazy expiry failed"));
-  const [balanceCents, cashableCents, config, { state, timezone }, openRedemptions] = await Promise.all([
-    getBalanceCents(db, buyerId),
-    getCashableBalanceCents(db, buyerId),
+  const [{ balanceCents, promoCents, paidCents, cashableCents }, config, { state, timezone }, openRedemptions] = await Promise.all([
+    getFundingBalances(db, buyerId),
     getThreadCashConfig(),
     loadStreakState(buyerId),
     listOpenThreadCashRedemptions(db, buyerId),
@@ -122,9 +122,14 @@ router.get("/", async (req, res) => {
       nextExpiresAt: expiry.expiringSoon.nextExpiresAt?.toISOString() ?? null,
       buckets: expiry.expiringSoon.buckets.map((b) => ({ expiresAt: b.expiresAt.toISOString(), amountCents: b.amountCents })),
     },
-    // How much of balanceCents a seller may cash out (earned from Live gifts
-    // and payments, never reward credit). Additive field.
+    // How much of balanceCents a seller may withdraw: paid Thread Cash
+    // received from others, never promo credit. Additive field.
     cashableCents,
+    // Promo credit (platform rewards, incl. promo a buyer gifted): spendable
+    // in Brandthread, never withdrawable. Additive field.
+    promoCents,
+    // All paid-funded Thread Cash in the balance. Additive field.
+    paidCents,
     // Redeemed at checkout but neither spent nor attached to a payment (see
     // POST /redeem/:token/cancel). Additive field (item 109).
     openRedemptions,
@@ -519,6 +524,17 @@ router.post("/live-gift", liveTipsGate(), async (req, res) => {
     }
     const gift = await sendLiveGift(buyerId, sellerId, streamId, amountCents, idempotencyKey);
     void notifyThreadCashReceived({ transferId: gift.giftId, fromUserId: buyerId, toUserId: sellerId, amountCents });
+    // Announce it in the room — server-confirmed, unlike a chat line any
+    // viewer could type — so the host and every viewer see the gift land.
+    void db.execute(sql`SELECT display_name, brand_name, username FROM users WHERE clerk_id = ${buyerId} LIMIT 1`)
+      .then((r) => {
+        const u = r.rows[0] as { display_name?: string; brand_name?: string; username?: string } | undefined;
+        broadcastToRoom(streamId, {
+          type: "gift",
+          gift: { fromUserId: buyerId, displayName: u?.display_name || u?.username || "Viewer", amountCents },
+        });
+      })
+      .catch(() => {});
     res.json({ ok: true, giftId: gift.giftId });
   } catch (error) {
     if (error instanceof ThreadCashError) {

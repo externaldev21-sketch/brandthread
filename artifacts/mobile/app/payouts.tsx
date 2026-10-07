@@ -31,6 +31,7 @@ import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashC
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
 import { formatCents } from '@/lib/money';
+import { signedBalance, pausedRowCaption } from '@/lib/recoveries';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -216,7 +217,12 @@ function PayoutsScreenContent() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
-  const availFmt   = balance?.available?.formatted ?? '$0.00';
+  // A lost chargeback still being recovered: the balance is shown net of it
+  // (it can be negative) and every cash-out is paused until it is covered.
+  const payoutsPaused = balance?.payoutsPaused === true;
+  const availFmt   = payoutsPaused && balance?.balanceAfterRecovery
+    ? signedBalance(balance.balanceAfterRecovery.amount)
+    : balance?.available?.formatted ?? '$0.00';
   const pendFmt    = balance?.pending?.formatted   ?? '$0.00';
   // Never a bare dash placeholder: say plainly when nothing is scheduled.
   const nextPayoutLabel = balance?.nextPayout?.arrivalDate
@@ -261,6 +267,8 @@ function PayoutsScreenContent() {
       <SellerThreadCashCard
         balanceCents={threadCash.balanceCents}
         cashableCents={threadCash.cashableCents}
+        promoCents={threadCash.promoCents}
+        paused={payoutsPaused}
         loading={threadCash.loading}
         error={threadCash.error}
         onReload={threadCash.reload}
@@ -269,13 +277,14 @@ function PayoutsScreenContent() {
       <CashOutSheet
         visible={cashOutVisible}
         balanceCents={threadCash.cashableCents ?? 0}
+        promoCents={threadCash.promoCents ?? 0}
         onClose={() => setCashOutVisible(false)}
         onCashedOut={handleCashedOut}
       />
 
       {/* Balance hero */}
       <View style={styles.balanceHero}>
-        <Text style={styles.balanceHeroLabel}>Available balance</Text>
+        <Text style={styles.balanceHeroLabel}>{payoutsPaused ? 'Balance' : 'Available balance'}</Text>
         {loading ? (
           <LoadingSkeleton height={44} style={{ width: 160, marginTop: 6, marginBottom: 6 }} />
         ) : loadError ? (
@@ -285,12 +294,25 @@ function PayoutsScreenContent() {
         ) : (
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
-        {!loadError && !loading && <Text style={styles.balanceHeroSub}>{nextPayoutLabel}</Text>}
+        {!loadError && !loading && <Text style={styles.balanceHeroSub}>{payoutsPaused ? 'Payouts paused' : nextPayoutLabel}</Text>}
         <View style={styles.balanceDivider} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>
           <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>
         </View>
+        {payoutsPaused && !loadError && (
+          <TouchableOpacity
+            style={styles.pausedRow}
+            onPress={() => { haptic(); router.push('/recoveries' as never); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Payouts paused. ${pausedRowCaption(balance?.recoveryOwedCents ?? 0)}`}
+            testID="payouts-paused-row"
+          >
+            <Feather name="pause-circle" size={14} color={theme.muted} />
+            <Text style={styles.pausedRowText} numberOfLines={2}>{pausedRowCaption(balance?.recoveryOwedCents ?? 0)}</Text>
+            <Feather name="chevron-right" size={14} color={theme.muted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {!isPreview && (
@@ -559,6 +581,8 @@ const createStyles = (theme: AppThemePreset) => {
   balancePendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   balancePendingLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium },
   balancePendingAmount: { color: muted, fontSize: FS.sm, fontFamily: FONT.semibold },
+  pausedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: border },
+  pausedRowText: { color: text, fontSize: FS.xs, fontFamily: FONT.medium, flexShrink: 1 },
   balanceLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 4 },
   balanceAmount:{ color: text, fontSize: FS.xl, fontFamily: FONT.semibold, marginBottom: 2 },
   balanceSub:   { color: subtle, fontSize: FS.xs, fontFamily: FONT.regular },
