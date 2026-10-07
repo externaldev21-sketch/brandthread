@@ -25,6 +25,11 @@ vi.mock("../../middlewares/requireAuth", () => ({
 }));
 
 vi.mock("../../lib/objectStorage", () => ({
+  // Product-card thumbnails instantiate this service when the shared router
+  // loads. These upload tests exercise the byte-validation/storage-client
+  // path, not product-card reads.
+  ObjectStorageService: class {},
+  ObjectNotFoundError: class extends Error {},
   objectStorageClient: {
     bucket: () => ({
       file: (filename: string) => ({
@@ -105,7 +110,7 @@ describe("POST /api/conversations/upload-media", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        data: Buffer.from("hello").toString("base64"),
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WtVZpkAAAAASUVORK5CYII=",
         mimeType: "image/png",
         // Legacy field — no longer read by the route at all.
         extension: "../../../etc/passwd",

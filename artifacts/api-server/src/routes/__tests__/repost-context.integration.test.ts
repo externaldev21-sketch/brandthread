@@ -112,7 +112,11 @@ beforeAll(async () => {
     { userId: oneWay, postId: post.id, type: "repost" },
     { userId: seller, postId: post.id, type: "repost" },
     { userId: viewer, postId: post.id, type: "repost" },
-    ...cappedFriends.map((userId) => ({ userId, postId: post.id, type: "repost" })),
+    // The named mutual friend's repost must be newer than the overflow cohort.
+    // Equal-time inserts legitimately let the latest-id tie-breaker exclude it.
+    ...cappedFriends.map((userId) => ({
+      userId, postId: post.id, type: "repost", createdAt: new Date(Date.now() - 60_000),
+    })),
   ]);
 
   const app = express();

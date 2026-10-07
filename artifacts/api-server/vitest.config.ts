@@ -70,6 +70,9 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, ...exclude],
     globalSetup: resolution.ok ? [path.join(here, "vitest.global-setup.ts")] : [],
     setupFiles: resolution.ok ? [path.join(here, "vitest.setup.ts")] : [],
+    // Cold PostgreSQL fixtures must finish before assertions run. Keep the
+    // normal per-test deadline unchanged; only setup/cleanup gets this budget.
+    hookTimeout: 120_000,
     // DB-backed test files share one Postgres database and clean up their own
     // rows (by test-data signature, see vitest.setup.ts) in afterAll. Running
     // files in parallel would let one file's cleanup race another file's

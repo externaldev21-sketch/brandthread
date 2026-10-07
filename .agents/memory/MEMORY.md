@@ -99,3 +99,4 @@
 - [Shared performance boundaries](shared-performance-boundaries.md) — cache persistence throttles storage, not dehydration; frozen scenes need imperative animation cleanup.
 - [Fresh seller preview](fresh-seller-preview.md) — owner requires a new-account zero state; native preview is always empty, and web demo requires the current URL's explicit demo=1.
 - [Web interactive containers](expo-web-interactive-containers.md) — a View with button semantics can become an HTML button; never give a container button semantics around interactive children.
+- [Test result accounting](test-result-accounting.md) — zero failed assertions does not mean a suite passed; setup errors can leave every assertion skipped.

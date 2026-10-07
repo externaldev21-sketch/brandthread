@@ -36,7 +36,8 @@ const {
   setConversationPinnedMock: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({
+vi.mock('react-native', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-native')>()),
   ActivityIndicator: nativeComponent('ActivityIndicator'),
   Alert: { alert: vi.fn() },
   FlatList: (props: { data?: unknown[]; renderItem: (info: { item: unknown; index: number }) => React.ReactNode; keyExtractor?: (item: unknown, index: number) => string }) =>
@@ -71,7 +72,7 @@ vi.mock('react-native', () => ({
     );
   },
   Animated: {
-    Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } },
+    Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } interpolate() { return this._value; } },
     View: nativeComponent('Animated.View'),
     timing: () => ({ start: (cb?: () => void) => cb?.() }),
     spring: () => ({ start: (cb?: () => void) => cb?.() }),

@@ -142,7 +142,8 @@ vi.mock('expo-image', () => ({
   Image: (props: Record<string, unknown>) => React.createElement('Image', props, props.children as React.ReactNode),
 }));
 
-vi.mock('react-native-reanimated', () => ({
+vi.mock('react-native-reanimated', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-native-reanimated')>()),
   default: {
     createAnimatedComponent: (Component: unknown) => Component,
     View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
@@ -194,6 +195,7 @@ vi.mock('expo-audio', () => ({
   setAudioModeAsync: vi.fn().mockResolvedValue(undefined),
   useAudioPlayer: () => ({ pause: vi.fn(), seekTo: vi.fn().mockResolvedValue(undefined), replace: vi.fn(), play: vi.fn() }),
   useAudioPlayerStatus: () => ({ didJustFinish: false }),
+  useAudioRecorderState: () => ({ isRecording: false, durationMillis: 0, url: null }),
   useAudioRecorder: () => ({
     prepareToRecordAsync: vi.fn().mockResolvedValue(undefined),
     record: vi.fn(),
@@ -272,6 +274,7 @@ vi.mock('@/lib/theme', async (importOriginal) => {
 });
 
 import BuyerConversationScreen from '@/app/buyer-conversation';
+import { UndoToastProvider } from '@/components/BrandthreadUI';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -334,7 +337,7 @@ function textContent(renderer: ReactTestRenderer): string {
 async function renderScreen(): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
   await act(async () => {
-    renderer = create(<BuyerConversationScreen />);
+    renderer = create(<UndoToastProvider><BuyerConversationScreen /></UndoToastProvider>);
     await flushPromises();
   });
   return renderer;

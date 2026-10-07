@@ -219,7 +219,6 @@ describe("join → inbox row → realtime → mute → leave", () => {
     expect(mine[0]).toMatchObject({ lastMessage: "anyone tried Figma variables for tees? 🔥", lastMessageSenderName: "Alice", unreadCount: 1 });
     await until(() => true);
     expect(pushes.filter((p) => p.userId === BOB)).toHaveLength(0);
-    ws.close();
 
     // Reading moves the cursor and clears unread.
     expect((await patch(BOB, `/communities/${g.id}/read`)).status).toBe(200);
@@ -228,6 +227,13 @@ describe("join → inbox row → realtime → mute → leave", () => {
 
     // Mute → no pushes for Bob, but the row still tracks unread (quietly).
     expect((await patch(BOB, `/communities/${g.id}/mute`, { muted: true })).status).toBe(200);
+    // Keep the socket live through read/mute: an earlier unmuted message may
+    // still be completing its asynchronous fan-out. Test the next message
+    // offline, after the mute has committed and the socket has disconnected.
+    await new Promise<void>((resolve) => {
+      ws.once("close", resolve);
+      ws.close();
+    });
     await db.execute(sql`UPDATE communities SET last_push_at = now() - interval '10 minutes' WHERE id = ${g.id}::uuid`);
     await post(ALICE, `/communities/${g.id}/messages`, { text: "second one while you're muted" });
     await until(() => pushes.length > 0 || true, 200);

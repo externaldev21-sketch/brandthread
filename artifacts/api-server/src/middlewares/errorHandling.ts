@@ -7,12 +7,14 @@ import { ApiError, requestIdFor, toApiErrorEnvelope } from "../lib/apiError";
  * every path (e.g. the raw Stripe webhook routes), and requests can fail
  * before auth ever runs, so this must never throw and may return undefined.
  */
-function callerIdFor(req: Request): string | undefined {
-  try {
-    const fromClerk = getAuth(req)?.userId;
-    if (fromClerk) return fromClerk;
-  } catch {
-    // Clerk middleware not mounted on this path — fall through.
+function callerIdFor(req: Request, allowAuthLookup = true): string | undefined {
+  if (allowAuthLookup) {
+    try {
+      const fromClerk = getAuth(req)?.userId;
+      if (fromClerk) return fromClerk;
+    } catch {
+      // Clerk middleware not mounted on this path — fall through.
+    }
   }
   const fromRoute = (req as unknown as { clerkUserId?: string }).clerkUserId;
   return typeof fromRoute === "string" ? fromRoute : undefined;
@@ -64,7 +66,9 @@ export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       errorCode,
       status,
       route: `${req.method} ${req.originalUrl?.split("?")[0] ?? req.path}`,
-      userId: callerIdFor(req),
+      // Parser rejection precedes session middleware. Only use an identity
+      // already established by upload admission, without invoking Clerk.
+      userId: callerIdFor(req, !parseFailure && !payloadTooLarge),
       requestId: requestIdFor(req.id),
     },
     known ? "API request failed" : "Unhandled API request failure",

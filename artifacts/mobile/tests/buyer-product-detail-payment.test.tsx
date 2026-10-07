@@ -155,6 +155,8 @@ vi.mock('react-native-svg', async (importOriginal) => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
+  useGlobalSearchParams: useLocalSearchParamsMock,
+  useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, [callback]),
   usePathname: () => '/buyer-product-detail',
   useRouter: () => routerMock,
 }));
@@ -219,6 +221,7 @@ vi.mock('@/hooks/useColors', () => ({
 }));
 
 vi.mock('@/lib/api', () => ({
+  useApi: () => apiMock,
   invalidateSellerPaymentStatusCache: invalidatePaymentCacheMock,
 }));
 

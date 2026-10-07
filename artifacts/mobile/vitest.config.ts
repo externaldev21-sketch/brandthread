@@ -20,6 +20,8 @@ export default defineConfig({
       "expo-haptics": new URL("./tests/shims/haptics.ts", import.meta.url).pathname,
       "expo-local-authentication": new URL("./tests/shims/local-authentication.ts", import.meta.url).pathname,
       "expo-print": new URL("./tests/shims/print.ts", import.meta.url).pathname,
+      "expo-clipboard": new URL("./tests/shims/clipboard.ts", import.meta.url).pathname,
+      "expo-image-picker": new URL("./tests/shims/image-picker.ts", import.meta.url).pathname,
       "expo-notifications": new URL("./tests/shims/notifications.ts", import.meta.url).pathname,
       "@clerk/expo": new URL("./tests/shims/clerk.tsx", import.meta.url).pathname,
       "@react-native-async-storage/async-storage": new URL("./tests/shims/async-storage.ts", import.meta.url).pathname,

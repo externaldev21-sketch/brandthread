@@ -234,9 +234,12 @@ describe("buyer profile — what a visitor can read", () => {
     const allowed = new Set([
       "userId", "name", "username", "displayName", "bio", "avatarUrl", "accountType", "initials", "color", "handle",
       "coverVideoUrl", "coverPosterUrl", "followersCount", "followingCount", "likesCount", "postsCount", "isFollowing",
-      "isFollowedBy", "isMutual", "iBlockedThem",
+      "isFollowedBy", "isMutual", "iBlockedThem", "isPrivate", "followRequested", "contentHidden",
     ]);
     expect(Object.keys(body).filter((k) => !allowed.has(k))).toEqual([]);
+    for (const key of ["isPrivate", "followRequested", "contentHidden"]) {
+      expect(typeof body[key]).toBe("boolean");
+    }
   });
 
   it("the users.id alias returns the same allow-listed card", async () => {

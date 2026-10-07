@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Platform } from 'react-native';
+import { Animated, PanResponder, Platform, type GestureResponderHandlers } from 'react-native';
 import {
   useAudioRecorder, useAudioRecorderState, RecordingPresets,
   requestRecordingPermissionsAsync, setAudioModeAsync,
@@ -51,7 +51,7 @@ export interface UseVoiceRecorderResult {
   dragY: Animated.Value;
   isWeb: boolean;
   /** Native: spread onto the mic button's View. */
-  panHandlers: Record<string, unknown>;
+  panHandlers: GestureResponderHandlers;
   /** Web: tap-to-toggle. Call on every mic tap. */
   startWeb: () => Promise<void>;
   /** Explicit lock (web lock-icon tap, or reached via native drag). */
@@ -192,12 +192,10 @@ export function useVoiceRecorder(
   const latestRef = useRef({ beginRecording, lock, cancel, finish });
   latestRef.current = { beginRecording, lock, cancel, finish };
   const lockedRef = useRef(false);
-  const panHandlersRef = useRef<Record<string, unknown>>({});
+  const panHandlersRef = useRef<GestureResponderHandlers>({});
   if (Platform.OS !== 'web' && Object.keys(panHandlersRef.current).length === 0) {
-    // Lazily require PanResponder only on native to avoid pulling it into the
-    // web bundle's hot path unnecessarily.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { PanResponder } = require('react-native');
+    // Use the existing platform import; a raw CommonJS require bypasses the
+    // bundler/test platform boundary. Instantiation remains native-only.
     const responder = PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {

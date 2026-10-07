@@ -33,7 +33,18 @@ vi.mock("../../lib/liveReplay", () => ({
   stopCloudRecordingAndMaybeFinalize: async () => ({ postId: null }),
 }));
 vi.mock("../../lib/liveFeed", () => ({ rankLiveFeed: (rows: unknown[]) => rows }));
-vi.mock("../../ws/liveHub", () => ({ broadcastToRoom: () => undefined }));
+vi.mock("../../ws/liveHub", () => ({
+  broadcastToRoom: () => undefined,
+  roomUserIds: () => [],
+}));
+vi.mock("../../lib/liveModerationState", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/liveModerationState")>();
+  return {
+    ...actual,
+    loadEffectiveSettings: async () => actual.EMPTY_SETTINGS,
+    loadRestriction: async () => null,
+  };
+});
 
 import liveRouter from "../live";
 
@@ -75,18 +86,20 @@ describe("live block checks", () => {
   it("refuses a chat comment when the commenter and host are blocked", async () => {
     state.blocked = true;
     state.executeResults = [
-      { rows: [{ display_name: "V", brand_name: null, profile_image_url: null }] }, // viewer profile
-      { rows: [{ seller_id: "host-1" }] }, // stream host
+      { rows: [{ seller_id: "host-1", status: "live" }] },
+      { rows: [{ blocked: 1 }] }, // reciprocal block query
     ];
     const res = await call(`/${STREAM_ID}/comment`, "POST", { message: "hello" });
     expect(res.status).toBe(403);
-    expect(res.body.code).toBe("BLOCKED");
+    expect(res.body.code).toBe("LIVE_COMMENT_BLOCKED");
   });
 
   it("posts a chat comment when not blocked", async () => {
     state.executeResults = [
+      { rows: [{ seller_id: "host-1", status: "live" }] },
+      { rows: [] }, // no block in either direction
       { rows: [{ display_name: "V", brand_name: null, profile_image_url: null }] },
-      { rows: [{ seller_id: "host-1" }] },
+      { rows: [{ seller_id: "host-1" }] }, // moderation host boundary
       { rows: [{ id: "c1", message: "hello" }] }, // insert
     ];
     const res = await call(`/${STREAM_ID}/comment`, "POST", { message: "hello" });

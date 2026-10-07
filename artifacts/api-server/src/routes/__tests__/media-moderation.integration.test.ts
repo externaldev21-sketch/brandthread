@@ -11,7 +11,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { db, follows, mediaModerationResults, posts, reports, stories, users } from "@workspace/db";
 import { setMediaModerationProvider } from "../../lib/mediaModeration";
 
@@ -117,8 +117,16 @@ describe("media screening on create", () => {
     });
     expect(res.status).toBe(422);
     expect(res.body.code).toBe("IMAGE_REJECTED");
-    const [flag] = await db.select().from(mediaModerationResults).where(eq(mediaModerationResults.ownerId, AUTHOR));
-    expect(flag.priority).toBe("high");
+    // Rejected-upload auditing is asynchronous and distinct from the earlier
+    // held post. Wait for that specific result, not the first uploader row.
+    await vi.waitFor(async () => {
+      const [flag] = await db.select().from(mediaModerationResults).where(and(
+        eq(mediaModerationResults.ownerId, AUTHOR),
+        eq(mediaModerationResults.verdict, "reject"),
+        eq(mediaModerationResults.targetType, "upload"),
+      ));
+      expect(flag).toMatchObject({ priority: "high", surface: "post", mediaRefs: [] });
+    }, { timeout: 3000 });
   });
 
   it("hides a held story from followers but not its author", async () => {

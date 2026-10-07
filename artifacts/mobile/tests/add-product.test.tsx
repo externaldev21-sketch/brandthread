@@ -134,7 +134,7 @@ vi.mock('expo-file-system', () => ({
 vi.mock('expo-router', () => ({
   usePathname: () => '/add-product',
   useFocusEffect: (callback: () => void | (() => void)) => React.useEffect(callback, [callback]),
-  useRouter: () => ({ back: routerBackMock }),
+  useRouter: () => ({ back: routerBackMock, canGoBack: () => true }),
   useLocalSearchParams: () => ({}),
   useNavigation: () => ({
     addListener: addListenerMock,
