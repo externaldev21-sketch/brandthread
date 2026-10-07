@@ -54,6 +54,7 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
   payout: "payout",
   payouts: "payout",
   finance: "payout",
+  money: "payout",
   dispute: "dispute",
   disputes: "dispute",
   stock: "stock",

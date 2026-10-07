@@ -16,6 +16,10 @@ import {
   threadCashTransfers, users,
 } from "@workspace/db";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
+import {
+  FUNDING_SHIFT_SOURCE, entrySplit, getFundingBalances, insertCreditRows, insertDebitEntry, insertRestoreEntry,
+  splitPromoFirst, type FundingSplit,
+} from "./funding";
 
 /** A transfer sits unclaimed for this long before it expires back to the sender. */
 export const THREAD_CASH_TRANSFER_EXPIRY_DAYS = 14;
@@ -64,28 +68,15 @@ export async function getBalanceCents(executor: DbExecutor, buyerId: string): Pr
 }
 
 /**
- * The part of a balance that may be cashed out to real money: Thread Cash
- * EARNED from other people (Live gifts, message payments), less what was
- * already cashed out, capped at the current balance. Platform-funded reward
- * credit (daily check-ins, streak bonuses, refund credits, admin
- * adjustments) is spendable in the app but never cashable — cumulative
- * cash-outs can therefore never exceed cumulative earnings. Any other spend
- * (checkout redemptions, sends) is assumed to use reward credit first, so a
- * seller who spends never loses earned money they could still cash out
- * beyond what the balance itself allows.
+ * The part of a balance that may be cashed out to real money: PAID-funded
+ * Thread Cash received from other people (Live gifts, message payments), less
+ * paid money already cashed out or spent, capped at the balance. Promo credit
+ * — platform rewards, including promo a buyer gifted — is spendable in the
+ * app but never cashable (lib/threadCash/funding.ts). This narrows the older
+ * "earned − cashed out" rule: only real buyer-paid money is withdrawable.
  */
 export async function getCashableBalanceCents(executor: DbExecutor, userId: string): Promise<number> {
-  const [row] = await executor
-    .select({
-      balance: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}), 0)`,
-      earned: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} IN ('live_gift', 'send_received')), 0)`,
-      cashedOut: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} = 'cash_out'), 0)`,
-    })
-    .from(threadCashEntries)
-    .where(eq(threadCashEntries.buyerId, userId));
-  const balance = Number(row?.balance ?? 0);
-  const earnedLeft = Number(row?.earned ?? 0) - Number(row?.cashedOut ?? 0);
-  return Math.max(0, Math.min(balance, earnedLeft));
+  return (await getFundingBalances(executor, userId)).cashableCents;
 }
 
 /** The one lock every balance-reducing write for a user takes, so no two of
@@ -326,7 +317,8 @@ export async function getHistory(buyerId: string, limit = 50) {
   return db
     .select()
     .from(threadCashEntries)
-    .where(eq(threadCashEntries.buyerId, buyerId))
+    // funding_shift rows only record which funds an entry used; never shown.
+    .where(and(eq(threadCashEntries.buyerId, buyerId), sql`${threadCashEntries.source} <> ${FUNDING_SHIFT_SOURCE}`))
     .orderBy(desc(threadCashEntries.createdAt))
     .limit(limit);
 }
@@ -384,14 +376,15 @@ export async function redeemThreadCash(
         throw new ThreadCashError(`Insufficient Thread Cash. You have $${(balance / 100).toFixed(2)}.`, 400, "INSUFFICIENT_THREAD_CASH");
       }
       const token = `TCASH-${buyerId.slice(-6).toUpperCase()}-${randomUUID().toUpperCase()}`;
-      await tx.insert(threadCashEntries).values({
+      // Promo credit is spent before paid Thread Cash (lib/threadCash/funding.ts).
+      const split = splitPromoFirst(amountCents, await getFundingBalances(tx, buyerId));
+      await insertDebitEntry(tx, {
         buyerId,
-        amountCents: -amountCents,
         source: "redemption",
         referenceId: token,
         idempotencyKey,
         note: `Redeemed $${(amountCents / 100).toFixed(2)} Thread Cash`,
-      });
+      }, amountCents, split);
       return { token, discountCents: amountCents };
     });
   } catch (error: any) {
@@ -555,7 +548,9 @@ export async function cancelThreadCashRedemption(
     }
 
     const [redemption] = await tx.select({
+      id: threadCashEntries.id,
       amountCents: threadCashEntries.amountCents,
+      funding: threadCashEntries.funding,
       checkoutSessionId: threadCashEntries.checkoutSessionId,
       usedAt: threadCashEntries.usedAt,
     })
@@ -590,14 +585,14 @@ export async function cancelThreadCashRedemption(
         isNull(threadCashEntries.usedAt),
         isNull(threadCashEntries.checkoutSessionId),
       ));
-    await tx.insert(threadCashEntries).values({
+    // Back to exactly the funds the redemption used (promo stays promo).
+    await insertRestoreEntry(tx, {
       buyerId,
-      amountCents: returnedCents,
       source: "redemption_cancelled",
       referenceId: normalizedToken,
       idempotencyKey: cancelKey,
       note: `Returned $${(returnedCents / 100).toFixed(2)} Thread Cash from checkout`,
-    });
+    }, await entrySplit(tx, redemption));
     return { returnedCents, balanceCents: await getBalanceCents(tx, buyerId) };
   });
 }
@@ -665,14 +660,27 @@ export async function refundThreadCashSpend(
     .limit(1);
   if (existing) return { created: false };
 
-  await transaction.insert(threadCashEntries).values({
+  // Returned as the funds the order's redemption used — paid money first, so
+  // a refund never turns a buyer's paid Thread Cash into promo credit. With
+  // no paid funds involved (every order today) it is promo, as before.
+  const [redemption] = await transaction
+    .select({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents, funding: threadCashEntries.funding })
+    .from(threadCashEntries)
+    .where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+      eq(threadCashEntries.usedOrderId, orderId),
+    ))
+    .limit(1);
+  const spent: FundingSplit = redemption ? await entrySplit(transaction, redemption) : { promoCents: amountCents, paidCents: 0 };
+  const paidCents = Math.min(amountCents, spent.paidCents);
+  await insertRestoreEntry(transaction, {
     buyerId,
-    amountCents,
     source: "refund_credit",
     referenceId,
     note: `Thread Cash returned from refunded order ${orderId}`,
     usedOrderId: orderId,
-  });
+  }, { promoCents: amountCents - paidCents, paidCents });
   return { created: true };
 }
 
@@ -715,7 +723,7 @@ async function sendableBalanceCents(executor: DbExecutor, buyerId: string): Prom
     .select({
       balance: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}), 0)`,
       received: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} = 'send_received'), 0)`,
-      spent: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.amountCents} < 0), 0)`,
+      spent: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.amountCents} < 0 AND ${threadCashEntries.source} <> 'funding_shift'), 0)`,
     })
     .from(threadCashEntries)
     .where(eq(threadCashEntries.buyerId, buyerId));
@@ -850,13 +858,13 @@ export async function sendThreadCash(
         expiresAt: new Date(Date.now() + THREAD_CASH_TRANSFER_EXPIRY_DAYS * 86_400_000),
       }).returning({ id: threadCashTransfers.id });
 
-      await tx.insert(threadCashEntries).values({
+      // Promo first; the recipient later receives the same funding mix.
+      await insertDebitEntry(tx, {
         buyerId: senderId,
-        amountCents: -amountCents,
         source: "send_sent",
         referenceId: transfer.id,
         note: note ? `Sent $${(amountCents / 100).toFixed(2)} Thread Cash: ${note}` : `Sent $${(amountCents / 100).toFixed(2)} Thread Cash`,
-      });
+      }, amountCents, splitPromoFirst(amountCents, await getFundingBalances(tx, senderId)));
       return { transferId: transfer.id };
     });
   } catch (error: any) {
@@ -957,22 +965,24 @@ export async function sendLiveGift(
         throw new ThreadCashError("This seller has reached today's Thread Cash receiving limit.", 400, "THREAD_CASH_DAILY_RECEIVE_CAP");
       }
 
-      const [debit] = await tx.insert(threadCashEntries).values({
+      // Promo first: a buyer's promo credit is gifted before any paid
+      // Thread Cash, and the seller receives exactly that mix — promo stays
+      // promo (spendable, never withdrawable); only the paid part is cashable.
+      const split = splitPromoFirst(amountCents, await getFundingBalances(tx, buyerId));
+      const debit = await insertDebitEntry(tx, {
         buyerId,
-        amountCents: -amountCents,
         source: "live_gift_sent",
         referenceId: streamId,
         idempotencyKey,
         note: `Sent $${(amountCents / 100).toFixed(2)} Thread Cash in a live`,
-      }).returning({ id: threadCashEntries.id });
+      }, amountCents, split);
 
-      await tx.insert(threadCashEntries).values({
+      await insertCreditRows(tx, {
         buyerId: sellerId,
-        amountCents,
         source: "live_gift",
         referenceId: streamId,
         note: `Received $${(amountCents / 100).toFixed(2)} Thread Cash gift in a live`,
-      });
+      }, split);
 
       return { giftId: debit.id };
     });
@@ -1021,13 +1031,12 @@ export async function claimThreadCash(transferId: string, claimerId: string): Pr
     if (!claimed) {
       throw new ThreadCashError("This Thread Cash send has already been claimed or is no longer available.", 409, "THREAD_CASH_TRANSFER_NOT_PENDING");
     }
-    await tx.insert(threadCashEntries).values({
+    await insertCreditRows(tx, {
       buyerId: claimerId,
-      amountCents: transfer.amountCents,
       source: "send_received",
       referenceId: transferId,
       note: `Received $${(transfer.amountCents / 100).toFixed(2)} Thread Cash`,
-    });
+    }, await sentSplit(tx, transfer));
     return { amountCents: transfer.amountCents };
   });
 }
@@ -1048,13 +1057,12 @@ export async function cancelThreadCash(transferId: string, senderId: string): Pr
     if (!cancelled) {
       throw new ThreadCashError("This Thread Cash send can no longer be cancelled.", 409, "THREAD_CASH_TRANSFER_NOT_PENDING");
     }
-    await tx.insert(threadCashEntries).values({
+    await insertRestoreEntry(tx, {
       buyerId: senderId,
-      amountCents: transfer.amountCents,
       source: "send_cancelled",
       referenceId: transferId,
       note: `Cancelled Thread Cash send of $${(transfer.amountCents / 100).toFixed(2)}`,
-    });
+    }, await sentSplit(tx, transfer));
   });
 }
 
@@ -1064,14 +1072,26 @@ async function expireOneTransfer(tx: DbExecutor, transfer: typeof threadCashTran
     .where(and(eq(threadCashTransfers.id, transfer.id), eq(threadCashTransfers.status, "pending")))
     .returning({ id: threadCashTransfers.id });
   if (!expired) return false;
-  await tx.insert(threadCashEntries).values({
+  await insertRestoreEntry(tx, {
     buyerId: transfer.senderId,
-    amountCents: transfer.amountCents,
     source: "send_expired",
     referenceId: transfer.id,
     note: `Thread Cash send of $${(transfer.amountCents / 100).toFixed(2)} expired and was returned`,
-  });
+  }, await sentSplit(tx, transfer));
   return true;
+}
+
+/** The funds a send debited from its sender (what the recipient or a refund gets). */
+async function sentSplit(tx: DbExecutor, transfer: typeof threadCashTransfers.$inferSelect): Promise<FundingSplit> {
+  const [debit] = await tx.select({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents, funding: threadCashEntries.funding })
+    .from(threadCashEntries)
+    .where(and(
+      eq(threadCashEntries.buyerId, transfer.senderId),
+      eq(threadCashEntries.source, "send_sent"),
+      eq(threadCashEntries.referenceId, transfer.id),
+    ))
+    .limit(1);
+  return debit ? entrySplit(tx, debit) : { promoCents: transfer.amountCents, paidCents: 0 };
 }
 
 /**

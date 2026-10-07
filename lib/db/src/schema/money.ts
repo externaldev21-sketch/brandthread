@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, bigint, bigserial, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, bigint, bigserial, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { orders } from './index';
 
 // ─── Money ledger (double-entry, append-only) ─────────────────────────────────
@@ -59,6 +59,9 @@ export const orderReleases = pgTable('order_releases', {
   labelCents:        integer('label_cents').notNull().default(0),
   bulkShareCents:    integer('bulk_share_cents').notNull().default(0),
   reversedCents:     integer('reversed_cents').notNull().default(0),
+  // Kept back from this release to pay a seller recovery (lost chargeback);
+  // decided once before the transfer (migration 306). NULL = not decided yet.
+  recoveryNettedCents: integer('recovery_netted_cents'),
   // Increments only after Stripe definitively rejects a transfer, so an
   // ambiguous failure is always retried with the same idempotency key.
   attempt:           integer('attempt').notNull().default(1),
@@ -102,4 +105,45 @@ export const orderRefunds = pgTable('order_refunds', {
   updatedAt:                timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   orderIdx: index('order_refunds_order_idx').on(t.orderId),
+}));
+
+// ─── Seller recoveries (lost chargebacks after payout) ────────────────────────
+// Migration 306. One row per (Stripe dispute, order): the seller's share of a
+// lost chargeback that had already been paid out, plus their share of Stripe's
+// dispute fee. Outstanding = amount + fee − recovered − forgiven. While any
+// row is open the seller's payouts are paused and order releases net the debt
+// first (api-server lib/money/sellerRecovery.ts).
+export const sellerRecoveries = pgTable('seller_recoveries', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  sellerId:           text('seller_id').notNull(),
+  disputeId:          uuid('dispute_id'),
+  stripeDisputeId:    text('stripe_dispute_id').notNull(),
+  orderId:            uuid('order_id'),
+  paymentIntentId:    text('payment_intent_id'),
+  amountCents:        integer('amount_cents').notNull().default(0),
+  feeCents:           integer('fee_cents').notNull().default(0),
+  heldCancelledCents: integer('held_cancelled_cents').notNull().default(0),
+  recoveredCents:     integer('recovered_cents').notNull().default(0),
+  forgivenCents:      integer('forgiven_cents').notNull().default(0),
+  // open | recovered | written_off | reinstated
+  status:             text('status').notNull().default('open'),
+  createdAt:          timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  recoveredAt:        timestamp('recovered_at', { withTimezone: true }),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  disputeOrderUnique: uniqueIndex('seller_recoveries_dispute_order_unique').on(t.stripeDisputeId, t.orderId),
+  sellerIdx:          index('seller_recoveries_seller_idx').on(t.sellerId, t.createdAt),
+}));
+
+export const sellerRecoveryApplications = pgTable('seller_recovery_applications', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  recoveryId:  uuid('recovery_id').notNull().references(() => sellerRecoveries.id, { onDelete: 'cascade' }),
+  // transfer_reversal | release_netting | payout_netting | manual | write_off | reinstated
+  source:      text('source').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  stripeRef:   text('stripe_ref'),
+  orderId:     uuid('order_id'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  recoveryIdx: index('seller_recovery_applications_recovery_idx').on(t.recoveryId, t.createdAt),
 }));

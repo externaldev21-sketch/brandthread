@@ -47,7 +47,6 @@ import {
   awardDailyActiveTimeClaimOnce,
   recordThreadCashHeartbeat,
   getBalanceCents,
-  getCashableBalanceCents,
   getHistory,
   getThreadCashConfig,
   isFeatureEnabled,
@@ -59,6 +58,7 @@ import {
 } from "../lib/threadCash/wallet";
 import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { cashOutThreadCash, computeCashOutPayoutCents } from "../lib/threadCash/cashOut";
+import { getFundingBalances } from "../lib/threadCash/funding";
 import { stripe } from "../lib/stripe";
 import { broadcastToRoom } from "../ws/liveHub";
 
@@ -91,9 +91,8 @@ async function loadStreakState(buyerId: string): Promise<{ state: StreakState; t
 // ─── GET /api/thread-cash ───────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  const [balanceCents, cashableCents, config, { state, timezone }, openRedemptions] = await Promise.all([
-    getBalanceCents(db, buyerId),
-    getCashableBalanceCents(db, buyerId),
+  const [{ balanceCents, promoCents, paidCents, cashableCents }, config, { state, timezone }, openRedemptions] = await Promise.all([
+    getFundingBalances(db, buyerId),
     getThreadCashConfig(),
     loadStreakState(buyerId),
     listOpenThreadCashRedemptions(db, buyerId),
@@ -101,9 +100,14 @@ router.get("/", async (req, res) => {
   const preview = computeCheckIn(state, config, new Date(), timezone);
   res.json({
     balanceCents,
-    // How much of balanceCents a seller may cash out (earned from Live gifts
-    // and payments, never reward credit). Additive field.
+    // How much of balanceCents a seller may withdraw: paid Thread Cash
+    // received from others, never promo credit. Additive field.
     cashableCents,
+    // Promo credit (platform rewards, incl. promo a buyer gifted): spendable
+    // in Brandthread, never withdrawable. Additive field.
+    promoCents,
+    // All paid-funded Thread Cash in the balance. Additive field.
+    paidCents,
     // Redeemed at checkout but neither spent nor attached to a payment (see
     // POST /redeem/:token/cancel). Additive field (item 109).
     openRedemptions,

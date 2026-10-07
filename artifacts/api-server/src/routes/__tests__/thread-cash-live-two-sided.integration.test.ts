@@ -1,10 +1,12 @@
 /**
  * Thread Cash in Live, driven from BOTH sides through the real routes:
  * a buyer gifts the host of a live stream (POST /thread-cash/live-gift), the
- * seller's wallet (GET /thread-cash) shows the gift as cashable, and the
- * seller cashes it out (POST /thread-cash/cash-out) — with the guards that
- * keep money honest: no gifts into an ended or unknown stream, and reward
- * credit is never cashable.
+ * seller's wallet (GET /thread-cash) shows what of it is withdrawable, and
+ * the seller cashes that out (POST /thread-cash/cash-out) — with the guards
+ * that keep money honest: no gifts into an ended or unknown stream, and promo
+ * credit (rewards, and promo a buyer gifts) is never withdrawable. Only paid
+ * Thread Cash is; no purchase source exists yet, so the buyer's paid credit
+ * is inserted directly with funding 'paid', as a future purchase would.
  *
  * Real Express router, real Postgres. Only Clerk identity (a header) and the
  * Stripe client (the shared money-test fake) are stubbed.
@@ -41,6 +43,7 @@ vi.mock("../../lib/stripe", () => ({
 
 import { createFakeStripe } from "../../lib/money/__tests__/fakeStripe";
 import threadCashRouter from "../thread-cash";
+import { redeemThreadCash } from "../../lib/threadCash/wallet";
 
 const suffix = crypto.randomUUID().slice(0, 8);
 const SELLER = `tc-two-sided-seller-${suffix}`;
@@ -72,10 +75,12 @@ beforeAll(async () => {
     { id: liveId, sellerId: SELLER, channelName: `tc-live-${liveId}`, title: "Live", status: "live" },
     { id: endedId, sellerId: SELLER, channelName: `tc-ended-${endedId}`, title: "Ended", status: "ended" },
   ]);
-  // The buyer's spendable reward credit, and some reward credit the seller
-  // also holds (which must never become cash).
+  // The buyer's promo reward credit plus $5 of PAID Thread Cash (what a
+  // future purchase source writes), and reward credit the seller also holds
+  // (which must never become cash).
   await db.insert(threadCashEntries).values([
     { buyerId: BUYER, amountCents: 1_000, source: "daily_checkin", referenceId: "2026-10-05" },
+    { buyerId: BUYER, amountCents: 500, source: "purchase", referenceId: `test-purchase-${suffix}`, funding: "paid" },
     { buyerId: SELLER, amountCents: 400, source: "daily_checkin", referenceId: "2026-10-05" },
   ]);
   const app = express();
@@ -97,7 +102,7 @@ describe("Thread Cash in Live — buyer ↔ seller", () => {
   it("the seller starts with reward credit that is spendable but not cashable", async () => {
     const wallet = await call("GET", "/api/thread-cash", SELLER);
     expect(wallet.status).toBe(200);
-    expect(wallet.body).toMatchObject({ balanceCents: 400, cashableCents: 0 });
+    expect(wallet.body).toMatchObject({ balanceCents: 400, promoCents: 400, paidCents: 0, cashableCents: 0 });
 
     const cashOut = await call("POST", "/api/thread-cash/cash-out", SELLER, { threadCashCents: 100, idempotencyKey: crypto.randomUUID() });
     expect(cashOut.status).toBe(400);
@@ -112,10 +117,10 @@ describe("Thread Cash in Live — buyer ↔ seller", () => {
     const junk = await call("POST", "/api/thread-cash/live-gift", BUYER, { streamId: "not-a-uuid", amountCents: 100, idempotencyKey: crypto.randomUUID() });
     expect(junk.status).toBe(404);
 
-    expect((await call("GET", "/api/thread-cash", BUYER)).body.balanceCents).toBe(1_000);
+    expect((await call("GET", "/api/thread-cash", BUYER)).body.balanceCents).toBe(1_500);
   });
 
-  it("buyer gifts in the live → seller sees it in their wallet as cashable, and is notified", async () => {
+  it("buyer gifts in the live → seller's balance goes up, but promo stays promo (not withdrawable), and they're notified", async () => {
     const key = crypto.randomUUID();
     const gift = await call("POST", "/api/thread-cash/live-gift", BUYER, { streamId: liveId, amountCents: 300, idempotencyKey: key });
     expect(gift.status).toBe(200);
@@ -123,9 +128,14 @@ describe("Thread Cash in Live — buyer ↔ seller", () => {
     const retry = await call("POST", "/api/thread-cash/live-gift", BUYER, { streamId: liveId, amountCents: 300, idempotencyKey: key });
     expect(retry.body.giftId).toBe(gift.body.giftId);
 
-    expect((await call("GET", "/api/thread-cash", BUYER)).body.balanceCents).toBe(700);
+    // Promo is spent first: the buyer's paid $5 is untouched.
+    expect((await call("GET", "/api/thread-cash", BUYER)).body).toMatchObject({ balanceCents: 1_200, promoCents: 700, paidCents: 500 });
     const seller = await call("GET", "/api/thread-cash", SELLER);
-    expect(seller.body).toMatchObject({ balanceCents: 700, cashableCents: 300 });
+    expect(seller.body).toMatchObject({ balanceCents: 700, promoCents: 700, cashableCents: 0 });
+    const cashOut = await call("POST", "/api/thread-cash/cash-out", SELLER, { threadCashCents: 300, idempotencyKey: crypto.randomUUID() });
+    expect(cashOut.status).toBe(400);
+    expect(cashOut.body).toMatchObject({ code: "THREAD_CASH_NOT_CASHABLE" });
+    expect(cashOut.body.error).toContain("Promo credit isn't withdrawable");
 
     await vi.waitFor(async () => {
       const rows = await db.select().from(notificationsFeed).where(eq(notificationsFeed.userId, SELLER));
@@ -140,16 +150,36 @@ describe("Thread Cash in Live — buyer ↔ seller", () => {
     });
   });
 
-  it("the seller cashes out exactly what was earned and the wallet reflects it", async () => {
+  it("a gift that runs past the buyer's promo splits promo-first; the seller can withdraw exactly the paid part", async () => {
+    // Buyer has $7 promo + $5 paid; a $9 gift = $7 promo + $2 paid.
+    const gift = await call("POST", "/api/thread-cash/live-gift", BUYER, { streamId: liveId, amountCents: 900, idempotencyKey: crypto.randomUUID() });
+    expect(gift.status).toBe(200);
+    expect((await call("GET", "/api/thread-cash", BUYER)).body).toMatchObject({ balanceCents: 300, promoCents: 0, paidCents: 300 });
+    const seller = await call("GET", "/api/thread-cash", SELLER);
+    expect(seller.body).toMatchObject({ balanceCents: 1_600, promoCents: 1_400, paidCents: 200, cashableCents: 200 });
+    // The seller's history shows two credits (promo, paid) and no internal rows.
+    const history = await call("GET", "/api/thread-cash/history", SELLER);
+    const gifts = (history.body.history as any[]).filter((e) => e.source === "live_gift");
+    expect(gifts.map((e) => [e.amountCents, e.funding]).sort()).toEqual([[200, "paid"], [300, "promo"], [700, "promo"]].sort());
+    expect((history.body.history as any[]).some((e) => e.source === "funding_shift")).toBe(false);
+  });
+
+  it("a seller spending in the app uses promo first, keeping their withdrawable money", async () => {
+    await redeemThreadCash(SELLER, 500, crypto.randomUUID());
+    const seller = await call("GET", "/api/thread-cash", SELLER);
+    expect(seller.body).toMatchObject({ balanceCents: 1_100, promoCents: 900, paidCents: 200, cashableCents: 200 });
+  });
+
+  it("the seller cashes out exactly the paid part and the wallet reflects it", async () => {
     const tooMuch = await call("POST", "/api/thread-cash/cash-out", SELLER, { threadCashCents: 500, idempotencyKey: crypto.randomUUID() });
     expect(tooMuch.body.code).toBe("THREAD_CASH_NOT_CASHABLE");
 
-    const ok = await call("POST", "/api/thread-cash/cash-out", SELLER, { threadCashCents: 300, idempotencyKey: crypto.randomUUID() });
+    const ok = await call("POST", "/api/thread-cash/cash-out", SELLER, { threadCashCents: 200, idempotencyKey: crypto.randomUUID() });
     expect(ok.status).toBe(200);
-    expect(ok.body).toMatchObject({ threadCashCents: 300, payoutCents: 300 });
-    expect(stripeState.state.transfers.at(-1)).toMatchObject({ amount: 300, destination: `acct_test_${suffix}` });
+    expect(ok.body).toMatchObject({ threadCashCents: 200, payoutCents: 200 });
+    expect(stripeState.state.transfers.at(-1)).toMatchObject({ amount: 200, destination: `acct_test_${suffix}` });
 
     const seller = await call("GET", "/api/thread-cash", SELLER);
-    expect(seller.body).toMatchObject({ balanceCents: 400, cashableCents: 0 });
+    expect(seller.body).toMatchObject({ balanceCents: 900, promoCents: 900, paidCents: 0, cashableCents: 0 });
   });
 });

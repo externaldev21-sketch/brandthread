@@ -17,6 +17,7 @@ import { eq, sql } from "drizzle-orm";
 import { db, threadCashEntries, users } from "@workspace/db";
 import { postLedgerTransaction } from "../money/ledger";
 import { ThreadCashError, assertThreadCashNotFrozen, balanceLockKey, getBalanceCents, getCashableBalanceCents } from "./wallet";
+import { payoutPauseForRecovery } from "../money/sellerRecovery";
 
 type StripeLike = {
   transfers: {
@@ -98,16 +99,26 @@ export async function cashOutThreadCash(
         "INSUFFICIENT_THREAD_CASH",
       );
     }
-    // Only Thread Cash earned from other people is real money owed to the
-    // seller; reward credit (check-ins, streaks, refunds) is not cashable.
+    // Only paid Thread Cash received from other people is real money owed
+    // to the seller; promo credit (rewards, and promo a buyer gifted) is
+    // spendable in Brandthread but never withdrawable (./funding.ts).
     const cashable = await getCashableBalanceCents(tx, sellerId);
     if (threadCashCents > cashable) {
       throw new ThreadCashError(
         cashable > 0
-          ? `You can cash out up to $${(cashable / 100).toFixed(2)}. Thread Cash rewards can be spent in the app but not cashed out.`
-          : "Only Thread Cash you earn from Live gifts and payments can be cashed out.",
+          ? `You can withdraw up to $${(cashable / 100).toFixed(2)}. Promo credit isn't withdrawable — it can be spent in Brandthread.`
+          : "Promo credit isn't withdrawable — it can be spent in Brandthread. Only Thread Cash buyers paid for can be cashed out.",
         400,
         "THREAD_CASH_NOT_CASHABLE",
+      );
+    }
+    // A lost chargeback still being recovered pauses every payout, this one too.
+    const recovery = await payoutPauseForRecovery(tx, sellerId);
+    if (recovery.paused) {
+      throw new ThreadCashError(
+        `Payouts are paused while $${(recovery.owedCents / 100).toFixed(2)} from a lost chargeback is recovered from your upcoming order payouts.`,
+        409,
+        "PAYOUTS_PAUSED_RECOVERY",
       );
     }
 
@@ -138,6 +149,8 @@ export async function cashOutThreadCash(
       buyerId: sellerId,
       amountCents: -threadCashCents,
       source: "cash_out",
+      // Cash-outs only ever spend paid Thread Cash (cashable ≤ paid balance).
+      funding: "paid",
       referenceId: transfer.id,
       idempotencyKey,
       note: feeCents > 0
