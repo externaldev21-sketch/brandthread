@@ -139,6 +139,13 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/buyer-live?streamId=stream-9');
   });
 
+  it('opens a co-host invite push on the accept / decline screen, like its Activity row', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('co-1', { targetType: 'live_cohost', targetId: 'stream-3', type: 'live_cohost_invite' }));
+    expect(router.push).toHaveBeenCalledWith('/live-cohost-invite?streamId=stream-3');
+  });
+
   it('opens a story mention push in the mention viewer and a reshare push in the story viewer', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

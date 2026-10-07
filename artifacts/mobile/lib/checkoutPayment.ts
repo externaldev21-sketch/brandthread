@@ -57,6 +57,8 @@ export function choosePaymentPath(input: {
 export type PaymentIntentGroup = {
   items: Array<{ variantId: string; productId: string; quantity: number }>;
   discountCode?: string;
+  /** A line in this seller group was added from a live (server validates it). */
+  liveStreamId?: string;
 };
 
 export type PaymentIntentAddress = {
@@ -88,14 +90,23 @@ type SessionForPayment = Pick<CheckoutSession, 'deliveryGroups' | 'discounts'>;
 /** One group per seller. A promo code applies to single-seller orders, as before. */
 export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] {
   const code = session.deliveryGroups.length === 1 ? session.discounts.find(d => d.isValid)?.code : undefined;
-  return session.deliveryGroups.map(group => ({
-    items: group.items.map(item => ({
-      variantId: String(item.variantId),
-      productId: String(item.productId),
-      quantity: Number(item.quantity),
-    })),
-    ...(code ? { discountCode: String(code) } : {}),
-  }));
+  return session.deliveryGroups.map(group => {
+    const liveStreamId = liveStreamIdForItems(group.items);
+    return {
+      items: group.items.map(item => ({
+        variantId: String(item.variantId),
+        productId: String(item.productId),
+        quantity: Number(item.quantity),
+      })),
+      ...(code ? { discountCode: String(code) } : {}),
+      ...(liveStreamId ? { liveStreamId } : {}),
+    };
+  });
+}
+
+/** The live stream a seller group's lines were added from, if any (first one wins). */
+export function liveStreamIdForItems(items: ReadonlyArray<{ sourceLiveStreamId?: string }>): string | undefined {
+  return items.find(item => typeof item.sourceLiveStreamId === 'string' && item.sourceLiveStreamId)?.sourceLiveStreamId;
 }
 
 export function recipientName(address: Partial<CheckoutAddress>): string {
