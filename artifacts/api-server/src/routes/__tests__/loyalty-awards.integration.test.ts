@@ -353,7 +353,7 @@ describe("paid cart checkout rewards", () => {
       .where(eq(orders.stripeCheckoutSessionId, fixture.sessionId))
       .limit(1);
     expect(order).toMatchObject({
-      status: "pending",
+      status: "processing",
       totalCents: fixture.totalCents,
     });
 

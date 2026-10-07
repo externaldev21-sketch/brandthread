@@ -18,7 +18,6 @@ import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
 import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';

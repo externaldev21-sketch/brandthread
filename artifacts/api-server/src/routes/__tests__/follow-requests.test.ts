@@ -160,7 +160,7 @@ describe("close friends", () => {
       expect(await res.json()).toEqual({ ok: true, friendIds: ["a", "b"], skipped: [] });
       expect(s.deleted).toEqual(["close_friends"]);
       expect(s.inserted[0].values).toEqual([
-        { ownerId: "me-1", friendId: "a" }, { ownerId: "me-1", friendId: "b" },
+        { userId: "me-1", friendId: "a" }, { userId: "me-1", friendId: "b" },
       ]);
     } finally { server.close(); }
   });

@@ -49,8 +49,7 @@ function buildStripeEvidence(type: string, description: string, trackingNumber?:
     case "tracking":
       return {
         ...(trackingNumber ? { shipping_tracking_number: trackingNumber } : {}),
-        shipping_documentation:   description,
-        customer_communication:   description,
+        uncategorized_text: description,
       };
     case "photo":
       return {
@@ -58,12 +57,10 @@ function buildStripeEvidence(type: string, description: string, trackingNumber?:
       };
     case "policy":
       return {
-        refund_policy:             description,
         refund_policy_disclosure:  description,
       };
     case "written_response":
       return {
-        customer_communication: description,
         uncategorized_text:     description,
       };
     default:
@@ -231,8 +228,8 @@ router.post("/:id/evidence", async (req, res) => {
     // Merge all evidence fields for Stripe (latest submission wins per field)
     const files = await db.select().from(disputeEvidenceFiles).where(eq(disputeEvidenceFiles.disputeId, row.id));
     const mergedStripe = {
-      ...mergeStripeEvidence(newEvidence, await orderTrackingNumber(row.orderId)),
       ...buildEvidencePayload(newEvidence as any[], files),
+      ...mergeStripeEvidence(newEvidence, await orderTrackingNumber(row.orderId)),
     };
 
     let stripeStatus = row.status;
@@ -312,8 +309,8 @@ router.post("/:id/submit", async (req, res) => {
     const existing = (row.evidenceJson as any[]) ?? [];
     const files = await db.select().from(disputeEvidenceFiles).where(eq(disputeEvidenceFiles.disputeId, row.id));
     const mergedStripe = {
-      ...mergeStripeEvidence(existing, await orderTrackingNumber(row.orderId)),
       ...buildEvidencePayload(existing, files),
+      ...mergeStripeEvidence(existing, await orderTrackingNumber(row.orderId)),
     };
     if (Object.keys(mergedStripe).length === 0) {
       await db.update(disputes).set({ evidenceSubmittedAt: null }).where(eq(disputes.id, row.id));

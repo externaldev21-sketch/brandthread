@@ -101,7 +101,7 @@ function SlideCoverPage({ media, onPick, onBack }: {
     <SubPage title="Edit cover" onBack={onBack} testID="cover-page">
       <ScrollView contentContainerStyle={s.coverGrid}>
         {media.slides.map((sl, i) => (
-          <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" testID={`cover-slide-${i}`}>
+          <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" accessibilityLabel={`Use slide ${i + 1} as cover`} testID={`cover-slide-${i}`}>
             <Image source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
             {i === media.coverIndex ? <View style={s.coverCheck}><Feather name="check" size={14} color={CP.black} /></View> : null}
           </Pressable>

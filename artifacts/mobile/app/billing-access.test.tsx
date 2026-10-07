@@ -150,7 +150,8 @@ vi.mock('@/hooks/useColors', () => ({
   }),
 }));
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   useApi: () => apiMock,
 }));
 

@@ -326,9 +326,9 @@ describe("authenticated team membership discovery", () => {
     });
   });
 
-  it("resolves the same owner and role across discovery and request context for equal timestamps", async () => {
+  it("resolves the same owner and role across discovery and explicitly joined context for equal timestamps", async () => {
     const membershipResult = await getMembership(equalMemberId);
-    const contextResult = await getContext(equalMemberId);
+    const contextResult = await getContext(equalMemberId, "joined");
     const membership = membershipResult.body.membership;
 
     expect(membershipResult.status).toBe(200);

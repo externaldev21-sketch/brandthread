@@ -179,7 +179,7 @@ describe("concurrent checkouts for the last unit of stock", () => {
     // ("refund_pending" — oversold, refunded, no stock taken). If the
     // reservation were not atomic, this could read ["pending", "pending"]
     // (both think they won) instead.
-    expect(statuses).toEqual(["pending", "refund_pending"]);
+    expect(statuses).toEqual(["processing", "refund_pending"]);
 
     const [variant] = await db
       .select({ stock: productVariants.stock })

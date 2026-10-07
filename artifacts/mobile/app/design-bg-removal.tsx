@@ -597,6 +597,8 @@ function Swatch({ kind, label, active, onPress }: { kind: Backdrop; label: strin
 const PHOTO_R = RADIUS.lg;
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
+  vignetteWrap: { position: 'absolute', top: 0, left: 0, right: 0, height: 420 },
+  vignette: { flex: 1 },
   body: { flex: 1, paddingHorizontal: SP.md, paddingTop: SP.xs },
   frameOuter: { flex: 1, borderRadius: RADIUS.xl, padding: 1, overflow: 'hidden' },
   frameInner: { flex: 1, borderRadius: RADIUS.xl - 1, backgroundColor: '#050506', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },

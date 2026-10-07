@@ -1,4 +1,8 @@
 import React from 'react';
+vi.mock('@/lib/calls/CallSessionContext', () => ({
+  useCallSession: () => ({ startCall: vi.fn() }),
+  useCallLog: () => [],
+}));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -199,7 +203,10 @@ vi.mock('expo-audio', () => ({
   }),
 }));
 
-vi.mock('@clerk/expo', () => ({ useAuth: () => ({ userId: 'me' }) }));
+vi.mock('@clerk/expo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@clerk/expo')>()),
+  useAuth: () => ({ userId: 'me', isLoaded: true }),
+}));
 
 vi.mock('@/lib/safety', () => ({
   apiErrorMessage: (_e: unknown, fallback: string) => fallback,

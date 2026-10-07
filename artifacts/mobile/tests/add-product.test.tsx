@@ -1,4 +1,11 @@
 import React from 'react';
+vi.mock('@/contexts/FirstRunTipsContext', () => ({
+  useFirstRunTipsController: () => ({
+    ready: true, hasSeen: () => true, skipAll: true, claim: () => false,
+    release() {}, activeTipId: null, markSeen() {}, setSkipAllTips() {},
+    replayTips: async () => {},
+  }),
+}));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -278,7 +285,7 @@ describe('AddProduct draft exit protection', () => {
   it('warns after an immediate edit, then skips the warning once that edit is saved', async () => {
     renderer = await renderScreen();
 
-    const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
+    const nameInput = renderer.root.findByProps({ testID: 'product-input-Title' });
     await act(async () => {
       nameInput.props.onChangeText('Last-second product edit');
     });
@@ -323,7 +330,7 @@ describe('AddProduct draft exit protection', () => {
   it('prevents native back navigation after an immediate edit until the seller chooses to leave', async () => {
     renderer = await renderScreen();
 
-    const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
+    const nameInput = renderer.root.findByProps({ testID: 'product-input-Title' });
     await act(async () => {
       nameInput.props.onChangeText('Native back draft edit');
     });
@@ -364,8 +371,8 @@ describe('AddProduct draft exit protection', () => {
     renderer = await renderScreen();
     const form = renderer.root.findByProps({ testID: 'add-product-form' });
 
-    expect(form.findByProps({ testID: 'product-input-Product name *' })).toBeTruthy();
-    expect(form.findByProps({ testID: 'product-input-Retail price *' })).toBeTruthy();
+    expect(form.findByProps({ testID: 'product-input-Title' })).toBeTruthy();
+    expect(form.findByProps({ testID: 'product-input-Price *' })).toBeTruthy();
     expect(form.findByProps({ testID: 'product-input-Weight (grams)' })).toBeTruthy();
     expect(form.findAllByProps({ label: 'Publish product' }).filter(button => typeof button.type === 'string')).toHaveLength(1);
     expect(form.findAllByProps({ label: 'Next' })).toHaveLength(0);
@@ -382,7 +389,7 @@ describe('AddProduct draft exit protection', () => {
       options.props.action.onPress();
     });
     expect(form.findByProps({ testID: 'product-input-Option name' })).toBeTruthy();
-    expect(form.findByProps({ testID: 'product-input-Product name *' })).toBeTruthy();
+    expect(form.findByProps({ testID: 'product-input-Title' })).toBeTruthy();
 
     await act(async () => {
       await form.findAllByProps({ label: 'Publish product' })

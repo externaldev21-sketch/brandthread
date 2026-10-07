@@ -20,7 +20,7 @@ const fake = vi.hoisted(() => {
       update: async (id: string, params: any) => {
         disputeUpdates.push({ id, params });
         if (failDisputes) throw Object.assign(new Error("Stripe dispute unavailable"), { status: 502 });
-        return { id, status: disputeStatus };
+        return { id, status: params.submit ? disputeStatus : "needs_response" };
       },
       // Accepting concedes on Stripe, which marks the dispute lost.
       close: async (id: string) => {
@@ -196,13 +196,14 @@ describe("disputes", () => {
     expect(second.body.dispute.evidence[0].description).toBe("1ZTEST");
     // The typed tracking number, not the free-text description.
     expect(fake.disputeUpdates[0].params.evidence.shipping_tracking_number).toBe("1ZNUMBER");
-    expect(fake.disputeUpdates[0].params.evidence.shipping_documentation).toBe("1ZTEST");
+    expect(fake.disputeUpdates[0].params.evidence.shipping_documentation).toBeUndefined();
+    expect(fake.disputeUpdates[0].params.evidence.uncategorized_text).toBe("1ZTEST");
   });
 
   it("rejects evidence for a final dispute and maps final submission statuses", async () => {
     const final = await seedDispute(SELLER, { status: "won" });
     expect((await call(`/api/disputes/${final.id}/evidence`, { method: "POST", body: { type: "photo", description: "x" } })).status).toBe(400);
-    const open = await seedDispute();
+    const open = await seedDispute(SELLER, { evidenceJson: [{ type: "written_response", description: "Order fulfilled" }] });
     fake.disputeStatus("warning_closed");
     const submitted = await call(`/api/disputes/${open.id}/submit`, { method: "POST" });
     expect(submitted.status).toBe(200);
@@ -210,7 +211,7 @@ describe("disputes", () => {
   });
 
   it("returns Stripe provider failures on final submit and accept closes a contest", async () => {
-    const dispute = await seedDispute();
+    const dispute = await seedDispute(SELLER, { evidenceJson: [{ type: "written_response", description: "Order fulfilled" }] });
     fake.failDisputes(true);
     expect((await call(`/api/disputes/${dispute.id}/submit`, { method: "POST" })).status).toBe(502);
     // Accept fails cleanly (nothing changes) while Stripe is down…

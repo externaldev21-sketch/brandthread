@@ -9,7 +9,7 @@ import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
   revenueCatWebhookEvents, manufacturers, sampleOrders, manufacturerActivityEvents,
-  stripeTrialWarningEvents,
+  stripeTrialWarningEvents, disputes,
 } from "@workspace/db";
 import {
   activateAdCampaignFromCheckoutSession,
@@ -48,6 +48,7 @@ import { settleTransferOrder } from "../lib/money/cartTransfers";
 import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
 import { applyDisputePause, applyDisputePauseByDisputeId, ordersForDisputedPayment } from "../lib/delivery/disputePause";
 import { notifySellerDisputeClosed, notifySellerDisputeOpened } from "../lib/sellerMoneyNotifications";
+import { mapDisputeStatus } from "../lib/disputes/webhook";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {

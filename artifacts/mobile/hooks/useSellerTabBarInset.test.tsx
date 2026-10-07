@@ -11,6 +11,7 @@ vi.mock('@/lib/devPreview', () => ({ isSellerDevPreview: () => state.preview }))
 vi.mock('@/lib/tabBarVisibility', () => ({ useTabBarHiddenByScreen: () => state.hidden }));
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useBuyerTabBarMetrics: () => ({ occupiedHeight: 112 }),
+  useTabBarMetrics: () => ({ occupiedHeight: 112 }),
 }));
 vi.mock('@/hooks/useScreenBottomInset', () => ({ useScreenBottomInset: () => 8 }));
 

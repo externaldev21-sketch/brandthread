@@ -23,6 +23,8 @@ const {
 } = vi.hoisted(() => ({
   routerMock: { push: vi.fn(), back: vi.fn(), canGoBack: vi.fn(() => true), replace: vi.fn() },
   apiMock: {
+    liveReplays: { bySeller: vi.fn(async () => ({ items: [] })) },
+    giftCards: { store: vi.fn(async () => ({ enabled: false })) },
     seller: { getProfile: vi.fn() },
     publicSellers: { get: vi.fn(), recordVisit: vi.fn(), recordStoreVisit: vi.fn() },
     reviews: { forSeller: vi.fn() },

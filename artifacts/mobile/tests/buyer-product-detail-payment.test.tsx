@@ -47,7 +47,8 @@ const {
   useLocalSearchParamsMock: vi.fn(),
 }));
 
-vi.mock('react-native', () => {
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native')>();
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
@@ -77,6 +78,7 @@ vi.mock('react-native', () => {
   }
 
   return {
+    ...actual,
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Animated: {
@@ -145,7 +147,8 @@ vi.mock('expo-image', () => ({
 
 vi.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
 
-vi.mock('react-native-svg', () => ({
+vi.mock('react-native-svg', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-native-svg')>()),
   default: (props: Record<string, unknown>) => React.createElement('Svg', props, props.children as React.ReactNode),
   Line: (props: Record<string, unknown>) => React.createElement('SvgLine', props),
 }));
@@ -166,7 +169,7 @@ vi.mock('react-native-reanimated', () => {
   };
 
   return {
-    default: { View: el('AnimatedView') },
+    default: { View: el('AnimatedView'), createAnimatedComponent: (Component: unknown) => Component },
     useSharedValue: sharedValue,
     useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
     withSpring: (v: unknown) => v,
@@ -223,7 +226,8 @@ vi.mock('@/lib/money', () => ({
   formatCents: (cents: number) => `$${(cents / 100).toFixed(2)}`,
 }));
 
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/theme')>()),
   BG: '#07070F',
   SCREEN_BG: 'transparent',
   SURFACE: '#111113',

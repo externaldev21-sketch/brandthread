@@ -190,7 +190,7 @@ describe("attribution on a paid order", () => {
     const { order } = await pay({ sellerId: seller, buyerId: buyer, chargeModel: "destination", items: [{ ...product, quantity: 1 }] });
     expect(await commissionFor(order.id)).toBeUndefined();
     const [o] = await db.select().from(orders).where(eq(orders.id, order.id));
-    expect(o.status).toBe("pending");
+    expect(o.status).toBe("processing");
   });
 
   it("blocks self-referral: creator buying through their own link, and attaching their own code", async () => {

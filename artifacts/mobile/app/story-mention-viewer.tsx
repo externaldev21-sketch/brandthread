@@ -191,7 +191,7 @@ export default function StoryMentionViewerScreen() {
     if (blurTimer.current) clearTimeout(blurTimer.current);
   }, []);
 
-  const stories = queue ?? [];
+  const stories = React.useMemo(() => queue ?? [], [queue]);
   const current: StoryMentionItem | undefined = stories[storyIdx];
   // A deep link to a story that is no longer in my mentions is unavailable.
   const missing = !!storyId && queue !== null && !queue.some((item) => item.storyId === storyId);

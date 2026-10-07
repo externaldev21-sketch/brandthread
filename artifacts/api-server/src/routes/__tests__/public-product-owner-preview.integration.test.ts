@@ -70,11 +70,12 @@ function get(id: string, viewer?: string) {
 }
 
 describe("GET /api/public/products/:id owner preview", () => {
-  it("serves an active product to everyone, publicly cacheable, without previewOnly", async () => {
+  it("serves an active product without previewOnly and isolates authenticated viewers' cache entries", async () => {
     for (const viewer of [undefined, other, owner]) {
       const res = await get(ids.active, viewer);
       expect(res.status).toBe(200);
-      expect(res.headers.get("cache-control")).toMatch(/^public/);
+      if (viewer) expect(res.headers.get("cache-control")).toBe("private, no-store");
+      else expect(res.headers.get("cache-control")).toMatch(/^public/);
       const body = await res.json() as any;
       expect(body.previewOnly).toBeUndefined();
       expect(body.variants).toHaveLength(1);

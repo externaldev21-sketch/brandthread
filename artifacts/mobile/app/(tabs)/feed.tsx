@@ -3466,6 +3466,7 @@ export default function FeedScreen({
               style={styles.topIconBtn}
               activeOpacity={0.7}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
+              accessibilityLabel="Close search"
             >
               <Feather name="x" size={20} color={ON_DARK} />
             </TouchableOpacity>
@@ -3489,6 +3490,7 @@ export default function FeedScreen({
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
+              accessibilityLabel="Search"
             >
                 <Feather name="search" size={19} color={ON_DARK} />
             </TouchableOpacity>

@@ -1,4 +1,11 @@
 import React from 'react';
+vi.mock('@/contexts/FirstRunTipsContext', () => ({
+  useFirstRunTipsController: () => ({
+    ready: true, hasSeen: () => true, skipAll: true, claim: () => false,
+    release() {}, activeTipId: null, markSeen() {}, setSkipAllTips() {},
+    replayTips: async () => {},
+  }),
+}));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -109,7 +116,8 @@ vi.mock('expo-linear-gradient', () => ({
   LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
 
-vi.mock('react-native-svg', () => ({
+vi.mock('react-native-svg', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-native-svg')>()),
   default: nativeComponent('Svg'),
   Line: nativeComponent('Line'),
 }));
@@ -125,6 +133,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 vi.mock('expo-router', () => ({
+  usePathname: () => '/(buyer)/inbox',
   useRouter: () => routerMock,
   useFocusEffect: (callback: () => void | (() => void)) => {
     React.useEffect(() => {
@@ -277,7 +286,8 @@ vi.mock('@/lib/api', () => ({
 // bundled image assets at module scope, neither of which Vitest can
 // transform — mocked out here the same way native modules above are, since
 // __DEV__ is false in this test environment anyway (these are all no-ops).
-vi.mock('@/lib/previewInbox', () => ({
+vi.mock('@/lib/previewInbox', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/previewInbox')>()),
   isPreviewInboxEnabled: () => false,
   getPreviewConversations: () => [],
   getPreviewNotifications: () => [],

@@ -135,6 +135,13 @@ export function InCallView() {
             onPress={declineOrEndCall}
             accessibilityLabel="End call"
           />
+          {isVideo && engine && (
+            <ControlButton
+              icon="refresh-cw"
+              onPress={switchCamera}
+              accessibilityLabel="Flip camera"
+            />
+          )}
         </ControlCapsule>
       </View>
     </CallScreenShell>

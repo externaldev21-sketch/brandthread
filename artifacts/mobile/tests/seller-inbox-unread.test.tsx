@@ -84,7 +84,8 @@ vi.mock('expo-linear-gradient', () => ({
   LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
 
-vi.mock('react-native-svg', () => {
+vi.mock('react-native-svg', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-native-svg')>();
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -92,6 +93,7 @@ vi.mock('react-native-svg', () => {
     return MockNativeComponent;
   };
   return {
+    ...actual,
     default: nativeComponent('Svg'),
     Line: nativeComponent('Line'),
   };
@@ -110,7 +112,8 @@ vi.mock('@clerk/expo', () => ({
 // same way tests/buyer-inbox.test.tsx does for the buyer inbox. This test
 // always has a real Clerk user (see the @clerk/expo mock above), so
 // getSellerPreviewConversations() is never actually reached — item 71.
-vi.mock('@/lib/previewInbox', () => ({
+vi.mock('@/lib/previewInbox', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/previewInbox')>()),
   isPreviewInboxEnabled: previewMock.isPreviewInboxEnabled,
   getSellerPreviewConversations: () => [
     conversation('preview-seller-conversation-01', 1),
@@ -136,6 +139,8 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('expo-router', () => ({
+  usePathname: () => '/seller-inbox',
+  useScrollToTop: () => {},
   useRouter: () => routerMock,
   useFocusEffect: (callback: () => void | (() => void)) => {
     focusState.callback = callback;

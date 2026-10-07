@@ -3,6 +3,7 @@
  * Route: /design-templates
  */
 import React, { useState, useMemo } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,

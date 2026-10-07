@@ -520,6 +520,7 @@ export default function BuyerPostViewer() {
               // send "remove" for any post the viewer didn't own.
               await handleRepost();
             }}
+            accessibilityLabel={reposted ? 'Remove repost' : 'Repost'}
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
@@ -529,6 +530,7 @@ export default function BuyerPostViewer() {
               // Save AND unsave, with rollback (handleSaveToggle).
               await handleSaveToggle();
             }}
+            accessibilityLabel={saved ? 'Unsave post' : 'Save post'}
           >
             {/* Filled when saved (same treatment as the Friends feed) — in the
                 monochrome theme a colour change alone was invisible. */}
@@ -556,11 +558,12 @@ export default function BuyerPostViewer() {
                 Haptics.selectionAsync();
                 router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
               }}
+              accessibilityLabel="Report post"
             >
               <Feather name="flag" size={22} color={FG} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.engageBtn} onPress={handleShare}>
+          <TouchableOpacity style={s.engageBtn} onPress={handleShare} accessibilityLabel="Share post">
             <Feather name="share-2" size={22} color={FG} />
           </TouchableOpacity>
         </View>

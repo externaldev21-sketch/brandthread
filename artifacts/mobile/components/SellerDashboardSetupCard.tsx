@@ -31,8 +31,6 @@ export function SellerDashboardSetupCard({
     <View
       style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}
       testID="seller-dashboard-setup-card"
-      accessibilityRole="button"
-      accessibilityLabel="List your first product to start selling"
     >
       <PressableScale
         onPress={hasSetupChecklist ? onOpenSetup : onAddProduct}

@@ -42,26 +42,25 @@ export function buildStripeEvidence(
   switch (type) {
     case "tracking":
       return {
-        shipping_tracking_number: trackingNumber ?? "",
-        shipping_documentation: description,
-        customer_communication: description,
+        ...(trackingNumber ? { shipping_tracking_number: trackingNumber } : {}),
+        uncategorized_text: description,
       };
     case "photo":
       return { product_description: description };
     case "policy":
-      return { refund_policy: description, refund_policy_disclosure: description };
+      return { refund_policy_disclosure: description };
     case "written_response":
-      return { customer_communication: description, uncategorized_text: description };
+      return { uncategorized_text: description };
     default:
       return { uncategorized_text: description };
   }
 }
 
-type TextEvidence = { type: string; description: string };
+type TextEvidence = { type: string; description: string; trackingNumber?: string };
 
 /** Merge every text item (latest wins per field). */
 export function mergeTextEvidence(items: TextEvidence[]): Record<string, string> {
-  const tracking = items.find((e) => e.type === "tracking")?.description;
+  const tracking = items.find((e) => e.type === "tracking" && e.trackingNumber)?.trackingNumber;
   return items.reduce<Record<string, string>>(
     (acc, ev) => ({ ...acc, ...buildStripeEvidence(ev.type, ev.description, tracking) }),
     {},
@@ -69,9 +68,8 @@ export function mergeTextEvidence(items: TextEvidence[]): Record<string, string>
 }
 
 /**
- * Text evidence plus uploaded files. A file's Stripe field holds a file id; the
- * text variants of the same field are strings and Stripe accepts only one, so
- * an uploaded file takes precedence over text for the same field.
+ * Text evidence plus uploaded files. Stripe's file fields receive file IDs
+ * only; descriptions stay in text fields and never replace an uploaded file.
  */
 export function buildEvidencePayload(
   items: TextEvidence[],

@@ -113,7 +113,8 @@ vi.mock('@/lib/money', () => ({
   formatCents: (cents: number) => `$${(cents / 100).toFixed(2)}`,
 }));
 
-vi.mock('@/lib/theme', () => ({
+vi.mock('@/lib/theme', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/theme')>()),
   ACCENT: '#f8fafc',
   BG: '#09090b',
   SCREEN_BG: 'transparent',

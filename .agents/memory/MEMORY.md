@@ -98,3 +98,4 @@
 - [Store responsiveness boundary](store-responsiveness-boundary.md) — draft interactions must not wait on publication reads; fast draft rendering is not proof of live publication.
 - [Shared performance boundaries](shared-performance-boundaries.md) — cache persistence throttles storage, not dehydration; frozen scenes need imperative animation cleanup.
 - [Fresh seller preview](fresh-seller-preview.md) — owner requires a new-account zero state; native preview is always empty, and web demo requires the current URL's explicit demo=1.
+- [Web interactive containers](expo-web-interactive-containers.md) — a View with button semantics can become an HTML button; never give a container button semantics around interactive children.

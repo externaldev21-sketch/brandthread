@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { formatCents } from '@/lib/money';
 import { plural } from '@/lib/plural';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { useColors } from '@/hooks/useColors';

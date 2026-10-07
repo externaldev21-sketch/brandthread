@@ -12,15 +12,15 @@ const pdf = Buffer.from("%PDF-1.7\n...");
 describe("evidence field mapping", () => {
   it("maps text evidence types to Stripe fields", () => {
     expect(buildStripeEvidence("tracking", "1Z999", "1Z999")).toEqual({
-      shipping_tracking_number: "1Z999", shipping_documentation: "1Z999", customer_communication: "1Z999",
+      shipping_tracking_number: "1Z999", uncategorized_text: "1Z999",
     });
-    expect(buildStripeEvidence("policy", "No returns")).toEqual({ refund_policy: "No returns", refund_policy_disclosure: "No returns" });
+    expect(buildStripeEvidence("policy", "No returns")).toEqual({ refund_policy_disclosure: "No returns" });
     expect(buildStripeEvidence("other", "x")).toEqual({ uncategorized_text: "x" });
   });
 
   it("merges text and files; an uploaded file wins for the same field", () => {
     const payload = buildEvidencePayload(
-      [{ type: "tracking", description: "1Z999" }, { type: "written_response", description: "Delivered" }],
+      [{ type: "tracking", description: "Shipment details", trackingNumber: "1Z999" }, { type: "written_response", description: "Delivered" }],
       [
         { evidenceType: "receipt", stripeFileId: "file_r" },
         { evidenceType: "shipping_documentation", stripeFileId: "file_s" },
@@ -30,8 +30,16 @@ describe("evidence field mapping", () => {
     expect(payload.receipt).toBe("file_r");
     expect(payload.shipping_documentation).toBe("file_s");
     expect(payload.shipping_tracking_number).toBe("1Z999");
-    expect(payload.customer_communication).toBe("Delivered");
+    expect(payload.uncategorized_text).toBe("Delivered");
+    expect(payload.customer_communication).toBeUndefined();
     expect(payload.customer_signature).toBeUndefined();
+  });
+  it("never substitutes prose for a tracking number or a Stripe file ID", () => {
+    const payload = buildEvidencePayload([{ type: "tracking", description: "It was delivered" }], []);
+    expect(payload.shipping_tracking_number).toBeUndefined();
+    expect(payload.shipping_documentation).toBeUndefined();
+    expect(payload.customer_communication).toBeUndefined();
+    expect(payload.uncategorized_text).toBe("It was delivered");
   });
 });
 

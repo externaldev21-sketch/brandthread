@@ -36,6 +36,8 @@ export const REQUIRED_EVENTS = [
   "transfer.reversed",
   "charge.refunded",
   "charge.refund.updated",
+  "review.opened",
+  "review.closed",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.trial_will_end",

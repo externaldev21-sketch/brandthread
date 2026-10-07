@@ -16,7 +16,6 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   BrandthreadScreen, BrandthreadHeader, GradientCard,
 } from '@/components/BrandthreadUI';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
