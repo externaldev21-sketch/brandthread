@@ -16,6 +16,8 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import { BundlePricingError } from "../lib/money/bundlePricing";
+import { priceGroupBundles } from "../lib/money/bundleLoader";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +46,8 @@ const guestCheckoutSchema = z.object({
     productId: requestPrimitives.uuid,
     variantId: requestPrimitives.uuid,
     quantity: z.coerce.number().int().min(1).max(100),
+    /** The bundle the buyer added this line with (priced server-side). */
+    bundleId: requestPrimitives.uuid.nullable().optional(),
   })).min(1).max(100),
   successUrl: requestPrimitives.url,
   cancelUrl: requestPrimitives.url,
@@ -201,6 +205,29 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       }
     }
     const subtotalCents = cartItems.reduce((n, item) => n + item.priceCents * item.quantity, 0);
+    // Bundles (lib/money/bundlePricing.ts) — the same savings a signed-in
+    // buyer gets, applied as a Stripe coupon so tax is on the discounted amount.
+    let bundlePricing: Awaited<ReturnType<typeof priceGroupBundles>>;
+    try {
+      bundlePricing = await priceGroupBundles({
+        sellerId,
+        lines: cartItems.map((item, index) => ({
+          variantId: item.variantId, productId: items[index].productId, quantity: item.quantity,
+          priceCents: item.priceCents, bundleId: typeof items[index].bundleId === "string" ? items[index].bundleId : null,
+        })),
+      });
+    } catch (bundleError) {
+      if (bundleError instanceof BundlePricingError) {
+        return res.status(400).json({ error: bundleError.message, code: bundleError.code });
+      }
+      throw bundleError;
+    }
+    cartItems.forEach((item, index) => {
+      const bundleId = bundlePricing.lineBundleId[index];
+      if (bundleId) item.bundleId = bundleId;
+    });
+    const bundleDiscountCents = bundlePricing.bundleDiscountCents;
+    const afterBundlesCents = subtotalCents - bundleDiscountCents;
 
     // Prefer the seller's worldwide shipping zones; fall back to the legacy
     // single flat-rate row (shippingRates) when they have no zones configured
@@ -224,7 +251,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         weightTiers: weightTierRows,
         destinationCountry: shippingAddressValue.country,
         sellerHomeCountry: sellerRow?.country ?? "US",
-        subtotalCents,
+        subtotalCents: afterBundlesCents,
         weightGrams: cartWeightGrams,
       });
       if (resolved.unavailable) {
@@ -234,7 +261,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       shippingLineName = resolved.zoneName ? `Shipping (${resolved.zoneName})` : "Shipping";
     } else {
       const [rate] = await db.select().from(shippingRates).where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true))).limit(1);
-      shippingCents = !rate || (rate.freeAboveCents != null && subtotalCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
+      shippingCents = !rate || (rate.freeAboveCents != null && afterBundlesCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
       shippingLineName = rate?.name ?? "Shipping";
     }
     if (shippingCents) lineItems.push({ price_data: {
@@ -246,8 +273,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: subtotalCents,
-      preTaxTotalCents: subtotalCents + shippingCents,
+      merchandiseCents: afterBundlesCents,
+      preTaxTotalCents: afterBundlesCents + shippingCents,
     });
     const checkoutIdValue = crypto.randomUUID();
     const accessToken = guestAccessToken(checkoutIdValue);
@@ -261,6 +288,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         dropId: chargePlan.dropId,
         platformFeeCents: money.platformFeeCents,
         processingFeeEstimateCents: money.processingFeeEstimateCents,
+        ...(bundleDiscountCents > 0 ? { bundleDiscountCents, bundleLines: bundlePricing.applied } : {}),
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only
@@ -286,10 +314,22 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     }
     checkoutId = checkout.id;
     const validDropId = chargePlan.dropId ?? undefined;
+    let bundleCouponId: string | undefined;
+    if (bundleDiscountCents > 0) {
+      const coupon = await stripe.coupons.create({
+        amount_off: bundleDiscountCents,
+        currency: "usd",
+        duration: "once",
+        max_redemptions: 1,
+        name: bundlePricing.applied.map((bundle) => `Bundle: ${bundle.name}`).join(" + ").slice(0, 40),
+      });
+      bundleCouponId = coupon.id;
+    }
     stripeStarted = true;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      ...(bundleCouponId ? { discounts: [{ coupon: bundleCouponId }] } : {}),
       automatic_tax: {
         enabled: true,
         liability: { type: "account", account: seller.stripeAccountId },

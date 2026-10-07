@@ -48,6 +48,7 @@ import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { ProductReviewsSection } from '@/components/ProductReviewsSection';
+import { BundleSaveSection } from '@/components/bundles/BundleSaveSection';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -1199,6 +1200,9 @@ export default function BuyerProductDetailScreen() {
               {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
             </>
           )}
+
+          {/* Bundle & save — active bundles with this product; renders nothing when none. */}
+          <BundleSaveSection productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} onAdded={bumpCart} />
 
 
           <View style={s.divider} />

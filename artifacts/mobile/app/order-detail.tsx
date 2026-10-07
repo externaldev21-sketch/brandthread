@@ -83,6 +83,10 @@ export function adaptApiOrder(raw: any): Order {
     email: customerEmail,
   };
   const items: any[] = Array.isArray(raw.items) ? raw.items : [];
+  // Bundles applied at checkout (orders.bundle_lines; savings already in discountAmountCents).
+  const bundleLines: Array<{ bundleId: string; name: string; sets: number; discountCents: number }> =
+    Array.isArray(raw.bundleLines) ? raw.bundleLines.filter((b: any) => b && typeof b.bundleId === 'string') : [];
+  const bundleNameById = new Map(bundleLines.map(b => [b.bundleId, b.name]));
 
   // DB status → UI order status (shared with app/(tabs)/orders.tsx)
   const uiStatus: OrderStatus = dbStatusToOrderStatus(raw.status);
@@ -135,6 +139,7 @@ export function adaptApiOrder(raw: any): Order {
     trackingNumber:   item.trackingNumber ?? null,
     carrier:          item.carrier ?? null,
     refundedAt:       item.refundedAt ?? null,
+    bundleName:       typeof item.bundleId === 'string' ? bundleNameById.get(item.bundleId) ?? null : null,
   }));
 
   const totalCents    = raw.totalCents ?? 0;
@@ -266,6 +271,7 @@ export function adaptApiOrder(raw: any): Order {
        // Promo + Thread Cash on the Stripe charge, so the breakdown adds up
        // to the charged total (older rows without the field stay at 0).
        discountTotalCents:      Math.max(0, raw.discountAmountCents ?? 0),
+       bundleLines,
        shippingTotalCents:      shippingCents,
        taxTotalCents:           0,
        totalCents,
@@ -1210,6 +1216,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
               <View style={{ flex: 1 }}>
                 <Text style={s.lineItemName}>{li.productName}</Text>
                 <Text style={s.lineItemVariant}>{li.variant}</Text>
+                {li.bundleName ? <Text style={s.lineItemVariant}>Bundle: {li.bundleName}</Text> : null}
                 {li.sku && <Text style={s.lineItemSku}>SKU: {li.sku}</Text>}
                 {(order.deliverBy || li.trackingNumber || li.refundedAt) ? (
                   <Text style={s.lineItemVariant}>
@@ -1316,7 +1323,12 @@ function PaymentTab({ order }: { order: Order }) {
       <SectionHeader title="Payment Breakdown" />
       <BrandthreadCard>
         <InfoRow label="Subtotal" value={usd(p.subtotalCents)} />
-        {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} />}
+        {(p.bundleLines ?? []).map(b => (
+          <InfoRow key={b.bundleId} label={`Bundle: ${b.name}${b.sets > 1 ? ` ×${b.sets}` : ''}`} value={`-${usd(b.discountCents)}`} />
+        ))}
+        {p.discountTotalCents - (p.bundleLines ?? []).reduce((n, b) => n + b.discountCents, 0) > 0 && (
+          <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents - (p.bundleLines ?? []).reduce((n, b) => n + b.discountCents, 0))}`} />
+        )}
         <InfoRow label="Shipping" value={usd(p.shippingTotalCents)} />
         <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
         <View style={s.divider} />

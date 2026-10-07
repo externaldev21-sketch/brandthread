@@ -55,7 +55,8 @@ export function choosePaymentPath(input: {
 // ─── Request bodies (whitelisted, never card data) ───────────────────────────
 
 export type PaymentIntentGroup = {
-  items: Array<{ variantId: string; productId: string; quantity: number }>;
+  /** bundleId: the bundle the buyer added the line with; the server prices it. */
+  items: Array<{ variantId: string; productId: string; quantity: number; bundleId?: string }>;
   discountCode?: string;
 };
 
@@ -93,6 +94,7 @@ export function paymentGroups(session: SessionForPayment): PaymentIntentGroup[] 
       variantId: String(item.variantId),
       productId: String(item.productId),
       quantity: Number(item.quantity),
+      ...(typeof item.bundleId === 'string' && item.bundleId ? { bundleId: String(item.bundleId) } : {}),
     })),
     ...(code ? { discountCode: String(code) } : {}),
   }));
@@ -158,6 +160,8 @@ export type QuoteGroup = {
   sellerId: string;
   checkoutSessionId: string;
   subtotalCents: number;
+  /** Bundle savings (taken off before the promo code); absent on older servers. */
+  bundleDiscountCents?: number;
   shippingCents: number;
   discountCents: number;
   taxCents: number;
@@ -193,11 +197,12 @@ export function isCartQuote(value: unknown): value is CartQuote {
 export function quoteTotals(quote: CartQuote) {
   return quote.groups.reduce((sum, group) => ({
     subtotalCents: sum.subtotalCents + group.subtotalCents,
+    bundleDiscountCents: sum.bundleDiscountCents + Math.max(0, group.bundleDiscountCents ?? 0),
     shippingCents: sum.shippingCents + group.shippingCents,
     discountCents: sum.discountCents + group.discountCents,
     taxCents: sum.taxCents + group.taxCents,
     totalCents: sum.totalCents + group.totalCents,
-  }), { subtotalCents: 0, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 0 });
+  }), { subtotalCents: 0, bundleDiscountCents: 0, shippingCents: 0, discountCents: 0, taxCents: 0, totalCents: 0 });
 }
 
 // ─── Delivery window ─────────────────────────────────────────────────────────

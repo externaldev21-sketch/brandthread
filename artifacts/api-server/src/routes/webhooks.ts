@@ -747,6 +747,7 @@ export async function handleCheckoutPaid(
     variantLabel: string;
     quantity:     number;
     priceCents:   number;
+    bundleId?:    string | null;
   };
 
   const rawItems = csRecord.items as CartItem[];
@@ -895,6 +896,9 @@ export async function handleCheckoutPaid(
         grossChargedCents: totalCents,
         paidAt: successfulPaymentAt,
         discountAmountCents: stripeDiscountCents,
+        // Bundle savings fixed at checkout (already inside the Stripe discount above).
+        bundleDiscountCents: Math.min(Math.max(0, csRecord.bundleDiscountCents ?? 0), stripeDiscountCents),
+        bundleLines: csRecord.bundleLines ?? [],
         threadCashAppliedCents: oversoldItems.length === 0 ? threadCashAppliedCents : 0,
         stripePaymentIntentId:   piId,
         stripeCheckoutSessionId: sessionId,
@@ -1028,6 +1032,7 @@ export async function handleCheckoutPaid(
         variantLabel: item.variantLabel || null,
         quantity:     item.quantity,
         priceCents:   item.priceCents,
+        bundleId:     typeof item.bundleId === "string" && item.bundleId ? item.bundleId : null,
       })),
     );
 

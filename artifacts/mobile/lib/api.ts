@@ -44,6 +44,48 @@ const BASE =
  * ws(s):// URL from the same host this client already talks to over HTTP. */
 export const API_BASE_URL = BASE;
 
+// ─── Product bundles (api-server lib/bundlesPublic.ts) ────────────────────────
+export type PublicBundleVariant = { id: string; size: string | null; color: string | null; priceCents: number; stock: number };
+export type PublicBundleItem = {
+  id: string;
+  productId: string;
+  /** Fixed variant, or null when the buyer picks the size. */
+  variantId: string | null;
+  quantity: number;
+  productName: string;
+  image: string | null;
+  images: string[];
+  priceCents: number;
+  size: string | null;
+  color: string | null;
+  variants: PublicBundleVariant[];
+};
+export type PublicBundle = {
+  id: string;
+  sellerId: string;
+  sellerName: string | null;
+  name: string;
+  description: string | null;
+  images: string[];
+  bundlePriceCents: number;
+  itemsTotalCents: number;
+  compareAtCents: number;
+  savingsCents: number;
+  needsSelection: boolean;
+  items: PublicBundleItem[];
+};
+export type BundleSales = {
+  bundleId: string;
+  name: string;
+  status: string | null;
+  setsSold: number;
+  orderCount: number;
+  grossRevenueCents: number;
+  revenueCents: number;
+  discountCents: number;
+};
+
+
 /**
  * Every request gets a hard ceiling so a hung connection (dead server, black
  * hole route, a device that fell asleep mid-request) always resolves into an
@@ -1381,7 +1423,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       checkout: {
         /** Create a Stripe Checkout Session. Returns { sessionId, url }. */
         createSession: (
-          items: { variantId: string; productId: string; quantity: number }[],
+          items: { variantId: string; productId: string; quantity: number; bundleId?: string }[],
           opts: {
             contactEmail: string;
             contactPhone: string;
@@ -1502,7 +1544,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     guest: {
       checkout: {
         createSession: (
-          items: { variantId: string; productId: string; quantity: number }[],
+          items: { variantId: string; productId: string; quantity: number; bundleId?: string }[],
           opts: {
             contactEmail: string;
             contactPhone: string;
@@ -2564,8 +2606,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/bundles/${encodeURIComponent(id)}/items`, data),
       removeItem: (id: string, itemId: string) =>
         del<any>(`/api/bundles/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
+      /** A seller's storefront bundles (active, buyable, server-priced). Public. */
       publicList: (sellerId: string) =>
-        get<any[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
+        get<PublicBundle[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
+      /** Active bundles that include this product (buyer product page). Public. */
+      publicByProduct: (productId: string) =>
+        get<PublicBundle[]>(`/api/bundles/public/by-product/${encodeURIComponent(productId)}`),
+      /** One bundle for the bundle detail screen. Public; 404 when it can't be bought. */
+      publicGet: (bundleId: string) =>
+        get<PublicBundle>(`/api/bundles/public/bundle/${encodeURIComponent(bundleId)}`),
+      /** Seller: sales per bundle (paid, not cancelled, net of refunds). */
+      sales: (days?: number) =>
+        get<BundleSales[]>(`/api/bundles/sales${days ? `?days=${days}` : ''}`),
     },
     // (buyer key defined earlier in this object — no duplicate)
     /** Team members — invite flow, roles, and activity log */

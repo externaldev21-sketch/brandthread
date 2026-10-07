@@ -583,8 +583,8 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
 
 // ─── Order summary ─────────────────────────────────────────────────────────────
 
-function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrder }: {
-  subtotal: number; discountTotal: number; shipping: number; tax: number; total: number; hasPreOrder: boolean;
+function SummaryCard({ subtotal, bundleSavings = 0, discountTotal, shipping, tax, total, hasPreOrder }: {
+  subtotal: number; bundleSavings?: number; discountTotal: number; shipping: number; tax: number; total: number; hasPreOrder: boolean;
 }) {
   const { theme } = useAppTheme();
   const sum = useMemo(() => makeSummaryStyles(theme), [theme]);
@@ -599,6 +599,7 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
   return (
     <CheckoutSection title="Order summary" testID="cart-order-summary">
       <Row label="Subtotal" value={fmtPrice(subtotal)} />
+      {bundleSavings > 0 && <Row label="Bundle savings" value={`–${fmtPrice(bundleSavings)}`} accent={theme.success} />}
       <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} accent={discountTotal > 0 ? theme.success : undefined} />
       <Row label="Shipping & fees" value={fmtPrice(shipping)} small />
       <Row label="Est. tax" value={fmtPrice(tax)} small />
@@ -1220,6 +1221,7 @@ export default function CartScreen() {
               )}
               <SummaryCard
                 subtotal={summary.subtotalCents}
+                bundleSavings={summary.bundleSavingsCents ?? 0}
                 discountTotal={displayedDiscount}
                 shipping={summary.shippingTotalCents}
                 tax={summary.taxTotalCents}

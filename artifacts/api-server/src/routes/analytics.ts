@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { bundleSalesForSeller } from "../lib/bundlesPublic";
 import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, storeVisits, notificationDeliveries, notificationEvents, threadCashEntries } from "@workspace/db";
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
@@ -544,6 +545,17 @@ router.get("/products", async (req, res) => {
   });
 
   res.json(result);
+});
+
+// GET /api/analytics/bundles
+// Bundle sales: sets sold, orders, revenue (net of refunds) and savings given,
+// per bundle. Same order definition as the rest of this file: paid, not
+// cancelled, net of refunds (lib/bundlesPublic.ts bundleSalesForSeller).
+router.get("/bundles", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const days = Number(req.query.days);
+  const since = Number.isInteger(days) && days > 0 && days <= 3650 ? new Date(Date.now() - days * 86_400_000) : null;
+  res.json(await bundleSalesForSeller(ownerId, since));
 });
 
 // GET /api/analytics/post-clicks

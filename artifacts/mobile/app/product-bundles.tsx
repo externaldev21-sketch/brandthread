@@ -52,6 +52,11 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
           {formatCents(bundle.bundlePriceCents)}
           {savings > 0 ? ` · saves ${formatCents(savings)}` : ''}
         </Text>
+        {bundle.sales?.setsSold > 0 ? (
+          <Text style={r.meta} testID={`bundle-sales-${bundle.id}`}>
+            {bundle.sales.setsSold} sold · {formatCents(bundle.sales.revenueCents ?? 0)}
+          </Text>
+        ) : null}
       </View>
       <Feather name="chevron-right" size={16} color={MUTED} />
     </TouchableOpacity>

@@ -33,6 +33,8 @@ import { getSellerVacationStatus } from "../sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
 import { CheckoutPlanError, resolveChargePlan } from "./checkoutPlan";
 import { destinationApplicationFeeCents } from "./fees";
+import { BundlePricingError, linesAfterBundles, type AppliedBundle } from "./bundlePricing";
+import { priceGroupBundles } from "./bundleLoader";
 
 export const CART_CHECKOUT_KIND = "cart_checkout";
 /** Stripe's minimum USD card charge. */
@@ -120,8 +122,18 @@ export type CartShipping = {
 export type PricedGroup = {
   sellerId: string;
   sellerStripeAccountId: string;
-  items: Array<{ variantId: string; productId: string; productName: string; variantLabel: string; quantity: number; priceCents: number }>;
+  items: Array<{
+    variantId: string; productId: string; productName: string; variantLabel: string; quantity: number; priceCents: number;
+    /** The bundle this line counted toward (null when none). */
+    bundleId: string | null;
+    /** This line's share of the bundle savings. */
+    bundleDiscountCents: number;
+  }>;
+  /** Full price of the lines (before bundle savings and promo). */
   subtotalCents: number;
+  /** Bundle savings (lib/money/bundlePricing.ts), taken off before the promo code. */
+  bundleDiscountCents: number;
+  bundleLines: AppliedBundle[];
   shippingCents: number;
   shippingLineName: string;
   /** Business days before the seller ships (their zone's processing time), when known. */
@@ -130,7 +142,7 @@ export type PricedGroup = {
   discountCode: string | null;
   /** Promo on merchandise + any free-shipping part, as the hosted flow computes it. */
   discountCents: number;
-  /** Merchandise-only part of the promo (for spreading across tax lines). */
+  /** Merchandise-only part of the promo (for spreading across tax lines; bundle savings are separate). */
   merchandiseDiscountCents: number;
   shippingDiscountCents: number;
   platformFeeCents: number;
@@ -139,7 +151,7 @@ export type PricedGroup = {
 
 export async function priceCartGroup(input: {
   buyerId: string;
-  items: Array<{ variantId: string; productId: string; quantity: number }>;
+  items: Array<{ variantId: string; productId: string; quantity: number; bundleId?: string | null }>;
   discountCode?: string | null;
   shipping: CartShipping;
 }): Promise<PricedGroup> {
@@ -179,7 +191,7 @@ export async function priceCartGroup(input: {
     const variantLabel = [row.size, row.color].filter(Boolean).join(" / ");
     items.push({
       variantId: row.variantId, productId: item.productId, productName: row.productName, variantLabel,
-      quantity: item.quantity, priceCents: row.priceCents,
+      quantity: item.quantity, priceCents: row.priceCents, bundleId: null, bundleDiscountCents: 0,
     });
     discountLines.push({ productId: item.productId, priceCents: row.priceCents, quantity: item.quantity });
     weightGrams += (row.weightGrams ?? 0) * item.quantity;
@@ -211,6 +223,28 @@ export async function priceCartGroup(input: {
 
   const subtotalCents = items.reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
 
+  // Bundles first (the buyer pays the bundle price), then the promo code on
+  // what is left. Tax is charged on each line's discounted amount.
+  let bundles;
+  try {
+    bundles = await priceGroupBundles({
+      sellerId,
+      lines: input.items.map((item, index) => ({
+        variantId: items[index].variantId, productId: item.productId, quantity: item.quantity,
+        priceCents: items[index].priceCents, bundleId: item.bundleId ?? null,
+      })),
+    });
+  } catch (error) {
+    if (error instanceof BundlePricingError) throw new CartCheckoutError(400, error.code, error.message, error.details);
+    throw error;
+  }
+  items.forEach((item, index) => {
+    item.bundleId = bundles.lineBundleId[index];
+    item.bundleDiscountCents = bundles.lineDiscountCents[index];
+  });
+  const bundleDiscountCents = bundles.bundleDiscountCents;
+  const afterBundlesCents = subtotalCents - bundleDiscountCents;
+
   let shippingCents = 0;
   let shippingLineName = "Shipping";
   let processingDays: number | null = null;
@@ -227,7 +261,7 @@ export async function priceCartGroup(input: {
       weightTiers: tiers,
       destinationCountry: input.shipping.country,
       sellerHomeCountry: seller.shipFrom ?? "US",
-      subtotalCents,
+      subtotalCents: afterBundlesCents,
       weightGrams,
     });
     if (resolved.unavailable) {
@@ -240,7 +274,7 @@ export async function priceCartGroup(input: {
   } else {
     const [rate] = await db.select().from(shippingRates)
       .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true))).limit(1);
-    shippingCents = !rate || (rate.freeAboveCents != null && subtotalCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
+    shippingCents = !rate || (rate.freeAboveCents != null && afterBundlesCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
     shippingLineName = rate?.name ?? "Shipping";
   }
 
@@ -248,7 +282,8 @@ export async function priceCartGroup(input: {
   if (input.discountCode?.trim()) {
     try {
       discount = await validateDiscountCode({
-        sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: subtotalCents, lines: discountLines,
+        sellerId, code: input.discountCode, customerKey: input.buyerId, cartSubtotalCents: afterBundlesCents,
+        lines: linesAfterBundles(discountLines, bundles.lineDiscountCents),
       });
     } catch (error) {
       if (error instanceof DiscountValidationError) {
@@ -259,13 +294,14 @@ export async function priceCartGroup(input: {
   }
   const shippingDiscountCents = discount?.freeShipping ? shippingCents : 0;
   const discountCents = discount
-    ? Math.min(discount.appliedAmountCents + shippingDiscountCents, subtotalCents + shippingCents)
+    ? Math.min(discount.appliedAmountCents + shippingDiscountCents, afterBundlesCents + shippingCents)
     : 0;
-  const merchandiseDiscountCents = Math.max(0, Math.min(subtotalCents, discountCents - shippingDiscountCents));
+  const merchandiseDiscountCents = Math.max(0, Math.min(afterBundlesCents, discountCents - shippingDiscountCents));
 
+  // Bundle savings are seller-funded, like the promo: both lower the fee basis.
   const fee = destinationApplicationFeeCents({
-    merchandiseCents: Math.max(0, subtotalCents - discountCents),
-    preTaxTotalCents: Math.max(0, subtotalCents + shippingCents - discountCents),
+    merchandiseCents: Math.max(0, afterBundlesCents - discountCents),
+    preTaxTotalCents: Math.max(0, afterBundlesCents + shippingCents - discountCents),
   });
 
   return {
@@ -273,6 +309,8 @@ export async function priceCartGroup(input: {
     sellerStripeAccountId: seller.stripeAccountId,
     items,
     subtotalCents,
+    bundleDiscountCents,
+    bundleLines: bundles.applied,
     shippingCents,
     shippingLineName,
     processingDays,
@@ -311,7 +349,11 @@ export async function calculateGroupTax(
   group: PricedGroup,
   shipping: CartShipping,
 ): Promise<{ taxCents: number; calculationId: string | null }> {
-  const lineAmounts = spreadDiscount(group.items.map((i) => i.priceCents * i.quantity), group.merchandiseDiscountCents);
+  // Each line's bundle share comes off that line exactly; the promo is then spread over what is left.
+  const lineAmounts = spreadDiscount(
+    group.items.map((i) => i.priceCents * i.quantity - (i.bundleDiscountCents ?? 0)),
+    group.merchandiseDiscountCents,
+  );
   const taxableShipping = Math.max(0, group.shippingCents - group.shippingDiscountCents);
   if (lineAmounts.every((amount) => amount <= 0) && taxableShipping <= 0) return { taxCents: 0, calculationId: null };
   try {

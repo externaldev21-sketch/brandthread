@@ -124,6 +124,8 @@ export interface CheckoutDisplayTotals {
   subtotalCents: number;
   shippingCents: number;
   taxCents: number;
+  /** Bundle savings, already inside the total (shown on their own line). */
+  bundleSavingsCents?: number;
   /** Promo code savings — only applied server-side to single-seller checkouts. */
   promoCents: number;
   /** Loyalty rewards already folded into summary.totalCents (Thread Cash has its own line). */
@@ -169,6 +171,7 @@ export function getCheckoutDisplayTotals(
     subtotalCents: summary.subtotalCents,
     shippingCents: summary.shippingTotalCents,
     taxCents: summary.taxTotalCents,
+    bundleSavingsCents: Math.max(0, summary.bundleSavingsCents ?? 0),
     promoCents: cappedPromo,
     rewardsCents: summary.discountTotalCents - threadCashCents,
     threadCashCents,
