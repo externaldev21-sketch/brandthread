@@ -364,7 +364,9 @@ export async function publishNotification(n: {
   const muteKeys = [`type:${n.type}`, ...(n.actorId ? [`actor:${n.actorId}`] : [])];
   const muted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
     .where(and(eq(activityMutes.userId, n.userId), inArray(activityMutes.muteKey, muteKeys)));
-  const isMuted = muted.length > 0;
+  // The feed row always records the mute; incoming calls still push through it.
+  const rowMuted = muted.length > 0;
+  const isMuted = rowMuted && !n.ringThroughMutes;
 
   const [notification] = await db
     .insert(notificationsFeed)
@@ -374,7 +376,7 @@ export async function publishNotification(n: {
       type:         n.type,
       title:        n.title,
       body:         n.body   ?? "",
-      isMuted,
+      isMuted:      rowMuted,
       actorName:    n.actorName    ?? null,
       actorHandle:  n.actorHandle  ?? null,
       actorInitials: n.actorInitials ?? null,
@@ -395,7 +397,7 @@ export async function publishNotification(n: {
   // Do not send a second push when the in-app notification already existed,
   // and don't push a muted ("see less") event either — it's still visible if
   // the recipient goes looking, just not worth interrupting them for.
-  if (!notification || (isMuted && !n.ringThroughMutes)) return;
+  if (!notification || isMuted) return;
 
   if (pushCategory) {
     // A muted conversation (conversation_participants.muted_until in the
