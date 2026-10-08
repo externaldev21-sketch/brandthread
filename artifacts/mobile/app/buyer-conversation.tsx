@@ -2200,7 +2200,10 @@ export default function BuyerConversationScreen() {
               just the info icon below. */}
           {conv && !isAgentConv && (
             <PressableScale rippleEnabled={false}
-              style={s.roundBtn}
+              style={[s.roundBtn, isRequestMode && s.callBtnDisabled]}
+              // Pending message request: calls open once it's accepted (lib/callPolicy.ts).
+              disabled={isRequestMode}
+              accessibilityState={{ disabled: isRequestMode }}
               onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-call-voice"
@@ -2212,7 +2215,10 @@ export default function BuyerConversationScreen() {
           )}
           {conv && !isAgentConv && (
             <PressableScale rippleEnabled={false}
-              style={s.roundBtn}
+              style={[s.roundBtn, isRequestMode && s.callBtnDisabled]}
+              // Pending message request: calls open once it's accepted (lib/callPolicy.ts).
+              disabled={isRequestMode}
+              accessibilityState={{ disabled: isRequestMode }}
               onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-call-video"
@@ -2982,6 +2988,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 20,
   },
+  // Call buttons while the chat is a pending message request.
+  callBtnDisabled: { opacity: 0.55 },
   roundBtn: {
     width: 36,
     height: 36,

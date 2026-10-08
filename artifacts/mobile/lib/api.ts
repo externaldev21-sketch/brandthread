@@ -1237,6 +1237,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
         ),
+      /** Native call-ringing token (iOS PushKit VoIP / Android FCM) — lib/calls/native/. */
+      registerVoipToken: (body: {
+        token: string;
+        platform: 'ios' | 'android';
+        kind: 'voip' | 'fcm';
+        environment?: 'sandbox' | 'production';
+      }) => post<{ ok: boolean }>('/api/push/voip-token', body),
+      deregisterVoipToken: (token: string) =>
+        request<{ ok: boolean }>(
+          '/api/push/voip-token',
+          { method: 'DELETE', body: JSON.stringify({ token }) },
+          getToken,
+        ),
     },
     notifications: {
       trackEvent: (body: {

@@ -5,6 +5,7 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import type { CallMode } from '../types';
 import { createRtcStateStore, type RtcCredentials, type RtcEngine, type RtcEngineEvents } from './types';
+import { nativeCallKit } from '../native/nativeCallKit';
 
 let AgoraModule: any = null;
 try {
@@ -58,6 +59,13 @@ export function createRtcEngine(mode: CallMode, events: RtcEngineEvents): RtcEng
         onError: (code: number, msg: string) => events.error(msg || `Call error ${code}`),
       });
       engine.enableAudio();
+      // With CallKit owning the iOS audio session (lib/calls/native/), Agora
+      // must not deactivate it when it leaves the channel.
+      if (Platform.OS === 'ios' && nativeCallKit.available) {
+        engine.setAudioSessionOperationRestriction?.(
+          AgoraModule.AudioSessionOperationRestriction?.AudioSessionOperationRestrictionDeactivateSession ?? 4,
+        );
+      }
       if (mode === 'video') {
         engine.enableVideo();
         engine.startPreview();

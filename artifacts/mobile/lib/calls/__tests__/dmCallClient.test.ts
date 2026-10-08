@@ -54,6 +54,10 @@ describe('copy', () => {
   it('explains why a call could not be placed', () => {
     expect(startFailureMessage('CALLEE_BUSY')).toBe('They’re on another call.');
     expect(startFailureMessage('CALLING_NOT_CONFIGURED')).toMatch(/isn’t available/);
+    // Server call policy (api-server lib/callPolicy.ts) codes.
+    expect(startFailureMessage('BLOCKED')).toBe('You can’t call this person.');
+    expect(startFailureMessage('CALL_REQUEST_NOT_ACCEPTED')).toBe('You can call once they accept your message request.');
+    expect(startFailureMessage('CALL_REQUEST_PENDING')).toBe('Accept the message request to call.');
     expect(startFailureMessage(undefined)).toMatch(/couldn’t be placed/);
   });
 

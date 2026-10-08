@@ -1586,7 +1586,10 @@ export default function SellerConversationScreen() {
           {id && (
             <>
               <PressableScale
-                style={s.headerCallBtn}
+                style={[s.headerCallBtn, isRequestMode && s.callBtnDisabled]}
+                // Pending message request: calls open once it's accepted (lib/callPolicy.ts).
+                disabled={isRequestMode}
+                accessibilityState={{ disabled: isRequestMode }}
                 onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
@@ -1595,7 +1598,10 @@ export default function SellerConversationScreen() {
                 <Feather name="phone" size={ICON.lg} color={MUTED} />
               </PressableScale>
               <PressableScale
-                style={s.headerCallBtn}
+                style={[s.headerCallBtn, isRequestMode && s.callBtnDisabled]}
+                // Pending message request: calls open once it's accepted (lib/callPolicy.ts).
+                disabled={isRequestMode}
+                accessibilityState={{ disabled: isRequestMode }}
                 onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
@@ -2614,6 +2620,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   buyerContextCartNoteText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 17 },
 
   // ── Call + media styles ──────────────────────────────────────────────────────
+  // Call buttons while the chat is a pending message request.
+  callBtnDisabled: { opacity: 0.55 },
   headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
 
