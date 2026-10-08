@@ -348,6 +348,13 @@ export async function publishNotification(n: {
   pushInterruptionLevel?: "active" | "critical" | "passive" | "time-sensitive";
   /** Extra keys merged into the push `data` payload; they override core keys except notificationId. */
   extraData?: Record<string, unknown>;
+  /**
+   * Incoming calls only: a muted chat (conversation_participants.muted_until)
+   * and Activity "see less" mutes still let the push through, so a call
+   * always rings. The feed row keeps its muted flag. Message notifications
+   * never set this and stay muted.
+   */
+  ringThroughMutes?: boolean;
 }): Promise<void> {
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
@@ -388,13 +395,13 @@ export async function publishNotification(n: {
   // Do not send a second push when the in-app notification already existed,
   // and don't push a muted ("see less") event either — it's still visible if
   // the recipient goes looking, just not worth interrupting them for.
-  if (!notification || isMuted) return;
+  if (!notification || (isMuted && !n.ringThroughMutes)) return;
 
   if (pushCategory) {
     // A muted conversation (conversation_participants.muted_until in the
     // future) only suppresses device delivery; the feed row above is kept and
     // unread state is unchanged.
-    if (n.targetType === "conversation" && n.targetId) {
+    if (n.targetType === "conversation" && n.targetId && !n.ringThroughMutes) {
       const [participant] = await db.select({ mutedUntil: conversationParticipants.mutedUntil })
         .from(conversationParticipants)
         .where(and(

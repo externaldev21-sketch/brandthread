@@ -39,6 +39,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { followingSortDirection } from "../lib/followingSort";
 import { promotePendingRequestsOnFollow } from "../lib/conversationRouting";
+import { emitUserBlocked } from "../lib/blockEvents";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -1571,6 +1572,8 @@ router.post("/block", async (req, res) => {
       and(eq(follows.followerId, userId), eq(follows.followingId, myId)),
     ));
   });
+  // Ends any DM call ringing / live between the two (routes/call.ts).
+  await emitUserBlocked(myId, userId);
 
   res.json({ ok: true });
 });

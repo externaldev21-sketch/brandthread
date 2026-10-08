@@ -20,6 +20,11 @@
  *   GET  /api/call/dm/incoming                    → { call | null }
  *   GET  /api/call/dm/conversations/:id/calls     → { calls }
  *
+ * Who may call whom is lib/callPolicy.ts (block either way → 403 BLOCKED,
+ * pending message request → 403 CALL_REQUEST_NOT_ACCEPTED / CALL_REQUEST_PENDING).
+ * A muted chat still rings: the "calls" push bypasses chat mute and the
+ * native VoIP ring (lib/voipPush.ts) is sent alongside it.
+ *
  * The legacy /token channel name is deterministic (call_{conversationId});
  * DM calls use a per-call channel (dmcall_{callId without dashes}).
  */
@@ -33,6 +38,9 @@ import { publishNotification } from "./notifications-feed";
 import { logger } from "../lib/logger";
 import { isUniqueViolation } from "../lib/dbErrors";
 import { sendCallEvent } from "../ws/callHub";
+import { evaluateCallPolicy } from "../lib/callPolicy";
+import { onUserBlocked } from "../lib/blockEvents";
+import { sendCallVoipPush, type CallVoipPayload } from "../lib/voipPush";
 import {
   LIVE_CALL_STATUSES,
   RING_TIMEOUT_SECONDS,
@@ -403,17 +411,78 @@ async function publishMissedCall(call: DmCallRow, view: CallView): Promise<void>
   });
 }
 
-/** Side effects of a transition this request won: realtime update to both, missed-call notice. */
+function voipPayload(call: DmCallRow, view: CallView, type: CallVoipPayload["type"], reason?: string): CallVoipPayload {
+  const caller = view.participants.find((p) => p.userId === call.callerId);
+  return {
+    type,
+    callId: call.id,
+    conversationId: call.conversationId,
+    callerId: call.callerId,
+    callerName: caller?.name?.trim() || "Someone",
+    callerAvatar: view.avatars.get(call.callerId) ?? null,
+    hasVideo: call.mode === "video",
+    ...(reason ? { reason } : {}),
+  };
+}
+
+/**
+ * Why the callee's system call screen (CallKit / ConnectionService) should
+ * stop ringing after a transition, or null when it never rang / already
+ * stopped. `accepted` dismisses the ring on the callee's OTHER devices
+ * (answered elsewhere); the device that answered ignores it.
+ */
+export function nativeRingDismissReason(call: Pick<DmCallRow, "status" | "endReason">): string | null {
+  switch (call.status) {
+    case "accepted": return "answered_elsewhere";
+    case "declined":
+    case "cancelled":
+    case "missed":
+      return call.status;
+    case "failed": return call.endReason || "failed";
+    default: return null;
+  }
+}
+
+/** Side effects of a transition this request won: realtime update to both, missed-call notice, native ring dismissal. */
 async function afterTransition(call: DmCallRow): Promise<void> {
   try {
     const view = await loadCallView(call.conversationId);
     emitCallEvent("call.updated", call, view, [call.callerId, call.calleeId]);
+    const dismiss = nativeRingDismissReason(call);
+    if (dismiss) {
+      void sendCallVoipPush(call.calleeId, voipPayload(call, view, "dm_call_ended", dismiss));
+    }
     if (call.status === "missed" || call.status === "cancelled") {
       await publishMissedCall(call, view);
     }
   } catch (err) {
     logger.error({ err, callId: call.id }, "DM call transition side effects failed");
   }
+}
+
+/**
+ * A block between two people ends any call they have going right now: a
+ * ringing call becomes `failed` (end_reason 'blocked' — no missed-call
+ * notice, the native ring is dismissed) and an accepted call is ended.
+ * Called by POST /api/social/block. Never throws.
+ */
+export async function endLiveCallsBetween(a: string, b: string): Promise<number> {
+  let ended = 0;
+  try {
+    const live = (await getLiveCallsForUser(a)).filter((c) => c.callerId === b || c.calleeId === b);
+    for (const call of live) {
+      const updated = call.status === "ringing"
+        ? await transitionCall(call.id, "ringing", "failed", a, "blocked")
+        : await transitionCall(call.id, "accepted", "ended", a, "blocked");
+      if (updated) {
+        ended += 1;
+        await afterTransition(updated);
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "Ending calls after a block failed");
+  }
+  return ended;
 }
 
 /**
@@ -453,6 +522,9 @@ async function liveCallsFor(userId: string): Promise<DmCallRow[]> {
   return fresh.filter((c) => (LIVE_CALL_STATUSES as string[]).includes(c.status));
 }
 
+// A block ends a call that is ringing or live between the two right now.
+onUserBlocked((blockerId, blockedId) => endLiveCallsBetween(blockerId, blockedId));
+
 router.post("/dm/calls", async (req, res) => {
   const callerId = (req as any).clerkUserId as string;
   const { conversationId, mode } = req.body ?? {};
@@ -475,8 +547,9 @@ router.post("/dm/calls", async (req, res) => {
     return res.status(403).json({ error: "Calls are only available in 1:1 conversations", code: "NOT_ONE_TO_ONE" });
   }
   const calleeId = others[0]!;
-  if (await isBlockedEitherWay(callerId, calleeId)) {
-    return res.status(403).json({ error: "You can't call this person", code: "BLOCKED" });
+  const policy = await evaluateCallPolicy(callerId, calleeId, conversationId);
+  if (!policy.ok) {
+    return res.status(policy.status).json({ error: policy.error, code: policy.code });
   }
   if (!isCallingConfigured()) return notConfigured(res);
 
@@ -525,6 +598,8 @@ router.post("/dm/calls", async (req, res) => {
     // Activity feed row opens the chat; the push itself carries the call.
     targetId: conversationId,
     targetType: "conversation",
+    // A muted chat still rings (mute is for messages only).
+    ringThroughMutes: true,
     pushCategory: "message",
     pushChannelId: "calls",
     pushSound: "default",
@@ -539,6 +614,8 @@ router.post("/dm/calls", async (req, res) => {
       actorName: callerName,
     },
   }).catch((err) => req.log?.error?.({ err, callId: call.id }, "DM call incoming push failed"));
+  // System call screen on iOS (CallKit via PushKit) / Android (ConnectionService via FCM data).
+  void sendCallVoipPush(calleeId, voipPayload(call, view, "dm_call_incoming"));
 
   return res.status(201).json({ call: serializeCall(call, callerId, view.participants, view.avatars), rtc });
 });
@@ -588,6 +665,14 @@ async function handleCallAction(req: Request, res: Response, action: "accept" | 
       return respondCall(res, 200, call, userId, withRtc ? { rtc: rtcFor(call, userId) } : {});
     }
     if (withRtc && !isCallingConfigured()) return notConfigured(res);
+    // A block placed while it rang stops the answer too (the block route
+    // already ends live calls; this closes the race with an in-flight accept).
+    if (action === "accept" && await isBlockedEitherWay(call.callerId, call.calleeId)) {
+      const failed = await transitionCall(call.id, "ringing", "failed", userId, "blocked");
+      if (failed) await afterTransition(failed);
+      const current = failed ?? (await getCall(call.id)) ?? call;
+      return respondCall(res, 403, current, userId, { error: "You can't call this person", code: "BLOCKED" });
+    }
     const updated = await transitionCall(call.id, call.status as DmCallStatus, decision.next, userId);
     if (updated) {
       await afterTransition(updated);
