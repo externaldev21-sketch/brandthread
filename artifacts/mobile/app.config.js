@@ -6,12 +6,23 @@
  *
  * - updates.url: EAS Update endpoint, derived from the project ID that
  *   `eas init` writes to app.json (extra.eas.projectId).
+ * - android.googleServicesFile: set only when ./google-services.json is
+ *   present (Firebase Android app config — FCM device tokens for native call
+ *   ringing, lib/calls/native/). Without it the Android build is unchanged.
  */
+const fs = require('fs');
+const path = require('path');
+
 module.exports = ({ config }) => {
-  const projectId = config.extra?.eas?.projectId;
-  if (!projectId || config.updates?.url) return config;
+  let next = config;
+  const googleServices = path.join(__dirname, 'google-services.json');
+  if (!next.android?.googleServicesFile && fs.existsSync(googleServices)) {
+    next = { ...next, android: { ...next.android, googleServicesFile: './google-services.json' } };
+  }
+  const projectId = next.extra?.eas?.projectId;
+  if (!projectId || next.updates?.url) return next;
   return {
-    ...config,
-    updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` },
+    ...next,
+    updates: { ...next.updates, url: `https://u.expo.dev/${projectId}` },
   };
 };

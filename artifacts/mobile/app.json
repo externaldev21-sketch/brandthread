@@ -225,7 +225,9 @@
         "backgroundColor": "#0A0A0B"
       },
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_PHONE_NUMBERS"
       ],
       "intentFilters": [
         {
@@ -412,6 +414,8 @@
       ],
       "./plugins/with-sentry-upload-guard",
       "./plugins/with-upload-live-activity",
+      "./plugins/with-voip-callkit",
+      "expo-dev-client",
       [
         "@stripe/stripe-react-native",
         {
