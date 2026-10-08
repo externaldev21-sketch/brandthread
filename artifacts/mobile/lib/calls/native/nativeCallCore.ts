@@ -15,6 +15,8 @@ export interface NativeCallPush {
   type: NativeCallPushType;
   callId: string;
   conversationId: string | null;
+  /** The Clerk user this push is for (null from servers that predate it). */
+  calleeId: string | null;
   callerId: string | null;
   callerName: string;
   callerAvatar: string | null;
@@ -91,6 +93,7 @@ export function parseNativeCallPush(raw: unknown): NativeCallPush | null {
       type,
       callId: callId.toLowerCase(),
       conversationId: str(d.conversationId),
+      calleeId: str(d.calleeId),
       callerId: str(d.callerId),
       callerName: str(d.callerName) ?? 'Brandthread',
       callerAvatar: str(d.callerAvatar),
@@ -100,6 +103,22 @@ export function parseNativeCallPush(raw: unknown): NativeCallPush | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Is this push for the account signed in on this device right now?
+ * 'ring' only when someone is signed in and the push names that same user
+ * (a push without calleeId — an older server — is trusted when signed in).
+ * 'reject' when signed out, or signed into a different account: the ring was
+ * meant for the previous account on this phone. iOS still has to report a
+ * rejected VoIP push to CallKit (Apple requirement) and ends it at once with
+ * a generic name (AppDelegate.swift, plugins/with-voip-callkit.js);
+ * Android just ignores it.
+ */
+export function nativeRingDecision(pushCalleeId: string | null | undefined, signedInUserId: string | null | undefined): 'ring' | 'reject' {
+  if (!signedInUserId) return 'reject';
+  if (pushCalleeId && pushCalleeId !== signedInUserId) return 'reject';
+  return 'ring';
 }
 
 /** Server end reason (push / call record) → system end reason. */

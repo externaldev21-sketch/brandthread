@@ -13,11 +13,13 @@
  * Expo Go, web, an older build, or EXPO_PUBLIC_NATIVE_CALLS=0.
  */
 import { NativeModules } from 'react-native';
+import { getCallUserId } from './callIdentity';
 import {
   NATIVE_END_REASON,
   inertNativeCallKit,
   loadOptionalNative,
   nativeCallsFlagEnabled,
+  nativeRingDecision,
   parseNativeCallPush,
   type NativeCallKit,
 } from './nativeCallCore';
@@ -88,7 +90,11 @@ function makeIosCallKit(ck: CallKeep, voip: VoipPush): NativeCallKit {
       ];
       const onPush = (payload: unknown) => {
         const push = parseNativeCallPush(payload);
-        if (push) handlers.onPush(push);
+        if (!push) return;
+        // AppDelegate already ended a ring meant for another / no account.
+        void getCallUserId().then((userId) => {
+          if (nativeRingDecision(push.calleeId, userId) === 'ring') handlers.onPush(push);
+        });
       };
       voip.addEventListener('notification', onPush);
       voip.addEventListener('didLoadWithEvents', (events: Array<{ name: string; data: unknown }>) => {

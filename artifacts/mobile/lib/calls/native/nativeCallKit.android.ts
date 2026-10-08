@@ -11,9 +11,11 @@
  */
 import {
   inertNativeCallKit,
+  nativeRingDecision,
   parseNativeCallPush,
   type NativeCallKit,
 } from './nativeCallCore';
+import { getCallUserId } from './callIdentity';
 import {
   androidCallKeep,
   displayAndroidIncomingCall,
@@ -49,8 +51,11 @@ function makeAndroidCallKit(ck: AndroidCallKeep): NativeCallKit {
           subs.push(Notifications.addNotificationReceivedListener((n: any) => {
             const push = parseNativeCallPush(fcmDataOf(n?.request?.content?.data ?? n?.request?.trigger?.remoteMessage?.data));
             if (!push) return;
-            if (push.type === 'dm_call_incoming') displayAndroidIncomingCall(ck, push);
-            handlers.onPush(push);
+            void getCallUserId().then((userId) => {
+              if (nativeRingDecision(push.calleeId, userId) === 'reject') return;
+              if (push.type === 'dm_call_incoming') displayAndroidIncomingCall(ck, push);
+              handlers.onPush(push);
+            });
           }));
         } catch { /* notifications unavailable */ }
       }

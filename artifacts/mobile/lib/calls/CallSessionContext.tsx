@@ -76,7 +76,7 @@ function logReasonFor(session: CallSession): CallEndReason {
 
 export function CallSessionProvider({ children }: { children: React.ReactNode }) {
   const api = useApi();
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded, userId: authUserId } = useAuth();
   const { user } = useUser();
   const demo = isPreviewDemoMode();
 
@@ -356,12 +356,14 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   // drives the same accept / decline / end above; inert in Expo Go and web.
   useNativeCallBridge({
     enabled: !!agora && !!isSignedIn,
+    userId: !isLoaded ? undefined : (isSignedIn && authUserId ? authUserId : null),
     session,
     checkIncoming: () => agora?.checkIncoming(),
     acceptCall,
     declineOrEndCall,
     endOnServer: (callId) => api.call.dm.end(callId),
     uploadToken: (token) => api.push.registerVoipToken(token),
+    deregisterToken: (token) => api.push.deregisterVoipToken(token),
   });
 
   const rtcEngine = useCallback(() => {

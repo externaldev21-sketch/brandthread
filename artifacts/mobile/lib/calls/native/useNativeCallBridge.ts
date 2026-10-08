@@ -18,20 +18,36 @@ import { useEffect, useRef } from 'react';
 import type { CallSession } from '../types';
 import { nativeCallKit } from './nativeCallKit';
 import { nativeEndReasonFor, nativeEndReasonForSession, type NativeCallToken } from './nativeCallCore';
+import { setCallUserId } from './callIdentity';
 
 export function useNativeCallBridge(opts: {
   enabled: boolean;
+  /**
+   * The signed-in Clerk user id; null once auth has loaded signed out;
+   * undefined while auth is still loading. Persisted for the native push
+   * handlers (callIdentity.ts) so a ring for a previous account is dropped.
+   */
+  userId: string | null | undefined;
   session: CallSession | null;
   checkIncoming(): Promise<void> | void;
   acceptCall(): Promise<void>;
   declineOrEndCall(): Promise<void>;
   endOnServer(callId: string): Promise<unknown>;
   uploadToken(token: NativeCallToken): Promise<unknown>;
+  /** Best-effort DELETE /api/push/voip-token when the account on this device changes. */
+  deregisterToken(token: string): Promise<unknown>;
 }): void {
   const latest = useRef(opts);
   latest.current = opts;
   const pendingAnswer = useRef<string | null>(null);
   const reported = useRef<{ callId: string; answered: boolean; ended: boolean } | null>(null);
+
+  // Who native ringing may ring for. Cleared on sign-out, replaced on an
+  // account switch — before any push for the new account can arrive.
+  useEffect(() => {
+    if (opts.userId === undefined) return;
+    void setCallUserId(opts.userId);
+  }, [opts.userId]);
 
   useEffect(() => {
     if (!opts.enabled || !nativeCallKit.available) return undefined;
@@ -75,8 +91,16 @@ export function useNativeCallBridge(opts: {
       lastToken = token.token;
       latest.current.uploadToken(token).catch(() => { lastToken = ''; });
     });
-    return () => { offEvents(); offToken(); };
-  }, [opts.enabled]);
+    return () => {
+      offEvents();
+      offToken();
+      // Signing out / switching account: drop this device's token for the
+      // account that is leaving. Best-effort — once the session is gone the
+      // request may be refused; the push's calleeId check (callIdentity.ts)
+      // and the server moving the token on the next registration cover that.
+      if (lastToken) latest.current.deregisterToken(lastToken).catch(() => {});
+    };
+  }, [opts.enabled, opts.userId]);
 
   const { session } = opts;
   useEffect(() => {

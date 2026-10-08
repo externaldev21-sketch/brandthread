@@ -417,6 +417,7 @@ function voipPayload(call: DmCallRow, view: CallView, type: CallVoipPayload["typ
     type,
     callId: call.id,
     conversationId: call.conversationId,
+    calleeId: call.calleeId,
     callerId: call.callerId,
     callerName: caller?.name?.trim() || "Someone",
     callerAvatar: view.avatars.get(call.callerId) ?? null,

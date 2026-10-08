@@ -156,7 +156,11 @@ describe("muted chat still rings", () => {
     expect(callPush!.payload).toMatchObject({ channelId: "calls", priority: "high" });
     expect(spies.voip).toContainEqual({
       userId: CALLEE,
-      payload: expect.objectContaining({ type: "dm_call_incoming", callId: call.id, callerName: "Ava Caller", hasVideo: false, conversationId }),
+      payload: expect.objectContaining({
+        type: "dm_call_incoming", callId: call.id, callerName: "Ava Caller", hasVideo: false, conversationId,
+        // The device drops a ring addressed to another / no signed-in account.
+        calleeId: CALLEE, callerId: CALLER,
+      }),
     });
     expect(spies.socket.some((e) => e.userId === CALLEE && e.payload.type === "call.incoming")).toBe(true);
   });
@@ -209,7 +213,7 @@ describe("block stops calls", () => {
       .toEqual([CALLEE, CALLER].sort());
     expect(spies.voip).toContainEqual({
       userId: CALLEE,
-      payload: expect.objectContaining({ type: "dm_call_ended", callId: call.id, reason: "blocked" }),
+      payload: expect.objectContaining({ type: "dm_call_ended", callId: call.id, reason: "blocked", calleeId: CALLEE }),
     });
     // The callee can't answer it any more.
     const accept = await as(CALLEE, `/api/call/dm/calls/${call.id}/accept`, "POST", {});

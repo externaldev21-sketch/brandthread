@@ -43,6 +43,8 @@ export type CallVoipPayload = {
   type: "dm_call_incoming" | "dm_call_ended";
   callId: string;
   conversationId: string;
+  /** The Clerk user the push is for — the app drops a ring meant for another (or no) signed-in account. */
+  calleeId: string;
   callerId: string;
   callerName: string;
   callerAvatar: string | null;
@@ -223,6 +225,7 @@ export function buildApnsRequest(
       type: payload.type,
       callId: payload.callId,
       conversationId: payload.conversationId,
+      calleeId: payload.calleeId,
       callerId: payload.callerId,
       callerName: payload.callerName,
       callerAvatar: payload.callerAvatar,
@@ -246,6 +249,7 @@ export function buildFcmMessage(token: CallPushTokenRow, payload: CallVoipPayloa
     type: payload.type,
     callId: payload.callId,
     conversationId: payload.conversationId,
+    calleeId: payload.calleeId,
     callerId: payload.callerId,
     callerName: payload.callerName,
     callerAvatar: payload.callerAvatar ?? "",

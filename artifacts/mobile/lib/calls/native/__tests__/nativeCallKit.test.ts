@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const rn = vi.hoisted(() => ({ NativeModules: {} as Record<string, unknown>, Platform: { OS: 'ios' } }));
+const rn = vi.hoisted(() => ({
+  NativeModules: {} as Record<string, unknown>,
+  Platform: { OS: 'ios' },
+  Settings: { values: {} as Record<string, unknown>, set(v: Record<string, unknown>) { Object.assign(this.values, v); } },
+}));
 vi.mock('react-native', () => rn);
+const storage = vi.hoisted(() => new Map<string, string>());
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: async (k: string) => storage.get(k) ?? null,
+    setItem: async (k: string, v: string) => { storage.set(k, v); },
+    removeItem: async (k: string) => { storage.delete(k); },
+  },
+}));
 
 import {
   inertNativeCallKit,
@@ -9,8 +21,10 @@ import {
   nativeCallsFlagEnabled,
   nativeEndReasonFor,
   nativeEndReasonForSession,
+  nativeRingDecision,
   parseNativeCallPush,
 } from '../nativeCallCore';
+import { CALL_USER_ID_KEY, getCallUserId, setCallUserId } from '../callIdentity';
 
 const CALL = '11111111-2222-4333-8444-555555555555';
 
@@ -20,9 +34,10 @@ describe('parseNativeCallPush', () => {
       type: 'dm_call_incoming', callId: CALL.toUpperCase(), conversationId: 'conv-1', callerId: 'u1',
       callerName: 'Ava Stone', callerAvatar: 'https://img/a.jpg', hasVideo: true,
     })).toEqual({
-      type: 'dm_call_incoming', callId: CALL, conversationId: 'conv-1', callerId: 'u1',
+      type: 'dm_call_incoming', callId: CALL, conversationId: 'conv-1', calleeId: null, callerId: 'u1',
       callerName: 'Ava Stone', callerAvatar: 'https://img/a.jpg', hasVideo: true, reason: null,
     });
+    expect(parseNativeCallPush({ type: 'dm_call_incoming', callId: CALL, calleeId: 'user_b' })).toMatchObject({ calleeId: 'user_b' });
   });
 
   it('reads an FCM data map (string values) and a JSON string', () => {
@@ -37,6 +52,35 @@ describe('parseNativeCallPush', () => {
     expect(parseNativeCallPush({ type: 'new_message', callId: CALL })).toBeNull();
     expect(parseNativeCallPush({ type: 'dm_call_incoming', callId: 'not-a-uuid' })).toBeNull();
     expect(parseNativeCallPush({ type: 'dm_call_incoming', callId: CALL })).toMatchObject({ callerName: 'Brandthread' });
+  });
+});
+
+describe('nativeRingDecision — only ring for the account signed in on this device', () => {
+  it('rings when the push is for the signed-in user', () => {
+    expect(nativeRingDecision('user_a', 'user_a')).toBe('ring');
+  });
+  it('rejects a push for the previous account after switching accounts', () => {
+    expect(nativeRingDecision('user_a', 'user_b')).toBe('reject');
+  });
+  it('rejects every push while signed out', () => {
+    expect(nativeRingDecision('user_a', null)).toBe('reject');
+    expect(nativeRingDecision(null, null)).toBe('reject');
+    expect(nativeRingDecision('user_a', '')).toBe('reject');
+  });
+  it('trusts a push without calleeId (older server) only when someone is signed in', () => {
+    expect(nativeRingDecision(null, 'user_a')).toBe('ring');
+  });
+});
+
+describe('callIdentity', () => {
+  it('persists the signed-in id for the native handlers and clears it on sign-out', async () => {
+    rn.Platform.OS = 'ios';
+    await setCallUserId('user_a');
+    expect(await getCallUserId()).toBe('user_a');
+    expect(rn.Settings.values[CALL_USER_ID_KEY]).toBe('user_a'); // NSUserDefaults, read by AppDelegate.swift
+    await setCallUserId(null);
+    expect(await getCallUserId()).toBeNull();
+    expect(rn.Settings.values[CALL_USER_ID_KEY]).toBe('');
   });
 });
 

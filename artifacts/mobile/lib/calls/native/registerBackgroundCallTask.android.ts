@@ -6,7 +6,8 @@
  * Imported from lib/bootstrap.ts so it is defined before anything renders.
  * Does nothing without react-native-callkeep's native module.
  */
-import { nativeEndReasonFor, parseNativeCallPush } from './nativeCallCore';
+import { nativeEndReasonFor, nativeRingDecision, parseNativeCallPush } from './nativeCallCore';
+import { getCallUserId } from './callIdentity';
 import { androidCallKeep, displayAndroidIncomingCall, endAndroidCall, fcmDataOf } from './androidCallKeep';
 
 export const CALL_PUSH_TASK = 'brandthread-dm-call-push';
@@ -22,6 +23,8 @@ if (androidCallKeep) {
         if (!data || 'actionIdentifier' in data) return;
         const push = parseNativeCallPush(fcmDataOf(data.data ?? data));
         if (!push) return;
+        // Signed out, or signed into another account since: not this device's call.
+        if (nativeRingDecision(push.calleeId, await getCallUserId()) === 'reject') return;
         if (push.type === 'dm_call_incoming') displayAndroidIncomingCall(androidCallKeep!, push);
         else endAndroidCall(androidCallKeep, push.callId, nativeEndReasonFor(push.reason));
       });

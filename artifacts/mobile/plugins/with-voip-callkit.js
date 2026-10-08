@@ -34,7 +34,9 @@ const {
  *     hasVideo). A `dm_call_ended` push (caller hung up / answered on
  *     another device / missed / blocked) still has to be reported, so it is
  *     reported and ended in the same breath, which dismisses a ring that is
- *     showing and is invisible otherwise.
+ *     showing and is invisible otherwise. A push whose calleeId isn't the
+ *     account signed in on this phone (NSUserDefaults bt.callUserId) is
+ *     reported as "Brandthread" and ended at once.
  *
  * Android
  *  5. Permissions for a self-managed ConnectionService call that rings from
@@ -133,9 +135,37 @@ extension AppDelegate: PKPushRegistryDelegate {
   ) {
     let data = payload.dictionaryPayload
     let callId = (data["callId"] as? String) ?? UUID().uuidString.lowercased()
+    let ended = (data["type"] as? String) == "dm_call_ended"
+
+    // Only ring for the account signed in on this phone right now
+    // (lib/calls/native/callIdentity.ts writes bt.callUserId; nativeRingDecision
+    // is the JS twin). Signed out or another account: Apple still requires
+    // the push to be reported to CallKit, so report it under a generic name
+    // and end it immediately, without the caller's details or JS.
+    let signedInUserId = UserDefaults.standard.string(forKey: "bt.callUserId") ?? ""
+    let pushCalleeId = (data["calleeId"] as? String) ?? ""
+    let forThisAccount = !signedInUserId.isEmpty && (pushCalleeId.isEmpty || pushCalleeId == signedInUserId)
+    if !forThisAccount {
+      RNCallKeep.reportNewIncomingCall(
+        callId,
+        handle: "Brandthread",
+        handleType: "generic",
+        hasVideo: false,
+        localizedCallerName: "Brandthread",
+        supportsHolding: false,
+        supportsDTMF: false,
+        supportsGrouping: false,
+        supportsUngrouping: false,
+        fromPushKit: true,
+        payload: nil,
+        withCompletionHandler: completion
+      )
+      RNCallKeep.endCall(withUUID: callId, reason: 1)
+      return
+    }
+
     let callerName = (data["callerName"] as? String) ?? "Brandthread"
     let hasVideo = (data["hasVideo"] as? Bool) ?? false
-    let ended = (data["type"] as? String) == "dm_call_ended"
 
     // CallKeep calls completion() once CallKit has the call; JS never does.
     RNVoipPushNotificationManager.didReceiveIncomingPush(with: payload, forType: type.rawValue)
