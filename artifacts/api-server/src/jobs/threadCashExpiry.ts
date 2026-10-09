@@ -1,6 +1,7 @@
 import { logger } from "../lib/logger";
 import { runThreadCashExpiry } from "../lib/threadCash/expiry";
 import { expirePendingThreadCashTransfers } from "../lib/threadCash/wallet";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 60 * 1000;
 
@@ -22,12 +23,5 @@ export async function runThreadCashMaintenance(now = new Date()) {
 }
 
 export function startThreadCashExpiryJob(): void {
-  const run = () => {
-    void runThreadCashMaintenance().catch((err) =>
-      logger.error({ err, job: "threadCashExpiry" }, "Thread Cash expiry job failed"),
-    );
-  };
-  setTimeout(run, 60_000).unref?.();
-  setInterval(run, INTERVAL_MS).unref?.();
-  logger.info({ job: "threadCashExpiry", intervalMs: INTERVAL_MS }, "Thread Cash expiry job scheduled");
+  scheduleJob("threadCashExpiry", () => runThreadCashMaintenance(), { intervalMs: INTERVAL_MS, initialDelayMs: 60_000 });
 }

@@ -19,6 +19,7 @@ import { sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendPushToUser } from "./push";
 import { connectedUserIds } from "../ws/communityHub";
+import { scheduleJob } from "../jobs/runner";
 
 export const COMMUNITY_PUSH_WINDOW_MS = Number(process.env.COMMUNITY_PUSH_WINDOW_MS) || 3 * 60_000;
 const PAGE = 500;
@@ -126,8 +127,5 @@ export async function flushDueCommunityPushes(windowMs = COMMUNITY_PUSH_WINDOW_M
 }
 
 export function startCommunityPushJob(): void {
-  const timer = setInterval(() => {
-    void flushDueCommunityPushes().catch((err) => logger.error({ err }, "Community push flush failed"));
-  }, 30_000);
-  timer.unref();
+  scheduleJob("communityPush", () => flushDueCommunityPushes(), { intervalMs: 30_000 });
 }

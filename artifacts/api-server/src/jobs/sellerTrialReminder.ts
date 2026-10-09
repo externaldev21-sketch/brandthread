@@ -17,6 +17,7 @@ import {
 import { logger } from "../lib/logger";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
 import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
+import { scheduleJob } from "./runner";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 60 * 60 * 1000;
@@ -267,7 +268,5 @@ export async function runSellerTrialReminder(now = new Date()): Promise<void> {
 }
 
 export function startSellerTrialReminderJob(): void {
-  setTimeout(() => { void runSellerTrialReminder(); }, 5 * 60 * 1000);
-  setInterval(() => { void runSellerTrialReminder(); }, INTERVAL_MS);
-  logger.info({ job: "sellerTrialReminder", intervalMs: INTERVAL_MS }, "Seller trial reminder job scheduled");
+  scheduleJob("sellerTrialReminder", () => runSellerTrialReminder(), { intervalMs: INTERVAL_MS, initialDelayMs: 5 * 60 * 1000 });
 }

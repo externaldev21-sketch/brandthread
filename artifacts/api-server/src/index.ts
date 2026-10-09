@@ -34,6 +34,7 @@ import { startCommunityPushJob } from "./lib/communityPush";
 import { startScheduledPostPublisherJob } from "./jobs/scheduledPostPublisher";
 import { pool } from "@workspace/db";
 import { closeRedis } from "./lib/redis";
+import { jobRunner } from "./jobs/runner";
 
 validateEnv();
 
@@ -72,7 +73,8 @@ const server = app.listen(port, (err) => {
     logger.error({ err }, "ensureWebhookEvents startup call failed"),
   );
 
-  // Background jobs
+  // Background jobs. Each tick runs through jobs/runner.ts: a Postgres
+  // advisory lock makes sure only one instance runs a given job at a time.
   startAbandonedCartJob();
   startTrendingJob();
   startSellerRankingJob();
@@ -134,6 +136,8 @@ function shutdown(signal: NodeJS.Signals): void {
     }
 
     await closeRedis().catch(() => {});
+    // Stop job timers and release this instance's job advisory locks.
+    await jobRunner.close().catch(() => {});
     try {
       await pool.end();
       logger.info("Database pool closed");

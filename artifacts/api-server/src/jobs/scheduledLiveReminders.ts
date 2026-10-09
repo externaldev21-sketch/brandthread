@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { sendDueReminders } from "../lib/scheduledLives";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 1000;
 
@@ -16,7 +17,5 @@ export async function runScheduledLiveReminders(now = new Date()): Promise<void>
 }
 
 export function startScheduledLiveReminderJob(): void {
-  void runScheduledLiveReminders();
-  setInterval(() => void runScheduledLiveReminders(), INTERVAL_MS);
-  logger.info({ job: "scheduledLiveReminders", intervalMs: INTERVAL_MS }, "Scheduled live reminder job scheduled");
+  scheduleJob("scheduledLiveReminders", () => runScheduledLiveReminders(), { intervalMs: INTERVAL_MS, initialDelayMs: 0 });
 }

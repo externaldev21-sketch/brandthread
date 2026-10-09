@@ -8,6 +8,7 @@ import {
   getDeletionBlockers,
   purgeAccount,
 } from "../lib/accountDeletion";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 60 * 1000;
 const BATCH_SIZE = 25;
@@ -78,9 +79,5 @@ export async function runAccountPurge(now = new Date()): Promise<AccountPurgeRes
 }
 
 export function startAccountPurgeJob(): void {
-  const run = () =>
-    void runAccountPurge().catch((err) => logger.error({ err, job: "accountPurge" }, "Account purge job failed"));
-  setTimeout(run, 60_000);
-  setInterval(run, INTERVAL_MS).unref?.();
-  logger.info({ job: "accountPurge", intervalMs: INTERVAL_MS }, "Account purge job scheduled");
+  scheduleJob("accountPurge", () => runAccountPurge(), { intervalMs: INTERVAL_MS, initialDelayMs: 60_000 });
 }

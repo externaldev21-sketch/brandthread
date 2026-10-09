@@ -16,6 +16,7 @@ import {
 } from "../lib/teamInvites";
 import { isBrandthreadEmailConfigured } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
+import { scheduleJob } from "./runner";
 
 const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 60 * 60 * 1000;
@@ -162,7 +163,5 @@ export async function runTeamInviteReminder(): Promise<void> {
 export function startTeamInviteReminderJob(): void {
   // Check soon after startup so a deploy near an invite's reminder window
   // does not wait for the first full interval.
-  setTimeout(() => void runTeamInviteReminder(), 5 * 60 * 1000);
-  setInterval(() => void runTeamInviteReminder(), INTERVAL_MS);
-  logger.info({ job: "teamInviteReminder", intervalMs: INTERVAL_MS, initialDelayMs: 5 * 60 * 1000 }, "Invite reminder job scheduled");
+  scheduleJob("teamInviteReminder", () => runTeamInviteReminder(), { intervalMs: INTERVAL_MS, initialDelayMs: 5 * 60 * 1000 });
 }

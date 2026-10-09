@@ -2,6 +2,7 @@ import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { db, drops } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 60 * 1000;
 
@@ -39,7 +40,5 @@ export async function runScheduledDropBroadcasts(now = new Date()): Promise<void
 }
 
 export function startScheduledDropBroadcastJob(): void {
-  void runScheduledDropBroadcasts();
-  setInterval(() => void runScheduledDropBroadcasts(), INTERVAL_MS);
-  logger.info({ job: "scheduledDropBroadcasts", intervalMs: INTERVAL_MS }, "Scheduled drop broadcast job scheduled");
+  scheduleJob("scheduledDropBroadcasts", () => runScheduledDropBroadcasts(), { intervalMs: INTERVAL_MS, initialDelayMs: 0 });
 }

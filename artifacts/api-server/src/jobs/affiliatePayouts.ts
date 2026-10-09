@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { runAffiliatePayouts } from "../lib/affiliate/payouts";
+import { scheduleJob } from "./runner";
 
 const INTERVAL_MS = 15 * 60 * 1000;
 let running = false;
@@ -26,6 +27,5 @@ export async function runAffiliatePayoutsJob(now = new Date()): Promise<void> {
 }
 
 export function startAffiliatePayoutsJob(): void {
-  setInterval(() => void runAffiliatePayoutsJob(), INTERVAL_MS).unref?.();
-  logger.info({ job: "affiliatePayouts", intervalMs: INTERVAL_MS }, "Affiliate payouts job scheduled");
+  scheduleJob("affiliatePayouts", () => runAffiliatePayoutsJob(), { intervalMs: INTERVAL_MS });
 }

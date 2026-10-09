@@ -12,8 +12,8 @@
  */
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { logger } from "../lib/logger";
 import { broadcastToRoom } from "../ws/liveHub";
+import { scheduleJob } from "./runner";
 
 const RECOMPUTE_INTERVAL_MS = 10_000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -71,15 +71,8 @@ export async function cleanupStaleLiveViewers(): Promise<number> {
 }
 
 export function startLiveViewersPresenceJob(): void {
-  setInterval(() => {
-    void recomputeLiveViewerCounts().catch((err) =>
-      logger.error({ err, job: "liveViewersPresence" }, "Viewer count recompute failed"),
-    );
-  }, RECOMPUTE_INTERVAL_MS);
-
-  setInterval(() => {
-    void cleanupStaleLiveViewers().catch((err) =>
-      logger.error({ err, job: "liveViewersPresence" }, "Stale live_viewers cleanup failed"),
-    );
-  }, CLEANUP_INTERVAL_MS);
+  // Not distributed: each replica broadcasts the fresh counts to ITS OWN
+  // WebSocket rooms (liveHub is process-local), and the UPDATE is idempotent.
+  scheduleJob("liveViewersPresence.recompute", () => recomputeLiveViewerCounts(), { intervalMs: RECOMPUTE_INTERVAL_MS, distributed: false });
+  scheduleJob("liveViewersPresence.cleanup", () => cleanupStaleLiveViewers(), { intervalMs: CLEANUP_INTERVAL_MS });
 }
