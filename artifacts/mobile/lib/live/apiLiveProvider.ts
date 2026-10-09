@@ -212,10 +212,11 @@ export function createApiLiveProvider(): LiveStreamProvider {
             if (msg.at > new Date(since).getTime()) since = new Date(msg.at).toISOString();
             listener({ type: 'chat', streamId, messages: [msg] });
           } else if (event.type === 'viewerCount' && typeof event.count === 'number') {
-            listener({ type: 'viewers', streamId, viewerCount: event.count });
+            listener({ type: 'viewers', streamId, viewerCount: event.count as number });
           } else if (event.type === 'pinned') {
-            lastPinned = event.productId ?? null;
-            listener({ type: 'pinned', streamId, productId: lastPinned });
+            const pinnedId = typeof event.productId === 'string' ? event.productId : null;
+            lastPinned = pinnedId;
+            listener({ type: 'pinned', streamId, productId: pinnedId });
           } else if (event.type === 'ended') {
             listener({ type: 'ended', streamId });
           }
