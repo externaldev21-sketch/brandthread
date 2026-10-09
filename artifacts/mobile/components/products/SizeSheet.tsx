@@ -102,23 +102,27 @@ export function SizeSheet({
           {!!stockLine && <Text style={s.offerLine}>{stockLine}</Text>}
           <Text style={s.offerMeta}>{promiseLine}</Text>
           <View style={s.buttons}>
+            <View style={s.button}>
             <Button
               label={checkoutLabel}
               variant="secondary"
               onPress={onCheckout}
               loading={checkoutBusy}
               disabled={checkoutDisabled || checkoutBusy}
-              style={s.button}
+              fullWidth
               testID="size-sheet-checkout"
             />
+            </View>
+            <View style={s.button}>
             <Button
               label="Add to bag"
               onPress={onAddToBag}
               loading={addBusy}
               disabled={addBusy}
-              style={s.button}
+              fullWidth
               testID="size-sheet-add"
             />
+            </View>
           </View>
         </View>
       ) : (

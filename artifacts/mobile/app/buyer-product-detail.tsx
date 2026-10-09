@@ -1545,6 +1545,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* GOAT's pair: "Checkout" (outline) + "Add to bag" (primary), equal
             widths. With no size picked, either one opens the size sheet. */}
+        <View style={s.buyNowBtn}>
         {product.isPreOrder ? (
           <Button
             label={reserved ? 'Reserved' : 'Reserve (no charge)'}
@@ -1554,7 +1555,7 @@ export default function BuyerProductDetailScreen() {
             loading={reserveLoading}
             disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
-            style={s.buyNowBtn}
+            fullWidth
           />
         ) : (
           <Button
@@ -1563,17 +1564,19 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             loading={buyingNow}
             disabled={buyingNow || launching || paymentUnavailable || (allSelected && !inStock)}
-            style={s.buyNowBtn}
+            fullWidth
             testID="product-checkout"
           />
         )}
+        </View>
+        <View style={s.buyNowBtn}>
         {addedToCart ? (
           <Button
             label="In your bag"
             icon="check"
             onPress={() => router.push('/(buyer)/cart' as never)}
             accessibilityLabel="In your bag. View bag"
-            style={s.buyNowBtn}
+            fullWidth
             testID="product-view-cart"
           />
         ) : (
@@ -1583,10 +1586,11 @@ export default function BuyerProductDetailScreen() {
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
             accessibilityLabel={!allSelected ? 'Add to bag. Pick a size first' : !inStock ? 'Sold out' : 'Add to bag'}
-            style={s.buyNowBtn}
+            fullWidth
             testID="product-add-to-cart"
           />
         )}
+        </View>
       </View>
       </StickyFooter>
       <FirstRunTip
@@ -2042,7 +2046,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   promiseRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
   sizeRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, marginBottom: SP.sm,
-    borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
   },
   sizeRowLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   sizeRowValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
