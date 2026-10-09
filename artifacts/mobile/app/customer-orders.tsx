@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import { FS } from '@/lib/theme';
+import { FS, FONT } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
@@ -233,34 +233,34 @@ const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
+  errorText:    { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 24 },
   retryBtn:     { marginTop: 8 },
 
   custCard:     { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   avatar:       { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatarText:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  custName:     { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  custEmail:    { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  statsRow:     { flexDirection: 'row', borderRadius: 10, padding: 12 },
+  avatarText:   { fontSize: 16, fontFamily: FONT.bold },
+  custName:     { fontSize: 16, fontFamily: FONT.bold },
+  custEmail:    { fontSize: 12, fontFamily: FONT.regular },
+  statsRow:     { flexDirection: 'row', borderRadius: 8, padding: 12 },
   stat:         { flex: 1, alignItems: 'center', gap: 2 },
-  statVal:      { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  statLabel:    { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  statVal:      { fontSize: 15, fontFamily: FONT.bold },
+  statLabel:    { fontSize: FS.xs, fontFamily: FONT.regular },
   statDiv:      { width: 1, marginVertical: 4 },
   tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  tagText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  notes:        { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 16 },
+  tagText:      { fontSize: 11, fontFamily: FONT.semibold },
+  notes:        { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
 
-  sectionTitle: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
-  emptyCard:    { borderRadius: 14, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
-  emptyText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
-  orderList:    { borderRadius: 14, borderWidth: 1 },
+  sectionTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  emptyCard:    { borderRadius: 12, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
+  emptyText:    { fontSize: FS.sm, fontFamily: FONT.regular },
+  orderList:    { borderRadius: 12, borderWidth: 1 },
   orderRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 14, gap: 12 },
   orderLeft:    { flex: 1, gap: 3 },
-  orderNum:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
+  orderNum:     { fontSize: 13, fontFamily: FONT.semibold },
+  orderDate:    { fontSize: 11, fontFamily: FONT.regular },
+  trackingText: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic' },
   orderRight:   { alignItems: 'flex-end', gap: 6 },
-  orderTotal:   { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
+  orderTotal:   { fontSize: FS.sm, fontFamily: FONT.bold },
 });

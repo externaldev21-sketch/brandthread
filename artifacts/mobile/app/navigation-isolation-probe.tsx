@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
+import { FONT } from '@/lib/theme';
 
 const FLOWS = [
   { label: 'Buyer card', href: '/buyer-product-detail?id=scene-isolation-product' },
@@ -47,7 +48,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#F5F5F7',
-    fontFamily: 'Inter_700Bold',
+    fontFamily: FONT.bold,
     fontSize: 22,
     marginBottom: 8,
   },
@@ -56,13 +57,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#34343A',
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 16,
     backgroundColor: '#18181B',
   },
   buttonText: {
     color: '#F5F5F7',
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: FONT.semibold,
     fontSize: 15,
   },
 });

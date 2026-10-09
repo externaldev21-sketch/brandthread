@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 9,
+    borderRadius: 8,
   },
   message: {
     flex: 1,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 23,
     height: 23,
-    borderRadius: 7,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: BORDER,
   },
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 8,
   },
   storeCopy: {
     flex: 1,

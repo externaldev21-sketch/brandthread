@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleProp, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View, ViewStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -15,6 +14,7 @@ import {
   SP,
   SUBTLE,
 } from '@/lib/theme';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
 export function SellerDashboardSectionHeader({
   title,
@@ -29,7 +29,7 @@ export function SellerDashboardSectionHeader({
   const palette = theme as typeof theme & Record<string, string>;
   return (
     <View style={styles.sectionHeaderRow} testID={`seller-dashboard-section-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <Text style={[styles.sectionHeaderTitle, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+      <Text style={[styles.sectionHeaderTitle, { color: palette.text ?? FG }]} maxFontSizeMultiplier={2} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       {action && onAction ? (
         <TouchableOpacity onPress={onAction} style={styles.sectionHeaderActionButton}>
            <Text style={[styles.sectionHeaderAction, { color: palette.subtle ?? SUBTLE }]} maxFontSizeMultiplier={2}>{action}</Text>
@@ -58,7 +58,7 @@ export function SellerDashboardActionRow({
     label: string;
     onPress: () => void;
     variant: 'primary' | 'secondary';
-    icon?: React.ComponentProps<typeof Feather>['name'];
+    icon?: IconName;
   }>;
   testID: string;
 }) {
@@ -86,7 +86,7 @@ export function SellerDashboardListGroup({
 }) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, string>;
-  return <View style={[styles.listGroup, { backgroundColor: palette.card ?? palette.surface, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }, style]}>{children}</View>;
+  return <View style={[styles.listGroup, { backgroundColor: palette.card ?? palette.surface }, style]}>{children}</View>;
 }
 
 export function SellerDashboardListItem({
@@ -115,7 +115,7 @@ export function SellerDashboardListItem({
   const content = (
     <View style={[styles.listItem, { backgroundColor: palette.card ?? palette.surface }]} testID={`seller-dashboard-row-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <View style={[styles.listIconWrap, { backgroundColor: `${iconColor}1A` }]}>
-        <Feather name={icon as React.ComponentProps<typeof Feather>['name']} size={16} color={iconColor} />
+        <Icon name={icon as IconName} size={16} color={iconColor} />
       </View>
       <View style={styles.listBody}>
         <View style={styles.listTitleRow}>
@@ -139,7 +139,7 @@ export function SellerDashboardListItem({
           </Text>
         ) : null}
         {rightElement}
-        {onPress ? <Feather name="chevron-right" size={16} color={SUBTLE} /> : null}
+        {onPress ? <Icon name="chevron-right" size={16} color={SUBTLE} /> : null}
       </View>
     </View>
   );
@@ -206,12 +206,11 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     flexShrink: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: FONT.bold,
-    color: MUTED,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    // Sentence case, 17 semibold, white (BRANDTHREAD_DESIGN.md).
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: FONT.semibold,
+    color: FG,
   },
   sectionHeaderActionButton: {
     flexShrink: 0,
@@ -226,8 +225,6 @@ const styles = StyleSheet.create({
   listGroup: {
     backgroundColor: SELLER_DASHBOARD_GLASS,
     borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER_SUBTLE,
     overflow: 'hidden',
   },
   listItem: {
@@ -274,7 +271,7 @@ const styles = StyleSheet.create({
   badge: {
     flexShrink: 0,
     backgroundColor: RED,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },

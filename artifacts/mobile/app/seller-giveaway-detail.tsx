@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   title: { fontSize: FS.lg, fontFamily: FONT.bold, marginBottom: 4 },
   note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   meta: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 6, marginBottom: SP.md },
-  grid: { flexDirection: 'row', borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, marginBottom: SP.md },
+  grid: { flexDirection: 'row', borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, marginBottom: SP.md },
   cell: { flex: 1, paddingVertical: 18, alignItems: 'center', gap: 4 },
   value: { fontSize: FS.xl, fontFamily: FONT.bold },
   label: { fontSize: FS.xs, fontFamily: FONT.regular },

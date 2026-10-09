@@ -298,7 +298,7 @@ function makeStyles(ck: CheckoutColors) {
     orText: { fontFamily: FONT.medium, fontSize: FS.xs + 1, color: ck.subtle },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4 },
     cardIcon: {
-      width: 40, height: 28, borderRadius: 6, borderWidth: 1, borderColor: ck.fieldBorder,
+      width: 40, height: 28, borderRadius: 8, borderWidth: 1, borderColor: ck.fieldBorder,
       alignItems: 'center', justifyContent: 'center',
     },
     cardTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },

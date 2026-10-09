@@ -126,11 +126,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, lineHeight: 19, fontFamily: FONT.semibold, marginBottom: 6 },
   sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   divider: { height: 10 },
-  card: { borderRadius: 14, borderWidth: 1, padding: 14 },
+  card: { borderRadius: 12, borderWidth: 1, padding: 14 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   cardTitle: { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold },
   cardSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 3, lineHeight: 17 },
-  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  listCard: { borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, minHeight: 52 },
   listIcon: { width: 20 },
 });

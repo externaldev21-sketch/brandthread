@@ -312,7 +312,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   swipeBleed: { marginHorizontal: -SP.md },
   swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.background },
   checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
-  checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxBox: { width: 20, height: 20, borderRadius: 8, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
@@ -1321,7 +1321,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingHorizontal: SP.md, paddingBottom: SP.xs,
   },
-  selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  selectAllBox: { width: 20, height: 20, borderRadius: 8, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   // Same label + hairline as a checkout section (CheckoutPrimitives).
   savedSection: { borderTopWidth: 1, borderTopColor: theme.borderSubtle, paddingTop: 14, marginBottom: SP.md },

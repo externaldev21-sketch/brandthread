@@ -73,7 +73,7 @@ const s = StyleSheet.create({
   heroThread: { position: 'absolute', left: -SP.lg, right: -SP.lg, top: 0 },
   icon: { width: 60, height: 60, borderRadius: 30, backgroundColor: BG, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginLeft: SP.lg },
   text: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, lineHeight: 22 },
-  card: { backgroundColor: CARD, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, padding: SP.md, gap: 10 },
+  card: { backgroundColor: CARD, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, padding: SP.md, gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   url: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center' },

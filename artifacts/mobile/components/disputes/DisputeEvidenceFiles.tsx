@@ -177,7 +177,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
 const styles = StyleSheet.create({
   heading: { fontSize: FS.base, fontFamily: FONT.semibold },
   label: { fontSize: FS.base, fontFamily: FONT.semibold },
-  card: { borderRadius: 14, borderWidth: 1 },
+  card: { borderRadius: 12, borderWidth: 1 },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingHorizontal: SP.md, paddingVertical: SP.md },
   fileIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   fileName: { fontSize: FS.sm, fontFamily: FONT.semibold },

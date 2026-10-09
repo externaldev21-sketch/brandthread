@@ -186,6 +186,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   input: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, color: colors.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: FONT.regular },
   notes: { minHeight: 100, textAlignVertical: 'top' },
   bottom: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
-  button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
+  button: { minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
   buttonText: { fontSize: 15, fontFamily: FONT.bold },
 });

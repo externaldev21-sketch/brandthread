@@ -208,7 +208,7 @@ const s = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
     paddingHorizontal: SP.lg, paddingTop: SP.sm,
     maxHeight: '92%',
   },

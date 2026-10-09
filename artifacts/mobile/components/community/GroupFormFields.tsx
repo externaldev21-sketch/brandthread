@@ -142,8 +142,8 @@ export function GroupFormFields({ value, onChange, errors = {}, uploading, onPic
 
 const styles = StyleSheet.create({
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-  photoEmpty: { width: 84, height: 84, borderRadius: 24, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  photoBusy: { borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  photoEmpty: { width: 84, height: 84, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  photoBusy: { borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   textBtn: { minHeight: COMP.minTouchTarget, justifyContent: 'center' },
   textBtnLabel: { fontFamily: FONT.semibold, fontSize: FS.base },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },

@@ -436,7 +436,7 @@ const s = StyleSheet.create({
   quickReplies: { paddingVertical: 10 },
   quickChip:    {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
     borderWidth: 1,
   },
   quickChipText: { fontSize: FS.xs, fontFamily: FONT.semibold },

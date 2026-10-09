@@ -91,7 +91,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     alignItems: 'center',
     gap: 6,
     backgroundColor: `${theme.subtle}22`,
-    borderRadius: 20,
+    borderRadius: 16,
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
   },

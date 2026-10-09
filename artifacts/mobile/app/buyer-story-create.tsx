@@ -397,7 +397,7 @@ function HsbSlider({ label, value, max, colors, onChange }: {
         onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
         {...responder.panHandlers}
       >
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[StyleSheet.absoluteFill, { borderRadius: 12 }]} />
         <View style={[styles.hsbThumb, { left: `${frac * 100}%`, marginLeft: -11 }]} />
       </View>
     </View>
@@ -2439,7 +2439,7 @@ const styles = StyleSheet.create({
   textToolCancel: { color: 'rgba(255,255,255,0.7)', fontSize: FS.base, fontFamily: FONT.medium },
   textToolDone: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
   textToolCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  textToolInput: { fontFamily: FONT.bold, minWidth: 60, paddingHorizontal: 8, borderRadius: 6 },
+  textToolInput: { fontFamily: FONT.bold, minWidth: 60, paddingHorizontal: 8, borderRadius: 8 },
   textToolBottom: { paddingHorizontal: SP.md, gap: SP.sm },
   textToolRow: { flexDirection: 'row', gap: SP.sm },
   textToolChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },

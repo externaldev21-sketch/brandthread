@@ -1966,7 +1966,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   // growing the 64x64 box the ScrollView lays rows out against.
   activeRailAvatar1: { width: 64, height: 64, position: 'relative' },
   storyRing: {
-    position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 34,
+    position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 16,
   },
   storyRingUnseen: { borderWidth: 2 },
   storyRingSeen: { borderWidth: 1.5 },

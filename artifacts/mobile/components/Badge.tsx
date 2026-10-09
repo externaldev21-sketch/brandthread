@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { FONT } from '@/lib/theme';
 
 type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'gold' | 'default';
 
@@ -36,14 +37,12 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
     alignSelf: 'flex-start',
   },
   label: {
     fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: FONT.semibold,
   },
 });
 
@@ -80,5 +79,5 @@ const countBadgeStyles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   wide: { paddingHorizontal: 4 },
-  label: { fontSize: 11, fontFamily: 'Inter_700Bold', lineHeight: 13 },
+  label: { fontSize: 11, fontFamily: FONT.bold, lineHeight: 13 },
 });

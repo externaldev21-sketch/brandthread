@@ -167,7 +167,7 @@ function makeStyles(ck: CheckoutColors) {
     groupDivider: { borderTopWidth: 1, borderTopColor: ck.divider, marginTop: SP.md, paddingTop: SP.md },
     seller: { fontFamily: FONT.semibold, fontSize: FS.sm, color: ck.text, marginBottom: SP.sm + 2 },
     items: { gap: SP.sm + 4 },
-    thumb: { borderRadius: 6, overflow: 'hidden', backgroundColor: ck.divider },
+    thumb: { borderRadius: 8, overflow: 'hidden', backgroundColor: ck.divider },
     thumbFallback: { alignItems: 'center', justifyContent: 'center' },
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 4 },
     itemCopy: { flex: 1, minWidth: 0, paddingTop: 2 },

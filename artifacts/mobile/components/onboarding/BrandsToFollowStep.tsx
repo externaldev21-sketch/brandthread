@@ -15,6 +15,7 @@ import { setSellerFollowing } from '@/services/socialService';
 import { PressableScale, Reveal, StepHeadline, StepSub } from './OnboardingUI';
 import { SPACE, TYPE } from './onboardingTokens';
 import { radius } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerIds: string[]) => void } = {}) {
   const { theme } = useAppTheme();
@@ -165,23 +166,23 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
     marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  followAllText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  followAllText: { fontSize: 14, fontFamily: FONT.semibold },
   loadingWrap: { paddingVertical: SPACE.xxl, alignItems: 'center' },
   emptyText: { ...TYPE.label, color: theme.muted, paddingVertical: SPACE.lg, textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACE.xs },
   cardWrap: { width: '31%' },
   card: {
-    backgroundColor: theme.card, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: theme.card, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border, padding: 10, gap: 8,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo: { width: 36, height: 36, borderRadius: 18 },
   logoFallback: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  logoFallbackText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  logoFallbackText: { fontSize: 15, fontFamily: FONT.bold },
   followBadge: {
     width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardName: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  cardName: { flexShrink: 1, fontSize: 12, fontFamily: FONT.semibold, color: theme.text },
 });

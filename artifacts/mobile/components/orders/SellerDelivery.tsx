@@ -198,7 +198,7 @@ function sheetStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
     sheet: {
-      backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+      backgroundColor: theme.card, borderTopLeftRadius: 16, borderTopRightRadius: 16,
       padding: SP.lg, paddingBottom: SP.xl + 20,
     },
     title: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text },

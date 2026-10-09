@@ -41,7 +41,7 @@ export function GiftCardFace({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: CARD_BG, borderRadius: 20, padding: SP.lg,
+    backgroundColor: CARD_BG, borderRadius: 16, padding: SP.lg,
     justifyContent: 'space-between', borderWidth: 1, borderColor: '#2A2A2A',
   },
   cardFull: { aspectRatio: 1.6 },

@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
+import { FONT } from '@/lib/theme';
 
 interface FeatureCardProps {
   title: string;
@@ -52,7 +53,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 14,
     gap: 12,
     marginBottom: 8,
@@ -60,17 +61,17 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: { flex: 1 },
-  title: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  title: { fontSize: 14, fontFamily: FONT.semibold },
+  subtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 8,
   },
-  badgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  badgeText: { fontSize: 11, fontFamily: FONT.semibold },
 });

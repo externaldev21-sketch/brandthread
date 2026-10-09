@@ -1105,7 +1105,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     backgroundColor: colors.elevated,
     borderWidth: 1,
     borderColor: colors.primary,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 12,
     marginTop: 8,
   },

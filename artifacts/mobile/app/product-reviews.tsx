@@ -202,9 +202,9 @@ const s = StyleSheet.create({
   // Was fontSize: 10 (below the 11pt floor).
   verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   date: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
-  fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
+  fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
   fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   body: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20, marginBottom: 8 },
   photoRow: { flexDirection: 'row', gap: 6 },
-  photoThumb: { width: 56, height: 56, borderRadius: 6, backgroundColor: CARD_ELEVATED },
+  photoThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: CARD_ELEVATED },
 });

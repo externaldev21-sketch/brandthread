@@ -197,7 +197,7 @@ const row = StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.xs },
   label: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, flex: 1, textAlign: 'right' },
-  mono:  { fontFamily: 'Inter_400Regular', letterSpacing: 0.5, fontSize: FS.xs },
+  mono:  { fontFamily: FONT.regular, letterSpacing: 0.5, fontSize: FS.xs },
 });
 
 // ─── Star Rating component ────────────────────────────────────────────────────
@@ -414,7 +414,7 @@ function ReviewSheet({
 const rvs = StyleSheet.create({
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
     borderTopWidth: 1,
     padding: SP.lg,
   },
@@ -1285,7 +1285,7 @@ export default function BuyerOrderDetailScreen() {
       <Modal visible={showCancelModal} transparent animationType="slide" onRequestClose={() => setShowCancelModal(false)}>
         <ModalSafeArea>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+            <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
               <View style={{ alignItems: 'center', marginBottom: SP.md }}>
                 <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.error}24`, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
                   <Feather name="x-circle" size={24} color={theme.error} />
@@ -1314,7 +1314,7 @@ export default function BuyerOrderDetailScreen() {
       <Modal visible={showReceiptSheet} transparent animationType="slide" onRequestClose={() => setShowReceiptSheet(false)}>
         <ModalSafeArea>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+            <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
               <View style={{ alignItems: 'center', marginBottom: SP.md }}>
                 <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
                   <Feather name="package" size={24} color={theme.text} />
@@ -1396,7 +1396,7 @@ const makeStyles = (theme: AppThemePreset) => {
     paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm, textAlign: 'center' },
 
     // Tracking
-    trackingNumberDisplay: { fontSize: FS.base, fontFamily: 'Inter_400Regular', color: theme.text, letterSpacing: 1 },
+    trackingNumberDisplay: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.text, letterSpacing: 1 },
     carrierChip: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
     carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
     estDeliveryRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },

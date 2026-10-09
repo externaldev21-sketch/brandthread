@@ -342,7 +342,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   input: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADII.input, paddingHorizontal: SPACING.md, height: COMP.inputH, color: theme.text, ...TYPE_SCALE.body },
 
   defaultToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACING.xxs },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: 8, borderWidth: 1, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   defaultToggleText: { ...TYPE_SCALE.body, fontFamily: FONT.medium, color: theme.text },
 });

@@ -195,7 +195,7 @@ const createStyles = (theme: AppThemePreset) => {
     content: { padding: SP.md, paddingBottom: SP.lg },
     hero: { alignItems: 'center', paddingVertical: SP.lg, gap: SP.sm },
     heroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5 },
-    pill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: border },
+    pill: { borderRadius: 16, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: border },
     pillText: { color: text, fontSize: FS.xs, fontFamily: FONT.medium },
     group: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, paddingHorizontal: SP.md, marginBottom: SP.md },
     sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm, marginTop: SP.sm },

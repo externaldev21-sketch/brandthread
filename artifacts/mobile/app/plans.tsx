@@ -590,7 +590,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   phoneFrame: {
     alignSelf: 'center',
     width: 220,
-    borderRadius: 28,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: theme.border,
     backgroundColor: theme.card,
@@ -606,7 +606,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginBottom: 2,
   },
   phoneScreen: {
-    borderRadius: 20,
+    borderRadius: 16,
     backgroundColor: theme.cardElevated,
     padding: 12,
     gap: 8,

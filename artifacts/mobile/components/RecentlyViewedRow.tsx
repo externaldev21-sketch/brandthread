@@ -85,8 +85,7 @@ export function RecentlyViewedRow({ style }: { style?: object }) {
 
 const s = StyleSheet.create({
   header: {
-    fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase',
-    letterSpacing: 0.4, marginBottom: SP.sm,
+    fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm,
   },
   card: { width: 104 },
   image: { width: 104, height: 104, borderRadius: RADIUS.md },

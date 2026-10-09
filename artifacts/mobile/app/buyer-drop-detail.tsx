@@ -452,7 +452,7 @@ export default function BuyerDropDetail() {
               onPress={() => setReloadGeneration(g => g + 1)}
               accessibilityRole="button"
               accessibilityLabel="Try again"
-              style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: theme.accent }}
+              style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.accent }}
             >
               <Text style={[{ fontWeight: '600' }, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Try again</Text>
             </TouchableOpacity>
@@ -461,7 +461,7 @@ export default function BuyerDropDetail() {
             onPress={() => goBackOr(router)}
             accessibilityRole="button"
             accessibilityLabel="Back"
-            style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
+            style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}
           >
             <Text style={{ color: theme.text, fontWeight: '600' }}>Back</Text>
           </TouchableOpacity>

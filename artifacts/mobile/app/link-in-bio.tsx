@@ -332,7 +332,7 @@ const s = StyleSheet.create({
   pvAvatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 1, marginBottom: SP.sm },
   pvName: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center' },
   pvBio: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: 6, marginBottom: SP.md },
-  pvBtn: { width: '100%', borderWidth: 1.5, borderRadius: 14, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, marginTop: SP.sm },
+  pvBtn: { width: '100%', borderWidth: 1.5, borderRadius: 12, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, marginTop: SP.sm },
   pvGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginTop: SP.md, justifyContent: 'space-between' },
   pvImg: { width: '100%', aspectRatio: 4 / 5, borderRadius: 12 },
 });

@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-start', paddingTop: 4, paddingBottom: 8 },
   bubble: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 16,
     paddingHorizontal: 14, paddingVertical: 12,
   },
   dot: { width: DOT, height: DOT, borderRadius: DOT / 2 },

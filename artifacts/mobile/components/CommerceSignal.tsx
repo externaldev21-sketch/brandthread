@@ -416,7 +416,7 @@ export function HighDemandSectionHead({
 
 const hd = StyleSheet.create({
   root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 14 },
-  iconWrap:{ width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  iconWrap:{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: 20, fontFamily: FONT.bold, color: FG, letterSpacing: -0.4, lineHeight: 24 },
   sub:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 });

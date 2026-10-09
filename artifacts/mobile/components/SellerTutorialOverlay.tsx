@@ -128,13 +128,13 @@ const s = StyleSheet.create({
   },
   title: {
     fontSize: FS.md ?? 17,
-    fontFamily: FONT.bold ?? 'Inter_700Bold',
+    fontFamily: FONT.bold ?? FONT.bold,
     color: FG,
     marginBottom: 2,
   },
   subtitle: {
     fontSize: FS.sm ?? 13,
-    fontFamily: FONT.regular ?? 'Inter_400Regular',
+    fontFamily: FONT.regular ?? FONT.regular,
     color: MUTED,
   },
   list: { gap: 12 },
@@ -146,19 +146,19 @@ const s = StyleSheet.create({
   itemIcon: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   itemTitle: {
     fontSize: FS.sm ?? 13,
-    fontFamily: FONT.semibold ?? 'Inter_600SemiBold',
+    fontFamily: FONT.semibold ?? FONT.semibold,
     color: FG,
     marginBottom: 2,
   },
   itemDesc: {
     fontSize: FS.xs ?? 12,
-    fontFamily: FONT.regular ?? 'Inter_400Regular',
+    fontFamily: FONT.regular ?? FONT.regular,
     color: MUTED,
     lineHeight: 18,
   },
@@ -168,7 +168,7 @@ const s = StyleSheet.create({
   },
   skipText: {
     fontSize: FS.sm ?? 13,
-    fontFamily: FONT.regular ?? 'Inter_400Regular',
+    fontFamily: FONT.regular ?? FONT.regular,
     color: MUTED,
   },
 });

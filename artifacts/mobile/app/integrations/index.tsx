@@ -217,7 +217,7 @@ const s = StyleSheet.create({
   iconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
   rowDesc: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
-  connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
+  connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 16, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
   connectedText: { fontSize: 11, fontFamily: FONT.semibold },
   connectBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 7 },
   connectBtnText: { fontSize: 12, fontFamily: FONT.semibold },

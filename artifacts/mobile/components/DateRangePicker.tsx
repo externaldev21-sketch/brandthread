@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { FONT } from '@/lib/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -268,7 +269,7 @@ function Calendar({ month, rangeStart, rangeEnd, onDayPress, colors, isDark }: C
                           : isToday
                           ? primary
                           : colors.foreground,
-                        fontFamily: edge ? 'Inter_700Bold' : 'Inter_400Regular',
+                        fontFamily: edge ? FONT.bold : FONT.regular,
                       },
                     ]}
                   >
@@ -294,7 +295,7 @@ const calStyles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  weekLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  weekLabel: { fontSize: 11, fontFamily: FONT.semibold },
   strip: {
     position: 'absolute',
     top: 4,
@@ -502,8 +503,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     borderWidth: 1,
     borderBottomWidth: 0,
     maxHeight: '88%',
@@ -524,7 +525,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  title: { fontSize: 17, fontFamily: FONT.bold },
 
   // Presets
   presetSection: { borderBottomWidth: 1, paddingVertical: 6 },
@@ -544,15 +545,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioDot: { width: 8, height: 8, borderRadius: 4 },
-  presetLabel: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium' },
-  presetHint: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  presetLabel: { flex: 1, fontSize: 15, fontFamily: FONT.medium },
+  presetHint: { fontSize: 12, fontFamily: FONT.regular },
 
   // Calendar
   calSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  monthTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  calHint: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 10 },
+  monthTitle: { fontSize: 16, fontFamily: FONT.semibold },
+  calHint: { fontSize: 11, fontFamily: FONT.regular, textAlign: 'center', marginTop: 10 },
 
   // Bottom
   bottomBar: {
@@ -562,7 +563,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   rangeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rangeLabelText: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
+  rangeLabelText: { fontSize: 13, fontFamily: FONT.regular, flex: 1 },
   actions: { flexDirection: 'row', gap: 10 },
   flex1: { flex: 1 },
 });

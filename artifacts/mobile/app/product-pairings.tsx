@@ -274,7 +274,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: SP.md, height: 44, borderRadius: RADIUS.md, backgroundColor: c.card,
   },
   searchInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: c.foreground, height: 44 },
-  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 1.5, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: c.primary, borderColor: c.primary },
   empty: { fontSize: FS.base, fontFamily: FONT.medium, color: c.mutedForeground, textAlign: 'center', padding: SP.lg },
   retry: { paddingVertical: SP.sm, paddingHorizontal: SP.md },
