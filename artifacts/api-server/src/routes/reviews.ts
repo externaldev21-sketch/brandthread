@@ -9,6 +9,7 @@ import crypto from "node:crypto";
 import { db, reviews, reviewHelpfulVotes, orders, orderItems, productVariants, products, users } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { logger } from "../lib/logger";
 import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
 import { resolveToClerkId } from "./public";
@@ -188,7 +189,7 @@ router.post(
 );
 
 // ─── Authenticated: create a review ──────────────────────────────────────────
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, rateLimit("review"), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const { orderId, sellerId, productId, rating, body, photos, fitNote } = req.body as {
     orderId?:   string;
@@ -333,7 +334,7 @@ router.get("/mine", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/reviews/:reviewId/reply  (seller only)
-router.post("/:reviewId/reply", requireAuth, async (req, res) => {
+router.post("/:reviewId/reply", requireAuth, rateLimit("review"), async (req, res) => {
   const sellerId  = (req as any).clerkUserId as string;
   const reviewId = req.params.reviewId as string;
   const { replyText } = req.body as { replyText?: string };

@@ -35,6 +35,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
     "google-auth-library": "^10.9.0",
+    "helmet": "^8.1.0",
     "http-proxy-middleware": "^4.2.0",
     "ioredis": "^5.11.1",
     "openai": "^6.45.0",
@@ -44,8 +45,8 @@
     "resend": "^6.30.0",
     "sharp": "^0.35.4",
     "stripe": "^22.5.0",
-    "zod": "catalog:",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

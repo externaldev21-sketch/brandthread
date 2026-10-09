@@ -237,3 +237,42 @@ describe("upload, AI and per-IP ceilings", () => {
     });
   });
 });
+
+describe("abuse-prone write policies", () => {
+  it("routes Thread Cash sends and cash-outs to the money-transfer bucket", () => {
+    expect(rateLimitPolicyFor("POST", "/api/v1/thread-cash/send", true)?.id).toBe("money-transfer");
+    expect(rateLimitPolicyFor("POST", "/api/thread-cash/cash-out", true)?.id).toBe("money-transfer");
+    expect(rateLimitPolicyFor("POST", "/api/v1/thread-cash/check-in", true)?.id).toBe("mutation");
+    expect(rateLimitPolicyFor("GET", "/api/v1/thread-cash/send", true)?.id).toBe("authenticated-read");
+  });
+
+  it("caps post creation, reviews and Thread Cash transfers per account and per IP", () => {
+    expect(RATE_LIMIT_POLICIES["post-create"]).toMatchObject({ limit: 15, windowMs: 10 * 60_000, ipLimit: 60 });
+    expect(RATE_LIMIT_POLICIES.review).toMatchObject({ limit: 10, windowMs: 10 * 60_000, ipLimit: 40 });
+    expect(RATE_LIMIT_POLICIES["money-transfer"]).toMatchObject({ limit: 20, windowMs: 10 * 60_000, ipLimit: 60 });
+  });
+
+  it("returns 429 once a signed-in account exceeds the post-create limit", async () => {
+    authState.userId = `user_${crypto.randomUUID()}`;
+    const app = express();
+    app.set("trust proxy", 1);
+    app.post("/api/v1/posts", rateLimit("post-create"), (_req, res) => res.status(201).json({ ok: true }));
+    const ip = uniqueClientAddress();
+    try {
+      await withServer(app, async (baseUrl) => {
+        const statuses: number[] = [];
+        for (let i = 0; i < RATE_LIMIT_POLICIES["post-create"].limit + 1; i++) {
+          const response = await fetch(`${baseUrl}/api/v1/posts`, {
+            method: "POST",
+            headers: { "x-forwarded-for": ip },
+          });
+          statuses.push(response.status);
+        }
+        expect(statuses.slice(0, -1).every((s) => s === 201)).toBe(true);
+        expect(statuses.at(-1)).toBe(429);
+      });
+    } finally {
+      authState.userId = null;
+    }
+  });
+});
