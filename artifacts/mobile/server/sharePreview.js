@@ -43,7 +43,8 @@ const HASHTAG_RE = /^\/tag\/([\p{L}\p{N}_]{1,60})\/?$/u;
 
 const MATCHERS = [
   {
-    pattern: /^\/p\/([A-Za-z0-9_-]{6,64})\/?$/,
+    // /p/<id> is the canonical post link; /post/<id> is the long-form alias.
+    pattern: /^\/(?:p|post)\/([A-Za-z0-9_-]{6,64})\/?$/,
     async load(match) {
       const res = await fetchResource(`${apiBase()}/public/posts/${encodeURIComponent(match[1])}/share-preview`);
       if (res.status === 404) return NOT_FOUND;
@@ -58,7 +59,8 @@ const MATCHERS = [
     },
   },
   {
-    pattern: /^\/store\/(?!product(?:\/|$))([^/]+)\/?$/,
+    // /store/<handle>, and its short form /s/<handle>.
+    pattern: /^\/(?:store\/(?!product(?:\/|$))|s\/)([^/]+)\/?$/,
     async load(match) {
       const res = await fetchResource(`${apiBase()}/public/stores/${encodeURIComponent(match[1])}/share-preview`);
       if (res.status === 404) return NOT_FOUND;

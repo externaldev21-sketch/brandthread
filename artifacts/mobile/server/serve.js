@@ -12,6 +12,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreview } = require('./sharePreview');
 const { landingPathFor, shouldServeLanding } = require('./landing');
+const { appLinkFile } = require('./appLinks');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -112,6 +113,15 @@ const server = http.createServer(async (req, res) => {
     pathname = requestUrl.pathname;
   } catch {
     send(res, 400, 'Bad Request');
+    return;
+  }
+
+  // Universal link / App Link verification files: served before any redirect
+  // (Apple and Google refuse redirected association files).
+  const appLink = appLinkFile(pathname);
+  if (appLink) {
+    res.writeHead(200, { 'content-type': appLink.contentType, 'cache-control': 'public, max-age=3600' });
+    res.end(appLink.body);
     return;
   }
 
