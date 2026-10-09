@@ -1,4 +1,5 @@
 import React, { Component, ComponentType, PropsWithChildren, useEffect } from 'react';
+import { useNavigation } from 'expo-router';
 import { ErrorFallback, ErrorFallbackProps } from '@/components/ErrorFallback';
 import { reportError } from '@/lib/monitoring';
 
@@ -64,6 +65,16 @@ export type RouteErrorBoundaryProps = {
   retry: () => void | Promise<void>;
 };
 
+/**
+ * Back handler for a crashed route, or undefined when its navigator has
+ * nowhere to go back to. The catch component renders inside the screen,
+ * so this is the screen's own navigation (it bubbles to parent stacks).
+ */
+function useRouteBackHandler(): (() => void) | undefined {
+  const navigation = useNavigation();
+  return navigation.canGoBack() ? () => navigation.goBack() : undefined;
+}
+
 function useReportRouteError(error: Error, source: string) {
   useEffect(() => {
     if (__DEV__) {
@@ -90,7 +101,8 @@ function useReportRouteError(error: Error, source: string) {
  */
 export function ScreenErrorFallback({ error, retry }: RouteErrorBoundaryProps) {
   useReportRouteError(error, 'screen-error-boundary');
-  return <ErrorFallback scope="screen" error={error} resetError={() => { void retry(); }} />;
+  const onBack = useRouteBackHandler();
+  return <ErrorFallback scope="screen" error={error} resetError={() => { void retry(); }} onBack={onBack} />;
 }
 
 /**
@@ -99,5 +111,6 @@ export function ScreenErrorFallback({ error, retry }: RouteErrorBoundaryProps) {
  */
 export function TabScreenErrorFallback({ error, retry }: RouteErrorBoundaryProps) {
   useReportRouteError(error, 'tab-error-boundary');
-  return <ErrorFallback scope="screen" error={error} resetError={() => { void retry(); }} />;
+  const onBack = useRouteBackHandler();
+  return <ErrorFallback scope="screen" error={error} resetError={() => { void retry(); }} onBack={onBack} />;
 }

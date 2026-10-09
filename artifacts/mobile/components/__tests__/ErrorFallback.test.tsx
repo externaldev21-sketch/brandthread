@@ -4,7 +4,7 @@
  * 'app' (root boundary): "Try again" reloads the app, no back arrow.
  * 'screen' (per-screen/per-tab boundary): "Try again" calls resetError (the
  * router's `retry`), content is padded by the safe-area insets, and a back
- * arrow is shown only when the router can go back.
+ * arrow is shown only when an `onBack` handler is passed.
  */
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -12,10 +12,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { reloadMock, canGoBackMock, backMock, replaceMock } = vi.hoisted(() => ({
+const { reloadMock, replaceMock } = vi.hoisted(() => ({
   reloadMock: vi.fn(),
-  canGoBackMock: vi.fn(),
-  backMock: vi.fn(),
   replaceMock: vi.fn(),
 }));
 
@@ -45,7 +43,7 @@ vi.mock('@expo/vector-icons', () => {
   return { Feather: (props: Record<string, unknown>) => R.createElement('Feather', props) };
 });
 vi.mock('expo-router', () => ({
-  router: { canGoBack: canGoBackMock, back: backMock, replace: replaceMock },
+  router: { replace: replaceMock },
 }));
 vi.mock('expo', () => ({ reloadAppAsync: reloadMock }));
 vi.mock('@/hooks/useColors', () => ({
@@ -73,12 +71,9 @@ function byTestID(renderer: ReactTestRenderer, testID: string) {
 describe('ErrorFallback', () => {
   beforeEach(() => {
     reloadMock.mockReset().mockResolvedValue(undefined);
-    canGoBackMock.mockReset();
-    backMock.mockReset();
   });
 
   it("'screen' scope: Try again calls resetError, never reloads the app", () => {
-    canGoBackMock.mockReturnValue(false);
     const resetError = vi.fn();
     let renderer!: ReactTestRenderer;
     act(() => {
@@ -93,11 +88,11 @@ describe('ErrorFallback', () => {
     renderer.unmount();
   });
 
-  it("'screen' scope: pads for the safe area and shows a back arrow when it can go back", () => {
-    canGoBackMock.mockReturnValue(true);
+  it("'screen' scope: pads for the safe area and shows a back arrow wired to onBack", () => {
+    const backMock = vi.fn();
     let renderer!: ReactTestRenderer;
     act(() => {
-      renderer = create(<ErrorFallback scope="screen" error={new Error('x')} resetError={() => {}} />);
+      renderer = create(<ErrorFallback scope="screen" error={new Error('x')} resetError={() => {}} onBack={backMock} />);
     });
     const [back] = byTestID(renderer, 'error-fallback-back');
     expect(back).toBeDefined();
@@ -114,11 +109,10 @@ describe('ErrorFallback', () => {
   });
 
   it("'app' scope (default): Try again reloads the app and there is no back arrow", async () => {
-    canGoBackMock.mockReturnValue(true);
     const resetError = vi.fn();
     let renderer!: ReactTestRenderer;
     act(() => {
-      renderer = create(<ErrorFallback error={new Error('x')} resetError={resetError} />);
+      renderer = create(<ErrorFallback error={new Error('x')} resetError={resetError} onBack={() => {}} />);
     });
     await act(async () => {
       byTestID(renderer, 'error-fallback-retry')[0].props.onPress();

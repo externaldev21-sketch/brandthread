@@ -27,26 +27,23 @@ export type ErrorFallbackProps = {
    * app, since the provider tree itself may be what broke.
    * 'screen' — a per-screen / per-tab boundary (Expo Router's
    * `unstable_screenErrorBoundary`): "Try again" re-renders just the failed
-   * screen via `resetError` (the router's `retry`), content respects the
-   * safe area, and a back arrow is shown whenever there is somewhere to go
-   * back to, so the user is never stuck on a crashed screen.
+   * screen via `resetError` (the router's `retry`) and content respects the
+   * safe area.
    */
   scope?: 'app' | 'screen';
+  /**
+   * Screen scope only: when set, a back arrow is shown that calls it, so
+   * the user is never stuck on a crashed screen. The route adapters pass
+   * it only when the screen's navigator can actually go back.
+   */
+  onBack?: () => void;
 };
 
-function safeCanGoBack(): boolean {
-  try {
-    return router.canGoBack();
-  } catch {
-    return false;
-  }
-}
-
-export function ErrorFallback({ error, resetError, scope = 'app' }: ErrorFallbackProps) {
+export function ErrorFallback({ error, resetError, scope = 'app', onBack }: ErrorFallbackProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isScreen = scope === 'screen';
-  const canGoBack = isScreen && safeCanGoBack();
+  const showBack = isScreen && typeof onBack === 'function';
 
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -91,16 +88,19 @@ export function ErrorFallback({ error, resetError, scope = 'app' }: ErrorFallbac
           : null,
       ]}
     >
-      {canGoBack ? (
-        <IconButton
-          name="arrow-left"
-          onPress={() => router.back()}
-          accessibilityLabel="Go back"
-          color={colors.foreground}
-          variant="plain"
-          style={[styles.backButton, { top: insets.top + SPACING.xs }]}
-          testID="error-fallback-back"
-        />
+      {showBack ? (
+        // IconButton applies `style` to its inner icon view, so the absolute
+        // positioning lives on this wrapper (keeps it out of the centered flow).
+        <View style={[styles.backButton, { top: insets.top + SPACING.xs }]}>
+          <IconButton
+            name="arrow-left"
+            onPress={onBack}
+            accessibilityLabel="Go back"
+            color={colors.foreground}
+            variant="plain"
+            testID="error-fallback-back"
+          />
+        </View>
       ) : null}
       <View style={styles.content}>
         <View style={[styles.iconCircle, { borderColor: colors.border, backgroundColor: colors.card }]}>

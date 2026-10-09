@@ -18,8 +18,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { reportErrorMock } = vi.hoisted(() => ({
+const { reportErrorMock, canGoBackMock, goBackMock } = vi.hoisted(() => ({
   reportErrorMock: vi.fn(),
+  canGoBackMock: vi.fn(() => false),
+  goBackMock: vi.fn(),
+}));
+
+// The route adapters read the crashed screen's own navigation for the back arrow.
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ canGoBack: canGoBackMock, goBack: goBackMock }),
 }));
 
 vi.mock('@/lib/monitoring', () => ({
@@ -40,11 +47,12 @@ function Button(props: { testID: string; onPress: () => void; children: string }
 // native modules that aren't relevant to the boundary's own catch/reset
 // logic under test here; stub it out with something we can assert against.
 vi.mock('@/components/ErrorFallback', () => ({
-  ErrorFallback: ({ error, resetError, scope }: { error: Error; resetError: () => void; scope?: string }) => (
+  ErrorFallback: ({ error, resetError, scope, onBack }: { error: Error; resetError: () => void; scope?: string; onBack?: () => void }) => (
     <>
       <Message testID="default-fallback-message">{`Something went wrong: ${error.message}`}</Message>
       <Message testID="default-fallback-scope">{scope ?? 'app'}</Message>
       <Button testID="default-fallback-retry" onPress={resetError}>Try Again</Button>
+      {onBack ? <Button testID="default-fallback-back" onPress={onBack}>Back</Button> : null}
     </>
   ),
 }));
@@ -211,6 +219,22 @@ describe('ScreenErrorFallback', () => {
       await Promise.resolve();
     });
     expect(retry).toHaveBeenCalledTimes(1);
+    // Nowhere to go back to: no back arrow.
+    expect(hostNodesByTestID(renderer, 'default-fallback-back')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('offers a back arrow that goes back when the screen can go back', async () => {
+    canGoBackMock.mockReturnValueOnce(true);
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<ScreenErrorFallback error={new Error('x')} retry={vi.fn()} />);
+      await Promise.resolve();
+    });
+    act(() => {
+      hostNodesByTestID(renderer, 'default-fallback-back')[0].props.onPress();
+    });
+    expect(goBackMock).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 });
