@@ -68,6 +68,8 @@ export const queryKeys = {
   publicProduct: (id: string) => ['public-product', _queryScopeUserId, id] as const,
   /** The buyer order page's order row (loadBuyerOrder). */
   buyerOrder: (id: string) => ['buyer-order', _queryScopeUserId, id] as const,
+  /** A seller's public profile row (api.publicSellers.get). */
+  publicSeller: (id: string) => ['public-seller', _queryScopeUserId, id] as const,
 };
 
 /** How long a press-in prefetch (or a previous visit) counts as fresh enough

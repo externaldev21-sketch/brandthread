@@ -24,6 +24,8 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
+import { useQueryClient } from '@tanstack/react-query';
+import { PRESS_IN_REUSE_MS, queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
 import { useApi } from '@/hooks/useApi';
@@ -156,16 +158,27 @@ export default function SellerProfileScreen() {
   // buyer shell (viewing a brand's public profile); a no-op elsewhere.
   const barInset = useBuyerTabBarInset();
 
-  const [seller, setSeller] = useState<SellerView | null>(null);
+  // Cache-first (visitor view): the public seller row warmed by a press-in
+  // prefetch or a recent visit paints the header on the first frame; the
+  // load below refreshes it. Owner loads (isOwner=true, no id) are unchanged.
+  const queryClient = useQueryClient();
+  const [cachedSellerView] = useState<SellerView | null>(() => {
+    if (!routeSellerId || (params.isOwner === 'true' && !routeSellerId)) return null;
+    const data = queryClient.getQueryData<{ profile?: any }>(queryKeys.publicSeller(routeSellerId));
+    return data?.profile ? toSellerView(data.profile, routeSellerId) : null;
+  });
+  const [seller, setSeller] = useState<SellerView | null>(cachedSellerView);
+  const hasSellerRef = useRef(false);
+  hasSellerRef.current = !!seller;
   const sellsGiftCards = useStoreGiftCards(seller?.sellerId);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(!cachedSellerView);
   const [profileError, setProfileError] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followers, setFollowers] = useState<number | null>(null);
-  const [following, setFollowing] = useState<number | null>(null);
-  const [likes, setLikes] = useState<number | null>(null);
+  const [followers, setFollowers] = useState<number | null>(cachedSellerView?.followersCount ?? null);
+  const [following, setFollowing] = useState<number | null>(cachedSellerView?.followingCount ?? null);
+  const [likes, setLikes] = useState<number | null>(cachedSellerView?.likesCount ?? null);
   const [followPending, setFollowPending] = useState(false);
   const [rating, setRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
@@ -212,7 +225,7 @@ export default function SellerProfileScreen() {
       return () => { active = false; };
     }
     (async () => {
-      if (reloadTick === 0) setProfileLoading(true);
+      if (reloadTick === 0 && !hasSellerRef.current) setProfileLoading(true);
       setProfileError(false);
       try {
         let view: SellerView;
@@ -231,7 +244,12 @@ export default function SellerProfileScreen() {
           api.publicSellers
             .recordStoreVisit(routeSellerId, { source: resolveStoreVisitSource(params.src) })
             .catch(() => {});
-          const data = await api.publicSellers.get(routeSellerId);
+          const data = await queryClient.fetchQuery({
+            queryKey: queryKeys.publicSeller(routeSellerId),
+            queryFn: () => api.publicSellers.get(routeSellerId),
+            // Reuse only a press-in prefetch from moments ago; counts change.
+            staleTime: reloadTick === 0 ? PRESS_IN_REUSE_MS : 0,
+          });
           view = toSellerView(data.profile ?? {}, routeSellerId);
         }
         if (!active) return;
@@ -241,7 +259,8 @@ export default function SellerProfileScreen() {
         if (view.followersCount != null) setFollowers((count) => count ?? view.followersCount);
         if (view.followingCount != null) setFollowing((count) => count ?? view.followingCount);
       } catch {
-        if (active && reloadTick === 0) setProfileError(true);
+        // A cached profile already on screen stays up on a bad connection.
+        if (active && reloadTick === 0 && !hasSellerRef.current) setProfileError(true);
       } finally {
         if (active) { setProfileLoading(false); setRefreshing(false); }
       }

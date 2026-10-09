@@ -14,7 +14,7 @@ import { SaveHeart } from '@/components/SaveHeart';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
+import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import type { ShopProduct } from '@/services/profileService';
 import { InteractionLayer } from './ProfileControls';
 import { PROFILE_GRID_GAP } from './profileLayout';

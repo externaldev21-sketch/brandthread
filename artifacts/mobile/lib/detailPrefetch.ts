@@ -1,6 +1,6 @@
 /**
- * Press-in prefetch for detail pages: product tiles → app/buyer-product-detail.tsx
- * and order rows → app/buyer-order-detail.tsx. The row (and a product's hero
+ * Press-in prefetch for detail pages: product tiles → app/buyer-product-detail.tsx,
+ * order rows → app/buyer-order-detail.tsx, creator avatars → app/seller-profile.tsx. The row (and a product's hero
  * image) starts loading the moment a finger lands (~100–200ms before the tap
  * registers). The detail page reads the same query key — it paints straight
  * from a finished prefetch, and TanStack Query joins an in-flight one instead
@@ -36,4 +36,14 @@ export function prefetchProductOnPressIn(productId: string | null | undefined, i
 export function prefetchBuyerOrderOnPressIn(orderId: string | null | undefined): void {
   if (!orderId) return;
   prefetchQuery(queryClient, queryKeys.buyerOrder(orderId), () => fetchBuyerOrder(orderId), PRESS_IN_REUSE_MS);
+}
+
+/** GET /api/public/sellers/:id — the same row api.publicSellers.get returns. */
+export function fetchPublicSeller(sellerId: string): Promise<unknown> {
+  return getQuietly(`/api/public/sellers/${encodeURIComponent(sellerId)}`);
+}
+
+export function prefetchSellerOnPressIn(sellerId: string | null | undefined): void {
+  if (!sellerId) return;
+  prefetchQuery(queryClient, queryKeys.publicSeller(sellerId), () => fetchPublicSeller(sellerId), PRESS_IN_REUSE_MS);
 }

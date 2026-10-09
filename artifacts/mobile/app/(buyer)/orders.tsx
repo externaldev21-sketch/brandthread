@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import { prefetchBuyerOrderOnPressIn } from '@/lib/productPrefetch';
+import { prefetchBuyerOrderOnPressIn } from '@/lib/detailPrefetch';
 import * as Haptics from 'expo-haptics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';

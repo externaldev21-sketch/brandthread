@@ -7,7 +7,7 @@ import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
+import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import {
   OVERLAY,
   FONT, ICON, SHADOW_SM,

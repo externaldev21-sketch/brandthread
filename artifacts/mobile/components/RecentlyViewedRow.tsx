@@ -12,7 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { formatCents } from '@/lib/money';
-import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
+import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 interface RecentlyViewedItem {

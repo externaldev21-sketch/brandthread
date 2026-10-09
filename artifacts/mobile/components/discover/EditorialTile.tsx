@@ -16,7 +16,7 @@ import { FONT, FS, GUTTER } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
-import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
+import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 import { formatTimeRemaining } from '@/lib/countdown';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 

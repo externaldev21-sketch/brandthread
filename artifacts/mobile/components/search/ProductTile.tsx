@@ -10,7 +10,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
-import { prefetchProductOnPressIn } from '@/lib/productPrefetch';
+import { prefetchProductOnPressIn } from '@/lib/detailPrefetch';
 
 // Fixed 4:5 aspect ratio for every card so the grid never has uneven row
 // heights — no per-image aspect-ratio measurement.
