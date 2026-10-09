@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  PRELOAD_AHEAD,
   VideoPreloadManager,
   detectDataSaver,
+  isHlsUri,
+  pickPlaybackUri,
   planVideoPreload,
   remoteVideoUri,
+  shouldRevealVideo,
   withVideoCaching,
   type PreloadCandidate,
 } from '@/lib/videoPreload';
@@ -15,12 +19,12 @@ describe('planVideoPreload', () => {
   const items = [video(0), video(1), video(2), video(3), video(4)];
 
   it('warms the pages after the ones the list already mounts (current+2)', () => {
-    expect(planVideoPreload(items, 0)).toEqual(['https://cdn.test/v2.mp4']);
-    expect(planVideoPreload(items, 1)).toEqual(['https://cdn.test/v3.mp4']);
+    expect(planVideoPreload(items, 0, { ahead: 2 })).toEqual(['https://cdn.test/v2.mp4']);
+    expect(planVideoPreload(items, 1, { ahead: 2 })).toEqual(['https://cdn.test/v3.mp4']);
   });
 
   it('warms current+1 and current+2 when nothing is mounted ahead', () => {
-    expect(planVideoPreload(items, 0, { mountedAhead: 0 })).toEqual(['https://cdn.test/v1.mp4', 'https://cdn.test/v2.mp4']);
+    expect(planVideoPreload(items, 0, { ahead: 2, mountedAhead: 0 })).toEqual(['https://cdn.test/v1.mp4', 'https://cdn.test/v2.mp4']);
   });
 
   it('never goes past current+2 and handles the end of the list', () => {
@@ -133,5 +137,48 @@ describe('detectDataSaver', () => {
   it('is false where the platform exposes nothing (React Native)', () => {
     expect(detectDataSaver({})).toBe(false);
     expect(detectDataSaver(undefined)).toBe(false);
+  });
+});
+
+describe('HLS playback selection', () => {
+  it('prefers an https HLS playlist and falls back to the MP4', () => {
+    expect(pickPlaybackUri('https://stream.mux.com/abc123def456.m3u8', 'https://x/v.mp4', true)).toBe('https://stream.mux.com/abc123def456.m3u8');
+    expect(pickPlaybackUri(undefined, 'https://x/v.mp4', true)).toBe('https://x/v.mp4');
+    expect(pickPlaybackUri(null, 'https://x/v.mp4', true)).toBe('https://x/v.mp4');
+    expect(pickPlaybackUri('http://stream.mux.com/a.m3u8', 'https://x/v.mp4', true)).toBe('https://x/v.mp4');
+    expect(pickPlaybackUri('https://x/not-a-playlist.mp4', 'https://x/v.mp4', true)).toBe('https://x/v.mp4');
+  });
+
+  it('keeps the MP4 on web, where Chrome cannot play HLS in <video>', () => {
+    expect(pickPlaybackUri('https://stream.mux.com/abc123def456.m3u8', 'https://x/v.mp4', false)).toBe('https://x/v.mp4');
+  });
+
+  it('never adds disk caching to HLS sources', () => {
+    expect(isHlsUri('https://stream.mux.com/a.m3u8?token=1')).toBe(true);
+    expect(withVideoCaching('https://stream.mux.com/a.m3u8', true)).toBe('https://stream.mux.com/a.m3u8');
+  });
+});
+
+describe('feed preload budget', () => {
+  it('keeps at most previous/current/next players by default (no extra warm players)', () => {
+    const items = [video(0), video(1), video(2), video(3)];
+    expect(PRELOAD_AHEAD).toBe(1);
+    expect(planVideoPreload(items, 0)).toEqual([]);
+    expect(planVideoPreload(items, 1)).toEqual([]);
+  });
+});
+
+describe('shouldRevealVideo', () => {
+  const base = { hasStarted: true, readyToPlay: true, firstFrameRendered: false, firstFrameTimedOut: false };
+  it('keeps the poster until a frame has been painted', () => {
+    expect(shouldRevealVideo(base)).toBe(false);
+    expect(shouldRevealVideo({ ...base, firstFrameRendered: true })).toBe(true);
+  });
+  it('needs playback started and ready even if a frame rendered (preloaded next page)', () => {
+    expect(shouldRevealVideo({ ...base, hasStarted: false, firstFrameRendered: true })).toBe(false);
+    expect(shouldRevealVideo({ ...base, readyToPlay: false, firstFrameRendered: true })).toBe(false);
+  });
+  it('reveals after the fallback timeout when the platform never reports a first frame', () => {
+    expect(shouldRevealVideo({ ...base, firstFrameTimedOut: true })).toBe(true);
   });
 });

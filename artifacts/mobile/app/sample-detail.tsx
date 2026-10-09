@@ -48,6 +48,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { radius } from '@/constants/radii';
+import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -612,11 +613,13 @@ export default function SampleDetailScreen() {
     try {
       // Read the file bytes so we can send them as the raw PUT body and report
       // an accurate size for server-side validation.
-      const file = new FSFile(uri);
+      // Shared compress/resize step first (product preset; fails open).
+      const prepared = await prepareImageForUpload({ uri, mimeType: contentType }, 'product');
+      const file = new FSFile(prepared.uri);
       const bytes = await file.bytes();
       // The authenticated API enforces the byte limit and validates image
       // signatures before it writes any object to private storage.
-      const updated = await uploadSampleImage(sample.id, contentType, bytes);
+      const updated = await uploadSampleImage(sample.id, prepared.mimeType || contentType, bytes);
       setSample(current => current && current.id === sample.id
         ? { ...current, imageUris: updated.imageUrls, revision: updated.revision }
         : current);

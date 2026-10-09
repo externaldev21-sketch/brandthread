@@ -11,12 +11,12 @@
  * Transport-agnostic so the retry/resume logic is unit-testable; lib/api.ts
  * supplies the authenticated HTTP transport.
  */
-export interface ChunkedTransport {
+export interface ChunkedTransport<R = { objectPath: string; contentType: string; size: number }> {
   start(meta: { contentType: string; size: number }): Promise<{ uploadId: string; chunkSize: number; totalChunks: number }>;
   /** Rejects with `{ status: 404 }` when the session no longer exists. */
   status(uploadId: string): Promise<{ received: number[]; chunkSize: number; totalChunks: number }>;
   putChunk(uploadId: string, index: number, chunk: Blob, onBytes: (loaded: number) => void): Promise<void>;
-  complete(uploadId: string): Promise<{ objectPath: string; contentType: string; size: number }>;
+  complete(uploadId: string): Promise<R>;
 }
 
 export interface ResumeStore {
@@ -24,8 +24,8 @@ export interface ResumeStore {
   set(key: string, uploadId: string | null): Promise<void>;
 }
 
-export interface ChunkedUploadOptions {
-  transport: ChunkedTransport;
+export interface ChunkedUploadOptions<R = { objectPath: string; contentType: string; size: number }> {
+  transport: ChunkedTransport<R>;
   blob: Blob;
   contentType: string;
   resumeKey?: string;
@@ -44,7 +44,7 @@ export class UploadAbortedError extends Error {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function uploadChunked(opts: ChunkedUploadOptions) {
+export async function uploadChunked<R = { objectPath: string; contentType: string; size: number }>(opts: ChunkedUploadOptions<R>): Promise<R> {
   const { transport, blob, contentType, resumeKey, resumeStore, onProgress, signal } = opts;
   const concurrency = opts.concurrency ?? 2;
   const retries = opts.retries ?? 3;

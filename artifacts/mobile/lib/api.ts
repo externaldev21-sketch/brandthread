@@ -4,7 +4,8 @@
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
 import type { SizeChartData, SizeChartPreset, SizeChartTemplateSummary, SizeChartTemplateDetail } from '@/lib/sizeChartTypes';
-import { prepareImageForUpload } from '@/lib/imageUploadPrep';
+import { prepareImageForUpload, presetForUploadPath } from '@/lib/imageUploadPrep';
+import { sessionProgress, uploadResumeKey, uploadStrategy, withUploadRetry } from '@/lib/resumableUpload';
 import { useAuth } from '@clerk/expo';
 import type { LaunchChecklistResponse } from '@/lib/launchChecklist';
 import type {
@@ -547,43 +548,186 @@ export interface SellerProductQuestion {
   answer: { id: string; body: string; createdAt: string } | null;
 }
 
+/** Base64 (no data: prefix) of a blob, for the JSON upload endpoints. */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the selected file.'));
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+type UploadResponse = { status: number; text: string };
+
+class UploadNetworkError extends Error {
+  status = 0;
+}
+
+async function readUploadBlob(uri: string, what: string): Promise<Blob> {
+  const source = await fetch(uri);
+  if (!source.ok) throw new Error(`Could not read the ${what}.`);
+  return source.blob();
+}
+
+async function fetchUpload(url: string, body: Blob | null, headers: Record<string, string>): Promise<UploadResponse> {
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "POST", headers, ...(body ? { body } : {}) });
+  } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new UploadNetworkError(String(error)), { status: 0 });
+  }
+  return { status: res.status, text: await res.text() };
+}
+
+function xhrUpload(
+  method: "POST" | "PUT",
+  url: string,
+  body: Blob | null,
+  headers: Record<string, string>,
+  onBytes?: (loaded: number, total: number) => void,
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, String(value));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onBytes?.(event.loaded, event.total);
+    };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new UploadNetworkError("Network error while uploading. Check your connection."));
+    xhr.send(body);
+  });
+}
+
+/** Statuses a single-shot upload is retried on (the request was not processed). */
+const RETRY_UPLOAD_STATUSES = new Set([408, 429, 502, 503]);
+
+function uploadSessionTransport(
+  authHeaders: () => Promise<Record<string, string>>,
+): ChunkedTransport<{ uploadId: string; contentType: string; size: number }> {
+  const json = async <R,>(path: string, init: RequestInit): Promise<R> => {
+    const res = await fetch(`${BASE}${versionApiPath(path)}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return (res.status === 204 ? undefined : await res.json()) as R;
+  };
+  return {
+    start: (meta) => json("/api/upload-sessions", { method: "POST", body: JSON.stringify(meta) }),
+    status: (id) => json(`/api/upload-sessions/${encodeURIComponent(id)}`, { method: "GET" }),
+    complete: (id) => json(`/api/upload-sessions/${encodeURIComponent(id)}/complete`, { method: "POST", body: "{}" }),
+    putChunk: async (id, index, chunk, onBytes) => {
+      const res = await xhrUpload(
+        "PUT",
+        `${BASE}${versionApiPath(`/api/upload-sessions/${encodeURIComponent(id)}/chunks/${index}`)}`,
+        chunk,
+        { "Content-Type": "application/octet-stream", ...(await authHeaders()) },
+        (loaded) => onBytes(loaded),
+      );
+      if (res.status < 200 || res.status >= 300) throw new ApiError(res.status, res.text);
+    },
+  };
+}
+
+export interface SendUploadOptions {
+  /** API route that receives the file (it keeps all of its own validation). */
+  path: string;
+  blob: Blob;
+  contentType: string;
+  /** Resolves the bearer token for each attempt. */
+  authToken: () => Promise<string | null>;
+  /** Extra request headers for the route (e.g. ad media kind). */
+  headers?: Record<string, string>;
+  /** 0–1 progress. When set, single-shot uploads use XHR to report bytes. */
+  onProgress?: (fraction: number) => void;
+  /** Local uri of the file; part of the resume key for large files. */
+  resumeUri?: string;
+  /** Retry single-shot requests on network/transient errors (off for non-idempotent routes). */
+  retry?: boolean;
+  /** Show the shared network notice on failure (default true). */
+  reportErrors?: boolean;
+}
+
+/**
+ * The one upload path every upload point uses: files up to 5 MB in a single
+ * (retried) request, larger ones through a resumable chunked session that is
+ * then handed to the same route (lib/resumableUpload.ts). Resolves with the
+ * route's JSON body; rejects with ApiError(status, body) like request().
+ */
+export async function sendUploadBody<T = unknown>(opts: SendUploadOptions): Promise<T> {
+  const { path, blob, contentType, onProgress } = opts;
+  const reportErrors = opts.reportErrors !== false;
+  rejectSellerPreviewApiRequest();
+  const url = `${BASE}${versionApiPath(path)}`;
+  const authHeaders = async (): Promise<Record<string, string>> => {
+    const token = await opts.authToken();
+    return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders(), ...(opts.headers ?? {}) };
+  };
+  const once = async (run: () => Promise<UploadResponse>): Promise<UploadResponse> => {
+    const response = await run();
+    if (RETRY_UPLOAD_STATUSES.has(response.status)) throw new ApiError(response.status, response.text);
+    return response;
+  };
+  const attempt = (run: () => Promise<UploadResponse>) =>
+    opts.retry === false ? run() : withUploadRetry(() => once(run));
+  let result: UploadResponse;
+  try {
+    if (uploadStrategy(blob.size) === "single") {
+      result = await attempt(async () => {
+        const headers = { "Content-Type": contentType, ...(await authHeaders()) };
+        return onProgress
+          ? xhrUpload("POST", url, blob, headers, (loaded, total) => onProgress(Math.min(1, loaded / total) * 0.99))
+          : fetchUpload(url, blob, headers);
+      });
+    } else {
+      const session = await uploadChunked({
+        transport: uploadSessionTransport(authHeaders),
+        blob,
+        contentType,
+        resumeKey: uploadResumeKey(path, opts.resumeUri ?? "", blob.size, contentType),
+        resumeStore: chunkedResumeStore,
+        onProgress: (fraction) => onProgress?.(sessionProgress(fraction)),
+      });
+      // Session uploads hand off with an empty body; the route reads the
+      // stitched file server side. Safe to retry: the session stays until the
+      // route answers without a 5xx.
+      result = await withUploadRetry(() => once(async () =>
+        fetchUpload(url, null, { ...(await authHeaders()), "X-Upload-Id": session.uploadId })));
+    }
+  } catch (error) {
+    if (reportErrors) reportNetworkError(error);
+    throw error;
+  }
+  if (result.status < 200 || result.status >= 300) {
+    const error = new ApiError(result.status, result.text);
+    if (reportErrors) reportNetworkError(error);
+    throw error;
+  }
+  if (reportErrors) dismissNetworkNotice();
+  onProgress?.(1);
+  return (result.text ? JSON.parse(result.text) : undefined) as T;
+}
+
 async function uploadImage<T = any>(
   path: string,
   image: { uri: string; mimeType?: string | null },
   getToken: GetToken,
   getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
-  image = await prepareImageForUpload(image);
-  const source = await fetch(image.uri);
-  if (!source.ok) {
-    throw new Error("Could not read the selected image.");
-  }
-  const imageBlob = await source.blob();
-  rejectSellerPreviewApiRequest();
-  const contentType = image.mimeType || imageBlob.type || "image/jpeg";
-  const token = await getCachedToken(getToken);
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}${versionApiPath(path)}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": contentType,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...storeContextHeaders(),
-      },
-      body: imageBlob,
-    });
-  } catch (error) {
-    reportNetworkError(error);
-    throw error;
-  }
-  if (!res.ok) {
-    const error = new ApiError(res.status, await res.text());
-    reportNetworkError(error);
-    throw error;
-  }
-  dismissNetworkNotice();
-  const data = await res.json() as T;
+  image = await prepareImageForUpload(image, presetForUploadPath(path));
+  const blob = await readUploadBlob(image.uri, "selected image");
+  const data = await sendUploadBody<T>({
+    path,
+    blob,
+    contentType: image.mimeType || blob.type || "image/jpeg",
+    authToken: () => getCachedToken(getToken),
+    resumeUri: image.uri,
+  });
   await clearApiCache(await getCacheScope());
   return data;
 }
@@ -594,34 +738,14 @@ async function uploadVideo<T = any>(
   getToken: GetToken,
   getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
-  const source = await fetch(video.uri);
-  if (!source.ok) throw new Error("Could not read the recorded video.");
-  const videoBlob = await source.blob();
-  rejectSellerPreviewApiRequest();
-  const contentType = video.mimeType || videoBlob.type || "video/mp4";
-  const token = await getCachedToken(getToken);
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}${versionApiPath(path)}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": contentType,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...storeContextHeaders(),
-      },
-      body: videoBlob,
-    });
-  } catch (error) {
-    reportNetworkError(error);
-    throw error;
-  }
-  if (!res.ok) {
-    const error = new ApiError(res.status, await res.text());
-    reportNetworkError(error);
-    throw error;
-  }
-  dismissNetworkNotice();
-  const data = await res.json() as T;
+  const blob = await readUploadBlob(video.uri, "recorded video");
+  const data = await sendUploadBody<T>({
+    path,
+    blob,
+    contentType: video.mimeType || blob.type || "video/mp4",
+    authToken: () => getCachedToken(getToken),
+    resumeUri: video.uri,
+  });
   await clearApiCache(await getCacheScope());
   return data;
 }
@@ -640,7 +764,7 @@ export interface PublicPairedProduct {
 }
 export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
 
-/** Like uploadVideo, but reports upload progress (0–1) via XHR. */
+/** Like uploadVideo, but reports upload progress (0–1). */
 async function uploadVideoWithProgress<T = any>(
   path: string,
   video: { uri: string; mimeType?: string | null },
@@ -648,34 +772,17 @@ async function uploadVideoWithProgress<T = any>(
   getCacheScope: GetCacheScope = () => 'anonymous',
   onProgress?: (fraction: number) => void,
 ): Promise<T> {
-  const source = await fetch(video.uri);
-  if (!source.ok) throw new Error("Could not read the selected video.");
-  const videoBlob = await source.blob();
-  rejectSellerPreviewApiRequest();
-  const contentType = video.mimeType || videoBlob.type || "video/mp4";
-  const token = await getCachedToken(getToken);
-  const result = await new Promise<{ status: number; text: string }>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${BASE}${versionApiPath(path)}`);
-    xhr.setRequestHeader("Content-Type", contentType);
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    for (const [key, value] of Object.entries(storeContextHeaders())) xhr.setRequestHeader(key, String(value));
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && event.total > 0) onProgress?.(Math.min(1, event.loaded / event.total));
-    };
-    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
-    xhr.onerror = () => reject(new Error("Network error while uploading the video."));
-    xhr.send(videoBlob);
-  }).catch((error) => { reportNetworkError(error); throw error; });
-  if (result.status < 200 || result.status >= 300) {
-    const error = new ApiError(result.status, result.text);
-    reportNetworkError(error);
-    throw error;
-  }
-  dismissNetworkNotice();
-  onProgress?.(1);
+  const blob = await readUploadBlob(video.uri, "selected video");
+  const data = await sendUploadBody<T>({
+    path,
+    blob,
+    contentType: video.mimeType || blob.type || "video/mp4",
+    authToken: () => getCachedToken(getToken),
+    resumeUri: video.uri,
+    onProgress: onProgress ?? (() => {}),
+  });
   await clearApiCache(await getCacheScope());
-  return JSON.parse(result.text) as T;
+  return data;
 }
 /** Remembers in-flight chunked upload sessions so a retry/restart resumes instead of restarting. */
 const chunkedResumeStore: ResumeStore = {
@@ -1956,6 +2063,34 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a base64-encoded image/video/audio file and get back a public URL. */
       uploadMedia: (body: { data: string; mimeType: string; extension: string }) =>
         post<{ url: string }>('/api/conversations/upload-media', body),
+      /**
+       * Upload a picked photo or video file. Photos are compressed (message
+       * preset) and sent inline; anything over 5 MB (videos) goes through a
+       * resumable chunked session instead of a base64 string held in memory.
+       */
+      uploadMediaFile: async (file: { uri: string; mimeType: string; extension: string }) => {
+        const isImage = file.mimeType.startsWith('image/');
+        const prepared = isImage ? await prepareImageForUpload({ uri: file.uri, mimeType: file.mimeType }, 'message') : file;
+        const mimeType = prepared.mimeType || file.mimeType;
+        const extension = isImage ? (mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg') : file.extension;
+        const blob = await readUploadBlob(prepared.uri, isImage ? 'selected photo' : 'selected video');
+        if (uploadStrategy(blob.size) === 'single') {
+          return post<{ url: string }>('/api/conversations/upload-media', { data: await blobToBase64(blob), mimeType, extension });
+        }
+        rejectSellerPreviewApiRequest();
+        const authHeaders = async (): Promise<Record<string, string>> => {
+          const token = await getCachedToken(getToken);
+          return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...storeContextHeaders() };
+        };
+        const session = await uploadChunked({
+          transport: uploadSessionTransport(authHeaders),
+          blob,
+          contentType: mimeType,
+          resumeKey: uploadResumeKey('/api/conversations/upload-media', file.uri, blob.size, mimeType),
+          resumeStore: chunkedResumeStore,
+        });
+        return post<{ url: string }>('/api/conversations/upload-media', { uploadId: session.uploadId, mimeType, extension });
+      },
       /** Set (or replace) my reaction on a message — one active reaction per user per message. */
       addReaction: (conversationId: string, messageId: string, reactionType: string) =>
         put<{ userId: string; userName: string; reactionType: string; createdAt: string }>(
@@ -3831,22 +3966,23 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         mimeType: string,
         opts?: { mediaKind?: 'photos' | 'video'; durationSeconds?: number; insertAt?: number },
       ) => {
-        return request<{ objectPath: string; downloadUrl: string; mimeType: string; insertedAt: number }>(
-          `/api/ad-campaigns/${encodeURIComponent(id)}/media`,
-          {
-            method: 'POST',
-            body: blob,
-            headers: {
-              'Content-Type': mimeType,
-              'X-Media-Kind':  opts?.mediaKind ?? 'photos',
-              ...(opts?.durationSeconds !== undefined ? { 'X-Duration-Seconds': String(opts.durationSeconds) } : {}),
-              ...(opts?.insertAt !== undefined ? { 'X-Media-Index': String(opts.insertAt) } : {}),
-            } as any,
+        // Shared upload path: single request up to 5 MB, resumable chunked
+        // session above that. Not retried blindly — the route appends media.
+        return sendUploadBody<{ objectPath: string; downloadUrl: string; mimeType: string; insertedAt: number }>({
+          path: `/api/ad-campaigns/${encodeURIComponent(id)}/media`,
+          blob,
+          contentType: mimeType,
+          authToken: () => getCachedToken(getToken),
+          retry: false,
+          headers: {
+            'X-Media-Kind':  opts?.mediaKind ?? 'photos',
+            ...(opts?.durationSeconds !== undefined ? { 'X-Duration-Seconds': String(opts.durationSeconds) } : {}),
+            ...(opts?.insertAt !== undefined ? { 'X-Media-Index': String(opts.insertAt) } : {}),
           },
-          getToken,
-          false,
-          getCacheScope,
-        );
+        }).then(async (result) => {
+          await clearApiCache(await getCacheScope());
+          return result;
+        });
       },
       removeMedia: (id: string, index: number) =>
         del<{ ok: boolean; mediaCount: number }>(`/api/ad-campaigns/${encodeURIComponent(id)}/media/${index}`),

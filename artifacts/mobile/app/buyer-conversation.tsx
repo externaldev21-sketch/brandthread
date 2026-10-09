@@ -717,6 +717,11 @@ export default function BuyerConversationScreen() {
     return result.url;
   }
 
+  async function uploadMediaFile(uri: string, mimeType: string, extension: string): Promise<string> {
+    const result = await api.conversations.uploadMediaFile({ uri, mimeType, extension });
+    return result.url;
+  }
+
   // ── 1:1 voice / video call ────────────────────────────────────────────────────
 
   function handleStartCall(mode: 'voice' | 'video') {
@@ -891,7 +896,6 @@ export default function BuyerConversationScreen() {
       allowsMultipleSelection: true,
       selectionLimit: 15,
       quality: 0.85,
-      base64: true,
     });
     if (result.canceled || !result.assets.length) return;
     setShowMediaSheet(false);
@@ -910,8 +914,9 @@ export default function BuyerConversationScreen() {
     try {
       const urls: string[] = [];
       for (const asset of result.assets) {
-        if (!asset.base64) continue;
-        urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
+        // Compressed (message preset) and sent from the file, not a picker base64 string.
+        const mime = asset.mimeType === 'image/png' || asset.mimeType === 'image/webp' ? asset.mimeType : 'image/jpeg';
+        urls.push(await uploadMediaFile(asset.uri, mime, 'jpg'));
       }
       if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
       if (!urls.length) { setSelectedAttachment(null); return; }
@@ -936,12 +941,11 @@ export default function BuyerConversationScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       videoMaxDuration: 59,
       quality: 0.7,
-      base64: true,
     });
     if (result.canceled || !result.assets.length) return;
     const asset = result.assets[0];
     if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
-    if (!asset.base64) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
+    if (!asset.uri) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
     setShowMediaSheet(false);
     const token = ++mediaUploadTokenRef.current;
     const durationLabel = String(Math.round((asset.duration ?? 0) / 1000));
@@ -952,7 +956,8 @@ export default function BuyerConversationScreen() {
     setIsUploading(true);
     try {
       const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
-      const url = await uploadMedia(asset.base64, 'video/mp4', ext);
+      // Resumable chunked upload for anything over 5 MB (no base64 copy in memory).
+      const url = await uploadMediaFile(asset.uri, 'video/mp4', ext);
       if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
       setSelectedAttachment({
         type: 'video', uri: url,

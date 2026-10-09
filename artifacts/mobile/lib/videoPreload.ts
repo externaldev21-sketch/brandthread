@@ -11,7 +11,8 @@
  *     replay or a swipe back is served from disk.
  *  2. `VideoPreloadManager` keeps at most `maxWarm` extra, paused, muted
  *     players buffering the pages just beyond the ones that are already
- *     mounted (so current, current+1 and current+2 are all warm). It releases
+ *     mounted (PRELOAD_AHEAD; currently 1, so only previous/current/next hold
+ *     players and the manager stays idle unless that is raised). It releases
  *     any player whose page leaves the window and releases everything when the
  *     user leaves the feed, backgrounds the app, goes offline-saver, or signs out.
  *
@@ -20,8 +21,16 @@
  */
 import type { VideoSource } from 'expo-video';
 
-/** How many pages ahead of the active one should be warm (mounted + managed). */
-export const PRELOAD_AHEAD = 2;
+/**
+ * How many pages ahead of the active one should be warm (mounted + managed).
+ * 1 = the next page only, which the list already mounts with a real, paused,
+ * buffering player (`preload` on VideoVisual). That keeps at most three
+ * decoders alive (previous, current, next); pages further ahead are still
+ * served from the on-disk cache once seen. Raise it to warm extra players.
+ */
+export const PRELOAD_AHEAD = 1;
+/** Hard ceiling on extra warm players the manager will ever hold. */
+export const MAX_WARM_PLAYERS = 2;
 /** Pages ahead that the feed list itself already mounts a player for. */
 export const MOUNTED_AHEAD = 1;
 /** Disk cache budget for feed videos. expo-video's default is 1 GB. */
@@ -30,6 +39,38 @@ export const VIDEO_CACHE_BYTES = 512 * 1024 * 1024;
 export function remoteVideoUri(source: VideoSource | null | undefined): string | null {
   const uri = typeof source === 'string' ? source : source && typeof source === 'object' && 'uri' in source ? source.uri : null;
   return typeof uri === 'string' && /^https?:\/\//i.test(uri) ? uri : null;
+}
+
+export function isHlsUri(uri: string): boolean {
+  return /\.m3u8(?:$|[?#])/i.test(uri);
+}
+
+/**
+ * The uri a feed video should play: the adaptive HLS stream when the server
+ * has one (https only) on iOS/Android, otherwise the original MP4. Web keeps
+ * the MP4: only Safari plays HLS in a plain <video> element.
+ */
+export function pickPlaybackUri(hlsUrl: string | null | undefined, mp4Uri: string, native: boolean): string {
+  if (native && typeof hlsUrl === 'string' && /^https:\/\//i.test(hlsUrl) && isHlsUri(hlsUrl)) return hlsUrl;
+  return mp4Uri;
+}
+
+/** How long to wait for onFirstFrameRender after playback is ready before revealing anyway. */
+export const FIRST_FRAME_FALLBACK_MS = 1200;
+
+/**
+ * Whether the feed video should replace its poster. Only after playback
+ * started, the player is ready, and a frame has really been painted (or the
+ * first-frame event did not arrive within FIRST_FRAME_FALLBACK_MS, so a
+ * platform that never emits it still shows the video).
+ */
+export function shouldRevealVideo(state: {
+  hasStarted: boolean;
+  readyToPlay: boolean;
+  firstFrameRendered: boolean;
+  firstFrameTimedOut: boolean;
+}): boolean {
+  return state.hasStarted && state.readyToPlay && (state.firstFrameRendered || state.firstFrameTimedOut);
 }
 
 const cachedSources = new Map<string, VideoSource>();
@@ -44,7 +85,8 @@ const CACHED_SOURCE_LIMIT = 200;
 export function withVideoCaching(source: VideoSource, native: boolean): VideoSource {
   if (!native) return source;
   const uri = remoteVideoUri(source);
-  if (!uri) return source;
+  // expo-video's disk cache only covers progressive files, not HLS playlists.
+  if (!uri || isHlsUri(uri)) return source;
   if (typeof source === 'object' && source && 'useCaching' in source && source.useCaching != null) return source;
   const existing = cachedSources.get(uri);
   if (existing) return existing;
@@ -101,7 +143,7 @@ export class VideoPreloadManager {
   private readonly maxWarm: number;
 
   constructor(private readonly deps: VideoPreloadDeps) {
-    this.maxWarm = deps.maxWarm ?? PRELOAD_AHEAD;
+    this.maxWarm = deps.maxWarm ?? MAX_WARM_PLAYERS;
   }
 
   get warmUris(): string[] {

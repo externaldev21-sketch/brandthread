@@ -548,6 +548,8 @@ export interface SellerThreadPost {
   hashtags:          string[];
   styleTags?:        string[];
   mediaUris:         string[];
+  /** Adaptive (HLS) stream of a video post when the server has one; the feed prefers it over mediaUris[0]. */
+  hlsUrl?:           string;
   thumbnailUri?:     string;
   aspectRatio:       '9:16' | '3:4' | '1:1';
   contentType:       string;
@@ -632,6 +634,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     hashtags:        Array.isArray(p.hashtags) ? p.hashtags : [],
     styleTags:       Array.isArray(p.styleTags) ? p.styleTags : [],
     mediaUris:       apiMediaUris,
+    hlsUrl:          typeof p.videoHlsUrl === 'string' && p.videoHlsUrl ? p.videoHlsUrl : undefined,
     thumbnailUri:    p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:     p.aspectRatio ?? '9:16',
     contentType:     p.mediaType ?? p.contentType ?? 'video',
@@ -903,6 +906,7 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     hashtags:          p.hashtags ?? [],
     styleTags:         p.styleTags ?? [],
     mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
+    hlsUrl:            typeof p.videoHlsUrl === 'string' && p.videoHlsUrl ? p.videoHlsUrl : undefined,
     thumbnailUri:      p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
     slides:            mapSlides(p.slides),
