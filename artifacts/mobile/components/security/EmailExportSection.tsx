@@ -132,7 +132,7 @@ export function EmailExportSection({ categories }: { categories: string[] }) {
 
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wrap: { marginTop: SPACING.lg },
-  group: { ...TYPE_SCALE.caption, color: colors.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SPACING.xs },
+  group: { ...TYPE_SCALE.caption, color: colors.mutedForeground, marginBottom: SPACING.xs },
   card: { padding: SPACING.md, paddingHorizontal: SPACING.md, gap: 4 },
   title: { ...TYPE_SCALE.body, fontFamily: FONT.semibold, color: colors.foreground },
   body: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, lineHeight: 18 },
