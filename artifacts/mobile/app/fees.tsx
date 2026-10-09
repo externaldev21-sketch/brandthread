@@ -34,7 +34,7 @@ export default function FeesScreen() {
             <>
               <Text style={styles.sectionTitle}>Selling fees</Text>
               <View style={styles.card} testID="fees-table">
-                <FeeRow styles={styles} label="Brandthread fee" note="On the item price" value={bpsToPercentLabel(schedule.platformFeeBps)} />
+                <FeeRow styles={styles} label="Brandthread fee" note="On the item price + shipping" value={bpsToPercentLabel(schedule.platformFeeBps)} />
                 <FeeRow styles={styles} label="Payment processing" note="On the total the buyer pays" value={processingRateLabel(schedule)} last />
               </View>
 

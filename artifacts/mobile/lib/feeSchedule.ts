@@ -56,7 +56,8 @@ export function quoteFromSchedule(
   const quantity = opts.quantity && opts.quantity > 0 ? opts.quantity : 1;
   const merchandise = Math.max(0, Math.round(priceCents)) * quantity;
   const gross = merchandise + Math.max(0, opts.shippingCents ?? 0);
-  const platformFee = Math.min(bpsOfCents(merchandise, schedule.platformFeeBps), gross);
+  // Brandthread's fee is on item + shipping, like the server (api-server lib/money/fees.ts).
+  const platformFee = Math.min(bpsOfCents(gross, schedule.platformFeeBps), gross);
   const rawProcessing = gross === 0 ? 0 : bpsOfCents(gross, schedule.processing.bps) + schedule.processing.fixedCents;
   const processingFee = Math.min(rawProcessing, gross - platformFee);
   return {

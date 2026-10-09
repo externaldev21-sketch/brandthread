@@ -93,7 +93,7 @@ export default function SellerCreatorSettingsScreen() {
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
         {loading ? <ActivityIndicator color={theme.text} /> : error ? <RetryRow label="Couldn't load settings" onRetry={load} /> : (
           <>
-            <Field label="Default commission" value={commission} onChange={setCommission} suffix="%" help="Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down." />
+            <Field label="Default commission" value={commission} onChange={setCommission} suffix="%" help="Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down. It comes out of your payout for that order before the creator is paid." />
             <Field label="Buyer discount on creator codes" value={discount} onChange={setDiscount} suffix="%" help="0 keeps the code for tracking only." />
             <Field label="Attribution window" value={windowDays} onChange={setWindowDays} suffix="days" help="How long a clicked link keeps crediting the creator." />
             <Field label="Hold period" value={holdDays} onChange={setHoldDays} suffix="days" help="Days after delivery before commission becomes payable." />
