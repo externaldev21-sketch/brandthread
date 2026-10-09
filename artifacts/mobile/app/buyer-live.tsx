@@ -28,6 +28,7 @@ import {
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
+import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkoutReturn';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -412,16 +413,26 @@ function BuyerLiveNativeScreen() {
           clientIdempotencyKey: `live_${params.streamId}_${purchaseProduct.id}_${Date.now()}`,
         },
       );
-      const browser = await WebBrowser.openBrowserAsync(result.url);
-      if (browser.type === 'cancel' || browser.type === 'dismiss') {
-        setCheckoutError('Payment was cancelled. The live stream is still playing.');
-        return;
-      }
+      const browser = await WebBrowser.openAuthSessionAsync(result.url, currentCheckoutReturnUrls().redirectUrl);
+      const returnedUrl = browser.type === 'success' ? browser.url : null;
+      // Closing the page is not proof of a cancel: ask Stripe first.
+      const attempts = browser.type === 'success' && !/[?&]cancelled=1/.test(returnedUrl ?? '') ? 6 : 2;
       let verification: any = null;
-      for (let attempt = 0; attempt < 6; attempt++) {
+      for (let attempt = 0; attempt < attempts; attempt++) {
         verification = await api.buyer.checkout.verifySession(result.sessionId);
         if (verification?.paymentStatus === 'paid' || verification?.orderNumber) break;
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (attempt < attempts - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      const verdict = hostedCheckoutVerdict({
+        browserType: browser.type,
+        returnedUrl,
+        paymentStatus: verification?.paymentStatus,
+        orderId: verification?.orderId,
+        declineReason: verification?.declineReason,
+      });
+      if (verdict === 'cancelled') {
+        setCheckoutError('Payment was cancelled. The live stream is still playing.');
+        return;
       }
       if (verification?.paymentStatus !== 'paid') {
         setCheckoutError(verification?.declineReason ?? 'Payment is still pending. Please check your orders shortly.');
