@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   autoRefundEnabled, buildTimeline, computeDeliverBy, computePayoutReleaseAt, dueWarningLevel, formatDeadline,
   payoutBufferDays, payoutMode, undeliveredRefundCents, validatePreorderListing,
+  computePreorderDeliverBy, maxPreorderShipDays, preorderGraceDays, preorderMaxDeliveryDays,
 } from "../policy";
 
 const DAY = 86_400_000;
@@ -123,5 +124,31 @@ describe("partial-shipment refund amount", () => {
   });
   it("is zero when nothing is undelivered", () => {
     expect(undeliveredRefundCents({ chargedCents: 100, alreadyRefundedCents: 0, allItems: items, undeliveredItemIds: [], alreadyRefundedItemIds: [] })).toBe(0);
+  });
+});
+
+describe("pre-order deadline", () => {
+  const paid = new Date("2026-03-01T12:00:00Z");
+  const day = (n: number) => new Date(paid.valueOf() + n * DAY);
+
+  it("is the promised ship date + 15 days, capped at 180 days from purchase", () => {
+    expect(computePreorderDeliverBy(paid, day(90)).toISOString()).toBe(day(105).toISOString());
+    expect(computePreorderDeliverBy(paid, day(170)).toISOString()).toBe(day(180).toISOString());
+  });
+
+  it("counts a ship date already past from purchase, and falls back to 60 days without one", () => {
+    expect(computePreorderDeliverBy(paid, day(-3)).toISOString()).toBe(day(15).toISOString());
+    expect(computePreorderDeliverBy(paid, null).toISOString()).toBe(day(60).toISOString());
+  });
+
+  it("reads its config from env with safe bounds", () => {
+    expect(preorderGraceDays({})).toBe(15);
+    expect(preorderGraceDays({ PREORDER_DELIVERY_GRACE_DAYS: "21" })).toBe(21);
+    expect(preorderGraceDays({ PREORDER_DELIVERY_GRACE_DAYS: "0" })).toBe(15);
+    expect(preorderMaxDeliveryDays({})).toBe(180);
+    expect(preorderMaxDeliveryDays({ PREORDER_MAX_DELIVERY_DAYS: "120" })).toBe(120);
+    expect(preorderMaxDeliveryDays({ PREORDER_MAX_DELIVERY_DAYS: "400" })).toBe(180);
+    expect(maxPreorderShipDays({})).toBe(165);
+    expect(computePreorderDeliverBy(paid, day(100), { PREORDER_MAX_DELIVERY_DAYS: "90" }).toISOString()).toBe(day(90).toISOString());
   });
 });
