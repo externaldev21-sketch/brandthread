@@ -1254,7 +1254,7 @@ export default function BuyerOrderDetailScreen() {
         {order.status === 'delivered' && reviewSubmitted && (
           <View style={styles.reviewDoneRow}>
             <Feather name="check-circle" size={ICON.sm} color={theme.success} />
-            <Text style={styles.reviewDoneText}>Review submitted — thank you!</Text>
+            <Text style={styles.reviewDoneText}>Review submitted</Text>
           </View>
         )}
         {canLeaveReview && (

@@ -82,7 +82,7 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
 
           {/* CTA */}
           <PrimaryButton
-            label="Got it, let's go!"
+            label="Got it"
             onPress={onDismiss}
             style={{ marginTop: 4 }}
             icon="arrow-right"

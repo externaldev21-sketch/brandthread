@@ -191,7 +191,7 @@ export default function LoginActivity() {
           {session.current ? <View style={s.currentPill}><Text style={s.currentText}>This device</Text></View> : null}
         </View>
         <Text style={s.meta} numberOfLines={1}>
-          {[session.browser, session.location].filter(Boolean).join(' · ') || 'Location unavailable'}
+          {[session.browser, session.location].filter(Boolean).join(', ') || 'Location unavailable'}
         </Text>
         <Text style={s.metaSub}>
           {session.current ? 'Active now' : lastActiveLabel(session.lastActiveAt)}

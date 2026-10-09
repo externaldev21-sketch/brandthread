@@ -1798,7 +1798,7 @@ function ReturnsTab({ returns, loadError, router }: {
             {ret.items.map(item => (
               <View key={item.lineItemId} style={s.returnItemRow}>
                 <Feather name="package" size={ICON.xs} color={theme.muted} />
-                <Text style={s.returnItemText}>{[item.productName, item.variantTitle, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
+                <Text style={s.returnItemText}>{[item.productName, item.variantTitle, `×${item.quantity}`].filter(Boolean).join(', ')}</Text>
               </View>
             ))}
             <Text style={[s.returnExplanation, { marginTop: 2 }]}>

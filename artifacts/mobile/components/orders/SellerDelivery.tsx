@@ -160,7 +160,7 @@ export function ShipItemsSheet({
                     <Feather name={on ? 'check-square' : 'square'} size={ICON.md} color={on ? theme.text : theme.muted} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.itemName} numberOfLines={1}>{item.productName}</Text>
-                      <Text style={s.itemMeta} numberOfLines={1}>{[item.variant, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
+                      <Text style={s.itemMeta} numberOfLines={1}>{[item.variant, `×${item.quantity}`].filter(Boolean).join(', ')}</Text>
                     </View>
                   </TouchableOpacity>
                 );

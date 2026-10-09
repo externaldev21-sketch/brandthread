@@ -490,7 +490,7 @@ function ProductRow({ item, checked, onPress, theme, s }: {
     priceRangeLabel(item.minPriceCents, item.maxPriceCents, formatCents),
     `${item.variantCount} ${item.variantCount === 1 ? 'variant' : 'variants'}`,
     item.status === 'active' ? null : item.status[0].toUpperCase() + item.status.slice(1),
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(', ');
   return (
     <PressableScale
       style={[s.row, checked && s.rowChecked]}

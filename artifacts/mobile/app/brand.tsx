@@ -136,7 +136,7 @@ export default function BrandScreen() {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
           <Feather name="cpu" size={16} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Brand name generator</Text>
           <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
@@ -180,7 +180,7 @@ export default function BrandScreen() {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
           <Feather name="aperture" size={16} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Logo generator</Text>
           <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>

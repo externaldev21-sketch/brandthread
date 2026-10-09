@@ -273,7 +273,7 @@ export default function StorePublishScreen() {
               <View style={[pub.successIcon, { backgroundColor: SUCCESS_DIM }]}>
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
-              <Text style={pub.successTitle}>Your store is live!</Text>
+              <Text style={pub.successTitle}>Your store is live</Text>
               <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
               <View style={pub.successActions}>
                 <SecondaryButton label="View store" onPress={() => Linking.openURL(`https://${storeUrl}.brandthread.app`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />

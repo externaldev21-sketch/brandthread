@@ -334,7 +334,7 @@ export function OrderConfirmation({
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={2}>{item.productName}</Text>
                   <Text style={[styles.rowSub, { color: theme.muted }]} numberOfLines={1}>
-                    {[item.variantTitle, `Qty ${item.quantity}`].filter(Boolean).join(' · ')}
+                    {[item.variantTitle, `Qty ${item.quantity}`].filter(Boolean).join(', ')}
                   </Text>
                 </View>
                 <Text style={[styles.itemPrice, { color: theme.text }, TABULAR_NUMS]}>{formatCents(item.priceCents * item.quantity)}</Text>

@@ -172,7 +172,7 @@ export default function SellerCreatorProgramScreen() {
               >
                 <View style={{ flex: 1 }}>
                   <Text style={s.name}>{c.displayName ?? c.username ?? 'Creator'}</Text>
-                  <Text style={s.meta}>{c.code} · {c.stats.orders} orders · {formatCents(c.stats.revenueCents)}</Text>
+                  <Text style={s.meta}>{c.code}, {c.stats.orders} orders, {formatCents(c.stats.revenueCents)}</Text>
                   <Text style={s.meta}>Owed {formatCents(c.stats.pendingCents + c.stats.payableCents)} · Paid {formatCents(c.stats.paidCents)}</Text>
                 </View>
                 {c.status === 'pending' ? (

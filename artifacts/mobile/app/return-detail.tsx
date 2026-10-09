@@ -273,7 +273,7 @@ export default function ReturnDetailScreen() {
             <View key={item.lineItemId} style={[s.itemRow, idx > 0 && s.itemBorder]}>
               <View style={{ flex: 1 }}>
                 <Text style={s.itemName}>{item.productName}</Text>
-                <Text style={s.itemMeta}>{[item.variantTitle, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
+                <Text style={s.itemMeta}>{[item.variantTitle, `×${item.quantity}`].filter(Boolean).join(', ')}</Text>
               </View>
               <Text style={s.itemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
             </View>

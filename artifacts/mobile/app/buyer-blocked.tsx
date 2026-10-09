@@ -144,7 +144,7 @@ export default function BlockedAndMutedScreen() {
             <ListRow
               avatar={{ uri: item.avatarUrl, name: item.name }}
               title={item.name}
-              subtitle={`${[item.handle, item.accountType === 'seller' ? 'Seller' : null].filter(Boolean).join(' · ')}\nBlocked ${shortRelativeTime(item.blockedAt)}`}
+              subtitle={`${[item.handle, item.accountType === 'seller' ? 'Seller' : null].filter(Boolean).join(', ')}\nBlocked ${shortRelativeTime(item.blockedAt)}`}
               subtitleNumberOfLines={2}
               right={(
                 <Button

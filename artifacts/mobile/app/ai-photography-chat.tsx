@@ -333,7 +333,7 @@ export default function AIPhotographyChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <ScreenHeader title="AI Product Photography" divider={false} />
+      <ScreenHeader title="Product photography" divider={false} />
 
       {/* Chat mode switch — both modes share the same thread and composer.
           Only shown when Outfit Swap is enabled; otherwise Product Photography is the only mode. */}
@@ -454,7 +454,7 @@ export default function AIPhotographyChatScreen() {
           <Image source={{ uri: heroPhoto.uri }} style={styles.trayThumb} resizeMode="cover" />
           <View style={styles.lockedHeroCopy}>
             <Text style={[styles.lockedHeroTitle, { color: colors.foreground }]}>Hero locked</Text>
-            <Text style={[styles.lockedHeroSub, { color: colors.mutedForeground }]}>Same model · pose · scene</Text>
+            <Text style={[styles.lockedHeroSub, { color: colors.mutedForeground }]}>Same model, pose and scene</Text>
           </View>
           <TouchableOpacity
             style={[styles.resetHeroBtn, { borderColor: colors.border }]}

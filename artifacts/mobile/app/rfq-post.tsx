@@ -179,7 +179,7 @@ export default function RfqPostScreen() {
                     {mfg.isVerified && <Feather name="check-circle" size={13} color={theme.secondary} />}
                   </View>
                   <Text style={s.mfgMeta} numberOfLines={1}>
-                    {[mfg.specialty, mfg.country].filter(Boolean).join(' · ')}
+                    {[mfg.specialty, mfg.country].filter(Boolean).join(', ')}
                     {mfg.moq ? ` · MOQ ${mfg.moq}` : ''}
                   </Text>
                 </View>

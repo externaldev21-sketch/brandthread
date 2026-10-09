@@ -1111,7 +1111,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
           rel.activeOrders ? `${rel.activeOrders} active ${rel.activeOrders === 1 ? 'order' : 'orders'}` : null,
           rel.awaitingPayment ? `${rel.awaitingPayment} awaiting payment` : null,
           !rel.activeOrders && rel.totalOrders ? `${rel.totalOrders} past ${rel.totalOrders === 1 ? 'order' : 'orders'}` : null,
-        ].filter(Boolean).join(' · ') || 'No orders yet';
+        ].filter(Boolean).join(', ') || 'No orders yet';
         return (
           <View style={relCard.root} testID={`relationship-${mfg.id}`}>
             <TouchableOpacity style={relCard.topRow} activeOpacity={0.8} onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}>

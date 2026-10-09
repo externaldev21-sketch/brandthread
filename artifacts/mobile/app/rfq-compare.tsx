@@ -112,7 +112,7 @@ export default function RfqCompareScreen() {
       <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
       <View style={s.summary}>
         <Text style={s.summaryTitle} numberOfLines={1}>{rfq.garmentType}</Text>
-        <Text style={s.summaryMeta}>{rfq.quantity.toLocaleString('en-US')} units · sent to {rfq.manufacturersCount} manufacturers · {rfq.quotesReceivedCount} quoted</Text>
+        <Text style={s.summaryMeta}>{rfq.quantity.toLocaleString('en-US')} units, sent to {rfq.manufacturersCount} manufacturers, {rfq.quotesReceivedCount} quoted</Text>
       </View>
 
       {quotedQuotes.length === 0 ? (

@@ -293,7 +293,7 @@ function ProductTile({
             </Text>
             <Text style={styles.productCategory}>
               {locked
-                ? (product.category ?? 'COMING SOON')
+                ? (product.category ?? 'Upcoming')
                 : (product.category ?? (product.isPreOrder ? 'PRE-ORDER' : 'LIMITED'))}
             </Text>
           </View>

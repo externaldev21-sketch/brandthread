@@ -836,7 +836,7 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).buyer.reserve(product.id);
       setReserved(true);
-      Alert.alert('Reserved!', "Spot secured. We'll notify you once production is confirmed.");
+      Alert.alert('Reserved', "Spot secured. We'll notify you once production is confirmed.");
     } catch { Alert.alert('Error', 'Could not reserve. Please try again.'); }
     finally { setReserveLoading(false); }
   }

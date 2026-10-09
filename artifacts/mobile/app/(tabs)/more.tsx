@@ -59,7 +59,7 @@ const STORE_ITEMS: NavItem[] = [
 
 const STUDIO_ITEMS: NavItem[] = [
   { icon: 'edit-3', label: 'Design Studio', desc: 'Create designs and mockups', accent: 'accent', route: '/design' },
-  { icon: 'camera', label: 'AI Photoshoot', desc: 'Generate product photos', accent: 'accentLight', route: '/design-ai-photoshoot' },
+  { icon: 'camera', label: 'Photoshoot', desc: 'Generate product photos', accent: 'accentLight', route: '/design-ai-photoshoot' },
   { icon: 'scissors', label: 'Background Removal', desc: 'Clean image backgrounds', accent: 'secondary', route: '/design-bg-removal' },
   { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets', accent: 'warning', route: '/design-campaign' },
   { icon: 'layers', label: 'Brand Assets', desc: 'Logos, colors and graphics', accent: 'secondary', route: '/design-brand-assets' },

@@ -512,7 +512,7 @@ export default function StoreGenerateScreen() {
         textAlignVertical="top"
       />
 
-      <Text style={st.sectionLabel}>AI Tools</Text>
+      <Text style={st.sectionLabel}>Tools</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.aiToolsScroll}>
         {['Write with AI', 'Improve Writing', 'Shorten', 'Make Bold', 'More Premium', 'More Emotional'].map(tool => (
           <TouchableOpacity
@@ -549,7 +549,7 @@ export default function StoreGenerateScreen() {
 
       {aiSuggestion ? (
         <View style={st.aiSuggestionCard}>
-          <Text style={st.aiSuggestionLabel}>AI suggestion</Text>
+          <Text style={st.aiSuggestionLabel}>Suggestion</Text>
           <Text style={st.aiSuggestionText}>{aiSuggestion}</Text>
           <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm }}>
             <SecondaryButton

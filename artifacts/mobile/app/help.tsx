@@ -237,7 +237,7 @@ export default function HelpScreen() {
             {submitted ? (
               <View style={s.submittedBadge}>
                 <Feather name="check-circle" size={ICON.sm} color={theme.success} />
-                <Text style={s.submittedText}>Got it! We'll be in touch shortly.</Text>
+                <Text style={s.submittedText}>We'll be in touch shortly.</Text>
                 <TouchableOpacity onPress={() => setSubmitted(false)}>
                   <Text style={s.sendAnotherText}>Send another</Text>
                 </TouchableOpacity>

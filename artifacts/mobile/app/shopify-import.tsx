@@ -250,7 +250,7 @@ export default function ShopifyImportScreen() {
               </Text>
               {summary.skipped.length > 0 && (
                 <Text style={[styles.summarySkipped, { color: colors.mutedForeground }]} numberOfLines={2}>
-                  {summary.skipped.map((s) => s.reason).join(' · ')}
+                  {summary.skipped.map((s) => s.reason).join(', ')}
                 </Text>
               )}
             </View>

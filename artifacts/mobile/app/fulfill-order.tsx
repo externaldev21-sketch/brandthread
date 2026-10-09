@@ -456,7 +456,7 @@ export default function FulfillOrderScreen() {
           <View style={[s.successCircle, { backgroundColor: `${SUCCESS}26` }]}>
             <Feather name="check" size={48} color={SUCCESS} />
           </View>
-          <Text style={s.successText}>Order shipped!</Text>
+          <Text style={s.successText}>Order shipped</Text>
         </Animated.View>
       </View>
     );

@@ -107,7 +107,7 @@ export function DisputeEvidenceFiles({ disputeId, files, locked, readOnly, onAdd
               <View style={{ flex: 1 }}>
                 <Text style={[styles.fileName, { color: colors.foreground }]}>{f.fileName}</Text>
                 <Text style={[styles.meta, { color: colors.mutedForeground }]}>
-                  {fileTypeLabel(f.evidenceType)} · {formatBytes(f.sizeBytes)} · {shortDate(f.uploadedAt)}
+                  {fileTypeLabel(f.evidenceType)}, {formatBytes(f.sizeBytes)}, {shortDate(f.uploadedAt)}
                 </Text>
               </View>
               <Feather name="check" size={16} color={colors.foreground} />
