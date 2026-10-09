@@ -23,10 +23,10 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -167,6 +167,7 @@ function PublicProfileLanding({
             <View style={styles.avatarContainer}>
               {profile.avatarUrl ? (
                 <Image
+                  cachePolicy="memory-disk"
                   source={{ uri: profile.avatarUrl }}
                   style={styles.avatarImage}
                   accessible

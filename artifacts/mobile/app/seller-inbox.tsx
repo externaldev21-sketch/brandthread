@@ -625,7 +625,7 @@ export default function SellerInboxScreen() {
         >
           <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
             {other.avatarUri ? (
-              <Image cachePolicy="memory-disk" source={{ uri: other.avatarUri }} style={s.avatarImage} />
+              <Image cachePolicy="memory-disk" recyclingKey={other.avatarUri} source={{ uri: other.avatarUri }} style={s.avatarImage} />
             ) : (
               <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
             )}

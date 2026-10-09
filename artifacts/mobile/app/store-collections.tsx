@@ -4,8 +4,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, Image, ActivityIndicator,
+  StyleSheet, Alert, Modal, ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -382,7 +383,7 @@ export default function StoreCollectionsScreen() {
             {coverUploading ? (
               <ActivityIndicator color={PURPLE} />
             ) : form.coverImage ? (
-              <Image source={{ uri: form.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image cachePolicy="memory-disk" source={{ uri: form.coverImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
             ) : (
               <>
                 <Feather name="image" size={ICON.lg} color={MUTED} />

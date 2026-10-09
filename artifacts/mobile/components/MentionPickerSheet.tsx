@@ -12,8 +12,9 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Image, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CARD, FG, FONT, FS, MUTED, ON_DARK, RADIUS, SP } from '@/lib/theme';
@@ -52,7 +53,7 @@ function useMentionSearch(query: string, active: boolean, enabled: boolean) {
 
 function PersonAvatar({ person, size }: { person: MentionPerson; size: number }) {
   return person.avatarUrl ? (
-    <Image source={{ uri: person.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+    <Image cachePolicy="memory-disk" source={{ uri: person.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
       <Text style={styles.initials}>{person.initials}</Text>

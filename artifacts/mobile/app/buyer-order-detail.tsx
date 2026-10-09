@@ -21,9 +21,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
-  ActivityIndicator, Modal, TextInput, RefreshControl, Image,
+  ActivityIndicator, Modal, TextInput, RefreshControl,
   Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -351,7 +352,7 @@ function ReviewSheet({
         <View style={rvs.photoRow}>
           {photos.map(uri => (
             <View key={uri} style={rvs.photoWrap}>
-              <Image source={{ uri }} style={[rvs.photo, { backgroundColor: theme.cardElevated }]} />
+              <Image cachePolicy="memory-disk" source={{ uri }} style={[rvs.photo, { backgroundColor: theme.cardElevated }]} />
               <View style={rvs.photoRemoveSlot} pointerEvents="box-none">
                 <PressableScale
                   onPress={() => setPhotos(prev => prev.filter(u => u !== uri))}
@@ -1079,9 +1080,10 @@ export default function BuyerOrderDetailScreen() {
               {/* Thumbnail */}
               {item.imageUri ? (
                 <Image
+                  cachePolicy="memory-disk"
                   source={{ uri: item.imageUri }}
                   style={styles.itemThumb}
-                  resizeMode="cover"
+                  contentFit="cover"
                   accessibilityLabel={`Product image for ${item.productName}`}
                 />
               ) : (
