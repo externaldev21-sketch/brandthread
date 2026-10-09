@@ -32,7 +32,6 @@ import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { FONT, GUTTER, GRID_MAX_WIDTH, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer, useGridColumns } from '@/components/layout';
@@ -61,6 +60,7 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { EmptyState as OneLineEmptyState } from '@/components/ui/EmptyState';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
 
@@ -222,13 +222,28 @@ export default function BuyerSearchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Recent searches are per account (a protected endpoint): never asked for
+  // signed out, including the web preview.
   const loadRecent = useCallback(() => {
+    if (!isSignedIn) { setRecentSearches([]); return; }
     api.public.recent(10)
       .then(({ recent }) => setRecentSearches(recent.map((r) => r.query)))
       .catch(() => setRecentSearches([]));
-  }, [api]);
+  }, [api, isSignedIn]);
 
   useEffect(() => { loadRecent(); }, [loadRecent]);
+
+  // Trending searches (public): real logged queries once there's volume,
+  // otherwise the top categories and brands.
+  const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
+  useEffect(() => {
+    if (isBuyerDevPreview() && !isSignedIn) return;
+    let cancelled = false;
+    api.public.trending(5)
+      .then(({ trending }) => { if (!cancelled) setTrendingSearches(trending.map((t) => t.term).filter(Boolean)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api, isSignedIn]);
 
   function removeRecent(term: string) {
     hapticSelection();
@@ -349,16 +364,20 @@ export default function BuyerSearchScreen() {
   async function handleToggleFollow(person: SearchPerson) {
     if (followPending[person.userId] || person.userId.startsWith('preview-')) return;
     const wasFollowing = person.isFollowing;
+    const setFollowing = (value: boolean) =>
+      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: value } : p)));
     setFollowPending((prev) => ({ ...prev, [person.userId]: true }));
+    // Optimistic, like every other Follow button: flip now, roll back on failure.
+    setFollowing(!wasFollowing);
+    hapticPrimaryAction();
     try {
       let requested = false;
       if (wasFollowing) await api.social.unfollow(person.userId);
       else requested = (await api.social.follow(person.userId))?.status === 'requested';
       // A private account only received a follow request — not following yet.
-      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing && !requested } : p)));
-      hapticPrimaryAction();
+      if (requested) setFollowing(false);
     } catch {
-      // Keep previous state on failure.
+      setFollowing(wasFollowing);
     } finally {
       setFollowPending((prev) => {
         const next = { ...prev };
@@ -422,9 +441,9 @@ export default function BuyerSearchScreen() {
     <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
       <View style={styles.grid} onLayout={onGridLayout}>
         {items.map((item, index) => (
-          <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
+          <View key={item.id}>
             <ProductTile item={item} accent={primary} width={gridCardWidth} onPress={() => handleResultPress(item)} />
-          </AnimatedEntrance>
+          </View>
         ))}
       </View>
     </ResponsiveContainer>
@@ -434,9 +453,9 @@ export default function BuyerSearchScreen() {
     <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
       <View style={styles.videoGrid} onLayout={onGridLayout}>
         {items.map((item, index) => (
-          <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
+          <View key={item.id}>
             <VideoTile item={item} width={videoGridCardWidth} onPress={() => goToVideo(item)} />
-          </AnimatedEntrance>
+          </View>
         ))}
       </View>
     </ResponsiveContainer>
@@ -451,27 +470,17 @@ export default function BuyerSearchScreen() {
   ));
 
   function renderNoResults() {
+    // One line + one action (BRANDTHREAD_DESIGN.md "Copy").
     if (activeFilterCount > 0 && activeTab === 'products') {
       return (
         <View testID="buyer-search-no-results">
-          <EmptyState
-            icon="sliders"
-            title="No products match these filters"
-            description="Try removing a filter to see more."
-            action={{ label: 'Clear filters', icon: 'x-circle', onPress: () => setFilters({}) }}
-          />
+          <OneLineEmptyState title="No products match these filters." action={{ label: 'Clear filters', onPress: () => setFilters({}) }} />
         </View>
       );
     }
     return (
       <View testID="buyer-search-no-results">
-        <EmptyState
-          icon="search"
-          illustration="search"
-          title={`No results for "${trimmedQuery}"`}
-          description="Try a different spelling or a broader term."
-          action={{ label: 'Clear search', icon: 'x-circle', onPress: handleCancel }}
-        />
+        <OneLineEmptyState title={`No results for "${trimmedQuery}".`} action={{ label: 'Clear search', onPress: handleCancel }} />
       </View>
     );
   }
@@ -564,6 +573,16 @@ export default function BuyerSearchScreen() {
             <RecentSearchRow key={term} term={term} onPress={() => submitTerm(term)} onRemove={() => removeRecent(term)} />
           ))
         )}
+        {trendingSearches.length > 0 && (
+          <View testID="buyer-search-trending">
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>Trending searches</Text>
+            </View>
+            {trendingSearches.map((term) => (
+              <RecentSearchRow key={`trending-${term}`} term={term} icon="trending-up" onPress={() => submitTerm(term)} />
+            ))}
+          </View>
+        )}
       </View>
     );
   }
@@ -612,7 +631,7 @@ export default function BuyerSearchScreen() {
       if (tagRows.length === 0) {
         return (
           <View testID="buyer-search-tags-empty">
-            <EmptyState icon="hash" title="No tags found" description="Try a different search term." />
+            <OneLineEmptyState title="No tags found." />
           </View>
         );
       }
@@ -634,16 +653,16 @@ export default function BuyerSearchScreen() {
     return (
       <View>
         {topPeople.length > 0 && (
-          <AnimatedEntrance>
-            <Text style={styles.sectionLabel}>ACCOUNTS</Text>
+          <View>
+            <Text style={styles.sectionLabel}>People</Text>
             {personRows(topPeople)}
-          </AnimatedEntrance>
+          </View>
         )}
         {videoResults.length > 0 && (
-          <AnimatedEntrance delay={40}>
-            <Text style={styles.sectionLabel}>POSTS</Text>
+          <View>
+            <Text style={styles.sectionLabel}>Posts</Text>
             {videoGrid(videoResults)}
-          </AnimatedEntrance>
+          </View>
         )}
       </View>
     );
@@ -810,14 +829,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingLeft: SPACING.sm, paddingRight: 10,
     // theme-exempt: fixed dark fill per spec, same pattern as profile.tsx's
     // store-details section — regardless of light/dark theme.
-    backgroundColor: '#1f1f1f',
+    backgroundColor: '#1C1C1E',
     borderWidth: 0,
   },
   // Focused state stays the same pill as unfocused — no border/box appears.
   // Only a very subtle fill change signals focus (the browser's own default
   // outline is separately suppressed via WEB_INPUT_RESET on the TextInput).
-  fieldFocused: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
+  fieldFocused: { backgroundColor: '#1C1C1E' },
+  fieldInput: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, padding: 0 },
   headerSideButton: { minWidth: 24, alignItems: 'flex-end' },
   headerSideButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {
