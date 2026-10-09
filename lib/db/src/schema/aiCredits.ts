@@ -4,7 +4,8 @@ import { pgTable, uuid, text, integer, timestamp, date, jsonb, primaryKey, index
 // Created by migration 119. Every AI tool call debits credits server-side.
 // Three buckets, spent in this order: rollover (last month's unused credits,
 // one month only), the monthly allowance (resets each UTC month) and purchased
-// packs (never expire). Pro is unlimited and only tracked in ai_pro_usage.
+// packs (never expire). Every plan, Pro included, has a finite allowance;
+// ai_pro_usage only holds usage rows from when Pro was unlimited.
 
 export const aiCreditAccounts = pgTable('ai_credit_accounts', {
   clerkUserId:      text('clerk_user_id').primaryKey(),
@@ -13,7 +14,9 @@ export const aiCreditAccounts = pgTable('ai_credit_accounts', {
   purchasedBalance: integer('purchased_balance').notNull().default(0),
   monthlyAllowance: integer('monthly_allowance').notNull().default(0),
   monthlyPeriod:    text('monthly_period').notNull().default(''),
-  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Migration 261: first time the subscription was seen past due (null when paid).
+  billingIssueSince: timestamp('billing_issue_since', { withTimezone: true }),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

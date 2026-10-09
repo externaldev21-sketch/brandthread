@@ -28,6 +28,7 @@ import {
 } from "./routes/growthPublic";
 import { giveawayLanding } from "./routes/giveawayLanding";
 import { aiUsageContext } from "./lib/aiUsage";
+import { normalizeGatePath } from "./lib/gatePath";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -154,11 +155,15 @@ app.use(
   express.raw({ type: DESIGN_STUDIO_ASSET_MIME_TYPES, limit: "40mb" }),
 );
 
-// Tighter limit for every store AI route that can receive visual references
-// (logo, moodboard, and social screenshots). Clients pre-resize images before
-// uploading; a 10 MB ceiling keeps vision requests within a safe token budget.
-app.use("/api/store/ai", express.json({ limit: "10mb" }));
-app.use("/api/v1/store/ai", express.json({ limit: "10mb" }));
+// Store AI: the routes that receive visual references (logo, moodboard and
+// social screenshots) get 10 MB; clients pre-resize images before uploading.
+// Every other store AI route carries only questionnaire text, so 64 KB.
+// The path is normalized because Express also routes `/From-Logo/` there.
+const storeAiImageJson = express.json({ limit: "10mb" });
+const storeAiTextJson = express.json({ limit: "64kb" });
+const STORE_AI_IMAGE_ROUTE = /^\/(from-logo|from-moodboard|from-social)$/;
+app.use(["/api/store/ai", "/api/v1/store/ai"], (req, res, next) =>
+  (STORE_AI_IMAGE_ROUTE.test(normalizeGatePath(req.path)) ? storeAiImageJson : storeAiTextJson)(req, res, next));
 
 // Raised from the default 100kb so requests carrying base64-encoded reference
 // photos (e.g. AI product photography uploads) don't get rejected.

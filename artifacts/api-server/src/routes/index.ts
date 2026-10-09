@@ -12,7 +12,7 @@ import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
 import analyticsInsightsRouter from "./analytics-insights";
 import integrationsRouter from "./integrations";
-import logoRouter from "./logo";
+import logoRouter, { onboardingSampleRouter } from "./logo";
 import mockupRouter from "./mockup";
 import photographyRouter from "./photography";
 import bgRemovalRouter from "./bg-removal";
@@ -203,7 +203,6 @@ router.use("/webhooks/shopify", webhooksShopifyRouter);
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
-router.use("/support-chat",    aiSafetyGuard("support-chat", { mode: "chat" }), supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
 router.use("/release-test-control", releaseTestControlRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
@@ -217,6 +216,9 @@ router.use("/giveaways",       publicGiveawaysRouter); // public reads; per-view
 // AI credits: debits every paid AI endpoint listed in lib/aiCredits/catalogue.ts
 // (and refunds on error). Must stay ahead of the AI routers below.
 router.use(aiCreditsGate);
+// Support chat stays open to every signed-in account (buyers included); it sits
+// below the gate so its messages are metered (daily ceiling + global AI cap).
+router.use("/support-chat",    aiSafetyGuard("support-chat", { mode: "chat" }), supportChatRouter);
 router.use("/ai/credits",      aiCreditsRouter);
 router.use("/ai-helpers",      tc, aiHelpersRouter); // caption, product description, size chart, save (priced in AI_TOOL_RULES)
 router.use("/call",            callRouter);
@@ -225,8 +227,10 @@ router.use("/auth/data-export", dataExportJobsRouter); // async emailed export (
 router.use("/auth",            authRouter);
 router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,
-// server-enforced sample offered during seller onboarding.
-router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), logoRouter);
+// server-enforced sample offered during seller onboarding. Only the sample
+// handler is mounted here (never the paid /logo/generate); the AI gate meters
+// it against the global cap and a per-user daily ceiling.
+router.use("/onboarding-sample", aiSafetyGuard("onboarding-logo"), onboardingSampleRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);

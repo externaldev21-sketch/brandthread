@@ -196,6 +196,16 @@ describe("upload, AI and per-IP ceilings", () => {
     expect(rateLimitPolicyFor("POST", "/api/v1/support-chat/message", false)?.id).toBe("expensive");
     expect(rateLimitPolicyFor("POST", "/api/v1/ai/chat", true)?.id).toBe("expensive");
     expect(rateLimitPolicyFor("POST", "/api/v1/store/ai/logo", true)?.id).toBe("expensive");
+    expect(rateLimitPolicyFor("POST", "/api/onboarding-sample/logo", true)?.id).toBe("expensive");
+  });
+
+  it("matches the expensive policy on trailing-slash, double-slash and case variants", () => {
+    for (const path of [
+      "/api/logo/generate/", "/api/Logo/Generate", "/api/logo//generate", "/API/V1/AI/CHAT//",
+      "/api/onboarding-sample/logo/", "/api/Support-Chat/Message", "/api/store/AI/generate",
+    ]) {
+      expect(rateLimitPolicyFor("POST", path, true)?.id, path).toBe("expensive");
+    }
   });
 
   it("gives abuse-prone policies an IP ceiling above the per-user limit", () => {
