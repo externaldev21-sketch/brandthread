@@ -13,7 +13,8 @@ vi.mock("../nativeEntitlements", () => ({
   },
 }));
 
-import { getVerifiedPlanAccess, sendPlanLimitReached } from "../planAccess";
+import { getVerifiedPlanAccess, nextPlanFor, sendPlanLimitReached } from "../planAccess";
+import { FREE_TIER_LIMITS } from "../planCatalogue";
 
 describe("plan access catalogue", () => {
   beforeEach(() => {
@@ -26,6 +27,7 @@ describe("plan access catalogue", () => {
     await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
       planId: "starter",
       limits: { products: 25, teamSeats: 0 },
+      paid: true,
     });
   });
 
@@ -34,6 +36,7 @@ describe("plan access catalogue", () => {
     await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
       planId: "growth",
       limits: { products: null, teamSeats: 3 },
+      paid: true,
     });
   });
 
@@ -43,6 +46,7 @@ describe("plan access catalogue", () => {
     await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
       planId: "pro",
       limits: { products: null, teamSeats: null },
+      paid: true,
     });
   });
 
@@ -66,6 +70,27 @@ describe("plan access catalogue", () => {
       currentPlan: "starter",
       requiredPlan: "growth",
       limit: 25,
+    }));
+  });
+
+  it("applies the free-tier limits to a seller with no paid access (BT-002)", async () => {
+    state.provider = "none";
+    const access = await getVerifiedPlanAccess("owner");
+    expect(access).toEqual({ planId: "starter", limits: FREE_TIER_LIMITS, paid: false });
+    expect(nextPlanFor(access)).toBe("starter");
+    expect(nextPlanFor({ planId: "starter", paid: true })).toBe("growth");
+  });
+
+  it("tells a free seller to start a plan, not to upgrade", () => {
+    const status = vi.fn().mockReturnThis();
+    const json = vi.fn();
+    sendPlanLimitReached({ status, json } as any, {
+      resource: "products", currentPlan: "starter", requiredPlan: "growth", limit: 5, paid: false,
+    });
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({
+      currentPlan: "free",
+      requiredPlan: "starter",
+      message: "Your free plan includes 5 products. Start a plan to add more.",
     }));
   });
 });
