@@ -4,17 +4,29 @@ import {
   isDayFourOfFive,
   isPendingTrialReminderDeliverable,
   isReminderWindowOpen,
+  isTrialReminderDay,
 } from "../sellerTrialReminder";
 
-describe("seller trial day-four reminder", () => {
+describe("seller trial reminder day", () => {
   const start = new Date("2026-01-01T00:00:00.000Z");
   const end = new Date("2026-01-06T00:00:00.000Z");
+  const start7 = new Date("2026-01-01T00:00:00.000Z");
+  const end7 = new Date("2026-01-08T00:00:00.000Z");
 
-  it("only considers the fourth day of a five-day window eligible", () => {
-    expect(isDayFourOfFive(start, end, new Date("2026-01-04T12:00:00.000Z"))).toBe(true);
-    expect(isDayFourOfFive(start, end, new Date("2026-01-03T23:59:00.000Z"))).toBe(false);
-    expect(isDayFourOfFive(start, end, new Date("2026-01-05T00:00:00.000Z"))).toBe(false);
-    expect(isDayFourOfFive(start, new Date("2026-01-07T00:00:00.000Z"), new Date("2026-01-04T12:00:00.000Z"))).toBe(false);
+  it("a 7-day trial reminds on day 5, two days before the charge", () => {
+    expect(isTrialReminderDay(start7, end7, new Date("2026-01-05T12:00:00.000Z"))).toBe(true);
+    expect(isTrialReminderDay(start7, end7, new Date("2026-01-04T23:59:00.000Z"))).toBe(false);
+    expect(isTrialReminderDay(start7, end7, new Date("2026-01-06T00:00:00.000Z"))).toBe(false);
+    expect(isReminderWindowOpen(start7, end7, new Date("2026-01-07T12:00:00.000Z"))).toBe(true);
+    expect(isReminderWindowOpen(start7, end7, new Date("2026-01-08T00:00:00.000Z"))).toBe(false);
+  });
+
+  it("only considers one strict day eligible, and only whole-day trial windows", () => {
+    // A 5-day trial still in flight reminds two days before its charge too (day 3).
+    expect(isDayFourOfFive(start, end, new Date("2026-01-03T12:00:00.000Z"))).toBe(true);
+    expect(isDayFourOfFive(start, end, new Date("2026-01-02T23:59:00.000Z"))).toBe(false);
+    expect(isDayFourOfFive(start, end, new Date("2026-01-04T00:00:00.000Z"))).toBe(false);
+    expect(isDayFourOfFive(start, new Date("2026-01-07T12:00:00.000Z"), new Date("2026-01-04T12:00:00.000Z"))).toBe(false);
     expect(isReminderWindowOpen(start, end, new Date("2026-01-05T12:00:00.000Z"))).toBe(true);
   });
 

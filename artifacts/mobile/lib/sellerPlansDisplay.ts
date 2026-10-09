@@ -88,7 +88,7 @@ export interface PlanFaqItem {
 export const PLAN_FAQ: PlanFaqItem[] = [
   {
     question: 'Is there a free trial?',
-    answer: 'Every plan starts with a 5-day free trial. Your card is only charged once the trial ends, and you can cancel any time before then at no cost.',
+    answer: 'Every plan starts with a 7-day free trial. Your card is only charged once the trial ends, and you can cancel any time before then at no cost.',
   },
   {
     question: 'Does Brandthread take a commission on sales?',

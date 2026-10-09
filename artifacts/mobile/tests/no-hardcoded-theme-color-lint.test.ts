@@ -358,7 +358,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/manufacturer/RfqChatCards.tsx',
   'components/media/MediaCropper.tsx',
   'components/onboarding/OnboardingUI.tsx',
-  'components/onboarding/SellerPlanRecommendationStep.tsx',
   'components/paywall/SellerPaywallExitDrawer.tsx',
   'components/paywall/SellerPaywallOneTimeOffer.tsx',
   'components/paywall/SellerPlanSelector.tsx',

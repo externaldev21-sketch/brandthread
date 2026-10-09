@@ -40,11 +40,15 @@ describe("Dev's onboarding items", () => {
     expect(allOnboardingCopy).not.toMatch(/['"`][^'"`\n]*[→›»][^'"`\n]*['"`]/);
   });
 
-  it("5 & 6: no payouts, plans or trial during sign-up; the store preview comes first", () => {
+  it("5 & 6: no payouts during sign-up; plan + trial only after the store preview, with Dev's exact copy", () => {
     for (const phrase of ["payout-setup", "SellerPlanRecommendationStep", "Continue to plans"]) {
       expect(source).not.toContain(phrase);
     }
-    expect(SELLER_STEPS[SELLER_STEPS.length - 1]).toBe("BUILDING");
+    expect(SELLER_STEPS.slice(-2)).toEqual(["BUILDING", "PLAN"]);
+    const plan = read("../components/onboarding/steps/PlanStep.tsx");
+    expect(plan).toContain("trialCopy(days, reminderDaysBefore)");
+    expect(plan).not.toMatch(/label="Skip|'Skip'/);
+    expect(source).toContain("void trial.start(planId ?? recommendedPlanId)");
   });
 
   it("7: the free logo sample sends the install id so the server limits it per device", () => {

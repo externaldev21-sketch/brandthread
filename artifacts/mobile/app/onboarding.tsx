@@ -11,7 +11,8 @@
  *           @username" → styles → sizes → brands to follow → feed.
  *   SELLER: Shopify onboarding — brand stage → goals → location → the same
  *           account steps → name → brand name → username → "Building your
- *           store" (store preview + one free logo) → dashboard.
+ *           store" (store preview + one free logo) → plan + free trial →
+ *           dashboard.
  *
  * Nothing about payouts or notifications is asked here: payouts live on the
  * dashboard checklist, and push permission is requested at the first
@@ -115,6 +116,10 @@ import {
   SELLER_GOAL_OPTIONS,
 } from '@/components/onboarding/steps/SellerSteps';
 import type { WheelDate } from '@/components/onboarding/steps/WheelDatePicker';
+import { PlanStep } from '@/components/onboarding/steps/PlanStep';
+import { useSellerTrialCheckout } from '@/lib/useSellerTrialCheckout';
+import { recommendSellerPlan } from '@/lib/sellerPlans';
+import type { SellerPlanId } from '@/lib/sellerBilling';
 import { AccountTypeStep, type AccountType } from './account-type';
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
 import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
@@ -305,6 +310,7 @@ export default function OnboardingScreen() {
   const [sampleUnavailable, setSampleUnavailable] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [planId, setPlanId] = useState<SellerPlanId | null>(null);
 
   const usernameLiveCheck = useUsernameLiveCheck(stepId === 'USERNAME' ? username : '');
   const ctx = useMemo(() => ({ accountReady, authMethod }), [accountReady, authMethod]);
@@ -871,6 +877,7 @@ export default function OnboardingScreen() {
         ['onboarding_brand_name', brandName],
         ['onboarding_brand_stage', brandStage],
         ['onboarding_goals', JSON.stringify(goals)],
+        ['onboarding_selected_plan', planId ?? recommendedPlanId],
       ]);
       await AsyncStorage.multiRemove([userDraftKey(profile.clerkId)!, PENDING_DRAFT_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
@@ -886,6 +893,16 @@ export default function OnboardingScreen() {
       );
     }
   }
+
+  // ── Seller: plan + free trial (after the preview) ─────────────────────────
+  // finishSeller is a plain function declared above; the hook keeps the
+  // latest callback, so the trial's success always runs the current one.
+  const trial = useSellerTrialCheckout({ onActive: () => { void finishSeller(); } });
+  const recommendedPlanId = recommendSellerPlan(brandStage, goals).planId;
+  useEffect(() => {
+    if (stepId === 'PLAN' && !isDevWebPreviewUser) void trial.checkExisting();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepId]);
 
   // ── Step rendering ────────────────────────────────────────────────────────
   const isSeller = flow === 'seller';
@@ -1124,8 +1141,27 @@ export default function OnboardingScreen() {
             generating={generating}
             sampleError={sampleError}
             sampleUnavailable={sampleUnavailable}
-            onDone={() => { void finishSeller(); }}
-            finishing={finishing}
+            onDone={() => goNext('BUILDING')}
+          />
+        );
+
+      case 'PLAN':
+        return (
+          <PlanStep
+            brandName={brandName.trim()}
+            recommendedId={recommendedPlanId}
+            selectedId={planId ?? recommendedPlanId}
+            onSelect={setPlanId}
+            priceLabel={trial.priceLabel}
+            trialDays={trial.trialDays}
+            reminderDaysBefore={trial.config.reminderDaysBefore}
+            onStart={() => {
+              if (isDevWebPreviewUser) { void finishSeller(); return; }
+              void trial.start(planId ?? recommendedPlanId);
+            }}
+            starting={trial.busy || finishing}
+            error={trial.error}
+            onRestore={trial.native ? () => { void trial.restore(); } : undefined}
           />
         );
 
@@ -1141,9 +1177,8 @@ export default function OnboardingScreen() {
   const fullBleed = stepId === 'WELCOME';
   const showBack = !fullBleed
     && stepId !== 'WELCOME_USER'
-    && stepId !== 'BUILDING'
     && (stepId === 'ACCOUNT_TYPE' ? !isAddAccount && !accountReady : (!!flow && prevStepId(flow, stepId, ctx) !== null));
-  const ownsBottomInset = SELLER_QUESTION_STEPS.includes(stepId) || stepId === 'ACCOUNT_TYPE' || stepId === 'BUILDING'
+  const ownsBottomInset = SELLER_QUESTION_STEPS.includes(stepId) || stepId === 'ACCOUNT_TYPE' || stepId === 'BUILDING' || stepId === 'PLAN'
     || stepId === 'BIRTHDAY' || stepId === 'STYLE' || stepId === 'SIZES' || stepId === 'BRANDS';
 
   return (

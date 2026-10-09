@@ -333,6 +333,26 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
       await page.getByTestId('onboarding-building-done').click();
     });
 
+    await report.step('plan + free trial (card via Stripe Checkout on web)', async () => {
+      await page.getByTestId('onboarding-plan-trial-copy').waitFor({ timeout: 10_000 });
+      const copy = await page.getByTestId('onboarding-plan-trial-copy').innerText();
+      if (!/^Free for 7 days\. You won't be charged until [A-Z][a-z]{2} \d{1,2}\. We'll remind you 2 days before\. Cancel anytime\.$/.test(copy)) {
+        throw new Error(`Unexpected trial copy: ${copy}`);
+      }
+      await shot('plan');
+      await page.getByTestId('onboarding-plan-growth').click();
+      const popup = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
+      await page.getByTestId('onboarding-plan-start').click();
+      const stripeTab = await popup;
+      await stripeTab?.close().catch(() => {});
+      // Coming back from Stripe: the app polls the subscription and finishes.
+      await page.bringToFront();
+      await page.evaluate(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+        window.dispatchEvent(new Event('focus'));
+      });
+    });
+
     await report.step('lands on seller dashboard', async () => {
       await page.waitForURL(/\/\(tabs\)|\/$/, { timeout: 20_000 }).catch(() => {});
       await page.waitForTimeout(1500);
@@ -349,6 +369,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir, demo })
       if (user.brandStage !== 'build') throw new Error(`Expected brandStage "build", got ${JSON.stringify(user.brandStage)}`);
       if (!user.username) throw new Error('Expected a username to have been saved.');
       if (!user.shipFromCountry) throw new Error('Expected the business location to have been saved as the ship-from country.');
+      if (user.subscriptionPlanId !== 'growth') throw new Error(`Expected a growth trial checkout, got ${JSON.stringify(user.subscriptionPlanId)}`);
     });
   } finally {
     await context.close();

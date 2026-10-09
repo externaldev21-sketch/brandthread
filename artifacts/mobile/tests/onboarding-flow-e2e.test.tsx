@@ -321,6 +321,23 @@ vi.mock('@/lib/legalConsent', () => ({
   rememberPendingConsent: vi.fn(async () => {}),
 }));
 
+const trialMock = vi.hoisted(() => ({ started: [] as string[], onActive: null as null | (() => void) }));
+vi.mock('@/lib/useSellerTrialCheckout', () => ({
+  useSellerTrialCheckout: ({ onActive }: { onActive: () => void }) => {
+    trialMock.onActive = onActive;
+    return {
+      config: { trialDays: 7, reminderDaysBefore: 2, checkoutMode: 'auto', currency: 'usd', plans: [] },
+      native: false,
+      priceLabel: (id: string) => ({ starter: '$29', growth: '$79', pro: '$199' } as Record<string, string>)[id],
+      trialDays: () => 7,
+      start: async (id: string) => { trialMock.started.push(id); trialMock.onActive?.(); },
+      restore: async () => {},
+      checkExisting: async () => {},
+      busy: false,
+      error: null,
+    };
+  },
+}));
 vi.mock('@/lib/installId', () => ({ getInstallId: vi.fn(async () => 'install-test-0000-0000') }));
 vi.mock('@/lib/pickProfileImage', () => ({ pickFromLibrary: vi.fn(async () => null) }));
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
@@ -401,14 +418,6 @@ vi.mock('@/app/account-type', () => {
 vi.mock('@/components/onboarding/BrandsToFollowStep', () => {
   const React = require('react') as typeof import('react');
   return { BrandsToFollowStep: () => React.createElement('View', { testID: 'onboarding-brands-step' }) };
-});
-
-vi.mock('@/components/onboarding/SellerPlanRecommendationStep', () => {
-  const React = require('react') as typeof import('react');
-  return {
-    SellerPlanRecommendationStep: ({ onContinue }: { onContinue: () => void }) =>
-      React.createElement('TouchableOpacity', { testID: 'onboarding-plan-recommendation-continue', onPress: onContinue }),
-  };
 });
 
 vi.mock('@/components/onboarding/ThreadLine', () => ({
@@ -592,7 +601,7 @@ describe('onboarding flow (seller, Shopify order)', () => {
     renderer = undefined;
   });
 
-  it('questions → location → account → brand → store preview → dashboard, with no plan, payout or notification step', async () => {
+  it('questions → location → account → brand → store preview → plan + trial → dashboard, with no payout or notification step', async () => {
     renderer = await renderScreen();
     await tap(renderer, 'onboarding-welcome-get-started');
     await tap(renderer, 'onboarding-account-type-seller');
@@ -620,6 +629,16 @@ describe('onboarding flow (seller, Shopify order)', () => {
     await tap(renderer, 'onboarding-generate-sample');
     expect(api.logo.onboardingSample).toHaveBeenCalledWith('Noir Field Studio', 'Minimalist', 'install-test-0000-0000');
     await tap(renderer, 'onboarding-building-done');
+
+    // Plan + free trial right after the preview, Dev's exact copy, no skip.
+    expect(has(renderer, 'onboarding-plan-step')).toBe(true);
+    expect(has(renderer, 'onboarding-question-skip')).toBe(false);
+    const copy = findByTestId(renderer, 'onboarding-plan-trial-copy').props.children as string;
+    expect(copy).toMatch(/^Free for 7 days\. You won't be charged until [A-Z][a-z]{2} \d{1,2}\. We'll remind you 2 days before\. Cancel anytime\.$/);
+    expect(apiCalls.map((c) => c.name)).not.toContain('auth.completeOnboarding');
+    await tap(renderer, 'onboarding-plan-pro');
+    await tap(renderer, 'onboarding-plan-start');
+    expect(trialMock.started).toEqual(['pro']);
 
     const names = apiCalls.map((c) => c.name);
     for (const call of ['auth.sync', 'auth.onboarding', 'auth.updateProfile', 'seller.saveOnboardingData', 'shippingZones.updateSettings', 'auth.completeOnboarding']) {
@@ -725,9 +744,11 @@ describe('onboarding entry points and resume', () => {
 });
 
 describe('onboarding step machine sanity', () => {
-  it('neither flow has a payout, plan or notifications step', () => {
+  it('neither flow has a payout or notifications step; only sellers have a plan step', () => {
     for (const id of [...BUYER_STEPS, ...SELLER_STEPS]) {
-      expect(['PLAN', 'PAYOUTS', 'NOTIFICATIONS', 'LOADING', 'SUCCESS']).not.toContain(id);
+      expect(['PAYOUTS', 'NOTIFICATIONS', 'LOADING', 'SUCCESS']).not.toContain(id);
     }
+    expect(BUYER_STEPS).not.toContain('PLAN');
+    expect(SELLER_STEPS).toContain('PLAN');
   });
 });

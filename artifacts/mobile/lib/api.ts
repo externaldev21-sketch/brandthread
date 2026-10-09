@@ -1117,6 +1117,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     config: {
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
+      /** The shared seller plan config (trial length, reminder, prices, checkout mode). */
+      sellerPlans: () => get<unknown>('/api/config/seller-plans'),
     },
     // ── Live replays + Live tips (PR: live-replays-profile-tips) ──────────────
     liveReplays: {
