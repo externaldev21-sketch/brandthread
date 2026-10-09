@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/express";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { accountDeletionCodes, db, users } from "@workspace/db";
 import { isMailerConfigured, sendAccountDeletionCodeEmail } from "./mailer";
+import { cancelPendingThreadCashForAccount } from "./threadCash/wallet";
 
 /** The destructive endpoint deliberately accepts no aliases or whitespace. */
 export function hasDeletionConfirmation(body: unknown): boolean {
@@ -252,6 +253,10 @@ export async function purgeAccount(clerkUserId: string): Promise<boolean> {
     await tx.execute(sql`DELETE FROM muted_words WHERE user_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM buyer_preferences WHERE user_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM user_contact_hashes WHERE user_id = ${clerkUserId}`);
+    await tx.execute(sql`DELETE FROM live_viewers WHERE user_id_or_session_id = ${clerkUserId}`);
+    // Pending Thread Cash sends to or from the account go back to their
+    // senders as cancels; the ledger itself is financial history and stays.
+    await cancelPendingThreadCashForAccount(tx, clerkUserId);
     // Reports the person filed stay in the moderation record without
     // their identity; reports about their content keep the snapshot.
     await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);
@@ -285,10 +290,14 @@ export async function purgeAccount(clerkUserId: string): Promise<boolean> {
     await tx.execute(sql`UPDATE reviews SET seller_id = ${deletedSubject} WHERE seller_id = ${clerkUserId}`);
 
     // Seller catalog/profile content is no longer public. Products are
-    // archived rather than deleted because historical order line items can
-    // reference their variants.
+    // archived and soft-deleted rather than removed because historical order
+    // line items can reference their variants; deleted_at makes buyers' bags,
+    // saves and post tags drop them like any other deleted product (no
+    // recovery deadline, so they can never be restored).
     await tx.execute(sql`UPDATE products SET status = 'archived', images = '[]'::json,
-      description = NULL, updated_at = NOW() WHERE owner_id = ${clerkUserId}`);
+      description = NULL, deleted_at = COALESCE(deleted_at, NOW()), recoverable_until = NULL,
+      removal_kind = COALESCE(removal_kind, 'account_deleted'), updated_at = NOW()
+      WHERE owner_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM storefronts WHERE owner_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM seller_quote_requests WHERE seller_id = ${clerkUserId}`);
     await tx.execute(sql`DELETE FROM seller_tax_config WHERE seller_id = ${clerkUserId}`);
