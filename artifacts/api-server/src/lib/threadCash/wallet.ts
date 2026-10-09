@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
+  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks, threadCashDeviceClaims,
   threadCashTransfers, users,
 } from "@workspace/db";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
@@ -100,6 +100,46 @@ type CheckInAward = {
 };
 
 /**
+ * The daily reward is capped per device, not just per account: a phone
+ * running many accounts (a device farm) can only collect it for
+ * `maxCheckInsPerDevicePerDay` of them per buyer-local day (default 1). A
+ * claim without a device id is refused — the app always sends one, and
+ * omitting it was the way around this cap. Runs inside the award transaction
+ * and records the claim, so it rolls back with the award.
+ */
+async function claimDeviceDailyReward(tx: DbExecutor, award: CheckInAward): Promise<void> {
+  const deviceId = award.deviceId?.trim();
+  if (!deviceId) {
+    throw new ThreadCashError(
+      "Update the app to keep earning daily Thread Cash.",
+      400,
+      "THREAD_CASH_DEVICE_REQUIRED",
+    );
+  }
+  // Serialise claims from the same device on the same day, across accounts.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-device:${deviceId}:${award.localDate}`}))`);
+  const config = await getThreadCashConfig(tx);
+  const [row] = await tx
+    .select({ count: sql<string>`COUNT(*)` })
+    .from(threadCashDeviceClaims)
+    .where(and(
+      eq(threadCashDeviceClaims.deviceId, deviceId),
+      eq(threadCashDeviceClaims.localDate, award.localDate),
+      sql`${threadCashDeviceClaims.buyerId} <> ${award.buyerId}`,
+    ));
+  if (Number(row?.count ?? 0) >= config.maxCheckInsPerDevicePerDay) {
+    throw new ThreadCashError(
+      "Too many Thread Cash check-ins from this device today.",
+      429,
+      "THREAD_CASH_DEVICE_CHECKIN_CAP",
+    );
+  }
+  await tx.insert(threadCashDeviceClaims)
+    .values({ deviceId, localDate: award.localDate, buyerId: award.buyerId })
+    .onConflictDoNothing();
+}
+
+/**
  * Awards one day's Thread Cash (and streak bonus, if any) exactly once per
  * buyer-local calendar date. The unique index on
  * (buyer_id, reference_id) WHERE source = 'daily_checkin' is the ultimate
@@ -123,27 +163,7 @@ export async function awardDailyCheckInOnce(
       .limit(1);
     if (existing) return { created: false };
 
-    // Anti-farming: cap how many distinct accounts can check in from the
-    // same device on the same (buyer-local) day — a device farm running many
-    // accounts is the obvious way to multiply the daily award.
-    if (award.deviceId) {
-      const config = await getThreadCashConfig(tx);
-      const [row] = await tx
-        .select({ count: sql<string>`COUNT(*)` })
-        .from(threadCashStreaks)
-        .where(and(
-          eq(threadCashStreaks.lastDeviceId, award.deviceId),
-          eq(threadCashStreaks.lastCheckInDate, award.localDate),
-          sql`${threadCashStreaks.buyerId} <> ${award.buyerId}`,
-        ));
-      if (Number(row?.count ?? 0) >= config.maxCheckInsPerDevicePerDay) {
-        throw new ThreadCashError(
-          "Too many Thread Cash check-ins from this device today.",
-          429,
-          "THREAD_CASH_DEVICE_CHECKIN_CAP",
-        );
-      }
-    }
+    await claimDeviceDailyReward(tx, award);
 
     await tx.insert(threadCashEntries).values({
       buyerId: award.buyerId,
@@ -253,24 +273,7 @@ export async function awardDailyActiveTimeClaimOnce(
       );
     }
 
-    if (award.deviceId) {
-      const config = await getThreadCashConfig(tx);
-      const [row] = await tx
-        .select({ count: sql<string>`COUNT(*)` })
-        .from(threadCashStreaks)
-        .where(and(
-          eq(threadCashStreaks.lastDeviceId, award.deviceId),
-          eq(threadCashStreaks.lastCheckInDate, award.localDate),
-          sql`${threadCashStreaks.buyerId} <> ${award.buyerId}`,
-        ));
-      if (Number(row?.count ?? 0) >= config.maxCheckInsPerDevicePerDay) {
-        throw new ThreadCashError(
-          "Too many Thread Cash claims from this device today.",
-          429,
-          "THREAD_CASH_DEVICE_CHECKIN_CAP",
-        );
-      }
-    }
+    await claimDeviceDailyReward(tx, award);
 
     await tx.insert(threadCashEntries).values({
       buyerId: award.buyerId,

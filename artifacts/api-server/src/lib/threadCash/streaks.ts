@@ -32,7 +32,7 @@ export const DEFAULT_THREAD_CASH_CONFIG: ThreadCashConfig = {
   dailySendCapCents: 2000,
   dailyReceiveCapCents: 5000,
   minAccountAgeHoursForSend: 24,
-  maxCheckInsPerDevicePerDay: 3,
+  maxCheckInsPerDevicePerDay: 1,
 };
 
 export type StreakState = {
@@ -102,7 +102,12 @@ export function computeCheckIn(
 ): CheckInResult {
   const today = localDateString(now, timeZone);
 
-  if (state.lastCheckInDate === today) {
+  // The timezone is the client's, so it can't be trusted to move the day
+  // backwards: once a date is claimed, an earlier local date (reached by
+  // switching to a zone behind the last one) counts as already claimed.
+  // Otherwise flipping between UTC+14 and UTC-12 could collect up to three
+  // different "days" at the same instant.
+  if (state.lastCheckInDate !== null && today <= state.lastCheckInDate) {
     return {
       alreadyCheckedInToday: true,
       streakBroken: false,

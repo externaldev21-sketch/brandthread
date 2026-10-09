@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
-import { db, threadCashEntries, threadCashStreaks } from "@workspace/db";
+import { db, threadCashDeviceClaims, threadCashEntries, threadCashStreaks } from "@workspace/db";
 import {
   awardDailyCheckInOnce,
   bindThreadCashRedemptionToCheckout,
@@ -23,6 +23,7 @@ afterEach(async () => {
     const buyerId = testBuyerIds.pop()!;
     await db.delete(threadCashEntries).where(eq(threadCashEntries.buyerId, buyerId));
     await db.delete(threadCashStreaks).where(eq(threadCashStreaks.buyerId, buyerId));
+    await db.delete(threadCashDeviceClaims).where(eq(threadCashDeviceClaims.buyerId, buyerId));
   }
 });
 
@@ -34,7 +35,7 @@ describe("daily check-in award", () => {
 
     const results = await Promise.all(
       Array.from({ length: 5 }, () =>
-        awardDailyCheckInOnce({ buyerId, localDate, earnedCents: 10, streakBonusCents: 0 })),
+        awardDailyCheckInOnce({ buyerId, deviceId: `device-${buyerId}`, localDate, earnedCents: 10, streakBonusCents: 0 })),
     );
 
     expect(results.filter((r) => r.created)).toHaveLength(1);
@@ -46,7 +47,7 @@ describe("daily check-in award", () => {
     const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
     testBuyerIds.push(buyerId);
 
-    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-07", earnedCents: 10, streakBonusCents: 100 });
+    await awardDailyCheckInOnce({ buyerId, deviceId: `device-${buyerId}`, localDate: "2025-06-07", earnedCents: 10, streakBonusCents: 100 });
 
     const rows = await db.select().from(threadCashEntries).where(eq(threadCashEntries.buyerId, buyerId));
     expect(rows).toHaveLength(2);
@@ -59,8 +60,8 @@ describe("daily check-in award", () => {
     const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
     testBuyerIds.push(buyerId);
 
-    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-01", earnedCents: 10, streakBonusCents: 0 });
-    await awardDailyCheckInOnce({ buyerId, localDate: "2025-06-02", earnedCents: 10, streakBonusCents: 0 });
+    await awardDailyCheckInOnce({ buyerId, deviceId: `device-${buyerId}`, localDate: "2025-06-01", earnedCents: 10, streakBonusCents: 0 });
+    await awardDailyCheckInOnce({ buyerId, deviceId: `device-${buyerId}`, localDate: "2025-06-02", earnedCents: 10, streakBonusCents: 0 });
 
     const balance = await getBalanceCents(db, buyerId);
     expect(balance).toBe(20);
@@ -154,6 +155,10 @@ describe("checkout redemption", () => {
     const orderId = crypto.randomUUID();
     testBuyerIds.push(buyerId);
 
+    // The wallet must cover the redemption (the database refuses overdrafts).
+    await db.insert(threadCashEntries).values({
+      buyerId, amountCents: 250, source: "daily_checkin", referenceId: "2025-06-01",
+    });
     await db.insert(threadCashEntries).values({
       buyerId, amountCents: -250, source: "redemption", referenceId: token,
     });
@@ -178,8 +183,8 @@ describe("checkout redemption", () => {
     await db.transaction((tx) => refundThreadCashSpend(tx, buyerId, orderId, 250));
 
     const balance = await getBalanceCents(db, buyerId);
-    // -250 (redemption) + 250 (refund) = 0, and the refund only landed once.
-    expect(balance).toBe(0);
+    // +250 (reward) - 250 (redemption) + 250 (refund) = 250, and the refund only landed once.
+    expect(balance).toBe(250);
     const refundRows = await db.select().from(threadCashEntries).where(and(
       eq(threadCashEntries.buyerId, buyerId),
       eq(threadCashEntries.source, "refund_credit"),
