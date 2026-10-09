@@ -7,7 +7,7 @@
  *    pressable, so web never renders a button inside a button.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle, type GestureResponderEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -208,7 +208,8 @@ export function ProfileGlassButton({
   badge,
 }: {
   icon: FeatherName;
-  onPress: () => void;
+  /** Receives the press event so a ⋯ button can anchor its pull-down menu. */
+  onPress: (event?: GestureResponderEvent) => void;
   accessibilityLabel: string;
   accessibilityHint?: string;
   testID?: string;
@@ -217,7 +218,7 @@ export function ProfileGlassButton({
   const { theme } = useAppTheme();
   return (
     <PressableScale
-      onPress={() => onPress()}
+      onPress={(event) => onPress(event)}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}

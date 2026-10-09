@@ -1671,7 +1671,8 @@ export default function SellerConversationScreen() {
           {other ? (
             <PressableScale
               style={s.headerCallBtn}
-              onPress={() => { openConversationOptions({
+              onPress={(event) => { openConversationOptions({
+                event,
                 router,
                 social: api.social,
                 counterpart: { userId: other.userId, name: other.name },

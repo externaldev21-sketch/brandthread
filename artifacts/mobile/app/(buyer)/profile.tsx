@@ -75,9 +75,11 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { taggedItemHref } from '@/services/profileService';
 import { radius } from '@/constants/radii';
+import { openContextMenu } from '@/lib/contextMenu';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -378,6 +380,7 @@ export default function ProfileScreen() {
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   // Owner mode: private saved / liked / orders / Thread Cash are this screen's alone.
   const caps = profileCapabilities('buyer', 'owner');
   const tagged = useTaggedPosts(user?.id, activeTab === 'Tagged' && !!user?.id && !isBuyerDevPreview());
@@ -575,24 +578,17 @@ export default function ProfileScreen() {
   }, [router]);
 
   // ── Post sheet ──
-  const handlePostLongPress = useCallback((item: ProfileGridItem) => {
-    const post = posts.find((candidate) => candidate.id === item.id);
+  const handleArchivePost = async (target?: BuyerPost) => {
+    const post = target ?? postSheet;
     if (!post) return;
-    haptics.rigid();
-    setPostSheet(post);
-  }, [posts]);
-
-  const handleArchivePost = async () => {
-    if (!postSheet) return;
-    const post = postSheet;
     setPostSheet(null);
     setPosts(prev => prev.filter(item => item.id !== post.id));
     try { await archivePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not archive post', 'Try again.'); }
   };
 
-  const handleDeletePost = () => {
-    if (!postSheet) return;
-    const post = postSheet;
+  const handleDeletePost = (target?: BuyerPost) => {
+    const post = target ?? postSheet;
+    if (!post) return;
     setPostSheet(null);
     Alert.alert("Delete this post? This can't be undone.", undefined, [
       { text: 'Cancel', style: 'cancel' },
@@ -608,8 +604,8 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const handleShareCurrentPost = async () => {
-    const post = postSheet;
+  const handleShareCurrentPost = async (target?: BuyerPost) => {
+    const post = target ?? postSheet;
     setPostSheet(null);
     if (!post) return;
     const handle = profile?.username
@@ -622,6 +618,30 @@ export default function ProfileScreen() {
       });
     } catch {}
   };
+
+  // Long-press a tile: the Instagram grid preview menu (the post enlarged
+  // over a blurred screen, actions under it); the sheet is the fallback.
+  const postLongPressRef = useRef<(item: ProfileGridItem) => void>(() => {});
+  postLongPressRef.current = (item: ProfileGridItem) => {
+    const post = posts.find((candidate) => candidate.id === item.id);
+    if (!post) return;
+    const opened = openContextMenu({
+      preview: {
+        imageUri: item.posterUri,
+        aspectRatio: item.kind === 'video' ? 9 / 16 : 4 / 5,
+        title: profile?.username ? `@${profile.username}` : undefined,
+        subtitle: post.caption || undefined,
+      },
+      onPreviewPress: () => postTapRef.current(item),
+      items: [
+        { key: 'share', label: 'Share', icon: 'share', onPress: () => { void handleShareCurrentPost(post); } },
+        { key: 'archive', label: 'Archive', icon: 'archive', onPress: () => { void handleArchivePost(post); } },
+        { key: 'delete', label: 'Delete', icon: 'trash-2', destructive: true, onPress: () => handleDeletePost(post) },
+      ],
+    });
+    if (!opened) setPostSheet(post);
+  };
+  const handlePostLongPress = useCallback((item: ProfileGridItem) => postLongPressRef.current(item), []);
 
   const clerkName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
   // Only true in the dev `?bt_preview=buyer` bypass, which never signs in
@@ -643,6 +663,8 @@ export default function ProfileScreen() {
     if (!user?.id) return;
     router.push(profileVideosHref({ source: 'creator', id: user.id, startPostId: item.id, title: displayName }) as never);
   }, [displayName, router, user?.id]);
+  const postTapRef = useRef(handlePostTap);
+  postTapRef.current = handlePostTap;
 
   const handleSavedTap = useCallback(() => {
     router.push('/buyer-saved' as any);
@@ -823,7 +845,7 @@ export default function ProfileScreen() {
         <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
         <ProfileTopBarIcon
           name="more-horizontal"
-          onPress={() => { setMenuOpen(true); }}
+          onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
           accessibilityLabel="Profile options"
           testID="buyer-profile-more"
         />
@@ -991,6 +1013,7 @@ export default function ProfileScreen() {
 
       <ProfileMenuSheet
         visible={menuOpen}
+        anchor={menuAnchor}
         title={displayName}
         onClose={() => setMenuOpen(false)}
         items={[
@@ -1020,10 +1043,10 @@ export default function ProfileScreen() {
       {/* ── Post Long-Press Sheet ── */}
       <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>
         <Text style={[sheetStyles.sheetTitle, { color: theme.muted }]} numberOfLines={1}>{postSheet?.caption || 'Post'}</Text>
-        <SheetRow icon="share-2" label="Share post" onPress={handleShareCurrentPost} />
-        <SheetRow icon="archive" label="Archive" last onPress={handleArchivePost} />
+        <SheetRow icon="share-2" label="Share post" onPress={() => { void handleShareCurrentPost(); }} />
+        <SheetRow icon="archive" label="Archive" last onPress={() => { void handleArchivePost(); }} />
         <View style={[sheetStyles.sheetDivider, { backgroundColor: theme.border }]} />
-        <SheetRow icon="trash-2" label="Delete post" destructive onPress={handleDeletePost} />
+        <SheetRow icon="trash-2" label="Delete post" destructive onPress={() => handleDeletePost()} />
       </BottomSheet>
     </View>
   );

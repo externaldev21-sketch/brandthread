@@ -196,6 +196,7 @@ export default function BuyerSearchScreen() {
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+  const [safetyMenuOpen, setSafetyMenuOpen] = useState<(() => void) | null>(null);
 
   const topPad = useHeaderTopInset();
 
@@ -713,7 +714,11 @@ export default function BuyerSearchScreen() {
           loading={browseLoading}
           showRails={false}
           onTilePress={(post, idx) => openViewer(post, idx, browsePosts)}
-          onTileLongPress={setSafetyMenuPost}
+          onTileLongPress={(post) => {
+            const idx = browsePosts.findIndex((p) => p.id === post.id);
+            setSafetyMenuOpen(() => () => openViewer(post, Math.max(0, idx), browsePosts));
+            setSafetyMenuPost(post);
+          }}
           contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
         />
       ) : (
@@ -772,7 +777,16 @@ export default function BuyerSearchScreen() {
         <DiscoverSafetyMenu
           visible
           authorName={safetyMenuPost.authorName}
-          onClose={() => setSafetyMenuPost(null)}
+          postId={safetyMenuPost.id}
+          preview={safetyMenuOpen ? {
+            imageUri: safetyMenuPost.imageUri,
+            title: safetyMenuPost.authorName,
+            subtitle: safetyMenuPost.authorHandle,
+            avatarUri: safetyMenuPost.authorAvatarUrl,
+            body: safetyMenuPost.imageUri ? null : safetyMenuPost.caption,
+          } : undefined}
+          onOpen={safetyMenuOpen ?? undefined}
+          onClose={() => { setSafetyMenuPost(null); setSafetyMenuOpen(null); }}
           onNotInterested={() => { removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id); setSafetyMenuPost(null); }}
           onMute={() => { removePostFromLists(safetyMenuPost.authorId); setSafetyMenuPost(null); }}
           onReport={() => {

@@ -39,6 +39,7 @@ import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { radius } from '@/constants/radii';
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -310,12 +311,13 @@ function BuyerLiveNativeScreen() {
     }
   }
 
-  function openStreamOptions() {
+  function openStreamOptions(event?: unknown) {
     const sellerId: string | undefined = stream?.seller_id;
     const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
-    Alert.alert(sellerName, undefined, [
+    openPullDownMenu(event, menuItemsFromButtons([
       {
         text: 'Report live stream',
+        style: 'destructive' as const,
         onPress: () => router.push(reportHref({
           targetType: 'live',
           targetId: params.streamId,
@@ -332,7 +334,7 @@ function BuyerLiveNativeScreen() {
         },
       }] : []),
       { text: 'Cancel', style: 'cancel' as const },
-    ]);
+    ]).map((item, i) => ({ ...item, icon: i === 0 ? 'flag' as const : 'slash' as const })), { title: sellerName });
   }
 
   function openChatMessageOptions(comment: Comment) {

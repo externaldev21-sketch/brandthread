@@ -54,6 +54,7 @@ import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { PREVIEW_SELLER_IDENTITY, previewSellerBrandName } from '@/lib/previewIdentity';
@@ -163,6 +164,7 @@ export default function ProfileScreen() {
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const caps = profileCapabilities('seller', 'owner');
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
@@ -659,7 +661,7 @@ export default function ProfileScreen() {
             />
             <ProfileTopBarIcon
               name="more-horizontal"
-              onPress={() => { setMenuOpen(true); }}
+              onPress={(event) => { setMenuAnchor(anchorFromEvent(event)); setMenuOpen(true); }}
               accessibilityLabel="More options"
               testID="seller-profile-more"
             />
@@ -754,6 +756,7 @@ export default function ProfileScreen() {
 
       <ProfileMenuSheet
         visible={menuOpen}
+        anchor={menuAnchor}
         title={brandTitle}
         onClose={() => setMenuOpen(false)}
         items={[

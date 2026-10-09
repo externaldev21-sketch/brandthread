@@ -154,6 +154,9 @@ export default function DiscoverScreen() {
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+  // Set when the menu came from long-pressing a grid tile: it then shows as
+  // the long-press preview menu, and tapping the preview opens the post.
+  const [safetyMenuOpen, setSafetyMenuOpen] = useState<(() => void) | null>(null);
 
   const fetchJustDropped = useCallback(async () => {
     setJustDroppedLoading(true);
@@ -326,7 +329,11 @@ export default function DiscoverScreen() {
             fetchForYou(true);
           }}
           onTilePress={(post, idx) => openViewer(post, idx, forYouPosts)}
-          onTileLongPress={setSafetyMenuPost}
+          onTileLongPress={(post) => {
+            const idx = forYouPosts.findIndex((p) => p.id === post.id);
+            setSafetyMenuOpen(() => () => openViewer(post, Math.max(0, idx), forYouPosts));
+            setSafetyMenuPost(post);
+          }}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
           ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
@@ -347,7 +354,11 @@ export default function DiscoverScreen() {
             fetchFits(true);
           }}
           onTilePress={(post, idx) => openViewer(post, idx, fitsPosts)}
-          onTileLongPress={setSafetyMenuPost}
+          onTileLongPress={(post) => {
+            const idx = fitsPosts.findIndex((p) => p.id === post.id);
+            setSafetyMenuOpen(() => () => openViewer(post, Math.max(0, idx), fitsPosts));
+            setSafetyMenuPost(post);
+          }}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
         />
@@ -442,6 +453,15 @@ export default function DiscoverScreen() {
         <DiscoverSafetyMenu
           visible
           authorName={safetyMenuPost.authorName}
+          postId={safetyMenuPost.id}
+          preview={safetyMenuOpen ? {
+            imageUri: safetyMenuPost.imageUri,
+            title: safetyMenuPost.authorName,
+            subtitle: safetyMenuPost.authorHandle,
+            avatarUri: safetyMenuPost.authorAvatarUrl,
+            body: safetyMenuPost.imageUri ? null : safetyMenuPost.caption,
+          } : undefined}
+          onOpen={safetyMenuOpen ?? undefined}
           onNotInterested={() => removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id)}
           onMute={() => {
             muteUser({
@@ -462,7 +482,7 @@ export default function DiscoverScreen() {
               ownerName: safetyMenuPost.authorName,
             });
           }}
-          onClose={() => setSafetyMenuPost(null)}
+          onClose={() => { setSafetyMenuPost(null); setSafetyMenuOpen(null); }}
         />
       )}
       <FirstRunTip

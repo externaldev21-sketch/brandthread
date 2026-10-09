@@ -5,7 +5,7 @@
  * PressableScale press-feel with design-system tokens (RADII.chip, SPACING).
  */
 import React from 'react';
-import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle, type GestureResponderEvent } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT } from '@/lib/theme';
@@ -17,7 +17,8 @@ import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 
 export interface IconButtonProps {
   name: keyof typeof Feather.glyphMap;
-  onPress: () => void;
+  /** Receives the press event (a ⋯ button anchors its pull-down menu to it). */
+  onPress: (event?: GestureResponderEvent) => void;
   /** Optional: when omitted (or empty) a default is derived from the icon `name` (see lib/a11y/iconLabels.ts). */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -57,7 +58,7 @@ export function IconButton({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={() => onPress()}
+      onPress={(event) => onPress(event)}
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

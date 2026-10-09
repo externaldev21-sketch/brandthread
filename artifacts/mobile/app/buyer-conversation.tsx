@@ -47,7 +47,6 @@ import Composer from '@/components/ui/Composer';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { ALLOW_DEV_TOOLS } from '@/lib/buildFlags';
-import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
@@ -93,6 +92,7 @@ import {
   sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
 import { radius } from '@/constants/radii';
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -1472,14 +1472,12 @@ export default function BuyerConversationScreen() {
 
   // ── Header options ──────────────────────────────────────────────────────────
 
-  function openOptions() {
+  function openOptions(event?: unknown) {
     if (!participant) return;
-    // Alert.alert() with a button array is a silent no-op on web (see
-    // components/ui/ActionSheet.tsx's header comment) — this left the
-    // header "..." menu completely dead in the web preview. showActionSheet
-    // takes the identical { text, onPress, style }[] shape and renders a
-    // real themed bottom sheet on every platform.
-    showActionSheet('Options', undefined, [
+    // The header ⋯ pull-down (UIMenu style, lib/contextMenu.ts) — works on
+    // every platform including web, where Alert.alert is a no-op.
+    const icons = ['archive', messaging.blockedByMe ? 'user-check' : 'slash', 'flag'] as const;
+    openPullDownMenu(event, menuItemsFromButtons([
       {
         text: 'Archive conversation',
         onPress: async () => {
@@ -1518,6 +1516,7 @@ export default function BuyerConversationScreen() {
           },
       {
         text: `Report ${participant.name}`,
+        style: 'destructive' as const,
         onPress: () => {
           router.push(reportHref({
             targetType: 'profile',
@@ -1529,7 +1528,7 @@ export default function BuyerConversationScreen() {
         },
       },
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ]).map((item, i) => ({ ...item, icon: icons[i] })));
   }
 
   // ── Message long press → reaction bar + actions sheet ───────────────────────
@@ -2254,7 +2253,7 @@ export default function BuyerConversationScreen() {
           )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { openOptions(); }}
+            onPress={(event) => { openOptions(event); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-options"
             accessibilityRole="button"

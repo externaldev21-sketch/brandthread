@@ -27,6 +27,7 @@ import { Product, ProductVariant, ProductStatus } from '@/services/productTypes'
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -204,8 +205,8 @@ export default function ProductDetailScreen() {
             <Text style={s.editBtnText}>Edit</Text>
           </PressableScale>
           <PressableScale
-            onPress={() => {
-              Alert.alert('Product Options', '', [
+            onPress={(event) => {
+              openPullDownMenu(event, menuItemsFromButtons([
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
                     archiveProduct(product.id).then(p => {
@@ -216,7 +217,7 @@ export default function ProductDetailScreen() {
                     });
                   } else {
                     publishProduct(product.id).then(p => {
-                      if (p) { setProduct(p); Alert.alert('Product published'); }
+                      if (p) { setProduct(p); haptics.success(); Alert.alert('Product published'); }
                     }).catch(error => {
                       reportNetworkError(error, () => publishProduct(product.id).then(p => p && setProduct(p)));
                       Alert.alert('Could not publish product', 'Check your connection and try again.');
@@ -241,7 +242,7 @@ export default function ProductDetailScreen() {
                   Share.share({ message: `${product.name} — ${link}`, url: link }).catch(() => {});
                 }},
                 { text: 'Cancel', style: 'cancel' },
-              ]);
+              ], { Archive: 'archive', Publish: 'upload', Duplicate: 'copy', Share: 'share' }));
             }}
             style={s.iconBtnSmall}
             accessibilityLabel={`More actions for ${product.name}`}

@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { openPullDownMenu } from '@/lib/contextMenu';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -228,11 +229,10 @@ export default function UsersScreen() {
         rightElement={
           <View style={styles.headerActions}>
             <TouchableOpacity
-              onPress={() => {
-                Alert.alert(title, undefined, [
-                  { text: 'Invite someone', onPress: () => router.push('/team' as never) },
-                  { text: 'Cancel', style: 'cancel' },
-                ]);
+              onPress={(event) => {
+                openPullDownMenu(event, [
+                  { label: 'Invite someone', icon: 'user-plus', onPress: () => router.push('/team' as never) },
+                ], { title });
               }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}

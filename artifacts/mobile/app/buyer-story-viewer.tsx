@@ -55,6 +55,7 @@ import {
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -798,10 +799,10 @@ export default function BuyerStoryViewer() {
             variant="plain"
             color={ON_DARK}
             accessibilityLabel="Story options"
-            onPress={() => {
+            onPress={(event) => {
               setIsPaused(true);
               const author = { userId: currentStory.authorId, name: currentStory.authorName };
-              Alert.alert(currentStory.authorName, undefined, [
+              openPullDownMenu(event, menuItemsFromButtons([
                 ...(slidePeople.length > 0 ? [{
                   text: 'Tagged people',
                   onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
@@ -821,6 +822,7 @@ export default function BuyerStoryViewer() {
                 },
                 {
                   text: 'Report story',
+                  style: 'destructive',
                   onPress: () => router.push(reportHref({
                     targetType: 'story',
                     targetId: currentStory.id,
@@ -838,7 +840,7 @@ export default function BuyerStoryViewer() {
                   },
                 },
                 { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
-              ]);
+              ], { 'Tagged people': 'users', 'Report story': 'flag' }), { title: currentStory.authorName, onDismiss: () => setIsPaused(false) });
             }}
           />
         ) : null}

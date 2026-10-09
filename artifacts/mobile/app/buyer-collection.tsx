@@ -32,6 +32,7 @@ import { formatCents } from '@/lib/money';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { openPullDownMenu } from '@/lib/contextMenu';
 
 const { width: W } = Dimensions.get('window');
 const GAP = SP.sm;
@@ -123,13 +124,12 @@ export default function BuyerCollection() {
     }
   }
 
-  function openMoreOptions() {
+  function openMoreOptions(event?: unknown) {
     if (!collection) return;
-    Alert.alert(collection.name, undefined, [
-      { text: 'Rename', onPress: () => { setRenameValue(collection.name); setRenameOpen(true); } },
-      { text: 'Delete', style: 'destructive', onPress: handleDelete },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    openPullDownMenu(event, [
+      { label: 'Rename', icon: 'edit-2', onPress: () => { setRenameValue(collection.name); setRenameOpen(true); } },
+      { label: 'Delete', icon: 'trash-2', destructive: true, onPress: handleDelete },
+    ], { title: collection.name });
   }
 
   function handleDelete() {

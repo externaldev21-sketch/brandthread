@@ -6,11 +6,12 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { openPullDownMenu } from '@/lib/contextMenu';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -515,7 +516,7 @@ function SortModal({
           <TouchableOpacity
             key={key}
             style={[s.sortOption, current === key && s.sortOptionActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
+            onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel={`Sort by ${label}`}
@@ -556,7 +557,7 @@ function FilterSheet({
             <TouchableOpacity
               key={key}
               style={[s.sortOption, current === key && s.sortOptionActive]}
-              onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
+              onPress={() => { haptics.selection(); onSelect(key); onClose(); }}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel={`Filter orders by ${label}`}
@@ -888,7 +889,6 @@ export default function OrdersScreen() {
   }, [loading]);
 
   const retryUpdates = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
     setUpdatesPaused(false);
@@ -944,7 +944,6 @@ export default function OrdersScreen() {
   }, [router]);
 
   const handleBulkFulfill = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(('/fulfill-batch?orderIds=' + selectedIds.join(',')) as never);
   }, [router, selectedIds]);
 
@@ -973,17 +972,17 @@ export default function OrdersScreen() {
   }, [selectedIds, queryClient, api, userId]);
 
   const handleLongPress = useCallback((orderId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    haptics.selection();
     setSelectedIds(prev =>
       prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
   }, []);
 
   const handleBulkMarkReady = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
       setSelectedIds([]);
+      haptics.success();
       await loadData(generationRef.current);
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
@@ -1013,12 +1012,11 @@ export default function OrdersScreen() {
     }
   }, [orders, ordersOwnerId, userId]);
 
-  const handleMoreMenu = useCallback(() => {
-    showActionSheet('Orders', 'Choose an action', [
-      { text: 'Export CSV', onPress: handleExportCsv },
-      { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
-      { text: 'Refresh', onPress: onRefresh },
-      { text: 'Cancel', style: 'cancel' },
+  const handleMoreMenu = useCallback((event?: unknown) => {
+    openPullDownMenu(event, [
+      { label: 'Export CSV', icon: 'download', onPress: handleExportCsv },
+      { label: 'Bulk Actions', icon: 'check-square', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
+      { label: 'Refresh', icon: 'refresh-cw', onPress: onRefresh },
     ]);
   }, [onRefresh, handleExportCsv]);
 
