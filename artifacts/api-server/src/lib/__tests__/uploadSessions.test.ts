@@ -3,8 +3,12 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import {
+  MAX_OPEN_UPLOAD_SESSIONS,
   UPLOAD_SESSION_MAX_BYTES,
   UPLOAD_SESSION_TTL_MS,
+  isSessionExpired,
+  ownerSessionsDir,
+  sweepOwnerSessions,
   acceptUploadSession,
   completedChunks,
   contentTypeAllowed,
@@ -67,7 +71,7 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
-beforeEach(() => { state.user = "user-a"; state.now = 1_000_000; received = null; });
+beforeEach(() => { state.user = "user-a"; state.now = 1_000_000; received = null; storage.objects.clear(); });
 
 const json = (path: string, method: string, body?: unknown) =>
   fetch(`${base}${path}`, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -151,7 +155,7 @@ describe("session lifecycle", () => {
     state.user = "user-a";
 
     state.now += UPLOAD_SESSION_TTL_MS + 1;
-    expect((await json(`/sessions/${start.uploadId}`, "GET")).status).toBe(404);
+    expect((await json(`/sessions/${start.uploadId}`, "GET")).status).toBe(410);
     state.now = 1_000_000;
 
     const video = await (await json("/sessions", "POST", { contentType: "video/mp4", size: 1 })).json() as { uploadId: string };
@@ -182,5 +186,76 @@ describe("session lifecycle", () => {
     expect((await json(`/sessions/${s.uploadId}`, "DELETE")).status).toBe(204);
     expect((await json(`/sessions/${s.uploadId}`, "GET")).status).toBe(404);
     expect((await json("/sessions/not-a-uuid", "GET")).status).toBe(404);
+  });
+});
+
+describe("expiry and cleanup", () => {
+  const start = async (size = 8) => (await (await json("/sessions", "POST", { contentType: "image/png", size })).json()) as { uploadId: string };
+  const ownedKeys = (owner: string) => [...storage.objects.keys()].filter((k) => k.startsWith(ownerSessionsDir(owner)));
+
+  it("knows when a session is past its 24 h lifetime", () => {
+    expect(isSessionExpired({ createdAt: 0 }, UPLOAD_SESSION_TTL_MS)).toBe(false);
+    expect(isSessionExpired({ createdAt: 0 }, UPLOAD_SESSION_TTL_MS + 1)).toBe(true);
+    expect(isSessionExpired({ createdAt: Number.NaN }, 0)).toBe(true);
+  });
+
+  it("rejects chunks, completion and hand-off for an expired session and deletes it", async () => {
+    const s = await start();
+    await putChunk(s.uploadId, 0, Buffer.from("abcd"));
+    state.now += UPLOAD_SESSION_TTL_MS + 1;
+    const late = await putChunk(s.uploadId, 1, Buffer.from("efgh"));
+    expect(late.status).toBe(410);
+    expect((await late.json() as { code: string }).code).toBe("UPLOAD_EXPIRED");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ownedKeys("user-a")).toEqual([]);
+  });
+
+  it("refuses an expired, already-assembled session at hand-off", async () => {
+    const s = await start(2);
+    await putChunk(s.uploadId, 0, Buffer.from("ok"));
+    await json(`/sessions/${s.uploadId}/complete`, "POST");
+    state.now += UPLOAD_SESSION_TTL_MS + 1;
+    expect((await fetch(`${base}/target`, { method: "POST", headers: { "X-Upload-Id": s.uploadId } })).status).toBe(410);
+  });
+
+  it("starting a session sweeps that person's expired and orphaned sessions only", async () => {
+    const old = await start();
+    await putChunk(old.uploadId, 0, Buffer.from("abcd"));
+    state.user = "user-b";
+    const other = await start();
+    state.user = "user-a";
+    // Orphaned parts with no meta object.
+    storage.objects.set(`${ownerSessionsDir("user-a")}/11111111-1111-4111-8111-111111111111/p000000`, Buffer.from("zz"));
+
+    state.now += UPLOAD_SESSION_TTL_MS + 1;
+    const fresh = await start();
+    const keys = ownedKeys("user-a");
+    expect(keys.every((k) => k.includes(fresh.uploadId))).toBe(true);
+    expect(keys.length).toBeGreaterThan(0);
+    // user-b's (also old) session is untouched until user-b starts one.
+    expect(ownedKeys("user-b").some((k) => k.includes(other.uploadId))).toBe(true);
+  });
+
+  it("caps open sessions per person", async () => {
+    for (let i = 0; i < MAX_OPEN_UPLOAD_SESSIONS; i += 1) expect((await json("/sessions", "POST", { contentType: "image/png", size: 4 })).status).toBe(201);
+    const blocked = await json("/sessions", "POST", { contentType: "image/png", size: 4 });
+    expect(blocked.status).toBe(429);
+    expect((await blocked.json() as { code: string }).code).toBe("TOO_MANY_OPEN_UPLOADS");
+    // Someone else is unaffected; and once those expire the person can start again.
+    state.user = "user-b";
+    expect((await json("/sessions", "POST", { contentType: "image/png", size: 4 })).status).toBe(201);
+    state.user = "user-a";
+    state.now += UPLOAD_SESSION_TTL_MS + 1;
+    expect((await json("/sessions", "POST", { contentType: "image/png", size: 4 })).status).toBe(201);
+  });
+
+  it("sweep work is bounded per call", async () => {
+    for (let i = 0; i < 30; i += 1) {
+      storage.objects.set(`${ownerSessionsDir("user-c")}/${crypto.randomUUID()}/p000000`, Buffer.from("x"));
+    }
+    const first = await sweepOwnerSessions(storage, "user-c", 0);
+    expect(first.removed).toBe(20);
+    const second = await sweepOwnerSessions(storage, "user-c", 0);
+    expect(second.removed).toBe(10);
   });
 });

@@ -16,6 +16,12 @@
  * objects are removed once the route has answered (kept on a 5xx so the client
  * can retry the hand-off without re-sending anything).
  *
+ * Lifetime: sessions live under a per-person prefix and expire 24 h after
+ * they start. An expired session is refused (410) and deleted when touched,
+ * and starting a new session sweeps that person's expired or orphaned
+ * sessions (bounded work per request). A person may hold at most
+ * MAX_OPEN_UPLOAD_SESSIONS live sessions at once.
+ *
  * The backend is the Replit / Google Cloud Storage bucket behind
  * ObjectStorageService. Chunks go through the API (not a signed GCS resumable
  * URL) because the Replit storage sidecar only signs plain object URLs; GCS
@@ -24,13 +30,19 @@
  * and an app restart resumes where it stopped.
  */
 import express, { Router, type Request, type RequestHandler, type Response } from "express";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getAuth } from "@clerk/express";
 
 export const UPLOAD_SESSION_CHUNK_SIZE = 8 * 1024 * 1024;
 export const UPLOAD_SESSION_MAX_BYTES = 1024 * 1024 * 1024;
-/** Unfinished sessions older than this are refused (and safe to sweep). */
+/** Most chunks one session can have (1 GB / 8 MB). */
+export const UPLOAD_SESSION_MAX_CHUNKS = Math.ceil(UPLOAD_SESSION_MAX_BYTES / UPLOAD_SESSION_CHUNK_SIZE);
+/** Sessions older than this are refused and swept. */
 export const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+/** Live (unexpired) sessions one person may hold at once. */
+export const MAX_OPEN_UPLOAD_SESSIONS = 6;
+/** Upper bound on sessions inspected / deleted by one sweep. */
+export const UPLOAD_SESSION_SWEEP_LIMIT = 20;
 
 /** Media any upload route in the app accepts. Each route still applies its own, narrower list. */
 export const UPLOAD_SESSION_TYPES: readonly string[] = [
@@ -60,10 +72,17 @@ export interface UploadSessionStorage {
   deleteObjectEntity(objectPath: string): Promise<void>;
 }
 
-export const sessionDir = (id: string) => `/objects/uploads/sessions/${id}`;
-export const sessionMetaPath = (id: string) => `${sessionDir(id)}/meta.json`;
-export const sessionChunkPath = (id: string, index: number) => `${sessionDir(id)}/p${String(index).padStart(6, "0")}`;
-export const sessionAssembledPath = (id: string) => `${sessionDir(id)}/assembled`;
+/** Path-safe, non-reversible folder name for a person's sessions. */
+export function ownerKey(owner: string): string {
+  return createHash("sha256").update(owner).digest("hex").slice(0, 32);
+}
+
+export const ownerSessionsDir = (owner: string) => `/objects/uploads/sessions/${ownerKey(owner)}`;
+export const sessionDir = (owner: string, id: string) => `${ownerSessionsDir(owner)}/${id}`;
+export const sessionMetaPath = (owner: string, id: string) => `${sessionDir(owner, id)}/meta.json`;
+export const sessionChunkPath = (owner: string, id: string, index: number) =>
+  `${sessionDir(owner, id)}/p${String(index).padStart(6, "0")}`;
+export const sessionAssembledPath = (owner: string, id: string) => `${sessionDir(owner, id)}/assembled`;
 
 export function normalizeContentType(raw: unknown): string {
   return String(raw ?? "").split(";")[0].trim().toLowerCase();
@@ -81,6 +100,10 @@ export function contentTypeAllowed(contentType: string, allowed: readonly string
 
 export function expectedChunkSize(meta: Pick<UploadSessionMeta, "size" | "chunkSize" | "totalChunks">, index: number): number {
   return index === meta.totalChunks - 1 ? meta.size - meta.chunkSize * (meta.totalChunks - 1) : meta.chunkSize;
+}
+
+export function isSessionExpired(meta: Pick<UploadSessionMeta, "createdAt">, now: number): boolean {
+  return typeof meta.createdAt !== "number" || !Number.isFinite(meta.createdAt) || now - meta.createdAt > UPLOAD_SESSION_TTL_MS;
 }
 
 export type StartCheck =
@@ -129,32 +152,89 @@ export const defaultActorId: ActorResolver = (req) => {
   return (req as Request & { clerkUserId?: string }).clerkUserId;
 };
 
+export type SessionLookup =
+  | { status: "ok"; meta: UploadSessionMeta }
+  | { status: "expired"; meta: UploadSessionMeta }
+  | { status: "missing" };
+
+async function readMeta(storage: UploadSessionStorage, path: string): Promise<UploadSessionMeta | null> {
+  try {
+    const file = await storage.getObjectEntityFile(path);
+    const [bytes] = await file.download();
+    return JSON.parse(bytes.toString("utf8")) as UploadSessionMeta;
+  } catch {
+    return null;
+  }
+}
+
+export async function lookupSession(
+  storage: UploadSessionStorage,
+  id: string,
+  owner: string | undefined,
+  now: number = Date.now(),
+): Promise<SessionLookup> {
+  if (!owner || !UUID_RE.test(id)) return { status: "missing" };
+  const meta = await readMeta(storage, sessionMetaPath(owner, id));
+  if (!meta || meta.owner !== owner) return { status: "missing" };
+  return isSessionExpired(meta, now) ? { status: "expired", meta } : { status: "ok", meta };
+}
+
+/** Live session meta, or null (missing, someone else's, or expired). */
 export async function loadSessionMeta(
   storage: UploadSessionStorage,
   id: string,
   owner: string | undefined,
   now: number = Date.now(),
 ): Promise<UploadSessionMeta | null> {
-  if (!owner || !UUID_RE.test(id)) return null;
-  try {
-    const file = await storage.getObjectEntityFile(sessionMetaPath(id));
-    const [bytes] = await file.download();
-    const meta = JSON.parse(bytes.toString("utf8")) as UploadSessionMeta;
-    if (meta.owner !== owner) return null;
-    if (typeof meta.createdAt === "number" && now - meta.createdAt > UPLOAD_SESSION_TTL_MS) return null;
-    return meta;
-  } catch {
-    return null;
-  }
+  const found = await lookupSession(storage, id, owner, now);
+  return found.status === "ok" ? found.meta : null;
 }
 
 export async function discardSession(storage: UploadSessionStorage, id: string, meta: UploadSessionMeta): Promise<void> {
+  const totalChunks = Math.min(Math.max(0, Math.floor(meta.totalChunks) || 0), UPLOAD_SESSION_MAX_CHUNKS);
   const paths = [
-    sessionMetaPath(id),
-    sessionAssembledPath(id),
-    ...Array.from({ length: meta.totalChunks }, (_, i) => sessionChunkPath(id, i)),
+    sessionMetaPath(meta.owner, id),
+    sessionAssembledPath(meta.owner, id),
+    ...Array.from({ length: totalChunks }, (_, i) => sessionChunkPath(meta.owner, id, i)),
   ];
   await Promise.all(paths.map((p) => storage.deleteObjectEntity(p).catch(() => {})));
+}
+
+/**
+ * Deletes this person's expired sessions (and orphaned parts whose meta is
+ * gone), inspecting at most UPLOAD_SESSION_SWEEP_LIMIT sessions, and returns
+ * how many live sessions remain among those inspected.
+ */
+export async function sweepOwnerSessions(
+  storage: UploadSessionStorage,
+  owner: string,
+  now: number,
+): Promise<{ live: number; removed: number }> {
+  const prefix = `${ownerSessionsDir(owner)}/`;
+  const listed = await storage.listObjectEntities(prefix);
+  const byId = new Map<string, string[]>();
+  for (const item of listed) {
+    const rest = item.objectPath.slice(prefix.length);
+    const id = rest.split("/")[0];
+    if (!UUID_RE.test(id)) continue;
+    const paths = byId.get(id) ?? [];
+    paths.push(item.objectPath);
+    byId.set(id, paths);
+  }
+  let live = 0;
+  let removed = 0;
+  for (const [id, paths] of [...byId.entries()].slice(0, UPLOAD_SESSION_SWEEP_LIMIT)) {
+    const meta = await readMeta(storage, sessionMetaPath(owner, id));
+    if (meta && meta.owner === owner && !isSessionExpired(meta, now)) {
+      live += 1;
+      continue;
+    }
+    // Expired, or parts left behind without a meta object (an abandoned
+    // discard): remove exactly what is listed.
+    await Promise.all(paths.map((p) => storage.deleteObjectEntity(p).catch(() => {})));
+    removed += 1;
+  }
+  return { live, removed };
 }
 
 async function lazyStorage(): Promise<UploadSessionStorage> {
@@ -173,12 +253,32 @@ export interface UploadSessionRouterOptions {
   chunkSize?: number;
 }
 
+const EXPIRED_MESSAGE = "This upload expired. Please start it again.";
+
 export function createUploadSessionRouter(options: UploadSessionRouterOptions = {}) {
   const router = Router();
   const actorId = options.actorId ?? defaultActorId;
   const now = options.now ?? Date.now;
   const chunkSize = options.chunkSize ?? UPLOAD_SESSION_CHUNK_SIZE;
   const log = (req: Request) => (req as Request & { log?: { error: (o: unknown, m: string) => void } }).log;
+
+  /** Live session for this request, or an error response already sent. */
+  async function sessionFor(req: Request, res: Response): Promise<{ storage: UploadSessionStorage; owner: string; id: string; meta: UploadSessionMeta } | null> {
+    const id = String(req.params.uploadId);
+    const owner = actorId(req);
+    const storage = await resolveStorage(options.storage);
+    const found = await lookupSession(storage, id, owner, now());
+    if (found.status === "missing" || !owner) {
+      res.status(404).json({ error: "Upload not found" });
+      return null;
+    }
+    if (found.status === "expired") {
+      void discardSession(storage, id, found.meta);
+      res.status(410).json({ error: EXPIRED_MESSAGE, code: "UPLOAD_EXPIRED" });
+      return null;
+    }
+    return { storage, owner, id, meta: found.meta };
+  }
 
   router.post("/", express.json({ limit: "4kb" }), async (req, res) => {
     const owner = actorId(req);
@@ -192,7 +292,14 @@ export function createUploadSessionRouter(options: UploadSessionRouterOptions = 
     };
     try {
       const storage = await resolveStorage(options.storage);
-      await storage.createObjectEntityFromBuffer(Buffer.from(JSON.stringify(meta)), "application/json", sessionMetaPath(uploadId));
+      const { live } = await sweepOwnerSessions(storage, owner, meta.createdAt);
+      if (live >= MAX_OPEN_UPLOAD_SESSIONS) {
+        return res.status(429).json({
+          error: "Too many uploads in progress. Let one finish and try again.",
+          code: "TOO_MANY_OPEN_UPLOADS",
+        });
+      }
+      await storage.createObjectEntityFromBuffer(Buffer.from(JSON.stringify(meta)), "application/json", sessionMetaPath(owner, uploadId));
       return res.status(201).json({ uploadId, chunkSize: meta.chunkSize, totalChunks: meta.totalChunks });
     } catch (err) {
       log(req)?.error({ err }, "Could not start upload session");
@@ -201,16 +308,15 @@ export function createUploadSessionRouter(options: UploadSessionRouterOptions = 
   });
 
   router.get("/:uploadId", async (req, res) => {
-    const uploadId = String(req.params.uploadId);
-    const storage = await resolveStorage(options.storage);
-    const meta = await loadSessionMeta(storage, uploadId, actorId(req), now());
-    if (!meta) return res.status(404).json({ error: "Upload not found" });
+    const session = await sessionFor(req, res);
+    if (!session) return undefined;
+    const { storage, owner, id, meta } = session;
     try {
       const received = meta.assembled
         ? Array.from({ length: meta.totalChunks }, (_, i) => i)
-        : completedChunks(meta, await storage.listObjectEntities(`${sessionDir(uploadId)}/p`));
+        : completedChunks(meta, await storage.listObjectEntities(`${sessionDir(owner, id)}/p`));
       return res.json({
-        uploadId, chunkSize: meta.chunkSize, totalChunks: meta.totalChunks,
+        uploadId: id, chunkSize: meta.chunkSize, totalChunks: meta.totalChunks,
         received, assembled: meta.assembled === true,
       });
     } catch (err) {
@@ -223,11 +329,10 @@ export function createUploadSessionRouter(options: UploadSessionRouterOptions = 
     "/:uploadId/chunks/:index",
     express.raw({ type: "application/octet-stream", limit: chunkSize + 1024 }),
     async (req, res) => {
-      const uploadId = String(req.params.uploadId);
+      const session = await sessionFor(req, res);
+      if (!session) return undefined;
+      const { storage, owner, id, meta } = session;
       const index = Number(req.params.index);
-      const storage = await resolveStorage(options.storage);
-      const meta = await loadSessionMeta(storage, uploadId, actorId(req), now());
-      if (!meta) return res.status(404).json({ error: "Upload not found" });
       if (meta.assembled) return res.status(409).json({ error: "Upload is already complete" });
       if (!Number.isInteger(index) || index < 0 || index >= meta.totalChunks) {
         return res.status(400).json({ error: "Chunk index out of range" });
@@ -237,49 +342,46 @@ export function createUploadSessionRouter(options: UploadSessionRouterOptions = 
         return res.status(400).json({ error: "Chunk size does not match the declared upload" });
       }
       try {
-        await storage.createObjectEntityFromBuffer(bytes, "application/octet-stream", sessionChunkPath(uploadId, index));
+        await storage.createObjectEntityFromBuffer(bytes, "application/octet-stream", sessionChunkPath(owner, id, index));
         return res.json({ index, size: bytes.length });
       } catch (err) {
-        log(req)?.error({ err, uploadId, index }, "Could not store upload chunk");
+        log(req)?.error({ err, uploadId: id, index }, "Could not store upload chunk");
         return res.status(500).json({ error: "Chunk could not be stored" });
       }
     },
   );
 
   router.post("/:uploadId/complete", async (req, res) => {
-    const uploadId = String(req.params.uploadId);
-    const storage = await resolveStorage(options.storage);
-    const meta = await loadSessionMeta(storage, uploadId, actorId(req), now());
-    if (!meta) return res.status(404).json({ error: "Upload not found" });
-    if (meta.assembled) return res.json({ uploadId, contentType: meta.contentType, size: meta.size });
+    const session = await sessionFor(req, res);
+    if (!session) return undefined;
+    const { storage, owner, id, meta } = session;
+    if (meta.assembled) return res.json({ uploadId: id, contentType: meta.contentType, size: meta.size });
     try {
-      const done = new Set(completedChunks(meta, await storage.listObjectEntities(`${sessionDir(uploadId)}/p`)));
+      const done = new Set(completedChunks(meta, await storage.listObjectEntities(`${sessionDir(owner, id)}/p`)));
       const missing: number[] = [];
       for (let i = 0; i < meta.totalChunks; i += 1) if (!done.has(i)) missing.push(i);
       if (missing.length > 0) return res.status(409).json({ error: "Upload is incomplete", missing });
       await storage.combineObjectEntities(
-        Array.from({ length: meta.totalChunks }, (_, i) => sessionChunkPath(uploadId, i)),
-        sessionAssembledPath(uploadId),
+        Array.from({ length: meta.totalChunks }, (_, i) => sessionChunkPath(owner, id, i)),
+        sessionAssembledPath(owner, id),
         meta.contentType,
       );
       const next: UploadSessionMeta = { ...meta, assembled: true };
-      await storage.createObjectEntityFromBuffer(Buffer.from(JSON.stringify(next)), "application/json", sessionMetaPath(uploadId));
+      await storage.createObjectEntityFromBuffer(Buffer.from(JSON.stringify(next)), "application/json", sessionMetaPath(owner, id));
       // The parts are no longer needed once the assembled object exists.
       await Promise.all(Array.from({ length: meta.totalChunks }, (_, i) =>
-        storage.deleteObjectEntity(sessionChunkPath(uploadId, i)).catch(() => {})));
-      return res.json({ uploadId, contentType: meta.contentType, size: meta.size });
+        storage.deleteObjectEntity(sessionChunkPath(owner, id, i)).catch(() => {})));
+      return res.json({ uploadId: id, contentType: meta.contentType, size: meta.size });
     } catch (err) {
-      log(req)?.error({ err, uploadId }, "Could not finish upload session");
+      log(req)?.error({ err, uploadId: id }, "Could not finish upload session");
       return res.status(500).json({ error: "Upload could not be finished" });
     }
   });
 
   router.delete("/:uploadId", async (req, res) => {
-    const uploadId = String(req.params.uploadId);
-    const storage = await resolveStorage(options.storage);
-    const meta = await loadSessionMeta(storage, uploadId, actorId(req), now());
-    if (!meta) return res.status(404).json({ error: "Upload not found" });
-    await discardSession(storage, uploadId, meta);
+    const session = await sessionFor(req, res);
+    if (!session) return undefined;
+    await discardSession(session.storage, session.id, session.meta);
     return res.status(204).end();
   });
 
@@ -311,14 +413,20 @@ export async function readUploadSession(
   options: SessionHandoffOptions,
 ): Promise<SessionRead> {
   const storage = await resolveStorage(options.storage);
-  const meta = await loadSessionMeta(storage, uploadId, (options.actorId ?? defaultActorId)(req), (options.now ?? Date.now)());
-  if (!meta) return { ok: false, status: 404, error: "Upload not found" };
+  const owner = (options.actorId ?? defaultActorId)(req);
+  const found = await lookupSession(storage, uploadId, owner, (options.now ?? Date.now)());
+  if (found.status === "missing") return { ok: false, status: 404, error: "Upload not found" };
+  if (found.status === "expired") {
+    void discardSession(storage, uploadId, found.meta);
+    return { ok: false, status: 410, error: EXPIRED_MESSAGE };
+  }
+  const meta = found.meta;
   if (!meta.assembled) return { ok: false, status: 409, error: "Upload is incomplete" };
   if (!contentTypeAllowed(meta.contentType, options.allowedTypes)) {
     return { ok: false, status: 415, error: "Unsupported file type" };
   }
   if (meta.size > options.maxBytes) return { ok: false, status: 413, error: "File is too large" };
-  const file = await storage.getObjectEntityFile(sessionAssembledPath(uploadId));
+  const file = await storage.getObjectEntityFile(sessionAssembledPath(meta.owner, uploadId));
   const [buffer] = await file.download();
   if (buffer.length !== meta.size) return { ok: false, status: 409, error: "Upload is incomplete" };
   res.on("finish", () => {
