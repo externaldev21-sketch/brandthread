@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -93,6 +92,7 @@ import {
   SCREEN_BG,
   SP,
 } from '@/lib/theme';
+import { Icon } from '@/components/ui/Icon';
 
 type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 
@@ -764,7 +764,7 @@ export default function SellerHomeCommerceDashboard({
                   <Text style={[styles.storeUrlText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="middle">
                     {middleTruncate(storeUrl.replace(/^https?:\/\//, ''))}
                   </Text>
-                  <Feather name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
+                  <Icon name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -779,7 +779,7 @@ export default function SellerHomeCommerceDashboard({
 
           {!data && analyticsError ? (
             <View style={styles.errorBanner} testID="seller-dashboard-error">
-              <Feather name="alert-circle" size={16} color={theme.error} />
+              <Icon name="alert-circle" size={16} color={theme.error} />
               <Text style={[styles.errorText, { color: theme.error }]}>Couldn’t load your dashboard.</Text>
               <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
                 <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
@@ -906,7 +906,7 @@ export default function SellerHomeCommerceDashboard({
                   <Text style={[styles.threadCashValue, { color: THREAD_CASH_GREEN_MID }]}>
                     {threadCash.loading ? '···' : formatCents(threadCash.balanceCents ?? 0)}
                   </Text>
-                  <Feather name="chevron-right" size={16} color={theme.subtle} />
+                  <Icon name="chevron-right" size={16} color={theme.subtle} />
                 </TouchableOpacity>
               )}
 
@@ -929,7 +929,7 @@ export default function SellerHomeCommerceDashboard({
 
                 {!newSeller && secondaryError && (
                   <View style={[isTablet && styles.tabletRowItem, styles.errorBanner]}>
-                    <Feather name="alert-circle" size={16} color={theme.error} />
+                    <Icon name="alert-circle" size={16} color={theme.error} />
                     <Text style={[styles.errorText, { color: theme.error }]}>Some dashboard data couldn’t load.</Text>
                     <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
                       <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
@@ -1057,8 +1057,6 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
   heroValue: {
     fontFamily: FONT.bold,
@@ -1093,7 +1091,7 @@ const styles = StyleSheet.create({
     paddingTop: SP.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.6 },
+  balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, },
   balanceValue: { fontFamily: FONT.bold, fontSize: FS.lg, marginTop: 2, fontVariant: ['tabular-nums'] },
   withdrawButton: {
     minHeight: 44,
@@ -1124,8 +1122,6 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
   },
   setupList: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   setupCard: {

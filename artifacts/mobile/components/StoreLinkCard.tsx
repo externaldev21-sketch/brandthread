@@ -86,7 +86,6 @@ export function StoreLinkCard({
         <View style={styles.pairItem}>
           <Button
             label={link.copied ? 'Copied' : 'Copy link'}
-            icon={link.copied ? 'check' : 'copy'}
             variant="secondary"
             onPress={() => { void link.copy(); }}
             fullWidth
@@ -96,7 +95,6 @@ export function StoreLinkCard({
         <View style={styles.pairItem}>
           <Button
             label="Share"
-            icon="share"
             onPress={() => { void link.share(); }}
             fullWidth
             testID={`${testID}-share`}
@@ -106,7 +104,6 @@ export function StoreLinkCard({
       {showSaveQr && !compact ? (
         <Button
           label={link.saved ? 'Saved' : 'Save QR code'}
-          icon={link.saved ? 'check' : 'download'}
           variant="tertiary"
           onPress={() => { void link.saveQr(); }}
           fullWidth
