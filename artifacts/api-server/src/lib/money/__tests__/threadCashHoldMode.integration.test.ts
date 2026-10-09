@@ -57,7 +57,9 @@ async function payTransferOrderWithThreadCash(input: { priceCents: number; threa
     buyerId: buyer, amountCents: input.threadCashCents, source: "daily_checkin", referenceId: uid("grant"),
   });
   const redemption = await redeemThreadCash(buyer, input.threadCashCents, uid("redeem"));
-  const fee = destinationApplicationFeeCents({ merchandiseCents: input.priceCents, preTaxTotalCents: input.priceCents });
+  // No shipping on this order (the fee base is item + shipping).
+  const feeInput = { merchandiseCents: input.priceCents, shippingCents: 0, preTaxTotalCents: input.priceCents };
+  const fee = destinationApplicationFeeCents(feeInput);
   const reservationId = `checkout:${uid("reservation")}`;
   await reserveThreadCashRedemption(buyer, redemption.token, reservationId, input.priceCents, 1);
   const [checkout] = await db.insert(checkoutSessions).values({
