@@ -103,6 +103,7 @@ export async function pay(input: PayInput) {
   const discount = input.discountCents ?? 0;
   const fee = destinationApplicationFeeCents({
     merchandiseCents: Math.max(0, subtotal - discount),
+    shippingCents: shipping,
     preTaxTotalCents: Math.max(0, subtotal + shipping - discount),
   });
   const [checkout] = await db.insert(checkoutSessions).values({

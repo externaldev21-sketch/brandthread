@@ -6,9 +6,14 @@
  *
  * Owner's rule: Brandthread keeps 5% of each sale, and the seller also bears
  * standard Stripe processing. Both are computed here and nowhere else.
+ *
+ * The 5% is charged on the item price after discounts PLUS shipping (the
+ * "commission base"), on every plan and every checkout path, so moving price
+ * into shipping never lowers it. Tax is never part of it. Thread Cash and
+ * gift cards are ways of paying, not discounts: they never shrink it.
  */
 
-/** Brandthread's commission on merchandise, in basis points (500 bp = 5%). */
+/** Brandthread's commission on item + shipping, in basis points (500 bp = 5%). */
 export const PLATFORM_FEE_BPS = 500;
 
 /**
@@ -47,10 +52,17 @@ export function bpsOfCents(amountCents: number, bps: number): number {
   return Number((product + 5_000n) / 10_000n);
 }
 
-/** Brandthread's 5% commission on merchandise (after discounts). */
-export function platformFeeCents(merchandiseCents: number, feeBps: number = PLATFORM_FEE_BPS): number {
-  assertCents(merchandiseCents, "merchandiseCents");
-  return bpsOfCents(merchandiseCents, feeBps);
+/** Brandthread's 5% commission on a commission base (item after discounts + shipping). */
+export function platformFeeCents(commissionBaseCents: number, feeBps: number = PLATFORM_FEE_BPS): number {
+  assertCents(commissionBaseCents, "commissionBaseCents");
+  return bpsOfCents(commissionBaseCents, feeBps);
+}
+
+/** What the 5% is charged on: merchandise after discounts plus shipping. */
+export function commissionBaseCents(input: { merchandiseCents: number; shippingCents: number }): number {
+  assertCents(input.merchandiseCents, "merchandiseCents");
+  assertCents(input.shippingCents, "shippingCents");
+  return input.merchandiseCents + input.shippingCents;
 }
 
 /**
@@ -104,7 +116,10 @@ export function splitOrder(input: OrderSplitInput): OrderSplit {
   assertCents(input.grossCents, "grossCents");
 
   const merchandiseCents = Math.max(0, input.subtotalCents - input.discountCents);
-  const rawPlatformFee = platformFeeCents(merchandiseCents, input.platformFeeBps ?? PLATFORM_FEE_BPS);
+  const rawPlatformFee = platformFeeCents(
+    commissionBaseCents({ merchandiseCents, shippingCents: input.shippingCents }),
+    input.platformFeeBps ?? PLATFORM_FEE_BPS,
+  );
   const hasActualFee = input.processingFeeCents !== undefined && input.processingFeeCents !== null;
   if (hasActualFee) assertCents(input.processingFeeCents, "processingFeeCents");
   const rawProcessingFee = hasActualFee
@@ -127,20 +142,25 @@ export function splitOrder(input: OrderSplitInput): OrderSplit {
  * application_fee_amount for an in-stock destination charge. Stripe needs it
  * when the Checkout Session is created — before tax is known — so the
  * processing part is estimated on the pre-tax total. The ledger records the
- * difference between this estimate and Stripe's real fee.
+ * difference between this estimate and Stripe's real fee. The 5% is on
+ * merchandise + shipping, never more than the pre-tax total.
  */
 export function destinationApplicationFeeCents(input: {
+  /** Item subtotal after seller-funded discounts. */
   merchandiseCents: number;
+  /** Shipping charged to the buyer; part of the commission base. */
+  shippingCents: number;
   preTaxTotalCents: number;
   /** Seller-plan commission in bps; defaults to PLATFORM_FEE_BPS. */
   platformFeeBps?: number | null;
 }): { platformFeeCents: number; processingFeeEstimateCents: number; applicationFeeCents: number } {
   assertCents(input.merchandiseCents, "merchandiseCents");
   assertCents(input.preTaxTotalCents, "preTaxTotalCents");
-  const platformFee = Math.min(
-    platformFeeCents(input.merchandiseCents, input.platformFeeBps ?? PLATFORM_FEE_BPS),
+  const base = Math.min(
+    commissionBaseCents({ merchandiseCents: input.merchandiseCents, shippingCents: input.shippingCents }),
     input.preTaxTotalCents,
   );
+  const platformFee = platformFeeCents(base, input.platformFeeBps ?? PLATFORM_FEE_BPS);
   const processing = Math.min(
     estimateProcessingFeeCents(input.preTaxTotalCents),
     input.preTaxTotalCents - platformFee,

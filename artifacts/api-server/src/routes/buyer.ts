@@ -1037,6 +1037,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
       merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
+      shippingCents,
       preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
       platformFeeBps,
     });

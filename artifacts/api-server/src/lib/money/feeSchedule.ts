@@ -34,8 +34,8 @@ function intField(value: unknown, label: string, min: number, max: number): numb
 }
 
 /**
- * What a seller receives for one sale: platform fee on merchandise, estimated
- * processing on the whole charge (merchandise + shipping), via splitOrder.
+ * What a seller receives for one sale: platform fee and estimated processing
+ * both on the whole charge (merchandise + shipping), via splitOrder.
  */
 export function quoteSale(input: { priceCents: unknown; quantity?: unknown; shippingCents?: unknown }): FeeQuote {
   const priceCents = intField(input.priceCents, "priceCents", 0, MAX_QUOTE_CENTS);

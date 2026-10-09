@@ -279,6 +279,7 @@ export async function priceCartGroup(input: {
   const platformFeeBps = await resolveSellerPlatformFeeBps(sellerId);
   const fee = destinationApplicationFeeCents({
     merchandiseCents: Math.max(0, subtotalCents - discountCents),
+    shippingCents,
     preTaxTotalCents: Math.max(0, subtotalCents + shippingCents - discountCents),
     platformFeeBps,
   });
