@@ -22,7 +22,7 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   addToCart, createBuyNowSession, replaceCartItemVariant,
-  getCart,
+  getCart, warmCart,
 } from '@/services/cartService';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
@@ -566,6 +566,9 @@ export default function BuyerProductDetailScreen() {
   const cartFlyProgress = useRef(new Animated.Value(0)).current;
   const [flying, setFlying] = useState(false);
   const [flight, setFlight] = useState<{ source: CartFlightSource | null; target: CartFlightPoint } | null>(null);
+  // Confirm the bag against the server while the buyer browses, so "Add to
+  // bag" completes locally on the tap instead of waiting on a round trip.
+  useEffect(() => { warmCart(); }, []);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isReduceMotionEnabled?.()
