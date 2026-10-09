@@ -1605,7 +1605,6 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payout-setup" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payouts" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="fees"               options={{ headerShown: false, animation: 'ios_from_right' }} />

@@ -1,6 +1,7 @@
 /**
- * Hardcoded navigation targets in app source: the first path of every
- * router.push/replace/navigate, `pathname:`, `href`, `route:` string literal.
+ * Hardcoded navigation targets in app source: the path of every string
+ * literal passed to push/replace/navigate/nav(…) or set as `pathname:`,
+ * `href`, `route:`.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -9,7 +10,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE_DIRS = ['app', 'components', 'lib', 'hooks', 'contexts', 'services', 'constants'];
 
 const NAV_PATTERNS = [
-  /router\.(?:push|replace|navigate|dismissTo)\(\s*\(?\s*[`'"](\/[^`'"?#\s]*)/g,
+  // router.push(…), a local nav('/x') helper, … (`replace` only on a router:
+  // String.prototype.replace takes paths too).
+  /(?:\b(?:push|navigate|dismissTo|nav)|[rR]outer\.replace)\(\s*\(?\s*[`'"](\/[^`'"?#\s]*)/g,
   /\bpathname:\s*[`'"](\/[^`'"?#\s]*)/g,
   /\bhref(?:=\{?|:\s*)\s*\(?[`'"](\/[^`'"?#\s]*)/g,
   /\broute:\s*[`'"](\/[^`'"?#\s]*)/g,
