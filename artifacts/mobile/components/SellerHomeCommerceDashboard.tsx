@@ -80,6 +80,8 @@ import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTraff
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
 import { SellerDashboardAISuggestions } from '@/components/SellerDashboardAISuggestions';
+import { ReadyToSellChecklist } from '@/components/ReadyToSellChecklist';
+import { useReadyToSell } from '@/hooks/useReadyToSell';
 import {
   BG,
   FG,
@@ -663,6 +665,10 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
+  // Shopify's "Get ready to sell" until the first sale, then the sales hero.
+  // If the checklist can't load, the previous setup card stays as the fallback.
+  const readyToSell = useReadyToSell();
+  const showReadyToSell = newSeller && readyToSell.data !== null && !readyToSell.data.hasSale;
   const actionCounts: DashboardActionCounts | null = actionInputs ? {
     toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
@@ -800,6 +806,17 @@ export default function SellerHomeCommerceDashboard({
             </View>
           ) : (
             <>
+              {showReadyToSell && readyToSell.data ? (
+                <View style={styles.readyToSell}>
+                  <ReadyToSellChecklist
+                    data={readyToSell.data}
+                    hasPlan={readyToSell.hasPlan}
+                    onOpen={(route) => nav(route === '/add-product' ? withOrigin(route, 'dashboard') : route)}
+                    testID="seller-dashboard-ready-to-sell"
+                  />
+                </View>
+              ) : (
+              <>
               {/* ── Hero + scrubbable chart ────────────────────────────── */}
               <PressableScale onPress={() => setMetric('sales')} style={styles.heroWrap} accessibilityRole="button" accessibilityLabel="Show Total sales in the chart">
                 <Text style={[styles.heroLabel, { color: theme.muted }]}>
@@ -824,7 +841,9 @@ export default function SellerHomeCommerceDashboard({
                   <Text
                     style={[
                       styles.heroDelta,
-                      { color: deltaLine.direction === 'flat' ? theme.muted : theme.text },
+                      // Delta in silver for up, down and flat alike — the
+                      // arrow carries the direction, the hero number the weight.
+                      { color: theme.muted },
                     ]}
                   >
                     {deltaLine.label}
@@ -848,6 +867,8 @@ export default function SellerHomeCommerceDashboard({
                 emptyMessage={EMPTY_CHART_MESSAGE[range]}
                 showNowMarker={range === 'today'}
               />
+              </>
+              )}
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
               {!newSeller && (
@@ -903,7 +924,7 @@ export default function SellerHomeCommerceDashboard({
 
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
-                {newSeller ? (
+                {showReadyToSell ? null : newSeller ? (
                   <View style={[isTablet && styles.tabletRowItem, styles.section]}>
                     <SellerDashboardSetupCard
                       theme={theme}
@@ -978,7 +999,7 @@ export default function SellerHomeCommerceDashboard({
           {/* ── Setup checklist: "Continue setup" banner opens the guided
               walkthrough sheet, which owns the full task list — no separate
               inline checklist duplicated here. ──────────────────────────── */}
-          {!setupComplete && setupState.walkthroughShown && (
+          {!showReadyToSell && !setupComplete && setupState.walkthroughShown && (
             <View style={styles.section}>
               <SetupContinueBanner
                 percent={setupPercent}
@@ -988,7 +1009,8 @@ export default function SellerHomeCommerceDashboard({
             </View>
           )}
 
-          <LaunchChecklistCard />
+          {/* One setup list at a time: Get ready to sell replaces it for a new seller. */}
+          {!showReadyToSell && <LaunchChecklistCard />}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
@@ -1014,6 +1036,7 @@ export { DASHBOARD_RANGES };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
+  readyToSell: { marginTop: SP.sm },
   // flex: 1 on the ScrollView itself is required on iOS so the layout engine
   // gives it a bounded height and allows inner content to scroll correctly.
   scrollView: { flex: 1 },
