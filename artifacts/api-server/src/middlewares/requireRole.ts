@@ -27,6 +27,7 @@ import type { Request, RequestHandler } from "express";
 import { db, teamMembers, users } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { teamMembershipOrderBy } from "../lib/teamMembership";
+import { actsAsSelf, teamRouteRuleFor } from "./teamRouteRules";
 
 export type TeamRole =
   | "owner"
@@ -42,8 +43,11 @@ const ROLE_ORDER: Record<TeamRole, number> = {
   viewer: 0,
   staff: 1,
   orders: 1,
-  marketing: 1,
-  finance: 1,
+  // Marketing and finance members hold no orders/fulfilment permission
+  // (ROLE_PERMISSIONS below), so they must not pass the staff-ranked gates
+  // on order status, tracking, labels and shipping zones.
+  marketing: 0,
+  finance: 0,
   manager: 2,
   admin: 2,
   owner: 3,
@@ -51,6 +55,9 @@ const ROLE_ORDER: Record<TeamRole, number> = {
 
 /** The account owner is always granted full access to their own store. */
 export const TEAM_OWNER_BYPASS = true;
+
+/** Reads every member of a store may make (team rules gate the rest). */
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
  * Fine-grained capabilities, independent of the linear role hierarchy above.
@@ -172,7 +179,7 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
     (req as any).teamContext = ctx;
     (req as any).actorClerkId = ctx.actorClerkId;
     (req as any).actorRole = ctx.actorRole;
-    (req as any).clerkUserId = ctx.storeOwnerId;
+    (req as any).clerkUserId = (req as any).actAsSelf ? ctx.actorClerkId : ctx.storeOwnerId;
     return ctx;
   }
 
@@ -223,8 +230,9 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
   (req as any).teamContext = ctx;
   (req as any).actorClerkId = ctx.actorClerkId;
   (req as any).actorRole = ctx.actorRole;
-  // Act on the target store: downstream owner-scoped handlers keep working.
-  (req as any).clerkUserId = ctx.storeOwnerId;
+  // Act on the target store: downstream owner-scoped handlers keep working
+  // (unless this route acts for the signed-in person — see teamRouteRules.ts).
+  (req as any).clerkUserId = (req as any).actAsSelf ? ctx.actorClerkId : ctx.storeOwnerId;
   return ctx;
 }
 
@@ -233,6 +241,10 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
  * route's own path-literal param inference. */
 export function teamContext(): RequestHandler<any, any, any, any> {
   return async (req, res, next) => {
+    // Per-router team rules (middlewares/teamRouteRules.ts), looked up by the
+    // mount this middleware runs on.
+    const rule = teamRouteRuleFor(req.baseUrl);
+    if (actsAsSelf(rule, req.path)) (req as any).actAsSelf = true;
     try {
       await resolveTeamContext(req as Request);
     } catch (err) {
@@ -244,6 +256,15 @@ export function teamContext(): RequestHandler<any, any, any, any> {
         return;
       }
       throw err;
+    }
+    if ((req as any).actAsSelf) {
+      (req as any).clerkUserId = (req as any).actorClerkId ?? (req as any).clerkUserId;
+    } else if (rule?.writes && !SAFE_METHODS.has(req.method)) {
+      await requirePermission(rule.writes)(req, res, next);
+      return;
+    } else if (rule?.ownerWrites && !SAFE_METHODS.has(req.method)) {
+      await requireRole("owner")(req, res, next);
+      return;
     }
     next();
   };
